@@ -2670,5 +2670,123 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 47. A person is the same person across sittings (V1-PLAN L2i) ----
+  // A live tab's log is one sitting — this page load — shown under the person's
+  // name and colour. But the rule that asks "is this mine?" compared the exact
+  // log name, so after a reload the person was a stranger to their own ink: the
+  // field said *no label — <name> made this mark*, and core refused the word.
+  // The harness cannot reload its own page, so the sitting before the reload is
+  // a hand of this person's name under another suffix — what a reload leaves in
+  // the room — and this tab is the sitting after it; then the other way round,
+  // this tab draws and its next sitting labels. fern shares the room.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    const S = (x, y) => mm.worldToScreen(x, y);
+    const until47 = async (pred) => { for (let i = 0; i < 40 && !pred(); i++) await wait(50); };
+    const handIdOf47 = (name) => 'participant:hand:' + name.replace(/[^A-Za-z0-9._-]+/g, '_');
+    const named47 = (name) => MM.createSession(Object.assign({}, MM.DEFAULT_SESSION_CONFIG, { logName: name }));
+    const hub47 = new MM.LocalHub();
+    await mm.openLive('reload47', { transport: hub47.connect() });
+    const me47 = mm.folder().me;
+    const person47 = MM.handLabel(me47);
+    // The sitting before the reload: this person, another suffix (five letters, so
+    // never this page load's four). It drew a box in the room; fern drew a circle.
+    // Both are in the room before either sends, so each hears the other.
+    const prev47 = MM.sittingName(person47, 'prev1');
+    const prevSession47 = named47(prev47);
+    const prevStore47 = new MM.LiveStore(hub47.connect(), prev47, 'reload47');
+    const fern47 = named47('fern~f7');
+    const fernStore47 = new MM.LiveStore(hub47.connect(), 'fern~f7', 'reload47');
+    const box47 = prevSession47.addStroke(t.rect(200, 200, 160, 100).map((p) => ({ x: p.x, y: p.y })), Date.now() - 60000, undefined, 1);
+    await prevStore47.appendLog(prev47, prevSession47.getEvents().slice());
+    const kite47 = fern47.addStroke(t.circle(560, 250, 50).map((p) => ({ x: p.x, y: p.y })), Date.now() - 50000, undefined, 1);
+    await fernStore47.appendLog('fern~f7', fern47.getEvents().slice());
+    await until47(() => mm.session.getState().contentIds.includes(box47) && mm.session.getState().contentIds.includes(kite47));
+    await wait(60);
+    const st47 = mm.session.getState();
+    const prevHand47 = st47.nodes.get(handIdOf47(prev47));
+    step('47. after a reload the room brings back the box this person drew before it: the earlier sitting\'s mark, shown under this person\'s name',
+      person47 !== '' && prev47 !== me47 && st47.contentIds.includes(box47) && MM.authorOf(st47.nodes.get(box47)) === handIdOf47(prev47)
+        && !!prevHand47 && MM.wordOf(prevHand47) === person47,
+      { me: me47, person: person47, prev: prev47, maker: st47.nodes.get(box47) ? MM.authorOf(st47.nodes.get(box47)) : null, content: st47.contentIds });
+    // Held alone: the word goes on it — no longer *no label — <name> made this mark*.
+    const b47 = S(280, 250);
+    t.stroke(t.circle(b47.x, b47.y, 130)); t.takeLoop(b47.x, b47.y, 130); await wait(60);
+    const held47 = mm.session.getState().summon;
+    t.typeIn('label: inlet');
+    const line47 = t.readingLine();
+    const quiet47 = !!document.querySelector('#summon .reading.quiet');
+    const evs47 = mm.session.getEvents().length;
+    t.typeEnter('label: inlet'); await wait(60);
+    const s47 = mm.session.getState();
+    const lab47 = mm.session.getEvents().slice(evs47).filter((e) => e.type === 'label');
+    const status47 = document.getElementById('status').textContent;
+    step('47a. held after the reload, the box drawn before it is this person\'s to label: the line says the word goes on it, before Enter',
+      !!held47 && held47.enclosedIds.length === 1 && held47.enclosedIds[0] === box47 && line47 === '↵ label it “inlet”' && !quiet47,
+      { held: held47 && held47.enclosedIds, line: line47, quiet: quiet47 });
+    step('47b. Enter puts the word on it — one label event, this sitting\'s — and the box is still the earlier sitting\'s mark: the rule changed, not whose it is',
+      lab47.length === 1 && lab47[0].nodeId === box47 && !lab47[0].by && (MM.labelOf(s47.nodes.get(box47)) || {}).text === 'inlet'
+        && MM.labelOf(s47.nodes.get(box47)).source === MM.LOCAL_PARTICIPANT && MM.authorOf(s47.nodes.get(box47)) === handIdOf47(prev47)
+        && /labelled it “inlet”/.test(status47),
+      { labels: lab47, label: MM.labelOf(s47.nodes.get(box47)) || null, maker: MM.authorOf(s47.nodes.get(box47)), status: status47, stale: s47.staleResult });
+    // The word reaches the room: every board holds it on the box.
+    await mm.saveNow(); await wait(150);
+    const room47 = await fernStore47.readLogs();
+    const boardOf47 = (me, own) => {
+      const s = named47(me);
+      s.load(MM.mergeLogs(Object.assign({}, room47, own ? { [me]: own } : {}), { me }));
+      return s.getState();
+    };
+    const boards47 = [
+      ['the earlier sitting\'s', boardOf47(prev47, prevSession47.getEvents().filter((e) => !e.by))],
+      ['fern\'s', boardOf47('fern~f7', fern47.getEvents().filter((e) => !e.by))],
+      ['a third reader\'s', boardOf47('cleo~c7', null)],
+    ];
+    step('47c. the word reaches the room: on the earlier sitting\'s board — a tab still open — on fern\'s and on a third reader\'s, it stands on the box',
+      boards47.every(([, s]) => (MM.labelOf(s.nodes.get(box47)) || {}).text === 'inlet' && MM.labelOf(s.nodes.get(box47)).source === handIdOf47(me47)),
+      { boards: boards47.map(([who, s]) => ({ who, label: s.nodes.get(box47) ? MM.labelOf(s.nodes.get(box47)) || null : 'no box' })), room: Object.keys(room47) });
+    // Held with fern's circle: another person is refused as before, said before Enter and after it.
+    const c47 = S(420, 250);
+    t.stroke(t.circle(c47.x, c47.y, 250)); t.takeLoop(c47.x, c47.y, 250); await wait(60);
+    const heldBoth47 = mm.session.getState().summon;
+    t.typeIn('label: outlet');
+    const lineBoth47 = t.readingLine();
+    const evsBoth47 = mm.session.getEvents().length;
+    t.typeEnter('label: outlet'); await wait(60);
+    const sBoth47 = mm.session.getState();
+    const labBoth47 = mm.session.getEvents().slice(evsBoth47).filter((e) => e.type === 'label');
+    const statusBoth47 = document.getElementById('status').textContent;
+    step('47d. held with fern\'s circle, the word goes on this person\'s box and not on hers — another person is refused as before, said before Enter and after it',
+      !!heldBoth47 && heldBoth47.enclosedIds.length === 2 && [box47, kite47].every((id) => heldBoth47.enclosedIds.includes(id))
+        && lineBoth47 === '↵ label it “outlet” — on yours, not the mark fern made'
+        && labBoth47.length === 1 && labBoth47[0].nodeId === box47 && (MM.labelOf(sBoth47.nodes.get(box47)) || {}).text === 'outlet' && !MM.labelOf(sBoth47.nodes.get(kite47))
+        && /labelled it “outlet”/.test(statusBoth47) && /not on the mark fern made/.test(statusBoth47),
+      { held: heldBoth47 && heldBoth47.enclosedIds, line: lineBoth47, labels: labBoth47.map((e) => e.nodeId), status: statusBoth47 });
+    // And the other way round: this tab draws in the room, and its next sitting — as
+    // after the next reload — puts a word on what it drew; the word lands here.
+    const d0 = S(800, 200), d1 = S(920, 280);
+    t.stroke(t.rect(d0.x, d0.y, d1.x - d0.x, d1.y - d0.y));
+    const drawn47 = mm.session.getState().contentIds[mm.session.getState().contentIds.length - 1];
+    await mm.saveNow(); await wait(150);
+    const next47 = MM.sittingName(person47, 'next1');
+    const nextSession47 = named47(next47);
+    nextSession47.load(MM.mergeLogs(Object.assign({}, await fernStore47.readLogs(), { [next47]: [] }), { me: next47 }));
+    const worded47 = nextSession47.label({ nodeId: drawn47, text: 'cap', at: Date.now() });
+    const nextStore47 = new MM.LiveStore(hub47.connect(), next47, 'reload47');
+    await nextStore47.appendLog(next47, nextSession47.getEvents().filter((e) => !e.by));
+    await until47(() => !!MM.labelOf(mm.session.getState().nodes.get(drawn47)));
+    await wait(60);
+    const drawnNode47 = mm.session.getState().nodes.get(drawn47);
+    const drawnLab47 = (typeof mm.labelsDrawn === 'function' ? mm.labelsDrawn() : []).find((l) => l.id === drawn47);
+    step('47e. and the other way round: a box this tab drew in the room is its person\'s next sitting\'s to label — the word lands here, beside it, this tab\'s mark still',
+      !!drawn47 && worded47 === drawn47 && !!drawnNode47 && MM.authorOf(drawnNode47) === MM.LOCAL_PARTICIPANT
+        && (MM.labelOf(drawnNode47) || {}).text === 'cap' && MM.labelOf(drawnNode47).source === handIdOf47(next47)
+        && !!drawnLab47 && drawnLab47.text === 'cap' && drawnLab47.who === person47,
+      { drawn: drawn47, worded: worded47, stale: nextSession47.getState().staleResult, label: drawnNode47 ? MM.labelOf(drawnNode47) || null : null, drawnLabel: drawnLab47 || null });
+    prevStore47.close(); fernStore47.close(); nextStore47.close();
+    if (mm.folder().store && mm.folder().store.close) mm.folder().store.close();
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };

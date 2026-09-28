@@ -16,6 +16,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+// The committed core bundle, for the one test below that composes the reader with
+// core's rule the way the adapter does (V1-PLAN L2i). The reader itself still names nothing.
+import * as MM from '../metamedium-core.node.mjs';
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '09-field.js'), 'utf8');
 const { readFieldCommand, verbFor, libraryMatch, typedWord } = new Function(
@@ -219,6 +222,43 @@ test('label: with nothing after it, or nothing held to put it on, asks quietly',
   const bare = readFieldCommand({ text: 'label: inlet', open: true, items: [] });
   assert.equal(bare.kind, 'label');
   assert.equal(bare.command, null);
+});
+
+// ---- A person is the same person across sittings (V1-PLAN L2i) ----
+// The reader is told how many of the held marks are the person's own; the adapter
+// (`whoseInk` in 09-palette.js) asks core for each — the label door's own question,
+// `session.isMine`. Composed here as the adapter composes them, with the committed
+// core bundle: john draws in one sitting, the page reloads, and in the next sitting
+// the marks he drew before it are still his to label. fern's are not.
+
+test('label: after a reload the line counts the marks drawn before it as the person\'s own, and names only another person\'s', () => {
+  const named = (logName) => MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG, logName });
+  /** A 100 × 60 box at x, as a hand draws one: twenty points a side. */
+  const box = (x) => [[0, 0], [100, 0], [100, 60], [0, 60], [0, 0]].flatMap(([px, py], i, a) =>
+    i ? Array.from({ length: 20 }, (_, k) => ({ x: x + a[i - 1][0] + ((px - a[i - 1][0]) * k) / 20, y: a[i - 1][1] + ((py - a[i - 1][1]) * k) / 20 })) : []);
+  const a1 = named('john~a1'), fern = named('fern~x1');
+  const before = [a1.addStroke(box(0), 1000, undefined, 1, { content: true }), a1.addStroke(box(200), 1100, undefined, 1, { content: true })];
+  const hers = fern.addStroke(box(400), 1200, undefined, 1, { content: true });
+  // The reload: a new sitting, which hears the room and draws one more box.
+  const b2 = named('john~b2');
+  b2.load(MM.mergeLogs({ 'john~a1': a1.getEvents().slice(), 'fern~x1': fern.getEvents().slice(), 'john~b2': [] }, { me: 'john~b2' }));
+  const after = b2.addStroke(box(600), 2000, undefined, 1, { content: true });
+  const s = b2.getState();
+  // Who made a mark, by name — the attribution the adapter already shows.
+  const makerName = (id) => MM.wordOf(s.nodes.get(MM.authorOf(s.nodes.get(id)))) || 'another hand';
+  const marksOf = (ids) => {
+    const out = { mine: 0, others: [] };
+    for (const id of ids) {
+      if (b2.isMine(id)) out.mine++;
+      else out.others.push(makerName(id));
+    }
+    return out;
+  };
+  const line = (ids) => readFieldCommand(ctx({ text: 'label: inlet', marks: marksOf(ids) })).line;
+  assert.equal(line([before[0]]), '↵ label it “inlet”');
+  assert.equal(line([...before, after]), '↵ label it “inlet” — on each of your 3 marks');
+  assert.equal(line([...before, hers]), '↵ label it “inlet” — on your 2, not the mark fern made');
+  assert.equal(line([hers]), '↵ no label — fern made this mark; a label goes on your own ink');
 });
 
 // The row offers a typed word two ways, side by side: Name it (one thing, a

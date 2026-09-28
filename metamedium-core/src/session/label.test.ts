@@ -5,7 +5,7 @@
 // pin the difference, and the shape a label takes: a rep on the mark, never
 // an artifact, never a file.
 import { describe, it, expect } from 'vitest';
-import { createSession, DEFAULT_SESSION_CONFIG, type Session } from './session';
+import { createSession, DEFAULT_SESSION_CONFIG, type Session, type SessionEvent } from './session';
 import { LOCAL_PARTICIPANT, ENGINE_PARTICIPANT, authorOf, labelOf, labelsOf, wordOf, resemblances, isWord, lettersOf } from './nodes';
 import { interpretationsOf } from './interpretations';
 import { mergeLogs } from '../store/merge';
@@ -532,5 +532,163 @@ describe('a word is made by whoever wrote its letters (V1-PLAN L2g)', () => {
       expect(node.edges.map((e) => e.rel)).toEqual(['made-by', 'has-part', 'has-part', 'has-part', 'has-part', 'resembles']);
       expect(s.label({ nodeId: word, text: 'nav', at: 3000 })).toBe(word);
     }
+  });
+});
+
+// ===== A person is the same person across sittings (V1-PLAN L2i) ============
+// A live hand's log is one SITTING — a page load, a process (L1) — named
+// `person~suffix` (`sittingName`) and shown under the person's name and colour
+// (`handLabel`). But the rules that ask "is this mine?" compared the exact log
+// name, so after a reload a person could no longer label the marks they drew
+// before it: core refused `not-your-ink` — "that mark was made by john", said
+// to john — and the field said *no label — john made this mark*. A reload must
+// not make someone a stranger to their own ink.
+//
+// Those rules compare the PERSON — the log name without its sitting's suffix —
+// so every sitting of one person may label that person's marks, on every board,
+// and another person's are refused as before. What stays per sitting: the logs,
+// their participants, ids and numbering (L1), and gestures (L2h,
+// gesture-hands.test.ts). Attribution was already the person's and is unchanged.
+
+/** A hand's own log: the session's unstamped events, as a tab sends them. */
+const own = (s: Session) => s.getEvents().filter((e) => !e.by);
+/** The participant a log's events are attributed to on a board that is not its own. */
+const handIdOf = (logName: string) => 'participant:hand:' + logName.replace(/[^A-Za-z0-9._-]+/g, '_');
+
+describe('a person is the same person across sittings (V1-PLAN L2i)', () => {
+  it('after a reload, john labels a mark he drew before it: accepted at the door, and it stands on every board', () => {
+    const a1 = hand('john~a1');
+    const box1 = a1.addStroke(box(0, 0, 100, 60), 1000, undefined, 1, { content: true });
+    // The reload: a new sitting with no memory of the first, which hears the room.
+    const b2 = hand('john~b2');
+    b2.load(mergeLogs({ 'john~a1': own(a1), 'john~b2': [] }, { me: 'john~b2' }));
+    // Attribution is what it was: the mark is the earlier sitting's, shown as john.
+    const before = b2.getState();
+    expect(authorOf(before.nodes.get(box1)!)).toBe(handIdOf('john~a1'));
+    expect(wordOf(before.nodes.get(handIdOf('john~a1'))!)).toBe('john');
+
+    expect(b2.label({ nodeId: box1, text: 'inlet', at: 2000 })).toBe(box1);
+    expect(b2.getState().staleResult).toBeNull();
+    expect(labelOf(b2.getState().nodes.get(box1)!)).toEqual({ text: 'inlet', source: LOCAL_PARTICIPANT, at: 2000 });
+    // Still the earlier sitting's mark: the rule changed, not whose it is.
+    expect(authorOf(b2.getState().nodes.get(box1)!)).toBe(handIdOf('john~a1'));
+
+    // Every board replays it the same: the earlier sitting's own (a tab still
+    // open), the later one's, and another person's — the logs in either order.
+    const boards: [string, Record<string, SessionEvent[]>, string][] = [
+      ['john~a1', { 'john~a1': own(a1), 'john~b2': own(b2) }, handIdOf('john~b2')],
+      ['john~b2', { 'john~a1': own(a1), 'john~b2': own(b2) }, LOCAL_PARTICIPANT],
+      ['fern~x1', { 'john~a1': own(a1), 'john~b2': own(b2) }, handIdOf('john~b2')],
+      ['fern~x1', { 'john~b2': own(b2), 'john~a1': own(a1) }, handIdOf('john~b2')],
+    ];
+    for (const [me, logs, writer] of boards) {
+      const board = hand(me);
+      board.load(mergeLogs(logs, { me }));
+      const node = board.getState().nodes.get(box1)!;
+      expect(labelOf(node)?.text).toBe('inlet');
+      expect(labelOf(node)?.source).toBe(writer);
+    }
+  });
+
+  it('what he drew in either sitting is his in the other: the earlier tab, still open, labels what the later one drew', () => {
+    // Two tabs of one person, both open: each may put a word on the other's ink.
+    const a1 = hand('john~a1'), b2 = hand('john~b2');
+    const first = a1.addStroke(box(0, 0, 100, 60), 1000, undefined, 1, { content: true });
+    const second = b2.addStroke(box(300, 0, 100, 60), 1100, undefined, 1, { content: true });
+    a1.load(mergeLogs({ 'john~a1': own(a1), 'john~b2': own(b2) }, { me: 'john~a1' }));
+    b2.load(mergeLogs({ 'john~a1': own(a1), 'john~b2': own(b2) }, { me: 'john~b2' }));
+    expect(a1.label({ nodeId: second, text: 'outlet', at: 2000 })).toBe(second);
+    expect(b2.label({ nodeId: first, text: 'inlet', at: 2001 })).toBe(first);
+    for (const me of ['john~a1', 'john~b2', 'fern~x1']) {
+      const board = hand(me);
+      board.load(mergeLogs({ 'john~a1': own(a1), 'john~b2': own(b2) }, { me }));
+      const s = board.getState();
+      expect(labelOf(s.nodes.get(first)!)?.text).toBe('inlet');
+      expect(labelOf(s.nodes.get(second)!)?.text).toBe('outlet');
+    }
+  });
+
+  it('a thing he blessed and a word he wrote in one sitting are his to label in the next', () => {
+    const a1 = hand('john~a1');
+    const { artifact } = pairOf(a1, 0, 1000, 'pair');
+    const { word } = print(a1, 100, 300, 2000);
+    const b2 = hand('john~b2');
+    b2.load(mergeLogs({ 'john~a1': own(a1), 'john~b2': [] }, { me: 'john~b2' }));
+    expect(authorOf(b2.getState().nodes.get(artifact)!)).toBe(handIdOf('john~a1'));
+    expect(authorOf(b2.getState().nodes.get(word)!)).toBe(handIdOf('john~a1'));
+    expect(b2.label({ nodeId: artifact, text: 'inlet', at: 5000 })).toBe(artifact);
+    expect(b2.label({ nodeId: word, text: 'nav', at: 5001 })).toBe(word);
+    for (const me of ['john~a1', 'john~b2', 'fern~x1']) {
+      const board = hand(me);
+      board.load(mergeLogs({ 'john~a1': own(a1), 'john~b2': own(b2) }, { me }));
+      const s = board.getState();
+      expect(labelOf(s.nodes.get(artifact)!)?.text).toBe('inlet');
+      expect(labelOf(s.nodes.get(word)!)?.text).toBe('nav');
+    }
+  });
+
+  it('another person is refused as before — at the door with whose it is, and on replay on every board', () => {
+    const a1 = hand('john~a1');
+    const box1 = a1.addStroke(box(0, 0, 100, 60), 1000, undefined, 1, { content: true });
+    // fern, and johnny — whose name only begins like his — are other people.
+    for (const other of ['fern~x1', 'johnny~z1']) {
+      const s = hand(other);
+      s.load(mergeLogs({ 'john~a1': own(a1), [other]: [] }, { me: other }));
+      const before = s.getEvents().length;
+      expect(s.label({ nodeId: box1, text: 'mine now', at: 2000 })).toBeNull();
+      const stale = s.getState().staleResult!;
+      expect(stale.reason).toBe('not-your-ink');
+      expect(stale.detail).toContain('made by john');
+      expect(s.getEvents().length).toBe(before);
+    }
+    // A log of hers that carries one anyway is dropped on every board — his two sittings', hers, a third's.
+    const forged = [{ type: 'label' as const, nodeId: box1, text: 'mine now', at: 2000 }];
+    for (const me of ['john~a1', 'john~b2', 'fern~x1', 'cleo~c1']) {
+      const board = hand(me);
+      board.load(mergeLogs({ 'john~a1': own(a1), 'fern~x1': forged }, { me }));
+      expect(labelOf(board.getState().nodes.get(box1)!)).toBeUndefined();
+    }
+    // And a later sitting of his may not label hers.
+    const fern = hand('fern~x1');
+    const hers = fern.addStroke(box(300, 0, 100, 60), 1100, undefined, 1, { content: true });
+    const b2 = hand('john~b2');
+    b2.load(mergeLogs({ 'john~a1': own(a1), 'fern~x1': own(fern), 'john~b2': [] }, { me: 'john~b2' }));
+    expect(b2.label({ nodeId: hers, text: 'mine now', at: 3000 })).toBeNull();
+    expect(b2.getState().staleResult!.reason).toBe('not-your-ink');
+    expect(b2.getState().staleResult!.detail).toContain('made by fern');
+  });
+
+  it('what stays per sitting: two logs, two participants, and each its own numbering — the rule merges no one', () => {
+    const a1 = hand('john~a1');
+    const x = a1.addStroke(box(0, 0, 100, 60), 1000, undefined, 1, { content: true });
+    const b2 = hand('john~b2');
+    b2.load(mergeLogs({ 'john~a1': own(a1), 'john~b2': [] }, { me: 'john~b2' }));
+    const y = b2.addStroke(box(300, 0, 100, 60), 2000, undefined, 1, { content: true });
+    // Each sitting numbers its own marks, from its own name: no number is reused.
+    expect(x).toBe('stroke:john~a1:1');
+    expect(y).toBe('stroke:john~b2:1');
+    const fern = hand('fern~x1');
+    fern.load(mergeLogs({ 'john~a1': own(a1), 'john~b2': own(b2), 'fern~x1': [] }, { me: 'fern~x1' }));
+    const s = fern.getState();
+    // Two sittings are two hands on her board, both shown as john.
+    expect(s.participants).toContain(handIdOf('john~a1'));
+    expect(s.participants).toContain(handIdOf('john~b2'));
+    expect(authorOf(s.nodes.get(x)!)).toBe(handIdOf('john~a1'));
+    expect(authorOf(s.nodes.get(y)!)).toBe(handIdOf('john~b2'));
+    expect(wordOf(s.nodes.get(handIdOf('john~a1'))!)).toBe('john');
+    expect(wordOf(s.nodes.get(handIdOf('john~b2'))!)).toBe('john');
+  });
+
+  it('a board never told what its log is called compares hands exactly, as it always did', () => {
+    // An unnamed board is no sitting of anyone: nothing of another log's is its own.
+    const a1 = hand('john~a1');
+    const box1 = a1.addStroke(box(0, 0, 100, 60), 1000, undefined, 1, { content: true });
+    const bare = createSession();
+    bare.load(mergeLogs({ 'john~a1': own(a1), me: [] }, { me: 'me' }));
+    expect(bare.label({ nodeId: box1, text: 'inlet', at: 2000 })).toBeNull();
+    expect(bare.getState().staleResult!.reason).toBe('not-your-ink');
+    // Its own ink is still its own.
+    const mine = bare.addStroke(box(300, 0, 100, 60), 2100, undefined, 1, { content: true });
+    expect(bare.label({ nodeId: mine, text: 'outlet', at: 2200 })).toBe(mine);
   });
 });

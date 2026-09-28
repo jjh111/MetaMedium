@@ -274,3 +274,69 @@ describe('gestures are per hand (V1-PLAN L2h)', () => {
     }
   });
 });
+
+// ===== Two sittings of one person are two hands (V1-PLAN L2i) ===============
+// After a reload a person is the same person to the rules that ask "is this
+// mine?" (label.test.ts) — but two tabs of one person draw independently, so a
+// sitting's gestures stay its own, keyed by the sitting's hand (`handOf`) and
+// never by the person. Keyed by the person, his stroke in one tab would
+// dissolve his field in the other, and a loop waiting in one would be dropped
+// by a box drawn in the other.
+
+/** A sitting's hand on a board: the reader's own, or the hand its log name is attributed to. */
+const sittingOn = (reader: string, writer: string) =>
+  reader === writer ? LOCAL_PARTICIPANT : 'participant:hand:' + writer.replace(/[^A-Za-z0-9._-]+/g, '_');
+
+describe('two sittings of one person are two hands (V1-PLAN L2i)', () => {
+  it('his field in one tab survives his strokes in the other, and its bless makes that tab\'s thing, on every board', () => {
+    const a1 = hand('john~a1');
+    const boxes = ROW.map((pts, i) => a1.addStroke(pts, 1000 + 400 * i));
+    const loop = a1.addStroke(LOOP, 3000);
+    const check = a1.addStroke(CHECK, 3500);
+    const artifact = a1.bless({ summonId: a1.getState().summon!.id, name: 'row', at: 6000 })!;
+    // His second tab draws at the moment of the check, and between it and the bless.
+    const b2 = hand('john~b2');
+    const his = [b2.addStroke(rectStroke(1200, 900, 100, 60), 3500), b2.addStroke(rectStroke(1400, 900, 100, 60), 4500)];
+    const logs = { 'john~a1': a1.getEvents().slice(), 'john~b2': b2.getEvents().slice() };
+    for (const me of ['john~a1', 'john~b2', 'fern~x1']) {
+      const s = board(me, logs);
+      const st = s.getState();
+      expect(st.artifacts).toEqual([artifact]);
+      expect(membersOf(s, artifact)).toEqual([...boxes].sort());
+      expect(authorOf(st.nodes.get(artifact)!)).toBe(sittingOn(me, 'john~a1'));
+      expect(gestureOf(s, loop)).toEqual({ role: 'lasso' });
+      expect(gestureOf(s, check)).toEqual({ role: 'check' });
+      for (const id of his) {
+        expect(st.contentIds).toContain(id);
+        expect(authorOf(st.nodes.get(id)!)).toBe(sittingOn(me, 'john~b2'));
+      }
+      expect(st.summon).toBeNull();
+    }
+  });
+
+  it('his loop in one tab waits for that tab\'s check, whatever the other tab drew in between; and the look-back is the tab\'s own', () => {
+    const a1 = hand('john~a1');
+    const boxes = ROW.map((pts, i) => a1.addStroke(pts, 1000 + 400 * i));
+    const loop = a1.addStroke(LOOP, 3000);
+    const b2 = hand('john~b2');
+    // His other tab draws a box right beside the row between the loop and its check.
+    const his = b2.addStroke(rectStroke(670, 100, 150, 120), 3200);
+    const check = a1.addStroke(CHECK, 3500);
+    const logs = { 'john~a1': a1.getEvents().slice(), 'john~b2': b2.getEvents().slice() };
+    for (const me of ['john~a1', 'john~b2', 'fern~x1']) {
+      const s = board(me, logs);
+      expect(gestureOf(s, loop)).toEqual({ role: 'lasso' });
+      expect(gestureOf(s, check)).toEqual({ role: 'check' });
+      expect(s.getState().contentIds).toContain(his);
+    }
+    const first = board('john~a1', logs).getState();
+    expect(first.summon!.scopeSource).toBe('lasso');
+    expect([...first.summon!.enclosedIds].sort()).toEqual([...boxes].sort());
+    // What each tab was just doing is its own.
+    expect(first.recentIds).not.toContain(his);
+    const second = board('john~b2', logs).getState();
+    expect(second.summon).toBeNull();
+    expect(second.pendingLassoId).toBeNull();
+    expect(second.recentIds).toEqual([his]);
+  });
+});
