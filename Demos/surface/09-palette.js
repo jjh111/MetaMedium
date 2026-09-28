@@ -84,6 +84,8 @@
       run: () => takeOffer(o),
     };
     if (o.lead) item.certain = true;
+    // An act Enter may take with nothing typed (U1e): what the row shows — never a typed-only offer.
+    if (!o.hidden) item.act = true;
     if (o.name !== undefined) item.name = o.name;
     if (o.line !== undefined) item.line = o.line;
     return item;
@@ -126,6 +128,7 @@
         key: 'line:' + line.ids.join(','), grounds: { on: 'written', confidence: line.confidence, why: 'read from your handwriting by ' + nameOfParticipant(line.said[0].source) },
         label: '“' + line.text + '” ' + line.confidence.toFixed(2), name: line.text,
         why: allWriting ? 'the line you wrote — take it as text, here; the ink stays underneath' : 'the line you wrote — ' + MM.NAMING_IS + ' — take it as the name',
+        act: allWriting, // text where it is is an act; a name is a tap (U1e)
         run: () => { if (allWriting) writingToText(sum, line.text); else session.bless({ summonId: sum.id, name: line.text, at: Date.now() }); },
       }));
     }
@@ -138,6 +141,7 @@
           key: 'said:' + r.id, grounds: { on: 'written', confidence: t.confidence, why: 'read from your handwriting by ' + nameOfParticipant(t.source) },
           label: '“' + t.text + '” ' + t.confidence.toFixed(2), name: t.text,
           why: r.targets.length ? 'the word beside it — ' + MM.NAMING_IS + ' — take it as the name' : allWriting ? 'the word you wrote — take it as text, here; the ink stays underneath' : 'the word you wrote — ' + MM.NAMING_IS + ' — take it as the name',
+          act: allWriting && !r.targets.length,
           run: () => { if (allWriting && !r.targets.length) writingToText(sum, t.text); else session.bless({ summonId: sum.id, name: t.text, at: Date.now() }); },
         }));
       }
@@ -199,7 +203,7 @@
         key: concept ? concept.key : 'writing', grounds: { on: 'concept', confidence: conf, why: concept ? concept.groupWhy : 'writing, unread' },
         label: 'writing' + (conf ? ' ' + conf.toFixed(2) : ''), name: 'writing',
         why: readOffer.why + ' — read it',
-        tier: 2, asks: 'model', tool: 'read', verbs: ['writing'],
+        tier: 2, asks: 'model', tool: 'read', verbs: ['writing'], act: true,
         enter: 'read it' + (need ? ' — ' + need + ': it is kept, and runs when one joins' : ''),
         run: () => readOffer.run(),
       });

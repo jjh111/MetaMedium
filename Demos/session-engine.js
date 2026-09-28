@@ -4687,6 +4687,8 @@
    * @property {boolean} [certain]  a reading of these marks (the top row), not an affordance
    * @property {string} [why]       the tooltip; the reader quotes it when the offer is disabled
    * @property {boolean} [disabled] offered, but not available on this selection
+   * @property {boolean} [act]      an act Enter may take with nothing typed: an offer the row
+   *                                 shows, or a reading whose taking acts rather than names (U1e)
    * @property {string} [enter]     what Enter does when this item leads, said in the line
    *                                 instead of "take it as the name" (W2: writing is read)
    * @property {*} [asks]           truthy when taking it asks a model: the line carries the dot
@@ -4809,16 +4811,20 @@
 
     if (!c.open) return { kind: 'empty', line: '', command: null };
 
-    // Nothing typed: Enter takes the leading reading, if these marks have one.
+    // Nothing typed: Enter takes the likely act — the first act in the ranked order, which is
+    // the top the context holds steady (U1e; V1-PLAN §2.2) — never a reading as a name. A
+    // reading is taken as the name by tapping it, or by `name:`. It used to be Enter's: the
+    // default act on a drawing was to rename it after a category (audit row 4).
     if (!text) {
-      const first = items.find((i) => i.certain);
-      if (first) {
-        // A reading that says what taking it does (writing: read it, W2) says that; the rest are taken as the name.
-        const line = '↵ ' + (first.enter || first.label + ' — ' + String(first.why || '').split(' — ').pop());
-        const out = { kind: 'default', line: line, command: take(first) };
-        if (first.asks) out.model = true;
+      const act = items.find((i) => i.act && !i.disabled);
+      if (act) {
+        // A reading whose taking acts says what it does (writing: read it, W2; as text, here).
+        const line = '↵ ' + (act.enter || (act.certain ? act.label + ' — ' + String(act.why || '').split(' — ').pop() : act.label));
+        const out = { kind: 'default', line: line, command: take(act) };
+        if (act.asks) out.model = true;
         return out;
       }
+      if (items.some((i) => i.certain)) return { kind: 'empty', line: '↵ nothing yet — tap a reading to take it as the name', quiet: true, command: null };
       return { kind: 'empty', line: '', quiet: true, command: null };
     }
 
@@ -5023,6 +5029,8 @@
       run: () => takeOffer(o),
     };
     if (o.lead) item.certain = true;
+    // An act Enter may take with nothing typed (U1e): what the row shows — never a typed-only offer.
+    if (!o.hidden) item.act = true;
     if (o.name !== undefined) item.name = o.name;
     if (o.line !== undefined) item.line = o.line;
     return item;
@@ -5065,6 +5073,7 @@
         key: 'line:' + line.ids.join(','), grounds: { on: 'written', confidence: line.confidence, why: 'read from your handwriting by ' + nameOfParticipant(line.said[0].source) },
         label: '“' + line.text + '” ' + line.confidence.toFixed(2), name: line.text,
         why: allWriting ? 'the line you wrote — take it as text, here; the ink stays underneath' : 'the line you wrote — ' + MM.NAMING_IS + ' — take it as the name',
+        act: allWriting, // text where it is is an act; a name is a tap (U1e)
         run: () => { if (allWriting) writingToText(sum, line.text); else session.bless({ summonId: sum.id, name: line.text, at: Date.now() }); },
       }));
     }
@@ -5077,6 +5086,7 @@
           key: 'said:' + r.id, grounds: { on: 'written', confidence: t.confidence, why: 'read from your handwriting by ' + nameOfParticipant(t.source) },
           label: '“' + t.text + '” ' + t.confidence.toFixed(2), name: t.text,
           why: r.targets.length ? 'the word beside it — ' + MM.NAMING_IS + ' — take it as the name' : allWriting ? 'the word you wrote — take it as text, here; the ink stays underneath' : 'the word you wrote — ' + MM.NAMING_IS + ' — take it as the name',
+          act: allWriting && !r.targets.length,
           run: () => { if (allWriting && !r.targets.length) writingToText(sum, t.text); else session.bless({ summonId: sum.id, name: t.text, at: Date.now() }); },
         }));
       }
@@ -5138,7 +5148,7 @@
         key: concept ? concept.key : 'writing', grounds: { on: 'concept', confidence: conf, why: concept ? concept.groupWhy : 'writing, unread' },
         label: 'writing' + (conf ? ' ' + conf.toFixed(2) : ''), name: 'writing',
         why: readOffer.why + ' — read it',
-        tier: 2, asks: 'model', tool: 'read', verbs: ['writing'],
+        tier: 2, asks: 'model', tool: 'read', verbs: ['writing'], act: true,
         enter: 'read it' + (need ? ' — ' + need + ': it is kept, and runs when one joins' : ''),
         run: () => readOffer.run(),
       });

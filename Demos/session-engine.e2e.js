@@ -2299,7 +2299,7 @@ window.__scenario = async function(){
     if (labelPill) labelPill.dispatchEvent(new MouseEvent('mouseleave'));
     const after = t.readingLine();
     step('42h. pointed at, Label it says in the reading line what it will do — no badge, no new row — and the line is Enter\'s again when the pointer leaves',
-      pointed === '↵ label it “Pricing” — on your ink; makes nothing' && after === before && /take it as the name/.test(before),
+      pointed === '↵ label it “Pricing” — on your ink; makes nothing' && after === before && before !== pointed && before === mm.readField('').line,
       { before, pointed, after });
     const arts = mm.session.getState().artifacts.length, lib = mm.libraryEntries().length, evs = mm.session.getEvents().length;
     if (labelPill) labelPill.click();
