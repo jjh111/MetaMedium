@@ -23,7 +23,10 @@ import type { NotationReading } from './notation';
 import { drawFlowchart, drawWireframe, drawMolecule, drawWriting, FLOWCHART_VARIANTS } from './fixtures/flowchart';
 import type { Expected } from './fixtures/flowchart';
 import { handShape, boxCorners, diamondCorners, diamondTopBottom } from './fixtures/hand';
-import { handArrow } from '../test/strokes';
+import { handArrow, inkOf } from '../test/strokes';
+import { cleanOf, cleanPointsOf } from '../session/clean';
+import { getRep, strokePointsOf } from '../session/nodes';
+import type { MMNode } from '../session/nodes';
 
 const sameSet = (a: readonly string[], b: readonly string[]) => [...a].sort().join('|') === [...b].sort().join('|');
 
@@ -39,6 +42,27 @@ const count = (t: Tally, ok: boolean, why: string) => {
   else t.wrong.push(why);
 };
 const rate = (t: Tally) => `${t.right}/${t.n} (${t.n ? ((t.right / t.n) * 100).toFixed(0) : '—'}%)`;
+
+const atOf = (n: MMNode) => (getRep(n, 'stroke')!.data as { at: number }).at;
+
+/**
+ * *Draw them clean* on every mark, and the board drawn again as it then
+ * shows — each clean form in front, where the surface draws it, and the ink
+ * of every mark that has none — so the notation can read what the human now
+ * sees (S1). Returns the new board and each old stroke's id on it.
+ */
+function drawnClean(s: Session): { board: Session; idOf: (id: string) => string } {
+  const strokes = [...s.getState().nodes.values()].filter((n) => getRep(n, 'stroke') && !getRep(n, 'erased')).sort((a, b) => atOf(a) - atOf(b));
+  s.snap({ ids: strokes.map((n) => n.id), at: Math.max(...strokes.map(atOf)) + 1000 });
+  const board = createSession();
+  const ids = new Map<string, string>();
+  for (const { id } of strokes) {
+    const n = s.getState().nodes.get(id)!;
+    const clean = cleanOf(n);
+    ids.set(id, board.addStroke(clean ? inkOf(cleanPointsOf(n)!, clean.closed) : strokePointsOf(n)!, atOf(n)));
+  }
+  return { board, idOf: (id) => ids.get(id)! };
+}
 
 /** Score one reading of the flowchart against what was drawn. */
 function score(r: NotationReading | null, e: Expected, label: string, t: { charts: Tally; symbols: Tally; flows: Tally; labels: Tally }) {
@@ -77,6 +101,21 @@ describe('the flowchart bench', () => {
     count(t.top, notationsOf(s.getState())[0]?.notation === 'flowchart', `${label}: not first among the readings`);
   }
 
+  // After *Draw them clean* (S1): a decision redrawn as its upright bounds
+  // was a process. Every decision must still be one; the other symbols are
+  // reported.
+  const clean = { decisions: tally(), others: tally() };
+  for (const v of FLOWCHART_VARIANTS) {
+    const s = createSession();
+    const e = drawFlowchart(s, v);
+    const { board, idOf } = drawnClean(s);
+    const r = readFlowchart(board.getState());
+    for (const [name, want] of Object.entries(e.symbols)) {
+      const got = r?.symbols.find((x) => sameSet(x.ids, want.ids.map(idOf)));
+      count(want.symbol === 'decision' ? clean.decisions : clean.others, got?.symbol === want.symbol, `seed ${v.seed} ${name} drawn clean: wanted ${want.symbol}, read ${got ? `${got.symbol} ${got.confidence.toFixed(2)}` : 'nothing'}`);
+    }
+  }
+
   // The boards that are not flowcharts.
   const negatives: Record<string, { n: number; above: string[]; highest: number }> = {};
   const against = (name: string, draw: (s: Session, seed: number) => unknown) => {
@@ -104,6 +143,16 @@ describe('the flowchart bench', () => {
     return { ids, r: readFlowchart(s.getState()) };
   };
   const symbolIn = (x: { ids: string[]; r: NotationReading | null }) => x.r?.symbols.find((y) => sameSet(y.ids, x.ids));
+  /** The same board, every mark drawn clean first. */
+  const underClean = (draw: (s: Session) => string[], top: number): { ids: string[]; r: NotationReading | null } => {
+    const s = createSession();
+    s.addStroke(handShape(boxCorners(200, 100, 160, 70), { seed: 5 }), 1000);
+    s.addStroke(handArrow({ x: 200, y: 139 }, { x: 200, y: top - 4 }, { wings: 2, headLen: 16, seed: 6, jitter: 1 }), 5000);
+    const ids = draw(s);
+    const { board, idOf } = drawnClean(s);
+    return { ids: ids.map(idOf), r: readFlowchart(board.getState()) };
+  };
+  const trapClean = { diamonds: tally(), twoStroke: tally() };
   for (const seed of [1, 2, 3, 4]) {
     for (const jitter of [1.5, 3]) {
       for (const tilt of [-12, -9, -6, -3, 0, 3, 6, 9, 12]) {
@@ -118,6 +167,10 @@ describe('the flowchart bench', () => {
         const y = under((s) => diamondTopBottom(diamondCorners(200, 330, w, h), { seed: seed * 90 + w, jitter: jitter / 2 }).map((pts, i) => s.addStroke(pts, 9000 + i * 1000)), 330 - h / 2);
         const got2 = symbolIn(y);
         count(trap.twoStroke, got2?.symbol === 'decision', `diamond ${w}×${h} in two (seed ${seed}, jitter ${jitter}): ${got2 ? `${got2.symbol} ${got2.confidence.toFixed(2)}` : 'nothing'}`);
+        const xc = symbolIn(underClean((s) => [s.addStroke(handShape(diamondCorners(200, 330, w, h), { seed: seed * 70 + w, jitter }), 9000)], 330 - h / 2));
+        count(trapClean.diamonds, xc?.symbol === 'decision', `diamond ${w}×${h} drawn clean (seed ${seed}, jitter ${jitter}): ${xc ? `${xc.symbol} ${xc.confidence.toFixed(2)}` : 'nothing'}`);
+        const yc = symbolIn(underClean((s) => diamondTopBottom(diamondCorners(200, 330, w, h), { seed: seed * 90 + w, jitter: jitter / 2 }).map((pts, i) => s.addStroke(pts, 9000 + i * 1000)), 330 - h / 2));
+        count(trapClean.twoStroke, yc?.symbol === 'decision', `diamond ${w}×${h} in two, drawn clean (seed ${seed}, jitter ${jitter}): ${yc ? `${yc.symbol} ${yc.confidence.toFixed(2)}` : 'nothing'}`);
       }
     }
   }
@@ -133,9 +186,11 @@ describe('the flowchart bench', () => {
       `  the trap: boxes tilted up to 12° read as processes   ${rate(trap.tilted)}`,
       `  diamonds in one stroke read as decisions            ${rate(trap.diamonds)}`,
       `  diamonds in two strokes read as decisions           ${rate(trap.twoStroke)}`,
+      `  after Draw them clean: the flowcharts' decisions      ${rate(clean.decisions)}   their other symbols ${rate(clean.others)}`,
+      `  after Draw them clean: diamonds in one stroke        ${rate(trapClean.diamonds)}   in two ${rate(trapClean.twoStroke)}`,
       ...Object.entries(negatives).map(([name, n]) => `  ${name.padEnd(20)} above the floor ${n.above.length}/${n.n}   highest ${n.highest.toFixed(2)}`),
     ];
-    const wrong = [...t.charts.wrong, ...t.symbols.wrong, ...t.flows.wrong, ...t.labels.wrong, ...trap.tilted.wrong, ...trap.diamonds.wrong, ...trap.twoStroke.wrong].slice(0, 12);
+    const wrong = [...t.charts.wrong, ...t.symbols.wrong, ...t.flows.wrong, ...t.labels.wrong, ...trap.tilted.wrong, ...trap.diamonds.wrong, ...trap.twoStroke.wrong, ...clean.decisions.wrong, ...trapClean.diamonds.wrong, ...trapClean.twoStroke.wrong, ...clean.others.wrong].slice(0, 12);
     if (wrong.length) lines.push('  wrong:', ...wrong.map((w) => `    ${w}`));
     console.log(lines.join('\n'));
     expect(FLOWCHART_VARIANTS.length).toBeGreaterThanOrEqual(36);
@@ -162,6 +217,12 @@ describe('the flowchart bench', () => {
     expect(trap.tilted.wrong).toEqual([]);
     expect(trap.diamonds.wrong).toEqual([]);
     expect(trap.twoStroke.wrong).toEqual([]);
+  });
+
+  it('after Draw them clean, every decision is still a decision — a diamond is not redrawn as a box (S1)', () => {
+    expect(clean.decisions.wrong).toEqual([]);
+    expect(trapClean.diamonds.wrong).toEqual([]);
+    expect(trapClean.twoStroke.wrong).toEqual([]);
   });
 
   it('a UI wireframe, the canonical molecule and a line of writing never read as a flowchart above the floor', () => {

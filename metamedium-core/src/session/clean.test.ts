@@ -4,8 +4,9 @@ import { describe, it, expect } from 'vitest';
 import { createSession } from './session';
 import { boundsOf, getRep, strokePointsOf } from './nodes';
 import { cleanOf, cleanPointsOf, idealize, snapReading, SNAP_CONFIDENCE } from './clean';
-import { handRect, handCircle, handLine, handArrow, handTriangle, handText, handDot, circleStroke, rectStroke } from '../test/strokes';
+import { handRect, handCircle, handLine, handArrow, handTriangle, handText, handDot, circleStroke, rectStroke, handBox, boxVertices, handArc, inkOf } from '../test/strokes';
 import { getBounds } from '../geometry';
+import { analyzeStroke } from '../recognition';
 
 const at = (() => { let t = 1000; return () => (t += 100); })();
 
@@ -204,5 +205,116 @@ describe('session.snap', () => {
     s.snap({ ids: [id], at: at() });
     const c = cleanOf(s.getState().nodes.get(id)!)!;
     expect(getBounds(c.points)).toEqual(getBounds(rectStroke(100, 100, 200, 120)));
+  });
+});
+
+// ===== S1: a turned box keeps its angle; a bend is not a line; an arrow reads back =====
+
+/** The angle a clean box's first side lies at, folded into 0–90°. */
+const sideAngle = (pts: { x: number; y: number }[]) => {
+  const d = (Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x) * 180) / Math.PI;
+  return ((d % 90) + 90) % 90;
+};
+/** How far apart two angles lie, folded to a box's quarter turn: 0–45°. */
+const quarterApart = (a: number, b: number) => {
+  const d = Math.abs(((a - b) % 90 + 90) % 90);
+  return Math.min(d, 90 - d);
+};
+
+describe('a turned box is drawn clean at its own angle (S1)', () => {
+  const build = (pts: { x: number; y: number }[]) => {
+    const s = createSession();
+    const id = s.addStroke(pts, at());
+    return { s, id, node: s.getState().nodes.get(id)! };
+  };
+
+  it('squares and rectangles drawn at 0°, 10°, 20°, 30° and 45° clean to themselves at that angle', () => {
+    for (const [w, h] of [[160, 160], [220, 120]]) {
+      for (const turn of [0, 10, 20, 30, 45]) {
+        for (const seed of [1, 2, 3]) {
+          const drawn = boxVertices(400, 300, w, h, turn);
+          const { s, id, node } = build(handBox(400, 300, w, h, turn, { seed, jitter: 2, startAt: 0.1 }));
+          const r = snapReading(node, s.getState().nodes);
+          expect(r.ok, `${w}×${h} at ${turn}°: ${r.reasoning}`).toBe(true);
+          s.snap({ ids: [id], at: at() });
+          const clean = cleanOf(s.getState().nodes.get(id)!)!;
+          expect(clean.shape).toBe('rectangle');
+          expect(clean.points).toHaveLength(4);
+          expect(quarterApart(sideAngle(clean.points), turn), `${w}×${h} at ${turn}°, seed ${seed}`).toBeLessThan(3.5);
+          // Every clean corner stands on a corner that was drawn, within the hand's wobble.
+          for (const c of clean.points) {
+            const nearest = Math.min(...drawn.map((v) => Math.hypot(v.x - c.x, v.y - c.y)));
+            expect(nearest, `${w}×${h} at ${turn}°, seed ${seed}`).toBeLessThan(9);
+          }
+        }
+      }
+    }
+  });
+
+  it('a diamond cleans to a diamond: its corners at the top, the right, the bottom and the left', () => {
+    const { node } = build(handBox(300, 300, 150, 150, 45, { seed: 4, jitter: 1.5 }));
+    const c = idealize(node, 'rectangle')!;
+    const b = getBounds(c.points);
+    const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
+    const where = (p: { x: number; y: number }) => (p.y < cy - 50 ? 'top' : p.y > cy + 50 ? 'bottom' : p.x < cx ? 'left' : 'right');
+    expect(c.points.map(where).sort()).toEqual(['bottom', 'left', 'right', 'top']);
+    expect(c.reasoning).toMatch(/45°/);
+  });
+
+  it('a box drawn square to the screen, give or take the hand, is squared up as before', () => {
+    for (const turn of [-2, 0, 2.5]) {
+      const { node } = build(handBox(300, 300, 200, 140, turn, { seed: 5, jitter: 2 }));
+      const c = idealize(node, 'rectangle')!;
+      const ink = boundsOf(node)!;
+      expect(c.points).toEqual([
+        { x: ink.minX, y: ink.minY }, { x: ink.maxX, y: ink.minY },
+        { x: ink.maxX, y: ink.maxY }, { x: ink.minX, y: ink.maxY },
+      ]);
+    }
+  });
+});
+
+describe('a clean form stays the drawing it cleans (S1)', () => {
+  it('a bent stroke is never drawn clean as a straight line — the half of a two-stroke diamond', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      for (const [w, h] of [[120, 120], [160, 100], [180, 110], [220, 90]]) {
+        const s = createSession();
+        const L = { x: 300 - w / 2, y: 300 }, T = { x: 300, y: 300 - h / 2 }, R = { x: 300 + w / 2, y: 300 };
+        const pts = [...handLine(L, T, { seed: seed * 90 + w, jitter: 1 }), ...handLine(T, R, { seed: seed * 90 + w + 101, jitter: 1 }).slice(1)];
+        const id = s.addStroke(pts, at());
+        const r = snapReading(s.getState().nodes.get(id)!, s.getState().nodes);
+        expect(r.ok && r.shape === 'line', `${w}×${h} seed ${seed}: ${r.reasoning}`).toBe(false);
+      }
+    }
+  });
+
+  it('a straight line drawn by a shaky hand is still offered clean', () => {
+    for (const seed of [1, 2, 3]) {
+      const s = createSession();
+      const id = s.addStroke(handLine({ x: 100, y: 100 }, { x: 340, y: 140 }, { seed, jitter: 5 }), at());
+      const r = snapReading(s.getState().nodes.get(id)!, s.getState().nodes);
+      expect(r.ok, r.reasoning).toBe(true);
+      expect(r.shape).toBe('line');
+    }
+  });
+
+  it('an arrow’s clean form, drawn as ink, reads back as an arrow', () => {
+    for (const [len, headLen, wings] of [[72, 16, 2], [120, 16, 2], [220, 28, 1], [200, 32, 2], [335, 16, 2]] as const) {
+      for (const seed of [1, 2]) {
+        const s = createSession();
+        const id = s.addStroke(handArrow({ x: 100, y: 200 }, { x: 100 + len, y: 200 + len * 0.2 }, { headLen, wings, seed, jitter: 1 }), at());
+        const c = idealize(s.getState().nodes.get(id)!, 'arrow')!;
+        const again = analyzeStroke(inkOf(c.points, c.closed)).results[0];
+        expect(again?.type, `${len} with a ${headLen} head, ${wings} wing(s): ${again?.type} ${again?.confidence.toFixed(2)}`).toBe('arrow');
+      }
+    }
+  });
+
+  it('a wide arc is offered clean as an arc', () => {
+    const s = createSession();
+    const id = s.addStroke(handArc(300, 300, 150, -160, 140, { seed: 3, jitter: 1.5 }), at());
+    const r = snapReading(s.getState().nodes.get(id)!, s.getState().nodes);
+    expect(r.shape).toBe('arc');
+    expect(r.ok, r.reasoning).toBe(true);
   });
 });

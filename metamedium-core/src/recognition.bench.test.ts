@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { analyzeStroke } from './recognition';
 import { getFingerprint } from './geometry';
 import { handRect } from './test/strokes';
-import { buildCases, score } from './test/cases';
+import { buildCases, buildArcCases, ARC_SWEEPS, score } from './test/cases';
 
 describe('recognition benchmark — hand-drawn strokes', () => {
   const cases = buildCases();
@@ -70,5 +70,56 @@ describe('recognition benchmark — hand-drawn strokes', () => {
       const fp = getFingerprint(handRect(0, 0, 200, 140, { startAt: 0, density, jitter: 2, seed: 3 }));
       expect(fp.corners, `density ${density} counted ${fp.corners}`).toBe(4);
     }
+  });
+});
+
+// ===== S1: arcs of every sweep, and no false arcs =====
+//
+// A wide arc used to read as a line — straightness alone is blind to a bow
+// until the sweep passes 150° (a 140° arc was line 0.63). The arcs are their
+// own sweep, 30° to 300°, drawn every way the corpus draws everything else;
+// the corpus itself must not gain an arc it did not have.
+
+describe('recognition benchmark — arcs by sweep (S1)', () => {
+  const cases = buildArcCases();
+  const bySweep = new Map<number, { n: number; top: number; steady: number; steadyTop: number; confused: Record<string, number> }>();
+  for (const c of cases) {
+    const top = analyzeStroke(c.points).results[0]?.type;
+    const b = bySweep.get(c.sweep) ?? { n: 0, top: 0, steady: 0, steadyTop: 0, confused: {} };
+    bySweep.set(c.sweep, b);
+    const steady = !/jit5/.test(c.label);
+    b.n++;
+    if (steady) b.steady++;
+    if (top === 'arc') {
+      b.top++;
+      if (steady) b.steadyTop++;
+    } else b.confused[top ?? 'nothing'] = (b.confused[top ?? 'nothing'] ?? 0) + 1;
+  }
+
+  it('reports arcs by sweep', () => {
+    const lines = [`\n  ${cases.length} hand-drawn arcs, 30° to 300°`];
+    for (const [sweep, b] of bySweep) {
+      const confused = Object.entries(b.confused).map(([k, v]) => `${k}×${v}`).join(' ');
+      lines.push(`  arc ${String(sweep).padStart(3)}°  top ${String(b.top).padStart(3)}/${b.n} (${((b.top / b.n) * 100).toFixed(0).padStart(3)}%)   steady hand ${b.steadyTop}/${b.steady}` + (confused ? `   confused: ${confused}` : ''));
+    }
+    console.log(lines.join('\n'));
+    expect([...bySweep.keys()]).toEqual([...ARC_SWEEPS]);
+  });
+
+  it('reads an arc as an arc at every sweep from 30° to 300° — 98% of every hand, all of a steady one', () => {
+    for (const [sweep, b] of bySweep) {
+      expect(b.top / b.n, `${sweep}°`).toBeGreaterThanOrEqual(0.98);
+      expect(b.steadyTop, `${sweep}° steady`).toBe(b.steady);
+    }
+  });
+
+  it('gives the corpus no new arc: nothing but a line carries one, and no line reads as one first', () => {
+    const offered: string[] = [];
+    for (const c of buildCases()) {
+      const r = analyzeStroke(c.points).results;
+      if (r[0]?.type === 'arc') offered.push(`${c.label} reads as an arc first`);
+      else if (c.expect !== 'line' && r.some((x) => x.type === 'arc')) offered.push(`${c.label} carries an arc`);
+    }
+    expect(offered).toEqual([]);
   });
 });
