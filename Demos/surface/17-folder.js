@@ -634,8 +634,8 @@
   }
   /** The lock came just as this page stopped waiting for it: taken up as a board let go — once this page is on that board. */
   function lateGrant(id, release) {
-    if (board.id === id && onBoardHere() && board.journal.state === 'readonly' && board.lock !== 'held') { boardFreed(id, release); return; }
-    if (board.lateGrant) board.lateGrant.release();
+    if (board.id === id && board.ready && board.opened && onBoardHere() && board.journal.state === 'readonly' && board.lock !== 'held') { boardFreed(id, release); return; }
+    if (board.lateGrant && board.lateGrant.release !== release) board.lateGrant.release();
     board.lateGrant = { id, release };
   }
   /** Wait for the tab holding board `id` to let it go; stopped when this page leaves the board. */
@@ -655,7 +655,11 @@
   /** The other tab let go of board `id`: this one writes it from here — if nothing was written since it opened. */
   async function boardFreed(id, release) {
     if (board.id !== id || !onBoardHere() || board.journal.state === 'off' || board.lock === 'held') { if (release) release(); return; }
-    if (!board.backend || !board.opened || !board.ready) { lateGrant(id, release); return; }
+    if (!board.backend || !board.opened || !board.ready) {
+      if (board.lateGrant && board.lateGrant.release !== release) board.lateGrant.release();
+      board.lateGrant = { id, release };
+      return;
+    }
     const gen = board.gen;
     board.lock = 'held';
     board.release = release;
@@ -716,9 +720,20 @@
     return boardsTx(['boards'], (tx) => {
       const st = tx.objectStore('boards');
       const done = [];
-      for (const id of ids) st.get(id).onsuccess = (e) => { const cur = e.target.result; const next = cur && change(cur); if (next) { st.put(next); done.push(next); } };
+      for (const id of ids) {
+        st.get(id).onsuccess = (e) => {
+          // An entry the store refused earlier is changed where it is held, and written with the change.
+          const cur = e.target.result || boards.held.find((h) => h.id === id);
+          const next = cur && change(cur);
+          if (next) { st.put(next); done.push(next); }
+        };
+      }
       return done;
-    }).then((done) => { for (const e of done) boards.entries.set(e.id, e); if (done.length) boardsChanged(); return done; });
+    }).then((done) => {
+      for (const e of done) { boards.entries.set(e.id, e); boards.held = boards.held.filter((h) => h.id !== e.id); }
+      if (done.length) boardsChanged();
+      return done;
+    });
   }
   /** A new board, with a log or empty: its entry, its first record and its meta in one transaction. */
   function writeNewBoard(entry, events, view) {
@@ -1002,9 +1017,11 @@
       board.journal.arm(a);
     } else {
       board.journal.readonly({ kind: 'tab', detail: '' });
-      if (board.lateGrant && board.lateGrant.id === id) { const g = board.lateGrant; board.lateGrant = null; boardFreed(id, g.release); } else waitForBoard(id);
+      if (!(board.lateGrant && board.lateGrant.id === id)) waitForBoard(id);
     }
     board.ready = true;
+    // The other tab let go while this one was opening: taken up now that the board is open.
+    if (!plan.arm && board.lateGrant && board.lateGrant.id === id) { const g = board.lateGrant; board.lateGrant = null; boardFreed(id, g.release); }
     if (plan.damaged && plan.arm) say('the board kept in this browser had ' + (plan.damaged.skipped + plan.damaged.bad) + ' unreadable piece' + (plan.damaged.skipped + plan.damaged.bad === 1 ? '' : 's') + ' — what could be read is back, and is written whole again');
     // What the store has not heard: the import, what was drawn while it opened.
     persistBoard();
