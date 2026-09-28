@@ -323,3 +323,201 @@ describe('undo is per hand (V1-PLAN L2j)', () => {
     expect(s.getState().contentIds).toEqual([a]);
   });
 });
+
+describe('what an act is, and how undo takes one back (V1-PLAN L2j)', () => {
+  /** A board replayed from zero, for comparing with one that went back to a checkpoint. */
+  const fresh = (me: string, log: readonly SessionEvent[]) => {
+    const s = named(me);
+    s.load(log);
+    return s;
+  };
+
+  it('lastAct names what undo takes back — the act, in the order it stands — and nothing when the hand has none', () => {
+    const s = named('ann~a1');
+    expect(s.lastAct()).toEqual([]);
+    const ids = [box(s, 100, 1000), box(s, 300, 1100)];
+    expect(s.lastAct().map((e) => e.seq)).toEqual([2]);
+    s.withTool('test:pair', () => {
+      s.tidy({ ids, mode: 'align', axis: 'row', at: 2000 });
+      s.tidy({ ids, mode: 'equalize', at: 2000 });
+    });
+    const act = s.lastAct();
+    expect(act.map((e) => e.type)).toEqual(['tidy', 'tidy']);
+    expect(act.every((e) => e.act === act[0].act && e.tool === 'test:pair')).toBe(true);
+    const before = s.getEvents().filter((e) => !act.includes(e));
+    s.undo();
+    expect(s.getEvents()).toEqual(before);
+  });
+
+  it('nested withTool calls write one act; a new outermost call is the next act, numbered past it', () => {
+    const s = named('ann~a1');
+    const ids = [box(s, 100, 1000), box(s, 300, 1100)];
+    s.withTool('outer', () => {
+      s.withTool('inner', () => s.snap({ ids, at: 2000 }));
+      s.tidy({ ids, mode: 'equalize', at: 2000 });
+    });
+    s.withTool('next', () => s.tidy({ ids, mode: 'align', axis: 'row', at: 2100 }));
+    const acts = s.getEvents().slice(2).map((e) => [e.tool, e.act]);
+    expect(acts).toEqual([['inner', 1], ['outer', 1], ['next', 2]]);
+    // Plain events carry none.
+    expect(s.getEvents().slice(0, 2).every((e) => e.act === undefined)).toBe(true);
+    s.undo();
+    expect(s.getEvents()).toHaveLength(4);
+    s.undo();
+    expect(s.getEvents()).toHaveLength(2);
+  });
+
+  it('the field a tool closes before anything else is not its act; a close after it has written something is', () => {
+    const s = named('ann~a1');
+    const ids = [box(s, 100, 1000), box(s, 300, 1100)];
+    const summon = s.summonMarks(ids, 1200)!;
+    s.withTool('test:close-first', () => {
+      s.dismiss(summon, 2000);
+      s.tidy({ ids, mode: 'equalize', at: 2000 });
+      s.deselect(2000);
+    });
+    const tail = s.getEvents().slice(-3);
+    expect(tail.map((e) => [e.type, e.act])).toEqual([['dismiss', undefined], ['tidy', 1], ['deselect', 1]]);
+    s.undo(); // the tidy and the deselect after it
+    expect(s.getEvents().slice(-1)[0].type).toBe('dismiss');
+    expect(s.getState().summon).toBeNull();
+    s.undo(); // the close, an event of its own
+    expect(s.getState().summon?.id).toBe(summon);
+  });
+
+  it('a throw inside a tool leaves what it wrote as one act, and the next act is numbered past it', () => {
+    const s = named('ann~a1');
+    const ids = [box(s, 100, 1000), box(s, 300, 1100)];
+    expect(() => s.withTool('broken', () => {
+      s.tidy({ ids, mode: 'equalize', at: 2000 });
+      s.snap({ ids, at: 2000 });
+      throw new Error('no');
+    })).toThrow('no');
+    s.withTool('fine', () => s.tidy({ ids, mode: 'align', axis: 'row', at: 2100 }));
+    expect(s.getEvents().slice(2).map((e) => e.act)).toEqual([1, 1, 2]);
+    s.undo();
+    s.undo();
+    expect(s.getEvents()).toHaveLength(2);
+  });
+
+  it('act numbers only rise: an undo, a load of the log and a load of nothing never hand one out again', () => {
+    const s = named('ann~a1');
+    const ids = [box(s, 100, 1000), box(s, 300, 1100)];
+    s.withTool('t', () => s.tidy({ ids, mode: 'equalize', at: 2000 }));
+    s.withTool('t', () => s.tidy({ ids, mode: 'align', axis: 'row', at: 2100 }));
+    s.undo();
+    s.withTool('t', () => s.tidy({ ids, mode: 'align', axis: 'row', at: 2200 }));
+    expect(s.getEvents().slice(-1)[0].act).toBe(3);
+    const reopened = named('ann~a1');
+    reopened.load(s.getEvents());
+    reopened.withTool('t', () => reopened.snap({ ids, at: 2300 }));
+    expect(reopened.getEvents().slice(-1)[0].act).toBe(4);
+    reopened.load([]);
+    reopened.withTool('t', () => reopened.addStroke(rectStroke(0, 400, 120, 80), 2400, undefined, 1));
+    expect(reopened.getEvents()[0].act).toBe(5);
+  });
+
+  it('taken from the middle of a board: the replay goes back to a checkpoint before the act, never one taken with it, and reads as a replay from zero', () => {
+    const ann = named('ann~a1');
+    const bob = named('bob~b1');
+    for (let i = 0; i < 6; i++) box(bob, 100 + i * 150, 1000 + i * 100, 300);
+    const mine = box(ann, 100, 1150);
+    for (let i = 0; i < 6; i++) box(bob, 100 + i * 150, 2000 + i * 100, 500);
+    const logs = { 'ann~a1': ann.getEvents(), 'bob~b1': bob.getEvents() };
+    const board = createSession({ ...DEFAULT_SESSION_CONFIG, logName: 'ann~a1', checkpointEvery: 2 });
+    board.load(mergeLogs(logs, { me: 'ann~a1' }));
+    const at = board.getEvents().findIndex((e) => !e.by);
+    expect(at).toBe(2);
+    board.undo();
+    expect(board.getState().nodes.has(mine)).toBe(false);
+    expect(board.getEvents()).toHaveLength(12);
+    expect(stateOf(board)).toBe(stateOf(fresh('ann~a1', board.getEvents())));
+    // And it draws on from there as the replay would.
+    box(board, 900, 9000, 700);
+    expect(stateOf(board)).toBe(stateOf(fresh('ann~a1', board.getEvents())));
+  });
+
+  it('ticks are never taken back, and a checkpoint taken among them after the act is not gone back to (R4d\'s latent finding)', () => {
+    const s = createSession({ ...DEFAULT_SESSION_CONFIG, logName: 'ann~a1', checkpointEvery: 2 });
+    box(s, 100, 1000);
+    box(s, 300, 1100);
+    const last = box(s, 500, 1200);
+    s.tick(1300);
+    s.tick(1400); // a checkpoint at 4 holds the third box
+    s.tick(1500);
+    s.undo();
+    expect(s.getEvents().map((e) => e.type)).toEqual(['stroke', 'stroke', 'tick', 'tick', 'tick']);
+    expect(s.getState().nodes.has(last)).toBe(false);
+    expect(stateOf(s)).toBe(stateOf(fresh('ann~a1', s.getEvents())));
+  });
+
+  it('the board is replaced only when something left standing after the act mints its ids off the counter', () => {
+    // Authored events after the act: the same ids in the replay, so a model
+    // still thinking about a mark answers about it.
+    const ann = named('ann~a1');
+    box(ann, 100, 1000);
+    const bob = named('bob~b1');
+    box(bob, 300, 2000, 300);
+    const board = oracle('ann~a1', { 'ann~a1': ann.getEvents(), 'bob~b1': bob.getEvents() });
+    const g0 = board.getState().generation;
+    board.undo();
+    expect(board.getState().generation).toBe(g0);
+    // A mark after it with no authorship (drawn before its hand had a name):
+    // its id comes off the replay's counter, so the board is replaced.
+    const old = createSession();
+    old.addStroke(rectStroke(300, 300, 120, 80), 2000, undefined, 1);
+    const board2 = oracle('ann~a1', { 'ann~a1': ann.getEvents(), old: old.getEvents() });
+    const g1 = board2.getState().generation;
+    board2.undo();
+    expect(board2.getState().generation).toBe(g1 + 1);
+    expect(board2.getState().contentIds).toHaveLength(1);
+    // A board of one hand, its act the last thing on it: never replaced.
+    const one = createSession();
+    box(one, 100, 1000);
+    box(one, 300, 1100);
+    const g2 = one.getState().generation;
+    one.undo();
+    expect(one.getState().generation).toBe(g2);
+  });
+
+  it('with no authorship there is no number: a board of one hand that was never named undoes in the order written, one event at a time', () => {
+    const s = createSession();
+    const a = box(s, 100, 2000);
+    const b = box(s, 300, 1000); // written after, stamped before
+    s.undo();
+    expect(s.getState().contentIds).toEqual([a]);
+    s.undo();
+    expect(s.getState().contentIds).toEqual([]);
+    expect(b).not.toBe(a);
+  });
+
+  it('marks drawn before a hand had a name are taken back after everything it wrote under its name, in the order the log holds them', () => {
+    const s = createSession();
+    const early = [box(s, 100, 1000), box(s, 300, 1100)];
+    s.setLogName('ann~a1');
+    const later = box(s, 500, 1200);
+    const bob = named('bob~b1');
+    const his = box(bob, 100, 5000, 300);
+    const board = oracle('ann~a1', { 'ann~a1': s.getEvents(), 'bob~b1': bob.getEvents() });
+    board.undo();
+    expect(board.getState().nodes.has(later)).toBe(false);
+    board.undo();
+    expect([...board.getState().contentIds].sort()).toEqual([early[0], his].sort());
+    board.undo();
+    expect(board.getState().contentIds).toEqual([his]);
+    board.undo();
+    expect(board.getState().contentIds).toEqual([his]);
+  });
+
+  it("a model's reading in this hand's log is this hand's act: undo takes it back, as it always did", () => {
+    const s = named('ann~a1');
+    const a = box(s, 100, 1000);
+    const model = s.join('agent', 'qwen3', 1100, 2);
+    s.propose({ participantId: model, nodeId: a, edges: [{ to: 'type:rectangle', rel: 'resembles', weight: 0.7, reasoning: 'four corners' }], at: 1200 });
+    const n = s.getEvents().length;
+    expect(s.lastAct().map((e) => e.type)).toEqual(['propose']);
+    s.undo();
+    expect(s.getEvents()).toHaveLength(n - 1);
+    expect(s.getEvents().slice(-1)[0].type).toBe('join');
+  });
+});
