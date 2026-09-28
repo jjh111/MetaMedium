@@ -134,11 +134,15 @@ describe('D1’s hand-drawn flowchart, in Mermaid', () => {
     expect(unread).toContain(`"${UNREAD_WRITING}"`);
     const blank = m.notes.find((n) => n.includes('no writing'));
     for (const id of ['stroke_2', 'figure_6_7', 'stroke_12', 'figure_8_9_10_11']) expect(blank).toContain(id);
+    // The marks of that writing, for whoever would ask a model that can see to read them.
+    expect(m.unread).toEqual(['stroke:21', 'stroke:22', 'stroke:23', 'stroke:24', 'stroke:25', 'stroke:26']);
+    expect(m.unread).toEqual(e.labels.map((l) => l.id));
     // Read, nothing is unknown any more.
     readTheWriting(s, e);
     const read = exported(s);
     expect(read.notes.some((n) => n.includes('not been read'))).toBe(false);
     expect(read.text).not.toContain(UNREAD_WRITING);
+    expect(read.unread).toEqual([]);
   });
 
   it('maps back to the marks: each Mermaid id to what stands for its symbol, every stroke it is drawn with, and each link to its connector', () => {
@@ -320,8 +324,9 @@ describe('the trap: every label is quoted, and escaped', () => {
     for (const raw of NASTY) {
       const q = mermaidString(raw);
       expect(q.startsWith('"') && q.endsWith('"'), raw).toBe(true);
-      const inner = q.slice(1, -1);
-      expect(inner, raw).not.toMatch(/["%`<>&\n]|<(?!br>)/);
+      // A line break is the one piece of markup written on purpose.
+      const inner = q.slice(1, -1).split('<br>').join('');
+      expect(inner, raw).not.toMatch(/["%`<>&\n]/);
       // Every # is an entity Mermaid decodes: #name; or #digits;.
       expect(inner.replace(/#(\w+);/g, ''), raw).not.toContain('#');
       expect(unescapeMermaid(q), raw).toBe(raw);
@@ -453,7 +458,7 @@ describe('dispatch by notation', () => {
     expect(mermaidWriters()).toContain('flowchart');
     const r = reading([sym('stroke:1', 'process', [0, 0]), sym('stroke:2', 'process', [0, 200])], [flow('stroke:3', 'stroke:1', 'stroke:2')]);
     expect(toMermaid({ ...r, notation: 'test-class' })).toBeNull();
-    const off = registerMermaidWriter('test-class', (rr) => ({ text: `classDiagram\n    class ${rr.symbols.length}\n`, notation: rr.notation, diagram: 'classDiagram', ids: {}, marks: {}, links: [], notes: [] }));
+    const off = registerMermaidWriter('test-class', (rr) => ({ text: `classDiagram\n    class ${rr.symbols.length}\n`, notation: rr.notation, diagram: 'classDiagram', ids: {}, marks: {}, links: [], unread: [], notes: [] }));
     try {
       expect(mermaidWriters()).toContain('test-class');
       expect(toMermaid({ ...r, notation: 'test-class' })!.text).toBe('classDiagram\n    class 2\n');

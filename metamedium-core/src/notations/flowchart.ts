@@ -436,6 +436,22 @@ function centreOf(b: Bounds): Point {
   return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
 }
 
+/**
+ * The words a hand put on these marks' own ink (`label`, session.ts): each
+ * different word once, the marks taken in id order so the same marks say the
+ * same words however the log was merged. A figure's strokes each carry the
+ * word the hand labelled them with, so it is said once.
+ */
+function ownWords(nodes: ReadonlyMap<string, MMNode>, ids: readonly string[]): string | undefined {
+  const words: string[] = [];
+  for (const id of [...new Set(ids)].sort()) {
+    const n = nodes.get(id);
+    const t = n && labelOf(n)?.text.trim();
+    if (t && !words.includes(t)) words.push(t);
+  }
+  return words.length ? words.join(' ') : undefined;
+}
+
 /** How far a point stands from a box: 0 inside it. The cheap test in front of every hull and path distance. */
 function offBox(p: Point, b: Bounds): number {
   return Math.hypot(Math.max(0, b.minX - p.x, p.x - b.maxX), Math.max(0, b.minY - p.y, p.y - b.maxY));
@@ -584,6 +600,7 @@ export function readFlowchart(state: SessionState, scopeIds?: readonly string[])
         : direction === 'both'
           ? `${an(h.shape)} with a head at both ends, between ${from.symbol!.id} and ${to.symbol!.id}`
           : `${an(h.shape)} with no head, from ${from.symbol!.id} to ${to.symbol!.id} in the order it was drawn`;
+    const words = ownWords(nodes, [id]);
     connectors.push({
       id,
       ids: [id, ...headIds],
@@ -597,6 +614,7 @@ export function readFlowchart(state: SessionState, scopeIds?: readonly string[])
       confidence: MAX * quality,
       reason,
       labels: [],
+      ...(words ? { text: words } : {}),
     });
   }
 
@@ -630,6 +648,7 @@ export function readFlowchart(state: SessionState, scopeIds?: readonly string[])
   const out: NotationSymbol[] = placed.map((c) => {
     const rs = readings.get(c)!;
     const top = rs[0];
+    const words = ownWords(nodes, [c.id, ...c.ids]);
     return {
       id: c.id,
       ids: [...c.ids],
@@ -642,6 +661,7 @@ export function readFlowchart(state: SessionState, scopeIds?: readonly string[])
       bounds: { ...c.outline.bounds },
       ports: portsFor(top.symbol as SymbolName, c.outline),
       labels: [],
+      ...(words ? { text: words } : {}),
     };
   });
   const bySymbol = new Map(out.map((s) => [s.id, s]));
@@ -670,7 +690,7 @@ export function readFlowchart(state: SessionState, scopeIds?: readonly string[])
     const home = out
       .filter((s) => offBox(c, s.bounds) === 0 && outside(c, s.outline) === 0 && Math.max(s.bounds.maxX - s.bounds.minX, s.bounds.maxY - s.bounds.minY) > size)
       .sort((p, q) => (p.bounds.maxX - p.bounds.minX) * (p.bounds.maxY - p.bounds.minY) - (q.bounds.maxX - q.bounds.minX) * (q.bounds.maxY - q.bounds.minY))[0];
-    const base = { id: m.id, role: FLOWCHART_TABLE.label.role as Role, ...(text ? { text } : {}) };
+    const base = { id: m.id, role: FLOWCHART_TABLE.label.role as Role, ...(text ? { text } : {}), bounds: { ...b } };
     if (home) {
       labels.push({ ...base, of: home.id, where: 'inside', confidence: MAX * 0.9, reason: `writing inside ${home.symbol} ${home.id}` });
       home.labels.push(m.id);
