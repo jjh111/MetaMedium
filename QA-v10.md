@@ -80,7 +80,8 @@ Every mark has one id on every board — its log's name and its number there
 — and a tab's log is one sitting, a page load (`SURFACE-v10-PLAN.md` T8;
 `V1-PLAN.md` L1). A word goes only on the ink its maker drew (L2b, L2e), a
 thing is its blesser's and a word its writer's (L2f, L2g), and each hand's
-loop, field and selection are its own (L2h).
+loop, field and selection are its own (L2h). A reload is a new sitting and
+the same person: the marks drawn before it are still his to label (L2i).
 
 | John | Should see | Claude does |
 |---|---|---|
@@ -94,7 +95,7 @@ loop, field and selection are its own (L2h).
 | Circle two of his marks and take the loop; leave the field open | while it stands, Claude's line lands and **the field stays open on his two marks**; he types `name: pair` and Enter, and the thing is made, holding his two marks and nothing of Claude's | while John's field is open, `canvas_draw` a line near it. Then `canvas_look`: an artifact *pair*, by him, on this board too; its count line never says *the field is open* — John's field is his |
 | Draw a loop around a mark, and before his check… | …Claude's stroke lands; his check still takes **his** loop up and the field opens on his mark | `canvas_draw` a line between John's loop and his check |
 | Reload the tab (opened by its address, above) | the board comes back from the room: his marks in his colour, *you are* his name | `canvas_look` lists his earlier marks, by him, under their old ids; the next mark he draws carries a new sitting in its id, a number the room has never held |
-| After the reload, hold a mark drawn **before** it, type `label: inlet` | *no label — <his name> made this mark*: the marks drawn before a reload belong to the earlier sitting, so the reloaded tab may not label them — found by L3, not yet decided | — |
+| After the reload, hold a mark drawn **before** it, type `label: inlet` | the line says *↵ label it “inlet”* before Enter, and Enter puts *inlet* on it: a reload is a new sitting and the same person, so the marks drawn before it are still his to label (L2i). Then hold it with Claude's circle and type `label: outlet`: *↵ label it “outlet” — on yours, not the mark claude made* | `canvas_look`: his mark `labelled “outlet”`, still *by <his name>* — the earlier sitting's — and the circle without it; then `canvas_label` his mark: refused, whose it is said — Claude is another person |
 
 ## 7. The minimap and the frame
 

@@ -39,8 +39,10 @@ ink and never on another's — the MCP hand's `canvas_label` (`Demos/mcp.mjs`),
 a person's `label:` in the field (`09-field.js`; L2b, L2e); an artifact is
 made by whoever blessed it and a word by whoever wrote its letters, on every
 board (`applyBless`, `absorbIntoWord`; L2f, L2g); a hand's gestures are its
-own (`handOf`; L2h); one Enter is one act (`09-palette.js`) and `fitAll`
-fits the content (`01-view.js`; L2d). CI runs what exists
+own (`handOf`; L2h), and a person is the same person across sittings — a
+reload is a new hand, and the rules still ask the person "is this mine?"
+(`Session.isMine`; L2i, the phase's follow-up); one Enter is one act
+(`09-palette.js`) and `fitAll` fits the content (`01-view.js`; L2d). CI runs what exists
 (`.github/workflows/ci.yml`) — the relay's test, the surface build's guard
 against a function declared in two fragments, and a WebKit smoke that takes
 a pill — and both bundles equal a fresh build (L3). Beside them: the maths core (`src/maths/`), the
@@ -102,7 +104,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 261 records through the real UI (260 checks and one honest skip, 25d, on 27 Sep; headless with the shard's three scenarios via `node e2e/run.mjs`, which CI runs): page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room (and ids that hold in it: an undo sent, one sitting per page load, a doubled name and a truncated room said), a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), the explanation plane's layout, one Enter one act and what `fitAll` fits, labels (a hand's and a person's, on their own ink only), who made what, and gestures per hand in a room. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 267 records through the real UI (266 checks and one honest skip, 25d, on 27 Sep; headless with the shard's three scenarios via `node e2e/run.mjs`, which CI runs): page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room (and ids that hold in it: an undo sent, one sitting per page load, a doubled name and a truncated room said), a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), the explanation plane's layout, one Enter one act and what `fitAll` fits, labels (a hand's and a person's, on their own ink only), who made what, gestures per hand in a room, and a person the same across a reload. A run takes about 100 s; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -618,7 +620,11 @@ recent marks only (what the mark *crosses* may be anyone's); another
 hand's loop, summon, selection or dismissal never opens, closes or
 changes the reader's. A mark that is erased leaves every hand's gestures,
 whoever erased it. The board's `summon`, `selection`, `pendingLassoId`,
-`markMiss`, `commandMark` and `recentIds` are its reader's own. Two hands
+`markMiss`, `commandMark` and `recentIds` are its reader's own. **A hand is
+a sitting, not a person** (L2i): two tabs of one person draw independently,
+so his stroke in one never dissolves his field in the other, and a loop
+waiting in one waits for that tab's own check — though either may label
+what the other drew (*Live logs*). Two hands
 may now hold the same marks at once, and when both bless, each thing
 takes them — a mark can be part of two (the same on every board; which
 should win is not yet decided).
@@ -1354,13 +1360,34 @@ high-water mark (`session.ts`) only rises: an undo, a merge that no longer
 carries a dropped event, and `load([])` never lower it. A tab opened on
 `?live=` does not restore the device's board into the room, since every
 reload would carry it in again under a new name; the *live* tile brings
-the board you are on. **The same hand in name and colour, not in
-authorship:** a sitting is a participant of its own
+the board you are on.
+
+**A person is the same person across sittings** (V1-PLAN L2i; `personOf`,
+`samePerson` and `Session.isMine` in `session.ts`, `session/label.test.ts`,
+e2e 47). A sitting is still a participant of its own
 (`participant:hand:<log name>`), so what a person drew before a reload is
-the earlier sitting's — the reloaded tab may not label it (core refuses,
-`not-your-ink`; the field says *no label — john made this mark*), the
-label rule applied to a sitting. Found writing these docs, not changed;
-whether a sitting should inherit its person's marks is not yet decided.
+the earlier sitting's, as the panel and the card say. But **the rules that
+ask "is this mine?" compare the person** — the log name without its
+sitting's suffix (`handLabel`) — so every sitting of one person may label
+that person's marks, on every board: the reloaded tab labels what it drew
+before the reload, the earlier tab (still open) what the later one drew, a
+restarted MCP hand its own circle. Another person's marks are refused as
+before, with the reason. Before this, the rule compared the exact log name,
+and after a reload core told john *that mark was made by john*. This
+board's own hand is the person its log is written under (`logName`) — the
+same fact every other board reads off that log's name when it merges it —
+so every board agrees; a board never told its log's name is no sitting of
+anyone and compares hands exactly, as it always did. A model or the engine
+is no person and only ever itself. **What stays per sitting:** log names,
+ids and numbering (L1 — never reuse a number), gestures (L2h — two tabs of
+one person are two hands drawing independently) and a word's run of
+letters (L2g); the logs are never merged into one participant, or
+numbering could collide. **The trust
+model, plainly:** a name is self-asserted — there are no accounts — so
+treating one person's name as one person is the same trust the name and
+the colour already carry. It is not authentication: anyone who types
+*john* is john to the rules, as they already are in name and colour, and
+two hands that never gave a name are both *hand*.
 
 **A hand sends its log as it stands** (`LiveStore.publish`): the new tail
 as an append when the log only grew, the whole of it as a `full` when it
@@ -1493,9 +1520,10 @@ written by hand, so the repo takes no dependency; it imports the committed
 Node bundle `Demos/metamedium-core.node.mjs`. In the canvas: the *live*
 tile → *with Claude*, or `?live=claude&relay=http://127.0.0.1:8020`. Its
 ink arrives as its own log, stamped `by` on arrival, in its own colour. It
-is one sitting, named per process (`sittingName`), and `canvas_look` leads
-with what the room says about itself — a name two hands share, a history
-older than the relay remembers (`LiveStore.notices`).
+is one sitting, named per process (`sittingName`) — a restart is a new hand
+and the same person, so it may label what it drew before (L2i, the smoke) —
+and `canvas_look` leads with what the room says about itself — a name two
+hands share, a history older than the relay remembers (`LiveStore.notices`).
 **In a session without the tools loaded** (the `.mcp.json` was added after
 the session began), the hand still works from the shell: run `mcp.mjs` with
 its stdin fed by `tail -f` on a command file and its stdout to an output
@@ -1564,20 +1592,24 @@ awaited and the seat silently never took while the room joined fine.
 
 ### A label: a hand's word on its own ink (V1-PLAN L2b, L2e)
 
-> `session.label` / `labelOf` / `labelsOf` in core (`session/label.test.ts`);
-> `renderLabels` in `Demos/surface/08-render.js`; `canvas_label` in
-> `Demos/mcp.mjs`; the person's door — `readLabel` and `typedWord` in
-> `Demos/surface/09-field.js`, `labelMarks` and `labelItem` in `09-palette.js`
-> (e2e 42).
+> `session.label` / `session.isMine` / `labelOf` / `labelsOf` in core
+> (`session/label.test.ts`); `renderLabels` in `Demos/surface/08-render.js`;
+> `canvas_label` in `Demos/mcp.mjs`; the person's door — `readLabel` and
+> `typedWord` in `Demos/surface/09-field.js`, `labelMarks`, `labelItem` and
+> `whoseInk` in `09-palette.js` (e2e 42, 47).
 
 **Whoever made a mark may put a word on it; nobody else may.** Naming a mark
 someone else made is blessing it, the human's act; labelling your own ink is
 not (the notes, §B). A `label` event holds the word as a rep on the mark,
-attributed; it replays and undoes; an empty word takes it off; another hand's
-label on my mark is refused at the door (`not-your-ink`) and dropped on replay.
-A mark's maker is the hand that drew it; an artifact's is whoever blessed it,
-and a word's the hand that wrote its letters, on every board (L2f and L2g,
-under *Live logs*).
+attributed; it replays and undoes; an empty word takes it off; another
+person's label on my mark is refused at the door (`not-your-ink`) and dropped
+on replay. A mark's maker is the hand that drew it; an artifact's is whoever
+blessed it, and a word's the hand that wrote its letters, on every board (L2f
+and L2g, under *Live logs*). **"Whoever" is the person, not the sitting**
+(L2i): a reload is a new hand and the same person, so the marks drawn before
+it are still the person's to label — `session.isMine(id)` is the door's
+question, and the field asks it too, so the line before Enter and the door
+never disagree.
 **It is not a bless and not a file** (§D): no `word` rep, no artifact, no
 library entry, no card in the grid, never a name the matcher learns.
 

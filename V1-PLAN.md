@@ -247,7 +247,7 @@ suite and the gate green, `master` fast-forwarded and pushed.
 
 | Phase | Units | Done when |
 |---|---|---|
-| **0. Make week 1 whole** — ✅ done on `w2`, 27 Sep (on `master` when John lands it, L4) | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L2f an artifact is made by whoever blessed it · L2g a word is made by whoever wrote its letters · L2h gestures are per hand · L3 CI, bundles, docs | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
+| **0. Make week 1 whole** — ✅ done on `w2`, 27 Sep (on `master` when John lands it, L4) | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L2f an artifact is made by whoever blessed it · L2g a word is made by whoever wrote its letters · L2h gestures are per hand · L3 CI, bundles, docs · and L3's finding, L2i a person is the same person across sittings (27 Sep) | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
 | **0b. A board that holds** (pulled forward by `PERF.md`, 27 Sep) | R3 no lost work · R4b the engine holds 2,000 marks · R4c the surface draws only what changed · R4d a room merges a line, not the board · R4e a brief carries what it is about | nothing is ever lost silently; a 2,000-mark board opens in under 1.5 s, answers a stroke in 16 ms at p95 and draws its reading within 100 ms; a room line costs under 16 ms; the budgets are tests |
 | **1. The backbone** | B1 tools · B2 context · B3 packs | a tool is one file; the field ranks by context with reasons; a pack is used by an event and benched |
 | **2. Editing** | E1 handles · E2 bindings follow · E3 ports, heads and figures | a selected mark reshapes by its points; bound arrows follow; notations can declare ports |
@@ -600,6 +600,80 @@ typecheck clean, both bundles equal to a fresh build; relay and field 40,
 the build's test 4; surface in sync; the canvas MCP smoke and the shard's
 (605 in 31 files, typecheck clean) all pass; the gate 406 passed and the one
 honest skip (canvas 260; shard 123 + 11 + 12); WebKit smoke 4.
+
+**L2i a person is the same person across sittings** (L3's finding, a
+phase-0 follow-up). Since L1 a live hand's log is one sitting — a new
+suffix per page load or process (`sittingName`) — shown under the person's
+name and colour (`handLabel`); but the rules that ask "is this mine?"
+compare the exact log name, so after a reload a person may not label what
+they drew before it: core refuses `not-your-ink` and the field says *no
+label — john made this mark*. Those rules compare the person — the log name
+without its sitting's suffix — so every sitting of one person may label that
+person's marks, and the field counts them as the person's own; another
+person's are refused, with the reason. What stays per sitting: log names,
+ids and numbering (L1), and gesture state (L2h). Folder and browser-storage
+boards keep one stable name and are unchanged, and so are `held.test.ts`
+and `session.scenario.test.ts`. The trust model is said plainly in
+CLAUDE.md: a name is self-asserted — there are no accounts — so one name is
+one person on the trust the name and the colour already carry; it is not
+authentication. *Red first:* marks written by `john~a1`, a label by
+`john~b2` accepted, one by `fern~x1` refused, the field's line across two
+sittings; and a gate record — draw in a room, reload, label a mark drawn
+before the reload. *Invariant:* state is a pure function of the log.
+*Trap:* changing the attribution (whose colour, whose name on a card)
+instead of the rule; or merging sittings into one participant — the logs
+stay separate, or numbering could collide.
+
+**L2i status, 27 Sep 2026: done on `w2`** — `4f9c113` (red), `22b0c9b`,
+`564a058` (the canvas's half), `039f353` (the MCP hand), `7987ef0` (a
+guard), and the commit carrying this line. The label rule, at the door
+(`staleFor`) and on replay (`applyLabel`), asks `samePerson(maker, writer)`:
+the same hand, or two sittings of one person, the person being `handLabel`
+of the log's name. This board's own hand is the person its log is written
+under (`logName`) — the same fact every other board reads off that log's
+name when it merges it, so every board agrees; another hand is shown by its
+person already; a model or the engine is no person and only ever itself; a
+board never told its log's name compares hands exactly, as before.
+`Session.isMine(id, participant?)` asks the same question for the field:
+`whoseInk` and `labelMarks` (`09-palette.js`) asked `authorOf ===
+LOCAL_PARTICIPANT` — the sitting — and now ask core, so the line before
+Enter and the door never disagree (a test checks them mark by mark).
+Attribution is unchanged: the panel, the card and `canvas_look` still say
+a mark drawn before the reload is the earlier sitting's, *by john*, in
+john's hue. Pinned: after a reload john labels what he drew before it, and
+the word stands on every board — the earlier tab's (still open), the later
+one's, fern's, in both merge orders; the earlier tab labels what the later
+one drew; a thing he blessed and a word he wrote in one sitting are his in
+the next; fern, and johnny — whose name only begins like his — are refused
+at the door with whose it is, and a label in fern's log is dropped on every
+replay; the field's line says *on each of your 3 marks* across two sittings
+and names only fern's. Still per sitting, and said so in the tests: two
+logs, two participants, each its own numbering; his field in one tab
+survives his strokes in the other, his loop waits for its own tab's check,
+the look-back is the tab's own; his letters from two tabs never gather into
+one word (the gesture and word guards shown failing with another sitting of
+the person keyed as the same hand, the change then taken out).
+e2e 47–47e (the harness cannot reload its own page, so the sitting before
+the reload is a hand of this person's name under another suffix — what a
+reload leaves in the room): the box drawn before comes back the earlier
+sitting's; the line says `↵ label it “inlet”` where it said *no label —
+hand made this mark*; Enter writes one label event of this sitting's; the
+word stands on the earlier sitting's board, fern's and a third reader's;
+held with fern's circle it goes on the box and not on hers; and a box this
+tab drew is labelled by the person's next sitting, the word landing here.
+The canvas MCP smoke restarts the hand, which labels the circle it drew
+before the restart and is still refused the tab's box (its two new checks
+red on the old bundle). Every held log replays against the `e1f5349` bundle
+node for node — the same state and next id — bare, named, merged as the
+reader's own, merged with no reader and merged as another hand's: 30 of 30
+(none holds a label). *Found, not changed:* a hand that never gave a name
+is *hand*, so two unnamed people are one person to the rules — as they are
+already one name and one colour on the board. `7987ef0`'s message says
+core 900; it is 899. Whole suite at the last commit: core 899 in 67 files,
+typecheck clean, both bundles equal to a fresh build; relay and field 41,
+the build's test 4; surface in sync; the canvas MCP smoke and the shard's
+(605 in 31 files, typecheck clean) all pass; the gate 412 passed and the one
+honest skip (canvas 266; shard 123 + 11 + 12); WebKit smoke 4.
 
 ### Phase 0b — a board that holds (pulled forward, 27 September)
 The performance baseline (`PERF.md`, R4a) measured what daily use would meet

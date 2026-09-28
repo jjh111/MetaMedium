@@ -85,8 +85,10 @@ session.load(mergeLogs(logs, { me: 'john~a1b2' }));
 log. A folder's log is its file, loaded before anything is minted, so a folder
 keeps one name. A live hand has no history to load, so its log is **one
 sitting** — a page load, a process: `sittingName('john')` mints `john~a1b2`
-once per sitting, and `handLabel` gives back the name a person sees. Within a
-sitting the session's high-water mark only rises, whatever `load()` sees.
+once per sitting, and `handLabel` gives back the name a person sees — the
+person the rules that ask "is this mine?" compare (`Session.isMine`), so a
+reload is a new log and never a stranger to its own ink. Within a sitting the
+session's high-water mark only rises, whatever `load()` sees.
 
 Say nothing and ids fall back to a counter over the replay, which is what
 every log written before this rule carries and what every event of such a log
