@@ -1,6 +1,6 @@
 // ===== board (the journal) =====
 // Provides: the board this browser keeps, as an APPEND-ONLY JOURNAL (V1-PLAN.md §9 R3) — the
-//   pure half: linesOf / eventsOfLines (one event per line, the folder's own format),
+//   pure half: journalText / journalEvents (one event per line, the folder's own format),
 //   journalDiff (what the store must hear to hold the log as it now stands), journalFold (the
 //   records read back into the log), createJournal (when a record is written, what a failure
 //   does, when the whole log is written again), openPlan (what opening the store puts on the
@@ -37,13 +37,13 @@
 // (e2e/keep.mjs) is the only honest check of that, and it kills at random points.
 
   /** One event per line, a trailing newline — `encodeLog`'s format, so a record is a piece of a log file. */
-  function linesOf(events) {
+  function journalText(events) {
     let out = '';
     for (const ev of events) out += JSON.stringify(ev) + '\n';
     return out;
   }
   /** Lines back into events; a line that does not parse is counted, never fatal. */
-  function eventsOfLines(text) {
+  function journalEvents(text) {
     const events = [];
     let bad = 0;
     for (const line of String(text || '').split('\n')) {
@@ -89,7 +89,7 @@
       if (r.seq > lastSeq) lastSeq = r.seq;
       const full = r.base === 0;
       if (!full && (r.on !== chain || !(r.base <= log.length))) { skipped.push(r.seq); continue; }
-      const d = eventsOfLines(r.text);
+      const d = journalEvents(r.text);
       if (d.bad || (typeof r.n === 'number' && r.n !== d.events.length)) bad++;
       if (full) { log = d.events; chain = r.seq; sinceFull = 0; continue; }
       log.length = r.base;
@@ -220,7 +220,7 @@
       const whole = base === 0;
       const seq = ++j.seq;
       if (whole) { j.chain = seq; j.sinceFull = 0; j.wholes++; } else j.sinceFull++;
-      const rec = { seq, on: j.chain, base, n: events.length, text: linesOf(events) };
+      const rec = { seq, on: j.chain, base, n: events.length, text: journalText(events) };
       j.arr = next; j.len = next.length;
       j.inFlight++; j.issued++;
       const meta = whole ? j.meta : null;

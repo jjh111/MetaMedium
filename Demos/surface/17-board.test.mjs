@@ -18,8 +18,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '17-board.js'), 'utf8');
-const { linesOf, eventsOfLines, journalDiff, journalFold, legacyEventsOf, openPlan, troubleOf, troubleWords, createJournal } = new Function(
-  src + '\n  return { linesOf, eventsOfLines, journalDiff, journalFold, legacyEventsOf, openPlan, troubleOf, troubleWords, createJournal };'
+const { journalText, journalEvents, journalDiff, journalFold, legacyEventsOf, openPlan, troubleOf, troubleWords, createJournal } = new Function(
+  src + '\n  return { journalText, journalEvents, journalDiff, journalFold, legacyEventsOf, openPlan, troubleOf, troubleWords, createJournal };'
 )();
 
 /** mulberry32, as the e2e and the bench use. */
@@ -82,11 +82,11 @@ const quota = () => Object.assign(new Error('The quota has been exceeded.'), { n
 
 test('one event per line, and a line that does not parse is counted, not fatal', () => {
   const evs = [{ type: 'stroke', points: [{ x: 1, y: 2 }] }, { type: 'undo-free', text: 'a\nb "quoted"' }];
-  const text = linesOf(evs);
+  const text = journalText(evs);
   assert.equal(text.split('\n').length, 3); // two lines and the trailing newline
-  assert.deepEqual(eventsOfLines(text), { events: evs, bad: 0 });
-  assert.deepEqual(eventsOfLines(text + '{not json\n'), { events: evs, bad: 1 });
-  assert.equal(linesOf([]), '');
+  assert.deepEqual(journalEvents(text), { events: evs, bad: 0 });
+  assert.deepEqual(journalEvents(text + '{not json\n'), { events: evs, bad: 1 });
+  assert.equal(journalText([]), '');
 });
 
 test('the diff: a push is an append, an undo a cut where the event stood, a load the whole log', () => {
@@ -111,10 +111,10 @@ test('the diff: a push is an append, an undo a cut where the event stood, a load
 
 test('the fold: appends and cuts replay into the log; a whole log starts a chain', () => {
   const recs = [
-    { seq: 1, on: 1, base: 0, n: 2, text: linesOf([{ i: 0 }, { i: 1 }]) },
-    { seq: 2, on: 1, base: 2, n: 1, text: linesOf([{ i: 2 }]) },
+    { seq: 1, on: 1, base: 0, n: 2, text: journalText([{ i: 0 }, { i: 1 }]) },
+    { seq: 2, on: 1, base: 2, n: 1, text: journalText([{ i: 2 }]) },
     { seq: 3, on: 1, base: 2, n: 0, text: '' }, // undo
-    { seq: 4, on: 1, base: 2, n: 2, text: linesOf([{ i: 3 }, { i: 4 }]) },
+    { seq: 4, on: 1, base: 2, n: 2, text: journalText([{ i: 3 }, { i: 4 }]) },
   ];
   const f = journalFold(recs.slice().reverse()); // order is the seq's, not the array's
   assert.deepEqual(f.events, [{ i: 0 }, { i: 1 }, { i: 3 }, { i: 4 }]);
@@ -122,20 +122,20 @@ test('the fold: appends and cuts replay into the log; a whole log starts a chain
   assert.equal(f.sinceFull, 3);
   assert.equal(f.lastSeq, 4);
   assert.deepEqual(f.skipped, []);
-  const g = journalFold(recs.concat([{ seq: 5, on: 5, base: 0, n: 1, text: linesOf([{ i: 9 }]) }, { seq: 6, on: 5, base: 1, n: 1, text: linesOf([{ i: 10 }]) }]));
+  const g = journalFold(recs.concat([{ seq: 5, on: 5, base: 0, n: 1, text: journalText([{ i: 9 }]) }, { seq: 6, on: 5, base: 1, n: 1, text: journalText([{ i: 10 }]) }]));
   assert.deepEqual(g.events, [{ i: 9 }, { i: 10 }]);
   assert.equal(g.chain, 5);
 });
 
 test('the fold never applies a record to something it was not written against', () => {
-  const base = [{ seq: 1, on: 1, base: 0, n: 3, text: linesOf([{ i: 0 }, { i: 1 }, { i: 2 }]) }];
+  const base = [{ seq: 1, on: 1, base: 0, n: 3, text: journalText([{ i: 0 }, { i: 1 }, { i: 2 }]) }];
   // Record 2 (base 3, one event) never landed; 3 was written on top of it.
-  const hole = journalFold(base.concat([{ seq: 3, on: 1, base: 4, n: 1, text: linesOf([{ i: 4 }]) }]));
+  const hole = journalFold(base.concat([{ seq: 3, on: 1, base: 4, n: 1, text: journalText([{ i: 4 }]) }]));
   assert.deepEqual(hole.events.map((e) => e.i), [0, 1, 2]);
   assert.deepEqual(hole.skipped, [3]);
   // A whole log (seq 4) never landed; 5 continued its chain. On chain 1 its base is within
   // reach — and it must still not apply: it was written against a log the store never held.
-  const chain = journalFold(base.concat([{ seq: 5, on: 4, base: 1, n: 1, text: linesOf([{ i: 'x' }]) }]));
+  const chain = journalFold(base.concat([{ seq: 5, on: 4, base: 1, n: 1, text: journalText([{ i: 'x' }]) }]));
   assert.deepEqual(chain.events.map((e) => e.i), [0, 1, 2]);
   assert.deepEqual(chain.skipped, [5]);
   // A damaged record is counted.
@@ -294,8 +294,8 @@ test('opening: browser storage\'s old copy is imported once, unchanged, with the
 
 test('opening: another tab holds the board — shown, never written; a damaged store is written whole', () => {
   const recs = [
-    { seq: 1, on: 1, base: 0, n: 1, text: linesOf([{ i: 0 }]) },
-    { seq: 3, on: 1, base: 5, n: 1, text: linesOf([{ i: 9 }]) },
+    { seq: 1, on: 1, base: 0, n: 1, text: journalText([{ i: 0 }]) },
+    { seq: 3, on: 1, base: 5, n: 1, text: journalText([{ i: 9 }]) },
   ];
   const ro = openPlan({ meta: { v: 1 }, records: recs, legacy: null, owner: false });
   assert.equal(ro.arm, null);
