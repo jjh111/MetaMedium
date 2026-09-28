@@ -14,7 +14,7 @@ exits nonzero if anything in it failed.
 
 ```bash
 cd e2e && npm ci && npx playwright install chromium   # once
-node run.mjs            # from anywhere: all four scenarios
+node run.mjs            # from anywhere: the default six (canvas, keep, boards, shard, demo, demo2)
 cd e2e && npm run e2e   # the same thing
 
 npx playwright install webkit                   # once, for the smoke
@@ -33,11 +33,12 @@ guessing. Pick scenarios by name to run one: `node e2e/run.mjs canvas`,
 | `demo` | `__demo()` | `shard-3d/` over vite, in its own context |
 | `smoke` | three checks written in `run.mjs` itself | `Demos/session-engine.html?fresh=1&nosw=1`, usually with `--browser webkit` |
 | `keep` | no lost work — `keep.mjs`, written here, not a page harness | `Demos/session-engine.html?nosw=1`, in several contexts of its own |
+| `boards` | several named boards — `boards.mjs`, written here, the boards pane driven with the real pointer | `Demos/session-engine.html?nosw=1`, in one context, with a second and third tab |
 | `big` | a 2,000-mark board saved and opened again (opt-in, minutes) | the same page, with the board from `metamedium-core/bench/board.mjs` |
 
 `--browser chromium` (the default) or `--browser webkit` picks the engine, and
 the run's `e2e.json` records which as `browser` / `browserVersion`. `smoke` is
-**opt-in**: a bare `node run.mjs` still runs the four Chromium scenarios and
+**opt-in**: a bare `node run.mjs` still runs the six Chromium scenarios and
 nothing else, so the default gate needs no second engine installed.
 
 ### The WebKit smoke, and what it is not
@@ -65,12 +66,16 @@ inside one page: its claim is about the page going away. So `keep.mjs` drives th
 surface from outside, with Playwright's real pointer, and opens and closes pages
 itself — several contexts, each with the gate's own guards.
 
-- **The kill test** (K). One board, ten cycles. Each opens the board in a new tab,
-  checks that every stroke whose release the page had taken is there, in order,
-  with nothing undone; draws boxes (undoing now and then); and kills the page at a
-  random point — right after a release, *during* one (the release sent and the
-  kill sent behind it: the stroke must then be there whole or not at all),
-  mid-stroke, right after an undo, or a moment later. A kill is Chromium's
+- **The kill test** (K). Two boards — the first, and one made through the boards
+  pane in the first cycle (R1) — ten cycles. Each opens the page in a new tab
+  (which opens the board opened last), checks that every stroke whose release the
+  page had taken is on it, in order, with nothing undone, switches to the other
+  board through the pane and checks that one too; draws boxes (undoing now and
+  then, and switching boards between two strokes in half the cycles); and kills
+  the page at a random point — right after a release, *during* one (the release
+  sent and the kill sent behind it: the stroke must then be there whole or not at
+  all), mid-stroke, right after an undo, a moment later, right after a switch, or
+  in the middle of one. A kill is Chromium's
   `Page.crash` (the renderer dies: no pagehide, nothing flushed) or `page.close()`
   (WebKit's only kind). The seed is printed; `E2E_KEEP_SEED` runs one again and
   `E2E_KEEP_CYCLES` changes the count.
@@ -93,6 +98,28 @@ itself — several contexts, each with the gate's own guards.
 (6.6 M characters of log — past the ~5 M browser storage refused), draws one more
 stroke with the real pointer, reloads, and checks every event is back. Each open
 replays the board, which at that size is R4's problem: a run takes minutes.
+
+### Several boards: `boards`
+
+`boards.mjs` (V1-PLAN R1, acceptance A8) drives the control centre's *boards*
+tile and its pane the way a hand does, in one context that starts from a board
+written the way R3's surface wrote it (IndexedDB version 1, one whole record
+under `default`, made by the committed Node bundle): **N1** it comes back byte
+for byte as the first entry, "My board", named on the tile and in the title;
+**N2** new; **N3** switch, the board left whole in the store the moment the
+switch completes; **N4** reload, `?board=`, an id not held said; **N5** rename
+(the same id, so the same journal; two boards named alike); **N6** duplicate;
+**N7** delete to the trash; **N8** restore; **N9** emptying the trash said
+plainly first, then done — entry, meta and every record gone, nothing else;
+**N10** a board open in another tab kept in the trash; **N11** one tab writes a
+board, per board; **N12** the view per board; **N13** folders and sites as
+recent places of their kind; **N14** Reset no longer one tap from losing a
+board; **N15** a board out as a log file from the export pane and back in from
+the boards pane; **N16** a board that is not saved (every record refused: the
+page's `IDBObjectStore.add` throws a real `QuotaExceededError`, both engines) is
+never left without a word — the switch refused in the pane with its ways out,
+nothing the store held lost while writes fail, and the switch going once a save
+lands. About 15 s, on Chromium and WebKit.
 
 ## What it refuses to do
 

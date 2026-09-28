@@ -189,12 +189,12 @@ any structural change.
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/surface/` | **The reference surface's source**: `surface.css` and twenty-five script fragments (`00-core`, `00-ui` … `20-controls`, `21-minimap`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. **`17-board.js` is the second** (V1-PLAN R3): the journal the board this browser keeps is written through, driven in Node by a store held in memory — `node --test Demos/surface/17-board.test.mjs`, in CI's `core` job too. A fragment's `.test.mjs` is not concatenated into the build |
+| `Demos/surface/` | **The reference surface's source**: `surface.css` and twenty-seven script fragments (`00-core`, `00-ui` … `20-controls`, `21-minimap`, `22-boards`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. **`17-board.js` is the second** (V1-PLAN R3): the journal the board this browser keeps is written through, driven in Node by a store held in memory — `node --test Demos/surface/17-board.test.mjs`, in CI's `core` job too. **`17-boards.js` is the third** (R1): the list of boards — names, the trash, which board a page opens, whether the one on screen may be left — `node --test Demos/surface/17-boards.test.mjs`, also in CI. A fragment's `.test.mjs` is not concatenated into the build |
 | `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture and `mcp-smoke.mjs` as its stdio test; `metamedium-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). `programs/` holds `run` programs written for the canvas (`metamedium-explained.run.js`: the loop told as a program, ending on a real measurement of the viewer's own stroke). Plus fish, composition diagrams, no-modes graph, etc. |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal), and the social card. `make-card.mjs` regenerates that card from index.html's own hero — synthetic pointer input, so the picture shows the engine really reading a mark; `node Assets/make-card.mjs`. Change the picture and you must change the FILENAME and the four og:/twitter: tags in `index.html` and `404.html`, because scrapers cache by URL |
 | `archive/` | Retired versions and superseded plans, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) and PRDs v3.2/v4 |
-| `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `shard-3d`), opens a **fresh Chromium context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `shard-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — and awaits the result object each one returns. It does not reimplement them. **Four scenarios** (`canvas`, `shard`, `demo`, `demo2`), 342 records and one honest skip as of 16 Sep 2026, in about 110 s. Pass, fail and **skip** are counted separately (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. Chromium only so far — a WebKit smoke is still owed. **`keep`** (`e2e/keep.mjs`, V1-PLAN R3) is a scenario of its own that loads no harness: the kill test (the page crashed or closed at random points, reopened, every completed stroke there), a save forced to fail (storage full for real, a store the browser will not let the page use), the one import of browser storage's old board, two tabs, and the pages that must not write — in the default run, and on WebKit too (`--browser webkit keep`, where it can); **`big`** (opt-in, minutes) saves and reopens a 2,000-mark board. `e2e/README.md` has the rest |
+| `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `shard-3d`), opens a **fresh Chromium context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `shard-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — and awaits the result object each one returns. It does not reimplement them. **Four scenarios** (`canvas`, `shard`, `demo`, `demo2`), 342 records and one honest skip as of 16 Sep 2026, in about 110 s. Pass, fail and **skip** are counted separately (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. Chromium only so far — a WebKit smoke is still owed. **`keep`** (`e2e/keep.mjs`, V1-PLAN R3) is a scenario of its own that loads no harness: the kill test (the page crashed or closed at random points, reopened, every completed stroke there), a save forced to fail (storage full for real, a store the browser will not let the page use), the one import of browser storage's old board, two tabs, and the pages that must not write — in the default run, and on WebKit too (`--browser webkit keep`, where it can); since R1 the kill test keeps two boards and switches between them through the boards pane mid-session, killing right after a switch and in the middle of one too, and checks both. **`boards`** (`e2e/boards.mjs`, R1, in the default run) drives the boards pane with the real pointer: R3's board as the first entry, new, switch, reload and `?board=`, rename, duplicate, delete, restore, emptying the trash said first, a board open in another tab, one tab per board, the view per board, recent places, Reset, a board out as a file and back, and a board that is not saved never left without a word. **`big`** (opt-in, minutes) saves and reopens a 2,000-mark board. `e2e/README.md` has the rest |
 | `PERF.md`, `metamedium-core/bench/`, `e2e/perf.mjs` | **The performance baseline** (V1-PLAN §9 R4a, 27 Sep 2026): `bench/board.mjs` draws deterministic boards of 500, 2,000 and 5,000 marks from a seed (the generator is kept, never the boards); `bench/engine.mjs` times replay, memory, relations, the whole-board read, one more stroke, a live room's incoming line and a newcomer's hello; `e2e/perf.mjs`, beside the gate and on its servers and model guard, times the surface — open, pan, draw, release → reading drawn — in Chromium and WebKit; `bench/profile.mjs` reads a CPU profile back to `src/…:line` and the surface's fragments; `bench/report.mjs` prints `PERF.md`'s tables from the results. `PERF.md` has the answer (500 marks usable, 2,000 not, 5,000 does not open), every number with its command, the hotspots ranked with file:line, and budgets for R4b. Not in `npm test` or the gate |
 | `.github/workflows/ci.yml` | CI: typecheck + test + build for `metamedium-core` (incl. a bundle-drift check), `shard-3d` and `Web App Skeleton`, plus the **browser gate** (`e2e/run.mjs`, results uploaded on failure), on every push/PR |
 
@@ -928,10 +928,10 @@ differ only by base URL and key. Anthropic needs its own client.
 — the wordmark and the panel toggle on the left, the mark chip, undo and the
 **control centre** on the right — and nothing in it explains the system
 (D3). The centre is a grid of tiles in fixed slots (zoom · snap · view ·
-theme · hand · auto-read · folder · import · export · models · mark · reset ·
-help), each saying its state on its face, closing on the next stroke, Esc, or
-a tap outside. The panes (models, your mark) open under the bar, one at a
-time. The chrome is built from six components in `surface/00-ui.js` — pill,
+theme · hand · auto-read · folder · import · export · models · mark · live ·
+reset · help · boards), each saying its state on its face, closing on the next
+stroke, Esc, or a tap outside. The panes (models, your mark, boards) open under
+the bar, one at a time. The chrome is built from six components in `surface/00-ui.js` — pill,
 chip, tile, row, pane — one stylesheet section each. **Light and dark are
 the same tokens inverted**: the stylesheet defines the light set on `:root`
 and the dark set on `[data-theme="dark"]`, the page stamps one of the two
@@ -1206,15 +1206,14 @@ the kill test alone (`node e2e/run.mjs keep`: the renderer crashed or the tab
 closed at random points — after a release, during one, mid-stroke, after an
 undo — and every completed stroke is on the reopened board, in order).
 `pagehide` and `visibilitychange` flush what is not yet written (a folder's or
-a room's pending save too); a reload brings the board back; *Reset* empties it
-and waits until it has. **The old way** — the whole log as one string in
+a room's pending save too); a reload brings the board back. **The old way** — the whole log as one string in
 browser storage (`mm-log`), rewritten 900 ms after the last change — stopped
 saving at about 1,500 marks and swallowed the error (PERF.md); that board is
 **imported once, unchanged**, the first time the store opens, and the key is
-removed only when the write has landed. **One tab writes a board** (a Web Lock
-for the page's life, or until it opens a folder or a room): a second tab shows
-it and writes nothing, and when the first lets go it takes over — unless the
-board was written since it opened.
+removed only when the write has landed. **One tab writes a board** (a Web Lock per
+board, held while the page is on it): a second tab shows it and writes nothing,
+and when the first lets go it takes over — unless the board was written since
+it opened.
 **A save that fails is never silent**: the status line LEADS with it, whatever
 else it says, until a save succeeds — *not saved — the browser's storage for
 this page is full* (or: this browser will not let the page keep anything, a
@@ -1228,8 +1227,54 @@ the same way. **Whose board a page is** (`boardMode`): a live room keeps no
 local log (L1); a replay and an embed are figures and never read or write the
 reader's board (the whitepaper embeds both, on the canvas's origin); a folder
 or repository named in the URL is its own; `?fresh=1` starts empty and replaces
-what is kept at its first change, as it always did. One board per browser for
-now, under one name — naming boards is R1.
+what is kept at its first change, as it always did (a test's page, never an
+address the surface writes).
+
+**Several boards** (V1-PLAN R1, acceptance A8; `17-boards.js` decides — pure,
+tested in Node — `17-folder.js` acts, `22-boards.js` is the pane). **A board is
+its log**: each is its own journal, keyed by the board's id (records under
+`[id, seq]`, meta under `id`), and the list — IndexedDB version 2 adds the
+`boards` store — holds one entry a board: its name, when it was made, opened and
+put in the trash, and nothing of what it holds. **The name is shown, never the
+key**, so a rename is one field of one entry, never orphans a journal, and two
+boards may share a name. R3's board is the first entry, **"My board"**, under
+the key R3 kept it under (`default`), untouched. A board's meta also says what
+it holds — when it last changed, its events, marks and characters — written in
+the same transaction as each record, so the list is right after a kill.
+**Where it lives in the chrome**: the control centre's *boards* tile, in a fixed
+slot after *help*, its face the name of what is on screen; it opens a pane
+under the bar (one pane at a time), built from the pane and chip components:
+*New board*, *from a file…* (a log as *export* writes it becomes a board), each
+board with when it changed and roughly how big it is (*42 marks · 12 KB*), the
+board on screen marked *here*, and *rename*, *duplicate*, *delete*; the folders,
+repositories and sites opened lately as **recent places**, each saying its kind,
+opened again the way their tile opens them (a folder's handle kept where the
+browser can; never a room, never a key); and **the trash**. **Delete moves a
+board to the trash** with one tap and loses nothing — *restore* brings it back
+whole; **emptying the trash is its own act, said plainly before it happens**
+(*1 board will be deleted for good — “Sketches” (42 marks). This cannot be
+undone.*), a second, deliberate tap; and a board another tab holds is never
+emptied out from under it (its lock is taken for the delete, and the pane says
+why it stayed). **Reset** is a fresh board under the same name, what the old
+one held in the trash — never one tap from losing it (it supersedes the handler
+`07-input.js` still sets; the old one emptied the board). **`?board=<id>`**
+opens a board; with none, the board opened last; an id this browser does not
+hold is said. The title carries the name, the address the id, and **the view
+comes back per board** (zoom and pan: a device preference per board id, not the
+log; the minimap follows). **Switching is in place and flushes the board being
+left**: the next board's lock and records are read while the one on screen goes
+on being written; then it is flushed and waited on until its store holds all of
+it — or the switch is refused and said in the pane, with *export the log* and
+*leave it anyway* (a second tap) — and only then, in one task with nothing
+awaited, is it left and the next loaded, so no stroke can land between. From a
+folder, a repository or a room a board opens in a page of its own, after the
+folder's save; opening a folder or joining a room from a board waits the same
+way, and a board that is not saved stops it (the line's *open a folder* carries
+that board in instead). The kill test runs across switches (two boards, switched mid-session,
+killed right after a switch and in the middle of one; both whole). The list
+never stands between a board and its journal: an entry the store refuses (full)
+is held and written once a record lands. With no IndexedDB there is one board
+and the pane says so.
 
 ### Live logs: multiplayer as a transport (v9 S6)
 
