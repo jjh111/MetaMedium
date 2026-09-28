@@ -13357,6 +13357,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   function applyReshape(ev) {
     const node = nodes.get(ev.id);
     if (!node || !ev.handle || !ev.to || !Number.isFinite(ev.to.x) || !Number.isFinite(ev.to.y)) return;
+    if (isPendingLasso(ev.id)) return;
     const clean = reshapedClean(node, nodes, { kind: ev.handle.kind, index: ev.handle.index }, { x: ev.to.x, y: ev.to.y });
     if (!clean) return;
     const was = getRep(node, "clean");
@@ -14209,7 +14210,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     bind: (args) => void dispatch({ type: "bind", ...args }),
     reshape: (args) => {
       const node = args && nodes.get(args.id);
-      if (!node || !args.handle) return false;
+      if (!node || !args.handle || isPendingLasso(args.id)) return false;
       const pv = reshapePreview(node, nodes, { kind: args.handle.kind, index: args.handle.index }, args.to);
       if (!pv) return false;
       dispatch({

@@ -2646,6 +2646,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const node = nodes.get(ev.id);
     // A log is read, not trusted (DATA-1): a point that is not one reshapes nothing.
     if (!node || !ev.handle || !ev.to || !Number.isFinite(ev.to.x) || !Number.isFinite(ev.to.y)) return;
+    // A loop that waits is a gesture in waiting, never redrawn (as `snappableIds` never offers it).
+    if (isPendingLasso(ev.id)) return;
     const clean = reshapedClean(node, nodes, { kind: ev.handle.kind, index: ev.handle.index }, { x: ev.to.x, y: ev.to.y });
     if (!clean) return;
     const was = getRep(node, 'clean');
@@ -3754,7 +3756,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       // is written: the handle let go at `to` on the board, kept in the
       // mark's own space. Nothing to reshape, nothing written.
       const node = args && nodes.get(args.id);
-      if (!node || !args.handle) return false;
+      if (!node || !args.handle || isPendingLasso(args.id)) return false;
       const pv = reshapePreview(node, nodes, { kind: args.handle.kind, index: args.handle.index }, args.to);
       if (!pv) return false;
       dispatch({
