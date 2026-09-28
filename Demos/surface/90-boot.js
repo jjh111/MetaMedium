@@ -60,6 +60,8 @@
     saveNow: saveNow,
     // The board this browser keeps (V1-PLAN R3), for tests: its state, what its store holds, and the way out into a folder.
     board: boardState, boardRecords: () => (board.backend ? board.backend.read() : Promise.resolve(null)), keepBoardIn: keepBoardIn,
+    boardLog: () => (board.backend ? board.backend.read().then((got) => journalFold(got.records).events) : Promise.resolve(null)),
+    boardIdle: () => board.journal.idle(),
     setViewMode: setViewMode, viewMode: () => viewMode, focusOn: focusOn,
     // Frames, for tests: the wired code a member renders with, and a frame as files.
     wiredCodeOf: (id) => wiredCodeOf(session.getState(), id),

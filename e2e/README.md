@@ -32,6 +32,8 @@ guessing. Pick scenarios by name to run one: `node e2e/run.mjs canvas`,
 | `shard` | `__scenario()` | `shard-3d/` over vite |
 | `demo` | `__demo()` | `shard-3d/` over vite, in its own context |
 | `smoke` | three checks written in `run.mjs` itself | `Demos/session-engine.html?fresh=1&nosw=1`, usually with `--browser webkit` |
+| `keep` | no lost work — `keep.mjs`, written here, not a page harness | `Demos/session-engine.html?nosw=1`, in several contexts of its own |
+| `big` | a 2,000-mark board saved and opened again (opt-in, minutes) | the same page, with the board from `metamedium-core/bench/board.mjs` |
 
 `--browser chromium` (the default) or `--browser webkit` picks the engine, and
 the run's `e2e.json` records which as `browser` / `browserVersion`. `smoke` is
@@ -55,6 +57,38 @@ minutes is one whoever waits on it turns off.
 A full run is about 70 s headless. `E2E_HEADED=1` watches it;
 `E2E_RESULTS=<dir>` moves the output; `E2E_TIMEOUT_MS` raises the per-scenario
 ceiling.
+
+### No lost work: `keep` and `big`
+
+The board a browser keeps when there is no folder (V1-PLAN R3) cannot be tested
+inside one page: its claim is about the page going away. So `keep.mjs` drives the
+surface from outside, with Playwright's real pointer, and opens and closes pages
+itself — several contexts, each with the gate's own guards.
+
+- **The kill test** (K). One board, ten cycles. Each opens the board in a new tab,
+  checks that every stroke whose release the page had taken is there, in order,
+  with nothing undone; draws boxes (undoing now and then); and kills the page at a
+  random point — right after a release, *during* one (the release sent and the
+  kill sent behind it: the stroke must then be there whole or not at all),
+  mid-stroke, right after an undo, or a moment later. A kill is Chromium's
+  `Page.crash` (the renderer dies: no pagehide, nothing flushed) or `page.close()`
+  (WebKit's only kind). The seed is printed; `E2E_KEEP_SEED` runs one again and
+  `E2E_KEEP_CYCLES` changes the count.
+- **A save forced to fail** (Q, B). Browser storage filled to its limit and the
+  origin's quota taken to nothing through the DevTools protocol, so IndexedDB
+  refuses with a real `QuotaExceededError` (Chromium; the quota must be down
+  before the page first opens its store, or Chromium never looks at it again) —
+  and, on both engines, every storage door made to throw `SecurityError` (a
+  private window, blocked site data). The status line must say it at once, keep
+  saying it, offer the ways out, and let it go when a save succeeds; both ways
+  out are taken.
+- **The import** (I), **two tabs** (T), and **pages that must not write** (L: a
+  live room, an embed, a replay).
+
+`big` puts a 2,000-mark board from the engine benchmark's generator on the page
+(6.6 M characters of log — past the ~5 M browser storage refused), draws one more
+stroke with the real pointer, reloads, and checks every event is back. Each open
+replays the board, which at that size is R4's problem: a run takes minutes.
 
 ## What it refuses to do
 

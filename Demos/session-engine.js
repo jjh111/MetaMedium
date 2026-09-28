@@ -6663,6 +6663,9 @@
   const PAGE_SITTING = MM.sittingToken(8);
   async function openLive(room, opts) {
     opts = opts || {};
+    // From here this page's log is the room's: nothing drawn under the room's
+    // name is written into the board this browser keeps (L1: a live tab keeps no local log).
+    board.journal.off();
     if (folder.store && folder.store.close) folder.store.close();
     folder.noticed = new Set();
     // A hand in a room is one SITTING: a second tab of the same person is a
@@ -6925,6 +6928,8 @@
         resolve(db);
       };
       req.onerror = () => reject(req.error || new DOMException('the browser would not open its storage', 'UnknownError'));
+      // An older copy of the page holds the store open at an older version and will not let go.
+      req.onblocked = () => { board.journal.broken({ kind: 'tab', detail: 'an older copy of the page' }); };
     });
   }
 
@@ -7007,17 +7012,20 @@
       const ctl = typeof AbortController === 'function' ? new AbortController() : null;
       const forever = () => new Promise(() => {});
       const timer = setTimeout(() => { if (settled) return; settled = true; if (ctl) ctl.abort(); resolve('taken'); }, waitMs);
-      navigator.locks.request(BOARD_LOCK, ctl ? { signal: ctl.signal } : {}, () => {
-        if (settled) { boardFreed(); return forever(); }
-        settled = true; clearTimeout(timer); resolve('held');
-        return forever();
-      }).catch(() => { if (!settled) { settled = true; clearTimeout(timer); resolve('none'); } });
+      const none = () => { if (!settled) { settled = true; clearTimeout(timer); resolve('none'); } };
+      try {
+        navigator.locks.request(BOARD_LOCK, ctl ? { signal: ctl.signal } : {}, () => {
+          if (settled) { boardFreed(); return forever(); }
+          settled = true; clearTimeout(timer); resolve('held');
+          return forever();
+        }).catch(none);
+      } catch (err) { none(); } // a page the lock manager will not serve (an opaque origin): this tab writes, as before
     });
   }
   /** Wait for the other tab to let the board go. */
   function waitForBoard() {
     if (!(navigator.locks && navigator.locks.request)) return;
-    navigator.locks.request(BOARD_LOCK, () => { boardFreed(); return new Promise(() => {}); }).catch(() => { /* nothing */ });
+    try { navigator.locks.request(BOARD_LOCK, () => { boardFreed(); return new Promise(() => {}); }).catch(() => { /* nothing */ }); } catch (err) { /* nothing */ }
   }
   /** The other tab let go: this one writes from here — if nothing was written since it opened. */
   async function boardFreed() {
@@ -7039,14 +7047,26 @@
    */
   async function openBoard(mode) {
     board.mode = mode;
+    try { return await openBoardNow(mode); } catch (err) {
+      // Whatever went wrong, it is said: a page that silently stopped saving is the one thing this may not do.
+      board.journal.broken(troubleOf(err, 'open'));
+      board.ready = true;
+      return false;
+    }
+  }
+  async function openBoardNow(mode) {
     let legacy = null;
     try { legacy = localStorage.getItem(LOCAL_LOG_KEY); } catch (err) { legacy = null; }
     let got = null, fallback = null, unreadable = null;
     try {
-      const db = await openBoardDB();
+      // A store that never answers is a store that does not work: said, not waited on forever.
+      const db = await Promise.race([openBoardDB(), new Promise((resolve, reject) => setTimeout(() => reject(new DOMException('the browser did not open its storage within 10 s', 'TimeoutError')), 10000))]);
       board.backend = idbBackend(db);
       board.how = 'indexeddb';
-    } catch (err) { fallback = err; }
+    } catch (err) {
+      if (err && err.name === 'TimeoutError') throw err;
+      fallback = err;
+    }
     if (!fallback) {
       board.lock = await takeBoardLock(1500);
       try { got = await board.backend.read(); } catch (err) { unreadable = err; }
@@ -8005,6 +8025,8 @@
     saveNow: saveNow,
     // The board this browser keeps (V1-PLAN R3), for tests: its state, what its store holds, and the way out into a folder.
     board: boardState, boardRecords: () => (board.backend ? board.backend.read() : Promise.resolve(null)), keepBoardIn: keepBoardIn,
+    boardLog: () => (board.backend ? board.backend.read().then((got) => journalFold(got.records).events) : Promise.resolve(null)),
+    boardIdle: () => board.journal.idle(),
     setViewMode: setViewMode, viewMode: () => viewMode, focusOn: focusOn,
     // Frames, for tests: the wired code a member renders with, and a frame as files.
     wiredCodeOf: (id) => wiredCodeOf(session.getState(), id),

@@ -189,12 +189,12 @@ any structural change.
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/surface/` | **The reference surface's source**: `surface.css` and twenty-four script fragments (`00-core`, `00-ui` … `20-controls`, `21-minimap`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. A fragment's `.test.mjs` is not concatenated into the build |
+| `Demos/surface/` | **The reference surface's source**: `surface.css` and twenty-five script fragments (`00-core`, `00-ui` … `20-controls`, `21-minimap`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. **`17-board.js` is the second** (V1-PLAN R3): the journal the board this browser keeps is written through, driven in Node by a store held in memory — `node --test Demos/surface/17-board.test.mjs`, in CI's `core` job too. A fragment's `.test.mjs` is not concatenated into the build |
 | `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file. **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture and `mcp-smoke.mjs` as its stdio test; `metamedium-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). `programs/` holds `run` programs written for the canvas (`metamedium-explained.run.js`: the loop told as a program, ending on a real measurement of the viewer's own stroke). Plus fish, composition diagrams, no-modes graph, etc. |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal), and the social card. `make-card.mjs` regenerates that card from index.html's own hero — synthetic pointer input, so the picture shows the engine really reading a mark; `node Assets/make-card.mjs`. Change the picture and you must change the FILENAME and the four og:/twitter: tags in `index.html` and `404.html`, because scrapers cache by URL |
 | `archive/` | Retired versions and superseded plans, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) and PRDs v3.2/v4 |
-| `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `shard-3d`), opens a **fresh Chromium context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `shard-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — and awaits the result object each one returns. It does not reimplement them. **Four scenarios** (`canvas`, `shard`, `demo`, `demo2`), 342 records and one honest skip as of 16 Sep 2026, in about 110 s. Pass, fail and **skip** are counted separately (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. Chromium only so far — a WebKit smoke is still owed. `e2e/README.md` has the rest |
+| `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `shard-3d`), opens a **fresh Chromium context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `shard-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — and awaits the result object each one returns. It does not reimplement them. **Four scenarios** (`canvas`, `shard`, `demo`, `demo2`), 342 records and one honest skip as of 16 Sep 2026, in about 110 s. Pass, fail and **skip** are counted separately (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. Chromium only so far — a WebKit smoke is still owed. **`keep`** (`e2e/keep.mjs`, V1-PLAN R3) is a scenario of its own that loads no harness: the kill test (the page crashed or closed at random points, reopened, every completed stroke there), a save forced to fail (storage full for real, a store the browser will not let the page use), the one import of browser storage's old board, two tabs, and the pages that must not write — in the default run, and on WebKit too (`--browser webkit keep`, where it can); **`big`** (opt-in, minutes) saves and reopens a 2,000-mark board. `e2e/README.md` has the rest |
 | `PERF.md`, `metamedium-core/bench/`, `e2e/perf.mjs` | **The performance baseline** (V1-PLAN §9 R4a, 27 Sep 2026): `bench/board.mjs` draws deterministic boards of 500, 2,000 and 5,000 marks from a seed (the generator is kept, never the boards); `bench/engine.mjs` times replay, memory, relations, the whole-board read, one more stroke, a live room's incoming line and a newcomer's hello; `e2e/perf.mjs`, beside the gate and on its servers and model guard, times the surface — open, pan, draw, release → reading drawn — in Chromium and WebKit; `bench/profile.mjs` reads a CPU profile back to `src/…:line` and the surface's fragments; `bench/report.mjs` prints `PERF.md`'s tables from the results. `PERF.md` has the answer (500 marks usable, 2,000 not, 5,000 does not open), every number with its command, the hotspots ranked with file:line, and budgets for R4b. Not in `npm test` or the gate |
 | `.github/workflows/ci.yml` | CI: typecheck + test + build for `metamedium-core` (incl. a bundle-drift check), `shard-3d` and `Web App Skeleton`, plus the **browser gate** (`e2e/run.mjs`, results uploaded on failure), on every push/PR |
 
@@ -1173,9 +1173,7 @@ through an `import` event **in this participant's log**, laid out as
 cards; a second machine that pulls sees the same board and discovers
 nothing twice. Logs are one file per participant under
 `.metamedium/logs/`, one event per line, and the canvas is `mergeLogs` of
-them; **autosave** rewrites only this participant's file, or holds the
-whole log in browser storage when there is no folder — a reload brings the
-board back and *Reset* forgets it. A static site is opened read-only through
+them; **autosave** rewrites only this participant's file. A static site is opened read-only through
 `.metamedium/manifest.json` (`?folder=<base>`), so a published canvas can be
 drawn on and the ink stays the reader's. **The live budget**: the nearest
 twelve live artifacts render; the rest stand as parked cards — except that
@@ -1193,6 +1191,44 @@ network-first with the cache as the fallback. **Loops do not depend on paint**: 
 the browser stops painting gets no animation frames, so the tank and the
 worker take a timer's tick when no frame comes (`nextFrame` in
 `01-view.js`) — time is state, not a movie.
+
+**With no folder, the board is kept in this browser** (V1-PLAN R3;
+`Demos/surface/17-board.js` decides, `17-folder.js` acts): in IndexedDB
+(`mm-boards`), as an **append-only journal**. A record is `{ base, text }` —
+keep the first `base` events, then append these — so a stroke is one event
+written and an undo is a cut, never a rewrite; a record with base 0 is the
+whole log, starts a chain, and its transaction deletes every record before it.
+**A change is written in the task that made it**: the journal is the session's
+*first* listener, ahead of the paint (a release on a big board paints for
+seconds), and the transaction is begun and committed before `append` returns —
+so a tab that dies right after a release keeps the stroke. That is claimed by
+the kill test alone (`node e2e/run.mjs keep`: the renderer crashed or the tab
+closed at random points — after a release, during one, mid-stroke, after an
+undo — and every completed stroke is on the reopened board, in order).
+`pagehide` and `visibilitychange` flush what is not yet written (a folder's or
+a room's pending save too); a reload brings the board back; *Reset* empties it
+and waits until it has. **The old way** — the whole log as one string in
+browser storage (`mm-log`), rewritten 900 ms after the last change — stopped
+saving at about 1,500 marks and swallowed the error (PERF.md); that board is
+**imported once, unchanged**, the first time the store opens, and the key is
+removed only when the write has landed. **One tab writes a board** (a Web Lock
+for the page's life): a second tab shows it and writes nothing, and when the
+first lets go it takes over — unless the board was written since it opened.
+**A save that fails is never silent**: the status line LEADS with it, whatever
+else it says, until a save succeeds — *not saved — the browser's storage for
+this page is full* (or: this browser will not let the page keep anything, a
+private window or blocked site data; this board is open in another tab; the
+folder refused the write) — with its ways out as buttons in the sentence:
+*export the log*, and *open a folder* where the browser can, which carries this
+board into the folder (`keepBoardIn`) rather than letting the folder's replace
+it. A failed write is retried as the whole log after a pause and on a timer.
+With no IndexedDB, browser storage is the store as before, and fails out loud
+the same way. **Whose board a page is** (`boardMode`): a live room keeps no
+local log (L1); a replay and an embed are figures and never read or write the
+reader's board (the whitepaper embeds both, on the canvas's origin); a folder
+or repository named in the URL is its own; `?fresh=1` starts empty and replaces
+what is kept at its first change, as it always did. One board per browser for
+now, under one name — naming boards is R1.
 
 ### Live logs: multiplayer as a transport (v9 S6)
 
