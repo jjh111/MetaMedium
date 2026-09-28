@@ -290,7 +290,12 @@ function detectArrow(fp: Fingerprint, points: Point[], scale = 1): RecognitionRe
     // box's side never has — and which says nothing about the barb's angle,
     // because John's real barbs do not all draw back far (S1).
     const barb = barbOf(path, tipIdx, head, tail, scale);
-    const shortBarb = 1 - ramp(barb.ratio, BARB_OF_SHAFT[0], BARB_OF_SHAFT[1]);
+    // Short against the shaft, or short in the hand's space: a barb is a
+    // flick of the pen, and on a short arrow the flick is most of the shaft.
+    const shortBarb = Math.max(
+      1 - ramp(barb.ratio, BARB_OF_SHAFT[0], BARB_OF_SHAFT[1]),
+      1 - ramp(barb.reach / scale, BARB_FLICK_PX[0], BARB_FLICK_PX[1])
+    );
     return {
       fit: (shaftOk * 0.5 + barbOk * 0.35 + shortHead * 0.15) * shortBarb,
       head,
@@ -323,6 +328,12 @@ function detectArrow(fp: Fingerprint, points: Point[], scale = 1): RecognitionRe
  * box two and a half times as wide as it is tall, is two fifths of its first.
  */
 export const BARB_OF_SHAFT = [0.3, 0.45] as const;
+/**
+ * …or it is a flick of the pen, whatever the shaft: this many pixels on
+ * screen at most, full credit to the first. About half John's x-height (31–40
+ * px) and D1's heads (16 px); an L's arm on any box a hand draws is longer.
+ */
+export const BARB_FLICK_PX = [16, 32] as const;
 
 /**
  * The barb at one end of a stroke: how far it reaches from the tip, against

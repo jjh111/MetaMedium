@@ -206,6 +206,17 @@ describe('an arrow’s barb is short against its shaft; an L is two arms (S1)', 
     }
   });
 
+  it('a barb is a flick of the pen: a short arrow with a hand-sized head is still an arrow', () => {
+    // On a 40px shaft a 16px barb is 0.4 of it — as long against its shaft as
+    // an L's arm — but in the hand's space it is a flick, not an arm.
+    for (const [len, headLen] of [[40, 16], [50, 16], [60, 20]]) {
+      for (const seed of [1, 2, 3]) {
+        const results = analyzeStroke(handArrow({ x: 0, y: 0 }, { x: len, y: len * 0.25 }, { headLen, seed, jitter: 1 })).results;
+        expect(results.map((r) => r.type), `${len} with ${headLen}`).toContain('arrow');
+      }
+    }
+  });
+
   it('a tall l with a liftoff flick stays a line (QA-v10: no arrow)', () => {
     // John's l, 8×73 on screen: a stem, and the hook a pen leaves lifting off.
     for (const seed of [1, 2, 3, 4]) {
