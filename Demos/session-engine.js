@@ -5571,6 +5571,10 @@
     // to the hand, beside or above or below each card that is clear of all of them
     // and still whole on screen. Nothing clear: where it was wanted, as before.
     const cards = (o.avoid || (o.panel ? [o.panel] : [])).filter(Boolean);
+    // The press itself is kept clear: fitted into the screen at its edge, the field used to slide
+    // back under the hand and open beneath the pointer (U2's walk). The other side of the hand is
+    // among the places tried below.
+    if (anchor) cards.push({ left: at.x - FIELD_M, right: at.x + FIELD_M, top: at.y - FIELD_M, bottom: at.y + FIELD_M });
     const clear = (b) => !cards.some((r) => b.x < r.right + FIELD_M - 0.5 && b.x + w > r.left - FIELD_M + 0.5 && b.y < r.bottom + FIELD_M - 0.5 && b.y + h > r.top - FIELD_M + 0.5);
     if (clear(want)) return want;
     const tries = [fit(o.hand === 'left' ? at.x + 14 : at.x - 14 - w, at.y - 22)];
