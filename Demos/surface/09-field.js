@@ -36,6 +36,9 @@
    * @property {boolean} [certain]  a reading of these marks (the top row), not an affordance
    * @property {string} [why]       the tooltip; the reader quotes it when the offer is disabled
    * @property {boolean} [disabled] offered, but not available on this selection
+   * @property {string} [enter]     what Enter does when this item leads, said in the line
+   *                                 instead of "take it as the name" (W2: writing is read)
+   * @property {*} [asks]           truthy when taking it asks a model: the line carries the dot
    *
    * @typedef {Object} FieldContext  everything the reader is allowed to know
    * @property {string} text          what has been typed, untrimmed
@@ -65,6 +68,7 @@
    * @property {string} kind        empty|default|name|label|what|ask|draw|brief|structure|verb|library|behaviour|blocked|page|run|program|new
    * @property {string} line        the sentence under the field: what Enter will do
    * @property {boolean} [quiet]    said, but not as a promise — Enter does nothing
+   * @property {boolean} [model]    Enter asks a model: the line carries the dot
    * @property {FieldCommand|null} command
    */
 
@@ -157,7 +161,13 @@
     // Nothing typed: Enter takes the leading reading, if these marks have one.
     if (!text) {
       const first = items.find((i) => i.certain);
-      if (first) return { kind: 'default', line: '↵ ' + first.label + ' — ' + String(first.why || '').split(' — ').pop(), command: take(first) };
+      if (first) {
+        // A reading that says what taking it does (writing: read it, W2) says that; the rest are taken as the name.
+        const line = '↵ ' + (first.enter || first.label + ' — ' + String(first.why || '').split(' — ').pop());
+        const out = { kind: 'default', line: line, command: take(first) };
+        if (first.asks) out.model = true;
+        return out;
+      }
       return { kind: 'empty', line: '', quiet: true, command: null };
     }
 

@@ -409,7 +409,8 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       const calls = chats().length;
       const wordAt = await page.evaluate((id) => { const b = window.__mm.MM.boundsOf(window.__mm.session.getState().nodes.get(id)); return window.__mm.worldToScreen((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2); }, board.word);
       const held = await holdAt(page, wordAt.x, wordAt.y);
-      const took = held && (await takePill(page, 'Read the writing') || await takePill(page, 'Read as writing'));
+      // A word held alone: its one option is the writing reading, which reads it (W2).
+      const took = held && (await takePill(page, /^writing( \d\.\d\d)?$/) || await takePill(page, 'Read the writing') || await takePill(page, 'Read as writing'));
       await sleep(200);
       const said = await statusLine(page);
       const after = await page.evaluate(() => ({

@@ -4647,6 +4647,9 @@
    * @property {boolean} [certain]  a reading of these marks (the top row), not an affordance
    * @property {string} [why]       the tooltip; the reader quotes it when the offer is disabled
    * @property {boolean} [disabled] offered, but not available on this selection
+   * @property {string} [enter]     what Enter does when this item leads, said in the line
+   *                                 instead of "take it as the name" (W2: writing is read)
+   * @property {*} [asks]           truthy when taking it asks a model: the line carries the dot
    *
    * @typedef {Object} FieldContext  everything the reader is allowed to know
    * @property {string} text          what has been typed, untrimmed
@@ -4676,6 +4679,7 @@
    * @property {string} kind        empty|default|name|label|what|ask|draw|brief|structure|verb|library|behaviour|blocked|page|run|program|new
    * @property {string} line        the sentence under the field: what Enter will do
    * @property {boolean} [quiet]    said, but not as a promise — Enter does nothing
+   * @property {boolean} [model]    Enter asks a model: the line carries the dot
    * @property {FieldCommand|null} command
    */
 
@@ -4768,7 +4772,13 @@
     // Nothing typed: Enter takes the leading reading, if these marks have one.
     if (!text) {
       const first = items.find((i) => i.certain);
-      if (first) return { kind: 'default', line: '↵ ' + first.label + ' — ' + String(first.why || '').split(' — ').pop(), command: take(first) };
+      if (first) {
+        // A reading that says what taking it does (writing: read it, W2) says that; the rest are taken as the name.
+        const line = '↵ ' + (first.enter || first.label + ' — ' + String(first.why || '').split(' — ').pop());
+        const out = { kind: 'default', line: line, command: take(first) };
+        if (first.asks) out.model = true;
+        return out;
+      }
       return { kind: 'empty', line: '', quiet: true, command: null };
     }
 
@@ -5073,6 +5083,28 @@
     // An act as particular to these marks as a reading (Fold “…” into the text)
     // stands with the readings, where it always stood: after the line it takes.
     const lead = offers.filter((i) => i.certain);
+    // Writing reads when it is writing (PLAN-USER-SURFACE W2): held writing that nobody has
+    // read is ONE option — its reading, taken by reading it (the read tool's own act, so a
+    // model that sees, Claude's seat, or the ask kept for one), never by naming it "writing".
+    // Read the writing and What is this? stay typeable and leave the row. Once the words land
+    // the reading names again, and the words lead, as they always did.
+    const readOffer = allWriting ? offers.find((i) => i.key === 'read') : null;
+    if (readOffer) {
+      const at = conceived.findIndex((i) => i.key === 'concept:writing');
+      const concept = at >= 0 ? conceived[at] : null;
+      const conf = concept ? concept.groupConf : writingConfidence(s, marks);
+      const need = needFor('read');
+      const reads = readingItem({
+        key: concept ? concept.key : 'writing', grounds: { on: 'concept', confidence: conf, why: concept ? concept.groupWhy : 'writing, unread' },
+        label: 'writing' + (conf ? ' ' + conf.toFixed(2) : ''), name: 'writing',
+        why: readOffer.why + ' — read it',
+        tier: 2, asks: 'model', tool: 'read', verbs: ['writing'],
+        enter: 'read it' + (need ? ' — ' + need + ': it is kept, and runs when one joins' : ''),
+        run: () => readOffer.run(),
+      });
+      if (concept) conceived.splice(at, 1, reads); else conceived.unshift(reads);
+      for (const i of offers) if (i.key === 'read' || i.key === 'what') i.group = 'hidden';
+    }
     const items = known.concat(lined, lead, worded, proposed, conceived, offers.filter((i) => !i.certain));
     // A pill that asks a model none here can answer says what it needs, inline, while it is pointed at (J5).
     for (const it of items) {
@@ -5081,6 +5113,18 @@
       if (need) it.line = '↵ ' + it.label + ' — ' + need + ': it is kept, and runs when one joins';
     }
     return items;
+  }
+
+  /** How surely held marks read as writing, when no concept says: the shape rung's `text` reading, the least sure of them. */
+  function writingConfidence(s, ids) {
+    let least = null;
+    for (const id of ids) {
+      const n = s.nodes.get(id);
+      const r = n && MM.interpretationsOf(n, s.nodes).find((x) => x.tier === 0 && x.label === 'text');
+      if (!r) return 0;
+      least = least === null ? r.weight : Math.min(least, r.weight);
+    }
+    return least || 0;
   }
 
   // ===== Taking an offer: the tool writes, the surface does the rest =========
@@ -5418,6 +5462,7 @@
     const cmd = r.command;
     const out = { kind: r.kind, line: r.line, run: cmd ? () => runFieldCommand(cmd, sum, items) : null };
     if (r.quiet) out.quiet = true;
+    if (r.model) out.model = true;
     // The pill the reading points at, for the row to mark as chosen.
     if (cmd && cmd.do === 'take') out.item = (items[cmd.index] && items[cmd.index].key === cmd.key) ? items[cmd.index] : items.find((i) => i.key === cmd.key);
     if (cmd && cmd.do === 'library') out.entry = libraryEntries(s).find((e) => e.id === cmd.id) || null;
@@ -5703,8 +5748,8 @@
     // own line (Name it, Label it: one word, two acts), what THAT pill will do while it is
     // pointed at or chosen by the arrows. The difference said where the hand is looking.
     const chosen = paletteNavigated && shown[paletteIndex] && shown[paletteIndex].line ? shown[paletteIndex] : null;
-    const sayLine = (line, quiet) => { if (readingEl) { readingEl.textContent = line || ''; readingEl.classList.toggle('quiet', !!quiet); } };
-    const standingLine = () => (chosen ? sayLine(chosen.line, false) : sayLine(r.line, r.quiet));
+    const sayLine = (line, quiet, model) => { if (readingEl) { readingEl.textContent = line || ''; readingEl.classList.toggle('quiet', !!quiet); readingEl.classList.toggle('model', !!model); } };
+    const standingLine = () => (chosen ? sayLine(chosen.line, false) : sayLine(r.line, r.quiet, r.model));
     let i = 0, shownAfford = 0, shownCertain = 0;
     for (const item of shown) {
       // Which pill leads its row: the one a "first because" belongs to.

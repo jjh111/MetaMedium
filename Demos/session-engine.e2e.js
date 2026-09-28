@@ -41,7 +41,10 @@ window.__helpers = function(){
   function coreSlots(){ return [...document.querySelectorAll('#summon .row.core .pill')].map(b=>b.dataset.verb); }
   // Take a loop up the way a hand does: the active command mark drawn across its right edge.
   function takeLoop(cx, cy, r){ const taught = !!window.__mm.session.getState().commandMark; stroke(taught ? caret(cx + r - 30, cy - 20) : check(cx + r - 35, cy - 8)); }
-  window.__t = {stroke,strokeOn,line,rect,circle,caret,check,scratch,word,summary,chips,takeLoop,typeIn,typeEnter,readingLine,coreSlots};
+  // The one option that reads held writing nobody has read (W2): the writing reading itself on a
+  // scope that is all writing, else Read the writing among the rest.
+  function readPill(){ return document.querySelector('#summon .pill.item[data-key="concept:writing"], #summon .pill.item[data-key="writing"]') || [...document.querySelectorAll('#summon .item')].find(b => /^Read the writing/.test(b.textContent.trim())) || null; }
+  window.__t = {stroke,strokeOn,line,rect,circle,caret,check,scratch,word,summary,chips,takeLoop,typeIn,typeEnter,readingLine,coreSlots,readPill};
 
   // Teach the caret as the command mark, through the real pad UI.
   window.__teach = function(){
@@ -1503,7 +1506,7 @@ window.__scenario = async function(){
     step('30. three words on one line read as writing, with a number', chips30.some(c => /^writing 0\.\d\d/.test(c)), chips30);
     window.__readReply = [{ text: 'hello wide world', confidence: 0.9 }];
     const calls30 = window.__calls.length;
-    const readPill = [...document.querySelectorAll('#summon .item')].find(b => /Read the writing/.test(b.textContent));
+    const readPill = t.readPill(); // the writing reading itself, which reads (W2)
     step('30a. one offer to read the line, not three', !!readPill && /line of 3/.test(readPill.title), readPill && readPill.title);
     if (readPill) readPill.click();
     const wordsNow = () => { const st = mm.session.getState(); return st.contentIds.filter(id => MM.transcriptOf(st.nodes.get(id))).map(id => MM.transcriptOf(st.nodes.get(id))); };
@@ -1622,7 +1625,7 @@ window.__scenario = async function(){
     t.stroke(t.word(200, 300, 90, 28, 6)); t.stroke(t.word(320, 302, 110, 26, 7)); t.stroke(t.word(460, 300, 80, 28, 5));
     t.stroke(t.circle(370, 330, 220)); t.takeLoop(370, 330, 220); await wait(60);
     window.__readReply = [{ text: 'hello wide world', confidence: 0.9 }];
-    const readPill34 = [...document.querySelectorAll('#summon .item')].find(b => /Read the writing/.test(b.textContent));
+    const readPill34 = t.readPill(); // the one option that reads the writing (W2)
     if (readPill34) readPill34.click();
     const readCount34 = () => { const st = mm.session.getState(); return st.contentIds.filter(id => MM.transcriptOf(st.nodes.get(id))).length; };
     for (let i = 0; i < 30 && readCount34() < 3; i++) await wait(100);
@@ -1660,7 +1663,7 @@ window.__scenario = async function(){
     t.stroke(t.word(200, 300, 90, 28, 6)); t.stroke(t.word(320, 302, 110, 26, 7)); t.stroke(t.word(460, 300, 80, 28, 5));
     t.stroke(t.circle(370, 330, 220)); t.takeLoop(370, 330, 220); await wait(60);
     window.__readReply = [{ text: 'hello wide world', confidence: 0.9 }];
-    const rp35 = [...document.querySelectorAll('#summon .item')].find(b => /Read the writing/.test(b.textContent));
+    const rp35 = t.readPill(); // the one option that reads the writing (W2)
     if (rp35) rp35.click();
     const read35 = () => { const st = mm.session.getState(); return st.contentIds.filter(id => MM.transcriptOf(st.nodes.get(id))).length; };
     for (let i = 0; i < 30 && read35() < 3; i++) await wait(100);
@@ -1688,7 +1691,7 @@ window.__scenario = async function(){
     if (w2) { t.stroke(t.circle(w2.box.minX + 55, w2.box.minY - 37, 80)); t.takeLoop(w2.box.minX + 55, w2.box.minY - 37, 80); }
     await wait(60);
     window.__readReply = [{ text: 'wide', confidence: 0.9 }];
-    const rp35b = [...document.querySelectorAll('#summon .item')].find(b => /Read the writing/.test(b.textContent));
+    const rp35b = t.readPill(); // the one option that reads the writing (W2)
     if (rp35b) rp35b.click();
     for (let i = 0; i < 30 && !t.chips().some(c => /Fold “wide” into the text/.test(c)); i++) await wait(100);
     const foldPill = [...document.querySelectorAll('#summon .item')].find(b => /Fold “wide” into the text/.test(b.textContent));
@@ -3550,27 +3553,30 @@ window.__scenario = async function(){
     const visible55 = () => [...document.querySelectorAll('#summon .row.certain .pill.item, #summon .row.afford .pill.item')].map((b) => ({ key: b.dataset.key, label: (b.querySelector('span') || b).textContent.trim(), dot: !!b.querySelector('.dot') }));
     const last55 = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
     const said55 = (ids) => { const st = mm.session.getState(); return ids.map((id) => MM.transcriptOf(st.nodes.get(id))).filter(Boolean); };
+    // A model is a participant only through its join event, which a load wipes: the stub joins again.
+    const rejoin55 = () => { mm.agents.length = 0; mm.agents.push(MM.createAgentParticipant(mm.session, Object.assign({}, MM.PRESETS.ollama, { model: 'e2e-stub', vision: true }), Date.now())); };
     // A written word, held: the one option is to read it, and Enter does.
-    mm.session.load([]); mm.setView(1, 0, 0);
+    mm.session.load([]); mm.setView(1, 0, 0); rejoin55();
     t.stroke(t.word(200, 300, 90, 28, 6)); const word55 = last55();
     mm.session.summonMarks([word55], Date.now()); await wait(80);
     const pills55 = visible55(), line55 = t.readingLine();
     const calls55 = window.__calls.length;
     window.__readReply = [{ text: 'hello', confidence: 0.9 }];
-    t.typeEnter(''); await wait(400);
+    t.typeEnter(''); for (let i = 0; i < 30 && !said55([word55]).length; i++) await wait(100);
     step('55. a written word held: the field offers one option, reading it, and the line says ↵ read it — Enter reads it',
       pills55.length === 1 && pills55[0].dot && !pills55.some((p) => /Read the writing|What is this/.test(p.label)) && /^↵ read it/.test(line55)
         && window.__calls.length === calls55 + 1 && said55([word55]).join(' ') === 'hello',
       { pills: pills55, line: line55, calls: window.__calls.length - calls55, said: said55([word55]) });
     // A written line, held: the same, and the line is read in one call.
-    mm.session.load([]); mm.setView(1, 0, 0);
+    mm.session.load([]); mm.setView(1, 0, 0); rejoin55();
     const words55 = [];
     for (const [x, y, w, h, humps] of [[200, 300, 90, 28, 6], [320, 302, 110, 26, 7], [460, 300, 80, 28, 5]]) { t.stroke(t.word(x, y, w, h, humps)); words55.push(last55()); }
     mm.session.summonMarks(words55, Date.now()); await wait(80);
     const pills55b = visible55(), line55b = t.readingLine();
     const calls55b = window.__calls.length;
     window.__readReply = [{ text: 'hello wide world', confidence: 0.9 }];
-    t.typeEnter(''); await wait(400);
+    t.typeEnter(''); for (let i = 0; i < 30 && said55(words55).length < 3; i++) await wait(100);
+    await wait(100);
     step('55b. a written line held: one option, the writing reading, with its dot; the line says ↵ read it, and Enter reads the line in one call — never names it "writing"',
       pills55b.length === 1 && pills55b[0].dot && /^writing 0\.\d\d$/.test(pills55b[0].label) && /^↵ read it/.test(line55b)
         && window.__calls.length === calls55b + 1 && said55(words55).join(' ') === 'hello wide world' && !mm.session.getState().artifacts.length,
@@ -3592,6 +3598,7 @@ window.__scenario = async function(){
       { line: line55d, kept: kept55 && kept55.what, need: need55, pane: pane55, calls: window.__calls.length - calls55d });
     mm.agents.push(...agents55);
     window.__readReply = null;
+    mm.session.load([]); rejoin55();
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
@@ -3681,7 +3688,7 @@ window.__fieldGolden = async function () {
   await hold(words);
   out['line of writing'] = capture();
   window.__readReply = [{ text: 'hello wide world', confidence: 0.9 }];
-  const readPill = document.querySelector('#summon .pill[data-key="read"]');
+  const readPill = t.readPill(); // the writing reading, which reads it (W2)
   if (readPill) readPill.click();
   const heard = () => { const st = mm.session.getState(); return words.filter((id) => MM.transcriptOf(st.nodes.get(id))).length; };
   for (let i = 0; i < 40 && heard() < 3; i++) await wait(100);

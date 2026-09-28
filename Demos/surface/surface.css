@@ -370,6 +370,8 @@ body.panelHidden #inspector { display: none; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 #summon .reading.quiet { color: var(--dim); }
+/* Enter asks a model (W2: writing is read): the line carries the pill's dot. */
+#summon .reading.model::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--agent); margin-right: 5px; vertical-align: 1px; }
 /* An ask kept for a model (V1-PLAN J5): what it needs, said where it was asked, and the one way the models pane opens for it. */
 #summon .need { font: 10.5px var(--mono); color: var(--dim); padding: 0 5px 4px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 #summon .need[hidden] { display: none; }

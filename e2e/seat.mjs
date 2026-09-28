@@ -326,7 +326,8 @@ export async function runSeat(browser, servers, { freshContext, screenshot }) {
       await stroke(page, pts);
       word = await page.evaluate(() => { const s = window.__mm.session.getState(); return s.contentIds[s.contentIds.length - 1]; });
       const opened = await holdOn(page, pts[Math.floor(pts.length / 2)]);
-      const took = opened && await takePill(page, 'Read the writing');
+      // A word held alone: its one option is the writing reading, which reads it (W2).
+      const took = opened && await takePill(page, /^writing( \d\.\d\d)?$/);
       const parked = await waitFor(page, () => window.__mm.MM.pendingBriefs(window.__mm.session.getState()).length === 1, null, 5000);
       const now = await page.evaluate(seatNow);
       const k2 = now.pending && now.pending[0] ? now.pending[0].key : null;
