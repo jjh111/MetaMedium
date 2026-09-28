@@ -245,7 +245,7 @@ any structural change.
 
 | Path | What it is |
 |---|---|
-| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, and Mermaid out), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*) and the LLM transport. New recognition/engine work lands HERE |
+| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, Mermaid out and in, and a layered layout), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*) and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages). Fully on the `brand/` system as of 3 Sept 2026 — its `:root` is `brand/tokens.css` under the names this page already used, so change a value THERE first |
 | `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
@@ -466,8 +466,10 @@ label, a small square in a corner declares it right, a short line under a
 number that reaches nothing is its underline, and `sheetLines` leaves every
 number on a mark out of the page (`maths/writing.ts` reads the board's words
 once for both). The **figure** the solver works on — corners, sides and the
-marks that drew them — is filled by one closed stroke (`figureOfMark`) and,
-for lines meeting, by `polygonFigure`. Each drawing gets a unit (its labels',
+marks that drew them — is filled by one closed stroke (`figureOfMark`; a
+box drawn leaning, whose clean form keeps its `lean`, is a quadrilateral,
+never a rectangle, whose rules assume right corners) and, for lines
+meeting, by `polygonFigure`. Each drawing gets a unit (its labels',
 else the page's) and a scale that says how consistently its labels agree
 with the ink (`TO_SCALE_WITHIN`). `maths/solve.ts` works **one figure at a
 time, in closed form** — triangle, rectangle, circle, arc, parts summing to
@@ -1387,6 +1389,35 @@ join — never the log's order — so the same drawing says the same text in any
 merge order; `fixtures/flowchart.mermaid.ts` holds the golden every hand of
 D1's bench must export. `ids`/`marks`/`links` map the text back to the marks
 for the surface that renders it (the `mermaid` kind, still to come).
+
+**Mermaid in** (V1-PLAN §3, D3; `notations/mermaid-in.ts`,
+`notations/layered.ts`). `drawMermaid(session, text, { at, scale?,
+participantId?, origin? })` draws a Mermaid text as ink the engine reads
+exactly as a hand's, so D1 reads it and D2 says it back — **the round trip
+is the test** (`mermaid-in.test.ts`: D2's goldens, the fixtures in
+`fixtures/flowchart.mermaid-in.ts`, D1's 36 hands and seeded random charts).
+A reader per diagram keyword (`registerMermaidReader`; the flowchart's reads
+`flowchart`, `graph`, `flowchart-elk`), `readMermaid(text)` to parse alone;
+what it cannot read — styles, a subgraph's frame, a flow to itself, a line it
+cannot parse — is **refused with its line, never thrown**, and what is drawn
+otherwise than written (a shape with no symbol of its own, a dotted link, RL)
+is said in `notes`. `layoutLayered` is deterministic and **keeps the text's
+order as the reading order** — a node never ranks above the one written
+before it, a rank keeps the written order (barycentre passes move places,
+never the order), ranks are the longest forward path, links back break
+cycles and are said, and the ranks stretch until the flows run the header's
+way as D2 measures it. Each symbol is a clean form D1 reads as itself —
+`strokeFor`'s rectangle and circle, a square turned 45°, a box leaning 22°, a
+stadium within 2.6:1 — sized from its words within a factor of two (D1 takes
+a symbol under 0.4 of the median for a head), in the hand's space at the
+scale given, declared content; each connector runs port to port (straight,
+or an arc with closed triangle heads), bound at both ends at a site the mark
+offers itself (`DrawnEnd.of` says `mark`, or `notation` for a flowchart
+port); every word is a `label` on its own ink, by the importing hand. heads.ts
+reads any mark small, touching and on a connector's line as its head, so a
+way that brings one past those gates is read first on a scratch session and
+taken only if every end reads as drawn. Only strokes, binds and labels enter
+the log; for one undo, wrap the call in `session.withTool` (L2j).
 
 ### Spatial Graph — retired
 

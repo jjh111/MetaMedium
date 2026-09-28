@@ -1369,6 +1369,13 @@ and a leaning box (its base, not its bounds). Found, for its owner:
 `maths/dimension.ts` makes any rectangle-read mark a figure of kind
 `rectangle`, whose rules assume right corners; a clean form that carries a
 `lean` is a parallelogram and wants `quadrilateral` there (the maths lane).
+*Status of that, 28 Sep 2026 (fixed in D3's lane, `w2-maths`, item 0):*
+`figureOfMark` reads the clean form it measures — held, else offered — and
+one that carries a `lean` is a quadrilateral, each side standing alone, its
+lean said in the reason; an upright or turned box is a rectangle as before.
+Red first: a data symbol ruled and by hand, and held clean, was `rectangle`;
+labelled 30 and 10, solved as one it was given a diagonal of 31.62 and an
+area of 300. Every other maths test unchanged (170 in `src/maths`).
 **D2 Mermaid out** — the exporter tool,
 the `mermaid` kind in `kinds/kinds.ts` and its renderer in the `run`
 sandbox, the export pane. *Red first:* the fixture's Mermaid equals a golden
@@ -1407,6 +1414,65 @@ pass `readWith` for words read with their line; the text ends in a newline.
 **D3 Mermaid in** — the parser, the layered layout, drawing
 through `strokeFor` with bindings. *Red first:* export of import is the
 original text, normalised; import of export reads as the same notation.
+*Status, 28 Sep 2026:* D3's core built on `w2-maths`; *Draw it* from a
+`mermaid` artifact and a pasted or dropped `.mmd` are the surface's, still to
+come. `notations/mermaid-in.ts`: a reader per diagram keyword
+(`registerMermaidReader`, symmetric to D2's writers; the flowchart's reads
+`flowchart`, `graph`, `flowchart-elk`); `readMermaid(text)` → `{ keyword,
+notation, direction, nodes, links, notes, refused }` and `drawMermaid(session,
+text, { at, scale?, participantId?, origin? })` → `{ notation, direction,
+ids, links, notes, refused, bounds, lastAt }`. Read: TD, TB, LR, RL, BT; the
+six shapes `FLOWCHART_TABLE` writes, and eight more drawn as the nearest and
+said; `-->`, `---`, `<-->`, `--->`, `-.->`, `==>`, `--o`, `--x`; labels
+`|…|` and `-- … -->`, quoted and bare, decoded with `unescapeMermaid`;
+chains and `&` groups; `%%`. Refused with its line, never thrown: styles,
+a subgraph's frame (its contents are read), interactions, directives, front
+matter, a flow to itself, `~~~`, `@{ }`, a line it cannot parse, an unknown
+diagram. `notations/layered.ts`: ranks by the longest forward path, never
+above the node written before, so **the text's order is the reading
+order** — the choice the round trip rests on, where barycentre ordering
+would have reordered a D2 text that has a crossing; barycentre passes set
+places only; links back break cycles, each said; the ranks stretch until the
+flows run the header's way as D2 measures it; when every link would run
+within a rank, every link crosses one. Drawn: a clean form D1 reads as each
+symbol — a process and a start or end through `strokeFor`, a decision a
+square turned 45° (a flat one reads as a triangle or a box unsure), data a
+box leaning 22°, a terminator a stadium within 2.6:1 — sized from its words
+within a factor of two, in the hand's space at the scale given, declared
+content by the importing hand; each connector port to port, straight or an
+arc with closed triangle heads, bound at both ends at a site the mark offers
+itself (every end in the tests; `DrawnEnd.of` says so); every word a `label`
+on its own ink. heads.ts reads at a connector's end any mark small beside
+it, touching the end and on its line — another connector, a head drawn
+apart, the symbol itself — so ends sharing a port lie 45° apart, and a way
+that brings any mark past those gates is read first on a scratch session and
+taken only when every end reads as drawn; what cannot be made to read is
+said. Only strokes, binds and labels enter the log; wrapped in
+`session.withTool` it is one act. The round trip: D2's two goldens, five
+fixtures (`fixtures/flowchart.mermaid-in.ts`: LR, labelled links both ways,
+a cycle, every shape and link, escapes) and a text a hand wrote come back,
+all 36 of D1's hands exported and drawn back read as the same notation, and
+60 seeded random charts plus 15 at 0.25× and 4× (`randomFlowchartText`) —
+Mermaid-in 74 tests, layout 16, core 1237. Run once beyond the suite: 1,000
+random charts of up to 12 nodes, 300 at each of 0.25× and 4×, 150 of up to
+30 all come back; of 60 of up to 60 nodes (≈90 links) two dense ones keep a
+misread and say so; a 45-node, 59-link chart draws in 0.36 s. Found, for
+their owners: `strokeFor`'s arrow caps its barb at 40 units, so past about
+1,200 px an arrow drawn by it reads as a line (D3 scales long ones; a model's
+`agent.draw()` does not); heads.ts reads the symbol a connector ends on as a
+head too, and a triangle drawn apart at a decision's vertex can be swallowed
+as the diamond's fill, so a curved connector a hand draws into a decision
+may lose its direction; a short connector along a longer one's line where
+they meet is read as its head (the flowchart and heads.ts); and a flat
+diamond offers its bounds' corners as sites, not its vertices (magnets).
+The surface's half must know: call it inside `session.withTool` with `at`
+now, `scale` 1/zoom and an `origin` (beside everything on the board when
+none), off the pointer's path (synchronous, ~0.4 s at 45 nodes); preview
+with `readMermaid` and offer *Draw it* only when `notation` is set; say
+`notes` and each `refused` line; `ids` and each link's `ids` are the marks
+to select or fit (`bounds`); words are labels, which the surface draws
+above a mark's top-left, not inside a symbol; declared content leaves an
+open field standing; at most 60 nodes and 120 links, the rest said.
 **D4 UML class**, **D5 sequence and state**, **D6 ER and mind map** — one
 notation module and pack each, each with its golden Mermaid and its bench.
 **D7 Routing** — orthogonal connectors between ports and *tidy the diagram*.
