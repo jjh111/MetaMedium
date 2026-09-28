@@ -9,8 +9,12 @@
 // again, each must come back as it is, but for the ids, which are the marks'
 // own on the way back (the test renames both by first appearance).
 //
-// Written by hand, not generated. Ids avoid the words Mermaid's lexer reads
+// Written by hand, not generated — but for the last, a seeded generator of
+// random charts in the same form. Ids avoid the words Mermaid's lexer reads
 // as keywords at the start of an id (`end…`, `style…`, `class…`).
+
+import { mermaidString } from '../mermaid';
+import { rng } from '../../test/strokes';
 
 /** Runs across: a decision's two branches stand one above the other in the fourth column. */
 export const MERMAID_LR = `flowchart LR
@@ -98,3 +102,48 @@ export const MERMAID_ESCAPED = `flowchart TD
     q1 -->|"yes | (default)"| p2
     q1 -->|"no {else}"| p3
 `;
+
+// ===== Random charts, written as D2 writes them =====
+
+
+/** Words a random chart's symbols and flows say — among them every character D2 escapes, and a line break. */
+const WORDS = ['Start', 'Read the order', 'In stock?', 'Ship it', 'x > 0 & y < 1?', '50% off', 'yes', 'no', 'Parse "a|b" [x]', 'a much longer label that runs on', 'one\ntwo', '#1 `code`', ''];
+const CORE: [string, string][] = [['[', ']'], ['{', '}'], ['([', '])'], ['[/', '/]']];
+
+/**
+ * A seeded chart of 3 to `most` nodes as D2 would write it: every node on a
+ * line of its own, in the order it is to be read, then the links sorted by
+ * the nodes they join. Links run mostly forward in the text, some back (so
+ * there are cycles), as -->, --- or <-->, some labelled. Every node is
+ * joined; a start circle only where every link at it leaves by -->, an end
+ * circle only where every link arrives by --> (a flowchart reads a circle by
+ * its flows); at least one symbol is not a circle. TD, or LR one time in
+ * three.
+ */
+export function randomFlowchartText(seed: number, most = 12): string {
+  const r = rng(seed);
+  const pick = <T,>(xs: readonly T[]) => xs[Math.floor(r() * xs.length)];
+  const n = 3 + Math.floor(r() * (most - 2));
+  const links: { a: number; b: number; arrow: string; label?: string }[] = [];
+  const m = n - 1 + Math.floor(r() * n);
+  for (let k = 0; k < m; k++) {
+    let a = Math.floor(r() * n), b = Math.floor(r() * n);
+    if (a === b) continue;
+    if (r() < 0.75 && a > b) [a, b] = [b, a];
+    const arrow = r() < 0.75 ? '-->' : r() < 0.6 ? '---' : '<-->';
+    links.push({ a, b, arrow, ...(r() < 0.3 ? { label: pick(WORDS.filter(Boolean)) } : {}) });
+  }
+  for (let i = 1; i < n; i++) if (!links.some((l) => l.a === i || l.b === i)) links.push({ a: i - 1, b: i, arrow: '-->' });
+  const shape = Array.from({ length: n }, (_, i) => {
+    const at = links.filter((l) => l.a === i || l.b === i);
+    if (at.length && at.every((l) => l.arrow === '-->' && l.a === i) && r() < 0.5) return ['((', '))'];
+    if (at.length && at.every((l) => l.arrow === '-->' && l.b === i) && r() < 0.5) return ['(((', ')))'];
+    return pick(CORE);
+  });
+  if (shape.every((s) => s[0].startsWith('(('))) shape[0] = ['[', ']'];
+  const lines = [`flowchart ${r() < 0.67 ? 'TD' : 'LR'}`];
+  shape.forEach(([open, close], i) => lines.push(`    n${i}${open}${mermaidString(open.startsWith('((') ? pick(['go', 'stop', '']) : pick(WORDS))}${close}`));
+  links.sort((p, q) => p.a - q.a || p.b - q.b);
+  for (const l of links) lines.push(`    n${l.a} ${l.arrow}${l.label ? `|${mermaidString(l.label)}|` : ''} n${l.b}`);
+  return lines.join('\n') + '\n';
+}
