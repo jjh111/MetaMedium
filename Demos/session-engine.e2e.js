@@ -3890,7 +3890,7 @@ window.__fieldGolden = async function () {
 window.__FIELD_GOLDEN = {
   "row of three boxes": {
     core: ["name", "copy", "paste", "erase"],
-    line: "↵ row 0.83 — take it as the name",
+    line: "↵ Draw them clean",
     certain: [
       {"key": "concept:row", "label": "row 0.83", "title": "3 comparable marks sitting side by side (overlap 0.95, similarity 1.00) — already well lined up — take it as the name — 3 comparable marks sitting side by side (overlap 0.95, similarity 1.00) — already well lined up", "dot": false},
     ],
@@ -3929,7 +3929,7 @@ window.__FIELD_GOLDEN = {
   },
   "molecule": {
     core: ["name", "copy", "paste", "erase"],
-    line: "↵ flow 0.90 — take it as the name",
+    line: "↵ Draw them clean",
     certain: [
       {"key": "concept:flow", "label": "flow 0.90", "title": "3 nodes joined by 2 edges — take it as the name — 3 nodes joined by 2 edges", "dot": false},
     ],
@@ -3943,7 +3943,7 @@ window.__FIELD_GOLDEN = {
   },
   "molecule, the second one drawn": {
     core: ["name", "copy", "paste", "erase"],
-    line: "↵ molecule 1.00 — take it as another molecule",
+    line: "↵ Draw them clean",
     certain: [
       {"key": "sug:<match-1>", "label": "molecule 1.00", "title": "same shapes (3×circle + 2×line); same links (5 kinds) — against the definition — take it as another molecule — you named this shape before", "dot": false},
       {"key": "concept:flow", "label": "flow 0.90", "title": "3 nodes joined by 2 edges — take it as the name — 3 nodes joined by 2 edges", "dot": false},
@@ -3987,7 +3987,7 @@ window.__FIELD_GOLDEN = {
   },
   "text made from the writing": {
     core: ["name", "copy", "paste", "erase"],
-    line: "",
+    line: "↵ Edit the text",
     certain: [],
     afford: [
       {"key": "edit-text:<text>", "label": "Edit the text", "title": "a new version of the words; every version kept", "dot": false},
