@@ -9416,6 +9416,151 @@ function regionsOverlapping(regions, b) {
   );
 }
 
+// src/relate/grid.ts
+var MIN_LEVEL = -40;
+function finiteBounds(b) {
+  return Number.isFinite(b.minX) && Number.isFinite(b.minY) && Number.isFinite(b.maxX) && Number.isFinite(b.maxY);
+}
+function levelOf(b) {
+  const size = Math.max(b.maxX - b.minX, b.maxY - b.minY);
+  if (!(size > 0)) return MIN_LEVEL;
+  let level = Math.max(MIN_LEVEL, Math.ceil(Math.log2(size)));
+  while (2 ** level < size) level++;
+  return level;
+}
+var MarkGrid = class {
+  constructor() {
+    /** level → cx → cy → the ids filed there. */
+    this.levels = /* @__PURE__ */ new Map();
+    /** How many marks each level holds, and how many cells, so a query skips empty levels. */
+    this.counts = /* @__PURE__ */ new Map();
+    this.filed = /* @__PURE__ */ new Map();
+  }
+  get size() {
+    return this.filed.size;
+  }
+  has(id) {
+    return this.filed.has(id);
+  }
+  /** The box a mark is filed under, as it was given. */
+  boundsOf(id) {
+    return this.filed.get(id)?.bounds;
+  }
+  ids() {
+    return this.filed.keys();
+  }
+  /** File a mark (or move it, when it is already filed). A box that is not finite is not filed. */
+  set(id, bounds) {
+    this.delete(id);
+    if (!finiteBounds(bounds)) return;
+    const level = levelOf(bounds);
+    const cell = 2 ** level;
+    const cx2 = Math.floor(bounds.minX / cell);
+    const cy2 = Math.floor(bounds.minY / cell);
+    let xs = this.levels.get(level);
+    if (!xs) this.levels.set(level, xs = /* @__PURE__ */ new Map());
+    let ys = xs.get(cx2);
+    if (!ys) xs.set(cx2, ys = /* @__PURE__ */ new Map());
+    let here = ys.get(cy2);
+    const count2 = this.counts.get(level) ?? { marks: 0, cells: 0 };
+    if (!here) {
+      ys.set(cy2, here = /* @__PURE__ */ new Set());
+      count2.cells++;
+    }
+    here.add(id);
+    count2.marks++;
+    this.counts.set(level, count2);
+    this.filed.set(id, { level, cx: cx2, cy: cy2, bounds: { minX: bounds.minX, minY: bounds.minY, maxX: bounds.maxX, maxY: bounds.maxY } });
+  }
+  delete(id) {
+    const f = this.filed.get(id);
+    if (!f) return false;
+    this.filed.delete(id);
+    const xs = this.levels.get(f.level);
+    const ys = xs.get(f.cx);
+    const here = ys.get(f.cy);
+    here.delete(id);
+    const count2 = this.counts.get(f.level);
+    count2.marks--;
+    if (here.size === 0) {
+      ys.delete(f.cy);
+      count2.cells--;
+      if (ys.size === 0) xs.delete(f.cx);
+    }
+    if (count2.marks === 0) {
+      this.counts.delete(f.level);
+      this.levels.delete(f.level);
+    }
+    return true;
+  }
+  clear() {
+    this.levels.clear();
+    this.counts.clear();
+    this.filed.clear();
+  }
+  /** Every mark whose box meets `box` (edges touching count), in no particular order. */
+  query(box) {
+    const out = [];
+    this.visit(() => box, (id, b) => {
+      if (b.maxX >= box.minX && b.minX <= box.maxX && b.maxY >= box.minY && b.minY <= box.maxY) out.push(id);
+    });
+    return out;
+  }
+  /**
+   * Marks near a point, where how near depends on how big the mark is:
+   * `radiusFor(cell)` is the farthest a mark of at most `cell` across can be
+   * and still count. Every mark whose box comes within its level's radius of
+   * the point is returned — a superset, for the caller's exact test.
+   */
+  around(p, radiusFor) {
+    const out = [];
+    this.visit(
+      (cell) => {
+        const r = radiusFor(cell);
+        return { minX: p.x - r, minY: p.y - r, maxX: p.x + r, maxY: p.y + r };
+      },
+      (id, b, box) => {
+        if (b.maxX >= box.minX && b.minX <= box.maxX && b.maxY >= box.minY && b.minY <= box.maxY) out.push(id);
+      }
+    );
+    return out;
+  }
+  /** Walk the cells a box (per level) could reach, handing each filed mark to `fn`. */
+  visit(boxAt, fn) {
+    for (const [level, xs] of this.levels) {
+      const cell = 2 ** level;
+      const box = boxAt(cell);
+      if (!finiteBounds(box)) {
+        for (const ys of xs.values()) for (const here of ys.values()) for (const id of here) fn(id, this.filed.get(id).bounds, box);
+        continue;
+      }
+      const x0 = Math.floor(box.minX / cell) - 1, x1 = Math.floor(box.maxX / cell);
+      const y0 = Math.floor(box.minY / cell) - 1, y1 = Math.floor(box.maxY / cell);
+      const span = (x1 - x0 + 1) * (y1 - y0 + 1);
+      const count2 = this.counts.get(level);
+      if (span > count2.cells) {
+        for (const [cx2, ys] of xs) {
+          if (cx2 < x0 || cx2 > x1) continue;
+          for (const [cy2, here] of ys) {
+            if (cy2 < y0 || cy2 > y1) continue;
+            for (const id of here) fn(id, this.filed.get(id).bounds, box);
+          }
+        }
+        continue;
+      }
+      for (let cx2 = x0; cx2 <= x1; cx2++) {
+        const ys = xs.get(cx2);
+        if (!ys) continue;
+        for (let cy2 = y0; cy2 <= y1; cy2++) {
+          const here = ys.get(cy2);
+          if (!here) continue;
+          for (const id of here) fn(id, this.filed.get(id).bounds, box);
+        }
+      }
+    }
+  }
+};
+
 // src/diagram/roles.ts
 var ROLES = ["container", "node", "edge", "label", "annotation", "unclassified"];
 var CLOSED = /* @__PURE__ */ new Set(["rectangle", "circle", "triangle"]);
@@ -10720,151 +10865,6 @@ function buildGraphScaffold(graph, content, theme = {}) {
     "</div>"
   ].join("\n");
 }
-
-// src/relate/grid.ts
-var MIN_LEVEL = -40;
-function finiteBounds(b) {
-  return Number.isFinite(b.minX) && Number.isFinite(b.minY) && Number.isFinite(b.maxX) && Number.isFinite(b.maxY);
-}
-function levelOf(b) {
-  const size = Math.max(b.maxX - b.minX, b.maxY - b.minY);
-  if (!(size > 0)) return MIN_LEVEL;
-  let level = Math.max(MIN_LEVEL, Math.ceil(Math.log2(size)));
-  while (2 ** level < size) level++;
-  return level;
-}
-var MarkGrid = class {
-  constructor() {
-    /** level → cx → cy → the ids filed there. */
-    this.levels = /* @__PURE__ */ new Map();
-    /** How many marks each level holds, and how many cells, so a query skips empty levels. */
-    this.counts = /* @__PURE__ */ new Map();
-    this.filed = /* @__PURE__ */ new Map();
-  }
-  get size() {
-    return this.filed.size;
-  }
-  has(id) {
-    return this.filed.has(id);
-  }
-  /** The box a mark is filed under, as it was given. */
-  boundsOf(id) {
-    return this.filed.get(id)?.bounds;
-  }
-  ids() {
-    return this.filed.keys();
-  }
-  /** File a mark (or move it, when it is already filed). A box that is not finite is not filed. */
-  set(id, bounds) {
-    this.delete(id);
-    if (!finiteBounds(bounds)) return;
-    const level = levelOf(bounds);
-    const cell = 2 ** level;
-    const cx2 = Math.floor(bounds.minX / cell);
-    const cy2 = Math.floor(bounds.minY / cell);
-    let xs = this.levels.get(level);
-    if (!xs) this.levels.set(level, xs = /* @__PURE__ */ new Map());
-    let ys = xs.get(cx2);
-    if (!ys) xs.set(cx2, ys = /* @__PURE__ */ new Map());
-    let here = ys.get(cy2);
-    const count2 = this.counts.get(level) ?? { marks: 0, cells: 0 };
-    if (!here) {
-      ys.set(cy2, here = /* @__PURE__ */ new Set());
-      count2.cells++;
-    }
-    here.add(id);
-    count2.marks++;
-    this.counts.set(level, count2);
-    this.filed.set(id, { level, cx: cx2, cy: cy2, bounds: { minX: bounds.minX, minY: bounds.minY, maxX: bounds.maxX, maxY: bounds.maxY } });
-  }
-  delete(id) {
-    const f = this.filed.get(id);
-    if (!f) return false;
-    this.filed.delete(id);
-    const xs = this.levels.get(f.level);
-    const ys = xs.get(f.cx);
-    const here = ys.get(f.cy);
-    here.delete(id);
-    const count2 = this.counts.get(f.level);
-    count2.marks--;
-    if (here.size === 0) {
-      ys.delete(f.cy);
-      count2.cells--;
-      if (ys.size === 0) xs.delete(f.cx);
-    }
-    if (count2.marks === 0) {
-      this.counts.delete(f.level);
-      this.levels.delete(f.level);
-    }
-    return true;
-  }
-  clear() {
-    this.levels.clear();
-    this.counts.clear();
-    this.filed.clear();
-  }
-  /** Every mark whose box meets `box` (edges touching count), in no particular order. */
-  query(box) {
-    const out = [];
-    this.visit(() => box, (id, b) => {
-      if (b.maxX >= box.minX && b.minX <= box.maxX && b.maxY >= box.minY && b.minY <= box.maxY) out.push(id);
-    });
-    return out;
-  }
-  /**
-   * Marks near a point, where how near depends on how big the mark is:
-   * `radiusFor(cell)` is the farthest a mark of at most `cell` across can be
-   * and still count. Every mark whose box comes within its level's radius of
-   * the point is returned — a superset, for the caller's exact test.
-   */
-  around(p, radiusFor) {
-    const out = [];
-    this.visit(
-      (cell) => {
-        const r = radiusFor(cell);
-        return { minX: p.x - r, minY: p.y - r, maxX: p.x + r, maxY: p.y + r };
-      },
-      (id, b, box) => {
-        if (b.maxX >= box.minX && b.minX <= box.maxX && b.maxY >= box.minY && b.minY <= box.maxY) out.push(id);
-      }
-    );
-    return out;
-  }
-  /** Walk the cells a box (per level) could reach, handing each filed mark to `fn`. */
-  visit(boxAt, fn) {
-    for (const [level, xs] of this.levels) {
-      const cell = 2 ** level;
-      const box = boxAt(cell);
-      if (!finiteBounds(box)) {
-        for (const ys of xs.values()) for (const here of ys.values()) for (const id of here) fn(id, this.filed.get(id).bounds, box);
-        continue;
-      }
-      const x0 = Math.floor(box.minX / cell) - 1, x1 = Math.floor(box.maxX / cell);
-      const y0 = Math.floor(box.minY / cell) - 1, y1 = Math.floor(box.maxY / cell);
-      const span = (x1 - x0 + 1) * (y1 - y0 + 1);
-      const count2 = this.counts.get(level);
-      if (span > count2.cells) {
-        for (const [cx2, ys] of xs) {
-          if (cx2 < x0 || cx2 > x1) continue;
-          for (const [cy2, here] of ys) {
-            if (cy2 < y0 || cy2 > y1) continue;
-            for (const id of here) fn(id, this.filed.get(id).bounds, box);
-          }
-        }
-        continue;
-      }
-      for (let cx2 = x0; cx2 <= x1; cx2++) {
-        const ys = xs.get(cx2);
-        if (!ys) continue;
-        for (let cy2 = y0; cy2 <= y1; cy2++) {
-          const here = ys.get(cy2);
-          if (!here) continue;
-          for (const id of here) fn(id, this.filed.get(id).bounds, box);
-        }
-      }
-    }
-  }
-};
 
 // src/session/session.ts
 var DEFAULT_SESSION_CONFIG = {
@@ -14216,6 +14216,7 @@ export {
   DEFAULT_TIMEOUT_MS,
   DIAMOND_SLACK,
   DIRECTED_LINKS,
+  ENGAGING_KINDS,
   ENGINE_NAME,
   ENGINE_PARTICIPANT,
   FILLED_AT,
@@ -14251,6 +14252,7 @@ export {
   MAX_TIER0_CONFIDENCE,
   META_DIR,
   MIN_CONFIDENCE,
+  MarkGrid,
   MemoryStore,
   NO_MATCH,
   ONE_BEND,
@@ -14388,6 +14390,7 @@ export {
   findCorners,
   findCornersWithSeparation,
   fingerprintOf,
+  finiteBounds,
   fit2 as fit,
   force,
   formatExpr,
@@ -14448,8 +14451,10 @@ export {
   matchDefinition,
   matchPrimitiveFromLibrary,
   matchesCommandMark,
+  mayCross,
   measure,
   mergeLogs,
+  nearLimitOf,
   nearestMagnet,
   negateQuantity,
   nodeIdsIn,
@@ -14488,6 +14493,7 @@ export {
   quantity,
   rangeOf,
   ranked,
+  reachAround,
   readNumber,
   readSheet,
   readingsToEdges,
@@ -14553,6 +14559,7 @@ export {
   wallBoxes,
   whyNotResolved,
   withParams,
+  withinReach,
   wordConfidence,
   wordOf,
   worldOf

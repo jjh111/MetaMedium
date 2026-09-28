@@ -347,6 +347,7 @@ export {
   countCrossings,
   outlineOf,
   scratchedOut,
+  mayCross,
   DEFAULT_ERASE_CROSSINGS,
 } from './session/erase';
 export type { ScratchTarget } from './session/erase';
@@ -367,8 +368,16 @@ export {
   clusters,
   describeRelations,
   DEFAULT_RELATE_CONFIG,
+  ENGAGING_KINDS,
+  withinReach,
+  nearLimitOf,
+  reachAround,
 } from './relate/relations';
 export type { Relation, RelationKind, Mark, RelateConfig } from './relate/relations';
+// Where marks are (V1-PLAN §9 R4b): a grid whose cells are sized from the
+// marks, asked which boxes meet a box — what the session finds the marks
+// within a mark's reach with, and what a surface can cull to the viewport by.
+export { MarkGrid, finiteBounds } from './relate/grid';
 
 // The diagram rung — what a mark PLAYS: container, node, edge, label,
 // annotation, unclassified. A closed vocabulary, placed by a table
