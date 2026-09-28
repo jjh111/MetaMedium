@@ -14,16 +14,36 @@
   const MINI_W = 176, MINI_H = 108, MINI_PAD = 8;
   let mini = null; // { scale, ox, oy } of the last paint: world → map pixels
 
+  /**
+   * What the map shows, for one log (R4c): every mark's box and what it is,
+   * and the box they fill. The map still shows the whole board — only the
+   * reading of it is kept while the log stands; each paint draws the boxes
+   * and the viewport again, where the view now puts them.
+   */
+  let miniSeen = { key: null, items: null, content: null };
+  function miniItems(s) {
+    const key = logKey();
+    if (!paintReference && miniSeen.key === key) return miniSeen;
+    const arts = new Set(s.artifacts), answers = new Set(s.explanations);
+    const items = [];
+    for (const id of s.contentIds.concat(s.explanations)) {
+      const b = MM.boundsOf(s.nodes.get(id));
+      if (b) items.push({ id: id, b: b, artifact: arts.has(id), answer: answers.has(id) });
+    }
+    const seen = { key: paintReference ? null : key, items: items, content: items.length ? union(items.map((x) => x.b)) : null };
+    if (!paintReference) miniSeen = seen;
+    return seen;
+  }
+
   function renderMinimap(s) {
     if (!minimapEl) return;
-    const ids = s.contentIds.concat(s.explanations);
-    const boxes = ids.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
-    if (!boxes.length) { minimapEl.hidden = true; mini = null; return; }
+    const seen = miniItems(s);
+    if (!seen.items.length) { minimapEl.hidden = true; mini = null; return; }
     minimapEl.hidden = false;
     const dpr = window.devicePixelRatio || 1;
     if (minimapEl.width !== Math.round(MINI_W * dpr)) { minimapEl.width = Math.round(MINI_W * dpr); minimapEl.height = Math.round(MINI_H * dpr); }
     const vp = { minX: -view.panX / view.zoom, minY: -view.panY / view.zoom, maxX: (innerWidth - view.panX) / view.zoom, maxY: (innerHeight - view.panY) / view.zoom };
-    const all = union(boxes.concat([vp]));
+    const all = union([seen.content, vp]);
     const w = Math.max(1, all.maxX - all.minX), h = Math.max(1, all.maxY - all.minY);
     const scale = Math.min((MINI_W - MINI_PAD * 2) / w, (MINI_H - MINI_PAD * 2) / h);
     const ox = MINI_PAD + ((MINI_W - MINI_PAD * 2) - w * scale) / 2 - all.minX * scale;
@@ -32,14 +52,14 @@
     const g = minimapEl.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, MINI_W, MINI_H);
-    for (const id of ids) {
-      const b = MM.boundsOf(s.nodes.get(id));
-      if (!b) continue;
+    const answerFill = 'rgba(' + C.goldRGB + ',0.35)';
+    for (const it of seen.items) {
+      const b = it.b;
       const x = ox + b.minX * scale, y = oy + b.minY * scale;
       const bw = Math.max(1.5, (b.maxX - b.minX) * scale), bh = Math.max(1.5, (b.maxY - b.minY) * scale);
-      if (paintOps) recordOp({ kind: 'mini', id: id, box: boxOfRect(x, y, bw, bh), moved: true });
-      if (s.artifacts.includes(id)) { g.strokeStyle = 'rgba(' + C.goldRGB + ',0.8)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, bw, bh); }
-      else { g.fillStyle = s.explanations.includes(id) ? 'rgba(' + C.goldRGB + ',0.35)' : C.inkFaint; g.fillRect(x, y, bw, bh); }
+      if (paintOps) recordOp({ kind: 'mini', id: it.id, box: boxOfRect(x, y, bw, bh), moved: true });
+      if (it.artifact) { g.strokeStyle = 'rgba(' + C.goldRGB + ',0.8)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, bw, bh); }
+      else { g.fillStyle = it.answer ? answerFill : C.inkFaint; g.fillRect(x, y, bw, bh); }
     }
     g.strokeStyle = C.ink; g.lineWidth = 1; g.setLineDash([]);
     g.strokeRect(ox + vp.minX * scale + 0.5, oy + vp.minY * scale + 0.5, Math.max(2, (vp.maxX - vp.minX) * scale), Math.max(2, (vp.maxY - vp.minY) * scale));
@@ -66,7 +86,8 @@
       miniPanTo(miniToWorld(e));
       e.preventDefault();
     });
-    minimapEl.addEventListener('pointermove', (e) => { if (miniDrag && mini) miniPanTo(miniToWorld(e)); });
+    // A drag across the map pans once a frame, like any other pan (R4c).
+    minimapEl.addEventListener('pointermove', (e) => { if (miniDrag && mini) { const w = miniToWorld(e); view.panX = innerWidth / 2 - w.x * view.zoom; view.panY = innerHeight / 2 - w.y * view.zoom; viewChanged(); } });
     const miniEnd = () => { miniDrag = false; };
     minimapEl.addEventListener('pointerup', miniEnd);
     minimapEl.addEventListener('pointercancel', miniEnd);

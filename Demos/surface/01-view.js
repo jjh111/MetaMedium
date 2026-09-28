@@ -1,5 +1,5 @@
 // ===== view =====
-// Provides: view {zoom, panX, panY}, screenToWorld/worldToScreen/wpx, zoomAround, fitAll, afterViewChange, the wheel/pinch/keyboard zoom, resize,
+// Provides: view {zoom, panX, panY}, screenToWorld/worldToScreen/wpx, zoomBy, zoomAround, fitAll, afterViewChange, viewChanged (one paint a frame), the wheel/pinch/keyboard zoom, resize,
 //   and the space actually visible: usableRect (pure), viewportRect, usableViewport, relayoutChrome.
 // Uses: core; input (panning/pinch state); palette (replaceOpenField).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -28,15 +28,29 @@
   /** World length that renders as `n` screen pixels — for chrome that must not shrink. */
   const wpx = (n) => n / view.zoom;
 
-  function zoomAround(sx, sy, factor) {
+  /** Zoom the view about a screen point; true when the zoom changed. The paint is the caller's. */
+  function zoomBy(sx, sy, factor) {
     const before = clampZoom(view.zoom);
     const after = clampZoom(before * factor);
-    if (after === before) return;
+    if (after === before) return false;
     view.zoom = after;
     const ratio = after / before;
     view.panX = sx - (sx - view.panX) * ratio;
     view.panY = sy - (sy - view.panY) * ratio;
-    afterViewChange();
+    return true;
+  }
+  function zoomAround(sx, sy, factor) {
+    if (zoomBy(sx, sy, factor)) afterViewChange();
+  }
+
+  // A hand's pan, pinch or wheel moves the view on every event and paints
+  // once a frame (R4c): a trackpad sends more wheel events than the screen
+  // has frames, and a paint for every one of them was the frame. The ink and
+  // the stage move together, in the frame that paints them.
+  let viewPaint = null;
+  function viewChanged() {
+    if (viewPaint) return;
+    viewPaint = nextFrame(() => { viewPaint = null; afterViewChange(); });
   }
 
   // ===== The space actually visible =======================================
@@ -214,7 +228,7 @@
       // Pinch deltas are small and continuous; wheel clicks are large and
       // stepped. Scale the factor by the delta so both feel proportionate.
       const k = e.deltaMode === 0 && Math.abs(e.deltaY) < 50 ? 0.01 : 0.0022;
-      zoomAround(e.clientX, e.clientY, Math.exp(-e.deltaY * k));
+      if (zoomBy(e.clientX, e.clientY, Math.exp(-e.deltaY * k))) viewChanged();
       return;
     }
     // A line-mode wheel (a mouse) moves in bigger steps than a pixel-mode one.
@@ -223,7 +237,7 @@
     if (e.shiftKey && !e.deltaX) { dx = dy; dy = 0; } // shift + a plain wheel scrolls sideways
     view.panX -= dx;
     view.panY -= dy;
-    afterViewChange();
+    viewChanged();
   }, { passive: false });
 
   // Safari: pinch is a gesture event, not a wheel.
@@ -232,7 +246,7 @@
   canvas.addEventListener('gesturechange', (e) => {
     e.preventDefault();
     const target = clampZoom(gestureStartZoom * e.scale);
-    zoomAround(e.clientX, e.clientY, target / view.zoom);
+    if (zoomBy(e.clientX, e.clientY, target / view.zoom)) viewChanged();
   });
   canvas.addEventListener('gestureend', (e) => e.preventDefault());
 

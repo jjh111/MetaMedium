@@ -175,7 +175,7 @@
   };
 
 // ===== view =====
-// Provides: view {zoom, panX, panY}, screenToWorld/worldToScreen/wpx, zoomAround, fitAll, afterViewChange, the wheel/pinch/keyboard zoom, resize,
+// Provides: view {zoom, panX, panY}, screenToWorld/worldToScreen/wpx, zoomBy, zoomAround, fitAll, afterViewChange, viewChanged (one paint a frame), the wheel/pinch/keyboard zoom, resize,
 //   and the space actually visible: usableRect (pure), viewportRect, usableViewport, relayoutChrome.
 // Uses: core; input (panning/pinch state); palette (replaceOpenField).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -204,15 +204,29 @@
   /** World length that renders as `n` screen pixels — for chrome that must not shrink. */
   const wpx = (n) => n / view.zoom;
 
-  function zoomAround(sx, sy, factor) {
+  /** Zoom the view about a screen point; true when the zoom changed. The paint is the caller's. */
+  function zoomBy(sx, sy, factor) {
     const before = clampZoom(view.zoom);
     const after = clampZoom(before * factor);
-    if (after === before) return;
+    if (after === before) return false;
     view.zoom = after;
     const ratio = after / before;
     view.panX = sx - (sx - view.panX) * ratio;
     view.panY = sy - (sy - view.panY) * ratio;
-    afterViewChange();
+    return true;
+  }
+  function zoomAround(sx, sy, factor) {
+    if (zoomBy(sx, sy, factor)) afterViewChange();
+  }
+
+  // A hand's pan, pinch or wheel moves the view on every event and paints
+  // once a frame (R4c): a trackpad sends more wheel events than the screen
+  // has frames, and a paint for every one of them was the frame. The ink and
+  // the stage move together, in the frame that paints them.
+  let viewPaint = null;
+  function viewChanged() {
+    if (viewPaint) return;
+    viewPaint = nextFrame(() => { viewPaint = null; afterViewChange(); });
   }
 
   // ===== The space actually visible =======================================
@@ -390,7 +404,7 @@
       // Pinch deltas are small and continuous; wheel clicks are large and
       // stepped. Scale the factor by the delta so both feel proportionate.
       const k = e.deltaMode === 0 && Math.abs(e.deltaY) < 50 ? 0.01 : 0.0022;
-      zoomAround(e.clientX, e.clientY, Math.exp(-e.deltaY * k));
+      if (zoomBy(e.clientX, e.clientY, Math.exp(-e.deltaY * k))) viewChanged();
       return;
     }
     // A line-mode wheel (a mouse) moves in bigger steps than a pixel-mode one.
@@ -399,7 +413,7 @@
     if (e.shiftKey && !e.deltaX) { dx = dy; dy = 0; } // shift + a plain wheel scrolls sideways
     view.panX -= dx;
     view.panY -= dy;
-    afterViewChange();
+    viewChanged();
   }, { passive: false });
 
   // Safari: pinch is a gesture event, not a wheel.
@@ -408,7 +422,7 @@
   canvas.addEventListener('gesturechange', (e) => {
     e.preventDefault();
     const target = clampZoom(gestureStartZoom * e.scale);
-    zoomAround(e.clientX, e.clientY, target / view.zoom);
+    if (zoomBy(e.clientX, e.clientY, target / view.zoom)) viewChanged();
   });
   canvas.addEventListener('gestureend', (e) => e.preventDefault());
 
@@ -1559,10 +1573,19 @@
   }
   let heldCandidates = []; // offers among what the held loop encloses
 
+  // What is offered is the log's (R4c): the offers and what a waiting loop
+  // holds of them are read again when the log changes or the mode does, not
+  // on every paint — a pan or a hover used to ask every mark on the board.
+  // The reference paint (paintCheck) asks them afresh, as every paint did.
+  let offersKey = null;
   function refreshOffers() {
-    const s = session.getState();
-    snapOffers = snapMode === 'off' ? new Map() : new Map(session.snapCandidates().map((c) => [c.id, c]));
-    heldCandidates = heldEnclosed(s).filter((id) => snapOffers.has(id));
+    const key = logKey() + '|' + snapMode;
+    if (paintReference || key !== offersKey) {
+      const s = session.getState();
+      snapOffers = snapMode === 'off' ? new Map() : new Map(session.snapCandidates().map((c) => [c.id, c]));
+      heldCandidates = heldEnclosed(s).filter((id) => snapOffers.has(id));
+      offersKey = paintReference ? null : key;
+    }
     // A held loop scopes the tile: what you circled, not everything.
     if (ccOpen()) syncTiles();
   }
@@ -1607,25 +1630,45 @@
   // site and logs the bind, and leaving the reach dissolves it (invariant 4).
   let magnetHold = null;   // the hit the live stroke's end is in reach of, if any
   let magnetStart = null;  // the hit the live stroke began on, if any
-  const magnetCache = new WeakMap(); // node → sites (nodes are rebuilt on replay)
-  function sitesForMagnet(node, nodes) {
-    let sites = magnetCache.get(node);
-    if (!sites) { sites = MM.magnetSites(node, nodes); magnetCache.set(node, sites); }
-    return sites;
+  /**
+   * Every site on the board, for one log (R4c): read when the pen first asks
+   * after the log changed, then each move is a pass over a flat list of
+   * points. A node keeps the sites it had when its own reps and edges are the
+   * ones they were (a mark's sites are read off its own clean form, reading
+   * and ink) — unless a notation offers ports, whose readings can look past
+   * the mark, and then every mark is read again. The cache used to be keyed
+   * by the node object, which a move or a snap changes in place.
+   */
+  let magnetSitesAt = { key: null, sites: [], xs: new Float64Array(0), ys: new Float64Array(0), byNode: new Map() };
+  function sitesNow() {
+    const key = logKey();
+    if (magnetSitesAt.key === key) return magnetSitesAt;
+    const s = session.getState();
+    const own = !MM.registeredPorts().length;
+    const before = magnetSitesAt.byNode, byNode = new Map(), sites = [];
+    for (const [id, n] of s.nodes) {
+      if (!MM.strokePointsOf(n)) continue;
+      const was = own && before.get(id);
+      const kept = was && was.node === n && was.reps === n.reps && was.nReps === n.reps.length && was.edges === n.edges && was.nEdges === n.edges.length;
+      const mine = kept ? was.sites : MM.magnetSites(n, s.nodes);
+      byNode.set(id, { node: n, reps: n.reps, nReps: n.reps.length, edges: n.edges, nEdges: n.edges.length, sites: mine });
+      for (const site of mine) sites.push(site);
+    }
+    const xs = new Float64Array(sites.length), ys = new Float64Array(sites.length);
+    sites.forEach((site, i) => { xs[i] = site.point.x; ys[i] = site.point.y; });
+    magnetSitesAt = { key: key, sites: sites, xs: xs, ys: ys, byNode: byNode };
+    return magnetSitesAt;
   }
   /** The nearest site to a world point within the hand's radius, or null. */
   function magnetQuery(w) {
-    const s = session.getState();
+    const at = sitesNow();
     const radius = MM.MAGNET_SCREEN_PX / view.zoom; // about the hand, not the world (invariant 3)
-    let best = null;
-    for (const [id, n] of s.nodes) {
-      if (!MM.strokePointsOf(n)) continue;
-      for (const site of sitesForMagnet(n, s.nodes)) {
-        const distance = Math.hypot(site.point.x - w.x, site.point.y - w.y);
-        if (distance <= radius && (!best || distance < best.distance)) best = { site, distance };
-      }
+    let best = -1, bestD = 0;
+    for (let i = 0; i < at.sites.length; i++) {
+      const distance = Math.hypot(at.xs[i] - w.x, at.ys[i] - w.y);
+      if (distance <= radius && (best < 0 || distance < bestD)) { best = i; bestD = distance; }
     }
-    return best;
+    return best < 0 ? null : { site: at.sites[best], distance: bestD };
   }
 
 // ===== handwriting =====
@@ -1812,7 +1855,7 @@
       if (touches.size === 2) {
         // Two fingers: this is a pinch, not a stroke. Drop the live ink — it
         // was the first finger landing, not a mark.
-        live = null; pressEnd(); magnetStart = null; magnetHold = null;
+        live = null; pressEnd(); magnetStart = null; magnetHold = null; drawLive();
         const [a, b] = [...touches.values()];
         pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, zoom: view.zoom };
         return;
@@ -1894,11 +1937,11 @@
         const dist = Math.hypot(a.x - b.x, a.y - b.y);
         const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
         const target = clampZoom(pinch.zoom * (dist / Math.max(1, pinch.dist)));
-        zoomAround(pinch.mid.x, pinch.mid.y, target / view.zoom);
+        zoomBy(pinch.mid.x, pinch.mid.y, target / view.zoom);
         view.panX += mid.x - pinch.mid.x;
         view.panY += mid.y - pinch.mid.y;
         pinch.mid = mid;
-        afterViewChange();
+        viewChanged();
         return;
       }
     }
@@ -1911,7 +1954,7 @@
       view.panX += e.clientX - panning.x;
       view.panY += e.clientY - panning.y;
       panning = { x: e.clientX, y: e.clientY };
-      afterViewChange();
+      viewChanged(); // one paint a frame, however many moves the frame holds
       return;
     }
     if (!live) {
@@ -1924,7 +1967,7 @@
     }
     live.push(screenToWorld(e.clientX, e.clientY));
     magnetHold = magnetQuery(live[live.length - 1]); // the offer follows the pen; out of reach, it lets go
-    render(state); // live ink
+    drawLive(); // the pen and its magnet, on their own layer; the board is as it was (R4c)
   });
 
   const endTouch = (e) => {
@@ -1934,7 +1977,7 @@
     return touches.size > 0; // a finger is still down: nothing to commit yet
   };
   canvas.addEventListener('pointercancel', (e) => {
-    endTouch(e); live = null; pressEnd(); magnetStart = null; magnetHold = null;
+    endTouch(e); live = null; pressEnd(); magnetStart = null; magnetHold = null; drawLive();
     if (forward) { postPointer(forward, 'cancel', e, screenToWorld(e.clientX, e.clientY)); forward = null; }
   });
 
@@ -2085,11 +2128,15 @@
   function scratchNearMiss(s, node, points) {
     const fp = MM.fingerprintOf(node);
     if (!fp || fp.isClosed || fp.corners < 2 || !points || points.length < 6) return null;
+    const sb = MM.getBounds(points);
     for (const id of s.contentIds) {
       if (id === node.id || s.artifacts.includes(id)) continue;
       const t = s.nodes.get(id);
       const pts = t && MM.strokePointsOf(t);
       if (!pts) continue;
+      // A stroke crosses only an outline whose box its own box meets: the rest are passed over unread (R4c).
+      const tb = MM.getBounds(pts);
+      if (tb.maxX < sb.minX || tb.minX > sb.maxX || tb.maxY < sb.minY || tb.minY > sb.maxY) continue;
       const tf = MM.fingerprintOf(t);
       const outline = MM.outlineOf({ points: pts, closed: !!(tf && tf.isClosed) });
       if (outline && MM.countCrossings(points, outline, 3) === 2) return id;
@@ -2241,16 +2288,20 @@
     return 'press and hold a mark to hold it · or circle marks and double-tap inside';
   }
 
+  /** The last mark on the board whose box, with a little slack, holds the point — found among the few the paint's index says could. */
   function nodeAt(x, y) {
     const slack = wpx(8);
-    for (let i = state.contentIds.length - 1; i >= 0; i--) {
-      const b = MM.boundsOf(state.nodes.get(state.contentIds[i]));
-      if (b && x >= b.minX - slack && x <= b.maxX + slack &&
-               y >= b.minY - slack && y <= b.maxY + slack) {
-        return state.contentIds[i];
-      }
-    }
-    return null;
+    const ix = boardIndex(state);
+    let best = null, bestAt = -1;
+    const consider = (id) => {
+      const at = ix.contentAt.get(id);
+      if (at === undefined || at <= bestAt) return;
+      const b = MM.boundsOf(state.nodes.get(id));
+      if (b && x >= b.minX - slack && x <= b.maxX + slack && y >= b.minY - slack && y <= b.maxY + slack) { best = id; bestAt = at; }
+    };
+    for (const id of ix.paint.query({ minX: x - slack, minY: y - slack, maxX: x + slack, maxY: y + slack })) consider(id);
+    for (const id of ix.unboxed) consider(id);
+    return best;
   }
 
   /** An artifact that renders as a figure on the board rather than on a page. */
@@ -2297,13 +2348,178 @@
   const boxOfRect = (x, y, w, h) => ({ minX: round2(x), minY: round2(y), maxX: round2(x + w), maxY: round2(y + h) });
   function recordOp(op) { if (paintOps) paintOps.push(op); }
 
-  // ===== The rungs, read once per frame ====================================
-  // Shape → role → genre for everything on the board, from session.read().
-  // Labels under marks, the inspector's ladder and the palette all read from
-  // the same reading, so they cannot disagree with each other. Cached on the
-  // set of ids, because hover re-renders and relate() is O(n²).
-  let rungs = { key: null, roles: new Map(), genre: null, reading: null };
+  // ===== What the log says, kept while the log stands (R4c) =================
+  // A paint reads what the log derives — what each mark plays, where every
+  // mark is, who read what, which labels stand — and keeps each only while
+  // the log it came from stands. The key is the log itself: which array the
+  // session holds (undo and load replace it), how long it is, and which event
+  // ends it. Nothing else can say the board changed, so nothing else keys a
+  // cache here: a stale cache is worse than a slow one.
+  const serials = new WeakMap();
+  let serialNext = 0;
+  const serialOf = (o) => { let n = serials.get(o); if (n === undefined) { n = ++serialNext; serials.set(o, n); } return n; };
+  function logKey() {
+    const evs = session.getEvents();
+    return serialOf(evs) + ':' + evs.length + ':' + (evs.length ? serialOf(evs[evs.length - 1]) : 0);
+  }
+
+  const growBox = (a, b) => (!a ? { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY }
+    : { minX: Math.min(a.minX, b.minX), minY: Math.min(a.minY, b.minY), maxX: Math.max(a.maxX, b.maxX), maxY: Math.max(a.maxY, b.maxY) });
+  const boxMeets = (a, b) => a.maxX >= b.minX && a.minX <= b.maxX && a.maxY >= b.minY && a.minY <= b.maxY;
+  function pointsBox(points) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of points) { if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x; if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y; }
+    return points.length ? { minX, minY, maxX, maxY } : null;
+  }
+
+  /**
+   * The board as the paint reads it, for one log: built once when the log
+   * changes, a few milliseconds on a board of thousands of marks.
+   *
+   * - `scope` is the ink the rungs read, in their order: every loose mark,
+   *   then each artifact's members (a box inside a live page is still a node,
+   *   and the ladder says so); `at` is where each id stands in it.
+   * - `reach` files those marks by their own boxes (`MM.MarkGrid`, cells sized
+   *   from the marks), to find the marks within one's reach; `stray` are the
+   *   marks whose boxes are not finite, which the grid does not hold and
+   *   every neighbourhood carries; `wiredBy` is each mark's connectors.
+   * - `paint` files each content mark by what it DRAWS — its own box, its
+   *   clean form's and every part's, an artifact by its members' however far
+   *   they have moved from where it was blessed — and `boxes` holds that box
+   *   for the parts too; `unboxed` are the marks it has no finite box for,
+   *   drawn always.
+   * - `roles` and `genre` fill in as the paint asks.
+   */
+  let paintIndex = null;
+  function boardIndex(s) {
+    const key = logKey();
+    if (!paintIndex || paintIndex.key !== key) paintIndex = buildIndex(s, key);
+    return paintIndex;
+  }
+  function buildIndex(s, key) {
+    const artifactSet = new Set(s.artifacts);
+    const scope = s.contentIds.filter((id) => !artifactSet.has(id));
+    for (const aid of s.artifacts) for (const e of s.nodes.get(aid).edges) if (e.rel === 'has-part') scope.push(e.to);
+    const at = new Map();
+    scope.forEach((id, i) => { const p = at.get(id); if (p) p.push(i); else at.set(id, [i]); });
+    const reach = new MM.MarkGrid(), stray = [], wiredBy = new Map();
+    for (const id of at.keys()) {
+      const n = s.nodes.get(id);
+      const b = n && MM.boundsOf(n);
+      if (b) { if (MM.finiteBounds(b)) reach.set(id, b); else stray.push(id); }
+      if (n) for (const e of n.edges) if (e.rel === 'connects') { const w = wiredBy.get(e.to); if (w) w.push(id); else wiredBy.set(e.to, [id]); }
+    }
+    const boxes = new Map(), topOf = new Map();
+    const boxOf = (id, top, depth) => {
+      if (boxes.has(id)) return boxes.get(id);
+      boxes.set(id, null);
+      const n = s.nodes.get(id);
+      if (!n) return null;
+      let b = null;
+      const own = MM.boundsOf(n);
+      if (own) b = growBox(b, own);
+      const points = MM.strokePointsOf(n);
+      if (points) {
+        const pb = pointsBox(points);
+        if (pb) b = growBox(b, pb);
+        const clean = MM.cleanPointsOf(n);
+        const cb = clean && pointsBox(clean);
+        if (cb) b = growBox(b, cb);
+      }
+      if (depth < 12) {
+        for (const e of n.edges) {
+          if (e.rel !== 'has-part') continue;
+          if (!topOf.has(e.to)) topOf.set(e.to, top);
+          const pb = boxOf(e.to, top, depth + 1);
+          if (pb) b = growBox(b, pb);
+        }
+      }
+      boxes.set(id, b);
+      return b;
+    };
+    const paint = new MM.MarkGrid(), contentAt = new Map(), unboxed = [];
+    s.contentIds.forEach((id, i) => {
+      contentAt.set(id, i);
+      const b = boxOf(id, id, 0);
+      if (b && MM.finiteBounds(b)) paint.set(id, b); else unboxed.push(id);
+    });
+    return {
+      key, scope, at, reach, stray, wiredBy, paint, boxes, topOf, contentAt, unboxed,
+      artifactsInOrder: s.contentIds.filter((id) => artifactSet.has(id)),
+      roles: new Map(), genre: null, readChips: null, labelled: null, candidates: null,
+    };
+  }
+
+  // ===== The rungs: what a mark plays ======================================
+  // Shape → role → genre. The reading under a mark and the panel's ladder
+  // read one mark's role; the panel's code row for a live artifact reads the
+  // board's genre. The role is placed by the table in `diagram/roles.ts` from
+  // the mark's own shape, the ENGAGING relations it has (contains, inside,
+  // near, touching, crossing) and the wires, and an engaging relation holds
+  // only between marks within reach of each other (`MM.withinReach`, R4b) —
+  // so the role the whole board would give a mark is the role its
+  // neighbourhood gives it: the mark, the marks within its reach, the ends of
+  // its wires and the connectors wired to it, read in the whole board's own
+  // order so that ties in strength fall the same way. That is what a stroke
+  // costs the surface now: the marks it touched and their neighbours, read
+  // when the paint shows them, never the whole board. `paintCheck` holds a
+  // hand's paint to the whole-board read (`wholeBoardRungs`, what this was on
+  // every stroke until R4c).
   function readRungs(s) {
+    if (paintReference) return wholeBoardRungs(s);
+    return { roles: { get: (id) => roleOf(s, id) }, get genre() { return boardGenre(s); } };
+  }
+
+  /** The ids a mark's role is read over: its neighbourhood, in the board's order. */
+  function neighbourhoodOf(ix, s, id) {
+    if (ix.stray.includes(id)) return ix.scope.slice();
+    const near = new Set([id]);
+    const b = ix.reach.boundsOf(id);
+    if (b) {
+      const r = MM.reachAround(b);
+      for (const x of ix.reach.query({ minX: b.minX - r, minY: b.minY - r, maxX: b.maxX + r, maxY: b.maxY + r })) {
+        if (MM.withinReach(b, ix.reach.boundsOf(x))) near.add(x);
+      }
+    }
+    for (const x of ix.stray) near.add(x);
+    const n = s.nodes.get(id);
+    if (n) for (const e of n.edges) if (e.rel === 'connects') near.add(e.to);
+    for (const w of ix.wiredBy.get(id) || []) near.add(w);
+    const pos = [];
+    for (const x of near) { const p = ix.at.get(x); if (p) for (const i of p) pos.push(i); }
+    pos.sort((a, b2) => a - b2);
+    return pos.map((i) => ix.scope[i]);
+  }
+
+  /** The role the whole board gives a mark, read over its neighbourhood; undefined for what the rungs do not read. */
+  function roleOf(s, id) {
+    const ix = boardIndex(s);
+    if (!ix.at.has(id)) return undefined;
+    if (ix.roles.has(id)) return ix.roles.get(id);
+    let role;
+    for (const r of session.read(neighbourhoodOf(ix, s, id)).roles) if (r.id === id) role = r;
+    ix.roles.set(id, role);
+    return role;
+  }
+
+  /** The board's genre: every mark's role, each read over its neighbourhood. Asked only by a live artifact's panel. */
+  function boardGenre(s) {
+    const ix = boardIndex(s);
+    if (!ix.genre) {
+      if (!ix.scope.length) ix.genre = { genre: 'empty', reasoning: 'nothing drawn yet' };
+      else {
+        const roles = [];
+        for (const id of ix.scope) { const r = roleOf(s, id); if (r) roles.push(r); }
+        ix.genre = MM.genreOf(roles);
+      }
+    }
+    return ix.genre;
+  }
+
+  // The whole-board read: every mark's role, related over the whole board at
+  // once — O(n·R), 7.9 s on 2,000 marks. What the reference paint reads.
+  let rungs = { key: null, roles: new Map(), genre: null, reading: null };
+  function wholeBoardRungs(s) {
     const ids = s.contentIds.filter((id) => !s.artifacts.includes(id));
     // Members of artifacts keep their roles — a box inside a live page is
     // still a node, and the ladder should say so.
@@ -2320,9 +2536,27 @@
   }
 
   // ===== Rendering: ink is ground truth ===================================
+  // Below a pixel, a hand's points crowd one another: at the zoom that shows a
+  // whole board a stroke of seventy points spans a few pixels, and stroking
+  // every one of them — twice, with its halo — was most of the frame. So a
+  // point nearer than THIN_PX on screen to the last one drawn is passed over
+  // (the last point is always drawn): nothing drawn moves by as much as that,
+  // and at working zoom a hand's points stand further apart than it and every
+  // one is drawn. The reference paint draws every point.
+  const THIN_PX = 1;
   function path(points, closed) {
     ctx.beginPath();
-    points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    const n = points.length;
+    if (!n) return;
+    const tol = paintReference ? 0 : THIN_PX / view.zoom, tol2 = tol * tol;
+    let lx = points[0].x, ly = points[0].y;
+    ctx.moveTo(lx, ly);
+    for (let i = 1; i < n; i++) {
+      const p = points[i];
+      if (i < n - 1 && tol2 > 0) { const dx = p.x - lx, dy = p.y - ly; if (dx * dx + dy * dy < tol2) continue; }
+      ctx.lineTo(p.x, p.y);
+      lx = p.x; ly = p.y;
+    }
     if (closed) ctx.closePath();
   }
   function inkStroke(points, closed, style) {
@@ -2341,6 +2575,19 @@
 
   /** The colour each mark's ink was stroked in by the last paint, by node id. For tests. */
   const inkDrawn = new Map();
+  /**
+   * The colour a mark's ink WOULD be stroked in, for a mark the last paint
+   * passed over because it was off screen: its maker's, or the gold of a live
+   * artifact it is part of — as `inkOf` would choose. For tests.
+   */
+  function inkWouldBe(id) {
+    const s = state, ix = boardIndex(s);
+    const top = ix.contentAt.has(id) ? id : ix.topOf.get(id);
+    const n = s.nodes.get(id), t = top && s.nodes.get(top);
+    if (!n || !t || !MM.strokePointsOf(n)) return null;
+    if (id !== top && (n.reps.some((r) => r.modality === 'erased') || (isWritingArtifact(t) && !flipped.has(top)))) return null;
+    return s.live.includes(top) ? `rgba(${C.goldRGB},0.85)` : colourOf(n);
+  }
 
   function inkOf(node, style) {
     const points = MM.strokePointsOf(node);
@@ -2385,11 +2632,14 @@
     for (const e of node.edges) { // artifact: draw its members (transparent within)
       if (e.rel !== 'has-part') continue;
       const m = state.nodes.get(e.to);
+      if (!m || m.reps.some((r) => r.modality === 'erased')) continue;
+      // Off screen, a member is passed over — unless a drag or a tank has moved it, when its box is not where it is drawn.
+      if (paintView && !paintMoved && paintIndex) { const mb = paintIndex.boxes.get(m.id); if (mb && MM.finiteBounds(mb) && !boxMeets(mb, paintView)) continue; }
       // Each mark in the colour of the hand that DREW it, not of the one that made the
       // whole: an artifact is made by whoever blessed it, and a hand may bless a group
       // several hands drew (V1-PLAN L2f). A colour the style imposes — a live page's
       // gold, the outline of what was built — holds for every mark in it.
-      if (m && !m.reps.some((r) => r.modality === 'erased')) inkOf(m, style.byMaker ? Object.assign({}, style, { color: colourOf(m) }) : style);
+      inkOf(m, style.byMaker ? Object.assign({}, style, { color: colourOf(m) }) : style);
     }
   }
 
@@ -2427,6 +2677,136 @@
     for (const key of [...askedToRead]) { const first = String(key).replace(/^line:/, '').split(',')[0]; if (!s.nodes.has(first)) askedToRead.delete(key); }
   }
 
+  // ===== The stroke in progress, on a layer of its own (R4c) ================
+  // A pointer move while drawing repaints the pen — the stroke so far, and the
+  // magnet it is in reach of — on a canvas laid over the board's, and never
+  // the board: a paint of everything on every move, on a big board, was the
+  // ink lagging the pen. The layer takes no pointer; the board's canvas under
+  // it takes every one, as before. Every paint of the board repaints it too,
+  // so a pan or a zoom mid-stroke keeps the pen where the hand is.
+  const liveCanvas = document.createElement('canvas');
+  liveCanvas.id = 'liveInk';
+  liveCanvas.setAttribute('aria-hidden', 'true');
+  liveCanvas.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;z-index:2;';
+  canvas.insertAdjacentElement('afterend', liveCanvas);
+  const liveCtx = liveCanvas.getContext('2d');
+  let liveShown = false;
+  function drawLive() {
+    const dpr = window.devicePixelRatio || 1;
+    if (liveCanvas.width !== Math.round(innerWidth * dpr) || liveCanvas.height !== Math.round(innerHeight * dpr)) {
+      liveCanvas.width = Math.round(innerWidth * dpr);
+      liveCanvas.height = Math.round(innerHeight * dpr);
+      liveCanvas.style.width = innerWidth + 'px';
+      liveCanvas.style.height = innerHeight + 'px';
+      liveShown = true;
+    }
+    liveCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (liveShown) liveCtx.clearRect(0, 0, innerWidth, innerHeight);
+    liveShown = !!live;
+    if (!live) return;
+    liveCtx.setTransform(dpr * view.zoom, 0, 0, dpr * view.zoom, dpr * view.panX, dpr * view.panY);
+    liveCtx.lineCap = 'round';
+    liveCtx.lineJoin = 'round';
+    liveCtx.beginPath();
+    live.forEach((p, i) => (i ? liveCtx.lineTo(p.x, p.y) : liveCtx.moveTo(p.x, p.y)));
+    liveCtx.strokeStyle = C.ink;
+    liveCtx.lineWidth = Math.max(2, wpx(1.3));
+    liveCtx.stroke();
+    // The hold, while the pen is in a site's reach: a ring and the site's
+    // name, in the participant colour — an offer, never a trap (P1).
+    if (magnetHold) {
+      const p = magnetHold.site.point;
+      liveCtx.beginPath();
+      liveCtx.arc(p.x, p.y, wpx(8), 0, Math.PI * 2);
+      liveCtx.strokeStyle = C.agent;
+      liveCtx.lineWidth = wpx(1.5);
+      liveCtx.stroke();
+      liveCtx.beginPath();
+      liveCtx.arc(p.x, p.y, wpx(2.2), 0, Math.PI * 2);
+      liveCtx.fillStyle = C.agent;
+      liveCtx.fill();
+      liveCtx.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
+      liveCtx.lineWidth = wpx(3);
+      liveCtx.strokeStyle = C.haloText;
+      liveCtx.strokeText(magnetHold.site.kind, p.x + wpx(13), p.y - wpx(9));
+      liveCtx.fillStyle = C.agent;
+      liveCtx.fillText(magnetHold.site.kind, p.x + wpx(13), p.y - wpx(9));
+    }
+  }
+
+  /** The canvas in world units, grown by `m` world units on every side. */
+  function screenWorld(m) {
+    const a = screenToWorld(0, 0), b = screenToWorld(innerWidth, innerHeight);
+    return { minX: Math.min(a.x, b.x) - m, minY: Math.min(a.y, b.y) - m, maxX: Math.max(a.x, b.x) + m, maxY: Math.max(a.y, b.y) + m };
+  }
+
+  /** Where a match chip sits and how big it is, measured in the chrome's own size — drawn or not. */
+  function chipRect(str, x, y) {
+    ctx.font = wpx(10.5).toFixed(2) + 'px ui-monospace, SFMono-Regular, Menlo, monospace';
+    const w = ctx.measureText(str).width + wpx(14), h = wpx(17);
+    return { x: x, y: y - h, w: w, h: h };
+  }
+
+  /** The box each cluster candidate's marks fill, for this log. */
+  function candidateBoxes(s, ix) {
+    if (!ix.candidates) ix.candidates = s.clusterCandidates.map((c) => union(c.nodeIds.map((id) => MM.boundsOf(s.nodes.get(id)))));
+    return ix.candidates;
+  }
+
+  /** What each model read a group as, for this log: the marks that hold a reading of the second tier, and what the chip says. */
+  function readChipsOf(s, ix) {
+    if (ix && ix.readChips) return ix.readChips;
+    const out = [];
+    for (const id of s.contentIds) {
+      const n = s.nodes.get(id);
+      if (!n || n.reps.some((r) => r.modality === 'erased')) continue;
+      const reads = MM.interpretationsOf(n, s.nodes).filter((r) => r.tier === 2 && !r.blessed).sort((a, b) => b.weight - a.weight);
+      if (!reads.length) continue;
+      out.push({ id: id, text: reads.slice(0, 2).map((r) => r.label + ' ' + r.weight.toFixed(2)).join('  ·  ') + '  ·  ' + reads[0].sourceName });
+    }
+    if (ix) ix.readChips = out;
+    return out;
+  }
+
+  /** Whether an artifact wears its brackets and name: a FIGURE only while the hand is on it. */
+  function chromeShown(s, id, inspectedId) {
+    const node = s.nodes.get(id);
+    if (!node || !MM.boundsOf(node)) return false;
+    return !(isFigureArtifact(node) && id !== inspectedId && !s.selection.includes(id));
+  }
+
+  /**
+   * The content marks this paint draws, in the board's order: those whose
+   * box meets the screen, and — wherever they are — what the hand is on or
+   * holds, what a drag or a tank has moved, and the artifacts whose name or
+   * brackets reach the screen.
+   */
+  function paintOrder(s, ix, vb, inspectedId, pv) {
+    const out = new Set(ix.paint.query(vb));
+    for (const id of ix.unboxed) out.add(id);
+    if (inspectedId) out.add(inspectedId);
+    const last = lastContentId(s);
+    if (last) out.add(last);
+    for (const id of s.selection) out.add(id);
+    if (s.summon) for (const id of s.summon.enclosedIds) out.add(id);
+    for (const id of heldCandidates) out.add(id);
+    if (pv) for (const id of pv.ids) out.add(id);
+    for (const id of tank.place.keys()) out.add(id);
+    for (const id of ix.artifactsInOrder) {
+      if (out.has(id) || !chromeShown(s, id, inspectedId)) continue;
+      const node = s.nodes.get(id), b0 = MM.boundsOf(node), pl = bodyPlacement(id);
+      const b = pl ? { minX: b0.minX + pl.dx, maxX: b0.maxX + pl.dx, minY: b0.minY + pl.dy, maxY: b0.maxY + pl.dy } : b0;
+      ctx.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
+      const w = ctx.measureText((MM.wordOf(node) || '') + '  ·  live').width;
+      const chrome = { minX: b.minX - wpx(24), minY: b.minY - wpx(40), maxX: Math.max(b.maxX, b.minX + w) + wpx(24), maxY: b.maxY + wpx(24) };
+      if (boxMeets(chrome, vb)) out.add(id);
+    }
+    return [...out].filter((id) => ix.contentAt.has(id)).sort((a, b) => ix.contentAt.get(a) - ix.contentAt.get(b));
+  }
+
+  /** While a paint culls, the world box it draws within; null when it draws everything. */
+  let paintView = null;
+
   function render(s) {
     state = s;
     chipHits = [];
@@ -2437,6 +2817,10 @@
     // No model is asked from here: a paint is not a request (§6.3).
     syncStage(s);
     refreshOffers();
+    // The reference paint (paintCheck) reads the whole board and draws all of
+    // it, as every paint did before R4c; a hand's paint reads what the log
+    // keeps and draws what is on screen.
+    const ix = paintReference ? null : boardIndex(s);
 
     const dpr = window.devicePixelRatio || 1;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -2449,51 +2833,69 @@
 
     // Ink thins as you zoom out; hold a visible floor so a wide board still reads.
     const inkW = Math.max(2, wpx(1.3));
+    // What is on screen: the canvas, with room for what a mark draws past its
+    // own box — a stroke's width and its halo, a chip, a few words beside it.
+    const vb = ix ? screenWorld(Math.max(wpx(48), inkW * 2)) : null;
 
-    for (const c of s.clusterCandidates) {
-      const b0 = union(c.nodeIds.map((id) => MM.boundsOf(s.nodes.get(id))));
+    const cands = ix ? candidateBoxes(s, ix) : null;
+    s.clusterCandidates.forEach((c, ci) => {
+      const b0 = cands ? cands[ci] : union(c.nodeIds.map((id) => MM.boundsOf(s.nodes.get(id))));
       const cp = bodyPlacement(c.nodeIds[0]);
       const b = cp ? { minX: b0.minX + cp.dx, maxX: b0.maxX + cp.dx, minY: b0.minY + cp.dy, maxY: b0.maxY + cp.dy } : b0;
       const pad = wpx(14);
-      ctx.setLineDash([wpx(4), wpx(6)]);
-      ctx.strokeStyle = `rgba(${C.goldRGB},0.38)`;
-      ctx.lineWidth = wpx(1);
-      ctx.strokeRect(b.minX - pad, b.minY - pad, b.maxX - b.minX + pad * 2, b.maxY - b.minY + pad * 2);
-      ctx.setLineDash([]);
       // A match is a chip beside the group, with its number (D8); a tap on it
       // opens the field with the match leading. Plural, like every reading:
       // two definitions with the same shapes are both named.
       const said = c.matches.slice(0, 2).map((m) => m.name + ' ' + m.score.toFixed(2)).join('  ·  ');
-      const hit = chipText(said, b.minX - pad, b.minY - pad - wpx(8));
-      chipHits.push({ ids: c.nodeIds.slice(), x: hit.x, y: hit.y, w: hit.w, h: hit.h });
-      if (paintOps) recordOp({ kind: 'match', id: c.nodeIds.join(','), text: said, box: boxOfRect(b.minX - pad, hit.y, Math.max(hit.w, b.maxX - b.minX + pad * 2), b.maxY + pad - hit.y), moved: !!cp });
-    }
+      const at = chipRect(said, b.minX - pad, b.minY - pad - wpx(8));
+      const whole = { minX: b.minX - pad, minY: at.y, maxX: Math.max(b.minX - pad + at.w, b.maxX + pad), maxY: b.maxY + pad };
+      if (!vb || cp || boxMeets(whole, vb)) {
+        ctx.setLineDash([wpx(4), wpx(6)]);
+        ctx.strokeStyle = `rgba(${C.goldRGB},0.38)`;
+        ctx.lineWidth = wpx(1);
+        ctx.strokeRect(b.minX - pad, b.minY - pad, b.maxX - b.minX + pad * 2, b.maxY - b.minY + pad * 2);
+        ctx.setLineDash([]);
+        chipText(said, b.minX - pad, b.minY - pad - wpx(8));
+        if (paintOps) recordOp({ kind: 'match', id: c.nodeIds.join(','), text: said, box: boxOfRect(whole.minX, whole.minY, whole.maxX - whole.minX, whole.maxY - whole.minY), moved: !!cp });
+      }
+      // Measured wherever it is, so a tap and a test find it whether it was drawn or not.
+      chipHits.push({ ids: c.nodeIds.slice(), x: at.x, y: at.y, w: at.w, h: at.h });
+    });
     // What a model read a group as stays beside it (v10 F6): a chip with the
     // number and the reader, whether or not the field is still open, and a
     // tap on it opens the field on those marks again. A reading held on a
     // group's first member speaks for the group it was asked about.
-    for (const id of s.contentIds) {
-      const n = s.nodes.get(id);
-      if (!n || n.reps.some((r) => r.modality === 'erased')) continue;
-      const reads = MM.interpretationsOf(n, s.nodes).filter((r) => r.tier === 2 && !r.blessed).sort((a, b) => b.weight - a.weight);
-      if (!reads.length) continue;
-      const group = (readGroups.get(id) || [id]).filter((g) => s.contentIds.includes(g));
+    const inPlane = ix ? (g) => ix.contentAt.has(g) : (g) => s.contentIds.includes(g);
+    for (const rc of readChipsOf(s, ix)) {
+      const id = rc.id;
+      const group = (readGroups.get(id) || [id]).filter(inPlane);
       const boxes = (group.length ? group : [id]).map((g) => MM.boundsOf(s.nodes.get(g))).filter(Boolean);
       if (!boxes.length) continue;
       const b = union(boxes);
       const pad = wpx(14);
-      const text = reads.slice(0, 2).map((r) => r.label + ' ' + r.weight.toFixed(2)).join('  ·  ') + '  ·  ' + reads[0].sourceName;
-      const hit = chipText(text, b.minX - pad, b.maxY + pad + wpx(17));
-      chipHits.push({ ids: group.length ? group : [id], x: hit.x, y: hit.y, w: hit.w, h: hit.h });
-      if (paintOps) recordOp({ kind: 'read', id: id, text: text, box: boxOfRect(hit.x, hit.y, hit.w, hit.h), moved: false });
+      const at = chipRect(rc.text, b.minX - pad, b.maxY + pad + wpx(17));
+      if (!vb || boxMeets({ minX: at.x, minY: at.y, maxX: at.x + at.w, maxY: at.y + at.h }, vb)) {
+        chipText(rc.text, b.minX - pad, b.maxY + pad + wpx(17));
+        if (paintOps) recordOp({ kind: 'read', id: id, text: rc.text, box: boxOfRect(at.x, at.y, at.w, at.h), moved: false });
+      }
+      chipHits.push({ ids: group.length ? group : [id], x: at.x, y: at.y, w: at.w, h: at.h });
     }
 
     const inspectedId = hoverId || lastContentId(s);
+    const pv = dragPreview();
+    // Which artifacts wear their brackets and name — for every artifact on the
+    // board, in its order, drawn or not: a label rises above the name, and the
+    // name is the same whether the artifact is on screen or not.
+    for (const id of ix ? ix.artifactsInOrder : s.contentIds.filter((x) => s.artifacts.includes(x))) if (chromeShown(s, id, inspectedId)) chromeDrawn.push(id);
+    const artifactSet = new Set(s.artifacts), liveSetNow = new Set(s.live);
+    // Members of an artifact are culled one by one — a big drawing is mostly
+    // off screen at working zoom — except while a tank moves bodies about.
+    paintView = vb && !tank.place.size ? vb : null;
 
-    for (const id of s.contentIds) {
+    for (const id of ix ? paintOrder(s, ix, vb, inspectedId, pv) : s.contentIds) {
       const node = s.nodes.get(id);
-      const isArtifact = s.artifacts.includes(id);
-      const isLive = s.live.includes(id);
+      const isArtifact = artifactSet.has(id);
+      const isLive = liveSetNow.has(id);
       const pending = s.pendingLassoId === id;
       // A closed stroke around marks is plain ink until the mark takes it: nothing
       // lights up on its own. The command mark is what makes it a selection.
@@ -2503,7 +2905,6 @@
       // what got built, and that promise is only kept by drawing them on top.
       // While a hand holds the selection, the held marks follow it before the
       // log has the move — one event lands when the hand lets go.
-      const pv = dragPreview();
       const held = pv && pv.ids.includes(id);
       if (held) { ctx.save(); applyPreview(pv); }
       // A body in a running tank is drawn where its behaviour has taken it:
@@ -2530,9 +2931,7 @@
         // the first, and a figure made of eight of them is unreadable. Same
         // rule the reading under a mark already follows: shown for the one the
         // hand is on, not for every mark on the board.
-        const quiet = isFigureArtifact(node) && id !== inspectedId && !s.selection.includes(id);
-        if (!quiet) {
-          chromeDrawn.push(id);
+        if (chromeShown(s, id, inspectedId)) {
           const name = (MM.wordOf(node) || '') + (isLive ? '  ·  live' : '');
           if (paintOps) recordOp({ kind: 'chrome', id: id, text: name, box: boxOfRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY), moved: !!pl });
           brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
@@ -2555,8 +2954,9 @@
         }
       }
     }
+    paintView = null;
 
-    renderLabels(s, inspectedId);
+    renderLabels(s, inspectedId, ix, vb);
 
     if (s.summon) {
       for (const gid of s.summon.gestureIds) {
@@ -2570,28 +2970,9 @@
       }
     }
 
-    if (live) {
-      ctx.beginPath();
-      live.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-      ctx.strokeStyle = C.ink;
-      ctx.lineWidth = inkW;
-      ctx.stroke();
-      // The hold, while the pen is in a site's reach: a ring and the site's
-      // name, in the participant colour — an offer, never a trap (P1).
-      if (magnetHold) {
-        const p = magnetHold.site.point;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, wpx(8), 0, Math.PI * 2);
-        ctx.strokeStyle = C.agent;
-        ctx.lineWidth = wpx(1.5);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, wpx(2.2), 0, Math.PI * 2);
-        ctx.fillStyle = C.agent;
-        ctx.fill();
-        text(magnetHold.site.kind, p.x + wpx(13), p.y - wpx(9), C.agent);
-      }
-    }
+    // The stroke in progress lives on a layer of its own (drawLive), so a
+    // pointer move repaints the pen and nothing else.
+    drawLive();
 
     renderFrames(s);
     renderWorking(s);
@@ -2703,23 +3084,34 @@
   }
 
   /** Every label on a mark whose ink is on the board: loose marks, and the marks an artifact holds. */
-  function renderLabels(s, inspectedId) {
+  function renderLabels(s, inspectedId, ix, vb) {
     labelsDrawn = [];
     const pv = dragPreview();
+    for (const { id, placedBy } of labelledOf(s, ix)) {
+      const node = s.nodes.get(id);
+      drawLabel(s, node, MM.labelOf(node), placedBy, inspectedId, pv, vb);
+    }
+  }
+
+  /** The marks that carry a label, and the content mark each is drawn under, in the board's order — for this log. */
+  function labelledOf(s, ix) {
+    if (ix && ix.labelled) return ix.labelled;
+    const out = [];
     const seen = new Set();
     const visit = (id, placedBy) => {
       if (seen.has(id)) return;
       seen.add(id);
       const node = s.nodes.get(id);
       if (!node || node.reps.some((r) => r.modality === 'erased')) return;
-      const lab = MM.labelOf(node);
-      if (lab) drawLabel(s, node, lab, placedBy, inspectedId, pv);
+      if (MM.labelOf(node)) out.push({ id: id, placedBy: placedBy });
       for (const e of node.edges) if (e.rel === 'has-part') visit(e.to, placedBy);
     };
     for (const id of s.contentIds) visit(id, id);
+    if (ix) ix.labelled = out;
+    return out;
   }
 
-  function drawLabel(s, node, lab, placedBy, inspectedId, pv) {
+  function drawLabel(s, node, lab, placedBy, inspectedId, pv, vb) {
     const b0 = MM.boundsOf(node);
     if (!b0) return;
     // A body in a running tank, and a held selection mid-drag, carry their words with them.
@@ -2733,17 +3125,20 @@
     const colour = colourOf(node);
     const who = nameOfParticipant(lab.source || authorOf(node));
     const whoShown = node.id === inspectedId || placedBy === inspectedId;
-    if (held) { ctx.save(); applyPreview(pv); }
     ctx.font = size.toFixed(3) + "px 'Space Grotesk', system-ui, sans-serif";
+    const w = ctx.measureText(lab.text).width;
+    // Where it stands is said wherever it is; it is drawn when it reaches the screen.
+    labelsDrawn.push({ id: node.id, text: lab.text, x: x, y: y, w: w, size: size, px: size * view.zoom, colour: colour, who: who, whoShown: whoShown });
+    const reach = { minX: x, minY: y - size * 1.2, maxX: x + w + (whoShown ? size + wpx(11) * (who.length + 3) : 0), maxY: y + size * 0.5 };
+    if (vb && !held && !pl && !boxMeets(reach, vb)) return;
+    if (held) { ctx.save(); applyPreview(pv); }
     ctx.lineWidth = size * 0.24;
     ctx.strokeStyle = C.haloText;
     ctx.strokeText(lab.text, x, y);
     ctx.fillStyle = colour;
     ctx.fillText(lab.text, x, y);
-    const w = ctx.measureText(lab.text).width;
     if (whoShown) text('· ' + who, x + w + size * 0.4, y, `rgba(${C.labelRGB},0.85)`);
     if (held) ctx.restore();
-    labelsDrawn.push({ id: node.id, text: lab.text, x: x, y: y, w: w, size: size, px: size * view.zoom, colour: colour, who: who, whoShown: whoShown });
     if (paintOps) recordOp({ kind: 'label', id: node.id, text: lab.text, box: boxOfRect(x, y - size, w, size * 1.45), moved: !!(held || pl) });
   }
 
@@ -2918,7 +3313,15 @@
     const m = wpx(600), thin = wpx(3);
     const win = { x: vw.minX - m, y: vw.minY - m, w: (vw.maxX - vw.minX) + m * 2, h: (vw.maxY - vw.minY) + m * 2 };
     const out = [];
-    for (const id of s.contentIds) {
+    // The marks near the window, in the board's order: the paint's index finds them, the test below is the same.
+    let ids = s.contentIds;
+    if (!paintReference) {
+      const ix = boardIndex(s);
+      const near = new Set(ix.paint.query({ minX: win.x - thin, minY: win.y - thin, maxX: win.x + win.w + thin, maxY: win.y + win.h + thin }));
+      for (const id of ix.unboxed) near.add(id);
+      ids = [...near].filter((id) => ix.contentAt.has(id)).sort((a, b) => ix.contentAt.get(a) - ix.contentAt.get(b));
+    }
+    for (const id of ids) {
       const b = MM.boundsOf(s.nodes.get(id));
       if (!b) continue;
       const r = rectOf(b);
@@ -3004,15 +3407,17 @@
       card.rect = placeCard(card, placed, obstacles, vw, gap);
       placed.push(card.rect);
       cardRects.push({ id: card.id, about: card.about.slice(), what: card.what, who: card.who, ago: card.ago, x: card.rect.x, y: card.rect.y, w: card.rect.w, h: card.rect.h });
-      if (paintOps) {
-        const r = card.rect, sub = card.subject;
-        recordOp({ kind: 'card', id: card.id, text: card.who + ' · ' + card.what + ' · ' + card.ago + ' · ' + card.lines.join(' '),
-          box: boxOfRect(Math.min(r.x, sub.minX), Math.min(r.y, sub.minY), Math.max(r.x + r.w, sub.maxX) - Math.min(r.x, sub.minX), Math.max(r.y + r.h, sub.maxY) - Math.min(r.y, sub.minY)), moved: false });
-      }
     }
 
+    // Every card is placed, on screen or not — a card off screen still keeps
+    // its place from the ones that are — and drawn when it, its leader or the
+    // marks it speaks for reach the screen.
+    const vb = paintReference ? null : screenWorld(wpx(48));
     for (const card of cards) {
       const r = card.rect, sub = rectOf(card.subject);
+      const reach = { minX: Math.min(r.x, sub.x), minY: Math.min(r.y, sub.y), maxX: Math.max(r.x + r.w, sub.x + sub.w), maxY: Math.max(r.y + r.h, sub.y + sub.h) };
+      if (vb && !boxMeets(reach, vb)) continue;
+      if (paintOps) recordOp({ kind: 'card', id: card.id, text: card.who + ' · ' + card.what + ' · ' + card.ago + ' · ' + card.lines.join(' '), box: boxOfRect(reach.minX, reach.minY, reach.maxX - reach.minX, reach.maxY - reach.minY), moved: false });
       // The leader keeps the anchor the placing moved: marks to card, by the
       // nearest edges, so a card always says which ink it speaks for.
       const from = edgePoint(sub, { x: r.x + r.w / 2, y: r.y + r.h / 2 });
@@ -3132,13 +3537,17 @@
     for (const k of ['reading', 'status', 'standing', 'panel', 'chips', 'labels', 'cards', 'chrome', 'mini', 'offers', 'held']) {
       if (!same(got[k], want[k])) diffs.push({ what: 'said differently: ' + k, got: got[k], want: want[k] });
     }
-    // On screen: the canvas in world units, and a margin for what a stroke's
-    // width, its halo and a chip's words carry past the box they were given.
-    const a = screenToWorld(0, 0), b = screenToWorld(innerWidth, innerHeight), m = wpx(120);
-    const vp = { minX: a.x - m, minY: a.y - m, maxX: b.x + m, maxY: b.y + m };
-    const onScreen = (op) => op.moved || !op.box ||
-      (op.box.maxX >= vp.minX && op.box.minX <= vp.maxX && op.box.maxY >= vp.minY && op.box.minY <= vp.maxY) ||
-      (op.clean && op.clean.maxX >= vp.minX && op.clean.minX <= vp.maxX && op.clean.maxY >= vp.minY && op.clean.minY <= vp.maxY);
+    // On screen: what an op draws — its box, and what it carries past the box
+    // it was given (a stroke's width and halo, the words beside a mark or
+    // above an artifact) — meets the canvas. Generous on purpose: a hand's
+    // paint must draw everything this calls on screen.
+    const vp = screenWorld(0);
+    const carry = { ink: wpx(8) + 4, ghost: wpx(8) + 4, match: wpx(4), read: wpx(4), card: wpx(4), label: wpx(24), chrome: wpx(40), reading: wpx(24) };
+    const reach = (bx, op) => {
+      const m = carry[op.kind] || wpx(8), words = op.text && (op.kind === 'reading' || op.kind === 'chrome' || op.kind === 'label') ? op.text.length * wpx(9) : 0;
+      return { minX: bx.minX - m, minY: bx.minY - m, maxX: bx.maxX + m + words, maxY: bx.maxY + m };
+    };
+    const onScreen = (op) => op.moved || !op.box || boxMeets(reach(op.box, op), vp) || (op.clean && boxMeets(reach(op.clean, op), vp));
     const key = (op) => JSON.stringify(op);
     const wantKeys = new Set(want.ops.map(key)), gotKeys = new Set(got.ops.map(key));
     for (const op of got.ops) if (!wantKeys.has(key(op))) diffs.push({ what: 'drawn, and the whole-board read draws it otherwise or not at all', op: op });
@@ -4678,7 +5087,7 @@
 
 // ===== inspector =====
 // Provides: the panel: a mark, an artifact, a word, the selection.
-// Uses: core, render (readRungs), snap, handwriting, models.
+// Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -4739,6 +5148,17 @@
   /** The kind of an artifact's newest code rep, html by default. */
   function codeKindOf(node) { const r = node && codeRepOf(node); return (r && r.data.kind) || 'html'; }
 
+  // The panel is written only when what it says changed (R4c): a pan or a
+  // hover repaints the board, and rebuilding the panel's DOM with the same
+  // words on every frame was work for nothing — and closed whatever a hand
+  // had opened in it. Every write to the panel goes through here.
+  let panelSaid = null;
+  function showPanel(html) {
+    if (html === panelSaid) return;
+    panelSaid = html;
+    inspectorEl.innerHTML = html;
+  }
+
   function renderInspector(s, id) {
     if (s.summon) return renderSummonScope(s);
 
@@ -4751,17 +5171,17 @@
       // It is not a tour and not a mode: it is the empty state of one row, and
       // the first mark drawn replaces it with that mark's reading.
       if (!s.contentIds.length && !s.artifacts.length) {
-        inspectorEl.innerHTML = '<div class="eyebrow">nothing drawn yet</div>' +
+        showPanel('<div class="eyebrow">nothing drawn yet</div>' +
           '<ol class="firstLoop">' +
           '<li><b>draw a few marks</b> — a box, a circle, a line</li>' +
           '<li><b>press and hold one</b> — it is held with what it sits with</li>' +
           '<li><b>choose what it becomes</b> — tap a pill, or type in the field</li>' +
           '</ol>' +
-          '<div class="why">the canvas reads every mark as you draw it; a model is asked only when you ask one</div>';
+          '<div class="why">the canvas reads every mark as you draw it; a model is asked only when you ask one</div>');
         return;
       }
-      inspectorEl.innerHTML = '<div class="eyebrow">mark</div>' +
-        '<div class="empty">nothing here yet</div>';
+      showPanel('<div class="eyebrow">mark</div>' +
+        '<div class="empty">nothing here yet</div>');
       return;
     }
 
@@ -5020,7 +5440,7 @@
         '<div class="row"><span class="k">size</span><span class="v">' + Math.round(fp.size) + 'px</span></div>';
     }
 
-    inspectorEl.innerHTML = html;
+    showPanel(html);
   }
 
   /**
@@ -5054,9 +5474,14 @@
     return { here: 'shapes' + (shapes.length ? ', ' + [...new Set(shapes)].join(', ') : ''), next: 'draw them clean · a name · a brief is a program' };
   }
 
+  // What the selection reads as, kept while the log stands (R4c): a pan with
+  // the field open used to read every held mark again on every frame.
+  let scopeRead = { key: null, reading: null };
   function renderSummonScope(s) {
     const sum = s.summon;
-    const reading = session.read(sum.enclosedIds);
+    const key = logKey() + '|' + sum.enclosedIds.join(',');
+    if (paintReference || scopeRead.key !== key) scopeRead = { key: paintReference ? null : key, reading: session.read(sum.enclosedIds) };
+    const reading = scopeRead.reading;
     let html = '<div class="eyebrow">selection</div>';
 
     html += '<div class="row"><span class="k">holds</span><span class="v">' +
@@ -5126,7 +5551,7 @@
       if (strongest) html += '<div class="why">' + esc(strongest.kind + ': ' + strongest.reasoning) + '</div>';
     }
 
-    inspectorEl.innerHTML = html;
+    showPanel(html);
   }
 
   // Debug handle. This is a reference surface for the engine, so reading the
@@ -8043,16 +8468,36 @@
   const MINI_W = 176, MINI_H = 108, MINI_PAD = 8;
   let mini = null; // { scale, ox, oy } of the last paint: world → map pixels
 
+  /**
+   * What the map shows, for one log (R4c): every mark's box and what it is,
+   * and the box they fill. The map still shows the whole board — only the
+   * reading of it is kept while the log stands; each paint draws the boxes
+   * and the viewport again, where the view now puts them.
+   */
+  let miniSeen = { key: null, items: null, content: null };
+  function miniItems(s) {
+    const key = logKey();
+    if (!paintReference && miniSeen.key === key) return miniSeen;
+    const arts = new Set(s.artifacts), answers = new Set(s.explanations);
+    const items = [];
+    for (const id of s.contentIds.concat(s.explanations)) {
+      const b = MM.boundsOf(s.nodes.get(id));
+      if (b) items.push({ id: id, b: b, artifact: arts.has(id), answer: answers.has(id) });
+    }
+    const seen = { key: paintReference ? null : key, items: items, content: items.length ? union(items.map((x) => x.b)) : null };
+    if (!paintReference) miniSeen = seen;
+    return seen;
+  }
+
   function renderMinimap(s) {
     if (!minimapEl) return;
-    const ids = s.contentIds.concat(s.explanations);
-    const boxes = ids.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
-    if (!boxes.length) { minimapEl.hidden = true; mini = null; return; }
+    const seen = miniItems(s);
+    if (!seen.items.length) { minimapEl.hidden = true; mini = null; return; }
     minimapEl.hidden = false;
     const dpr = window.devicePixelRatio || 1;
     if (minimapEl.width !== Math.round(MINI_W * dpr)) { minimapEl.width = Math.round(MINI_W * dpr); minimapEl.height = Math.round(MINI_H * dpr); }
     const vp = { minX: -view.panX / view.zoom, minY: -view.panY / view.zoom, maxX: (innerWidth - view.panX) / view.zoom, maxY: (innerHeight - view.panY) / view.zoom };
-    const all = union(boxes.concat([vp]));
+    const all = union([seen.content, vp]);
     const w = Math.max(1, all.maxX - all.minX), h = Math.max(1, all.maxY - all.minY);
     const scale = Math.min((MINI_W - MINI_PAD * 2) / w, (MINI_H - MINI_PAD * 2) / h);
     const ox = MINI_PAD + ((MINI_W - MINI_PAD * 2) - w * scale) / 2 - all.minX * scale;
@@ -8061,14 +8506,14 @@
     const g = minimapEl.getContext('2d');
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, MINI_W, MINI_H);
-    for (const id of ids) {
-      const b = MM.boundsOf(s.nodes.get(id));
-      if (!b) continue;
+    const answerFill = 'rgba(' + C.goldRGB + ',0.35)';
+    for (const it of seen.items) {
+      const b = it.b;
       const x = ox + b.minX * scale, y = oy + b.minY * scale;
       const bw = Math.max(1.5, (b.maxX - b.minX) * scale), bh = Math.max(1.5, (b.maxY - b.minY) * scale);
-      if (paintOps) recordOp({ kind: 'mini', id: id, box: boxOfRect(x, y, bw, bh), moved: true });
-      if (s.artifacts.includes(id)) { g.strokeStyle = 'rgba(' + C.goldRGB + ',0.8)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, bw, bh); }
-      else { g.fillStyle = s.explanations.includes(id) ? 'rgba(' + C.goldRGB + ',0.35)' : C.inkFaint; g.fillRect(x, y, bw, bh); }
+      if (paintOps) recordOp({ kind: 'mini', id: it.id, box: boxOfRect(x, y, bw, bh), moved: true });
+      if (it.artifact) { g.strokeStyle = 'rgba(' + C.goldRGB + ',0.8)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, bw, bh); }
+      else { g.fillStyle = it.answer ? answerFill : C.inkFaint; g.fillRect(x, y, bw, bh); }
     }
     g.strokeStyle = C.ink; g.lineWidth = 1; g.setLineDash([]);
     g.strokeRect(ox + vp.minX * scale + 0.5, oy + vp.minY * scale + 0.5, Math.max(2, (vp.maxX - vp.minX) * scale), Math.max(2, (vp.maxY - vp.minY) * scale));
@@ -8095,7 +8540,8 @@
       miniPanTo(miniToWorld(e));
       e.preventDefault();
     });
-    minimapEl.addEventListener('pointermove', (e) => { if (miniDrag && mini) miniPanTo(miniToWorld(e)); });
+    // A drag across the map pans once a frame, like any other pan (R4c).
+    minimapEl.addEventListener('pointermove', (e) => { if (miniDrag && mini) { const w = miniToWorld(e); view.panX = innerWidth / 2 - w.x * view.zoom; view.panY = innerHeight / 2 - w.y * view.zoom; viewChanged(); } });
     const miniEnd = () => { miniDrag = false; };
     minimapEl.addEventListener('pointerup', miniEnd);
     minimapEl.addEventListener('pointercancel', miniEnd);
@@ -8134,7 +8580,7 @@
     inspect: (id) => { hoverId = id || null; render(state); },
     colourOf: (id) => { const n = session.getState().nodes.get(id); return n ? colourOf(n) : null; },
     // The colour the last paint stroked a mark's ink in — inside an artifact too, where each mark keeps its drawer's (L2f).
-    inkDrawn: (id) => inkDrawn.get(id) || null,
+    inkDrawn: (id) => inkDrawn.get(id) || inkWouldBe(id) || null,
     // The explanation plane, for tests: where the last paint put each answer card.
     answerCards: () => cardRects.map((c) => ({ id: c.id, about: c.about.slice(), what: c.what, who: c.who, ago: c.ago, x: c.x, y: c.y, w: c.w, h: c.h })),
     // Text folds back from ink, for tests: the words of a text where they stand.

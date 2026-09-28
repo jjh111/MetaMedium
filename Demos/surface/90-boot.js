@@ -31,7 +31,7 @@
     inspect: (id) => { hoverId = id || null; render(state); },
     colourOf: (id) => { const n = session.getState().nodes.get(id); return n ? colourOf(n) : null; },
     // The colour the last paint stroked a mark's ink in — inside an artifact too, where each mark keeps its drawer's (L2f).
-    inkDrawn: (id) => inkDrawn.get(id) || null,
+    inkDrawn: (id) => inkDrawn.get(id) || inkWouldBe(id) || null,
     // The explanation plane, for tests: where the last paint put each answer card.
     answerCards: () => cardRects.map((c) => ({ id: c.id, about: c.about.slice(), what: c.what, who: c.who, ago: c.ago, x: c.x, y: c.y, w: c.w, h: c.h })),
     // Text folds back from ink, for tests: the words of a text where they stand.

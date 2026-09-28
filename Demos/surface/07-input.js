@@ -31,7 +31,7 @@
       if (touches.size === 2) {
         // Two fingers: this is a pinch, not a stroke. Drop the live ink — it
         // was the first finger landing, not a mark.
-        live = null; pressEnd(); magnetStart = null; magnetHold = null;
+        live = null; pressEnd(); magnetStart = null; magnetHold = null; drawLive();
         const [a, b] = [...touches.values()];
         pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, zoom: view.zoom };
         return;
@@ -113,11 +113,11 @@
         const dist = Math.hypot(a.x - b.x, a.y - b.y);
         const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
         const target = clampZoom(pinch.zoom * (dist / Math.max(1, pinch.dist)));
-        zoomAround(pinch.mid.x, pinch.mid.y, target / view.zoom);
+        zoomBy(pinch.mid.x, pinch.mid.y, target / view.zoom);
         view.panX += mid.x - pinch.mid.x;
         view.panY += mid.y - pinch.mid.y;
         pinch.mid = mid;
-        afterViewChange();
+        viewChanged();
         return;
       }
     }
@@ -130,7 +130,7 @@
       view.panX += e.clientX - panning.x;
       view.panY += e.clientY - panning.y;
       panning = { x: e.clientX, y: e.clientY };
-      afterViewChange();
+      viewChanged(); // one paint a frame, however many moves the frame holds
       return;
     }
     if (!live) {
@@ -143,7 +143,7 @@
     }
     live.push(screenToWorld(e.clientX, e.clientY));
     magnetHold = magnetQuery(live[live.length - 1]); // the offer follows the pen; out of reach, it lets go
-    render(state); // live ink
+    drawLive(); // the pen and its magnet, on their own layer; the board is as it was (R4c)
   });
 
   const endTouch = (e) => {
@@ -153,7 +153,7 @@
     return touches.size > 0; // a finger is still down: nothing to commit yet
   };
   canvas.addEventListener('pointercancel', (e) => {
-    endTouch(e); live = null; pressEnd(); magnetStart = null; magnetHold = null;
+    endTouch(e); live = null; pressEnd(); magnetStart = null; magnetHold = null; drawLive();
     if (forward) { postPointer(forward, 'cancel', e, screenToWorld(e.clientX, e.clientY)); forward = null; }
   });
 
@@ -304,11 +304,15 @@
   function scratchNearMiss(s, node, points) {
     const fp = MM.fingerprintOf(node);
     if (!fp || fp.isClosed || fp.corners < 2 || !points || points.length < 6) return null;
+    const sb = MM.getBounds(points);
     for (const id of s.contentIds) {
       if (id === node.id || s.artifacts.includes(id)) continue;
       const t = s.nodes.get(id);
       const pts = t && MM.strokePointsOf(t);
       if (!pts) continue;
+      // A stroke crosses only an outline whose box its own box meets: the rest are passed over unread (R4c).
+      const tb = MM.getBounds(pts);
+      if (tb.maxX < sb.minX || tb.minX > sb.maxX || tb.maxY < sb.minY || tb.minY > sb.maxY) continue;
       const tf = MM.fingerprintOf(t);
       const outline = MM.outlineOf({ points: pts, closed: !!(tf && tf.isClosed) });
       if (outline && MM.countCrossings(points, outline, 3) === 2) return id;
