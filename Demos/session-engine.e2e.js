@@ -3843,6 +3843,28 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 58c, 56e. Held writing: the field beside it, not over it; the panel says it is read (found walking the audit again, U2) ----
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    mm.agents.length = 0; mm.agents.push(MM.createAgentParticipant(mm.session, Object.assign({}, MM.PRESETS.ollama, { model: 'e2e-stub', vision: true }), Date.now()));
+    const words58c = [];
+    for (const [x, w] of [[420, 90], [540, 110], [680, 80]]) { t.stroke(t.word(x, 420, w, 28, 6)); const st = mm.session.getState(); words58c.push(st.contentIds[st.contentIds.length - 1]); }
+    const c58c = document.getElementById('canvas');
+    const pe58c = (type, x, y) => c58c.dispatchEvent(new PointerEvent(type, { pointerId: 1, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1 }));
+    const at58c = mm.worldToScreen(465, 425);
+    pe58c('pointerdown', at58c.x, at58c.y); await wait(700); pe58c('pointerup', at58c.x, at58c.y); await wait(80);
+    const st58c = mm.session.getState();
+    let box = null;
+    for (const id of (st58c.summon ? st58c.summon.enclosedIds : [])) { const b = MM.boundsOf(st58c.nodes.get(id)); const a = mm.worldToScreen(b.minX, b.minY), z = mm.worldToScreen(b.maxX, b.maxY); box = box ? { l: Math.min(box.l, a.x), t: Math.min(box.t, a.y), r: Math.max(box.r, z.x), b: Math.max(box.b, z.y) } : { l: a.x, t: a.y, r: z.x, b: z.y }; }
+    const fr = document.getElementById('summon').getBoundingClientRect();
+    const over58c = !!box && fr.left < box.r && fr.right > box.l && fr.top < box.b && fr.bottom > box.t;
+    step('58c. a line of writing held: the field opens beside the held marks, never over them, when there is room', !!st58c.summon && !!box && !over58c,
+      { held: st58c.summon && st58c.summon.enclosedIds.length, marks: box && [box.l, box.t, box.r, box.b].map(Math.round), field: [fr.left, fr.top, fr.right, fr.bottom].map(Math.round) });
+    const becomes56e = [...document.querySelectorAll('#inspector .row')].map((r) => r.textContent).find((x) => /^becomes/.test(x)) || '';
+    step('56e. the panel says held writing becomes what Enter does — read — not only a name', /read/i.test(becomes56e), becomes56e);
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };
 
