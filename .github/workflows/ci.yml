@@ -46,6 +46,10 @@ jobs:
       # job's working directory does not matter.
       - name: The field's reader, on its own
         run: node --test ../Demos/surface/09-field.test.mjs
+      # Its sibling (V1-PLAN R6): the hand's rules — what a pen, a finger and a
+      # palm do, and the hand tile's face and cycle — pure, in Node.
+      - name: The hand's rules, on their own
+        run: node --test ../Demos/surface/07-hand.test.mjs
       # The relay's catch-up and the rooms over it (DIRECTOR-PLAN-W2 L1): `replay`
       # is pure; the truncation line and the three-hand room run over a real
       # relay on a free port of 127.0.0.1, with the committed Node bundle checked
@@ -131,7 +135,7 @@ jobs:
           if-no-files-found: warn
 
   webkit:
-    name: the WebKit smoke — the canvas on a second engine
+    name: WebKit — the smoke, pencil and tablet, and no lost work, on a second engine
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -144,12 +148,18 @@ jobs:
       - name: WebKit
         working-directory: e2e
         run: npx playwright install --with-deps webkit
-      # A smoke, not an iPhone test (e2e/README.md): desktop WebKit, headless,
-      # drawing with real pointer input, holding a mark until the field opens,
-      # and taking one pill. The canvas only, so the shard needs no install
-      # here; the same model guard and the same exit rules as the gate.
-      - name: Run it
-        run: node e2e/run.mjs --browser webkit smoke
+      # Desktop WebKit, headless — the engine Safari is built on, not an iPad
+      # (e2e/README.md). The smoke draws with real pointer input, holds a mark
+      # until the field opens and takes one pill; `pencil` (V1-PLAN R6) is the
+      # pen and fingers synthesised in the page as iPadOS delivers them — pen
+      # draws with pressure, a finger pans, a palm is nothing, the pencil's
+      # hover, the field by pen and a pill, a clean, an undo, the keyboard, the
+      # hand tile, the mouse untouched, a save and a reload; `keep` is the kill
+      # test and the forced failures where WebKit can run them (no crash to
+      # send, no quota to force: those skip by name). The canvas only, so the
+      # shard needs no install here; the same model guard and exit rules.
+      - name: Run them
+        run: node e2e/run.mjs --browser webkit smoke pencil keep
       - name: What the run saw
         if: failure()
         uses: actions/upload-artifact@v4

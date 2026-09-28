@@ -14,12 +14,14 @@ exits nonzero if anything in it failed.
 
 ```bash
 cd e2e && npm ci && npx playwright install chromium   # once
-node run.mjs            # from anywhere: the default eight (canvas, keep, boards, app, budgets, shard, demo, demo2)
+node run.mjs            # from anywhere: the default nine (canvas, keep, boards, app, pencil, budgets, shard, demo, demo2)
 cd e2e && npm run e2e   # the same thing
 
-npx playwright install webkit                   # once, for the smoke
+npx playwright install webkit                   # once, for WebKit
 node run.mjs --browser webkit smoke             # the WebKit smoke, ~2 s
 cd e2e && npm run smoke:webkit                  # the same thing
+node run.mjs --browser webkit smoke pencil keep # what CI's webkit job runs, ~30 s
+cd e2e && npm run webkit                        # the same thing
 ```
 
 `shard-3d` needs its own `npm ci` first — the runner says so rather than
@@ -37,13 +39,15 @@ guessing. Pick scenarios by name to run one: `node e2e/run.mjs canvas`,
 | `boards` | several named boards — `boards.mjs`, written here, the boards pane driven with the real pointer | `Demos/session-engine.html?nosw=1`, in one context, with a second and third tab |
 | `big` | a 2,000-mark board saved and opened again (opt-in, minutes) | the same page, with the board from `metamedium-core/bench/board.mjs` |
 | `app` | one app address — `app.mjs`, written here: `/app/` installs, opens with the server gone, and is versioned per release | `app/` over the static server, then a server of its own it can take away, then a copy of the site it releases again |
+| `pencil` | pencil and tablet — `pencil.mjs`, written here: the pen and fingers synthesised in the page as iPadOS delivers them, and the keyboard as it tells the page | `Demos/session-engine.html?nosw=1` at 1180 × 820, in one context, reloaded once |
 | `budgets` | the surface's budgets and the equivalence check — `budgets.mjs`, written here, not a page harness | `Demos/session-engine.html?folder=…`, the bench's boards served from memory, a context each |
 
 `--browser chromium` (the default) or `--browser webkit` picks the engine, and
 the run's `e2e.json` records which as `browser` / `browserVersion`. `smoke` is
-**opt-in**: a bare `node run.mjs` runs the eight Chromium scenarios (`canvas`,
-`keep`, `boards`, `app`, `budgets`, `shard`, `demo`, `demo2`) and nothing else,
-so the default gate needs no second engine installed.
+**opt-in**: a bare `node run.mjs` runs the nine Chromium scenarios (`canvas`,
+`keep`, `boards`, `app`, `pencil`, `budgets`, `shard`, `demo`, `demo2`) and
+nothing else, so the default gate needs no second engine installed. CI's
+`webkit` job runs `smoke`, `pencil` and `keep` on WebKit.
 
 ### The WebKit smoke, and what it is not
 
@@ -194,6 +198,41 @@ on Chromium and WebKit (`--browser webkit app`):
   cache keeps its name — and offline the new page comes back beside the
   **old** help, the stale shell a cache named for the release prevents.
 
+### Pencil and tablet: `pencil`
+
+`pencil.mjs` (V1-PLAN R6, acceptance A10) is the canvas by pen and finger.
+A desktop engine has neither, so both are **synthesised in the page**:
+`PointerEvent`s with `pointerType: 'pen'` (a pressure and a tilt on each) and
+`pointerType: 'touch'` (a finger; a palm is a wider one), dispatched at the
+canvas with their own pointer ids, the way iPadOS delivers a pencil and a
+finger — the surface decides by `pointerType`, never by the user agent, so the
+events mean here what they mean on the glass. The on-screen keyboard is told
+to the page as iPadOS tells it: the layout viewport stays and the **visual**
+viewport shrinks — `window.visualViewport` stood in for by an init script
+before the page's own scripts run, whose `resize` the page's listeners hear.
+The mouse is Playwright's real pointer. Fourteen records, about ten seconds,
+the same on Chromium (in the default run) and WebKit (CI's `webkit` job):
+**P1** the pen draws and every point of its stroke carries its pressure;
+**P1b** the switch to the pen said once, the hand tile saying `right · pen`;
+**P2** a finger pans while a pen is present and draws nothing; **P2b** two
+fingers pinch and leave nothing in the log (a pinch's last finger used to
+commit a stroke with no points, and throw); **P3** a palm that lands while the
+pen draws adds nothing to its stroke; **P3b** a palm just after the pen lifts
+is nothing, and one just before it lands has its pan put back; **P4** the
+pencil's hover shows the reading under it and the magnet ghost, nothing
+logged; **P5** the pen holds a box, the field opens, a pen tap on *Draw them
+clean* takes it; **P6** the pen taps undo; **P7** the keyboard up — at 360 and
+260 px left the field stays in the visible viewport, its pills scrolling in
+what fits and every one scrolled to and hit, let go when the keyboard goes or
+the pills fit again, and *Label it* taken with a word typed; **P8** the hand
+tile gives a finger its ink back, a palm still draws nothing, a field a finger
+opened does not take the focus, four taps come round; **P9** the mouse
+untouched — it draws, with no pressure, and its hover draws no ghost; **P10**
+saved and reloaded, every stroke back with its pressure, the preference kept
+and the pen not announced again. What only the glass can say — a real
+Pencil's hover height, a real palm, the real keyboard, Scribble — is
+`QA-v1.md` §A10, by hand on an iPad.
+
 ## What it refuses to do
 
 **Carry anything between scenarios.** One browser context each — its own
@@ -242,13 +281,13 @@ and in both themes (`Assets/whitepaper-figures/README.md`).
 
 ## What is not here yet
 
-The four large scenarios are still Chromium only — WebKit gets the smoke above
-and nothing more, which is the honest version of the review's ask and is all it
-claims to be. CI runs the smoke in a job of its own (`webkit` in
+The canvas harness and the shard's three are still Chromium only. WebKit
+gets the smoke, `pencil` and `keep` in a job of their own (`webkit` in
 `.github/workflows/ci.yml`: `npx playwright install --with-deps webkit`, then
-`node e2e/run.mjs --browser webkit smoke`, with `e2e/results` uploaded as
-`e2e-webkit-results` when it fails); a WebKit scenario of the canvas's core
-records is V1-PLAN's R6. Real-model evaluation stays a separate opt-in lane; nothing here is
+`node e2e/run.mjs --browser webkit smoke pencil keep`, with `e2e/results`
+uploaded as `e2e-webkit-results` when it fails); `boards` and `app` pass on
+WebKit on macOS but are not in that job. None of it is an iPad: that is
+`QA-v1.md` §A10, by hand. Real-model evaluation stays a separate opt-in lane; nothing here is
 evidence about model quality. The two large scenarios are still one case each;
 splitting them is meant to be incremental and must not discard the full-loop
 acceptance run.

@@ -71,7 +71,10 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
-#canvas { position: absolute; left: 0; top: 0; cursor: crosshair; touch-action: none; }
+#canvas { position: absolute; left: 0; top: 0; cursor: crosshair; touch-action: none;
+  /* A pencil or a finger held still on the board is a hold, never a text selection or a
+     callout (V1-PLAN R6): there is no text in the canvas to select. */
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 
 /* ==========================================================================
    The bar: one row, and nothing in it explains the system (D3, D4).
@@ -351,6 +354,9 @@ body.panelHidden #inspector { display: none; }
 #summon .list .row { flex-direction: column; align-items: flex-start; }
 #summon.left .list .row { align-items: flex-end; }
 #summon .more { font: 10.5px var(--mono); color: var(--dim); padding: 2px 6px; }
+/* Held to the room the visible viewport leaves (09-palette.js, fitFieldHeight): with an on-screen
+   keyboard up, the pills scroll and the input, its reading and the core stay in view (V1-PLAN R6). */
+#summon .list.held { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; touch-action: pan-y; }
 .pill {
   display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
   background: var(--panel); border: 1px solid var(--rule); border-radius: 999px;

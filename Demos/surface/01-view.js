@@ -1,7 +1,7 @@
 // ===== view =====
 // Provides: view {zoom, panX, panY}, screenToWorld/worldToScreen/wpx, zoomBy, zoomAround, fitAll, afterViewChange, viewChanged (one paint a frame), the wheel/pinch/keyboard zoom, resize,
 //   and the space actually visible: usableRect (pure), viewportRect, usableViewport, relayoutChrome.
-// Uses: core; input (panning/pinch state); palette (replaceOpenField).
+// Uses: core; input (panning/pinch state, the touches down); palette (replaceOpenField).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -240,11 +240,15 @@
     viewChanged();
   }, { passive: false });
 
-  // Safari: pinch is a gesture event, not a wheel.
+  // Safari: pinch is a gesture event, not a wheel. On a trackpad, that is all
+  // there is; on an iPad's glass the same pinch also arrives as two touch
+  // pointers, which pinch and pan (07-input), so the gesture is left to them —
+  // two hands zooming one view about two different points was a jitter.
   let gestureStartZoom = 1;
   canvas.addEventListener('gesturestart', (e) => { e.preventDefault(); gestureStartZoom = view.zoom; });
   canvas.addEventListener('gesturechange', (e) => {
     e.preventDefault();
+    if (touches.size) return;
     const target = clampZoom(gestureStartZoom * e.scale);
     if (zoomBy(e.clientX, e.clientY, target / view.zoom)) viewChanged();
   });

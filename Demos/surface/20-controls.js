@@ -2,7 +2,7 @@
 // Provides: the control centre — one button in the bar, a grid of tiles in fixed slots (zoom, snap,
 //   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards);
 //   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
-// Uses: core (prefs, themeMode, hand), snap (snapMode), folder (viewMode, folder; the boards adapter:
+// Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
 //   boardOnScreenName, resetBoard), models (agents), teach (teachPanel), handwriting (autoRead); the page's
 //   version from its <meta name="metamedium-version"> (V1-PLAN R7), said at the head of the help pane.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -33,6 +33,7 @@
   addEventListener('pointerdown', (e) => {
     if (!ccOpen()) return;
     if (ccEl.contains(e.target) || ccBtn.contains(e.target)) return;
+    if (e.pointerType === 'touch' && palmHere()) return; // a palm on the glass is not a tap outside (V1-PLAN R6)
     closeCC();
   }, true);
 
@@ -47,7 +48,10 @@
     if (tiles.snapNow) { tiles.snapNow.hidden = n === 0; ui.tile(tiles.snapNow, heldCandidates.length ? 'snap circled' : 'snap now', n ? String(n) : '', { why: 'redraw every confidently read shape clean; the ink stays underneath' }); }
     ui.tile(tiles.view, 'view', viewMode === 'canvas' ? 'canvas' : viewMode, { on: viewMode !== 'canvas', why: 'canvas, or every artifact as a card' });
     ui.tile(tiles.theme, 'theme', themeMode, { why: 'system follows the OS; light and dark are the same tokens inverted' });
-    ui.tile(tiles.hand, 'hand', hand, { why: 'which side of the pen tip the field opens on' });
+    // The hand: which side of the pen tip the field opens on — and, once a pen has been seen here, what draws (V1-PLAN R6).
+    ui.tile(tiles.hand, 'hand', handFace(hand, draws), draws
+      ? { on: draws === 'pen', why: 'which side of the pen tip the field opens on, and what draws: the pen — a finger pans and pinches, and a palm on the glass is ignored — or a finger too. A tap changes one word' }
+      : { why: 'which side of the pen tip the field opens on' });
     ui.tile(tiles.autoRead, 'auto-read', autoRead ? 'on' : 'off', { on: autoRead, why: 'read handwriting with a model as it is written; off asks only when you say read' });
     ui.tile(tiles.folder, folder.store ? (folder.how === 'git' ? 'repo' : folder.how === 'static' ? 'site' : 'folder') : 'folder', folder.store ? (folder.name || 'open') : 'open…', { on: !!folder.store, why: 'a folder is the canvas: its files are artifacts, your ink is saved beside them' });
     ui.tile(tiles.imp, 'import', '…', { why: 'a picture is traced into ink; a file of a known kind becomes an artifact. Drop or paste works too' });
@@ -66,7 +70,8 @@
   // holds goes to the trash, whole. This supersedes the handler 07-input.js set earlier in the build,
   // which emptied the board in the browser and reloaded — one tap from losing it.
   if (tiles.reset) tiles.reset.onclick = () => { closeCC(); resetBoard(); };
-  tiles.hand.onclick = () => setHand(hand === 'right' ? 'left' : 'right');
+  // Until a pen is seen it flips the side, as it always did; after, one word of its face a tap (07-hand.js, nextHand).
+  tiles.hand.onclick = () => { const n = nextHand(hand, draws); if (n.draws !== draws) setDraws(n.draws); setHand(n.side); };
   tiles.autoRead.onclick = () => setAutoRead(!autoRead);
   // A live room: a name, and a relay when the other hand is on another machine.
   const livePanel = document.getElementById('livePanel');

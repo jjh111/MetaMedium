@@ -1,6 +1,6 @@
 // ===== teach =====
 // Provides: teaching the command mark: the pad, samples, the held mark on this device, the rail chip; togglePanel/closePanel.
-// Uses: core, view (render).
+// Uses: core, view (render), input (capture, palmHere).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -52,8 +52,14 @@
     teachDots.forEach((d, i) => d.classList.toggle('on', i < samples.length));
   }
 
+  // The pad follows one pointer: a palm on the glass while the pen teaches is neither a stroke
+  // of its own nor the end of the pen's (V1-PLAN R6). A mouse is one pointer, as before.
+  let padPointer = null;
   pad.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch' && palmHere()) return;
+    if (padStroke && e.pointerId !== padPointer) return;
     capture(pad, e);
+    padPointer = e.pointerId;
     if (samplesHeld || samples.length >= MM.COMMAND_MARK_SAMPLES) {
       samples = []; samplesHeld = false; teachUse.disabled = true;
       teachStatus.className = ''; teachStatus.textContent = '';
@@ -62,7 +68,7 @@
     padStroke = [{ x: e.clientX - r.left, y: e.clientY - r.top }];
   });
   pad.addEventListener('pointermove', (e) => {
-    if (!padStroke) return;
+    if (!padStroke || e.pointerId !== padPointer) return;
     const r = pad.getBoundingClientRect();
     padStroke.push({ x: e.clientX - r.left, y: e.clientY - r.top });
     drawPad();
@@ -75,14 +81,15 @@
     drawPad();
     evaluateSamples();
   }
-  pad.addEventListener('pointerup', endPadStroke);
-  pad.addEventListener('pointercancel', endPadStroke);
-  // A release that lands anywhere else — capture not taken, the pen lifted
-  // off the pad — still ends the stroke. Otherwise the pad keeps drawing
-  // wherever the pointer goes next, which is the "held pointer" that broke
-  // the first use of the pad.
-  addEventListener('pointerup', () => { if (padStroke) endPadStroke(); }, true);
-  addEventListener('pointercancel', () => { if (padStroke) endPadStroke(); }, true);
+  // The stroke's own release ends it, wherever it lands — capture not taken,
+  // the pen lifted off the pad. Otherwise the pad keeps drawing wherever the
+  // pointer goes next, which is the "held pointer" that broke the first use of
+  // the pad. Another pointer's release (a palm lifting) is not the stroke's.
+  const padRelease = (e) => { if (padStroke && e.pointerId === padPointer) endPadStroke(); };
+  pad.addEventListener('pointerup', padRelease);
+  pad.addEventListener('pointercancel', padRelease);
+  addEventListener('pointerup', padRelease, true);
+  addEventListener('pointercancel', padRelease, true);
 
   function evaluateSamples() {
     const need = MM.COMMAND_MARK_SAMPLES - samples.length;
