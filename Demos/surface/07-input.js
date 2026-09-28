@@ -252,7 +252,7 @@
   function pressBegin(e, w) {
     const id = nodeAt(w.x, w.y);
     if (!id || state.summon || state.selection.length || activeFingers() > 1) return;
-    press = { id: id, x: e.clientX, y: e.clientY, timer: setTimeout(() => { const p = press; press = null; if (!p || !live) return; live = null; held = true; holdAround(p.id); }, HOLD_MS) };
+    press = { id: id, x: e.clientX, y: e.clientY, timer: setTimeout(() => { const p = press; press = null; if (!p || !live) return; live = null; held = true; holdAround(p.id, { x: p.x, y: p.y }); }, HOLD_MS) };
   }
   function pressMove(e) { if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > HOLD_SLOP) pressEnd(); }
   function pressEnd() { if (press) { clearTimeout(press.timer); press = null; } }
@@ -312,9 +312,10 @@
     }
     return { ok: !differ.length, marks: marks.length, differing: differ.length, differ: differ.slice(0, 3) };
   }
-  /** Hold a mark with everything it hangs together with: the cluster over the relations the canvas sees. */
-  function holdAround(id) {
+  /** Hold a mark with everything it hangs together with: the cluster over the relations the canvas sees. The field opens by the press (U1c). */
+  function holdAround(id, at) {
     const s = session.getState();
+    if (at) lastPen = { x: at.x, y: at.y };
     const group = heldGroupOf(s, id);
     lastTap = null;
     session.summonMarks(group, Date.now());

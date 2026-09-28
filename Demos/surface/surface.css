@@ -391,6 +391,9 @@ body.panelHidden #inspector { display: none; }
 #summon .more { font: 10.5px var(--mono); color: var(--dim); padding: 2px 6px; }
 /* Held to the room the visible viewport leaves (09-palette.js, fitFieldHeight): with an on-screen
    keyboard up, the pills scroll and the input, its reading and the core stay in view (V1-PLAN R6). */
+/* A pill never runs off the field (U1c): a long reading is cut with an ellipsis inside it; its tooltip has the whole. */
+#summon .list .pill { max-width: 100%; min-width: 0; box-sizing: border-box; }
+#summon .list .pill > span { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 #summon .list.held { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; touch-action: pan-y; }
 .pill {
   display: inline-flex; align-items: center; gap: 5px; cursor: pointer;

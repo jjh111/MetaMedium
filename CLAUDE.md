@@ -665,7 +665,14 @@ beside them, the rest a keystroke away: each an offer from a registered tool
 (see *Tools* and *Context*, below). A word typed, or writing read, is offered two ways side by
 side — *Name it* and *Label it* (see *A label*, below). A pill carries a
 label; its reason is the tooltip; a pill that asks a model carries a dot.
-Copy holds the
+**The field opens by
+the hand and stays whole** (PLAN-USER-SURFACE U1c; `fieldAnchorFor`,
+`fieldBox`, `fieldAvoids` in `09-palette.js`): at the last press when it was
+on or beside the held marks — a hold now records its press; it used to open
+where the stroke before ended, a screen away — else beside the marks on the
+hand's side; off the panel and the minimap, at the nearest clear place, and
+placed again when a model's readings make it grow over one; a long pill is
+cut with an ellipsis inside the field, its tooltip whole. Copy holds the
 ink (and puts it on the clipboard as SVG); Paste puts it beside the selection
 or, from the keyboard, at the pen. A tap while the field or a selection is up
 dismisses it and is never a dot — judged by how far the pointer went **on

@@ -2789,7 +2789,7 @@
   function pressBegin(e, w) {
     const id = nodeAt(w.x, w.y);
     if (!id || state.summon || state.selection.length || activeFingers() > 1) return;
-    press = { id: id, x: e.clientX, y: e.clientY, timer: setTimeout(() => { const p = press; press = null; if (!p || !live) return; live = null; held = true; holdAround(p.id); }, HOLD_MS) };
+    press = { id: id, x: e.clientX, y: e.clientY, timer: setTimeout(() => { const p = press; press = null; if (!p || !live) return; live = null; held = true; holdAround(p.id, { x: p.x, y: p.y }); }, HOLD_MS) };
   }
   function pressMove(e) { if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > HOLD_SLOP) pressEnd(); }
   function pressEnd() { if (press) { clearTimeout(press.timer); press = null; } }
@@ -2849,9 +2849,10 @@
     }
     return { ok: !differ.length, marks: marks.length, differing: differ.length, differ: differ.slice(0, 3) };
   }
-  /** Hold a mark with everything it hangs together with: the cluster over the relations the canvas sees. */
-  function holdAround(id) {
+  /** Hold a mark with everything it hangs together with: the cluster over the relations the canvas sees. The field opens by the press (U1c). */
+  function holdAround(id, at) {
     const s = session.getState();
+    if (at) lastPen = { x: at.x, y: at.y };
     const group = heldGroupOf(s, id);
     lastTap = null;
     session.summonMarks(group, Date.now());
@@ -5545,17 +5546,25 @@
     const w = Math.max(FIELD_MIN_W, Math.min(FIELD_W, u.width - FIELD_M * 2, v.width - FIELD_M * 2));
     const h = o.height > 0 ? o.height : FIELD_H_GUESS;
     const at = anchor || { x: v.left + v.width / 2, y: v.top + v.height / 2 };
-    let x = o.hand === 'left' ? at.x - 14 - w : at.x + 14;
-    let y = at.y - 22;
-    // Off a panel that is neither a wall nor a sheet but a card in the way:
-    // slide past it when there is room, never when that would push the field
-    // off the screen (which is what an unconditional nudge did on a phone).
-    const p = o.panel;
-    if (p && o.hand !== 'left' && x < p.right + FIELD_M && x + w > p.left && y < p.bottom && y + h > p.top
-        && p.right + FIELD_M + w <= u.right - FIELD_M) x = p.right + FIELD_M;
-    x = fitSpan(x, w, { lo: u.left + FIELD_M, hi: u.right - FIELD_M }, { lo: v.left + FIELD_M, hi: v.right - FIELD_M });
-    y = fitSpan(y, h, { lo: u.top + FIELD_M, hi: u.bottom - FIELD_M }, { lo: v.top + FIELD_TOP, hi: v.bottom - FIELD_M });
-    return { x: x, y: y, w: w };
+    const fit = (x, y) => ({
+      x: fitSpan(x, w, { lo: u.left + FIELD_M, hi: u.right - FIELD_M }, { lo: v.left + FIELD_M, hi: v.right - FIELD_M }),
+      y: fitSpan(y, h, { lo: u.top + FIELD_M, hi: u.bottom - FIELD_M }, { lo: v.top + FIELD_TOP, hi: v.bottom - FIELD_M }),
+      w: w,
+    });
+    const want = fit(o.hand === 'left' ? at.x - 14 - w : at.x + 14, at.y - 22);
+    // Off every card in the way — the panel, the minimap (U1c; the panel alone was
+    // slid past before, and the field opened over the minimap). The field is placed
+    // where it was wanted when nothing is in the way; else at the nearest place,
+    // to the hand, beside or above or below each card that is clear of all of them
+    // and still whole on screen. Nothing clear: where it was wanted, as before.
+    const cards = (o.avoid || (o.panel ? [o.panel] : [])).filter(Boolean);
+    const clear = (b) => !cards.some((r) => b.x < r.right + FIELD_M - 0.5 && b.x + w > r.left - FIELD_M + 0.5 && b.y < r.bottom + FIELD_M - 0.5 && b.y + h > r.top - FIELD_M + 0.5);
+    if (clear(want)) return want;
+    const tries = [fit(o.hand === 'left' ? at.x + 14 : at.x - 14 - w, at.y - 22)];
+    for (const r of cards) tries.push(fit(r.right + FIELD_M, want.y), fit(r.left - FIELD_M - w, want.y), fit(want.x, r.top - FIELD_M - h), fit(want.x, r.bottom + FIELD_M));
+    const far = (b) => Math.hypot(Math.max(b.x - at.x, 0, at.x - (b.x + w)), Math.max(b.y - at.y, 0, at.y - (b.y + h)));
+    const ok = tries.filter(clear).sort((a, b) => far(a) - far(b) || Math.hypot(a.x - want.x, a.y - want.y) - Math.hypot(b.x - want.x, b.y - want.y));
+    return ok[0] || want;
   }
 
   /** The panel's rect while it stands, else null — a hidden panel is in nobody's way. */
@@ -5563,6 +5572,36 @@
     if (document.body.classList.contains('panelHidden') || inspectorEl.hidden) return null;
     const r = inspectorEl.getBoundingClientRect();
     return r.width > 0 && r.height > 0 ? r : null;
+  }
+  /** The minimap's rect while it shows, else null. */
+  function minimapRect() {
+    const el = document.getElementById('minimap');
+    if (!el || el.hidden || getComputedStyle(el).display === 'none') return null;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 ? r : null;
+  }
+  /** The cards the field keeps off (U1c): the panel and the minimap. */
+  function fieldAvoids() { return [panelRect(), minimapRect()].filter(Boolean); }
+
+  /**
+   * Where the field opens: by the hand's last press when that was on or beside the held
+   * marks, else beside the marks themselves on the hand's side (U1c). The last press used
+   * to be taken whatever it was — after a hold it was the stroke before, and the field
+   * opened a screen away from what it holds.
+   */
+  function fieldAnchorFor(sum) {
+    const s = session.getState();
+    let box = null;
+    for (const id of sum.enclosedIds) {
+      const b = s.nodes.get(id) && MM.boundsOf(s.nodes.get(id));
+      if (!b) continue;
+      const a = worldToScreen(b.minX, b.minY), z = worldToScreen(b.maxX, b.maxY);
+      box = box ? { left: Math.min(box.left, a.x), top: Math.min(box.top, a.y), right: Math.max(box.right, z.x), bottom: Math.max(box.bottom, z.y) } : { left: a.x, top: a.y, right: z.x, bottom: z.y };
+    }
+    const NEAR = 80;
+    if (lastPen && (!box || (lastPen.x >= box.left - NEAR && lastPen.x <= box.right + NEAR && lastPen.y >= box.top - NEAR && lastPen.y <= box.bottom + NEAR))) return { x: lastPen.x, y: lastPen.y };
+    if (!box) return null;
+    return { x: hand === 'left' ? box.left : box.right, y: Math.max(box.top, Math.min(box.bottom, box.top + 22)) };
   }
 
   const FIELD_LIST_MIN = 64; // the pills' list is never held shorter than about two rows
@@ -5596,10 +5635,11 @@
     const v = viewportRect(), u = usableViewport();
     // Width first: the height below is whatever the content comes to at that
     // width, measured rather than assumed.
-    const first = fieldBox(fieldAnchor, { viewport: v, usable: u, height: 0, hand: hand, panel: panelRect() });
+    const avoid = fieldAvoids();
+    const first = fieldBox(fieldAnchor, { viewport: v, usable: u, height: 0, hand: hand, avoid: avoid });
     summonEl.style.width = first.w + 'px';
     fitFieldHeight(v, u);
-    const box = fieldBox(fieldAnchor, { viewport: v, usable: u, height: summonEl.offsetHeight, hand: hand, panel: panelRect() });
+    const box = fieldBox(fieldAnchor, { viewport: v, usable: u, height: summonEl.offsetHeight, hand: hand, avoid: avoid });
     summonEl.style.left = box.x + 'px';
     summonEl.style.top = box.y + 'px';
     summonEl.style.width = box.w + 'px';
@@ -5621,7 +5661,7 @@
     // changed since, so geometry is re-run and content is not (UI-1).
     if (shownSummonId === sum.id) { placeField(); return; }
     shownSummonId = sum.id;
-    fieldAnchor = lastPen ? { x: lastPen.x, y: lastPen.y } : null;
+    fieldAnchor = fieldAnchorFor(sum);
     paletteContext = contextFor(sum.enclosedIds);
     paletteItems = rankItems(conversionsFor(s), paletteContext);
     paletteIndex = -1;
@@ -5831,7 +5871,9 @@
     // The pills' list held to the room a keyboard leaves, or let go once they fit again (R6).
     fitFieldHeight(v, usableViewport());
     const r = summonEl.getBoundingClientRect();
-    if (r.bottom <= v.bottom - 2 && r.right <= v.right - 2 && r.top >= v.top - 2 && r.left >= v.left - 2) return;
+    // …or has grown over a card it keeps off — a model's readings landing make it taller (U1c).
+    const over = fieldAvoids().some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top);
+    if (!over && r.bottom <= v.bottom - 2 && r.right <= v.right - 2 && r.top >= v.top - 2 && r.left >= v.left - 2) return;
     placeField();
   }
 

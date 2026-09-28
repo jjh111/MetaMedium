@@ -2160,6 +2160,19 @@ changed: the room's and folder's own words (*live claude · you are john ·
 with fern*, *folder … · saved*), which already speak plainly, and the
 models' names, which J5 put in words.
 
+*U1c status, 28 Sep 2026: built on `claude/friendly-galileo-g1z8wo`* — the red
+commit (e2e 58–58b: a box held at each corner opened the field 637–902 px from
+the press and over the minimap; a model's long readings ran pills to x 1794)
+and the commit carrying this line. A hold records its press as the field's
+anchor (`holdAround`, `07-input.js`), and `fieldAnchorFor` takes the last
+press only when it is on or beside the held marks, else the marks' own edge on
+the hand's side; `fieldBox` keeps off every card (`fieldAvoids`: the panel and
+the minimap), trying the other side of the hand and each side of each card,
+nearest the hand first; `keepFieldOnScreen` places it again when it grows over
+one; a pill in the list is at most the list's width, its label cut with an
+ellipsis. The stub answers *What is this?* with `window.__whatReply` when a
+test sets it.
+
 ### Phase 7 — review and release
 **H1** — week 1's U7 (the `hand` gate scenario) plus `QA-v1.md`, a hand
 checklist for A1–A10 with the MCP hand in the room checking each step.

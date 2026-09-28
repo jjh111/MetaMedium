@@ -3715,8 +3715,9 @@ window.__scenario = async function(){
     for (let i = 0; i < 30 && !t.chips().some((c) => /entity/.test(c)); i++) await wait(100);
     await wait(80);
     const f58 = rect58(document.getElementById('summon'));
-    const pills58 = [...document.querySelectorAll('#summon .pill.item')].map((b) => { const r = b.getBoundingClientRect(); return { text: b.textContent.trim().slice(0, 30), right: Math.round(r.right), left: Math.round(r.left) }; });
+    const pills58 = [...document.querySelectorAll('#summon .pill.item')].map((b) => { const r = b.getBoundingClientRect(); return { text: b.textContent.trim().slice(0, 30), right: r.right, left: r.left }; });
     const whole58 = !!f58 && pills58.length > 0 && pills58.every((p) => p.left >= f58.left - 0.5 && p.right <= f58.right + 0.5);
+    pills58.forEach((p) => { p.left = Math.round(p.left); p.right = Math.round(p.right); });
     step('58b. after a model\'s long readings arrive every pill stands inside the field — none runs off its edge — and the field is whole on screen, off the minimap',
       !!what58 && t.chips().some((c) => /entity/.test(c)) && whole58 && f58.right <= W + 0.5 && f58.bottom <= H + 0.5 && !meets58(f58, rect58(document.getElementById('minimap'))),
       { what: !!what58, field: f58 && [f58.left, f58.top, f58.right, f58.bottom].map(Math.round), pills: pills58 });
