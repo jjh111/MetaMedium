@@ -16141,23 +16141,237 @@ if (mm.THREE && mm.scene) {
   var RECENT_MS = 12e4;
   var NEIGHBOURHOOD_MAX = 80;
   var RECENT_EVENTS_MAX = 400;
-  function nearnessOf(_a, _b) {
-    return 0;
+  function nearnessOf(a, b) {
+    if (!finiteBounds(a) || !finiteBounds(b)) return 0;
+    if (boundsOverlap(a, b)) return 1;
+    return fade(boundingBoxDistance(a, b), nearLimitOf(a, b));
   }
-  function pointNearnessOf(_p, _b) {
-    return 0;
+  function pointNearnessOf(p, b) {
+    if (!finiteBounds(b) || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return 0;
+    const dx = Math.max(0, b.minX - p.x, p.x - b.maxX);
+    const dy = Math.max(0, b.minY - p.y, p.y - b.maxY);
+    return fade(Math.hypot(dx, dy), reachAround(b));
   }
-  var conceptNoun = (name) => "a " + name;
+  function fade(gap, limit) {
+    if (gap < limit) return 1;
+    const far = limit * CONTEXT_FADE;
+    return gap >= far ? 0 : 1 - (gap - limit) / (far - limit);
+  }
+  var isPoint = (at) => !Array.isArray(at) && typeof at.x === "number" && typeof at.y === "number";
+  function lastAtOf(events) {
+    let at = 0;
+    for (let i = events.length - 1, n2 = 0; i >= 0 && n2 < 64; i--, n2++) if (events[i].at > at) at = events[i].at;
+    return at;
+  }
+  var article2 = (word) => /^[aeiou]/i.test(word) ? "an" : "a";
+  var CONCEPT_NOUN = {
+    writing: "a line of writing",
+    labelled: "a mark with writing in it"
+  };
+  var conceptNoun = (name) => CONCEPT_NOUN[name] ?? article2(name) + " " + name;
+  var shortReason = (reasoning) => reasoning.split(/ \(| — /)[0].trim();
+  function emptyContext(scopeIds, at) {
+    return { scopeIds, notations: [], concepts: [], recent: [], kind: null, key: null, at };
+  }
   function isEmptyContext(ctx) {
     return !ctx || !ctx.notations.length && !ctx.concepts.length && !ctx.recent.length;
   }
   function contextAt(board, at, opts = {}) {
-    const scopeIds = Array.isArray(at) ? [...at] : [];
+    const state = board.getState();
     const events = board.getEvents();
-    return { scopeIds, notations: [], concepts: [], recent: [], kind: null, key: null, at: opts.now ?? (events.length ? events[events.length - 1].at : 0) };
+    const now = opts.now ?? lastAtOf(events);
+    const point2 = isPoint(at) ? at : null;
+    const scopeIds = point2 ? [] : [...new Set(at)].filter((id) => state.nodes.has(id));
+    const scope = new Set(scopeIds);
+    const boxes = [];
+    for (const id of scopeIds) {
+      const b = boundsOf(state.nodes.get(id));
+      if (b && finiteBounds(b)) boxes.push(b);
+    }
+    if (!point2 && !boxes.length) return emptyContext(scopeIds, now);
+    const nearScope = (b) => {
+      if (point2) return pointNearnessOf(point2, b);
+      let best = 0;
+      for (const s of boxes) {
+        const n2 = nearnessOf(s, b);
+        if (n2 > best) best = n2;
+        if (best === 1) break;
+      }
+      return best;
+    };
+    const grid = new MarkGrid();
+    const order2 = /* @__PURE__ */ new Map();
+    state.contentIds.forEach((id, i) => {
+      if (scope.has(id)) return;
+      const n2 = state.nodes.get(id);
+      const b = n2 && boundsOf(n2);
+      if (!b || !finiteBounds(b)) return;
+      grid.set(id, b);
+      order2.set(id, i);
+    });
+    const seeds = /* @__PURE__ */ new Map();
+    const consider = (id) => {
+      if (seeds.has(id)) return;
+      const n2 = nearScope(grid.boundsOf(id));
+      if (n2 > 0) seeds.set(id, n2);
+    };
+    if (point2) {
+      for (const id of grid.around(point2, (cell) => CONTEXT_FADE * DEFAULT_RELATE_CONFIG.nearRatio * cell)) consider(id);
+    } else {
+      for (const b of boxes) {
+        const r = CONTEXT_FADE * reachAround(b);
+        for (const id of grid.query({ minX: b.minX - r, minY: b.minY - r, maxX: b.maxX + r, maxY: b.maxY + r })) consider(id);
+      }
+    }
+    const byOrder = (p, q) => order2.get(p) - order2.get(q);
+    const hoods = [];
+    const hoodOf = /* @__PURE__ */ new Map();
+    const visited = /* @__PURE__ */ new Set();
+    let budget = NEIGHBOURHOOD_MAX;
+    const seeded2 = [...seeds].sort((a, b) => b[1] - a[1] || byOrder(a[0], b[0]));
+    for (const [seed] of seeded2) {
+      if (visited.has(seed) || budget <= 0) continue;
+      const hood = { ids: [], anchor: seed, nearness: 0 };
+      const queue = [seed];
+      visited.add(seed);
+      while (queue.length && budget > 0) {
+        const x = queue.shift();
+        hood.ids.push(x);
+        hoodOf.set(x, hood);
+        budget--;
+        hood.nearness = Math.max(hood.nearness, seeds.get(x) ?? 0);
+        const bx = grid.boundsOf(x);
+        const r = reachAround(bx);
+        for (const o of grid.query({ minX: bx.minX - r, minY: bx.minY - r, maxX: bx.maxX + r, maxY: bx.maxY + r })) {
+          if (visited.has(o) || !withinReach(bx, grid.boundsOf(o))) continue;
+          visited.add(o);
+          queue.push(o);
+        }
+      }
+      hood.ids.sort(byOrder);
+      hood.anchor = hood.ids[0];
+      hoods.push(hood);
+    }
+    const notations = /* @__PURE__ */ new Map();
+    const concepts = /* @__PURE__ */ new Map();
+    for (const hood of hoods) {
+      let read = [];
+      try {
+        read = notationsOf(state, hood.ids);
+      } catch {
+        read = [];
+      }
+      for (const r of read) {
+        if (!(r.confidence >= NOTATION_FLOOR)) continue;
+        const weight = r.confidence * hood.nearness;
+        const had = notations.get(r.notation);
+        if (had && had.weight >= weight) continue;
+        const name = r.name.toLowerCase();
+        notations.set(r.notation, {
+          id: r.notation,
+          name: r.name,
+          weight,
+          confidence: r.confidence,
+          nearness: hood.nearness,
+          summary: r.summary,
+          reason: `it sits beside ${article2(name)} ${name}: ${r.summary}`,
+          anchor: hood.anchor
+        });
+      }
+      if (hood.ids.length < 2) continue;
+      for (const c of board.read(hood.ids.slice()).concepts) {
+        const weight = c.confidence * hood.nearness;
+        const had = concepts.get(c.concept);
+        if (had && had.weight >= weight) continue;
+        concepts.set(c.concept, {
+          name: c.concept,
+          weight,
+          confidence: c.confidence,
+          nearness: hood.nearness,
+          reason: `it sits beside ${conceptNoun(c.concept)}: ${shortReason(c.reasoning)}`,
+          anchor: hood.anchor
+        });
+      }
+    }
+    const recent = recentActs(state, events, now, scope, nearScope, hoodOf);
+    const byWeight = (xs) => [...xs].sort((a, b) => b.weight - a.weight);
+    const ns = byWeight(notations.values());
+    const cs = byWeight(concepts.values());
+    const lead = ns[0] ? { kind: "notation:" + ns[0].id, anchor: ns[0].anchor } : cs[0] ? { kind: "concept:" + cs[0].name, anchor: cs[0].anchor } : null;
+    return {
+      scopeIds,
+      notations: ns,
+      concepts: cs,
+      recent,
+      kind: lead ? lead.kind : null,
+      key: lead ? lead.kind + "@" + lead.anchor : null,
+      at: now
+    };
   }
-  function describeContext(_ctx) {
-    return [];
+  function targetsOf(ev, state) {
+    const e = ev;
+    const out = [];
+    if (Array.isArray(e.ids)) {
+      for (const id of e.ids) if (typeof id === "string") out.push(id);
+    }
+    if (Array.isArray(e.aboutIds)) {
+      for (const id of e.aboutIds) if (typeof id === "string") out.push(id);
+    }
+    if (typeof e.nodeId === "string") out.push(e.nodeId);
+    if (typeof e.strokeId === "string") out.push(e.strokeId);
+    if (ev.type === "bless" || ev.type === "frame" || ev.type === "import") {
+      if (ev.origin && typeof ev.seq === "number") out.push(`artifact:${ev.origin}:${ev.seq}`);
+      else {
+        for (const id of state.artifacts) {
+          const n2 = state.nodes.get(id);
+          if (n2 && n2.createdAt === ev.at && (typeof e.name !== "string" || wordOf(n2) === e.name)) out.push(id);
+        }
+      }
+    }
+    return out;
+  }
+  var toolName = (id) => getTool(id)?.name ?? id;
+  function recentActs(state, events, now, scope, nearScope, hoodOf) {
+    const acts = /* @__PURE__ */ new Map();
+    for (let i = events.length - 1, n2 = 0; i >= 0 && n2 < RECENT_EVENTS_MAX; i--, n2++) {
+      const ev = events[i];
+      if (!ev.tool || ev.by !== void 0) continue;
+      if (!(ev.at <= now) || now - ev.at > RECENT_MS) continue;
+      const key2 = ev.act !== void 0 ? "act:" + ev.act : "event:" + i;
+      let a = acts.get(key2);
+      if (!a) acts.set(key2, a = { tool: ev.tool, offer: ev.offer ?? ev.tool, at: ev.at, ids: /* @__PURE__ */ new Set() });
+      if (ev.at > a.at) a.at = ev.at;
+      for (const id of targetsOf(ev, state)) a.ids.add(id);
+    }
+    const best = /* @__PURE__ */ new Map();
+    for (const a of acts.values()) {
+      let near = 0;
+      for (const id of a.ids) {
+        if (scope.has(id)) continue;
+        const node = state.nodes.get(id);
+        if (!node || getRep(node, "erased")) continue;
+        const b = boundsOf(node);
+        if (!b || !finiteBounds(b)) continue;
+        near = Math.max(near, nearScope(b), hoodOf.get(id)?.nearness ?? 0);
+      }
+      const recency = 1 - (now - a.at) / RECENT_MS;
+      const weight = near * Math.max(0, recency);
+      if (!(weight > 0)) continue;
+      const had = best.get(a.offer);
+      if (had && had.weight >= weight) continue;
+      best.set(a.offer, { tool: a.tool, offer: a.offer, at: a.at, weight, reason: `you used ${toolName(a.tool)} beside it` });
+    }
+    return [...best.values()].sort((a, b) => b.weight - a.weight);
+  }
+  function describeContext(ctx) {
+    const out = [];
+    for (const n2 of ctx.notations) {
+      const name = (n2.name ?? n2.id).toLowerCase();
+      out.push(`${article2(name)} ${name} ${n2.weight.toFixed(2)}${n2.summary ? " \u2014 " + n2.summary : ""}`);
+    }
+    for (const c of ctx.concepts) out.push(`${conceptNoun(c.name)} ${c.weight.toFixed(2)}`);
+    for (const r of ctx.recent) out.push(`${toolName(r.tool)}, taken beside it${typeof r.weight === "number" ? " " + r.weight.toFixed(2) : ""}`);
+    return out;
   }
 
   // src/context/rank.ts
@@ -16165,28 +16379,84 @@ if (mm.THREE && mm.scene) {
   var RECENT_SAME_TOOL = 0.5;
   var STEADY_MARGIN = 0.1;
   var STEADY_MS = 12e4;
-  var AFFINITY = {};
-  function liftTargets(_kind) {
-    return [];
+  var AFFINITY = {
+    "notation:flowchart": ["on:flow", "on:clean"]
+  };
+  function liftTargets(kind) {
+    const at = kind.indexOf(":");
+    const type = kind.slice(0, at), name = kind.slice(at + 1);
+    const own = type === "notation" ? ["on:" + name, "tool:notation:" + name] : ["on:" + name];
+    return own.concat(AFFINITY[kind] ?? []);
   }
-  function standsOn(_item) {
-    return /* @__PURE__ */ new Set();
+  function standsOn(item) {
+    const out = /* @__PURE__ */ new Set();
+    const on = item.grounds?.on;
+    if (on) out.add("on:" + on);
+    if (item.key.startsWith("concept:")) out.add("on:" + item.key.slice("concept:".length));
+    if (item.tool) out.add("tool:" + item.tool);
+    out.add("key:" + item.key);
+    return out;
   }
-  function liftOf(_item, _ctx = NO_CONTEXT) {
-    return { factor: 1, because: [] };
+  var toolName2 = (id) => getTool(id)?.name ?? id;
+  function liftOf(item, ctx = NO_CONTEXT) {
+    if (!ctx || isSpecific(item)) return { factor: 1, because: [] };
+    const on = standsOn(item);
+    const hits = [];
+    const lifts = (kind) => liftTargets(kind).some((t) => on.has(t));
+    for (const n2 of ctx.notations) if (n2.weight > 0 && lifts("notation:" + n2.id)) hits.push({ w: n2.weight, why: n2.reason });
+    for (const c of ctx.concepts) if (c.weight > 0 && lifts("concept:" + c.name)) hits.push({ w: c.weight, why: c.reason ?? "it sits beside a " + c.name });
+    for (const r of ctx.recent) {
+      const w2 = r.weight ?? 0;
+      if (!(w2 > 0)) continue;
+      if (r.offer === item.key) hits.push({ w: w2, why: "you just took it beside these" });
+      else if (item.tool && r.tool === item.tool) hits.push({ w: w2 * RECENT_SAME_TOOL, why: "you just used " + toolName2(r.tool) + " beside these" });
+    }
+    if (!hits.length) return { factor: 1, because: [] };
+    hits.sort((a, b) => b.w - a.w);
+    const because = [];
+    for (const h2 of hits) if (!because.includes(h2.why)) because.push(h2.why);
+    return { factor: 1 + (CONTEXT_LIFT_MAX - 1) * Math.min(1, hits[0].w), because };
   }
-  function canLift(_items) {
-    return false;
+  function canLift(items) {
+    const targets = /* @__PURE__ */ new Set();
+    for (const c of BUILTIN_CONCEPTS) for (const t of liftTargets("concept:" + c.name)) targets.add(t);
+    for (const n2 of registeredNotations()) for (const t of liftTargets("notation:" + n2)) targets.add(t);
+    for (const kind of Object.keys(AFFINITY)) for (const t of liftTargets(kind)) targets.add(t);
+    return items.some((item) => {
+      if (isSpecific(item)) return false;
+      if (item.tool) return true;
+      for (const t of standsOn(item)) if (targets.has(t)) return true;
+      return false;
+    });
   }
-  function rank(items, _ctx = NO_CONTEXT, opts = {}) {
-    const uses = opts.uses ?? {};
-    return items.map((item) => {
+  function rank(items, ctx = NO_CONTEXT, opts = {}) {
+    const uses = opts.usesHere ? { ...opts.uses ?? {}, ...opts.usesHere } : opts.uses ?? {};
+    const out = items.map((item) => {
       const likelihood = likelihoodOf(item, uses);
-      return { ...item, likelihood, lift: 1, score: likelihood, because: [] };
-    }).sort((a, b) => b.score - a.score);
+      const lift = liftOf(item, ctx);
+      return { ...item, likelihood, lift: lift.factor, score: likelihood * lift.factor, because: lift.because };
+    });
+    let floor = Infinity;
+    for (const x of out) if (isSpecific(x) && x.likelihood < floor) floor = x.likelihood;
+    for (const x of out) if (x.lift > 1 && x.likelihood < floor && x.score >= floor) x.score = floor * (1 - 1e-12);
+    return out.sort((a, b) => b.score - a.score);
   }
-  function steadyTop(ranked2, _held, _opts = {}) {
-    return ranked2.slice();
+  function steadyTop(ranked2, held2, opts = {}) {
+    const out = ranked2.slice();
+    if (!held2) return out;
+    const h2 = typeof held2 === "string" ? { key: held2, at: void 0 } : held2;
+    if (opts.now !== void 0 && h2.at !== void 0 && opts.now - h2.at > STEADY_MS) return out;
+    const eligible = opts.eligible ?? (() => true);
+    const leadAt = out.findIndex((x) => eligible(x));
+    const heldAt = out.findIndex((x) => x.key === h2.key && eligible(x));
+    if (leadAt < 0 || heldAt <= leadAt) return out;
+    const lead = out[leadAt], kept = out[heldAt];
+    if (isSpecific(lead) && !isSpecific(kept)) return out;
+    const margin = opts.margin ?? STEADY_MARGIN;
+    if (lead.score > kept.score * (1 + margin)) return out;
+    out.splice(heldAt, 1);
+    out.splice(leadAt, 0, { ...kept, steady: true, because: [`it led here a moment ago, and nothing here beats it by ${Math.round(margin * 100)}%`, ...kept.because] });
+    return out;
   }
   function topOf(ranked2, eligible = () => true) {
     return ranked2.find((x) => eligible(x));
