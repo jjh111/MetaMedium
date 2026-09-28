@@ -497,11 +497,6 @@ function offBox(p: Point, b: Bounds): number {
   return Math.hypot(Math.max(0, b.minX - p.x, p.x - b.maxX), Math.max(0, b.minY - p.y, p.y - b.maxY));
 }
 
-/** How far apart two boxes stand: 0 when they touch or overlap. */
-function boxGap(a: Bounds, b: Bounds): number {
-  return Math.hypot(Math.max(0, b.minX - a.maxX, a.minX - b.maxX), Math.max(0, b.minY - a.maxY, a.minY - b.maxY));
-}
-
 /** A path's stretch near one of its ends: its first or last END_SHARE of points. */
 function nearEnd(path: readonly Point[], end: 'start' | 'end'): Point[] {
   const k = Math.max(2, Math.ceil(path.length * END_SHARE));
@@ -652,6 +647,8 @@ export function readUmlClass(state: SessionState, scopeIds?: readonly string[]):
     const pts = strokePointsOf(m.node);
     if (!fp || !pts) continue;
     if (fp.isClosed) {
+      // A box the rung reads as a rectangle at all — at any angle, since it is blind to one: the corners are measured only then.
+      if (!resemblances(m.node).some((e) => e.to === 'type:rectangle')) continue;
       const b = boxOf(pts, false);
       if (b && b.score >= BOX_FLOOR) candidates.push({ id: m.id, box: [m.id], marks: [m.id], shape: b, scale: m.scale, frame: framesOf(b)[0], lines: [], fit: 1, lead: '' });
     } else if (!isWriting(m.node)) open.push(m);
@@ -731,13 +728,31 @@ export function readUmlClass(state: SessionState, scopeIds?: readonly string[]):
   for (const c of classes) for (const id of [...c.box, ...c.lines.map((l) => l.id)]) classOfMark.set(id, c);
   const connectorIds = open.filter((m) => !inFigure.has(m.id) && !lineIds.has(m.id) && !insideOf.has(m.id)).map((m) => m.id);
   if (!classes.length) return null;
-  const heads = new Map<string, ConnectorHeads>();
-  for (const id of connectorIds) {
+  const reachOf = (c: Candidate) => Math.max(magnetRadius(c.shape.size, c.scale), c.shape.size * DEFAULT_SESSION_CONFIG.wireEndpointRatio);
+  // The cheap test first: a relation runs from a class to a class, so each of its ends comes near a box — two boxes, or
+  // one when a pointer reaches out from it. Only those are read for their heads, which is what costs.
+  const classesNear = (p: Point, scale: number) => classes.filter((c) => offBox(p, c.shape.bounds) <= 2 * reachOf(c) + magnetRadius(0, scale));
+  const reaching = connectorIds.filter((id) => {
     const m = marks.get(id)!;
-    // The cheap test first: a relation reaches from a class to a class, so its box comes near two.
-    const reachOut = Math.max(m.bounds.maxX - m.bounds.minX, m.bounds.maxY - m.bounds.minY) * 0.5 + magnetRadius(sizeOfBounds(m.bounds), m.scale);
-    const near = classes.filter((c) => boxGap(m.bounds, c.shape.bounds) <= reachOut).length;
-    if (!near) continue;
+    const pts = strokePointsOf(m.node);
+    if (!pts || pts.length < 2) return false;
+    const a = classesNear(pts[0], m.scale), b = classesNear(pts[pts.length - 1], m.scale);
+    return a.length > 0 || b.length > 0;
+  });
+  // With no class that has lines across it, only a head can say UML — at the end of a line running from one box to
+  // another. Nothing else is read for its heads; and with no such line, nothing here says UML at all.
+  const anyLines = classes.some((c) => c.lines.length);
+  const asked = anyLines
+    ? reaching
+    : reaching.filter((id) => {
+        const m = marks.get(id)!;
+        const pts = strokePointsOf(m.node)!;
+        const a = classesNear(pts[0], m.scale), b = classesNear(pts[pts.length - 1], m.scale);
+        return a.some((x) => b.some((y) => x !== y));
+      });
+  if (!asked.length && !anyLines) return null;
+  const heads = new Map<string, ConnectorHeads>();
+  for (const id of asked) {
     const h = headsOf(state, id);
     if (h) heads.set(id, h);
   }
@@ -763,7 +778,6 @@ export function readUmlClass(state: SessionState, scopeIds?: readonly string[]):
   const relations: UmlRelation[] = [];
   const pointers: string[] = [];
   const edgeMarks = new Map<string, string>(); // a head drawn apart → its relation
-  const reachOf = (c: Candidate) => Math.max(magnetRadius(c.shape.size, c.scale), c.shape.size * DEFAULT_SESSION_CONFIG.wireEndpointRatio);
   const words = [...marks.values()].filter((m) => isWord(m.node) && !insideOf.has(m.id));
   const usedWords = new Set<string>();
   const endOf = (id: string, e: ConnectorEnd, bindings: ReturnType<typeof activeBindingsOf>, length: number): ResolvedEnd => {
