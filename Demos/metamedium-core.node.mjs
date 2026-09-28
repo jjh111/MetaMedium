@@ -13434,6 +13434,14 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     }
     definitionsChanged = true;
     recomputeClusterCandidates();
+    rereadSummonMatches();
+  }
+  function rereadSummonMatches() {
+    for (const g of gestures.values()) {
+      if (!g.summon) continue;
+      g.summon.suggestions = g.summon.suggestions.filter((x) => x.kind !== "match");
+      g.summon.suggestions.unshift(...makeSuggestions(g.summon.enclosedIds).filter((x) => x.kind === "match"));
+    }
   }
   function applyUnuse(ev) {
     const ref = typeof ev.pack === "string" ? ev.pack : String(ev.pack);
@@ -13445,6 +13453,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     library = library.filter((id) => !id.startsWith(prefix));
     definitionsChanged = true;
     recomputeClusterCandidates();
+    rereadSummonMatches();
   }
   function codeVersion(nodeId) {
     const node = nodes.get(nodeId);

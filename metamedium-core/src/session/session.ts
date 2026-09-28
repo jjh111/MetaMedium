@@ -3125,6 +3125,22 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     }
     definitionsChanged = true;
     recomputeClusterCandidates();
+    rereadSummonMatches();
+  }
+
+  /**
+   * Every hand's open summon reads its matches again, as a correction's does
+   * for its corrector (`applyCorrect`): the definitions this board matches by
+   * changed for every hand, so a field open on some marks offers what the
+   * board now knows them as — the pack's molecule the moment it is used, and
+   * not a moment after it is stopped.
+   */
+  function rereadSummonMatches() {
+    for (const g of gestures.values()) {
+      if (!g.summon) continue;
+      g.summon.suggestions = g.summon.suggestions.filter((x) => x.kind !== 'match');
+      g.summon.suggestions.unshift(...makeSuggestions(g.summon.enclosedIds).filter((x) => x.kind === 'match'));
+    }
   }
 
   function applyUnuse(ev: Extract<SessionEvent, { type: 'unuse' }>) {
@@ -3138,6 +3154,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     library = library.filter((id) => !id.startsWith(prefix));
     definitionsChanged = true;
     recomputeClusterCandidates();
+    rereadSummonMatches();
   }
 
   /** How many versions of code a node carries. A revision is pinned to one of these. */

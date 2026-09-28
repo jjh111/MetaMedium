@@ -148,6 +148,20 @@ describe('matched as taught definitions are', () => {
     expect(s.matchesOf([one])[0]).toMatchObject({ name: 'bubble', pack: 'basics@1', score: 1 });
   });
 
+  it('a field open when the pack is used offers its match at once, and not a moment after it is stopped', () => {
+    const s = createSession();
+    const ids = draw(s, molecule());
+    s.summonMarks(ids, next());
+    const matches = () => s.getState().summon!.suggestions.filter((x) => x.kind === 'match').map((x) => `${x.label}·${x.pack}`);
+    expect(matches()).toEqual([]);
+    s.use('basics@1', next());
+    expect(matches()).toEqual(['molecule·basics@1']);
+    s.unuse('basics@1', next());
+    expect(matches()).toEqual([]);
+    s.undo();
+    expect(matches()).toEqual(['molecule·basics@1']);
+  });
+
   it('this board’s own definition wins a tie, and both are offered', () => {
     const s = createSession();
     s.use('test-molecule@1', next());
