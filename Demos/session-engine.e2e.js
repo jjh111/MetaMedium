@@ -3784,16 +3784,16 @@ window.__FIELD_GOLDEN = {
     more: "",
     ranked: ["sug:<match-1>", "snap", "concept:flow", "not:<match-1>", "3d", "read-any", "what", "duplicate", "keep"],
   },
+  // Recorded again 28 Sep 2026 by design (PLAN-USER-SURFACE W2): writing nobody has read is one
+  // option — its reading, which reads it (the dot, ↵ read it) — and Read the writing and What is
+  // this? leave the row (still typeable: "ranked" keeps them). Every other scope is unchanged.
   "line of writing": {
     core: ["name", "copy", "paste", "erase"],
-    line: "↵ writing 0.75 — take it as the name",
+    line: "↵ read it",
     certain: [
-      {"key": "concept:writing", "label": "writing 0.75", "title": "3 marks of writing on one line, a word's gap apart — take it as the name — 3 marks of writing on one line, a word's gap apart", "dot": false},
+      {"key": "concept:writing", "label": "writing 0.75", "title": "a line of 3 words, unread — read it — 3 marks of writing on one line, a word's gap apart", "dot": true},
     ],
-    afford: [
-      {"key": "read", "label": "Read the writing", "title": "a line of 3 words, unread", "dot": true},
-      {"key": "what", "label": "What is this?", "title": "every joined model reads the group; its readings join the row above", "dot": true},
-    ],
+    afford: [],
     more: "",
     ranked: ["concept:writing", "read", "what", "duplicate", "keep"],
   },
