@@ -322,6 +322,8 @@ export async function runSeat(browser, servers, { freshContext, screenshot }) {
       check(`J4.3. Read the writing on a word parks a read about it, and canvas_pending hands the hand the word's ink as a PNG (${png ? png.length + ' bytes' : 'none'})`,
         took && parked && !!k2 && now.pending[0].ask === 'read' && now.pending[0].about.includes(word) && /read the writing/.test(textOf(res)) && !!png && png[0] === 0x89 && png.toString('ascii', 1, 4) === 'PNG',
         { opened, took, now, text: textOf(res).slice(0, 300) });
+      // Answered once the watcher has said so, as a woken session answers.
+      await until(() => watch.lines.length >= 2, 5000);
       await hand.call('canvas_answer', { key: k2, reply: [{ text: 'hello', confidence: 0.9 }, { text: 'hallo', confidence: 0.3 }] });
       const read = await waitFor(page, (id) => { const mm = window.__mm, n = mm.session.getState().nodes.get(id); return !!n && mm.MM.transcriptOf(n) === 'hello'; }, word);
       const status = await page.evaluate(() => (document.getElementById('status').textContent || '').trim());
@@ -337,6 +339,7 @@ export async function runSeat(browser, servers, { freshContext, screenshot }) {
       await waitFor(page, () => window.__mm.MM.pendingBriefs(window.__mm.session.getState()).length === 1, null, 5000);
       const k3 = (await page.evaluate(seatNow)).pending[0]?.key || null;
       await until(async () => !!k3 && textOf(await hand.call('canvas_pending', {})).includes(k3), 5000);
+      await until(() => watch.lines.length >= 3, 5000);
       const ref = await hand.call('canvas_answer', { key: k3, refuse: 'two boxes are not enough to say what they are' });
       const said = await waitFor(page, () => /would not: two boxes are not enough to say what they are/.test(document.getElementById('status').textContent || ''));
       const after = await page.evaluate(seatReadings, boxA);

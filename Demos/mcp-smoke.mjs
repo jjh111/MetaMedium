@@ -462,6 +462,8 @@ async function seatCases() {
     check('Read the writing parks a read: canvas_pending says so and hands over the word\'s ink as a PNG, as canvas_see does',
       !!readParked && readParked.ask === 'read' && /read the writing/.test(p2) && p2.includes(word) && !!picBuf && picBuf[0] === 0x89 && picBuf.toString('ascii', 1, 4) === 'PNG',
       { parked: readParked, text: p2.slice(0, 400), image: !!pic });
+    // Answered once the watcher has said so — a session answers after it is woken.
+    await until(() => watchLines.length >= 2, 4000);
     await call('canvas_answer', { key: readParked ? readParked.key : '', reply: [{ text: 'hello', confidence: 0.9 }, { text: 'hallo', confidence: 0.3 }] });
     const got2 = await settled(reading);
     const wordNode = session.getState().nodes.get(word);
@@ -471,6 +473,7 @@ async function seatCases() {
     const third = seat.interpret([boxA, boxB], Date.now());
     const k3 = seat.waiting()[0];
     await pendingText((t) => k3 && t.includes(k3.key));
+    await until(() => watchLines.length >= 3, 4000);
     const edgesBefore = session.getState().nodes.get(boxA).edges.length;
     const ref = await call('canvas_answer', { key: k3 ? k3.key : '', refuse: 'two boxes are not enough to say what they are' });
     const got3 = await settled(third);

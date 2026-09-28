@@ -18,6 +18,17 @@
 // no truth of its own. Its events reach the tab as its own log, stamped
 // `by` on arrival like any other hand's, and draw in its own colour.
 //
+// **And it is the seat** (V1-PLAN J4): a page that seats *Claude Code (MCP
+// hand)* asks it as it asks any model — What is this?, Read the writing, a
+// question — and every question is PARKED in the room as a brief (core's
+// `participants/seat.ts`). `canvas_pending` lists the briefs waiting, each with
+// the contract a model would have been given and, for a read, the ink as a
+// picture; `canvas_answer` answers one by the brief's own id, checked first
+// against the parser the page will read it with. Every line this hand writes
+// says it answers at the seat, and a beat keeps it heard while it waits, so
+// the page can offer "Claude Code — in this room". `Demos/seat-watch.mjs`
+// prints one line per brief parked, which is how a session is woken for one.
+//
 // The protocol is MCP over stdio — newline-delimited JSON-RPC — written by
 // hand so the repo takes no dependency. Logging goes to stderr; stdout
 // carries the protocol and nothing else.
@@ -62,7 +73,9 @@ let relayServer = null;
 try { relayServer = await ensureRelay(RELAY); } catch (err) { log(err.message); process.exit(1); }
 if (relayServer) log(`relay started on ${RELAY} (none was answering)`);
 const transport = relayTransport(RELAY, ROOM);
-const store = new MM.LiveStore(transport, ME, ROOM);
+// A hand that answers at the seat says so on every line of its own (V1-PLAN
+// J4), so a page in the room can offer Claude Code as the model it asks.
+const store = new MM.LiveStore(transport, ME, ROOM, { seat: true });
 // This hand SAYS WHAT ITS LOG IS CALLED (ids per hand, SURFACE-v10-PLAN D8).
 // The name is the one its lines are appended under — `ME`, the same name
 // `mergeLogs` is given as `me` — because the core derives every node id it
@@ -107,9 +120,16 @@ store.subscribe(() => {
   Promise.resolve().then(() => { mergePending = false; return merge(); }).catch((err) => log('merge: ' + err.message));
 });
 /** My log as it stands, to the room: the tail when it only grew, the whole of it when it did not. */
+let lastSent = Date.now();
 async function flush() {
+  lastSent = Date.now();
   await store.publish(myLog());
 }
+// A hand waiting for a brief can be quiet for an hour; a page asks who is here
+// by who was heard in the last minute. So, while nothing else has been sent, a
+// beat — a line with no events, which no hand merges or paints for.
+const BEAT_MS = 20000;
+setInterval(() => { if (Date.now() - lastSent >= BEAT_MS) { lastSent = Date.now(); store.here(); } }, BEAT_MS / 4).unref();
 // A newcomer says hello; the room answers with its logs. Tools wait for the
 // first answer, or a moment, so the first look is not at an empty board.
 const ready = new Promise((resolve) => {
@@ -182,10 +202,18 @@ function look(args) {
   for (const id of s.explanations) {
     const n = s.nodes.get(id);
     if (!n || n.reps.some((x) => x.modality === 'erased')) continue;
+    // The seat's own traffic is said below, in a line each — never its prompt.
+    if (MM.isSeatTraffic(n, s.nodes)) continue;
     const d = (n.reps.find((x) => x.modality === 'explanation') || {}).data || {};
     const about = n.edges.filter((e) => e.rel === 'about').map((e) => e.to);
     lines.push(id + ' · “' + (d.text || '') + '”' + (about.length ? ' about ' + about.join(', ') : '') + (authorOf(n, s) ? ' · by ' + authorOf(n, s) : ''));
   }
+  const briefs = MM.seatBriefs(s).filter((b) => !b.withdrawn);
+  for (const b of briefs.filter((x) => !x.reply)) {
+    lines.push('brief ' + b.key + ' · ' + (b.asked || 'a brief') + ' · about ' + (b.about.join(', ') || '(nothing)') + ' · from ' + b.who + ' — waiting for you at the seat: canvas_pending reads it, canvas_answer answers it');
+  }
+  const answered = briefs.filter((x) => x.reply).length;
+  if (answered) lines.push(answered + ' brief' + (answered === 1 ? '' : 's') + ' at the seat answered');
   return { text: lines.join('\n') };
 }
 
@@ -372,6 +400,88 @@ function placeBy(place, s) {
   return { bounds: { minX: x, minY: y, maxX: x + w, maxY: y + h }, said: (how === 'in' ? 'inside ' : how === 'right' || how === 'left' ? how + ' of ' : how + ' ') + id };
 }
 
+// ----- The seat (V1-PLAN J4) ------------------------------------------------
+// A page that seats Claude Code parks every question in the room as a brief —
+// an answer on the explanation plane whose question is `brief` — and waits for
+// the answer whose question is the brief's own id. Core reads the plane for
+// both sides (`pendingBriefs`, `seatBriefs`), so the hand and the page cannot
+// disagree about what is waiting; and the answer is checked here with the same
+// parser the page will read it with, so a reply the page could not read is
+// said here and never sent.
+
+/** What the page reads from an answer to this ask, and how it is written. */
+const CONTRACTS = {
+  what: { parse: (t) => MM.parseReadings(t).length > 0, shape: 'a JSON array of 1 to 4 readings: [{"label": "short-name", "confidence": 0.0–1.0, "reasoning": "one sentence citing the evidence"}]' },
+  read: { parse: (t) => MM.parseTranscripts(t).length > 0, shape: 'a JSON array of what the writing says, best first: [{"text": "what it says", "confidence": 0.0–1.0}]' },
+  ask: { parse: (t) => !!t.trim(), shape: '1–3 short sentences of plain prose, as a string' },
+  build: { parse: (t) => !!MM.parseFill(t), shape: 'a JSON object: {"theme": {…}, "regions": {"<region id>": {"tag": "…", "style": "…", "html": "…"}}}' },
+  program: { parse: (t) => !!MM.parseProgram(t), shape: 'a JSON object: {"name": "…", "parts": ["…"], "code": "the function body"} — or {"reuse": "<library name>"}' },
+  draw: { parse: (t) => MM.parseShapes(t).length > 0, shape: 'a JSON array of shapes: [{"shape": "rectangle"|"circle"|"triangle", "x", "y", "w", "h", "why"} or {"shape": "line"|"arrow", "from": {x, y}, "to": {x, y}, "why"}]' },
+  behave: { parse: (t) => MM.parseBehaviourReply(t).terms.length > 0, shape: 'a JSON object: {"terms": [{"verb": "…", "target": "…", "weight": 1, "why": "…"}], "unread": []}' },
+};
+
+function pending() {
+  const s = session.getState();
+  const waiting = MM.pendingBriefs(s);
+  if (!waiting.length) return { text: 'no brief is parked. A person asks at the *Claude Code (MCP hand)* seat — What is this?, Read the writing, a question typed as ask: … — and it waits here until you answer it.' };
+  const content = [];
+  waiting.forEach((b, i) => {
+    const c = CONTRACTS[b.ask] || null;
+    const lines = [
+      (i ? '========\n\n' : '') + 'brief ' + b.key + ' · ' + (b.asked || 'a brief') + ' · from ' + b.who,
+      'about:',
+      ...b.about.map((id) => { const n = s.nodes.get(id); return '  ' + (n ? describeMark(n, s) : id + ' (no longer on the board)'); }),
+    ];
+    let image = null;
+    if (b.ask === 'read') {
+      // The page would have handed a model its own picture of the ink; the log
+      // carries no pixels, so the ink is drawn here from the board, as canvas_see draws it.
+      const strokes = inkOf(s, b.about);
+      if (strokes.length) {
+        image = inkPNG(strokes.map((st) => st.points), { size: 640 }).png.toString('base64');
+        lines.push('the ink of ' + b.about.join(', ') + ' is the picture below — read what it says');
+      } else lines.push('(no ink left to show)');
+    }
+    lines.push('', 'THE CONTRACT — what a model is told; answer in exactly this:', b.contract || '(none was carried)', '', 'THE BRIEF:', b.brief, '',
+      'Answer: canvas_answer { "key": "' + b.key + '", "reply": ' + (c ? c.shape : 'what the contract asks for') + ' } — or refuse: { "key": "' + b.key + '", "refuse": "one clause saying why" }.');
+    content.push({ type: 'text', text: lines.join('\n') });
+    if (image) content.push({ type: 'image', data: image, mimeType: 'image/png' });
+  });
+  return { content };
+}
+
+async function answer(args) {
+  const key = String(args.key || '');
+  const waiting = MM.pendingBriefs(session.getState());
+  const held = waiting.find((b) => b.key === key);
+  if (!held) {
+    return { text: waiting.length
+      ? 'no brief “' + key + '” is waiting. Waiting now: ' + waiting.map((b) => b.key).join(', ')
+      : 'no brief “' + key + '” is waiting, and none is.' };
+  }
+  const wire = MM.seatReplyText({ reply: args.reply, refuse: args.refuse });
+  if (wire.error) return { text: wire.error + ' — nothing was sent' };
+  const refused = MM.refusalOf(wire.text);
+  const c = CONTRACTS[held.ask];
+  if (refused === null && c && !c.parse(wire.text)) {
+    return { text: 'the page would read nothing from that: for “' + held.asked + '” it reads ' + c.shape + ' — nothing was sent, and brief ' + key + ' still waits' };
+  }
+  const id = session.answer({
+    participantId: MM.LOCAL_PARTICIPANT,
+    // The answer names the brief it answers, by the brief's own id…
+    question: key,
+    text: wire.text,
+    // …and is about the marks the brief's own edges name: the page's ids, the same here.
+    aboutIds: held.about,
+    at: now(),
+  });
+  if (!id) return { text: 'the marks brief ' + key + ' was about are gone — nothing was sent' };
+  await flush();
+  return { text: refused !== null
+    ? 'brief ' + key + ' refused: “' + refused + '” — the page says so, and nothing lands'
+    : 'brief ' + key + ' answered (' + wire.text.length + ' chars) — the page reads it with the parser a model\'s reply meets, and holds what it reads, attributed to the seat; nothing is blessed' };
+}
+
 // ----- The tools ------------------------------------------------------------
 const num = { type: 'number' };
 const TOOLS = [
@@ -423,11 +533,24 @@ const TOOLS = [
     inputSchema: { type: 'object', required: ['kind', 'code'], properties: { kind: { type: 'string' }, code: { type: 'string' }, name: { type: 'string' }, artifactId: { type: 'string' }, bounds: { type: 'object', properties: { x: num, y: num, w: num, h: num } }, place: { type: 'object', properties: { in: { type: 'string' }, under: { type: 'string' }, above: { type: 'string' }, right: { type: 'string' }, left: { type: 'string' }, w: num, h: num } } } },
     run: write,
   },
+  {
+    name: 'canvas_pending',
+    description: 'The briefs a person has parked at the *Claude Code (MCP hand)* seat and nobody has answered: What is this? on some marks, Read the writing, a question, or a brief at a loop. Each comes with its key (the brief\'s own id), what was asked, the marks it is about with their ids, the CONTRACT a model would have been given — answer in exactly that — and the brief itself; for a read, the ink of those marks as a PNG. This is the seat: you are the model. Answer with canvas_answer.',
+    inputSchema: { type: 'object', properties: {} },
+    run: pending,
+  },
+  {
+    name: 'canvas_answer',
+    description: 'Answer a brief parked at the seat, IN THE CONTRACT canvas_pending printed with it — What is this?: an array of readings [{"label","confidence","reasoning"}]; Read the writing: an array [{"text","confidence"}]; a question: a string of plain prose. Pass it as "reply" (an array or object, or its JSON as a string). Or "refuse" with one clause saying why, and nothing lands. The page reads your answer with the same parser a model\'s meets and holds what it reads, attributed to the seat — never blessed; a reply it could not read is refused here, before anything is sent.',
+    inputSchema: { type: 'object', required: ['key'], properties: { key: { type: 'string', description: 'The brief\'s own id, exactly as canvas_pending printed it. Copy it; never build one.' }, reply: { description: 'What the contract asks for.' }, refuse: { type: 'string' } } },
+    run: answer,
+  },
 ];
 
 // ----- MCP over stdio: newline-delimited JSON-RPC -----------------------------
 const send = (msg) => process.stdout.write(JSON.stringify(msg) + '\n');
 const contentOf = (out) => {
+  if (Array.isArray(out.content)) return out.content;
   const content = [];
   if (out.text) content.push({ type: 'text', text: out.text });
   if (out.image) content.push({ type: 'image', data: out.image, mimeType: 'image/png' });
@@ -446,7 +569,7 @@ async function handle(line) {
           protocolVersion: (msg.params && msg.params.protocolVersion) || '2025-06-18',
           capabilities: { tools: {} },
           serverInfo: { name: 'metamedium', version: '0.1.0' },
-          instructions: 'You are a hand on a MetaMedium canvas, in room "' + ROOM + '" as "' + label(ME) + '". The human draws; the engine reads every mark (shape, role, concept) and the human names and builds from those readings. Look first (canvas_look), see the ink when it matters (canvas_see), then act with the same verbs a hand has: draw in the shape vocabulary, say a sentence beside marks, propose a reading, label your own marks, transcribe writing, write code. Everything you do is held and attributed to you; the human blesses or ignores it. Never claim a reading is settled — offer it with a confidence and a reason.',
+          instructions: 'You are a hand on a MetaMedium canvas, in room "' + ROOM + '" as "' + label(ME) + '". The human draws; the engine reads every mark (shape, role, concept) and the human names and builds from those readings. Look first (canvas_look), see the ink when it matters (canvas_see), then act with the same verbs a hand has: draw in the shape vocabulary, say a sentence beside marks, propose a reading, label your own marks, transcribe writing, write code. Everything you do is held and attributed to you; the human blesses or ignores it. Never claim a reading is settled — offer it with a confidence and a reason. You are also the SEAT: when the human asks *Claude Code (MCP hand)* — What is this?, Read the writing, a question — the brief is parked here; canvas_pending gives you it, the marks and the contract (and for a read, the ink as a picture), and canvas_answer returns your answer in that contract, which the page takes exactly as it takes a model\'s.',
         });
         break;
       case 'notifications/initialized':
