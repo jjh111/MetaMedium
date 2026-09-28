@@ -831,6 +831,54 @@ tool's offer appears. *Invariant:* one field with stable slots — the four
 core buttons never move. *Trap:* the field mixes readings (*what this is*)
 and affordances (*what it affords*); only affordances become offers.
 
+**B1 Tools — status, 27 Sep 2026: done on `w2`** — `f16a720` (red: e2e 49,
+the golden record, captured from the surface before any refactor — a row of
+three boxes, with "row" and "nav" typed at it; a molecule, and the second
+one drawn after naming the first; a line of writing unread, read, and taken
+as text: the four core slots, the line under the field, every pill's key,
+label, reason and dot in the order shown, and every item the field holds in
+the order the reader walks, ids said by their part in the fixture),
+`7714594` (red: a registered tool's offer in `offersFor`), `e388c55`,
+`223c5c1`, `12dada2`, `b303a43`, `a4c260a`, `b9b4ecb`, and the docs.
+`metamedium-core/src/tools/` holds the contract (§2.1, with `Grounds` — what
+an offer stands on — `ToolHost` — what only a host knows — `Taken`, and
+`Context` as B2's placeholder, read everywhere as `NO_CONTEXT`), the
+registry (`registerTool` returning the way out, `getTool`, `offersFor` and
+`toolsFor` in registry order, each key once and no asking offer leading,
+`completionsFor` for what is typed, `takeOffer`, `describeTools`,
+`toolScope`, `toolsVersion` and `onToolsChange`), the ranking
+(`rankOffers(items, uses)`: the palette's `baseLikelihood`, pure, the
+device's counts handed in) and seventeen built-ins, one file and one
+registration line each, in the order the field always built its pills:
+correct, text, name, label, tidy, control, clean, graph3d, frames,
+text-edit, verbs, clocks, read, what, duplicate, keep, structure. A concept's
+conversion names its tool (`Conversion.tool`). `09-palette.js` is the
+adapter: the readings are read there and ranked by the same function; the
+affordances are `MM.offersFor`; a pill is taken through `MM.takeOffer`, and
+what only the surface can do (ask a model, open the editor, flip a text,
+hold a clip, put words in a text's places) it does in the same stamp. Every
+event a tool writes carries `tool` and `offer` (`session.withTool`, stamped
+in `dispatch` beside authorship; the same log with and without them replays
+to the same board). `here()` names the canvas's own tools on every prompt
+that carries `HERE`; the tier-1 library's acting modules and the router
+name their tools; the models pane lists what the canvas does with no model.
+e2e 49b–c register a tool in one line while the field is open: offered at
+once, the core slots unmoved, its answer stamped with its id and key, absent
+where no box is held, gone when unregistered. *Found:* ties fall by
+insertion order, and the field's old order put *Make it text* before *Show
+it in 3D* but *Edit the text* after *Frame these* — so editing a text is a
+tool of its own, registered after frames; learned use at its cap makes 0.4
+exactly 0.5, a tie the registry order has to keep; and *Fold “…” into the
+text* was a pill in the top row, so an offer may lead, and leads after the
+line it takes. *Not changed:* taking a reading (a name, the words written)
+is not a tool's act and is not stamped; the library's typed completion stays
+a reading. Whole suite before the last commit: core 1,070 in 80 files,
+typecheck clean, both bundles equal to a fresh build; relay, field, build
+and board tests 76; surface in sync; the canvas MCP smoke and the shard's
+(605 in 31 files, typecheck clean) pass; the gate 504 passed and the one
+honest skip (canvas 301, keep 31, boards 19, budgets 7, shard 123 + 11 +
+12); WebKit smoke 4.
+
 **B2 Context.** *Owns* `metamedium-core/src/context/` (`contextAt`, `rank`,
 hysteresis), the use counts in `09-palette.js`, the reading under a new mark
 in `08-render.js`. *Done:* the same scope ranks differently beside a flow
