@@ -89,6 +89,8 @@ export interface NotationSymbol {
   ports: NotationPort[];
   /** The writing that labels it. */
   labels: string[];
+  /** A word a hand put on the symbol's own ink (a `label`), when one did — its writing is in `labels`. */
+  text?: string;
 }
 
 /** One end of a connector, read past any head. */
@@ -126,6 +128,8 @@ export interface NotationConnector {
   reason: string;
   /** The writing beside it. */
   labels: string[];
+  /** A word a hand put on the connector's own ink (a `label`), when one did. */
+  text?: string;
 }
 
 /** Writing, and what it labels. */
@@ -136,6 +140,8 @@ export interface NotationLabel {
   where: 'inside' | 'beside' | 'alone';
   /** What it says, when somebody has read it. */
   text?: string;
+  /** Where the writing stands, in canvas units — so several pieces are read in order. */
+  bounds?: Bounds;
   role: Role;
   confidence: number;
   reason: string;

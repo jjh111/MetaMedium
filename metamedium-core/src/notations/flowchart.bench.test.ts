@@ -102,9 +102,10 @@ describe('the flowchart bench', () => {
   }
 
   // After *Draw them clean* (S1): a decision redrawn as its upright bounds
-  // was a process. Every decision must still be one; the other symbols are
-  // reported.
-  const clean = { decisions: tally(), others: tally() };
+  // was a process. Every decision must still be one — and every data symbol
+  // (D2's item: a parallelogram redrawn as its upright box was a process, 36
+  // of 36); the other symbols are reported.
+  const clean = { decisions: tally(), data: tally(), others: tally() };
   for (const v of FLOWCHART_VARIANTS) {
     const s = createSession();
     const e = drawFlowchart(s, v);
@@ -112,7 +113,8 @@ describe('the flowchart bench', () => {
     const r = readFlowchart(board.getState());
     for (const [name, want] of Object.entries(e.symbols)) {
       const got = r?.symbols.find((x) => sameSet(x.ids, want.ids.map(idOf)));
-      count(want.symbol === 'decision' ? clean.decisions : clean.others, got?.symbol === want.symbol, `seed ${v.seed} ${name} drawn clean: wanted ${want.symbol}, read ${got ? `${got.symbol} ${got.confidence.toFixed(2)}` : 'nothing'}`);
+      const t = want.symbol === 'decision' ? clean.decisions : want.symbol === 'data' ? clean.data : clean.others;
+      count(t, got?.symbol === want.symbol, `seed ${v.seed} ${name} drawn clean: wanted ${want.symbol}, read ${got ? `${got.symbol} ${got.confidence.toFixed(2)}` : 'nothing'}`);
     }
   }
 
@@ -186,11 +188,11 @@ describe('the flowchart bench', () => {
       `  the trap: boxes tilted up to 12° read as processes   ${rate(trap.tilted)}`,
       `  diamonds in one stroke read as decisions            ${rate(trap.diamonds)}`,
       `  diamonds in two strokes read as decisions           ${rate(trap.twoStroke)}`,
-      `  after Draw them clean: the flowcharts' decisions      ${rate(clean.decisions)}   their other symbols ${rate(clean.others)}`,
+      `  after Draw them clean: the flowcharts' decisions      ${rate(clean.decisions)}   data ${rate(clean.data)}   their other symbols ${rate(clean.others)}`,
       `  after Draw them clean: diamonds in one stroke        ${rate(trapClean.diamonds)}   in two ${rate(trapClean.twoStroke)}`,
       ...Object.entries(negatives).map(([name, n]) => `  ${name.padEnd(20)} above the floor ${n.above.length}/${n.n}   highest ${n.highest.toFixed(2)}`),
     ];
-    const wrong = [...t.charts.wrong, ...t.symbols.wrong, ...t.flows.wrong, ...t.labels.wrong, ...trap.tilted.wrong, ...trap.diamonds.wrong, ...trap.twoStroke.wrong, ...clean.decisions.wrong, ...trapClean.diamonds.wrong, ...trapClean.twoStroke.wrong, ...clean.others.wrong].slice(0, 12);
+    const wrong = [...t.charts.wrong, ...t.symbols.wrong, ...t.flows.wrong, ...t.labels.wrong, ...trap.tilted.wrong, ...trap.diamonds.wrong, ...trap.twoStroke.wrong, ...clean.decisions.wrong, ...clean.data.wrong, ...trapClean.diamonds.wrong, ...trapClean.twoStroke.wrong, ...clean.others.wrong].slice(0, 12);
     if (wrong.length) lines.push('  wrong:', ...wrong.map((w) => `    ${w}`));
     console.log(lines.join('\n'));
     expect(FLOWCHART_VARIANTS.length).toBeGreaterThanOrEqual(36);
@@ -223,6 +225,11 @@ describe('the flowchart bench', () => {
     expect(clean.decisions.wrong).toEqual([]);
     expect(trapClean.diamonds.wrong).toEqual([]);
     expect(trapClean.twoStroke.wrong).toEqual([]);
+  });
+
+  it('after Draw them clean, every data symbol is still data — a parallelogram keeps its lean, not redrawn as its upright box (D2)', () => {
+    expect(clean.data.n).toBe(FLOWCHART_VARIANTS.length);
+    expect(clean.data.wrong).toEqual([]);
   });
 
   it('a UI wireframe, the canonical molecule and a line of writing never read as a flowchart above the floor', () => {

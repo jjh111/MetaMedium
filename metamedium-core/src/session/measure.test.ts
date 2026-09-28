@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { createSession } from './session';
 import { measure, describeMaths, RIGHT_ANGLE_TOLERANCE } from './measure';
-import { circleStroke, rectStroke, lineStroke, triangleStroke, handText, handArrow } from '../test/strokes';
+import { boundsOf } from './nodes';
+import { circleStroke, rectStroke, lineStroke, triangleStroke, handText, handArrow, handRect, handBox, inkOf } from '../test/strokes';
+import { boxCorners, parallelogramCorners, handShape } from '../notations/fixtures/hand';
 import { solveBoard } from '../maths/solve';
 import { TRIANGLE_LABELS, TRIANGLE_CORNERS, TRIANGLE_SQUARE, TRIANGLE_LABEL_BOXES, TRIANGLE_EXPECTED } from '../maths/fixtures/triangle';
 
@@ -57,6 +59,58 @@ describe('measure — the maths of a mark', () => {
   it('describes itself on one line', () => {
     const m = built(circleStroke(300, 200, 80));
     expect(describeMaths(m!)).toMatch(/^centre \(300, 200\) · radius 80px · circumference \d+px · area [\d,]+px²$/);
+  });
+});
+
+// ===== A turned box by its sides (V1-PLAN §9 D2, the maths lane's item from S1) =====
+
+describe('measure — a box by its sides, at whatever angle it stands', () => {
+  it('a box turned 30° measures its own sides, not the upright box around it', () => {
+    // Its axis-aligned bounds are 233×204; its sides are 200 and 120.
+    const m = built(inkOf(boxCorners(300, 300, 200, 120, 30), true));
+    expect(m!.shape).toBe('rectangle');
+    expect(get(m, 'width')).toBe(200);
+    expect(get(m, 'height')).toBe(120);
+    expect(get(m, 'perimeter')).toBe(640);
+    expect(get(m, 'area')).toBe(24000);
+    expect(get(m, 'aspect')).toBe(1.7);
+  });
+
+  it('drawn by hand, turned either way, within a few px of its sides — the side nearer level is its width', () => {
+    for (const [turn, w, h] of [[20, 200, 120], [-35, 200, 120], [60, 120, 200]] as const) {
+      const m = built(handBox(300, 300, 200, 120, turn, { seed: 7 + turn, jitter: 1.5 }));
+      expect(m!.shape, `turned ${turn}°`).toBe('rectangle');
+      expect(Math.abs(get(m, 'width') - w), `turned ${turn}°: width ${get(m, 'width')}`).toBeLessThanOrEqual(4);
+      expect(Math.abs(get(m, 'height') - h), `turned ${turn}°: height ${get(m, 'height')}`).toBeLessThanOrEqual(4);
+    }
+  });
+
+  it('a box drawn upright measures as it always did — the box its ink fills', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      for (const [w, h] of [[200, 140], [320, 130], [170, 170]]) {
+        const s = createSession();
+        const id = s.addStroke(handRect(100, 100, w, h, { seed, jitter: 2.5 }), 1000);
+        const node = s.getState().nodes.get(id)!;
+        const b = boundsOf(node)!;
+        const m = measure(node, s.getState().nodes)!;
+        expect(get(m, 'width'), `${w}×${h} seed ${seed}`).toBe(Math.round(b.maxX - b.minX));
+        expect(get(m, 'height'), `${w}×${h} seed ${seed}`).toBe(Math.round(b.maxY - b.minY));
+        expect(m.measures.some((x) => x.key === 'lean')).toBe(false);
+      }
+    }
+  });
+
+  it('a box that leans — a flowchart’s data symbol — measures its base, its height and its lean', () => {
+    // 180 wide, 64 high, its top 28 to the right of its bottom: the sides lean 24°.
+    const m = built(inkOf(parallelogramCorners(300, 300, 180, 64, 28), true));
+    expect(m!.shape).toBe('rectangle');
+    expect(get(m, 'width')).toBe(180);
+    expect(get(m, 'height')).toBe(64);
+    expect(get(m, 'area')).toBe(11520);
+    expect(get(m, 'perimeter')).toBe(500);
+    expect(get(m, 'lean')).toBe(24);
+    const hand = built(handShape(parallelogramCorners(300, 300, 180, 64, 28), { seed: 3, jitter: 2 }));
+    expect(Math.abs(get(hand, 'lean') - 24)).toBeLessThanOrEqual(4);
   });
 });
 
