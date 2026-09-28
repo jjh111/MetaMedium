@@ -1,5 +1,7 @@
 // ===== controls =====
-// Provides: the control centre — one button in the bar, a grid of tiles in fixed slots (zoom, snap,
+// Provides: the control centre — one button in the bar, three labelled groups of tiles in fixed slots
+//   (PLAN-USER-SURFACE U1f: Board — boards, folder, import, export, reset; View — zoom, view, theme, hand,
+//   snap, snap now; Helpers — models, live, auto-read, packs, your mark, help; the markup is the page's) (zoom, snap,
 //   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards, packs);
 //   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
 // Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
@@ -11,7 +13,9 @@
 
   // ===== The control centre (SURFACE-v9-PLAN D4) ==============================
   // Fourteen rail buttons become one button and a grid of tiles that keep
-  // their slots (I12: a slot is a promise). Tiles are toggles where they can
+  // their slots (I12: a slot is a promise), in three labelled groups (U1f) —
+  // settings, one-off acts and connections side by side had no grouping, and
+  // Reset stood beside Help. Tiles are toggles where they can
   // be and say their state on their face. The centre closes on the next
   // stroke, on Esc, and on a tap outside it.
   const ccBtn = document.getElementById('ccBtn');

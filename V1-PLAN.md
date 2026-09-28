@@ -2196,6 +2196,16 @@ and with only readings says *tap a reading to take it as the name*; a tap
 still names (59c). e2e 42h pinned Enter's line as a rename and now pins that
 the line is Enter's again when the pointer leaves.
 
+*U1f status, 28 Sep 2026: built on `claude/friendly-galileo-g1z8wo`* — the red
+commit (e2e 60: no groups) and the commit carrying this line. The control
+centre (`Demos/session-engine.html`, `surface.css`, `20-controls.js`'s
+header) is three labelled groups — Board (boards, folder, import, export,
+reset), View (zoom, view, theme, hand, snap, snap now), Helpers (models,
+live, auto-read, packs, your mark, help) — every tile keeping its id, Reset
+with the board and far from Help; it scrolls when the window is short. e2e
+51 pinned the packs tile as the grid's last; it now pins it among the
+Helpers, as the plan says to, deliberately.
+
 ### Phase 7 — review and release
 **H1** — week 1's U7 (the `hand` gate scenario) plus `QA-v1.md`, a hand
 checklist for A1–A10 with the MCP hand in the room checking each step.

@@ -29,26 +29,33 @@
 </header>
 
 <div id="cc" hidden>
-  <div class="tile wide" id="zoomTile">
-    <span class="k">zoom</span>
-    <span class="zoomRow"><button id="zoomOut" title="Zoom out">−</button><span class="z" id="zoomPct">100%</span><button id="zoomIn" title="Zoom in">+</button><button id="fitBtn" title="Fit everything on screen">fit</button></span>
-  </div>
-  <button id="snapMode"></button>
-  <button id="snapBtn" hidden></button>
-  <button id="gridBtn" aria-pressed="false"></button>
-  <button id="themeBtn"></button>
-  <button id="handBtn"></button>
-  <button id="autoReadBtn"></button>
-  <button id="folderBtn"></button>
-  <button id="importBtn"></button>
-  <button id="exportBtn"></button>
-  <button id="modelBtn" aria-pressed="false"></button>
-  <button id="teachBtn" aria-pressed="false"></button>
-  <button id="liveBtn"></button>
-  <button id="resetBtn"></button>
-  <button id="helpBtn"></button>
-  <button id="boardsBtn" aria-pressed="false"></button>
-  <button id="packsBtn" aria-pressed="false"></button>
+  <!-- Three labelled groups (PLAN-USER-SURFACE U1f): what the board is, how it looks, and who helps. Reset stands with the board, far from help. -->
+  <div class="ccGroup" data-group="board"><div class="ccHead">Board</div><div class="ccTiles">
+    <button id="boardsBtn" aria-pressed="false"></button>
+    <button id="folderBtn"></button>
+    <button id="importBtn"></button>
+    <button id="exportBtn"></button>
+    <button id="resetBtn"></button>
+  </div></div>
+  <div class="ccGroup" data-group="view"><div class="ccHead">View</div><div class="ccTiles">
+    <div class="tile wide" id="zoomTile">
+      <span class="k">zoom</span>
+      <span class="zoomRow"><button id="zoomOut" title="Zoom out">−</button><span class="z" id="zoomPct">100%</span><button id="zoomIn" title="Zoom in">+</button><button id="fitBtn" title="Fit everything on screen">fit</button></span>
+    </div>
+    <button id="gridBtn" aria-pressed="false"></button>
+    <button id="themeBtn"></button>
+    <button id="handBtn"></button>
+    <button id="snapMode"></button>
+    <button id="snapBtn" hidden></button>
+  </div></div>
+  <div class="ccGroup" data-group="helpers"><div class="ccHead">Helpers</div><div class="ccTiles">
+    <button id="modelBtn" aria-pressed="false"></button>
+    <button id="liveBtn"></button>
+    <button id="autoReadBtn"></button>
+    <button id="packsBtn" aria-pressed="false"></button>
+    <button id="teachBtn" aria-pressed="false"></button>
+    <button id="helpBtn"></button>
+  </div></div>
   <input id="importInput" type="file" accept="image/*,.svg,.html,.htm,.js,.mjs,.json,.md,.txt" multiple capture="environment" hidden>
 </div>
 

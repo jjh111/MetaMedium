@@ -1870,9 +1870,12 @@ e2e stub). What John's GLM Flash on OpenRouter taught:
 **The surface's chrome** (`Demos/session-engine.html`, v9 S1): **one bar**
 — the wordmark and the panel toggle on the left, the mark chip, undo and the
 **control centre** on the right — and nothing in it explains the system
-(D3). The centre is a grid of tiles in fixed slots (zoom · snap · view ·
-theme · hand · auto-read · folder · import · export · models · mark · live ·
-reset · help · boards), each saying its state on its face, closing on the next
+(D3). The centre is tiles in fixed slots in **three labelled groups**
+(PLAN-USER-SURFACE U1f; the markup is `Demos/session-engine.html`'s):
+**Board** (boards · folder · import · export · reset), **View** (zoom · view
+· theme · hand · snap · snap now) and **Helpers** (models · live · auto-read
+· packs · mark · help) — *Reset* with the board, far from *Help* — each tile
+saying its state on its face, closing on the next
 stroke, Esc, or a tap outside. The panes (models, your mark, boards) open under
 the bar, one at a time. The chrome is built from six components in `surface/00-ui.js` — pill,
 chip, tile, row, pane — one stylesheet section each. **Light and dark are

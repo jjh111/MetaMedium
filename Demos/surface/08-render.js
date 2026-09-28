@@ -848,7 +848,7 @@
     const hint = s.pendingLassoId ? 'cross the loop with ' + (s.commandMark ? 'your mark' : '✓') + ' to select what it holds' : '';
     const strokes = s.contentIds.length - s.artifacts.length;
     // Counts in the person's words (U1b): marks and things, never "loose" or "artifact".
-    const parts = strokes ? [strokes + ' mark' + (strokes === 1 ? '' : 's')] : s.artifacts.length ? [] : ['nothing drawn yet'];
+    const parts = strokes ? [strokes + ' mark' + (strokes === 1 ? '' : 's')] : []; // an empty board: the next move says it
     if (s.artifacts.length) {
       const running = liveSet(s).size;
       parts.push(s.artifacts.length + ' thing' + (s.artifacts.length === 1 ? '' : 's') + ' made' + (s.live.length ? ' (' + (running < s.live.length ? running + ' of ' + s.live.length + ' live, the rest parked' : s.live.length + ' live') + ')' : ''));

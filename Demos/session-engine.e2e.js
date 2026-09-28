@@ -3172,15 +3172,16 @@ window.__scenario = async function(){
 
     // The tile, last in the grid; its pane; use.
     mm.openCC(); await wait(20);
-    const grid51 = [...document.getElementById('cc').children].filter((el) => el.matches('button, .tile')).map((el) => el.id).filter(Boolean);
+    // The tiles of the group the packs tile stands in (U1f grouped the centre: packs are a Helper).
+    const grid51 = [...document.querySelectorAll('#cc .ccGroup[data-group="helpers"] .ccTiles > button')].map((el) => el.id).filter(Boolean);
     await openPacks51();
     const listed51 = [...pane51.querySelectorAll('.pkItem')].map((r) => r.dataset.pack);
     const tapped51 = await tap51('basics@1', 'use');
     const uses51 = mm.session.getEvents().filter((e) => e.type === 'use');
     const marked51 = !!pane51.querySelector('.pkItem.used[data-pack="basics@1"]');
     const faceIn51 = face51();
-    step('51. the packs tile is the last in the control centre; its pane lists what this build ships and never a test pack; use writes one use event, and the board uses basics@1 — the tile and the pane say so',
-      grid51[grid51.length - 1] === 'packsBtn' && JSON.stringify(listed51) === '["basics@1","flowchart@1","uml-class@1","sequence@1"]' && tapped51 && uses51.length === 1 && uses51[0].pack === 'basics@1' &&
+    step('51. the packs tile stands with the Helpers in the control centre (U1f; it was the last tile before the centre was grouped); its pane lists what this build ships and never a test pack; use writes one use event, and the board uses basics@1 — the tile and the pane say so',
+      grid51.includes('packsBtn') && JSON.stringify(listed51) === '["basics@1","flowchart@1","uml-class@1","sequence@1"]' && tapped51 && uses51.length === 1 && uses51[0].pack === 'basics@1' &&
         JSON.stringify(mm.session.getState().packs) === '["basics@1"]' && faceIn51 === 'basics' && marked51,
       { lastTiles: grid51.slice(-3), listed: listed51, uses: uses51.map((e) => e.pack), face: faceIn51, marked: marked51 });
     await closePacks51();
