@@ -30,8 +30,8 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, mkdtempSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { dirname, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { VERSION_PATTERN, readVersion, stampPage, make, write } from './build-app.mjs';
 import { standalone } from '../Demos/build-standalone.mjs';

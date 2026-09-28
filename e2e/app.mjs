@@ -100,25 +100,30 @@ async function helpText(page) {
 
 /**
  * Every address into the site that the whitepaper, its 404 page and the README
- * link — relative ones, and absolute ones under the published site — with a
- * replay's recording beside the page that plays it.
+ * give: each relative href and src, and each absolute address under the
+ * published site wherever it stands (a link, a social card's image, the root)
+ * — with a replay's recording beside the page that plays it.
  */
 function publishedLinks() {
   const SITE_URL = 'https://jjh111.github.io/MetaMedium/';
   const out = new Set();
+  const add = (path) => {
+    out.add(path);
+    const replay = /^Demos\/[^?]+\?(?:.*&)?replay=([^&]+)/.exec(path);
+    if (replay) out.add('Demos/' + decodeURIComponent(replay[1]));
+  };
   for (const f of ['index.html', '404.html', 'README.md']) {
-    const text = readFileSync(join(root, f), 'utf8');
-    const found = [...text.matchAll(/(?:href|src)="([^"]+)"/g), ...text.matchAll(/\]\((https:\/\/jjh111\.github\.io\/MetaMedium\/[^)\s]*)\)/g)].map((m) => m[1].replace(/&amp;/g, '&'));
-    for (let u of found) {
-      if (u.startsWith(SITE_URL)) u = u.slice(SITE_URL.length);
-      else if (/^(?:[a-z]+:|\/\/|#)/i.test(u) || u.startsWith('/')) continue;
+    const text = readFileSync(join(root, f), 'utf8').replace(/&amp;/g, '&');
+    for (const m of text.matchAll(/https:\/\/jjh111\.github\.io\/MetaMedium\/[^"'\s)<>]*/g)) add(m[0].slice(SITE_URL.length).split('#')[0]);
+    for (const m of text.matchAll(/\s(?:href|src)="([^"]+)"/g)) {
+      const u = m[1];
+      if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|#|\/)/i.test(u)) continue;
       const path = u.split('#')[0];
-      if (!path) continue;
-      out.add(path);
-      const replay = /^Demos\/[^?]+\?(?:.*&)?replay=([^&]+)/.exec(path);
-      if (replay) out.add('Demos/' + decodeURIComponent(replay[1]));
+      if (path) add(path);
     }
   }
+  // And the address the whitepaper had before v5, kept as a redirect stub (CLAUDE.md: keep it).
+  add('MetaMedium_Whitepaper_v4.html');
   return [...out];
 }
 

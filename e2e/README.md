@@ -149,8 +149,10 @@ on Chromium and WebKit (`--browser webkit app`):
   `Authorization` — or asking for an event stream — is never kept, while the
   same request without one is; the old address opens as it did, with its own
   worker at `/Demos/`, on the same board; that worker keeps to its own caches;
-  and every address the whitepaper, `404.html` and the README link into the
-  site still answers, a replay's recording with the page that plays it.
+  and every address the whitepaper, `404.html` and the README give into the
+  site still answers — each link, the social card's image, the root, a
+  replay's recording with the page that plays it, and the v4 whitepaper's
+  redirect stub.
 - **With the server gone** (B1): a server of its own over the repository,
   one visit, a box drawn, the server stopped — connection refused — and
   `/app/` reloads from its worker's cache with the box on the board, and an

@@ -1136,7 +1136,8 @@ file answering, installable (Chromium's own check), the page *controlled*
 (narrow the scope and A3, A5, B1 fail while Chromium still calls it
 installable), a box kept across a reload the worker served and with the
 server gone, the version in the help pane, no key kept, the old address and
-all 27 published links answering, and a release's first network fetch
+all 30 published addresses answering (every link and social-card image
+the whitepaper, `404.html` and the README give, and the v4 stub), and a release's first network fetch
 dropping the old shell — beside a control where the cache kept its name and
 the old help came back offline beside the new page. `node --test
 scripts/build-app.test.mjs scripts/release.test.mjs` (17, in CI): semver's
