@@ -132,6 +132,27 @@ describe('lines whose ends meet read as one figure', () => {
     expect(f.kind).toBe('rectangle');
   });
 
+  it('a box drawn as two Ls — top and right, then left and bottom — is one rectangle (S1)', () => {
+    // An L's second arm is no barb: D1 found each L of this box read as an
+    // arrow 0.59, and figures skip arrows, so the box was never seen.
+    for (const [w, h] of [[160, 70], [120, 120], [200, 90]]) {
+      for (const seed of [1, 2, 3]) {
+        const s = createSession();
+        const a = { x: 300, y: 300 }, b = { x: 300 + w, y: 300 }, c = { x: 300 + w, y: 300 + h }, d = { x: 300, y: 300 + h };
+        const ell = (p: Point, q: Point, r: Point, k: number) => [...handLine(p, q, { seed: seed + k, jitter: 1.5 }), ...handLine(q, r, { seed: seed + k + 50, jitter: 1.5 }).slice(1)];
+        const [first, second] = draw(s, [ell(a, b, c, 0), ell(a, d, c, 10)]);
+        const figures = figuresOf(s.getState());
+        expect(figures, `${w}×${h} seed ${seed}`).toHaveLength(1);
+        const f = figures[0];
+        expect(f).toMatchObject({ kind: 'rectangle', shape: 'rectangle' });
+        expect(sameSet(f.ids, [first, second])).toBe(true);
+        for (const corner of [a, b, c, d]) expect(f.vertices.some((v) => near(v, corner, 8)), `${w}×${h} seed ${seed}`).toBe(true);
+        // Two corners where each L bends, two where the Ls meet.
+        expect(f.corners.map((x) => x.how).sort()).toEqual(['bend', 'bend', 'touching', 'touching']);
+      }
+    }
+  });
+
   it('a side drawn in two strokes is one side, and keeps both marks', () => {
     const s = createSession();
     const { right, longLegEnd, shortLegEnd } = TRIANGLE_CORNERS;

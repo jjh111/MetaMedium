@@ -298,6 +298,62 @@ export function handCircle(cx: number, cy: number, r: number, options: HandOptio
   return points;
 }
 
+/**
+ * An open arc the way a hand draws one: `sweep` degrees of a circle of radius
+ * `r` about (cx, cy), starting at `fromDeg`, with the same tremor, sensor noise
+ * and sampling density as every other hand stroke. No breathing radius, unlike
+ * `handCircle`: on the large radius of a shallow arc a 3% breath is a wobble
+ * bigger than the bow itself, and no hand draws a gentle curve that way.
+ */
+export function handArc(cx: number, cy: number, r: number, fromDeg: number, sweep: number, options: HandOptions = {}): Point[] {
+  const o = { ...DEFAULTS, ...options };
+  const wobble = tremor(o.seed, o.jitter);
+  const noise = rng(o.seed * 977 + 13);
+  const steps = Math.max(12, Math.round(((r * Math.abs(sweep) * Math.PI) / 180) * o.density));
+  const points: Point[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const a = ((fromDeg + (sweep * i) / steps) * Math.PI) / 180;
+    const d = wobble(i / steps);
+    points.push({
+      x: cx + r * Math.cos(a) + d.x + (noise() - 0.5) * 2 * o.sensorNoise,
+      y: cy + r * Math.sin(a) + d.y + (noise() - 0.5) * 2 * o.sensorNoise,
+    });
+  }
+  return points;
+}
+
+/**
+ * A clean form walked as ink: its outline sampled every few pixels, closed
+ * back to its start when it is closed — the board as *Draw them clean* shows
+ * it, drawn again, so it can be read again.
+ */
+export function inkOf(points: Point[], closed: boolean, step = 3): Point[] {
+  const ring = closed ? [...points, points[0]] : points;
+  const out: Point[] = [{ x: ring[0].x, y: ring[0].y }];
+  for (let i = 1; i < ring.length; i++) {
+    const a = ring[i - 1], b = ring[i];
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / step));
+    for (let k = 1; k <= n; k++) out.push({ x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n });
+  }
+  return out;
+}
+
+/** A box `w` × `h` centred on (cx, cy), turned `turn` degrees, drawn by hand — a diamond at 45° when it is square. */
+export function handBox(cx: number, cy: number, w: number, h: number, turn: number, options: HandOptions = {}): Point[] {
+  return handPolygon(boxVertices(cx, cy, w, h, turn), options);
+}
+
+/** A box's corners — its own top-left, top-right, bottom-right, bottom-left — turned `turn` degrees about its centre. */
+export function boxVertices(cx: number, cy: number, w: number, h: number, turn: number): Point[] {
+  const t = (turn * Math.PI) / 180, c = Math.cos(t), s = Math.sin(t);
+  return [
+    { x: -w / 2, y: -h / 2 },
+    { x: w / 2, y: -h / 2 },
+    { x: w / 2, y: h / 2 },
+    { x: -w / 2, y: h / 2 },
+  ].map((p) => ({ x: cx + p.x * c - p.y * s, y: cy + p.x * s + p.y * c }));
+}
+
 export function handLine(from: Point, to: Point, options: HandOptions = {}): Point[] {
   const o = { ...DEFAULTS, ...options };
   const wobble = tremor(o.seed, o.jitter);
