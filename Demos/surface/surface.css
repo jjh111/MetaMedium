@@ -356,7 +356,7 @@ body.panelHidden #inspector { display: none; }
 #summon .more { font: 10.5px var(--mono); color: var(--dim); padding: 2px 6px; }
 /* Held to the room the visible viewport leaves (09-palette.js, fitFieldHeight): with an on-screen
    keyboard up, the pills scroll and the input, its reading and the core stay in view (V1-PLAN R6). */
-#summon .list.held { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+#summon .list.held { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; touch-action: pan-y; }
 .pill {
   display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
   background: var(--panel); border: 1px solid var(--rule); border-radius: 999px;

@@ -41,7 +41,7 @@ const root = resolve(here, '..');
 const RESULTS = process.env.E2E_RESULTS ? resolve(process.env.E2E_RESULTS) : join(here, 'results');
 
 const HEADLESS = process.env.E2E_HEADED !== '1';
-/** The engines this gate can drive. Chromium runs everything; WebKit runs the smoke. */
+/** The engines this gate can drive. Chromium runs everything; WebKit runs the smoke, pencil, keep, boards and app (CI's `webkit` job: the first three). */
 const ENGINES = { chromium, webkit };
 const SCENARIO_TIMEOUT = Number(process.env.E2E_TIMEOUT_MS || 420000);
 
@@ -494,7 +494,8 @@ async function main() {
 
   const wanted = argv.filter((a) => !a.startsWith('-'));
   // `smoke` is opt-in: it is the short WebKit interaction, not part of the gate's
-  // own four, and naming it in the default list would run it twice on Chromium.
+  // own scenarios, and naming it in the default list would run it twice on Chromium.
+  // `pencil` is in the default list (Chromium) and CI's `webkit` job runs it again on WebKit.
   // `big` is opt-in too: a 2,000-mark board saved and opened again, minutes of replay.
   const all = ['canvas', 'keep', 'boards', 'app', 'pencil', 'budgets', 'shard', 'demo', 'demo2', 'smoke', 'big'];
   const byDefault = ['canvas', 'keep', 'boards', 'app', 'pencil', 'budgets', 'shard', 'demo', 'demo2'];

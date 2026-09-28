@@ -6,7 +6,8 @@
 //
 // A desktop engine has no pencil and no finger to give, so both are SYNTHESISED
 // IN THE PAGE: `PointerEvent`s with `pointerType: 'pen'` (and a pressure, a
-// tilt) and `pointerType: 'touch'` (a finger; a palm is a touch that is wider),
+// tilt) and `pointerType: 'touch'` (a finger, or a palm — given a wider contact,
+// though the surface knows a palm by when it lands, never by its size),
 // dispatched at the canvas the way iPadOS delivers them — a pencil as `pen`, a
 // finger as `touch`, each with its own pointer id. The surface decides by
 // `pointerType`, never by the user agent, so the same events mean the same
@@ -220,6 +221,7 @@ export async function runPencil(browser, servers, { freshContext, screenshot }) 
     await waitReady(page);
     await page.evaluate(installHand);
     check('P0. the board opens, empty, at an iPad\'s size (1180 × 820)', (await page.evaluate(boardNow)).events === 0);
+    measured.palmMs = await page.evaluate(() => window.__mm.palmMs);
 
     // ---- P1. The pen draws, and its pressure is on every point ----
     let box = null;
@@ -450,6 +452,7 @@ export async function runPencil(browser, servers, { freshContext, screenshot }) 
       await page.evaluate(() => window.__keyboard(0));
       await frames(page);
       await penTapGround();
+      measured.fieldAt260 = { top: Math.round(at260.field.top), bottom: Math.round(at260.field.bottom), pillsPx: at260.listH + ' of ' + at260.listScroll };
       const allReach = reach.length >= 5 && reach.every((p) => p.inView && p.hit);
       const span = (g) => Math.round(g.field.top) + '–' + Math.round(g.field.bottom);
       check(`P7. the keyboard up, the field stays in the visible viewport — with 360 px left ${at360.inView ? 'inside' : 'OUTSIDE'} (${span(at360)}), with 260 ${at260.inView ? 'inside' : 'OUTSIDE'} (${span(at260)}; its ${at260.pills} pills ${at260.held ? 'scrolling in ' + at260.listH + ' of ' + at260.listScroll + ' px' : 'NOT HELD'}), its input in view each time — every pill in reach, scrolled to and hit where it stands (${reach.filter((p) => p.inView && p.hit).length} of ${reach.length}); the keyboard away, the list is ${away.held ? 'STILL HELD' : 'let go'}; back up with a word typed, the two pills fit (${typed.held ? 'STILL HELD' : 'let go'}) and ${took ? took.text : 'no Label it pill'}, taken by the pen, ${labelled ? 'labels the row' : 'labelled nothing'}`,

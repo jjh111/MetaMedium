@@ -2339,6 +2339,8 @@
     // Another pointer's cancel is not the one under way's.
     if (owner && e.pointerId !== owner.id) return;
     owner = null;
+    // A hold the system cancelled is over too: left standing, it would eat the next stroke's release.
+    held = false;
     live = null; pressEnd(); magnetStart = null; magnetHold = null; drawLive();
     if (forward) { postPointer(forward, 'cancel', e, screenToWorld(e.clientX, e.clientY)); forward = null; }
   });
