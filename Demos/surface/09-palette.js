@@ -649,8 +649,16 @@
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.height > 0 ? r : null;
   }
-  /** The cards the field keeps off (U1c): the panel and the minimap. */
-  function fieldAvoids() { return [panelRect(), minimapRect()].filter(Boolean); }
+  /**
+   * What the field keeps off (U1c): the panel and the minimap — and the marks it holds, when there
+   * is room beside them (U2's walk: held writing opened a field over itself). A group too big to
+   * stand beside is not kept off: fieldBox falls back to where it was wanted.
+   */
+  function fieldAvoids() {
+    const s = session.getState();
+    const held = s.summon ? heldBoxOf(s.summon) : null;
+    return [panelRect(), minimapRect(), held].filter(Boolean);
+  }
 
   /**
    * Where the field opens: by the hand's last press when that was on or beside the held
@@ -658,7 +666,8 @@
    * to be taken whatever it was — after a hold it was the stroke before, and the field
    * opened a screen away from what it holds.
    */
-  function fieldAnchorFor(sum) {
+  /** The held marks' box on screen, or null. */
+  function heldBoxOf(sum) {
     const s = session.getState();
     let box = null;
     for (const id of sum.enclosedIds) {
@@ -667,6 +676,10 @@
       const a = worldToScreen(b.minX, b.minY), z = worldToScreen(b.maxX, b.maxY);
       box = box ? { left: Math.min(box.left, a.x), top: Math.min(box.top, a.y), right: Math.max(box.right, z.x), bottom: Math.max(box.bottom, z.y) } : { left: a.x, top: a.y, right: z.x, bottom: z.y };
     }
+    return box;
+  }
+  function fieldAnchorFor(sum) {
+    const box = heldBoxOf(sum);
     const NEAR = 80;
     if (lastPen && (!box || (lastPen.x >= box.left - NEAR && lastPen.x <= box.right + NEAR && lastPen.y >= box.top - NEAR && lastPen.y <= box.bottom + NEAR))) return { x: lastPen.x, y: lastPen.y };
     if (!box) return null;

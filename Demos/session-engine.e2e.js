@@ -3710,16 +3710,19 @@ window.__scenario = async function(){
       const f = rect58(document.getElementById('summon'));
       const mini = rect58(document.getElementById('minimap')), bar = rect58(document.getElementById('bar')), panel = rect58(document.getElementById('inspector'));
       const dx = f ? Math.max(f.left - press.x, 0, press.x - f.right) : Infinity, dy = f ? Math.max(f.top - press.y, 0, press.y - f.bottom) : Infinity;
+      // The held box on screen: a field kept off the marks it holds (58c) stands right beside them.
+      const hb = { left: x, top: y, right: x + 110, bottom: y + 70 };
+      const gap = f ? Math.hypot(Math.max(f.left - hb.right, 0, hb.left - f.right), Math.max(f.top - hb.bottom, 0, hb.top - f.bottom)) : Infinity;
       tries58.push({ name, open: !!mm.session.getState().summon && !!f, inView: !!f && f.left >= -0.5 && f.top >= -0.5 && f.right <= W + 0.5 && f.bottom <= H + 0.5,
-        offMinimap: !meets58(f, mini), offBar: !meets58(f, bar), offPanel: !meets58(f, panel), fromPress: Math.round(Math.hypot(dx, dy)),
+        offMinimap: !meets58(f, mini), offBar: !meets58(f, bar), offPanel: !meets58(f, panel), fromPress: Math.round(Math.hypot(dx, dy)), fromMarks: Math.round(gap),
         // …and never over the press itself: a field that slid back under the hand opened under the pointer (found walking the audit again, U2).
         clearOfPress: !!f && !(press.x > f.left - 8 && press.x < f.right + 8 && press.y > f.top - 8 && press.y < f.bottom + 8) });
       const sm = mm.session.getState().summon; if (sm) mm.session.dismiss(sm.id, Date.now());
       if (mm.session.getState().selection.length) mm.session.deselect(Date.now()); // a hold needs nothing held
       await wait(30);
     }
-    step('58. the field opens by the press on the held marks — at every corner of the screen it stands within reach of the hand, never over the press itself, whole on screen, and never over the minimap, the bar or the panel',
-      tries58.every((x) => x.open && x.inView && x.offMinimap && x.offBar && x.offPanel && x.fromPress <= 60 && x.clearOfPress), tries58);
+    step('58. the field opens by the press on the held marks — at every corner of the screen it stands within reach of the hand (60 px of the press, or right beside the held marks), never over the press itself, whole on screen, and never over the minimap, the bar or the panel',
+      tries58.every((x) => x.open && x.inView && x.offMinimap && x.offBar && x.offPanel && (x.fromPress <= 60 || x.fromMarks <= 24) && x.clearOfPress), tries58);
     // A model's long readings arrive: every pill stays inside the field, and the field on screen.
     window.__whatReply = [
       { label: 'an-entity-association-diagram-with-several-parts-and-a-long-name', confidence: 0.85, reasoning: 'a long reading' },
