@@ -87,6 +87,31 @@ describe('Session.rebase', () => {
     expect(s.getState().staleResult).toBeNull();
   });
 
+  it('leaves a checkpoint where it ended: a line crossing a mark drawn since goes back there, not to the last regular one', () => {
+    const s = named('me~1', { checkpointEvery: 50 });
+    const ada = drew('ada~1', 12, 1000);
+    s.load(mergeLogs({ 'ada~1': ada.slice(0, 10) }, { me: 'me~1' }));
+    s.rebase(10, mergeLogs({ 'ada~1': ada }, { me: 'me~1' }).slice(10)); // a line: the log is 12 long, a checkpoint at 12
+    s.addStroke(circleStroke(900, 500, 40, 24), 20_000, undefined, 1); // this hand draws: 13
+    const ben = drew('ben~1', 1, 19_000, 1000, 3000);
+    const merged = mergeLogs({ 'ada~1': ada, 'ben~1': ben, 'me~1': mine(s) }, { me: 'me~1' });
+    const r = s.rebase(12, merged.slice(12));
+    expect(r).toEqual({ cut: true, from: 12, applied: 2 });
+    const whole = named('me~1');
+    whole.load(merged);
+    expect(stateOf(s)).toBe(stateOf(whole));
+  });
+
+  it('an undo far back, past the checkpoints that keep the index, rebuilds it and reads the same', () => {
+    const s = named('me~1', { checkpointEvery: 2 });
+    for (let i = 0; i < 14; i++) s.addStroke(rectStroke(i * 160, (i % 3) * 140, 120, 80, 8), 1000 + i * 100, undefined, 1);
+    for (let i = 0; i < 11; i++) s.undo();
+    const whole = named('me~1');
+    whole.load(s.getEvents());
+    expect(s.getEvents()).toHaveLength(3);
+    expect(stateOf(s)).toBe(stateOf(whole));
+  });
+
   it('raises the high-water mark as a load does: the next number is past every one it was handed', () => {
     const s = named('me~1');
     s.rebase(0, [{ ...drew('me~1', 1, 1000)[0], seq: 40 }]);

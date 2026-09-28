@@ -10111,6 +10111,26 @@ var MarkGrid = class {
     this.counts.clear();
     this.filed.clear();
   }
+  /**
+   * Become a copy of `other`: the same marks filed the same way, sharing
+   * nothing either will change — a filed box is never changed in place, so
+   * those are shared. For a checkpoint, which keeps the index as it stood.
+   */
+  copyFrom(other) {
+    this.levels = /* @__PURE__ */ new Map();
+    for (const [level, xs] of other.levels) {
+      const xs2 = /* @__PURE__ */ new Map();
+      for (const [cx2, ys] of xs) {
+        const ys2 = /* @__PURE__ */ new Map();
+        for (const [cy2, here] of ys) ys2.set(cy2, new Set(here));
+        xs2.set(cx2, ys2);
+      }
+      this.levels.set(level, xs2);
+    }
+    this.counts = /* @__PURE__ */ new Map();
+    for (const [level, c] of other.counts) this.counts.set(level, { marks: c.marks, cells: c.cells });
+    this.filed = new Map(other.filed);
+  }
   /** Every mark whose box meets `box` (edges touching count), in no particular order. */
   query(box) {
     const out = [];
@@ -11106,6 +11126,44 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   const CHECKPOINT_EVERY = 200;
   const checkpointEvery = config.checkpointEvery !== void 0 && config.checkpointEvery >= 1 ? Math.floor(config.checkpointEvery) : CHECKPOINT_EVERY;
   let checkpoints = [];
+  function copyDerived(d, grids = true) {
+    const copies = /* @__PURE__ */ new Map();
+    const cp = (c) => {
+      let x = copies.get(c);
+      if (!x) {
+        x = { ...c, scores: new Map(c.scores) };
+        copies.set(c, x);
+      }
+      return x;
+    };
+    const linkedCopy = /* @__PURE__ */ new Map();
+    for (const [id, set] of d.linked) linkedCopy.set(id, new Set(set));
+    const componentOfCopy = /* @__PURE__ */ new Map();
+    for (const [id, c] of d.componentOf) componentOfCopy.set(id, cp(c));
+    let reachCopy = d.reach, inkCopy = d.ink;
+    if (grids) {
+      reachCopy = new MarkGrid();
+      reachCopy.copyFrom(d.reach);
+      inkCopy = new MarkGrid();
+      inkCopy.copyFrom(d.ink);
+    }
+    return {
+      order: new Map(d.order),
+      nextOrder: d.nextOrder,
+      inContent: new Set(d.inContent),
+      reach: reachCopy,
+      ink: inkCopy,
+      linked: linkedCopy,
+      componentOf: componentOfCopy,
+      matchable: new Set([...d.matchable].map(cp)),
+      unsettled: new Set(d.unsettled),
+      definitionsSeen: new Map(d.definitionsSeen),
+      definitionsChanged: d.definitionsChanged,
+      holding: new Set([...d.holding].map(cp)),
+      holdingInOrder: d.holdingInOrder.map(cp),
+      holdingMoved: d.holdingMoved
+    };
+  }
   const nodeCopy = (n2) => ({ ...n2, reps: n2.reps.slice(), edges: n2.edges.slice() });
   function snapshot() {
     const copied = /* @__PURE__ */ new Map();
@@ -11122,7 +11180,23 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       markHands: new Map(markHands),
       lastAt,
       counter: counter2,
-      clocks: { ...clocks }
+      clocks: { ...clocks },
+      derived: copyDerived({
+        order: order2,
+        nextOrder,
+        inContent,
+        reach,
+        ink,
+        linked,
+        componentOf,
+        matchable,
+        unsettled,
+        definitionsSeen,
+        definitionsChanged,
+        holding,
+        holdingInOrder,
+        holdingMoved
+      })
     };
   }
   function restore(s) {
@@ -11139,11 +11213,45 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     lastAt = s.lastAt;
     counter2 = s.counter;
     clocks = { ...s.clocks ?? {} };
-    rebuildDerived();
+    if (!s.derived) {
+      rebuildDerived();
+      return;
+    }
+    const d = copyDerived(s.derived, false);
+    order2 = d.order;
+    nextOrder = d.nextOrder;
+    inContent = d.inContent;
+    reach.copyFrom(s.derived.reach);
+    ink.copyFrom(s.derived.ink);
+    linked = d.linked;
+    componentOf = d.componentOf;
+    matchable = d.matchable;
+    unsettled = d.unsettled;
+    definitionsSeen = d.definitionsSeen;
+    definitionsChanged = d.definitionsChanged;
+    holding = d.holding;
+    holdingInOrder = d.holdingInOrder;
+    holdingMoved = d.holdingMoved;
+  }
+  const DERIVED_KEPT = 4;
+  function keepCheckpoint(c) {
+    checkpoints.push(c);
+    for (let i = checkpoints.length - 1 - DERIVED_KEPT; i >= 0 && checkpoints[i].snap.derived; i--) delete checkpoints[i].snap.derived;
   }
   function maybeCheckpoint(length) {
     if (length > 0 && length % checkpointEvery === 0 && !checkpoints.some((c) => c.length === length)) {
-      checkpoints.push({ length, snap: snapshot() });
+      keepCheckpoint({ length, snap: snapshot() });
+    }
+  }
+  const END_CHECKPOINTS = 3;
+  function checkpointAtEnd() {
+    const length = events.length;
+    if (length === 0 || checkpoints.some((c) => c.length === length)) return;
+    keepCheckpoint({ length, snap: snapshot() });
+    let kept = 0;
+    for (let i = checkpoints.length - 1; i >= 0; i--) {
+      if (checkpoints[i].length % checkpointEvery === 0) continue;
+      if (++kept > END_CHECKPOINTS) checkpoints.splice(i, 1);
     }
   }
   let order2 = /* @__PURE__ */ new Map();
@@ -12718,6 +12826,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       replay();
       report = { cut: true, from, applied: events.length - from };
     }
+    checkpointAtEnd();
     if (!logNameSaid) {
       let remembered;
       for (const ev of events) if (!ev.by && ev.origin) remembered = ev.origin;

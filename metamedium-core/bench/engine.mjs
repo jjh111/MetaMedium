@@ -285,7 +285,10 @@ async function board() {
 }
 
 // ===========================================================================
-// room: one incoming line in a room of three hands, as the surface merges it
+// room: one incoming line in a room of three hands, as the surface merged it
+// before R4d — every log read, `myLogNow`, the whole room merged and loaded.
+// The surface since R4d merges a line into a merge kept standing; `room.mjs`
+// measures that, beside this path (`--path=before`), against the budgets.
 // ===========================================================================
 
 /** A transport on the hub that counts what goes through it and times what arrives. */

@@ -5,7 +5,9 @@
 //   - one incoming line costs ≤ 16 ms of main-thread work, with no full
 //     replay, on the 2,000-mark board in a room of three hands; a line that
 //     lands before events already applied replays from the nearest
-//     checkpoint, not from zero; and a line with no events does no work;
+//     checkpoint, not from zero — one that crosses a mark this hand drew a
+//     moment before (two hands drawing at once) within the 16 ms too; and a
+//     line with no events does no work;
 //   - a newcomer's hello delivers at most one copy of each log, in rooms of
 //     three and six — with a hand that left, and one that vanished without a
 //     word — and the newcomer ends with exactly the logs the room holds.
@@ -216,7 +218,20 @@ async function lines() {
     gc();
     inOrder.push(await oneLine(lastAt, 900 + i * 40));
   }
-  // Out of order: B's clock is behind, so its stroke belongs before events A already applied.
+  // Crossing: A draws, and B's line arrives with a stroke B drew a moment
+  // before A's — two hands drawing at once, a line in flight while the other
+  // drew. The commonest line that lands before events already applied.
+  const crossing = [];
+  const aStroke = [...logs[hands[0]]].reverse().find((e) => e.type === 'stroke');
+  for (let i = 0; i < 8; i++) {
+    lastAt += 1500;
+    session.addStroke(aStroke.points.map((p) => ({ x: p.x + 900 + i * 40, y: p.y + 1400 })), lastAt, undefined, 1);
+    await P.save(reader);
+    gc();
+    crossing.push(await oneLine(lastAt - 40, 3000 + i * 40));
+  }
+  // Out of order among the other hands: B's clock is behind by more, so its
+  // stroke belongs before lines already merged.
   const evsAt = () => session.getEvents().map((e) => e.at || 0);
   const outOfOrder = [];
   for (const back of [3, 30, 150]) {
@@ -258,12 +273,19 @@ async function lines() {
       replayedFromZero: inOrder.some((l) => l.asked.some((x) => x.how === 'load')),
       asked: inOrder.slice(0, 3).map((l) => l.asked),
     },
+    crossing: {
+      n: crossing.length,
+      perLine: summarize(crossing.map((l) => l.ms)),
+      replayedFromZero: crossing.some((l) => l.asked.some((x) => x.how === 'load' || x.from === 0)),
+      asked: crossing.slice(0, 3).map((l) => l.asked),
+    },
     outOfOrder: outOfOrder.map((l) => ({ back: l.back, ms: l.ms, asked: l.asked, replayedFromZero: l.asked.some((x) => x.how === 'load' || x.from === 0) })),
     quiet: quiet.map((q) => ({ label: q.label, ms: q.ms, touched: q.asked.length > 0 || q.notified > 0, asked: q.asked })),
     events: events0,
     marks: stats.marks,
   };
   say(`  one line in order (n ${out.lines.n}): median ${ms(perLine.median)}, p95 ${ms(perLine.p95)} — the store ${ms(out.lines.receive.median)}, the merge and apply ${ms(out.lines.work.median)}; ${out.lines.replayedFromZero ? 'a replay from zero every line' : 'no replay'}; the save it schedules ${ms(out.lines.save.median)}`);
+  say(`  a line crossing a mark this hand just drew (n ${out.crossing.n}): median ${ms(out.crossing.perLine.median)}, p95 ${ms(out.crossing.perLine.p95)} — ${out.crossing.replayedFromZero ? 'replayed from zero' : 'from the checkpoint at ' + (out.crossing.asked[0] && out.crossing.asked[0][0] ? out.crossing.asked[0][0].from : '?') + ', …'}`);
   for (const l of out.outOfOrder) say(`  a line ${l.back} events back: ${ms(l.ms)} — ${l.replayedFromZero ? 'replayed from zero' : 'from the checkpoint at ' + (l.asked[0] ? l.asked[0].from : '?')}`);
   for (const q of out.quiet) say(`  ${q.label}: ${ms(q.ms)} — ${q.touched ? 'the board was touched' : 'no work'}`);
   for (const s of stores) s.close();

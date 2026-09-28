@@ -1,7 +1,9 @@
 // PERF.md's live-room budgets as tests (V1-PLAN.md §9 R4d), on the generated
 // 2,000-mark board: one incoming line in a room of three costs ≤ 16 ms with no
 // full replay; a line that lands before events already applied replays from
-// the nearest checkpoint, not from zero; a line with no events does no work;
+// the nearest checkpoint, not from zero — and the commonest of those, a line
+// crossing a mark this hand drew a moment before, stays within the 16 ms too;
+// a line with no events does no work;
 // and a newcomer's hello delivers at most one copy of each log — in rooms of
 // three and six, with a hand that left and one that vanished — the newcomer
 // ending with exactly the logs the room holds. Every run records its numbers
@@ -66,6 +68,7 @@ const once = async () => {
       lineMedianMs: +n.line.lines.perLine.median.toFixed(2),
       lineP95Ms: +n.line.lines.perLine.p95.toFixed(2),
       replayedFromZero: n.line.lines.replayedFromZero,
+      crossing: n.line.crossing ? { medianMs: +n.line.crossing.perLine.median.toFixed(2), p95Ms: +n.line.crossing.perLine.p95.toFixed(2), fromZero: n.line.crossing.replayedFromZero } : null,
       outOfOrder: n.line.outOfOrder.map((l) => ({ back: l.back, ms: +l.ms.toFixed(2), fromZero: l.replayedFromZero })),
       quiet: n.line.quiet.map((q) => ({ label: q.label, ms: +q.ms.toFixed(2), touched: q.touched })),
       hello: n.hello.map((h) => ({ hands: h.hands, left: h.left, vanished: h.vanished, maxCopies: h.maxCopies, newcomerMB: h.newcomerMB, holdsTheRoom: h.holdsTheRoom })),
@@ -86,11 +89,15 @@ test('one incoming line on the 2,000-mark board, in a room of three: ≤ 16 ms a
   assert.deepEqual(over, [], `over budget: ${over.join('; ')}`);
 });
 
-test('a line that lands before events already applied replays from the nearest checkpoint, not from zero', { timeout: LIMIT_MS + 60_000 }, async (t) => {
+test('a line that lands before events already applied replays from the nearest checkpoint, not from zero — and one crossing a mark just drawn stays in the budget', { timeout: LIMIT_MS + 60_000 }, async (t) => {
   const r = await once();
   assert.ok(r.numbers, 'the room did not finish');
+  const c = r.numbers.line.crossing;
+  if (c) t.diagnostic(`crossing a mark this hand just drew (n ${c.n}): median ${ms(c.perLine.median)}, p95 ${ms(c.perLine.p95)} — ${c.replayedFromZero ? 'from zero' : 'from ' + JSON.stringify(c.asked[0])}`);
   for (const l of r.numbers.line.outOfOrder) t.diagnostic(`${l.back} events back: ${ms(l.ms)} — ${l.replayedFromZero ? 'from zero' : 'from ' + JSON.stringify(l.asked)}`);
   assert.deepEqual(r.numbers.line.outOfOrder.filter((l) => l.replayedFromZero).map((l) => l.back), [], 'lines that replayed the board from zero');
+  assert.ok(c && !c.replayedFromZero, 'a line crossing a mark just drawn replayed the board from zero');
+  assert.ok(c.perLine.p95 <= BUDGETS.lineP95Ms, `a line crossing a mark just drawn: p95 ${ms(c.perLine.p95)} > ${BUDGETS.lineP95Ms} ms`);
 });
 
 test('a line with no events does no work: a hello, the relay\'s word, a whole log already held', { timeout: LIMIT_MS + 60_000 }, async (t) => {
