@@ -681,46 +681,15 @@ export function readSequence(state: SessionState, scopeIds?: readonly string[], 
   const closedOf = (s: Stroke) => !!fingerprintOf(s.node)?.isClosed;
   const writes = (s: Stroke) => writingLike(s.node, s.ink, s.scale);
 
-  // 1. What participants hang from: boxes (one stroke, or ruled), and stick figures.
-  const heads: Head[] = [];
-  const used = new Set<string>();
-  for (const s of loose) {
-    if (!closedOf(s) || isWriting(s.node) || !reads(s.node, 'rectangle')) continue;
-    const box = boxOf(s.ink, false);
-    if (!box || box.score < BOX_FLOOR) continue;
-    heads.push(headOfBox(s.id, [s.id], [s.mark], box, s.scale, ''));
-  }
-  const openLoose = loose.filter((s) => !closedOf(s) && !writes(s));
-  for (const f of figuresAmong(nodes, openLoose.map((s) => s.id))) {
-    if (f.vertices.length !== 4) continue;
-    const box = boxOf(f.vertices, true);
-    if (!box || box.score < BOX_FLOOR) continue;
-    heads.push(headOfBox(f.id, [...f.ids], [...f.ids], { ...box, score: box.score * (f.confidence / MAX) }, strokes.get(f.ids[0])!.scale, `${count(f.ids.length)} strokes whose ends meet: `));
-    f.ids.forEach((id) => used.add(id));
-  }
-  for (const s of loose) {
-    if (!closedOf(s) || !reads(s.node, 'circle', 0.4) || topOf(s.node)?.type !== 'circle') continue;
-    const fig = figureOf(s, openLoose, used);
-    if (!fig) continue;
-    heads.push(fig);
-    fig.strokes.forEach((id) => used.add(id));
-  }
-  // A box holding another box is a frame, not a participant (the trap: not the role table's word for it).
-  const holds = (a: Head, b: Head) => b.bounds !== a.bounds && sizeOfBounds(b.bounds) < sizeOfBounds(a.bounds) && offBox(centreOf(b.bounds), a.bounds) === 0 && outside(centreOf(b.bounds), a.outline) === 0;
-  const frames = new Set(heads.filter((a) => heads.some((b) => a !== b && holds(a, b))));
-  const candidates = heads.filter((h) => !frames.has(h));
   const least = opts.lifelinesOnly ? 1 : 2;
-  if (candidates.length < least) return null;
 
-  // 2. Lifeline pieces: long lines near plumb, one stroke or dashed.
-  const inHeads = new Set(candidates.flatMap((h) => h.strokes));
-  const pieces: Piece[] = [];
+  // 1. Lifeline pieces first — long lines near plumb, one stroke or dashed — since a sequence diagram has at least two,
+  //    and a participant is only ever what stands over one: the cheap test, before anything is measured as a box.
+  let pieces: Piece[] = [];
   for (const s of loose) {
-    if (inHeads.has(s.id)) continue;
     const p = solidPiece(s);
     if (p) pieces.push(p);
   }
-  // Dashed lines, read once — only where participants might be.
   const lines = dashedLines(state, scope);
   const inLine = new Map<string, DashedLine>();
   for (const l of lines) {
@@ -729,6 +698,54 @@ export function readSequence(state: SessionState, scopeIds?: readonly string[], 
     const p = dashedPiece(l, sc);
     if (p) pieces.push(p);
   }
+  if (pieces.length < least) return null;
+  const tops = pieces.map((p) => p.top);
+
+  // 2. What they hang from: boxes (one stroke, or ruled) and stick figures, each standing over a piece's top.
+  const heads: Head[] = [];
+  const used = new Set<string>();
+  const overTop = (b: Bounds, across: number, below: number, scale: number) => {
+    const cx = (b.minX + b.maxX) / 2, h = b.maxY - b.minY, reach = magnetRadius(0, scale);
+    return tops.some((t) => Math.abs(t.x - cx) <= across + reach && t.y >= b.maxY - 0.5 * h - reach && t.y <= b.maxY + below + reach);
+  };
+  for (const s of loose) {
+    if (!closedOf(s) || isWriting(s.node) || !reads(s.node, 'rectangle')) continue;
+    const b = s.bounds, w = b.maxX - b.minX, h = b.maxY - b.minY;
+    if (!overTop(b, LIFELINE_MIDDLE * w, Math.max(LIFELINE_BELOW * h, magnetRadius(s.size, s.scale)), s.scale)) continue;
+    const box = boxOf(s.ink, false);
+    if (!box || box.score < BOX_FLOOR) continue;
+    heads.push(headOfBox(s.id, [s.id], [s.mark], box, s.scale, ''));
+  }
+  const openLoose = loose.filter((s) => !closedOf(s) && !writes(s));
+  for (const s of loose) {
+    if (!closedOf(s) || !reads(s.node, 'circle', 0.4) || topOf(s.node)?.type !== 'circle') continue;
+    if (!overTop(s.bounds, Math.max(0.8 * s.size, 12 * s.scale), 3.5 * s.size + Math.max(4 * s.size, 70 * s.scale), s.scale)) continue;
+    const fig = figureOf(s, openLoose, used);
+    if (!fig) continue;
+    heads.push(fig);
+    fig.strokes.forEach((id) => used.add(id));
+  }
+  // A box ruled in several strokes, over a piece nothing else stands over: the strokes above that piece's top, read as figures.
+  const hangs = (t: Point) => heads.some((h) => Math.abs(t.x - h.foot.x) <= h.across && t.y >= h.foot.y - 0.5 * h.height && t.y <= h.foot.y + h.below);
+  const orphans = tops.filter((t) => !hangs(t));
+  if (orphans.length) {
+    const near = openLoose.filter((o) => !used.has(o.id) && orphans.some((t) => o.bounds.maxX >= t.x - 250 * o.scale && o.bounds.minX <= t.x + 250 * o.scale && o.bounds.maxY >= t.y - 250 * o.scale && o.bounds.minY <= t.y + 20 * o.scale));
+    for (const f of near.length >= 2 ? figuresAmong(nodes, near.map((o) => o.id)) : []) {
+      if (f.vertices.length !== 4) continue;
+      const box = boxOf(f.vertices, true);
+      if (!box || box.score < BOX_FLOOR) continue;
+      heads.push(headOfBox(f.id, [...f.ids], [...f.ids], { ...box, score: box.score * (f.confidence / MAX) }, strokes.get(f.ids[0])!.scale, `${count(f.ids.length)} strokes whose ends meet: `));
+      f.ids.forEach((id) => used.add(id));
+    }
+  }
+  // A box holding another box is a frame, not a participant (the trap: not the role table's word for it).
+  const holds = (a: Head, b: Head) => b.bounds !== a.bounds && sizeOfBounds(b.bounds) < sizeOfBounds(a.bounds) && offBox(centreOf(b.bounds), a.bounds) === 0 && outside(centreOf(b.bounds), a.outline) === 0;
+  const frames = new Set(heads.filter((a) => heads.some((b) => a !== b && holds(a, b))));
+  const candidates = heads.filter((h) => !frames.has(h));
+  if (candidates.length < least) return null;
+  // A ruled box's own side is no lifeline.
+  const inHeads = new Set(candidates.flatMap((h) => h.strokes));
+  pieces = pieces.filter((p) => !p.strokes.some((id) => inHeads.has(id)));
 
   // 3. Each participant's lifeline: the piece under its foot, then the pieces under that.
   const closedHulls = candidates.map((h) => ({ h, hull: h.outline }));
