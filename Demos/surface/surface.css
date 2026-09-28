@@ -284,6 +284,11 @@ html, body {
 #modelPanel .mpLocal .model .why { color: var(--dim); font-size: 10px; margin-left: auto; }
 #modelPanel .mpLocal .note { color: var(--dim); font-size: 10px; padding: 3px 8px; }
 #modelPanel .mpRemember { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 10.5px; color: var(--dim); cursor: pointer; }
+/* The seat (V1-PLAN J4): Claude Code leads the pane; the door waits under "advanced". */
+#modelPanel .mpSeat .mpItem { padding-left: 8px; }
+#modelPanel .mpAdvanced summary { cursor: pointer; font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--dim); }
+#modelPanel .mpAdvanced[open] summary { margin-bottom: 4px; }
+#modelPanel .mpAdvanced input { margin-top: 6px; }
 #modelPanel .mpRemember input { width: auto; margin: 0; accent-color: var(--gold); }
 
 /* ==========================================================================

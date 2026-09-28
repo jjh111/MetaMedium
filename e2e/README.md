@@ -14,7 +14,7 @@ exits nonzero if anything in it failed.
 
 ```bash
 cd e2e && npm ci && npx playwright install chromium   # once
-node run.mjs            # from anywhere: the default ten (canvas, keep, boards, app, pencil, models, budgets, shard, demo, demo2)
+node run.mjs            # from anywhere: the default eleven (canvas, keep, boards, app, pencil, models, seat, budgets, shard, demo, demo2)
 cd e2e && npm run e2e   # the same thing
 
 npx playwright install webkit                   # once, for WebKit
@@ -41,12 +41,13 @@ guessing. Pick scenarios by name to run one: `node e2e/run.mjs canvas`,
 | `app` | one app address — `app.mjs`, written here: `/app/` installs, opens with the server gone, and is versioned per release | `app/` over the static server, then a server of its own it can take away, then a copy of the site it releases again |
 | `pencil` | pencil and tablet — `pencil.mjs`, written here: the pen and fingers synthesised in the page as iPadOS delivers them, and the keyboard as it tells the page | `Demos/session-engine.html?nosw=1` at 1180 × 820, in one context, reloaded once |
 | `models` | a hosted model is asked, and says why when it cannot be (V1-PLAN J5) — `models.mjs`, written here: the models pane and the field driven with the real pointer against `startModelStub` (`servers.mjs`), an OpenAI-compatible endpoint on 127.0.0.1 answering in OpenRouter's recorded shapes (`metamedium-core/src/llm/fixtures/`); nothing on this machine is probed — Ollama's list is a stand-in in the page, LM Studio does not answer | `app/`, in one context, reloaded once |
+| `seat` | the canvas's seat — `seat.mjs`, written here: Claude Code over MCP as the model the field asks, with a relay of its own, `Demos/mcp.mjs` as the answerer over stdio and `Demos/seat-watch.mjs` beside it | `Demos/session-engine.html?live=claude&relay=…&nosw=1`, in one context, reloaded once, and a second page for *with Claude* |
 | `budgets` | the surface's budgets and the equivalence check — `budgets.mjs`, written here, not a page harness | `Demos/session-engine.html?folder=…`, the bench's boards served from memory, a context each |
 
 `--browser chromium` (the default) or `--browser webkit` picks the engine, and
 the run's `e2e.json` records which as `browser` / `browserVersion`. `smoke` is
 **opt-in**: a bare `node run.mjs` runs the ten Chromium scenarios (`canvas`,
-`keep`, `boards`, `app`, `pencil`, `models`, `budgets`, `shard`, `demo`, `demo2`) and
+`keep`, `boards`, `app`, `pencil`, `models`, `seat`, `budgets`, `shard`, `demo`, `demo2`) and
 nothing else, so the default gate needs no second engine installed. CI's
 `webkit` job runs `smoke`, `pencil` and `keep` on WebKit.
 
@@ -238,6 +239,37 @@ selected box — one reshape, no stroke, no summon, the ink as drawn — and a
 finger laid on another of its handles pans (V1-PLAN E1). What only the glass can say — a real
 Pencil's hover height, a real palm, the real keyboard, Scribble — is
 `QA-v1.md` §A10, by hand on an iPad.
+
+### The canvas's seat: `seat`
+
+`seat.mjs` (V1-PLAN J4) is Claude Code as the model the field asks, with no
+model anywhere. It starts a relay of its own on a free port of 127.0.0.1 —
+never `:8020`, the default, where a room of John's may be; any request a page
+of the scenario makes there is refused before it leaves and counted (J4.8) —
+and on it `Demos/mcp.mjs` as the seat's answerer, spoken to over stdio from the
+script the way Claude Code speaks to it, and `Demos/seat-watch.mjs`, whose
+lines are collected. The models pane probes :11434 and :1234 as it opens;
+there that probe is refused in the page before it leaves, as on a machine with
+neither server, and the gate's guard stands behind it for everything else.
+Twelve records, about thirteen seconds: **J4.0** no room — the pane leads with
+Claude Code and says in one sentence how to reach it, nothing to join; the key
+form no longer offers the door, which stands under *advanced*; **J4.1** in the
+room with Claude's hand present, one tap on *Claude Code — in this room* takes
+the seat, at the front of the models, seeing, local; **J4.2** *What is this?*
+on two boxes parks one brief about them, shown working beside them, the
+watcher prints one line, and `canvas_pending` lists it by the brief's own id
+with the marks and the contract; **J4.2b** `canvas_answer` lands the readings
+as a model's — held, attributed to the seat — and no card is drawn for the
+brief or its reply; **J4.3** *Read the writing* on a word parks a read and the
+hand is handed the word's ink as a PNG; **J4.3b** the transcript lands on the
+word; **J4.4** a refusal is said, *claude would not: …*, and nothing lands;
+**J4.5** a brief nobody answers: Esc with nothing held withdraws it and the
+hand no longer lists it; **J4.5b** the watcher printed one line per brief,
+four, and nothing else; **J4.6** a reload — a new sitting — finds the answered
+brief still paired by its own id, the seat's readings still on the boxes;
+**J4.7** *with Claude* in the Live pane joins the room and takes the seat in
+one act, *Claude is here and will read for you*; **J4.8** nothing reached
+`:8020`.
 
 ## What it refuses to do
 

@@ -3,7 +3,7 @@
 //   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards, packs);
 //   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
 // Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
-//   boardOnScreenName, resetBoard), models (agents), teach (teachPanel), handwriting (autoRead), packs (packsFace); the page's
+//   boardOnScreenName, resetBoard), models (agents), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude); the page's
 //   version from its <meta name="metamedium-version"> (V1-PLAN R7), said at the head of the help pane.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
@@ -78,12 +78,9 @@
   const livePanel = document.getElementById('livePanel');
   ui.pane(livePanel, 'live', () => closePanel(livePanel, tiles.live));
   tiles.live.onclick = () => { togglePanel(livePanel, tiles.live); if (!livePanel.hasAttribute('hidden')) { const r = document.getElementById('liveRoom'); if (!r.value) r.value = folder.how === 'live' ? folder.name : 'table'; document.getElementById('liveName').value = prefs.get('hand-name', '') || ''; } };
-  // The room Claude Code joins (Demos/mcp.mjs, SURFACE-v10-PLAN D1): room "claude" through the relay the MCP hand starts on this machine.
-  document.getElementById('liveClaude').onclick = () => {
-    document.getElementById('liveRoom').value = 'claude';
-    document.getElementById('liveRelay').value = 'http://127.0.0.1:8020';
-    document.getElementById('liveJoin').click();
-  };
+  // The room Claude Code joins (Demos/mcp.mjs, SURFACE-v10-PLAN D1) — room "claude" through the relay
+  // on this machine, or the one typed — and the seat, in one act (V1-PLAN J4, 24-seat.js).
+  document.getElementById('liveClaude').onclick = () => { withClaude(); };
   document.getElementById('liveJoin').onclick = () => {
     const room = document.getElementById('liveRoom').value.trim();
     const name = document.getElementById('liveName').value.trim();

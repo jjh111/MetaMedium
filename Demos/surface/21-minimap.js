@@ -24,9 +24,11 @@
   function miniItems(s) {
     const key = logKey();
     if (!paintReference && miniSeen.key === key) return miniSeen;
-    const arts = new Set(s.artifacts), answers = new Set(s.explanations);
+    // The seat's traffic is no card on the board, so no box here either (V1-PLAN J4).
+    const said = s.explanations.filter((id) => { const n = s.nodes.get(id); return !!n && !MM.isSeatTraffic(n, s.nodes); });
+    const arts = new Set(s.artifacts), answers = new Set(said);
     const items = [];
-    for (const id of s.contentIds.concat(s.explanations)) {
+    for (const id of s.contentIds.concat(said)) {
       const b = MM.boundsOf(s.nodes.get(id));
       if (b) items.push({ id: id, b: b, artifact: arts.has(id), answer: answers.has(id) });
     }

@@ -1,7 +1,7 @@
 // ===== handwriting =====
 // Provides: handwriting: inkImage, isWriting, isRead, readOne, readLine (a line of writing as one image), readWriting; the auto-read preference (off by default);
 //   (V1-PLAN J5) whyNoReader — which joined models cannot read writing, and why — and keepRead, a read kept for a model that can see.
-// Uses: core (prefs), models (agents, withWork, factsOf, keepAsk, noteOutcome, modelWords), render, input (say).
+// Uses: core (prefs), models (agents, withWork, factsOf, keepAsk, noteOutcome, modelWords), render, input (say), seat (isSeatAgent: the seat reads while seated).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -23,6 +23,9 @@
    */
   function readers() {
     const sees = seeing();
+    // The seat taken is a deliberate act that says *ask me* (V1-PLAN J4): Claude reads.
+    const seat = sees.find(isSeatAgent);
+    if (seat) return [seat];
     if (sees.length <= 1) return sees;
     const size = (a) => { const m = /(\d+(?:\.\d+)?)\s*b\b/i.exec(a.config.model || ''); return m ? parseFloat(m[1]) : Infinity; };
     return [sees.slice().sort((a, b) => size(a) - size(b))[0]];
@@ -116,7 +119,7 @@
     if (!image) return false;
     const first = nodes[0];
     who.forEach((agent) => {
-      withWork('write:' + agent.id + ':' + first.id, ids, modelWords(agent) + ' · reading the line', agent.read({ nodeId: first.id, image: image, at: Date.now(), hold: false })).then((res) => {
+      withWork('write:' + agent.id + ':' + first.id, ids, modelWords(agent) + ' · reading the line', agent.read({ nodeId: first.id, about: nodes.map((n) => n.id), image: image, at: Date.now(), hold: false })).then((res) => {
         noteOutcome(agent, res.ok, res.ok ? 'read “' + res.transcripts[0].text + '”' : res.error);
         if (res.ok) {
           const top = res.transcripts[0];

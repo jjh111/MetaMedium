@@ -1140,7 +1140,7 @@
   /** Measure one card: its lines at the chrome's own size, and the box they need. */
   function measureCard(s, id) {
     const node = s.nodes.get(id);
-    if (!node || MM.getRep(node, 'erased')) return null;
+    if (!node || MM.getRep(node, 'erased') || MM.isSeatTraffic(node, s.nodes)) return null;
     const data = MM.explanationOf(node);
     const anchor = MM.boundsOf(node);
     if (!data || !anchor) return null;

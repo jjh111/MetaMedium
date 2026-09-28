@@ -337,20 +337,22 @@
 
   // --- Joining, and remembering ---
   // `facts`: what its provider said it can do, or why that is a guess (J5) — the row's tooltip, and the
-  // reason a model that reads text only gives when writing is to be read.
-  function join(config, pick, facts) {
+  // reason a model that reads text only gives when writing is to be read. `made`: a participant made
+  // elsewhere — the seat (24-seat.js, J4) — joins the same way.
+  function join(config, pick, facts, made) {
     if (isJoined(config.baseUrl, config.model)) {
       mpStatus.textContent = MM.modelWords(config) + ' is already here.';
       return null;
     }
     // Several models may run at once — that is the point. Every model is
     // tier 2; local or hosted is a cost the router pays attention to. Each is
-    // asked through a transport that keeps its last call for its row (J5).
+    // asked through a transport that keeps its last call for its row (J5); the
+    // seat brings its own transport, and its row keeps what noteOutcome says.
     const holder = {};
     const send = recording(holder);
-    const agent = MM.createAgentParticipant(session, config, Date.now(), { transport: send });
+    const agent = made || MM.createAgentParticipant(session, config, Date.now(), { transport: send });
     holder.agent = agent;
-    sendOf.set(agent.id, send);
+    if (!made) sendOf.set(agent.id, send);
     if (facts) factsOf.set(agent.id, facts);
     agents.push(agent);
     // The pick remembers what the provider said (whether it sees, what it is called) — never the key, which is its own entry.

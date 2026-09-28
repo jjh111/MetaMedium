@@ -12,6 +12,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startRelay } from './relay.mjs';
 import { relayTransport } from './live-node.mjs';
+import { inkPNG } from './ink-png.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const MM = await import(pathToFileURL(path.join(here, 'metamedium-core.node.mjs')).href);
@@ -71,7 +72,9 @@ try {
   child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
   const list = await rpc('tools/list', {});
   const names = (list.result && list.result.tools || []).map((t) => t.name);
-  check('eight tools, each a verb a hand has', names.length === 8 && ['canvas_look', 'canvas_see', 'canvas_draw', 'canvas_say', 'canvas_propose', 'canvas_label', 'canvas_transcribe', 'canvas_write'].every((n) => names.includes(n)), names);
+  check('eight tools, each a verb a hand has', ['canvas_look', 'canvas_see', 'canvas_draw', 'canvas_say', 'canvas_propose', 'canvas_label', 'canvas_transcribe', 'canvas_write'].every((n) => names.includes(n)), names);
+  // …and the seat's two (V1-PLAN J4): the briefs parked for Claude Code, and the answer to one.
+  check('ten tools: the hand\'s eight and the seat\'s two — canvas_pending and canvas_answer', names.length === 10 && ['canvas_pending', 'canvas_answer'].every((n) => names.includes(n)), names);
 
   // The tab draws first: a box, in its own log.
   const box = MM.strokeFor({ shape: 'rectangle', x: 100, y: 100, w: 200, h: 120 });
@@ -355,8 +358,164 @@ try {
     await wait(100);
     again.child.kill();
   }
+
+  // ===== The seat: Claude Code is the canvas's model (V1-PLAN J4) =============
+  // A page seats Claude Code — core's seat participant — and asks it what two
+  // boxes are, what a word says, and something it will not answer. Every
+  // question is PARKED in the room as a brief (an answer on the explanation
+  // plane whose question is `brief`); the hand lists it with canvas_pending and
+  // answers with canvas_answer, by the brief node's own id (L2a); and the page
+  // takes each answer exactly as it takes a model's — the same prompts, the
+  // same parsers, the same propose channel. Beside them the watcher, a silent
+  // reader, prints one line per brief parked and nothing else, which is what
+  // wakes a Claude Code session.
+  await seatCases();
 } catch (err) {
   check('the run finished', false, err.message);
+}
+
+async function seatCases() {
+  if (typeof MM.createSeatParticipant !== 'function' || typeof MM.pendingBriefs !== 'function') {
+    check('core offers the seat — createSeatParticipant, seatBriefs, pendingBriefs', false, { createSeatParticipant: typeof MM.createSeatParticipant, pendingBriefs: typeof MM.pendingBriefs });
+    return;
+  }
+  // The watcher, started before anything is asked: it must say nothing until a brief is parked.
+  const watchLines = [];
+  const watch = spawn(process.execPath, [path.join(here, 'seat-watch.mjs')], { env: { ...process.env, MM_ROOM: ROOM, MM_RELAY: RELAY }, stdio: ['ignore', 'pipe', 'pipe'] });
+  let watchBuf = '';
+  watch.stdout.on('data', (d) => { watchBuf += d; let i; while ((i = watchBuf.indexOf('\n')) >= 0) { const line = watchBuf.slice(0, i); watchBuf = watchBuf.slice(i + 1); if (line.trim()) watchLines.push(line); } });
+  watch.stderr.on('data', (d) => process.stderr.write('  [watch] ' + d));
+  watch.on('error', (err) => watchLines.push('(the watcher did not start: ' + err.message + ')'));
+
+  // A page in the room, the way the surface is one (17-folder.js, openLive): its
+  // log named for its sitting, the room's lines merged as they land (LiveMerge),
+  // and its own log sent whenever it changes.
+  const pageMe = 'page~1';
+  const store = new MM.LiveStore(relayTransport(RELAY, ROOM), pageMe, ROOM);
+  const session = MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG, logName: pageMe });
+  const merger = new MM.LiveMerge(session, pageMe);
+  let merging = false, mergeQueued = false;
+  store.subscribe(() => {
+    if (mergeQueued) return;
+    mergeQueued = true;
+    queueMicrotask(() => { mergeQueued = false; merging = true; try { merger.sync(store.heldLogs()); } finally { merging = false; } });
+  });
+  session.subscribe(() => { if (!merging) void store.publish(store.ownLog(session.getEvents())); });
+  store.hello();
+  const seat = MM.createSeatParticipant(session, Date.now(), { baseUrl: RELAY });
+  try {
+    const settled = (p, ms) => Promise.race([p, wait(ms || 8000).then(() => ({ ok: false, error: 'the page never heard an answer' }))]);
+    const keysIn = (text) => [...String(text).matchAll(/^brief (\S+) · /gm)].map((m) => m[1]);
+    const pendingText = async (want) => {
+      let t = '';
+      for (let i = 0; i < 40; i++) { t = textOf(await call('canvas_pending', {})); if (want(t)) break; await wait(100); }
+      return t;
+    };
+    await wait(300);
+    check('the watcher says nothing while no brief is parked', watchLines.length === 0, watchLines);
+
+    // ---- What is this? on two boxes ----
+    const t0 = Date.now();
+    const boxA = session.addStroke(MM.strokeFor({ shape: 'rectangle', x: 100, y: 1300, w: 160, h: 110 }), t0, undefined, 1);
+    const boxB = session.addStroke(MM.strokeFor({ shape: 'rectangle', x: 320, y: 1300, w: 160, h: 110 }), t0 + 1, undefined, 1);
+    check('the seat joins the page\'s session as a model that sees, on this machine', session.getState().participants.includes(seat.id) && seat.config.vision === true && MM.providerLocality(seat.config) === 'local', seat.config);
+    const asking = seat.interpret([boxA, boxB], Date.now());
+    const parked = seat.waiting()[0];
+    check('What is this? parks a brief in the page\'s own log, about the two boxes — nothing is posted anywhere but the room',
+      !!parked && MM.pendingBriefs(session.getState()).some((b) => b.key === parked.key && b.ask === 'what' && b.about.join() === [boxA, boxB].join()),
+      { waiting: seat.waiting(), pending: MM.pendingBriefs(session.getState()).map((b) => ({ key: b.key, ask: b.ask, about: b.about })) });
+    const p1 = await pendingText((t) => parked && t.includes(parked.key));
+    check('canvas_pending lists it: the brief\'s own id as its key, what was asked, the marks it is about with their ids, and the contract to answer in',
+      !!parked && keysIn(p1)[0] === parked.key && /what is this/.test(p1) && p1.includes(boxA) && p1.includes(boxB) && /Reply with ONLY a JSON array/.test(p1), p1.slice(0, 900));
+    await until(() => watchLines.length >= 1, 4000);
+    check('the watcher prints one line for it — the key and what was asked', watchLines.length === 1 && !!parked && watchLines[0].includes(parked.key) && /what is this/.test(watchLines[0]), watchLines);
+    const looked = textOf(await call('canvas_look', {}));
+    check('canvas_look says a brief waits, and never prints its prompt', /brief[^\n]*what is this/.test(looked) && /canvas_pending/.test(looked) && !/Reply with ONLY a JSON array/.test(looked), looked.split('\n').filter((l) => /brief/.test(l)));
+    const bad = await call('canvas_answer', { key: parked ? parked.key : '', reply: 'a pair, I think' });
+    check('a reply the page could not read is not sent: canvas_answer says what the page reads, and the brief still waits',
+      /JSON array/.test(textOf(bad)) && /nothing was sent/.test(textOf(bad)) && !!parked && keysIn(textOf(await call('canvas_pending', {}))).includes(parked.key), textOf(bad));
+    const nobody = await call('canvas_answer', { key: 'explanation:nobody:1', reply: [] });
+    check('an answer to a brief that is not waiting is said, not sent', /no brief “explanation:nobody:1” is waiting/.test(textOf(nobody)), textOf(nobody));
+    const ans = await call('canvas_answer', { key: parked ? parked.key : '', reply: [{ label: 'pair of cards', confidence: 0.82, reasoning: 'two boxes of one size, side by side on one band' }, { label: 'two windows', confidence: 0.4, reasoning: 'the same boxes, read as a facade' }] });
+    check('canvas_answer sends it, by the brief\'s own id', /answered/.test(textOf(ans)), textOf(ans));
+    const got = await settled(asking);
+    const st = session.getState();
+    const reads = MM.interpretationsOf(st.nodes.get(boxA), st.nodes).filter((r) => r.sourceName === MM.SEAT_NAME);
+    check('the page takes it exactly as a model\'s: parsed by the same parser, held on the group as readings attributed to the seat, never blessed',
+      got.ok && got.readings.length === 2 && got.readings[0].label === 'pair of cards' && reads.some((r) => /pair-of-cards|pair of cards/.test(r.label) && !r.blessed),
+      { got, reads: reads.map((r) => ({ label: r.label, weight: r.weight, source: r.sourceName, blessed: r.blessed })) });
+    const paired = MM.seatBriefs(st).find((b) => parked && b.key === parked.key);
+    check('on the page the brief stands answered, paired with the reply by the brief\'s own id', !!paired && !!paired.reply && paired.reply.refused === null && MM.pendingBriefs(st).length === 0,
+      paired && { key: paired.key, reply: paired.reply && { id: paired.reply.id, refused: paired.reply.refused } });
+
+    // ---- Read the writing on a word: the hand gets the ink as a picture ----
+    const humps = 7, n = humps * 14;
+    const cursive = Array.from({ length: n + 1 }, (_, i) => { const t = i / n, a = t * humps * Math.PI; return { x: 100 + 260 * t, y: 1520 + 20 - 20 * Math.abs(Math.sin(a)) * (0.7 + 0.3 * Math.cos(a * 0.37)) }; });
+    const word = session.addStroke(cursive, Date.now(), undefined, 1);
+    const image = 'data:image/png;base64,' + inkPNG([cursive], { size: 320 }).png.toString('base64');
+    const reading = seat.read({ nodeId: word, image, at: Date.now() });
+    const readParked = seat.waiting()[0];
+    const p2res = await (async () => { for (let i = 0; i < 40; i++) { const r = await call('canvas_pending', {}); if (readParked && textOf(r).includes(readParked.key)) return r; await wait(100); } return call('canvas_pending', {}); })();
+    const p2 = textOf(p2res);
+    const pic = (p2res.content || []).find((c) => c.type === 'image');
+    const picBuf = pic && Buffer.from(pic.data, 'base64');
+    check('Read the writing parks a read: canvas_pending says so and hands over the word\'s ink as a PNG, as canvas_see does',
+      !!readParked && readParked.ask === 'read' && /read the writing/.test(p2) && p2.includes(word) && !!picBuf && picBuf[0] === 0x89 && picBuf.toString('ascii', 1, 4) === 'PNG',
+      { parked: readParked, text: p2.slice(0, 400), image: !!pic });
+    // Answered once the watcher has said so — a session answers after it is woken.
+    await until(() => watchLines.length >= 2, 4000);
+    await call('canvas_answer', { key: readParked ? readParked.key : '', reply: [{ text: 'hello', confidence: 0.9 }, { text: 'hallo', confidence: 0.3 }] });
+    const got2 = await settled(reading);
+    const wordNode = session.getState().nodes.get(word);
+    check('the transcript lands on the word, attributed to the seat', got2.ok && MM.transcriptOf(wordNode) === 'hello', { got: got2, transcripts: MM.transcriptsOf(wordNode) });
+
+    // ---- A question, answered in prose, lands as the seat's own card ----
+    const asked = seat.ask('why are these one thing?', [boxA, boxB], Date.now());
+    const kq = seat.waiting()[0];
+    const pq = await pendingText((t) => kq && t.includes(kq.key));
+    await until(() => watchLines.length >= 3, 4000);
+    const notProse = await call('canvas_answer', { key: kq ? kq.key : '', reply: { answer: 'they touch' } });
+    await call('canvas_answer', { key: kq ? kq.key : '', reply: 'They are one size and sit on one band, a gap apart.' });
+    const gotQ = await settled(asked);
+    const card = gotQ.ok && session.getState().nodes.get(gotQ.explanationId);
+    const cardData = card && MM.explanationOf(card);
+    check('ask: is parked as a question and answered in prose — an object refused first — and lands as the seat\'s own card beside the boxes',
+      !!kq && /ask: why are these one thing\?/.test(pq) && /in prose/.test(textOf(notProse)) && gotQ.ok && !!cardData && cardData.text === 'They are one size and sit on one band, a gap apart.'
+        && card.edges.some((e) => e.rel === 'made-by' && e.to === seat.id) && !MM.isSeatTraffic(card, session.getState().nodes),
+      { pending: pq.slice(0, 200), notProse: textOf(notProse), got: gotQ });
+
+    // ---- A refusal is said ----
+    const third = seat.interpret([boxA, boxB], Date.now());
+    const k3 = seat.waiting()[0];
+    await pendingText((t) => k3 && t.includes(k3.key));
+    await until(() => watchLines.length >= 4, 4000);
+    const edgesBefore = session.getState().nodes.get(boxA).edges.length;
+    const ref = await call('canvas_answer', { key: k3 ? k3.key : '', refuse: 'two boxes are not enough to say what they are' });
+    const got3 = await settled(third);
+    check('a refusal is said in the page\'s words — who would not, and why — and nothing lands',
+      /refused/.test(textOf(ref)) && !got3.ok && /smoke would not: two boxes are not enough to say what they are/.test(got3.error || '') && session.getState().nodes.get(boxA).edges.length === edgesBefore,
+      { hand: textOf(ref), page: got3 });
+
+    // ---- A brief nobody answers can be withdrawn ----
+    const fourth = seat.interpret([boxA], Date.now());
+    const k4 = seat.waiting()[0];
+    await pendingText((t) => k4 && t.includes(k4.key));
+    // Heard by the watcher before it is withdrawn, so its line is not a race.
+    await until(() => watchLines.length >= 5, 4000);
+    const cancelled = !!k4 && seat.cancel(k4.key, 'stopped');
+    const got4 = await settled(fourth, 3000);
+    await wait(300);
+    const p4 = textOf(await call('canvas_pending', {}));
+    check('a brief withdrawn is given up on at once and leaves the hand\'s list', cancelled && !got4.ok && /stopped/.test(got4.error || '') && !!k4 && !p4.includes(k4.key) && seat.waiting().length === 0,
+      { cancelled, got: got4, pending: p4.slice(0, 200) });
+
+    await wait(400);
+    check('the watcher printed one line per brief parked — five — and nothing else', watchLines.length === 5 && watchLines.every((l) => /^brief \S+ · /.test(l)) && new Set(watchLines.map((l) => l.split(' ')[1])).size === 5, watchLines);
+  } finally {
+    seat.leave();
+    store.close();
+    watch.kill();
+  }
 }
 child.stdin.end();
 await wait(200);

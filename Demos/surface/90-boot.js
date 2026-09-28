@@ -89,6 +89,8 @@
     openStore: (store, how, name) => openStore(store, how, name),
     openGit: (spec, token, remember) => openGit(spec, token, remember),
     openLive: (room, opts) => openLive(room, opts), mergeLive: mergeLive, handColour: handColour,
+    // The seat (V1-PLAN J4), for tests: where it stands, and the acts.
+    seat: seatState, joinSeat: joinSeat, leaveSeat: leaveSeat, withClaude: withClaude,
     folder: () => folder,
     setParticipant: setParticipant,
     forgetLocalLog: forgetLocalLog,
