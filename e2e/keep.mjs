@@ -207,8 +207,11 @@ function fillBrowserStorage() {
 }
 
 /**
- * The browser's storage full, for real: browser storage filled, and the
- * origin's quota taken to nothing, so IndexedDB refuses as a full disk does.
+ * The browser's storage full, for real: browser storage filled to its limit,
+ * and the origin's quota taken to nothing, so IndexedDB refuses as a full disk
+ * does. The quota is taken down BEFORE the page first opens its store: Chromium
+ * works out the room a store has when it first opens it and does not look
+ * again while there is room, so taken down later it would not be felt.
  */
 export async function quotaTest(browser, servers, ctx) {
   const { freshContext, steps } = ctx;
@@ -220,23 +223,26 @@ export async function quotaTest(browser, servers, ctx) {
   let cell = 0;
   const drawn = []; // { sig, box }
   const draw = async () => { const box = cellBox(cell++, rand); const pts = boxPath(box); await drawPath(page, pts); drawn.push({ sig: sig(pts), box }); return pts; };
+  const waitSaid = async (re, want, ms = 3000) => {
+    let said = await statusText(page);
+    for (let i = 0; i < ms / 50 && re.test(said) !== want; i++) { await sleep(50); said = await statusText(page); }
+    return said;
+  };
   try {
-    await page.goto(url, { waitUntil: 'load', timeout: 60000 });
-    await waitReady(page);
-    await draw();
-    await sleep(1200);
-    const calm = await statusText(page);
-    check('Q1. a board that saves says nothing about saving', !/not saved/.test(calm), { status: calm });
-
     const cdp = await guards.context.newCDPSession(page);
+    await page.goto(`${servers.staticOrigin}/404.html`, { waitUntil: 'load' });
     const filled = await page.evaluate(fillBrowserStorage);
     await cdp.send('Storage.overrideQuotaForOrigin', { origin: servers.staticOrigin, quotaSize: 1 });
+    await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+    await waitReady(page);
+    const canFolder = await page.evaluate(() => !!window.showDirectoryPicker);
+    const atOpen = await waitSaid(/not saved/, true);
     await draw();
-    let said = '';
-    for (let i = 0; i < 60 && !/not saved/.test(said); i++) { await sleep(50); said = await statusText(page); }
-    check('Q2. storage full: said at once in the status line, in plain words, with the way out — export the log, open a folder',
-      /not saved — the browser's storage for this page is full/.test(said) && /export the log/.test(said) && /open a folder/.test(said),
-      { status: said, filledChars: filled });
+    const said = await waitSaid(/not saved/, true);
+    const full = /not saved — the browser's storage for this page is full/;
+    check('Q1. storage full: said at once in the status line, in plain words, with the way out — export the log, open a folder',
+      full.test(atOpen) && full.test(said) && /export the log/.test(said) && /open a folder/.test(said) === canFolder,
+      { atOpen, status: said, filledChars: filled, canFolder });
 
     // Another stroke, and a scratch that erases a box (a message of its own in the line): still said.
     await draw();
@@ -252,24 +258,27 @@ export async function quotaTest(browser, servers, ctx) {
     await drawPath(page, scratch);
     await sleep(300);
     const still = await statusText(page);
-    check('Q3. it keeps being said while saves fail — after another stroke, and alongside the line\'s own news (an erase)',
-      /not saved — the browser's storage for this page is full/.test(still), { status: still });
+    check('Q2. it keeps being said while saves fail — after another stroke, and alongside the line\'s own news (an erase)',
+      full.test(still) && /erased 1 mark/.test(still), { status: still });
 
     // Room again: the next save succeeds, and the line says so and lets it go.
     await page.evaluate(() => localStorage.removeItem('mm-test-filler'));
     await cdp.send('Storage.overrideQuotaForOrigin', { origin: servers.staticOrigin });
     await sleep(1700);
     await draw();
-    let after = await statusText(page);
-    for (let i = 0; i < 80 && /not saved/.test(after); i++) { await sleep(50); after = await statusText(page); }
-    check('Q4. once a save succeeds the line stops saying it', !/not saved/.test(after), { status: after });
+    const after = await waitSaid(/not saved/, false, 4000);
+    check('Q3. once a save succeeds the line stops saying it, and says it saved', !/not saved/.test(after) && /saved/.test(after), { status: after });
 
     await page.reload({ waitUntil: 'load' });
     await waitReady(page);
     const back = await strokesOnBoard(page);
     const want = drawn.length + 1; // the boxes and the scratch — its erase is a reading of the log, not a removal from it
-    check(`Q5. reloaded: everything drawn while saves were failing is on the board (${back.length} of ${want} strokes)`,
+    check(`Q4. reloaded: everything drawn while saves were failing is on the board (${back.length} of ${want} strokes)`,
       back.length === want && drawn.every((d) => back.some((o) => sameSig(o, d.sig))), { got: back.length, want });
+    await draw();
+    await sleep(1200);
+    const calm = await statusText(page);
+    check('Q5. a board that saves says nothing about saving', !/not saved/.test(calm), { status: calm });
   } catch (err) {
     check('Q. the storage-full test ran to its end', false, { error: String(err && err.stack ? err.stack : err) });
     await ctx.screenshot(page, 'keep-quota');
@@ -295,12 +304,40 @@ export async function blockedTest(browser, servers, ctx) {
   try {
     await page.goto(url, { waitUntil: 'load', timeout: 60000 });
     await waitReady(page);
+    const canFolder = await page.evaluate(() => !!window.showDirectoryPicker);
     await drawPath(page, boxPath({ x: 600, y: 300, w: 60, h: 40 }));
+    await drawPath(page, boxPath({ x: 760, y: 300, w: 60, h: 40 }));
     let said = '';
     for (let i = 0; i < 60 && !/not saved/.test(said); i++) { await sleep(50); said = await statusText(page); }
+    // "open a folder" is offered where the browser can open one (Chromium) and nowhere else.
     check('B1. a store the browser will not let the page use (a private window, blocked site data): said at once, with the way out',
-      /not saved — this browser will not let the page keep anything/.test(said) && /export the log/.test(said) && /open a folder/.test(said),
-      { status: said });
+      /not saved — this browser will not let the page keep anything/.test(said) && /export the log/.test(said) && /open a folder/.test(said) === canFolder,
+      { status: said, canFolder });
+
+    // The way out, taken: the whole log as a file.
+    const events = await page.evaluate(() => window.__mm.session.getEvents().length);
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }), page.click('#status button[data-way="export"]')]);
+    const { readFileSync } = await import('node:fs');
+    const file = readFileSync(await download.path(), 'utf8');
+    const lines = file.split('\n').filter(Boolean);
+    check(`B2. "export the log" in the line hands over the whole board as a file (${lines.length} of ${events} events, ${download.suggestedFilename()})`,
+      download.suggestedFilename() === 'canvas.jsonl' && lines.length === events && lines.every((l) => { try { return !!JSON.parse(l).type; } catch (e) { return false; } }),
+      { lines: lines.length, events });
+
+    // The other way out: a folder keeps the board from now on — carried in, not replaced.
+    // (The picker is the browser's own dialog; the gate hands the surface a folder held in memory.)
+    const kept = await page.evaluate(async () => {
+      const mm = window.__mm;
+      const store = new mm.MM.MemoryStore();
+      const before = mm.session.getEvents().filter((e) => e.type === 'stroke').length;
+      await mm.keepBoardIn(store, 'folder', 'rescue');
+      await mm.saveNow();
+      const logs = await store.readLogs();
+      const mine = Object.values(logs)[0] || [];
+      return { before, after: mm.session.getEvents().filter((e) => e.type === 'stroke').length, inFolder: mine.filter((e) => e.type === 'stroke').length, status: document.getElementById('status').textContent };
+    });
+    check(`B3. "open a folder" carries the board into the folder — ${kept.inFolder} of ${kept.before} strokes in its log — and the line stops saying it is not saved`,
+      kept.before === 2 && kept.after === 2 && kept.inFolder === 2 && !/not saved/.test(kept.status) && /rescue/.test(kept.status), kept);
   } catch (err) {
     check('B. the blocked-store test ran to its end', false, { error: String(err && err.stack ? err.stack : err) });
     await ctx.screenshot(page, 'keep-blocked');

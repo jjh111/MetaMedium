@@ -120,26 +120,27 @@
    * events stand on the board, and the journal writes them as the first whole log, with the meta
    * record in the same transaction. Until that lands the old copy is left where it is
    * (`meta` rides with the record, and the adapter removes the copy when it hears it landed).
-   * @returns {{ events: Array, from: string, arm: object|null, damaged: object|null }}
+   * @returns {{ events: Array, from: string, arm: object|null, damaged: object|null, lastSeq: number }}
    */
   function openPlan(o) {
     const legacy = legacyEventsOf(o.legacy);
     if (o.fallback) {
       // Browser storage holds the log it held: the journal starts from it, and writes what follows.
-      return { events: legacy || [], from: legacy && legacy.length ? 'browser storage' : 'nothing', arm: { seq: 0, chain: 0, sinceFull: 0, whole: false }, damaged: null };
+      return { events: legacy || [], from: legacy && legacy.length ? 'browser storage' : 'nothing', arm: { seq: 0, chain: 0, sinceFull: 0, whole: false }, damaged: null, lastSeq: 0 };
     }
     const fold = journalFold(o.records || []);
     const opened = !!o.meta || (o.records || []).length > 0;
     const damaged = fold.skipped.length || fold.bad ? { skipped: fold.skipped.length, bad: fold.bad } : null;
     if (!opened) {
       const events = legacy || [];
-      if (!o.owner) return { events, from: events.length ? 'browser storage' : 'nothing', arm: null, damaged: null };
+      if (!o.owner) return { events, from: events.length ? 'browser storage' : 'nothing', arm: null, damaged: null, lastSeq: fold.lastSeq };
       return {
         events,
         from: events.length ? 'browser storage' : 'nothing',
         // Nothing is in the store yet: the whole log is what it must hear first.
         arm: { seq: fold.lastSeq, chain: 0, sinceFull: 0, whole: true, meta: { v: 1, created: o.now || 0, imported: legacy ? legacy.length : 0 } },
         damaged: null,
+        lastSeq: fold.lastSeq,
       };
     }
     return {
@@ -147,6 +148,7 @@
       from: 'store',
       arm: o.owner ? { seq: fold.lastSeq, chain: fold.chain, sinceFull: fold.sinceFull, whole: !!damaged } : null,
       damaged,
+      lastSeq: fold.lastSeq,
     };
   }
 

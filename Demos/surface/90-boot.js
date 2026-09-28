@@ -58,6 +58,8 @@
     setParticipant: setParticipant,
     forgetLocalLog: forgetLocalLog,
     saveNow: saveNow,
+    // The board this browser keeps (V1-PLAN R3), for tests: its state, what its store holds, and the way out into a folder.
+    board: boardState, boardRecords: () => (board.backend ? board.backend.read() : Promise.resolve(null)), keepBoardIn: keepBoardIn,
     setViewMode: setViewMode, viewMode: () => viewMode, focusOn: focusOn,
     // Frames, for tests: the wired code a member renders with, and a frame as files.
     wiredCodeOf: (id) => wiredCodeOf(session.getState(), id),
@@ -74,15 +76,28 @@
   };
 
 
+  // The board this browser keeps hears every change FIRST, before the paint:
+  // a release on a big board paints for seconds, and the record of the stroke
+  // must be the browser's before then (V1-PLAN R3, the kill test).
+  session.subscribe(persistBoard);
   session.subscribe(render);
   const replayUrl = params.get('replay');
+  const mode = boardMode();
+  if (mode === 'off') board.journal.off();
   if (!replayUrl) {
-    // Last time's board comes back from browser storage; a folder or a site
-    // named in the URL is opened as the canvas instead.
-    const restored = restoreLocalLog();
-    restoreMark();
-    rejoinRemembered();
-    if (restored) flash('your last board is back — Reset starts a fresh one');
+    // Last time's board comes back from the browser (IndexedDB — a moment,
+    // not at once); a folder, a repository or a room named in the URL is the
+    // canvas instead, and this page keeps no board of its own.
+    const settle = (restored) => {
+      restoreMark();
+      rejoinRemembered();
+      if (restored) flash('your last board is back — Reset starts a fresh one');
+    };
+    if (mode === 'restore') openBoard(mode).then(settle, () => settle(false));
+    else {
+      if (mode === 'fresh') openBoard(mode);
+      settle(false);
+    }
     if (params.get('folder')) openStatic(params.get('folder'));
     else if (params.get('git')) openGit(params.get('git'));
     else if (params.get('live')) openLive(params.get('live'), params.get('relay') ? { relay: params.get('relay') } : {});
