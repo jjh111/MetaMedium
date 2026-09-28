@@ -1748,8 +1748,8 @@ whole; **emptying the trash is its own act, said plainly before it happens**
 undone.*), a second, deliberate tap; and a board another tab holds is never
 emptied out from under it (its lock is taken for the delete, and the pane says
 why it stayed). **Reset** is a fresh board under the same name, what the old
-one held in the trash — never one tap from losing it (it supersedes the handler
-`07-input.js` still sets; the old one emptied the board). **`?board=<id>`**
+one held in the trash — never one tap from losing it (`20-controls.js`; the
+old handler in `07-input.js`, which emptied the board, is gone). **`?board=<id>`**
 opens a board; with none, the board opened last; an id this browser does not
 hold is said. The title carries the name, the address the id, and **the view
 comes back per board** (zoom and pan: a device preference per board id, not the

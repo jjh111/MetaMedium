@@ -2610,9 +2610,6 @@
     else if (act === 'behave-drop') session.behave({ nodeId: id, behaviour: { terms: [{ verb: 'wander', weight: 1 }, { verb: 'hold', weight: 0.35 }], source: 'hand' }, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() });
     else session.snap({ ids: [id], mode: 'raw', at: Date.now() });
   });
-  // Reset is a fresh board: what the browser kept goes too, or the reload would
-  // bring it back — and the reload waits until it has gone.
-  document.getElementById('resetBtn').onclick = () => { forgetLocalLog().then(() => location.reload()); };
 
   // The status line says ONE thing: the last thing that happened, for a
   // while, then the standing state. `say` is for outcomes worth reading
@@ -9666,8 +9663,7 @@
 
   tiles.theme.onclick = () => setThemeMode(THEME_MODES[(THEME_MODES.indexOf(themeMode) + 1) % THEME_MODES.length]);
   // Reset is a fresh board, never one tap from losing this one (V1-PLAN R1): what the board on screen
-  // holds goes to the trash, whole. This supersedes the handler 07-input.js set earlier in the build,
-  // which emptied the board in the browser and reloaded — one tap from losing it.
+  // holds goes to the trash, whole.
   if (tiles.reset) tiles.reset.onclick = () => { closeCC(); resetBoard(); };
   // Until a pen is seen it flips the side, as it always did; after, one word of its face a tap (07-hand.js, nextHand).
   tiles.hand.onclick = () => { const n = nextHand(hand, draws); if (n.draws !== draws) setDraws(n.draws); setHand(n.side); };
