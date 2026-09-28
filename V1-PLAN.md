@@ -250,8 +250,8 @@ suite and the gate green, `master` fast-forwarded and pushed.
 | **0. Make week 1 whole** — ✅ done on `w2`, 27 Sep (on `master` when John lands it, L4) | L1 ids that hold · L1b one event, applied once · L2a the shard pairs by id · L2b labels on the board · L2c the shard asks · L2d duplicate Enter, fitAll, the cache measured · L2e a person labels their own ink · L2f an artifact is made by whoever blessed it · L2g a word is made by whoever wrote its letters · L2h gestures are per hand · L3 CI, bundles, docs · and L3's finding, L2i a person is the same person across sittings (27 Sep) · and R4d's, L2j undo is per hand (27 Sep) | every unit week 1 claimed is whole, CI runs what exists (WebKit included), docs say what the code does |
 | **0b. A board that holds** (pulled forward by `PERF.md`, 27 Sep) | R3 no lost work · R4b the engine holds 2,000 marks · R4c the surface draws only what changed · R4d a room merges a line, not the board · R4e a brief carries what it is about | nothing is ever lost silently; a 2,000-mark board opens in under 1.5 s, answers a stroke in 16 ms at p95 and draws its reading within 100 ms; a room line costs under 16 ms; the budgets are tests |
 | **1. The backbone** — ✅ done on `w2`, 28 Sep | B1 tools · B2 context · B3 packs | a tool is one file; the field ranks by context with reasons; a pack is used by an event and benched |
-| **2. Editing** | E1 handles · E2 bindings follow · E3 ports, heads and figures | a selected mark reshapes by its points; bound arrows follow; notations can declare ports |
-| **3. Diagrams** | D1 flowchart · S1 the shape rung holds a diamond, an L and a wide arc · D2 Mermaid out · D3 Mermaid in · D4 UML class · D5 sequence and state · D6 ER and mind map · D7 routing · D8 the repair demo | A1–A3 pass in the gate |
+| **2. Editing** — ✅ done, 28 Sep | E1 handles · E2 bindings follow · E3 ports, heads and figures | a selected mark reshapes by its points; bound arrows follow; notations can declare ports |
+| **3. Diagrams** — core of D1–D4 and D5's sequence half built, 28 Sep; the surfaces next | D1 flowchart · S1 the shape rung holds a diamond, an L and a wide arc · W1 drawing never destroys what it connects · S2 an arrow read where its ink points · D2 Mermaid out · D3 Mermaid in · D4 UML class · D5 sequence and state · D6 ER and mind map · D7 routing · D8 the repair demo | A1–A3 pass in the gate |
 | **4. Maths** ∥ after B1 | M1 quantities and expressions · M2 the sheet · M3 figures and dimensions · M4 solving · M5 maths on the board · M6 the garment pack · M7 true size and print | A4 passes in the gate |
 | **5. Seats** ∥ | J1 decide on the canvas · J2 extraction, a spike · J3 numerals, an experiment | the seat is measured on fixtures; the spike and the experiment say yes or not yet, with numbers |
 | **6. Ready for use** | R1 boards · R2 the log format · R3 no lost work · R4 performance · R5 first run · R6 pencil and WebKit · R7 deploy and release · R8 one platform · R9 the shard alongside | A8–A10 pass; budgets met |
@@ -1444,6 +1444,35 @@ lean said in the reason; an upright or turned box is a rectangle as before.
 Red first: a data symbol ruled and by hand, and held clean, was `rectangle`;
 labelled 30 and 10, solved as one it was given a diagonal of 31.62 and an
 area of 300. Every other maths test unchanged (170 in `src/maths`).
+**W1 Drawing a diagram never destroys or swallows what it connects** — a
+correctness unit, found by E2, D4, D5 and D1: an arrow whose two-wing head
+landed on a box's outline crossed it three times and erased it; a short
+vertical flow with *yes* written beside it was gathered into the word; a
+diamond drawn as two quick halves was a word. *Owns* `session/erase.ts`,
+`session/words.ts`, the word and scratch paths of `session/session.ts`.
+*Status, 28 Sep 2026: built on `w2`* — `38c09f0` and `205c8fb` (red: 24
+core tests, then the sequence lane's two — an open target, a head drawn
+apart), `d163d44` (a head is not a scratch: every crossing where the stroke
+meets the mark — the barb at an end, an end on the mark's ink or a bindable
+site, an end of the mark drawn over — rubs nothing out; 30 of 30, and 324
+real scratches across a box, a circle, a triangle and a line erase exactly
+what they did), `612043a` (a connector that meets what it connects, or is
+long against the run's x-height, is no letter; halves whose ends pair into a
+figure are no letters; a head drawn apart is its connector's — 20 of 20),
+`3de4936` (the cheap run check first). Every bench prints what it printed at
+`b6bee71`, line for line (recognition 1,674 at 99.9%, clean, command mark,
+flowchart, class, packs); budgets on 2,000 marks: replay 324 ms, a stroke
+0.18 ms. *Left, said plainly:* the unit was stopped before its e2e records
+(an arrow drawn into a box and *yes* beside a flow, with real pointer input)
+and before it had itemised why the generated 2,000-mark board reads 62 edges
+differently (strokes that no longer gather into words, most likely);
+both are the first things the next session owes it.
+**S2 An arrow is read where its ink points** — the rung's arrow tip a wing
+short of the ink (E2), a long arrow's small head lost while *line* leads
+(D5), `strokeFor`'s barb too small past ~1,200 px (D3), a head's fill given
+to the box beside it (D4), a flat diamond's sites at its box's corners
+(D3). *Status, 28 Sep 2026:* briefed; stopped while surveying, before any
+commit. The five findings stand.
 **D2 Mermaid out** — the exporter tool,
 the `mermaid` kind in `kinds/kinds.ts` and its renderer in the `run`
 sandbox, the export pane. *Red first:* the fixture's Mermaid equals a golden

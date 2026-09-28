@@ -24,6 +24,23 @@ automatically → ask "why?" and get grounded reasoning.
 `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active engine plan; MVP.md
 absorbs and raises its Stage D.
 
+**28 Sep 2026: phases 1 and 2 of `V1-PLAN.md` are done and phase 3's cores
+are built, all on `master`.** The backbone: every affordance is an offer from
+a registered tool (B1), ranked by what stands beside it with the reason said
+and the top offer held steady (B2, *Context*), and premade content arrives as
+library packs a board uses by an event (B3, *Library packs*). Editing: one
+selected mark's own points reshape its clean form (E1, *Handles*), and bound
+arrows follow what they are bound to, derived from the bindings, never logged
+(E2). Diagrams, in core: the flowchart (D1), the UML class diagram (D4) and
+the sequence diagram with the dashed lines it reads (D5's first half), each a
+notation with its pack, its bench and its Mermaid out (D2) and in (D3,
+with a layered layout); and W1 keeps a diagram's own strokes from erasing or
+being swallowed. What is next is each diagram and the maths **on the
+surface** — the field saying *a flowchart 0.73*, a Mermaid artifact, *Draw
+it* from Mermaid, maths offers — then S2, state and ER, first run, a review
+of use, and v1.0.0 (`V1-PLAN.md` §8–§9, every unit with its dated status
+line).
+
 **27 Sep 2026: phase 0 of `V1-PLAN.md` is done on `w2` — week 1 is whole**
 (each unit's dated status line is in the plan's §9). **Ids hold** (L1): a
 live hand's log is one sitting, a page load or an MCP process
@@ -710,7 +727,14 @@ honestly — a line drawn *through* a shape crosses twice and is safe. Two rules
 keep it safe: a **closed** stroke is never a scratch (it is a lasso), and
 scratch targets are **ink**, never artifacts. The surface says when a
 scratch was one pass short (*crossed it twice — one more pass erases it*),
-so the rule is learned by doing.
+so the rule is learned by doing. **A head is not a scratch** (V1-PLAN W1,
+`erase.ts`'s header, `scratchHits` in `session.ts`): when every crossing of a
+mark falls where the stroke *meets* it — within the barb at one of its ends
+(measured on the stroke), at an end that lands on the mark's ink or on a site
+the magnet binds, or over an end of that mark — the stroke is arriving, not
+rubbing out, and the mark stands. An arrow drawn into a box, or across a
+sequence lifeline, used to cross it three times with its two wings and erase
+it; every real scratch in the controls still erases exactly what it did.
 
 ### Tools: what the field affords, one contract (V1-PLAN §2.1, B1)
 
@@ -1995,7 +2019,18 @@ fingerprint carries it, so the model is asked to *read*, not to interpret.
   the new stroke's maker made, never the board's last mark whoever made
   it, so the letters of two hands — or of a hand and a model — never
   gather into one word, and the word is made by the hand that wrote its
-  letters, on every board (under *Live logs*).
+  letters, on every board (under *Live logs*). **Drawing is not writing**
+  (V1-PLAN W1; `words.ts` holds the pure parts, `connectorNotLetter`,
+  `closesFigure` and `oneDrawing` in `session.ts` read a stroke's ends against
+  its neighbours, `headApartAt` in `diagram/heads.ts`): a connector that meets
+  what it connects — bound, or arriving at a mark that is not writing — or that
+  is long against the run's own x-height is no letter (a hand's ascender stands
+  under three x-heights, John's included); two strokes whose ends pair up into
+  a figure `figuresAmong` reads are halves, not letters (a diamond in two
+  quick strokes); and a head drawn apart right after its connector is that
+  connector's. A flowchart's *yes* written beside a vertical flow, a class
+  relation's “1” and “*”, and a sequence's self-message head used to be
+  gathered into words with the line they label.
 - `propose()` carries `reps` as well as edges, so a transcript is held through
   the same channel as every other reading and undo drops it.
 - **Writing gathers by nearness into a line** (v10 D3; the `writing`
