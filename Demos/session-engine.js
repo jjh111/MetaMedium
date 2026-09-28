@@ -4795,12 +4795,16 @@
     return id;
   }
 
-  /** A brief that failed leaves no artifact named after it: the bless is undone when nothing has happened since. */
+  /**
+   * A brief that failed leaves no artifact named after it: the bless is undone when this hand
+   * has done nothing since — it is still this hand's last act (`session.lastAct`, V1-PLAN L2j),
+   * whatever another hand in the room drew meanwhile. It was the last event on the BOARD, which
+   * in a room is whoever acted last by the clocks, and undo takes back this hand's act.
+   */
   function dropFailedBless(artifactId) {
-    const evs = session.getEvents();
-    const last = evs[evs.length - 1];
+    const act = session.lastAct();
     const s = session.getState();
-    if (last && last.type === 'bless' && s.artifacts[s.artifacts.length - 1] === artifactId) { session.undo(); releasePrompted(); return true; }
+    if (act.length === 1 && act[0].type === 'bless' && s.artifacts[s.artifacts.length - 1] === artifactId) { session.undo(); releasePrompted(); return true; }
     return false;
   }
 
