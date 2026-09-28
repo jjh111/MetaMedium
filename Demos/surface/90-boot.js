@@ -60,6 +60,9 @@
     saveNow: saveNow,
     // The board this browser keeps (V1-PLAN R3), for tests: its state, what its store holds, and the way out into a folder.
     board: boardState, boardRecords: () => (board.backend ? board.backend.read() : Promise.resolve(null)), keepBoardIn: keepBoardIn,
+    // The boards this browser keeps (V1-PLAN R1), for tests: the list as this page holds it, one board as its store holds it, and the acts.
+    boards: boardsState, boardsStore: boardsStore, switchBoard: switchBoard, newBoard: newBoard, renameBoard: renameBoard,
+    duplicateBoard: duplicateBoard, trashBoard: trashBoard, restoreBoard: restoreBoard, planEmptyTrash: planEmptyTrash, emptyTrash: emptyTrash,
     boardLog: () => (board.backend ? board.backend.read().then((got) => journalFold(got.records).events) : Promise.resolve(null)),
     boardIdle: () => board.journal.idle(),
     setViewMode: setViewMode, viewMode: () => viewMode, focusOn: focusOn,
@@ -88,16 +91,21 @@
   if (mode === 'off') board.journal.off();
   if (!replayUrl) {
     // Last time's board comes back from the browser (IndexedDB — a moment,
-    // not at once); a folder, a repository or a room named in the URL is the
-    // canvas instead, and this page keeps no board of its own.
+    // not at once): the one the address names (?board=), else the one opened
+    // last; a folder, a repository or a room named in the URL is the canvas
+    // instead, and this page keeps no board of its own — it reads the list,
+    // for the boards pane and the places it remembers.
     const settle = (restored) => {
-      restoreMark();
+      // The device's mark, taught again only where the board's log says otherwise (so opening a board is not a change to it).
+      markAfterOpen();
       rejoinRemembered();
-      if (restored) flash('your last board is back — Reset starts a fresh one');
+      const others = [...boards.entries.values()].filter((e) => isKept(e) && !e.trashed && e.id !== board.id).length;
+      if (restored && !board.saidAtOpen) flash('“' + boardOnScreenName() + '” is back' + (others ? ' — ' + others + ' more in boards' : ''));
     };
     if (mode === 'restore') openBoard(mode).then(settle, () => settle(false));
     else {
       if (mode === 'fresh') openBoard(mode);
+      else if (!EMBED) openBoardsList();
       settle(false);
     }
     if (params.get('folder')) openStatic(params.get('folder'));

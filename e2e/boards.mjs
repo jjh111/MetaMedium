@@ -253,6 +253,7 @@ export async function boardsTest(browser, servers, ctx) {
     await until(page, (b) => { const x = window.__mm.boards(); const e = x.list.find((y) => y.id === b); return !!e && e.trashed > 0 && x.current !== b && !x.switching && !x.busy; }, b3);
     await openBoardsPane(page);
     await page.click('#boardsPanel button[data-empty-trash]');
+    await page.waitForSelector('#boardsPanel .bdConfirm', { timeout: 10000 }).catch(() => {});
     const said = await page.evaluate(() => { const c = document.querySelector('#boardsPanel .bdConfirm'); return c ? c.textContent.replace(/\s+/g, ' ').trim() : ''; });
     const stillThere = await storeOf(page, b3);
     await page.click('#boardsPanel button[data-empty-cancel]');
@@ -281,6 +282,7 @@ export async function boardsTest(browser, servers, ctx) {
     await page.click(`#boardsPanel button[data-trash="${b4}"]`);
     await until(page, (b) => { const e = window.__mm.boards().list.find((y) => y.id === b); return !!e && e.trashed > 0 && !window.__mm.boards().busy; }, b4);
     await page.click('#boardsPanel button[data-empty-trash]');
+    await page.waitForSelector('#boardsPanel .bdConfirm', { timeout: 10000 }).catch(() => {});
     const said10 = await page.evaluate(() => { const c = document.querySelector('#boardsPanel .bdConfirm'); return c ? c.textContent.replace(/\s+/g, ' ').trim() : ''; });
     const confirm10 = await page.$('#boardsPanel button[data-empty-confirm]');
     if (confirm10) await confirm10.click();
@@ -359,7 +361,7 @@ export async function boardsTest(browser, servers, ctx) {
     const siteRow = siteId ? await rowText(page, siteId) : null;
     const folderRow = await page.evaluate(() => { const e = window.__mm.boards().list.find((x) => x.kind === 'folder' && x.name === 'scratch-folder'); const r = e && document.querySelector('#boardsPanel .bdItem[data-id="' + e.id + '"]'); return r ? r.textContent.replace(/\s+/g, ' ').trim() : null; });
     if (siteId) await page.click(`#boardsPanel button[data-open="${siteId}"]`);
-    const reopened = await until(page, () => window.__mm.folder().how === 'static' && /__boards\/site/.test(window.__mm.folder().name), null, 15000);
+    const reopened = await until(page, () => window.__mm.folder().how === 'static' && /__boards\/site/.test(window.__mm.folder().name) && !window.__mm.boards().switching, null, 15000);
     await openBoardsPane(page);
     await page.click(`#boardsPanel button[data-open="${b2}"]`);
     await page.waitForURL(new RegExp('[?&]board=' + b2), { timeout: 20000 }).catch(() => {});

@@ -1,9 +1,9 @@
 // ===== controls =====
 // Provides: the control centre — one button in the bar, a grid of tiles in fixed slots (zoom, snap,
-//   view, theme, hand, auto-read, folder, import, export, models, teach, reset, help); syncTiles()
-//   writes every tile's face from state; openPane/closePanes keep one pane open at a time.
-// Uses: core (prefs, themeMode, hand), snap (snapMode), folder (viewMode, folder), models (agents),
-//   teach (teachPanel), handwriting (autoRead).
+//   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards);
+//   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
+// Uses: core (prefs, themeMode, hand), snap (snapMode), folder (viewMode, folder; the boards adapter:
+//   boardOnScreenName, resetBoard), models (agents), teach (teachPanel), handwriting (autoRead).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -21,6 +21,7 @@
     autoRead: document.getElementById('autoReadBtn'), folder: document.getElementById('folderBtn'), imp: document.getElementById('importBtn'),
     exp: document.getElementById('exportBtn'), models: document.getElementById('modelBtn'), teach: document.getElementById('teachBtn'),
     reset: document.getElementById('resetBtn'), help: document.getElementById('helpBtn'), live: document.getElementById('liveBtn'),
+    boards: document.getElementById('boardsBtn'),
   };
 
   function ccOpen() { return !ccEl.hasAttribute('hidden'); }
@@ -52,12 +53,18 @@
     ui.tile(tiles.exp, 'export', '…', { why: 'the board as SVG or PNG, or the session as its log' });
     ui.tile(tiles.models, 'models', agents.length ? agents.map((a) => a.config.model).join(', ') : 'none', { on: agents.length > 0, why: 'a model joins as a participant; it is asked only when you ask' });
     ui.tile(tiles.teach, 'mark', s.commandMark ? s.commandMark.name : 'check ✓', { on: !!s.commandMark, why: 'the mark that turns a circled group into a selection; teach your own' });
-    ui.tile(tiles.reset, 'reset', 'fresh board', { why: 'a fresh board; the one in browser storage is forgotten too' });
+    ui.tile(tiles.reset, 'reset', 'fresh board', { why: 'a fresh board under the same name — what this one holds goes to the trash, from which it comes back whole' });
     ui.tile(tiles.help, 'help', '?', { why: 'the hand QA plan, which doubles as the manual' });
     ui.tile(tiles.live, 'live', folder.how === 'live' ? folder.name : 'room…', { on: folder.how === 'live', why: 'a room other hands can join: between tabs on this machine, or across machines through a relay' });
+    // Its face is the name of what is on screen (V1-PLAN R1); the pane is 22-boards.js.
+    ui.tile(tiles.boards, 'boards', boardOnScreenName() || '…', { why: 'the boards this browser keeps — new, open, rename, duplicate, delete, and the trash — and the folders, repositories and sites opened lately' });
   }
 
   tiles.theme.onclick = () => setThemeMode(THEME_MODES[(THEME_MODES.indexOf(themeMode) + 1) % THEME_MODES.length]);
+  // Reset is a fresh board, never one tap from losing this one (V1-PLAN R1): what the board on screen
+  // holds goes to the trash, whole. This supersedes the handler 07-input.js set earlier in the build,
+  // which emptied the board in the browser and reloaded — one tap from losing it.
+  if (tiles.reset) tiles.reset.onclick = () => { closeCC(); resetBoard(); };
   tiles.hand.onclick = () => setHand(hand === 'right' ? 'left' : 'right');
   tiles.autoRead.onclick = () => setAutoRead(!autoRead);
   // A live room: a name, and a relay when the other hand is on another machine.

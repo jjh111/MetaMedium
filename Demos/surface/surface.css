@@ -208,6 +208,29 @@ html, body {
 #helpPanel .helpBody code { font-family: var(--mono); font-size: 10.5px; background: var(--well); padding: 0 3px; border-radius: 3px; }
 #helpPanel .helpBody a { color: var(--gold); }
 #helpPanel .helpBody hr { border: 0; border-top: 1px solid var(--rule); margin: 10px 0; }
+/* The boards pane (V1-PLAN R1): the boards this browser keeps, the places opened lately, the trash. */
+#boardsPanel { width: min(320px, calc(100vw - 24px)); box-sizing: border-box; max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+#boardsPanel .bdHead { display: flex; gap: 7px; margin-bottom: 8px; }
+#boardsPanel .bdHead button { flex: 1; }
+#boardsPanel .bdLabel { font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--dim); margin: 9px 0 4px; }
+#boardsPanel .bdPlaces, #boardsPanel .bdTrash { margin-top: 8px; border-top: 1px solid var(--edge); }
+#boardsPanel .bdItem { padding: 5px 7px; border: 1px solid transparent; border-radius: 6px; }
+#boardsPanel .bdItem + .bdItem { margin-top: 2px; }
+#boardsPanel .bdItem.here { border-color: var(--rule); background: rgba(var(--gold-rgb), 0.07); }
+#boardsPanel .bdTop { display: flex; align-items: center; gap: 6px; min-width: 0; }
+#boardsPanel button.bdName { border: 0; padding: 0; background: none; font: 12px var(--ui); color: var(--ink); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+#boardsPanel button.bdName:hover { color: var(--gold); }
+#boardsPanel span.bdName { font: 12px var(--ui); color: var(--dim); }
+#boardsPanel .bdMeta { font-family: var(--mono); font-size: 10px; color: var(--dim); margin-top: 2px; }
+#boardsPanel .bdActs { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+#boardsPanel .bdActs button, #boardsPanel .bdWay { padding: 2px 8px; font-size: 10.5px; }
+#boardsPanel .bdNameInput { margin-top: 0; padding: 3px 6px; font-size: 12px; }
+#boardsPanel .bdConfirm { margin-top: 8px; padding: 8px 9px; border: 1px solid var(--gold); border-radius: 6px; line-height: 1.45; }
+#boardsPanel .bdConfirm p { margin: 0 0 7px; color: var(--ink); }
+#boardsPanel .bdConfirmRow { display: flex; gap: 7px; }
+#boardsPanel .bdConfirmRow button { flex: 1; }
+#boardsPanel .bdEmpty { margin-top: 7px; width: 100%; }
+#boardsPanel #boardsStatus:not(:empty) { margin: 9px 0 0; }
 
 /* The model pane. */
 #modelPanel .mpRow { display: flex; gap: 7px; margin-top: 11px; }

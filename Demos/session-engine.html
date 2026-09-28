@@ -46,6 +46,7 @@
   <button id="liveBtn"></button>
   <button id="resetBtn"></button>
   <button id="helpBtn"></button>
+  <button id="boardsBtn" aria-pressed="false"></button>
   <input id="importInput" type="file" accept="image/*,.svg,.html,.htm,.js,.mjs,.json,.md,.txt" multiple capture="environment" hidden>
 </div>
 
@@ -96,6 +97,11 @@
   </div>
 </div>
 <div id="helpPanel" hidden><div class="helpBody"></div></div>
+<div id="boardsPanel" hidden>
+  <div class="bdList"></div>
+  <div id="boardsStatus" class="hint" aria-live="polite"></div>
+  <input id="boardsFile" type="file" accept=".jsonl,.ndjson,.json,.txt,application/json" hidden>
+</div>
 <div id="livePanel" hidden>
   <input id="liveRoom" placeholder="room" autocomplete="off" spellcheck="false" />
   <input id="liveName" placeholder="your name in the room" autocomplete="off" spellcheck="false" />
