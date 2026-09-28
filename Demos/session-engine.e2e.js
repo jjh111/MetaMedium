@@ -3602,6 +3602,46 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 56. The panel speaks to the user; the inspector waits behind details (PLAN-USER-SURFACE U1a; audit rows 1–2) ----
+  {
+    // What the panel SAYS: its text with every closed <details> left out, as a reader sees it.
+    const said56 = () => {
+      const el = document.getElementById('inspector').cloneNode(true);
+      el.querySelectorAll('details:not([open])').forEach((d) => [...d.childNodes].forEach((c) => { if (!(c.nodeType === 1 && c.tagName === 'SUMMARY')) c.remove(); }));
+      const parts = [], walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      while (walk.nextNode()) parts.push(walk.currentNode.nodeValue);
+      return parts.join(' ').replace(/\s+/g, ' ').trim();
+    };
+    const system56 = (text) => ({ id: /\bid\b|stroke:\d|participant:|figure:|\bllm:/.test(text), tier: /\btier\b/i.test(text), coordinate: /\(\s*-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?\s*\)/.test(text) });
+    const clean56 = (x) => !x.id && !x.tier && !x.coordinate;
+    mm.session.load([]); mm.setView(1, 0, 0);
+    t.stroke(t.rect(200, 200, 120, 80)); t.stroke(t.line({ x: 320, y: 240 }, { x: 420, y: 240 }, 30)); t.stroke(t.circle(460, 240, 40)); await wait(60);
+    const afterStroke56 = said56();
+    const inspect56 = document.querySelector('#inspector details.inspect');
+    step('56. after a stroke the panel says what the mark is and what it can become, in the user\'s words — no id, no tier, no coordinate; the inspector is behind details, closed',
+      clean56(system56(afterStroke56)) && /becomes|could become|can become/.test(afterStroke56) && !!inspect56 && !inspect56.open && /\bid\b/.test(inspect56.textContent),
+      { said: afterStroke56.slice(0, 300), system: system56(afterStroke56), details: !!inspect56, open: inspect56 && inspect56.open });
+    const on56 = mm.worldToScreen(260, 200);
+    const c56 = document.getElementById('canvas');
+    const pe56 = (type, x, y) => c56.dispatchEvent(new PointerEvent(type, { pointerId: 1, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1 }));
+    pe56('pointerdown', on56.x, on56.y); await wait(700); pe56('pointerup', on56.x, on56.y); await wait(60);
+    const afterHold56 = said56();
+    const held56 = !!mm.session.getState().summon;
+    step('56b. after a hold the panel says what is held and what it becomes — no id, no tier, no coordinate; the rest behind details',
+      held56 && clean56(system56(afterHold56)) && /becomes/.test(afterHold56) && !!document.querySelector('#inspector details.inspect'),
+      { held: held56, said: afterHold56.slice(0, 300), system: system56(afterHold56) });
+    // Opened, details stays open for the next thing the panel reports: remembered on this device.
+    const d56 = document.querySelector('#inspector details.inspect');
+    if (d56) { d56.open = true; d56.dispatchEvent(new Event('toggle')); }
+    await wait(30);
+    mm.session.dismiss(mm.session.getState().summon && mm.session.getState().summon.id, Date.now()); await wait(30);
+    t.stroke(t.circle(700, 400, 50)); await wait(60);
+    const again56 = document.querySelector('#inspector details.inspect');
+    step('56c. details opened stays open for the next mark, remembered on this device', !!again56 && again56.open, { open: again56 && again56.open });
+    if (again56) { again56.open = false; again56.dispatchEvent(new Event('toggle')); }
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };
 
