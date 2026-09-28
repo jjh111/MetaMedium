@@ -44,7 +44,7 @@ import type { Bounds, Point } from '../types';
 import type { SessionState } from '../session/session';
 import type { MMNode } from '../session/nodes';
 import { boundsOf, fingerprintOf, getRep, placed, strokePointsOf, transcriptOf } from '../session/nodes';
-import { cleanPointsOf, idealize, snapReading } from '../session/clean';
+import { cleanOf, cleanPointsOf, idealize, snapReading } from '../session/clean';
 import { magnetRadius } from '../session/magnets';
 import { clusters, relate } from '../relate/relations';
 import type { Mark } from '../relate/relations';
@@ -204,11 +204,9 @@ export function figureOfMark(node: MMNode, nodes: ReadonlyMap<string, MMNode>): 
   if (!fp || transcriptOf(node) || getRep(node, 'word-run')) return null;
   const snap = snapReading(node, nodes);
   const shape = snap.shape;
-  const held = getRep(node, 'clean') ? cleanPointsOf(node) : undefined;
-  const ideal = held ?? (() => {
-    const i = idealize(node, shape);
-    return i ? placed(node, i.points) : undefined;
-  })();
+  const heldForm = getRep(node, 'clean') ? cleanOf(node) : undefined;
+  const offered = heldForm ? undefined : idealize(node, shape);
+  const ideal = heldForm ? cleanPointsOf(node) : offered ? placed(node, offered.points) : undefined;
   if (!ideal || ideal.length < 2) return null;
   const why = `one stroke read as a ${shape} (${snap.reasoning})`;
   const id = node.id;
@@ -216,9 +214,18 @@ export function figureOfMark(node: MMNode, nodes: ReadonlyMap<string, MMNode>): 
     case 'triangle':
       if (ideal.length < 3) return null;
       return polygonFigure(ideal.slice(0, 3), { id, ids: [id], reason: why });
-    case 'rectangle':
+    case 'rectangle': {
       if (ideal.length < 4) return null;
+      // A box drawn leaning keeps its lean (clean.ts, D2): a parallelogram,
+      // whose corners are not right — so a quadrilateral, each side standing
+      // alone, never a rectangle, whose rules (a diagonal, an area of width
+      // times height) assume they are.
+      const lean = (heldForm ?? offered)?.lean;
+      if (lean !== undefined) {
+        return polygonFigure(ideal.slice(0, 4), { id, ids: [id], reason: `${why}; it leans ${Math.round(lean)}° — a parallelogram, solved as a quadrilateral` });
+      }
       return polygonFigure(ideal.slice(0, 4), { id, ids: [id], kind: 'rectangle', reason: why });
+    }
     case 'circle': {
       const b = boundsOfAll(ideal.map((p) => ({ minX: p.x, maxX: p.x, minY: p.y, maxY: p.y })));
       const w = b.maxX - b.minX, h = b.maxY - b.minY;
