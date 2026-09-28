@@ -477,3 +477,96 @@ export function handDot(cx: number, cy: number, r: number, options: HandOptions 
   }
   return points;
 }
+
+// ===== Printed writing, letter by letter =====
+
+/**
+ * A smooth stroke through points — a Catmull-Rom walk every `step` px — with
+ * a hand's wobble: how a pen rounds the turns of a letter.
+ */
+function penThrough(pts: Point[], jitter: number, seed: number, step = 3): Point[] {
+  const r = rng(seed * 131 + 7);
+  const out: Point[] = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const n = Math.max(2, Math.ceil(Math.hypot(p2.x - p1.x, p2.y - p1.y) / step));
+    for (let k = i === 0 ? 0 : 1; k <= n; k++) {
+      const t = k / n, t2 = t * t, t3 = t2 * t;
+      const x = 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
+      const y = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+      out.push({ x: x + (r() - 0.5) * jitter, y: y + (r() - 0.5) * jitter });
+    }
+  }
+  return out;
+}
+
+export interface PrintOptions {
+  /** The x-height in px: John's is 31–40 at zoom 1. */
+  xHeight?: number;
+  /** Ascenders (h, l, d, t) as a multiple of the x-height: John's are 2.2–2.3. */
+  ascender?: number;
+  /** Descenders (y) as a multiple of the x-height. */
+  descender?: number;
+  /** Wobble in px. */
+  jitter?: number;
+  seed?: number;
+  /** The gap between words, in px; a letter's gap is a quarter x-height. */
+  wordGap?: number;
+}
+
+/**
+ * Printed writing the way a hand prints it: each letter the strokes a hand
+ * makes — an l one stroke, a d a bowl and a stem, a t a stem and a bar, a y
+ * two strokes, an i a stem and a dot — on a baseline, in John's proportions
+ * by default (x-height 34, ascenders 2.3 x-heights: the h, l and d he wrote
+ * were 72–88 px at an x-height of 31–40). The d's stem stands a little clear
+ * of its bowl: a stem drawn down the bowl's own side crosses its wobble and
+ * would scratch the bowl out (erase.ts), which no hand means. Returns the
+ * strokes in writing order, the letter each belongs to, and where the pen
+ * ended.
+ */
+export function handPrint(text: string, x: number, baseline: number, options: PrintOptions = {}): { strokes: Point[][]; letters: string[]; end: number } {
+  const xh = options.xHeight ?? 34;
+  const asc = xh * (options.ascender ?? 2.3), desc = xh * (options.descender ?? 1);
+  const jitter = options.jitter ?? 1.5, seed = options.seed ?? 1;
+  const strokes: Point[][] = [];
+  const letters: string[] = [];
+  const y = baseline, top = y - xh, up = y - asc, down = y + desc;
+  const w = xh * 0.8;
+  let pen = x;
+  let k = 0;
+  const curve = (pts: Point[], step = 3) => penThrough(pts, jitter, seed * 997 + ++k * 13, step);
+  const line = (a: Point, b: Point) => handLine(a, b, { jitter: jitter * 0.5, seed: seed * 991 + ++k * 17, density: 0.35 });
+  const bowl = (x0: number, turn: number): Point[] => {
+    const pts: Point[] = [];
+    for (let i = 0; i <= 40; i++) {
+      const a = turn - (i / 40) * Math.PI * 2 * 0.95;
+      pts.push({ x: x0 + w / 2 + (w / 2) * Math.cos(a), y: y - xh / 2 + (xh / 2) * Math.sin(a) });
+    }
+    return curve(pts, 4);
+  };
+  for (const ch of text) {
+    const x0 = pen;
+    let adv = w;
+    const add = (...ss: Point[][]) => { for (const s of ss) { strokes.push(s); letters.push(ch); } };
+    switch (ch) {
+      case ' ': adv = (options.wordGap ?? xh) - xh * 0.25; break;
+      case 'a': add(bowl(x0, 0), line({ x: x0 + w + 1, y: top }, { x: x0 + w, y })); adv = w + 2; break;
+      case 'd': add(bowl(x0, 0), line({ x: x0 + w + 4, y: up }, { x: x0 + w + 3, y })); adv = w + 4; break;
+      case 'e': add(curve([{ x: x0, y: y - xh * 0.5 }, { x: x0 + w, y: y - xh * 0.5 }, { x: x0 + w * 0.8, y: top }, { x: x0 + w * 0.2, y: top + 2 }, { x: x0, y: y - xh * 0.4 }, { x: x0 + w * 0.3, y }, { x: x0 + w, y: y - 3 }])); break;
+      case 'h': add(curve([{ x: x0, y: up }, { x: x0, y }, { x: x0, y: top + xh * 0.3 }, { x: x0 + w * 0.5, y: top }, { x: x0 + w, y: top + xh * 0.3 }, { x: x0 + w, y }])); break;
+      case 'i': add(line({ x: x0, y: top }, { x: x0, y }), curve([{ x: x0 - 1, y: top - 12 }, { x: x0 + 1, y: top - 13 }, { x: x0, y: top - 11 }])); adv = 6; break;
+      case 'l': add(line({ x: x0 + 2, y: up }, { x: x0, y })); adv = 8; break;
+      case 'n': add(curve([{ x: x0, y: top }, { x: x0, y }, { x: x0, y: top + xh * 0.3 }, { x: x0 + w * 0.5, y: top }, { x: x0 + w, y: top + xh * 0.3 }, { x: x0 + w, y }])); break;
+      case 'o': add(bowl(x0, -Math.PI / 2)); break;
+      case 'r': add(curve([{ x: x0, y: top }, { x: x0, y }, { x: x0, y: top + xh * 0.4 }, { x: x0 + w * 0.4, y: top }, { x: x0 + w * 0.8, y: top + 2 }])); adv = w * 0.8; break;
+      case 's': add(curve([{ x: x0 + w, y: top + 3 }, { x: x0 + w * 0.5, y: top }, { x: x0, y: top + xh * 0.25 }, { x: x0 + w * 0.5, y: y - xh * 0.5 }, { x: x0 + w, y: y - xh * 0.25 }, { x: x0 + w * 0.5, y }, { x: x0, y: y - 3 }])); break;
+      case 't': add(line({ x: x0 + w * 0.4, y: y - xh * 1.6 }, { x: x0 + w * 0.4, y }), line({ x: x0, y: top + 2 }, { x: x0 + w * 0.8, y: top })); break;
+      case 'w': add(curve([{ x: x0, y: top }, { x: x0 + w * 0.3, y }, { x: x0 + w * 0.6, y: top + xh * 0.3 }, { x: x0 + w * 0.9, y }, { x: x0 + w * 1.2, y: top }])); adv = w * 1.2; break;
+      case 'y': add(line({ x: x0, y: top }, { x: x0 + w * 0.5, y }), line({ x: x0 + w, y: top }, { x: x0 + w * 0.1, y: down })); break;
+      default: throw new Error(`handPrint has no ${JSON.stringify(ch)}`);
+    }
+    pen = x0 + adv + (ch === ' ' ? 0 : xh * 0.25);
+  }
+  return { strokes, letters, end: pen };
+}

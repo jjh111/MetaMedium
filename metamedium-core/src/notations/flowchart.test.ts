@@ -17,7 +17,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import type { Point } from '../types';
 import { createSession } from '../session/session';
 import type { Session } from '../session/session';
-import { isWord, lettersOf } from '../session/nodes';
+import { isWord } from '../session/nodes';
 import { magnetSites, nearestMagnet } from '../session/magnets';
 import { registeredPorts, unregisterPorts } from '../session/ports';
 import { headsOf } from '../diagram/heads';
@@ -104,20 +104,20 @@ describe('symbols', () => {
     expect(r.connectors.some((c) => x.includes(c.id))).toBe(false);
   });
 
-  it('a diamond drawn as left and right halves, quickly, is gathered as a word by the letter rules — and still read as a decision', () => {
+  it('a diamond drawn as left and right halves, quickly, is one figure and not a word — and read as a decision', () => {
     const { s, x } = underABox((s, at) => {
       const [left, right] = diamondLeftRight(diamondCorners(200, 330, 160, 100), { seed: 6, jitter: 1 });
       return [s.addStroke(left, at), s.addStroke(right, at + 800)];
     }, 280);
     const st = s.getState();
-    // The letter rules (session.ts) see two small strokes side by side on one band, a second apart.
-    const word = st.contentIds.find((id) => isWord(st.nodes.get(id)!));
-    expect(word).toBeDefined();
-    expect(lettersOf(st.nodes.get(word!)!)).toEqual(x);
-    // The notation reads the word's two strokes meeting end to end.
+    // Two small strokes side by side on one band, a second apart — but their ends meet and close a
+    // figure, so the letter rules leave them strokes (session.ts, W1; it was D1's finding that they did not).
+    expect(st.contentIds.some((id) => isWord(st.nodes.get(id)!))).toBe(false);
+    for (const id of x) expect(st.contentIds).toContain(id);
+    // The notation reads the two strokes as the figure they make.
     const sym = symbolOf(read(s), x);
-    expect(sym).toMatchObject({ id: word, symbol: 'decision' });
-    expect(sym.reason).toMatch(/word/);
+    expect(sym.symbol).toBe('decision');
+    for (const id of x) expect(read(s).roles[id]).toBe('node');
   });
 
   it('an elongated round-ended form is a terminator: a stadium, and an oval', () => {
