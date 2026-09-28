@@ -7777,6 +7777,71 @@ function reshapeClean(clean, handle, to, floor = 0) {
   return null;
 }
 
+// src/session/manipulate.ts
+function manipulableOf(nodes, ids) {
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  const visit = (id) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    const n2 = nodes.get(id);
+    if (!n2 || getRep(n2, "erased")) return;
+    if (getRep(n2, "stroke")) {
+      out.push(n2);
+      return;
+    }
+    for (const e of n2.edges) if (e.rel === "has-part") visit(e.to);
+  };
+  ids.forEach(visit);
+  return out;
+}
+function markFrameOf(node) {
+  const moved2 = getRep(node, "transform")?.data;
+  if (moved2) return moved2;
+  return fingerprintOf(node)?.bounds;
+}
+function scaleFactors(sx, sy) {
+  return { sx: sx > 1e-3 ? sx : 1e-3, sy: sy > 1e-3 ? sy : 1e-3 };
+}
+function manipulatedReps(node, m) {
+  const b = markFrameOf(node);
+  if (!b) return null;
+  let to;
+  if (m.type === "move") {
+    to = { minX: b.minX + m.dx, maxX: b.maxX + m.dx, minY: b.minY + m.dy, maxY: b.maxY + m.dy };
+  } else if (m.type === "scale") {
+    const { sx, sy } = scaleFactors(m.sx, m.sy);
+    to = {
+      minX: m.about.x + (b.minX - m.about.x) * sx,
+      maxX: m.about.x + (b.maxX - m.about.x) * sx,
+      minY: m.about.y + (b.minY - m.about.y) * sy,
+      maxY: m.about.y + (b.maxY - m.about.y) * sy
+    };
+  } else {
+    const c = Math.cos(m.radians), s = Math.sin(m.radians);
+    const cx2 = (b.minX + b.maxX) / 2, cy2 = (b.minY + b.maxY) / 2;
+    const nx = m.about.x + (cx2 - m.about.x) * c - (cy2 - m.about.y) * s;
+    const ny = m.about.y + (cx2 - m.about.x) * s + (cy2 - m.about.y) * c;
+    to = { minX: b.minX + nx - cx2, maxX: b.maxX + nx - cx2, minY: b.minY + ny - cy2, maxY: b.maxY + ny - cy2 };
+  }
+  const reps = node.reps.filter((r) => r.modality !== "transform");
+  reps.push({ modality: "transform", data: to, source: "user" });
+  if (m.type !== "rotate") return reps;
+  const prev = getRep(node, "rotation")?.data ?? 0;
+  const turned2 = reps.filter((r) => r.modality !== "rotation");
+  turned2.push({ modality: "rotation", data: prev + m.radians, source: "user" });
+  return turned2;
+}
+function manipulationMap(m) {
+  if (m.type === "move") return (p) => ({ x: p.x + m.dx, y: p.y + m.dy });
+  if (m.type === "scale") {
+    const { sx, sy } = scaleFactors(m.sx, m.sy), o2 = m.about;
+    return (p) => ({ x: o2.x + (p.x - o2.x) * sx, y: o2.y + (p.y - o2.y) * sy });
+  }
+  const c = Math.cos(m.radians), s = Math.sin(m.radians), o = m.about;
+  return (p) => ({ x: o.x + (p.x - o.x) * c - (p.y - o.y) * s, y: o.y + (p.x - o.x) * s + (p.y - o.y) * c });
+}
+
 // src/diagram/heads.ts
 var HEAD_MAX_SHARE = 0.5;
 var HEAD_AXIS_SHARE = 0.3;
@@ -8270,6 +8335,56 @@ function holdReach(target, connector) {
 function sitsOn(end, site, target, connector) {
   return dist6(end, site) <= holdReach(target, connector);
 }
+function releasedBy(nodes, ids, m) {
+  const moved2 = manipulableOf(nodes, ids);
+  const together = new Set(moved2.map((n2) => n2.id));
+  const map = manipulationMap(m);
+  const out = [];
+  for (const n2 of moved2) {
+    const bs = bindingsOf(n2).filter((b) => b.end === "start" || b.end === "end");
+    if (!bs.length) continue;
+    const ends = connectorEnds(n2, nodes);
+    for (const b of bs) {
+      if (together.has(b.nodeId)) continue;
+      const target = nodes.get(b.nodeId);
+      const site = target && boundSiteOf(target, nodes, b.site);
+      const at = ends ? b.end === "start" ? ends.start : ends.end : null;
+      if (target && site && at && sitsOn(map(at), site.point, target, n2)) continue;
+      out.push({ strokeId: n2.id, end: b.end });
+    }
+  }
+  return out;
+}
+function reshapeDecision(node, nodes, handle, reshaped, shape, hold) {
+  const bs = bindingsOf(node).filter((b) => b.end === "start" || b.end === "end");
+  const releases = [];
+  const end = endOfHandle(node, nodes, handle.kind);
+  if (end) {
+    const held2 = hold && typeof hold.nodeId === "string" && hold.nodeId !== node.id && nodes.has(hold.nodeId) && hold.site && typeof hold.site.kind === "string" && Number.isInteger(hold.site.index) ? hold : null;
+    const current = bs.find((b) => b.end === end);
+    const same = !!held2 && !!current && current.nodeId === held2.nodeId && current.site.kind === held2.site.kind && current.site.index === held2.site.index;
+    if (current && !same) releases.push(end);
+    return { releases, tie: held2 && !same ? { end, nodeId: held2.nodeId, site: { kind: held2.site.kind, index: held2.site.index } } : null };
+  }
+  if (bs.length && movesWhole(shape, handle.kind)) {
+    const ends = connectorEnds(reshaped, nodes);
+    for (const b of bs) {
+      const target = nodes.get(b.nodeId);
+      const site = target && boundSiteOf(target, nodes, b.site);
+      const at = ends ? b.end === "start" ? ends.start : ends.end : null;
+      if (target && site && at && sitsOn(at, site.point, target, node)) continue;
+      releases.push(b.end);
+    }
+  }
+  return { releases, tie: null };
+}
+function lettingGo(node, ends) {
+  if (!ends.length) return node;
+  return { ...node, edges: node.edges.filter((e) => !(e.rel === "bound-to" && ends.includes(e.end))) };
+}
+function followOf(node) {
+  return followMapOf(node) ? getRep(node, "follow").data : void 0;
+}
 function heldEnds(node, nodes) {
   const out = [];
   for (const b of activeBindingsOf(node, nodes)) {
@@ -8347,6 +8462,38 @@ function followThrough(changed2, followersOf, isBound, refollow) {
     round = [...next].sort();
   }
   return moved2;
+}
+function boundByIndex(nodes) {
+  const out = /* @__PURE__ */ new Map();
+  for (const [id, n2] of nodes) {
+    for (const e of n2.edges) {
+      if (e.rel !== "bound-to" || typeof e.end !== "string" || !e.site) continue;
+      const list3 = out.get(e.to);
+      if (!list3) out.set(e.to, [id]);
+      else if (!list3.includes(id)) list3.push(id);
+    }
+  }
+  return out;
+}
+function followPreview(nodes, changed2, boundBy = boundByIndex(nodes)) {
+  const board = new Map(nodes);
+  for (const [id, n2] of changed2) board.set(id, n2);
+  const out = /* @__PURE__ */ new Map();
+  followThrough(
+    changed2.keys(),
+    (id) => boundBy.get(id) ?? [],
+    (id) => !!board.get(id)?.edges.some((e) => e.rel === "bound-to"),
+    (id) => {
+      const n2 = board.get(id);
+      const rep = n2 && followed(n2, board);
+      if (!n2 || !rep) return false;
+      const moved2 = { ...n2, reps: [...n2.reps.filter((r) => r.modality !== "follow"), rep] };
+      board.set(id, moved2);
+      out.set(id, moved2);
+      return true;
+    }
+  );
+  return out;
 }
 
 // src/session/words.ts
@@ -12427,6 +12574,11 @@ function libraryDefinitions(pack, makeBoard) {
 }
 
 // src/session/session.ts
+function manipulationOf(ev) {
+  if (ev.type === "move") return { type: "move", dx: ev.dx, dy: ev.dy };
+  if (ev.type === "scale") return { type: "scale", about: ev.about, sx: ev.sx, sy: ev.sy };
+  return { type: "rotate", about: ev.about, radians: ev.radians };
+}
 var DEFAULT_SESSION_CONFIG = {
   gesture: DEFAULT_GESTURE_CONFIG,
   wireEndpointRatio: 0.15,
@@ -13534,7 +13686,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     for (const p of placed2) {
       const node = nodes.get(p.id);
       const shown2 = cleanOf(node)?.reshaped || followMapOf(node) ? boundsOf(node) : void 0;
-      const frame = shown2 && frameBounds(node);
+      const frame = shown2 && markFrameOf(node);
       const to = shown2 && frame ? refit(frame, shown2, p.to) : p.to;
       node.reps = node.reps.filter((r) => r.modality !== "transform");
       node.reps.push({ modality: "transform", data: to, source: "engine" });
@@ -13804,77 +13956,13 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   function applySelect(ev) {
     gesturesOf(handOf(ev)).selection = ev.ids.filter((id) => inContent.has(id));
   }
-  function manipulable(ids) {
-    const out = [];
-    const seen = /* @__PURE__ */ new Set();
-    const visit = (id) => {
-      if (seen.has(id)) return;
-      seen.add(id);
-      const n2 = nodes.get(id);
-      if (!n2 || getRep(n2, "erased")) return;
-      if (getRep(n2, "stroke")) {
-        out.push(n2);
-        return;
-      }
-      for (const e of n2.edges) if (e.rel === "has-part") visit(e.to);
-    };
-    ids.forEach(visit);
-    return out;
-  }
-  function setTransform(node, to) {
-    node.reps = node.reps.filter((r) => r.modality !== "transform");
-    node.reps.push({ modality: "transform", data: to, source: "user" });
-  }
-  function frameBounds(node) {
-    const moved2 = getRep(node, "transform")?.data;
-    if (moved2) return moved2;
-    return fingerprintOf(node)?.bounds;
-  }
-  function applyMove(ev) {
+  function applyManipulation(ev) {
     const moved2 = [];
-    for (const n2 of manipulable(ev.ids)) {
-      const b = frameBounds(n2);
-      if (!b) continue;
-      setTransform(n2, { minX: b.minX + ev.dx, maxX: b.maxX + ev.dx, minY: b.minY + ev.dy, maxY: b.maxY + ev.dy });
-      boundsMoved(n2.id);
-      refreshWordBounds(n2);
-      moved2.push(n2.id);
-    }
-    followFrom(moved2);
-    recomputeClusterCandidates();
-  }
-  function applyScale(ev) {
-    const sx = ev.sx > 1e-3 ? ev.sx : 1e-3, sy = ev.sy > 1e-3 ? ev.sy : 1e-3;
-    const moved2 = [];
-    for (const n2 of manipulable(ev.ids)) {
-      const b = frameBounds(n2);
-      if (!b) continue;
-      setTransform(n2, {
-        minX: ev.about.x + (b.minX - ev.about.x) * sx,
-        maxX: ev.about.x + (b.maxX - ev.about.x) * sx,
-        minY: ev.about.y + (b.minY - ev.about.y) * sy,
-        maxY: ev.about.y + (b.maxY - ev.about.y) * sy
-      });
-      boundsMoved(n2.id);
-      refreshWordBounds(n2);
-      moved2.push(n2.id);
-    }
-    followFrom(moved2);
-    recomputeClusterCandidates();
-  }
-  function applyRotate(ev) {
-    const c = Math.cos(ev.radians), s = Math.sin(ev.radians);
-    const moved2 = [];
-    for (const n2 of manipulable(ev.ids)) {
-      const b = frameBounds(n2);
-      if (!b) continue;
-      const cx2 = (b.minX + b.maxX) / 2, cy2 = (b.minY + b.maxY) / 2;
-      const nx = ev.about.x + (cx2 - ev.about.x) * c - (cy2 - ev.about.y) * s;
-      const ny = ev.about.y + (cx2 - ev.about.x) * s + (cy2 - ev.about.y) * c;
-      setTransform(n2, { minX: b.minX + nx - cx2, maxX: b.maxX + nx - cx2, minY: b.minY + ny - cy2, maxY: b.maxY + ny - cy2 });
-      const prev = getRep(n2, "rotation")?.data ?? 0;
-      n2.reps = n2.reps.filter((r) => r.modality !== "rotation");
-      n2.reps.push({ modality: "rotation", data: prev + ev.radians, source: "user" });
+    const m = manipulationOf(ev);
+    for (const n2 of manipulableOf(nodes, ev.ids)) {
+      const reps = manipulatedReps(n2, m);
+      if (!reps) continue;
+      n2.reps = reps;
       boundsMoved(n2.id);
       refreshWordBounds(n2);
       moved2.push(n2.id);
@@ -14311,13 +14399,9 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         gesturesOf(handOf(ev)).selection = [];
         return null;
       case "move":
-        applyMove(ev);
-        return null;
       case "scale":
-        applyScale(ev);
-        return null;
       case "rotate":
-        applyRotate(ev);
+        applyManipulation(ev);
         return null;
       case "tidy":
         applyTidy(ev);
@@ -14482,28 +14566,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       if (outermost) openAct = null;
     }
   }
-  function releasesFor(ids, map) {
-    if (!boundBy.size) return [];
-    const moved2 = manipulable([...ids]);
-    const together = new Set(moved2.map((n2) => n2.id));
-    const out = [];
-    for (const n2 of moved2) {
-      const bs = bindingsOf(n2).filter((b) => b.end === "start" || b.end === "end");
-      if (!bs.length) continue;
-      const ends = connectorEnds(n2, nodes);
-      for (const b of bs) {
-        if (together.has(b.nodeId)) continue;
-        const target = nodes.get(b.nodeId);
-        const site = target && boundSiteOf(target, nodes, b.site);
-        const at = ends ? b.end === "start" ? ends.start : ends.end : null;
-        if (target && site && at && sitsOn(map(at), site.point, target, n2)) continue;
-        out.push({ strokeId: n2.id, end: b.end });
-      }
-    }
-    return out;
-  }
-  function manipulate(ev, map) {
-    const releases = releasesFor(ev.ids, map);
+  function manipulate(ev) {
+    const releases = boundBy.size ? releasedBy(nodes, ev.ids, manipulationOf(ev)) : [];
     if (!releases.length) {
       dispatch(ev);
       return;
@@ -14591,27 +14655,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       const pv = reshapePreview(node, nodes, handle, args.to);
       if (!pv) return false;
       const pid = args.participantId !== void 0 ? { participantId: args.participantId } : {};
-      const bs = bindingsOf(node).filter((b) => b.end === "start" || b.end === "end");
-      const releases = [];
-      let tie = null;
-      const end = endOfHandle(node, nodes, handle.kind);
-      if (end) {
-        const want = args.bind;
-        const hold = want && typeof want.nodeId === "string" && want.nodeId !== node.id && nodes.has(want.nodeId) && want.site && typeof want.site.kind === "string" && Number.isInteger(want.site.index) ? want : null;
-        const current = bs.find((b) => b.end === end);
-        const same = !!hold && !!current && current.nodeId === hold.nodeId && current.site.kind === hold.site.kind && current.site.index === hold.site.index;
-        if (current && !same) releases.push(end);
-        if (hold && !same) tie = { end, nodeId: hold.nodeId, site: { kind: hold.site.kind, index: hold.site.index } };
-      } else if (bs.length && movesWhole(pv.clean.shape, handle.kind)) {
-        const ends = connectorEnds(pv.node, nodes);
-        for (const b of bs) {
-          const target = nodes.get(b.nodeId);
-          const site = target && boundSiteOf(target, nodes, b.site);
-          const at = ends ? b.end === "start" ? ends.start : ends.end : null;
-          if (target && site && at && sitsOn(at, site.point, target, node)) continue;
-          releases.push(b.end);
-        }
-      }
+      const { releases, tie } = reshapeDecision(node, nodes, handle, pv.node, pv.clean.shape, args.bind);
       const write = () => {
         for (const e of releases) dispatch({ type: "unbind", strokeId: node.id, end: e, at: args.at, ...pid });
         dispatch({ type: "reshape", id: args.id, handle, to: pv.to, at: args.at, ...pid });
@@ -14666,15 +14710,9 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     splitWord: (nodeId, at) => void dispatch({ type: "split", nodeId, at }),
     select: (ids, at) => void dispatch({ type: "select", ids, at }),
     deselect: (at) => void dispatch({ type: "deselect", at }),
-    move: (args) => manipulate({ type: "move", ...args }, (p) => ({ x: p.x + args.dx, y: p.y + args.dy })),
-    scale: (args) => {
-      const sx = args.sx > 1e-3 ? args.sx : 1e-3, sy = args.sy > 1e-3 ? args.sy : 1e-3, o = args.about;
-      manipulate({ type: "scale", ...args }, (p) => ({ x: o.x + (p.x - o.x) * sx, y: o.y + (p.y - o.y) * sy }));
-    },
-    rotate: (args) => {
-      const c = Math.cos(args.radians), s = Math.sin(args.radians), o = args.about;
-      manipulate({ type: "rotate", ...args }, (p) => ({ x: o.x + (p.x - o.x) * c - (p.y - o.y) * s, y: o.y + (p.x - o.x) * s + (p.y - o.y) * c }));
-    },
+    move: (args) => manipulate({ type: "move", ...args }),
+    scale: (args) => manipulate({ type: "scale", ...args }),
+    rotate: (args) => manipulate({ type: "rotate", ...args }),
     bless: (args) => dispatch({ type: "bless", ...args }),
     dismiss: (summonId, at) => void dispatch({ type: "dismiss", summonId, at }),
     erase: (nodeId, at) => void dispatch({ type: "erase", nodeId, at }),
@@ -20265,6 +20303,7 @@ export {
   FLOWCHART,
   FLOWCHART_READER,
   FLOWCHART_TABLE,
+  FOLLOW_VISITS,
   FolderStore,
   GITHUB_API,
   GRAPH3D_MARK,
@@ -20327,6 +20366,7 @@ export {
   ReadOnlyError,
   SEND_WAIT_MS,
   SETTLED_CONFIDENCE,
+  SITS_EXACTLY,
   SKIP_DIRS,
   SLIVER,
   SNAPPABLE,
@@ -20379,7 +20419,9 @@ export {
   binarize,
   bindingsOf,
   blessedBehaviourOf,
+  boundByIndex,
   boundRepsOf,
+  boundSiteOf,
   boundToMark,
   boundingBoxDistance,
   boundsContain,
@@ -20477,6 +20519,7 @@ export {
   elementsOf,
   enclosedBy,
   encodeLog,
+  endOfHandle,
   evaluateChain,
   evaluateExpr,
   explanationOf,
@@ -20490,7 +20533,11 @@ export {
   finiteBounds,
   fit2 as fit,
   flowchartPortsOf,
+  followMapOf,
+  followOf,
   followPacks,
+  followPreview,
+  followed,
   force,
   formatExpr,
   formatNumber,
@@ -20512,6 +20559,7 @@ export {
   hasMultipleSources,
   headingsOf,
   headsOf,
+  holdReach,
   holds,
   idealize,
   inkMeasure,
@@ -20549,6 +20597,7 @@ export {
   leadOf,
   learnCommandMark,
   lettersOf,
+  lettingGo,
   levelOf2 as levelOf,
   libraryDefinitions,
   libraryId,
@@ -20565,6 +20614,10 @@ export {
   magnetSites,
   magnetsNear,
   makersOf,
+  manipulableOf,
+  manipulatedReps,
+  manipulationMap,
+  markFrameOf,
   matchBrace,
   matchConcepts,
   matchDefinition,
@@ -20577,6 +20630,7 @@ export {
   mermaidReaders,
   mermaidString,
   mermaidWriters,
+  movesWhole,
   nameMarks,
   nearLimitOf,
   nearestMagnet,
@@ -20596,6 +20650,7 @@ export {
   otsu,
   outlineOf,
   ownLog,
+  ownSitesOf,
   packBench,
   packDefinitionOf,
   packOfId,
@@ -20621,6 +20676,7 @@ export {
   parseTranscripts,
   participantOfLog,
   placed,
+  placementOf,
   planFor,
   pointNearnessOf,
   polygonFigure,
@@ -20658,9 +20714,11 @@ export {
   registeredTools,
   relate,
   relationsOf,
+  releasedBy,
   resampleByArcLength,
   resemblances,
   reshapeClean,
+  reshapeDecision,
   reshapePreview,
   reshapedClean,
   resolveFrame,
@@ -20685,6 +20743,7 @@ export {
   simplifyStroke,
   singular,
   siteOf,
+  sitsOn,
   sittingName,
   sittingToken,
   sizeOf2 as sizeOf,

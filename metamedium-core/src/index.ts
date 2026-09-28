@@ -267,10 +267,35 @@ export type { Binding, BoundRep } from './session/magnets';
 // one `reshape` event that reshapes the clean form and never the ink.
 export { handlesOf, reshapePreview, reshapedClean, reshapeClean, cleanFormOf, MIN_EXTENT_PX } from './session/handles';
 export type { Handle, HandleKind, ReshapePreview } from './session/handles';
-// Bindings follow (V1-PLAN E2, CONTROL-POINTS-PLAN P3): a connector's ends,
-// and where they stand.
-export { connectorEnds } from './session/follow';
-export type { ConnectorEnds } from './session/follow';
+// Bindings follow (V1-PLAN E2, CONTROL-POINTS-PLAN P3): a connector bound to a
+// site re-derives its end when the mark moves or is reshaped — a `'follow'`
+// rep the engine derives in the apply path, never logged. A connector's ends
+// and where they stand, the end a handle drags, the ends a hand's move walks
+// off their sites, and what would follow a drag before the log has it.
+export {
+  connectorEnds,
+  endOfHandle,
+  movesWhole,
+  holdReach,
+  sitsOn,
+  releasedBy,
+  reshapeDecision,
+  lettingGo,
+  followOf,
+  followed,
+  followPreview,
+  boundByIndex,
+  SITS_EXACTLY,
+  FOLLOW_VISITS,
+} from './session/follow';
+export type { ConnectorEnds, FollowRep, Tie } from './session/follow';
+export { boundSiteOf, ownSitesOf } from './session/magnets';
+export { followMapOf, placementOf } from './session/nodes';
+// A move, a scale or a turn as a pure function of a mark: what the reducer
+// does to each mark a manipulation moves, and what a preview of a drag asks.
+export { manipulableOf, manipulatedReps, manipulationMap, markFrameOf } from './session/manipulate';
+export type { Manipulation } from './session/manipulate';
+export type { Affine } from './session/affine';
 
 // Words from letters — printed letters gathered into one held mark (words.ts).
 export { isLetterLike, joinsRun, wordConfidence, LETTER_MAX_HEIGHT_PX, WORD_GAP_RATIO, WORD_WINDOW_MS } from './session/words';

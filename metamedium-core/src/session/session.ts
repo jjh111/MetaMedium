@@ -77,8 +77,15 @@ import { type GenreReading, type RoleReading, type Wire, assignRoles, genreOf } 
 import { BUILTIN_COMMAND_MARK, matchesCommandMark } from './commandmark';
 import { type SnapReading, idealize, snapReading, cleanOf } from './clean';
 import { reshapePreview, reshapedClean } from './handles';
-import { bindingsOf, boundSiteOf } from './magnets';
-import { connectorEnds, endOfHandle, followed, followThrough, movesWhole, sitsOn } from './follow';
+import { connectorEnds, followed, followThrough, releasedBy, reshapeDecision } from './follow';
+import { type Manipulation, manipulableOf, manipulatedReps, markFrameOf } from './manipulate';
+
+/** A move, scale or turn event as the manipulation it writes. */
+function manipulationOf(ev: Extract<SessionEvent, { type: 'move' | 'scale' | 'rotate' }>): Manipulation {
+  if (ev.type === 'move') return { type: 'move', dx: ev.dx, dy: ev.dy };
+  if (ev.type === 'scale') return { type: 'scale', about: ev.about, sx: ev.sx, sy: ev.sy };
+  return { type: 'rotate', about: ev.about, radians: ev.radians };
+}
 import { isLetterLike, joinsRun, wordConfidence } from './words';
 import { type StructuralSignature, type Examples, structuralSignature, matchDefinition, addExample, MATCH_FLOOR } from './signature';
 import type { Kind } from '../kinds/kinds';
@@ -2604,7 +2611,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       // where they carried it (E2), so the box tidy placed is where it STANDS
       // goes, and its ink's frame is taken there by the same fit.
       const shown = cleanOf(node)?.reshaped || followMapOf(node) ? boundsOf(node) : undefined;
-      const frame = shown && frameBounds(node);
+      const frame = shown && markFrameOf(node);
       const to = shown && frame ? refit(frame, shown, p.to) : p.to;
       node.reps = node.reps.filter((r) => r.modality !== 'transform');
       node.reps.push({ modality: 'transform', data: to, source: 'engine' });
@@ -3005,81 +3012,19 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     gesturesOf(handOf(ev)).selection = ev.ids.filter((id) => inContent.has(id));
   }
 
-  /** The strokes a manipulation actually moves: a stroke itself, or an artifact's or word's members, recursively. */
-  function manipulable(ids: string[]): MMNode[] {
-    const out: MMNode[] = [];
-    const seen = new Set<string>();
-    const visit = (id: string) => {
-      if (seen.has(id)) return;
-      seen.add(id);
-      const n = nodes.get(id);
-      if (!n || getRep(n, 'erased')) return;
-      if (getRep(n, 'stroke')) { out.push(n); return; }
-      for (const e of n.edges) if (e.rel === 'has-part') visit(e.to);
-    };
-    ids.forEach(visit);
-    return out;
-  }
-
-  function setTransform(node: MMNode, to: Bounds) {
-    node.reps = node.reps.filter((r) => r.modality !== 'transform');
-    node.reps.push({ modality: 'transform', data: to, source: 'user' });
-  }
-
-  /** A mark's current axis-aligned frame, before rotation — the thing transform reps describe. */
-  function frameBounds(node: MMNode): Bounds | undefined {
-    const moved = getRep(node, 'transform')?.data as Bounds | undefined;
-    if (moved) return moved;
-    return fingerprintOf(node)?.bounds;
-  }
-
-  function applyMove(ev: Extract<SessionEvent, { type: 'move' }>) {
+  /**
+   * A move, a scale or a turn (manipulate.ts): each stroke it moves — a
+   * stroke itself, or an artifact's or a word's members — gains its transform
+   * and turn, by the very function a surface's preview of the drag runs; and
+   * what is bound to what moved follows it (V1-PLAN E2).
+   */
+  function applyManipulation(ev: Extract<SessionEvent, { type: 'move' | 'scale' | 'rotate' }>) {
     const moved: string[] = [];
-    for (const n of manipulable(ev.ids)) {
-      const b = frameBounds(n);
-      if (!b) continue;
-      setTransform(n, { minX: b.minX + ev.dx, maxX: b.maxX + ev.dx, minY: b.minY + ev.dy, maxY: b.maxY + ev.dy });
-      boundsMoved(n.id);
-      refreshWordBounds(n);
-      moved.push(n.id);
-    }
-    // What is bound to what moved follows it (V1-PLAN E2).
-    followFrom(moved);
-    recomputeClusterCandidates();
-  }
-
-  function applyScale(ev: Extract<SessionEvent, { type: 'scale' }>) {
-    const sx = ev.sx > 1e-3 ? ev.sx : 1e-3, sy = ev.sy > 1e-3 ? ev.sy : 1e-3;
-    const moved: string[] = [];
-    for (const n of manipulable(ev.ids)) {
-      const b = frameBounds(n);
-      if (!b) continue;
-      setTransform(n, {
-        minX: ev.about.x + (b.minX - ev.about.x) * sx, maxX: ev.about.x + (b.maxX - ev.about.x) * sx,
-        minY: ev.about.y + (b.minY - ev.about.y) * sy, maxY: ev.about.y + (b.maxY - ev.about.y) * sy,
-      });
-      boundsMoved(n.id);
-      refreshWordBounds(n);
-      moved.push(n.id);
-    }
-    followFrom(moved);
-    recomputeClusterCandidates();
-  }
-
-  function applyRotate(ev: Extract<SessionEvent, { type: 'rotate' }>) {
-    const c = Math.cos(ev.radians), s = Math.sin(ev.radians);
-    const moved: string[] = [];
-    for (const n of manipulable(ev.ids)) {
-      const b = frameBounds(n);
-      if (!b) continue;
-      // Each mark turns about its own centre, and its centre swings about the pivot.
-      const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
-      const nx = ev.about.x + (cx - ev.about.x) * c - (cy - ev.about.y) * s;
-      const ny = ev.about.y + (cx - ev.about.x) * s + (cy - ev.about.y) * c;
-      setTransform(n, { minX: b.minX + nx - cx, maxX: b.maxX + nx - cx, minY: b.minY + ny - cy, maxY: b.maxY + ny - cy });
-      const prev = (getRep(n, 'rotation')?.data as number | undefined) ?? 0;
-      n.reps = n.reps.filter((r) => r.modality !== 'rotation');
-      n.reps.push({ modality: 'rotation', data: prev + ev.radians, source: 'user' });
+    const m = manipulationOf(ev);
+    for (const n of manipulableOf(nodes, ev.ids)) {
+      const reps = manipulatedReps(n, m);
+      if (!reps) continue;
+      n.reps = reps;
       boundsMoved(n.id);
       refreshWordBounds(n);
       moved.push(n.id);
@@ -3630,13 +3575,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         gesturesOf(handOf(ev)).selection = [];
         return null;
       case 'move':
-        applyMove(ev);
-        return null;
       case 'scale':
-        applyScale(ev);
-        return null;
       case 'rotate':
-        applyRotate(ev);
+        applyManipulation(ev);
         return null;
       case 'tidy':
         applyTidy(ev);
@@ -3874,38 +3815,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     }
   }
 
-  /**
-   * The bound ends a hand's move, scale or turn of these marks walks off
-   * their sites: for each connector it moves, each binding to a mark not
-   * moved with it whose end, carried by `map`, would stand beyond the
-   * magnet's reach of its site (`sitsOn`). A claim the hand walked away from
-   * is let go; one on a mark moved with it, or one the magnet still holds, is
-   * kept — and the follow puts that end back on its site.
-   */
-  function releasesFor(ids: readonly string[], map: (p: Point) => Point): { strokeId: string; end: 'start' | 'end' }[] {
-    if (!boundBy.size) return [];
-    const moved = manipulable([...ids]);
-    const together = new Set(moved.map((n) => n.id));
-    const out: { strokeId: string; end: 'start' | 'end' }[] = [];
-    for (const n of moved) {
-      const bs = bindingsOf(n).filter((b) => b.end === 'start' || b.end === 'end');
-      if (!bs.length) continue;
-      const ends = connectorEnds(n, nodes);
-      for (const b of bs) {
-        if (together.has(b.nodeId)) continue;
-        const target = nodes.get(b.nodeId);
-        const site = target && boundSiteOf(target, nodes, b.site);
-        const at = ends ? (b.end === 'start' ? ends.start : ends.end) : null;
-        if (target && site && at && sitsOn(map(at), site.point, target, n)) continue;
-        out.push({ strokeId: n.id, end: b.end as 'start' | 'end' });
-      }
-    }
-    return out;
-  }
-
-  /** A move, a scale or a turn, and the bound ends it walks off their sites let go first — one act. */
-  function manipulate(ev: Extract<SessionEvent, { type: 'move' | 'scale' | 'rotate' }>, map: (p: Point) => Point) {
-    const releases = releasesFor(ev.ids, map);
+  /** A move, a scale or a turn, and the bound ends it walks off their sites let go first (`releasedBy`) — one act. */
+  function manipulate(ev: Extract<SessionEvent, { type: 'move' | 'scale' | 'rotate' }>) {
+    const releases = boundBy.size ? releasedBy(nodes, ev.ids, manipulationOf(ev)) : [];
     if (!releases.length) {
       dispatch(ev);
       return;
@@ -4006,31 +3918,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       if (!pv) return false;
       const pid = args.participantId !== undefined ? { participantId: args.participantId } : {};
       // What the hand does to a connector's own bindings (V1-PLAN E2, the
-      // director's decision), decided here and written in the same act.
-      const bs = bindingsOf(node).filter((b) => b.end === 'start' || b.end === 'end');
-      const releases: ('start' | 'end')[] = [];
-      let tie: { end: 'start' | 'end'; nodeId: string; site: { kind: string; index: number } } | null = null;
-      const end = endOfHandle(node, nodes, handle.kind);
-      if (end) {
-        // Its own end dragged: let go where a magnet holds it, it binds there
-        // (the old claim for that end replaced); anywhere else, it lets go.
-        const want = args.bind;
-        const hold = want && typeof want.nodeId === 'string' && want.nodeId !== node.id && nodes.has(want.nodeId) && want.site && typeof want.site.kind === 'string' && Number.isInteger(want.site.index) ? want : null;
-        const current = bs.find((b) => b.end === end);
-        const same = !!hold && !!current && current.nodeId === hold.nodeId && current.site.kind === hold.site.kind && current.site.index === hold.site.index;
-        if (current && !same) releases.push(end);
-        if (hold && !same) tie = { end, nodeId: hold.nodeId, site: { kind: hold.site.kind, index: hold.site.index } };
-      } else if (bs.length && movesWhole(pv.clean.shape, handle.kind)) {
-        // Moved whole by a handle: the ends that no longer sit on their sites let go.
-        const ends = connectorEnds(pv.node, nodes);
-        for (const b of bs) {
-          const target = nodes.get(b.nodeId);
-          const site = target && boundSiteOf(target, nodes, b.site);
-          const at = ends ? (b.end === 'start' ? ends.start : ends.end) : null;
-          if (target && site && at && sitsOn(at, site.point, target, node)) continue;
-          releases.push(b.end as 'start' | 'end');
-        }
-      }
+      // director's decision), decided here and written in the same act: its
+      // own end dragged binds where a magnet holds it and lets go anywhere
+      // else; moved whole, it lets go of what it no longer sits on.
+      const { releases, tie } = reshapeDecision(node, nodes, handle, pv.node, pv.clean.shape, args.bind);
       const write = () => {
         for (const e of releases) dispatch({ type: 'unbind', strokeId: node.id, end: e, at: args.at, ...pid });
         dispatch({ type: 'reshape', id: args.id, handle, to: pv.to, at: args.at, ...pid });
@@ -4087,15 +3978,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     splitWord: (nodeId, at) => void dispatch({ type: 'split', nodeId, at }),
     select: (ids, at) => void dispatch({ type: 'select', ids, at }),
     deselect: (at) => void dispatch({ type: 'deselect', at }),
-    move: (args) => manipulate({ type: 'move', ...args }, (p) => ({ x: p.x + args.dx, y: p.y + args.dy })),
-    scale: (args) => {
-      const sx = args.sx > 1e-3 ? args.sx : 1e-3, sy = args.sy > 1e-3 ? args.sy : 1e-3, o = args.about;
-      manipulate({ type: 'scale', ...args }, (p) => ({ x: o.x + (p.x - o.x) * sx, y: o.y + (p.y - o.y) * sy }));
-    },
-    rotate: (args) => {
-      const c = Math.cos(args.radians), s = Math.sin(args.radians), o = args.about;
-      manipulate({ type: 'rotate', ...args }, (p) => ({ x: o.x + (p.x - o.x) * c - (p.y - o.y) * s, y: o.y + (p.x - o.x) * s + (p.y - o.y) * c }));
-    },
+    move: (args) => manipulate({ type: 'move', ...args }),
+    scale: (args) => manipulate({ type: 'scale', ...args }),
+    rotate: (args) => manipulate({ type: 'rotate', ...args }),
     bless: (args) => dispatch({ type: 'bless', ...args }),
     dismiss: (summonId, at) => void dispatch({ type: 'dismiss', summonId, at }),
     erase: (nodeId, at) => void dispatch({ type: 'erase', nodeId, at }),

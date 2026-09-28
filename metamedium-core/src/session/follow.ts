@@ -81,7 +81,8 @@ import type { Point } from '../types';
 import type { MMNode, Rep } from './nodes';
 import { boundsOf, followMapOf, getRep, placed, placementOf, standingPointsOf } from './nodes';
 import { cleanOf } from './clean';
-import { activeBindingsOf, boundSiteOf, magnetRadius } from './magnets';
+import { activeBindingsOf, bindingsOf, boundSiteOf, magnetRadius } from './magnets';
+import { type Manipulation, manipulableOf, manipulationMap } from './manipulate';
 import { cleanFormOf, MIN_EXTENT_PX } from './handles';
 import { inkEndsOf } from '../diagram/heads';
 import { type Affine, IDENTITY, carry, compose, invert, isAffine, pivotMap, translation } from './affine';
@@ -181,6 +182,94 @@ export function holdReach(target: MMNode, connector: MMNode): number {
 /** Whether a point sits on a site: within the magnet's reach of it. */
 export function sitsOn(end: Point, site: Point, target: MMNode, connector: MMNode): boolean {
   return dist(end, site) <= holdReach(target, connector);
+}
+
+/**
+ * The bound ends a hand's move, scale or turn of these marks walks off their
+ * sites: for each connector it moves, each binding to a mark not moved with
+ * it whose end, carried where the manipulation takes it, would stand beyond
+ * the magnet's reach of its site (`sitsOn`). A claim the hand walked away
+ * from is let go; one on a mark moved with it, or one the magnet still
+ * holds, is kept — and the follow puts that end back on its site. The
+ * session's door writes an `unbind` for each, first, in the manipulation's
+ * own act; a surface's preview of the drag asks the same.
+ */
+export function releasedBy(nodes: ReadonlyMap<string, MMNode>, ids: readonly string[], m: Manipulation): { strokeId: string; end: 'start' | 'end' }[] {
+  const moved = manipulableOf(nodes, ids);
+  const together = new Set(moved.map((n) => n.id));
+  const map = manipulationMap(m);
+  const out: { strokeId: string; end: 'start' | 'end' }[] = [];
+  for (const n of moved) {
+    const bs = bindingsOf(n).filter((b) => b.end === 'start' || b.end === 'end');
+    if (!bs.length) continue;
+    const ends = connectorEnds(n, nodes);
+    for (const b of bs) {
+      if (together.has(b.nodeId)) continue;
+      const target = nodes.get(b.nodeId);
+      const site = target && boundSiteOf(target, nodes, b.site);
+      const at = ends ? (b.end === 'start' ? ends.start : ends.end) : null;
+      if (target && site && at && sitsOn(map(at), site.point, target, n)) continue;
+      out.push({ strokeId: n.id, end: b.end as 'start' | 'end' });
+    }
+  }
+  return out;
+}
+
+/** A binding a handle drag makes: this end, on this site of that mark. */
+export interface Tie {
+  end: 'start' | 'end';
+  nodeId: string;
+  site: { kind: string; index: number };
+}
+
+/**
+ * What a handle drag does to a mark's own bindings (V1-PLAN E2, the
+ * director's decision), given the mark as the drag leaves it (`reshaped`, the
+ * node `reshapePreview` gives, holding its `shape`) and the site a magnet
+ * holds where the hand let go, if one does: a connector's own tail or tip
+ * binds there — the old claim for that end replaced — and lets go anywhere
+ * else; a handle that moves it whole (its middle) lets go of the ends that no
+ * longer sit on their sites. The session's `reshape` door writes the unbinds,
+ * the reshape and the bind in one act; a surface's preview mirrors them.
+ */
+export function reshapeDecision(
+  node: MMNode,
+  nodes: ReadonlyMap<string, MMNode>,
+  handle: { kind: string; index: number },
+  reshaped: MMNode,
+  shape: string,
+  hold?: { nodeId: string; site: { kind: string; index: number } } | null,
+): { releases: ('start' | 'end')[]; tie: Tie | null } {
+  const bs = bindingsOf(node).filter((b) => b.end === 'start' || b.end === 'end');
+  const releases: ('start' | 'end')[] = [];
+  const end = endOfHandle(node, nodes, handle.kind);
+  if (end) {
+    const held =
+      hold && typeof hold.nodeId === 'string' && hold.nodeId !== node.id && nodes.has(hold.nodeId) && hold.site && typeof hold.site.kind === 'string' && Number.isInteger(hold.site.index)
+        ? hold
+        : null;
+    const current = bs.find((b) => b.end === end);
+    const same = !!held && !!current && current.nodeId === held.nodeId && current.site.kind === held.site.kind && current.site.index === held.site.index;
+    if (current && !same) releases.push(end);
+    return { releases, tie: held && !same ? { end, nodeId: held.nodeId, site: { kind: held.site.kind, index: held.site.index } } : null };
+  }
+  if (bs.length && movesWhole(shape, handle.kind)) {
+    const ends = connectorEnds(reshaped, nodes);
+    for (const b of bs) {
+      const target = nodes.get(b.nodeId);
+      const site = target && boundSiteOf(target, nodes, b.site);
+      const at = ends ? (b.end === 'start' ? ends.start : ends.end) : null;
+      if (target && site && at && sitsOn(at, site.point, target, node)) continue;
+      releases.push(b.end as 'start' | 'end');
+    }
+  }
+  return { releases, tie: null };
+}
+
+/** A mark as it stands with these ends' bindings let go: its `bound-to` edges for them left out — what a preview draws a drag's result from. */
+export function lettingGo(node: MMNode, ends: readonly ('start' | 'end')[]): MMNode {
+  if (!ends.length) return node;
+  return { ...node, edges: node.edges.filter((e) => !(e.rel === 'bound-to' && ends.includes(e.end as 'start' | 'end'))) };
 }
 
 /** The map a connector holds from its bindings, read from its `'follow'` rep — or nothing. */
