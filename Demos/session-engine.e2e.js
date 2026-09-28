@@ -3450,6 +3450,58 @@ window.__scenario = async function(){
     step('53a. one undo takes the move back, and both arrows with it: each exactly where it stood before the drag, its tip on B\'s site where B stands again',
       mm.session.getEvents().length === n53 && back53.every(Boolean) && arrows53.every((id, i) => { const e = ends53(id); return !!e && at53(e.end, site53(b53, tipSites53[i].kind, tipSites53[i].index)); }),
       { events: mm.session.getEvents().length - n53, back: back53 });
+
+    // While B is dragged, before the hand lets go, both arrows are drawn following it — as the
+    // replay will carry them, so the preview is the act.
+    mm.session.select([b53], Date.now()); await wait(30);
+    const from53b = mm.worldToScreen(700, 264);
+    const sitesMid53 = tipSites53.map((x) => { const p = site53(b53, x.kind, x.index); return { x: p.x + 60, y: p.y + 45 }; });
+    pe53('pointerdown', from53b.x, from53b.y);
+    for (let i = 1; i <= 6; i++) pe53('pointermove', from53b.x + (60 * i) / 6, from53b.y + (45 * i) / 6);
+    await wait(30);
+    const during53 = typeof mm.followDrawn === 'function' ? mm.followDrawn() : [];
+    const logged53 = mm.session.getEvents().length;
+    pe53('pointerup', from53b.x + 60, from53b.y + 45); await wait(40);
+    const shown53 = arrows53.map((id, i) => {
+      const d = during53.find((f) => f.id === id), e = ends53(id);
+      return !!d && !!d.ends && at53(d.ends.end, sitesMid53[i]) && at53(d.ends.start, tails53[i]) && !!e && at53(e.end, d.ends.end) && at53(e.start, d.ends.start);
+    });
+    step('53b. while B is dragged, before the hand lets go, both arrows are drawn following it — each tip on its site where B will stand, each tail on A — with nothing logged yet; let go, each stands exactly where it was drawn following',
+      during53.length === 2 && logged53 === n53 + 1 && shown53.every(Boolean),
+      { during: during53.map((f) => ({ id: f.id, tip: round53(f.ends && f.ends.end) })), sites: sitesMid53.map(round53), shown: shown53 });
+    mm.session.undo(); await wait(30);
+
+    // Arrow 1's own tip dragged by its handle onto box C's corner: the pen's magnet holds it there,
+    // and let go it binds there — its claim on B replaced, in one act; one undo takes the act back.
+    t.stroke(t.rect(980, 520, 160, 120)); await wait(40);
+    const boxC53 = last53();
+    const corner53 = site53(boxC53, 'corner', 0);
+    mm.session.select([arrows53[0]], Date.now()); await wait(30);
+    const tip53 = (typeof mm.handlesDrawn === 'function' ? mm.handlesDrawn() : []).find((h) => h.kind === 'tip');
+    const n53c = mm.session.getEvents().length;
+    let held53 = null;
+    if (tip53) {
+      const a = mm.worldToScreen(tip53.x, tip53.y), b = mm.worldToScreen(corner53.x + 4, corner53.y + 3);
+      pe53('pointerdown', a.x, a.y);
+      for (let i = 1; i <= 8; i++) pe53('pointermove', a.x + ((b.x - a.x) * i) / 8, a.y + ((b.y - a.y) * i) / 8);
+      await wait(30);
+      held53 = typeof mm.dragHold === 'function' ? mm.dragHold() : null;
+      pe53('pointerup', b.x, b.y); await wait(40);
+    }
+    const evs53c = mm.session.getEvents().slice(n53c);
+    const bound53 = () => MM.bindingsOf(nodes53().get(arrows53[0]), nodes53()).map((x) => x.end + '→' + (x.nodeId === a53 ? 'A' : x.nodeId === b53 ? 'B' : x.nodeId === boxC53 ? 'C' : x.nodeId) + ' ' + x.site.kind + ' ' + x.site.index).sort().join(', ');
+    const oneAct53 = evs53c.length === 3 && typeof evs53c[0].act === 'number' && evs53c.every((e) => e.act === evs53c[0].act);
+    const tied53c = bound53();
+    const tipAt53 = ends53(arrows53[0]);
+    step('53c. arrow 1\'s tip dragged by its handle onto box C\'s corner: the magnet holds it there as it goes, and let go it binds there — the claim on B let go and C\'s corner taken, with the reshape, in one act; the tail stays tied to A',
+      !!tip53 && !!held53 && held53.nodeId === boxC53 && held53.kind === 'corner' && held53.index === 0 && JSON.stringify(evs53c.map((e) => e.type)) === '["unbind","reshape","bind"]' && oneAct53 &&
+        tied53c === 'end→C corner 0, start→A middle 1' && !!tipAt53 && at53(tipAt53.end, corner53) && at53(tipAt53.start, tails53[0]),
+      { handle: tip53 ? round53(tip53) : null, held: held53, events: evs53c.map((e) => e.type + (typeof e.act === 'number' ? '#' + e.act : '')), bound: tied53c, tip: round53(tipAt53 && tipAt53.end), corner: round53(corner53) });
+    mm.session.undo(); await wait(30);
+    const back53d = ends53(arrows53[0]);
+    step('53d. one undo takes that act back whole: the tip tied to B again and standing on its site, the arrow drawn as it was',
+      mm.session.getEvents().length === n53c && bound53() === 'end→B middle 3, start→A middle 1' && !!back53d && at53(back53d.end, site53(b53, 'middle', 3)),
+      { events: mm.session.getEvents().length - n53c, bound: bound53(), tip: round53(back53d && back53d.end) });
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 

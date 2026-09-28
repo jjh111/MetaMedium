@@ -5,7 +5,8 @@
 //   the working dot, the explanation plane and its layout, the status line (one sentence).
 // Uses: core, view, artifacts, snap, models, palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
 //   packs (packShort — a match chip says its pack; a pack this build lacks is said in the standing line),
-//   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet).
+//   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet),
+//   selection (dragPreview, dragFollowers — what follows a drag is drawn where it will stand, V1-PLAN E2).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -88,6 +89,7 @@
   let paintOps = null;        // while recording: what this paint drew, one op a thing
   let paintReference = false; // while painting as the whole-board read would
   let paintMoved = false;     // the ink being drawn is where a drag or a tank has taken it
+  let followShown = null;     // the connectors that follow the drag in progress, id → node as it will stand (V1-PLAN E2)
   let paintNow = 0;           // a clock held still for the two paints a check compares
   const nowMs = () => paintNow || Date.now();
   /** The reading under the inspected mark, as the last paint drew it: { id, text }, or null. */
@@ -458,7 +460,8 @@
     if (isWritingArtifact(node) && !flipped.has(node.id)) return;
     for (const e of node.edges) { // artifact: draw its members (transparent within)
       if (e.rel !== 'has-part') continue;
-      const m = state.nodes.get(e.to);
+      // A member that follows a drag (V1-PLAN E2) is drawn where the drag takes it.
+      const m = (followShown && followShown.get(e.to)) || state.nodes.get(e.to);
       if (!m || m.reps.some((r) => r.modality === 'erased')) continue;
       // Off screen, a member is passed over — unless a drag or a tank has moved it, when its box is not where it is drawn.
       if (paintView && !paintMoved && paintIndex) { const mb = paintIndex.boxes.get(m.id); if (mb && MM.finiteBounds(mb) && !boxMeets(mb, paintView)) continue; }
@@ -551,24 +554,29 @@
     // name, in the participant colour — an offer, never a trap (P1).
     if (magnetHold) magnetRing(magnetHold);
   }
-  /** A magnet the pen is in reach of: a ring, a dot, and the site's name — in world space, on the pen's layer. */
-  function magnetRing(hit) {
+  /**
+   * A magnet the pen is in reach of: a ring, a dot, and the site's name — in
+   * world space, on the pen's layer; or on the board's, where a connector's
+   * own end dragged by its handle is held (V1-PLAN E2).
+   */
+  function magnetRing(hit, c) {
+    c = c || liveCtx;
     const p = hit.site.point;
-    liveCtx.beginPath();
-    liveCtx.arc(p.x, p.y, wpx(8), 0, Math.PI * 2);
-    liveCtx.strokeStyle = C.agent;
-    liveCtx.lineWidth = wpx(1.5);
-    liveCtx.stroke();
-    liveCtx.beginPath();
-    liveCtx.arc(p.x, p.y, wpx(2.2), 0, Math.PI * 2);
-    liveCtx.fillStyle = C.agent;
-    liveCtx.fill();
-    liveCtx.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
-    liveCtx.lineWidth = wpx(3);
-    liveCtx.strokeStyle = C.haloText;
-    liveCtx.strokeText(hit.site.kind, p.x + wpx(13), p.y - wpx(9));
-    liveCtx.fillStyle = C.agent;
-    liveCtx.fillText(hit.site.kind, p.x + wpx(13), p.y - wpx(9));
+    c.beginPath();
+    c.arc(p.x, p.y, wpx(8), 0, Math.PI * 2);
+    c.strokeStyle = C.agent;
+    c.lineWidth = wpx(1.5);
+    c.stroke();
+    c.beginPath();
+    c.arc(p.x, p.y, wpx(2.2), 0, Math.PI * 2);
+    c.fillStyle = C.agent;
+    c.fill();
+    c.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
+    c.lineWidth = wpx(3);
+    c.strokeStyle = C.haloText;
+    c.strokeText(hit.site.kind, p.x + wpx(13), p.y - wpx(9));
+    c.fillStyle = C.agent;
+    c.fillText(hit.site.kind, p.x + wpx(13), p.y - wpx(9));
   }
 
   /** The canvas in world units, grown by `m` world units on every side. */
@@ -619,7 +627,7 @@
    * holds, what a drag or a tank has moved, and the artifacts whose name or
    * brackets reach the screen.
    */
-  function paintOrder(s, ix, vb, inspectedId, pv) {
+  function paintOrder(s, ix, vb, inspectedId, pv, followers) {
     const out = new Set(ix.paint.query(vb));
     for (const id of ix.unboxed) out.add(id);
     if (inspectedId) out.add(inspectedId);
@@ -629,6 +637,8 @@
     if (s.summon) for (const id of s.summon.enclosedIds) out.add(id);
     for (const id of heldCandidates) out.add(id);
     if (pv) for (const id of pv.ids) out.add(id);
+    // What follows a drag is drawn where the drag takes it, wherever that is (V1-PLAN E2).
+    if (followers) for (const id of followers.keys()) out.add(ix.contentAt.has(id) ? id : ix.topOf.get(id) || id);
     for (const id of tank.place.keys()) out.add(id);
     for (const id of ix.artifactsInOrder) {
       if (out.has(id) || !chromeShown(s, id, inspectedId)) continue;
@@ -725,6 +735,8 @@
 
     const inspectedId = hoverId || lastContentId(s);
     const pv = dragPreview();
+    // The connectors bound to what a drag moves, each drawn as it will stand when the hand lets go (V1-PLAN E2).
+    followShown = pv ? dragFollowers() : null;
     // Which artifacts wear their brackets and name — for every artifact on the
     // board, in its order, drawn or not: a label rises above the name, and the
     // name is the same whether the artifact is on screen or not.
@@ -734,8 +746,9 @@
     // off screen at working zoom — except while a tank moves bodies about.
     paintView = vb && !tank.place.size ? vb : null;
 
-    for (const id of ix ? paintOrder(s, ix, vb, inspectedId, pv) : s.contentIds) {
-      const node = s.nodes.get(id);
+    for (const id of ix ? paintOrder(s, ix, vb, inspectedId, pv, followShown) : s.contentIds) {
+      const follows = followShown && followShown.get(id);
+      const node = follows || s.nodes.get(id);
       const isArtifact = artifactSet.has(id);
       const isLive = liveSetNow.has(id);
       const pending = s.pendingLassoId === id;
@@ -747,13 +760,15 @@
       // what got built, and that promise is only kept by drawing them on top.
       // While a hand holds the selection, the held marks follow it before the
       // log has the move — one event lands when the hand lets go.
-      const held = pv && pv.ids.includes(id);
+      // A connector that follows the drag is drawn from where the drag takes it: its own
+      // node, carried as the replay will carry it, never the canvas's transform on top.
+      const held = !follows && pv && pv.ids.includes(id);
       if (held) { ctx.save(); applyPreview(pv); }
       // A body in a running tank is drawn where its behaviour has taken it:
       // the DRAWING moves, translated and turned, never a sprite in its place.
       const pl = bodyPlacement(id);
       if (pl) { ctx.save(); ctx.translate(pl.cx + pl.dx, pl.cy + pl.dy); ctx.rotate(pl.angle); ctx.translate(-pl.cx, -pl.cy); }
-      paintMoved = !!(held || pl);
+      paintMoved = !!(held || pl || follows);
       inkOf(node, {
         color: isLive ? `rgba(${C.goldRGB},0.85)` : color,
         width: id === inspectedId ? inkW * 1.3 : inkW,

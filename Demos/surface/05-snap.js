@@ -131,12 +131,18 @@
     const go = () => { magnetsWarming = false; if (!live) sitesNow(); };
     if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 2000 }); else setTimeout(go, 200);
   }
-  /** The nearest site to a world point within the hand's radius, or null. */
-  function magnetQuery(w) {
+  /**
+   * The nearest site to a world point within the hand's radius, or null —
+   * on any mark but `except`, when one is given: a connector's own end,
+   * dragged by its handle, feels every other mark's sites as the pen does
+   * (V1-PLAN E2), never its own.
+   */
+  function magnetQuery(w, except) {
     const at = sitesNow();
     const radius = MM.MAGNET_SCREEN_PX / view.zoom; // about the hand, not the world (invariant 3)
     let best = -1, bestD = 0;
     for (let i = 0; i < at.sites.length; i++) {
+      if (except && at.sites[i].nodeId === except) continue;
       const distance = Math.hypot(at.xs[i] - w.x, at.ys[i] - w.y);
       if (distance <= radius && (best < 0 || distance < bestD)) { best = i; bestD = distance; }
     }

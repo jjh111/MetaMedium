@@ -1453,8 +1453,10 @@
 // Provides: the selection as a thing on the canvas — a soft outline with
 //   handles around what a loop became, and the one selected mark's own points
 //   (V1-PLAN E1); hit tests (handleAt); the drag preview the input applies
-//   while a hand moves, scales, rotates or reshapes; renderSelection.
-// Uses: core (state, session), view (wpx, worldToScreen), render (union, logKey), input (drag, flash).
+//   while a hand moves, scales, rotates or reshapes, and what follows it —
+//   the connectors bound to what the hand moves (V1-PLAN E2, dragFollowers);
+//   a connector's own end, dragged, feeling the magnets; renderSelection.
+// Uses: core (state, session), view (wpx, worldToScreen), render (union, logKey, magnetRing), snap (magnetQuery), input (drag, flash).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -1464,7 +1466,7 @@
   // a corner to scale, the knob above to turn. None of it is a mode — the
   // next stroke elsewhere dissolves it, a tap dismisses it (and is never a
   // dot), and undoing the dismissal brings it back where it was.
-  let drag = null; // { ids, mode: 'move'|'scale'|'rotate'|'reshape', start, last, about, moved } — a reshape's also { id, handle, grab, to, pv }
+  let drag = null; // { ids, mode: 'move'|'scale'|'rotate'|'reshape', start, last, about, moved } — a reshape's also { id, handle, grab, to, pv, end, hold }
 
   // ===== Handles: the one mark's own points (V1-PLAN E1; CONTROL-POINTS-PLAN P2) =====
   // One mark selected alone, with a clean form — held, or the one it would be
@@ -1530,7 +1532,7 @@
   /** The drag's current transform, as a preview the renderer applies before the log has it. A reshape moves no mark as a whole: its preview is the form. */
   function dragPreview() {
     if (!drag || !drag.moved) return null;
-    if (drag.mode === 'reshape') return { ids: [], kind: 'reshape', id: drag.id, handle: drag.handle, to: drag.to, node: drag.pv ? drag.pv.node : null };
+    if (drag.mode === 'reshape') return { ids: [], kind: 'reshape', id: drag.id, handle: drag.handle, to: drag.to, node: drag.pv ? drag.pv.node : null, shape: drag.pv ? drag.pv.clean.shape : null, end: drag.end, hold: drag.hold };
     const dx = drag.last.x - drag.start.x, dy = drag.last.y - drag.start.y;
     if (drag.mode === 'move') return { ids: drag.ids, kind: 'move', dx, dy };
     if (drag.mode === 'scale') {
@@ -1588,7 +1590,10 @@
   function beginDrag(hit, w) {
     if (hit.kind === 'reshape') {
       // The handle follows the hand from where it was taken, not from where the pen landed on it.
-      drag = { ids: [], mode: 'reshape', id: hit.id, handle: hit.handle, grab: hit.at, to: hit.at, pv: null, start: w, last: w, moved: false, bounds: hit.bounds };
+      // A connector's own tail or tip is one of its ends (V1-PLAN E2): it feels the magnets as it goes.
+      const n = state.nodes.get(hit.id);
+      const end = n ? MM.endOfHandle(n, state.nodes, hit.handle.kind) : null;
+      drag = { ids: [], mode: 'reshape', id: hit.id, handle: hit.handle, grab: hit.at, to: hit.at, pv: null, end: end, hold: null, start: w, last: w, moved: false, bounds: hit.bounds };
       canvas.style.cursor = 'grabbing';
       return;
     }
@@ -1609,7 +1614,10 @@
       // The form as it will be: the very function the reshape runs, on the board's own state.
       drag.to = { x: drag.grab.x + (w.x - drag.start.x), y: drag.grab.y + (w.y - drag.start.y) };
       const n = state.nodes.get(drag.id);
-      drag.pv = n ? MM.reshapePreview(n, state.nodes, drag.handle, drag.to) : null;
+      // A connector's own end feels every other mark's sites as the pen does (V1-PLAN E2): in a
+      // site's reach it lands on the site, and let go there it binds there — an offer, never a trap.
+      drag.hold = n && drag.end ? magnetQuery(drag.to, drag.id) : null;
+      drag.pv = n ? MM.reshapePreview(n, state.nodes, drag.handle, drag.hold ? drag.hold.site.point : drag.to) : null;
     }
     render(state);
   }
@@ -1625,16 +1633,66 @@
     const at = Date.now();
     if (pv.kind === 'reshape') {
       // One reshape: the form where the hand let go, the ink as it was. A mark
-      // not yet drawn clean is drawn clean by the same act — said, once.
+      // not yet drawn clean is drawn clean by the same act — said, once. A
+      // connector's own end let go where a magnet holds it binds there; let go
+      // anywhere else, a bound end lets go of its site (V1-PLAN E2) — both in
+      // the same act, and one undo takes it all back.
       const n = state.nodes.get(pv.id);
       const born = !!n && !MM.cleanOf(n);
-      if (!session.reshape({ id: pv.id, handle: pv.handle, to: pv.to, at })) { render(state); return; }
-      if (born) flash('drawn clean and reshaped — the ink stays beneath; undo takes both back');
+      const hold = pv.hold;
+      const n0 = session.getEvents().length;
+      const bind = hold ? { nodeId: hold.site.nodeId, site: { kind: hold.site.kind, index: hold.site.index } } : null;
+      if (!session.reshape({ id: pv.id, handle: pv.handle, to: hold ? hold.site.point : pv.to, at, bind: bind })) { render(state); return; }
+      const wrote = session.getEvents().slice(n0).map((e) => e.type);
+      if (wrote.includes('bind')) flash('bound — ' + MM.describeMagnet(hold.site));
+      else if (wrote.includes('unbind')) flash('let go — that end is tied to nothing now; undo ties it again');
+      else if (born) flash('drawn clean and reshaped — the ink stays beneath; undo takes both back');
       return;
     }
+    const n0 = session.getEvents().length;
     if (pv.kind === 'move') session.move({ ids, dx: pv.dx, dy: pv.dy, at });
     else if (pv.kind === 'scale') session.scale({ ids, about: pv.about, sx: pv.sx, sy: pv.sy, at });
     else session.rotate({ ids, about: pv.about, radians: pv.radians, at });
+    // A connector moved whole lets go of the sites it walked off, in the same act (V1-PLAN E2).
+    const loose = session.getEvents().slice(n0).filter((e) => e.type === 'unbind').length;
+    if (loose) flash('moved — ' + (loose === 1 ? 'an end' : loose + ' ends') + ' let go of the sites ' + (loose === 1 ? 'it was' : 'they were') + ' tied to; undo ties ' + (loose === 1 ? 'it' : 'them') + ' again');
+  }
+
+  // ===== What follows the drag (V1-PLAN E2) =====
+  // While a hand moves, scales, turns or reshapes marks, the connectors bound
+  // to them are drawn following — as they will stand when the hand lets go,
+  // by the very functions the replay runs (core's manipulatedReps, releasedBy,
+  // reshapeDecision and followPreview), so the preview is the act. Nothing
+  // here is written: the follow is derived when the log has the move.
+  let boundByAt = { key: null, index: null };
+  /** The connectors that follow the drag in progress, each as it will stand — id to node — or null. */
+  function dragFollowers() {
+    const pv = dragPreview();
+    if (!pv) return null;
+    const s = state;
+    const key = logKey();
+    if (boundByAt.key !== key) boundByAt = { key: key, index: MM.boundByIndex(s.nodes) };
+    if (!boundByAt.index.size) return null; // nothing on the board is bound: nothing follows
+    const changed = new Map();
+    if (pv.kind === 'reshape') {
+      const n = s.nodes.get(pv.id);
+      if (!n || !pv.node) return null;
+      // The mark as the drag leaves it, the ends its own drag lets go of let go of here too.
+      const d = MM.reshapeDecision(n, s.nodes, pv.handle, pv.node, pv.shape, pv.hold ? { nodeId: pv.hold.site.nodeId, site: { kind: pv.hold.site.kind, index: pv.hold.site.index } } : null);
+      changed.set(pv.id, MM.lettingGo(pv.node, d.releases));
+    } else {
+      const m = pv.kind === 'move' ? { type: 'move', dx: pv.dx, dy: pv.dy } : pv.kind === 'scale' ? { type: 'scale', about: pv.about, sx: pv.sx, sy: pv.sy } : { type: 'rotate', about: pv.about, radians: pv.radians };
+      const released = MM.releasedBy(s.nodes, pv.ids, m);
+      for (const n of MM.manipulableOf(s.nodes, pv.ids)) {
+        const reps = MM.manipulatedReps(n, m);
+        if (!reps) continue;
+        const mine = released.filter((r) => r.strokeId === n.id).map((r) => r.end);
+        changed.set(n.id, MM.lettingGo(Object.assign({}, n, { reps: reps }), mine));
+      }
+    }
+    if (!changed.size) return null;
+    const out = MM.followPreview(s.nodes, changed, boundByAt.index);
+    return out.size ? out : null;
   }
 
   function renderSelection(s) {
@@ -1664,6 +1722,8 @@
       drawHandle(mh, reshaping && pv.handle.kind === mh.kind && pv.handle.index === mh.index);
       handlesDrawn.push({ kind: mh.kind, index: mh.index, x: mh.point.x, y: mh.point.y, reasoning: mh.reasoning });
     }
+    // A connector's own end in a site's reach: the ring the pen's magnet draws, where it will bind.
+    if (reshaping && pv.hold) magnetRing(pv.hold, ctx);
     ctx.restore();
   }
 
@@ -1800,12 +1860,18 @@
     const go = () => { magnetsWarming = false; if (!live) sitesNow(); };
     if (window.requestIdleCallback) requestIdleCallback(go, { timeout: 2000 }); else setTimeout(go, 200);
   }
-  /** The nearest site to a world point within the hand's radius, or null. */
-  function magnetQuery(w) {
+  /**
+   * The nearest site to a world point within the hand's radius, or null —
+   * on any mark but `except`, when one is given: a connector's own end,
+   * dragged by its handle, feels every other mark's sites as the pen does
+   * (V1-PLAN E2), never its own.
+   */
+  function magnetQuery(w, except) {
     const at = sitesNow();
     const radius = MM.MAGNET_SCREEN_PX / view.zoom; // about the hand, not the world (invariant 3)
     let best = -1, bestD = 0;
     for (let i = 0; i < at.sites.length; i++) {
+      if (except && at.sites[i].nodeId === except) continue;
       const distance = Math.hypot(at.xs[i] - w.x, at.ys[i] - w.y);
       if (distance <= radius && (best < 0 || distance < bestD)) { best = i; bestD = distance; }
     }
@@ -2734,7 +2800,8 @@
 //   the working dot, the explanation plane and its layout, the status line (one sentence).
 // Uses: core, view, artifacts, snap, models, palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
 //   packs (packShort — a match chip says its pack; a pack this build lacks is said in the standing line),
-//   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet).
+//   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet),
+//   selection (dragPreview, dragFollowers — what follows a drag is drawn where it will stand, V1-PLAN E2).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -2817,6 +2884,7 @@
   let paintOps = null;        // while recording: what this paint drew, one op a thing
   let paintReference = false; // while painting as the whole-board read would
   let paintMoved = false;     // the ink being drawn is where a drag or a tank has taken it
+  let followShown = null;     // the connectors that follow the drag in progress, id → node as it will stand (V1-PLAN E2)
   let paintNow = 0;           // a clock held still for the two paints a check compares
   const nowMs = () => paintNow || Date.now();
   /** The reading under the inspected mark, as the last paint drew it: { id, text }, or null. */
@@ -3187,7 +3255,8 @@
     if (isWritingArtifact(node) && !flipped.has(node.id)) return;
     for (const e of node.edges) { // artifact: draw its members (transparent within)
       if (e.rel !== 'has-part') continue;
-      const m = state.nodes.get(e.to);
+      // A member that follows a drag (V1-PLAN E2) is drawn where the drag takes it.
+      const m = (followShown && followShown.get(e.to)) || state.nodes.get(e.to);
       if (!m || m.reps.some((r) => r.modality === 'erased')) continue;
       // Off screen, a member is passed over — unless a drag or a tank has moved it, when its box is not where it is drawn.
       if (paintView && !paintMoved && paintIndex) { const mb = paintIndex.boxes.get(m.id); if (mb && MM.finiteBounds(mb) && !boxMeets(mb, paintView)) continue; }
@@ -3280,24 +3349,29 @@
     // name, in the participant colour — an offer, never a trap (P1).
     if (magnetHold) magnetRing(magnetHold);
   }
-  /** A magnet the pen is in reach of: a ring, a dot, and the site's name — in world space, on the pen's layer. */
-  function magnetRing(hit) {
+  /**
+   * A magnet the pen is in reach of: a ring, a dot, and the site's name — in
+   * world space, on the pen's layer; or on the board's, where a connector's
+   * own end dragged by its handle is held (V1-PLAN E2).
+   */
+  function magnetRing(hit, c) {
+    c = c || liveCtx;
     const p = hit.site.point;
-    liveCtx.beginPath();
-    liveCtx.arc(p.x, p.y, wpx(8), 0, Math.PI * 2);
-    liveCtx.strokeStyle = C.agent;
-    liveCtx.lineWidth = wpx(1.5);
-    liveCtx.stroke();
-    liveCtx.beginPath();
-    liveCtx.arc(p.x, p.y, wpx(2.2), 0, Math.PI * 2);
-    liveCtx.fillStyle = C.agent;
-    liveCtx.fill();
-    liveCtx.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
-    liveCtx.lineWidth = wpx(3);
-    liveCtx.strokeStyle = C.haloText;
-    liveCtx.strokeText(hit.site.kind, p.x + wpx(13), p.y - wpx(9));
-    liveCtx.fillStyle = C.agent;
-    liveCtx.fillText(hit.site.kind, p.x + wpx(13), p.y - wpx(9));
+    c.beginPath();
+    c.arc(p.x, p.y, wpx(8), 0, Math.PI * 2);
+    c.strokeStyle = C.agent;
+    c.lineWidth = wpx(1.5);
+    c.stroke();
+    c.beginPath();
+    c.arc(p.x, p.y, wpx(2.2), 0, Math.PI * 2);
+    c.fillStyle = C.agent;
+    c.fill();
+    c.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
+    c.lineWidth = wpx(3);
+    c.strokeStyle = C.haloText;
+    c.strokeText(hit.site.kind, p.x + wpx(13), p.y - wpx(9));
+    c.fillStyle = C.agent;
+    c.fillText(hit.site.kind, p.x + wpx(13), p.y - wpx(9));
   }
 
   /** The canvas in world units, grown by `m` world units on every side. */
@@ -3348,7 +3422,7 @@
    * holds, what a drag or a tank has moved, and the artifacts whose name or
    * brackets reach the screen.
    */
-  function paintOrder(s, ix, vb, inspectedId, pv) {
+  function paintOrder(s, ix, vb, inspectedId, pv, followers) {
     const out = new Set(ix.paint.query(vb));
     for (const id of ix.unboxed) out.add(id);
     if (inspectedId) out.add(inspectedId);
@@ -3358,6 +3432,8 @@
     if (s.summon) for (const id of s.summon.enclosedIds) out.add(id);
     for (const id of heldCandidates) out.add(id);
     if (pv) for (const id of pv.ids) out.add(id);
+    // What follows a drag is drawn where the drag takes it, wherever that is (V1-PLAN E2).
+    if (followers) for (const id of followers.keys()) out.add(ix.contentAt.has(id) ? id : ix.topOf.get(id) || id);
     for (const id of tank.place.keys()) out.add(id);
     for (const id of ix.artifactsInOrder) {
       if (out.has(id) || !chromeShown(s, id, inspectedId)) continue;
@@ -3454,6 +3530,8 @@
 
     const inspectedId = hoverId || lastContentId(s);
     const pv = dragPreview();
+    // The connectors bound to what a drag moves, each drawn as it will stand when the hand lets go (V1-PLAN E2).
+    followShown = pv ? dragFollowers() : null;
     // Which artifacts wear their brackets and name — for every artifact on the
     // board, in its order, drawn or not: a label rises above the name, and the
     // name is the same whether the artifact is on screen or not.
@@ -3463,8 +3541,9 @@
     // off screen at working zoom — except while a tank moves bodies about.
     paintView = vb && !tank.place.size ? vb : null;
 
-    for (const id of ix ? paintOrder(s, ix, vb, inspectedId, pv) : s.contentIds) {
-      const node = s.nodes.get(id);
+    for (const id of ix ? paintOrder(s, ix, vb, inspectedId, pv, followShown) : s.contentIds) {
+      const follows = followShown && followShown.get(id);
+      const node = follows || s.nodes.get(id);
       const isArtifact = artifactSet.has(id);
       const isLive = liveSetNow.has(id);
       const pending = s.pendingLassoId === id;
@@ -3476,13 +3555,15 @@
       // what got built, and that promise is only kept by drawing them on top.
       // While a hand holds the selection, the held marks follow it before the
       // log has the move — one event lands when the hand lets go.
-      const held = pv && pv.ids.includes(id);
+      // A connector that follows the drag is drawn from where the drag takes it: its own
+      // node, carried as the replay will carry it, never the canvas's transform on top.
+      const held = !follows && pv && pv.ids.includes(id);
       if (held) { ctx.save(); applyPreview(pv); }
       // A body in a running tank is drawn where its behaviour has taken it:
       // the DRAWING moves, translated and turned, never a sprite in its place.
       const pl = bodyPlacement(id);
       if (pl) { ctx.save(); ctx.translate(pl.cx + pl.dx, pl.cy + pl.dy); ctx.rotate(pl.angle); ctx.translate(-pl.cx, -pl.cy); }
-      paintMoved = !!(held || pl);
+      paintMoved = !!(held || pl || follows);
       inkOf(node, {
         color: isLive ? `rgba(${C.goldRGB},0.85)` : color,
         width: id === inspectedId ? inkW * 1.3 : inkW,
@@ -10399,6 +10480,10 @@
     labelsDrawn: () => labelsDrawn.map((l) => Object.assign({}, l)),
     // The one selected mark's own points (V1-PLAN E1), for tests: where the last paint drew each handle, in world units.
     handlesDrawn: () => handlesDrawn.map((h) => Object.assign({}, h)),
+    // What followed the drag in progress (V1-PLAN E2), for tests: each connector the last paint drew following, and its ends where it drew them.
+    followDrawn: () => (followShown ? [...followShown].map(([id, n]) => ({ id: id, ends: MM.connectorEnds(n, state.nodes) })) : []),
+    // The site a connector's own end dragged by its handle is held on (V1-PLAN E2), for tests — or null.
+    dragHold: () => (drag && drag.hold ? { nodeId: drag.hold.site.nodeId, kind: drag.hold.site.kind, index: drag.hold.site.index } : null),
     // What the last paint drew under the inspected mark, and the check that a hand's paint draws and says what the whole-board read would (R4c).
     readingDrawn: () => (readingDrawn ? Object.assign({}, readingDrawn) : null), paintCheck: paintCheck, rolesCheck: rolesCheck, heldCheck: heldCheck, paints: () => paints,
     // Point at a mark the way a hover does, for tests: it is inspected, its reading drawn under it and its ladder in the panel.

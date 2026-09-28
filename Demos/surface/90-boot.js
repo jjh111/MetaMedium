@@ -32,6 +32,10 @@
     labelsDrawn: () => labelsDrawn.map((l) => Object.assign({}, l)),
     // The one selected mark's own points (V1-PLAN E1), for tests: where the last paint drew each handle, in world units.
     handlesDrawn: () => handlesDrawn.map((h) => Object.assign({}, h)),
+    // What followed the drag in progress (V1-PLAN E2), for tests: each connector the last paint drew following, and its ends where it drew them.
+    followDrawn: () => (followShown ? [...followShown].map(([id, n]) => ({ id: id, ends: MM.connectorEnds(n, state.nodes) })) : []),
+    // The site a connector's own end dragged by its handle is held on (V1-PLAN E2), for tests — or null.
+    dragHold: () => (drag && drag.hold ? { nodeId: drag.hold.site.nodeId, kind: drag.hold.site.kind, index: drag.hold.site.index } : null),
     // What the last paint drew under the inspected mark, and the check that a hand's paint draws and says what the whole-board read would (R4c).
     readingDrawn: () => (readingDrawn ? Object.assign({}, readingDrawn) : null), paintCheck: paintCheck, rolesCheck: rolesCheck, heldCheck: heldCheck, paints: () => paints,
     // Point at a mark the way a hover does, for tests: it is inspected, its reading drawn under it and its ladder in the panel.
