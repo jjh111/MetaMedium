@@ -21,7 +21,8 @@ import { LiveMerge } from '../store/livemerge';
 import { encodeLog, decodeLog } from '../store/seam';
 import { registeredPorts, unregisterPorts } from '../session/ports';
 import { definitionOf } from '../tools/board';
-import { circleStroke, lineStroke, checkStroke } from '../test/strokes';
+import { circleStroke, lineStroke, checkStroke, handRect } from '../test/strokes';
+import { magnetSites } from '../session/magnets';
 import type { Point } from '../types';
 import { libraryDefinitions } from './definitions';
 import { followPacks } from './follow';
@@ -367,5 +368,30 @@ describe('the pen: a pack naming a notation offers its ports while in use', () =
   it('the notation reads whether or not its pack is used — recognition is never gated on a declaration', () => {
     expect(shippedPack('flowchart@1')!.notation).toBe('flowchart');
     expect(shippedPack('flowchart@1')!.definitions).toEqual([]);
+    expect(shippedPack('uml-class@1')!.notation).toBe('uml-class');
+    expect(shippedPack('uml-class@1')!.definitions).toEqual([]);
+  });
+
+  it('uml-class@1 in use puts each class’s four sides on the pen — a place along a side — and stopping takes them back (D4)', () => {
+    const s = createSession();
+    const stop = followPacks(s);
+    // A class: a box with a line across it, side to side.
+    const box = s.addStroke(handRect(100, 100, 200, 140, { seed: 1 }), next());
+    s.addStroke(lineStroke({ x: 101, y: 140 }, { x: 299, y: 140 }), next() + 4000);
+    const sites = () => magnetSites(s.getState().nodes.get(box)!, s.getState().nodes).filter((x) => x.kind === 'along:uml-class');
+    expect(sites()).toEqual([]);
+    s.use('uml-class@1', next() + 8000);
+    expect(registeredPorts()).toEqual(['uml-class']);
+    const along = sites();
+    expect(along.length).toBeGreaterThan(8);
+    // Somewhere along each of its four sides.
+    expect(along.some((x) => Math.abs(x.point.y - 100) < 6)).toBe(true);
+    expect(along.some((x) => Math.abs(x.point.x - 300) < 6)).toBe(true);
+    expect(along.some((x) => Math.abs(x.point.y - 240) < 6)).toBe(true);
+    expect(along.some((x) => Math.abs(x.point.x - 100) < 6)).toBe(true);
+    s.unuse('uml-class@1', next() + 12000);
+    expect(registeredPorts()).toEqual([]);
+    expect(sites()).toEqual([]);
+    stop();
   });
 });

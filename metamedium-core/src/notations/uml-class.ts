@@ -848,9 +848,11 @@ export function readUmlClass(state: SessionState, scopeIds?: readonly string[]):
     const quality = Math.min(from.quality, to.quality);
     const sure = mt.marker ? 0.75 + 0.25 * mt.sure : 0.8;
     const confidence = MAX * quality * sure;
+    // What sits at an end that reads as no head at all is said too: a head too small or shaky to read.
+    const unread = [h.start, h.end].filter((e) => !e.heads.length && /touches/.test(e.reason)).map((e) => `at its ${e.end}, ${e.reason.replace(/^a mark/, 'a mark')}`);
     const reason =
       kind === 'link'
-        ? `${an(h.shape)} with no head a class relation has, between ${from.class!.id} and ${to.class!.id}${mt.head || mf.head ? ` — ${[mf, mt].filter((x) => x.head).map((x) => x.why).join('; ')}` : ''}`
+        ? `${an(h.shape)} with no head a class relation has, between ${from.class!.id} and ${to.class!.id}${[...[mf, mt].filter((x) => x.head).map((x) => x.why), ...unread].map((x) => ` — ${x}`).join('')}`
         : `${an(h.shape)} from ${from.class!.id} to ${to.class!.id}, ${mt.why} at ${to.class!.id}${mf.marker ? `, and ${mf.why} at ${from.class!.id}` : ''}`;
     // The other kinds it could be: each head reading its marked end holds besides, as sure as heads.ts is of it.
     const readings: UmlRelation['readings'] = [{ kind, confidence, reason }];

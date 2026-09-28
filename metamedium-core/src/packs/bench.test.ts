@@ -3,7 +3,8 @@
 // and stays quiet on the drawing corpus the other benches use: the
 // recognition corpus's single marks (every shape every way a hand draws it,
 // boxes turned, arcs of every sweep), the flowchart bench's thirty-six
-// flowcharts, its wireframes and lines of writing, a row of boxes and a hub.
+// flowcharts, its wireframes and lines of writing, the class-diagram bench's
+// boards (D4), a row of boxes and a hub.
 // A canonical molecule in the corpus says what it is, and must be read as one.
 //
 // A false read is a match above the floor on a drawing that is neither
@@ -16,6 +17,7 @@ import type { Point } from '../types';
 import { buildCases, buildTurnedCases, buildArcCases } from '../test/cases';
 import { handCircle, handLine, handRect } from '../test/strokes';
 import { FLOWCHART_VARIANTS, drawFlowchart, drawMolecule, drawWireframe, drawWriting } from '../notations/fixtures/flowchart';
+import { CLASS_VARIANTS, drawClassDiagram, drawClassPair } from '../notations/fixtures/uml-class';
 import { benchCorpus, packBench, type BenchDrawing, type PackBenchResult } from './bench';
 import { shippedPacks } from './registry';
 import { packRef } from './pack';
@@ -31,6 +33,11 @@ function corpus(): BenchDrawing[] {
   const out: BenchDrawing[] = [];
   for (const c of [...buildCases(), ...buildTurnedCases(), ...buildArcCases()]) out.push({ label: c.label, strokes: [c.points] });
   FLOWCHART_VARIANTS.forEach((v) => out.push({ label: `flowchart seed ${v.seed} jitter ${v.jitter} tilt ${v.tilt}`, strokes: strokesOf((s) => drawFlowchart(s, v)) }));
+  // The class-diagram bench's boards (D4): six classes and five relations, and A2's pair.
+  CLASS_VARIANTS.filter((_, i) => i % 6 === 0).forEach((v) => {
+    out.push({ label: `class diagram seed ${v.seed}`, strokes: strokesOf((s) => drawClassDiagram(s, v)) });
+    out.push({ label: `A2 seed ${v.seed}`, strokes: strokesOf((s) => drawClassPair(s, v)) });
+  });
   for (const seed of [1, 2, 3, 4, 5, 6]) {
     out.push({ label: `wireframe ${seed}`, strokes: strokesOf((s) => drawWireframe(s, seed)) });
     out.push({ label: `writing ${seed}`, strokes: strokesOf((s) => drawWriting(s, seed)) });
