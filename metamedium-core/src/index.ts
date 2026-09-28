@@ -257,6 +257,11 @@ export { registerPorts, unregisterPorts, registeredPorts, alongIndex, alongOf, A
 export type { NotationPort, NotationPorts } from './session/ports';
 export { bindingsOf, boundRepsOf, activeBindingsOf, boundToMark, describeBinding } from './session/magnets';
 export type { Binding, BoundRep } from './session/magnets';
+// Handles (V1-PLAN E1, CONTROL-POINTS-PLAN P2) — the same sites made
+// draggable: one mark with a clean form shows its own, and dragging one writes
+// one `reshape` event that reshapes the clean form and never the ink.
+export { handlesOf, reshapePreview } from './session/handles';
+export type { Handle, HandleKind, ReshapePreview } from './session/handles';
 
 // Words from letters — printed letters gathered into one held mark (words.ts).
 export { isLetterLike, joinsRun, wordConfidence, LETTER_MAX_HEIGHT_PX, WORD_GAP_RATIO, WORD_WINDOW_MS } from './session/words';

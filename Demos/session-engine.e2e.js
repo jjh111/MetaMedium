@@ -3255,6 +3255,41 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 52. Handles (V1-PLAN E1; CONTROL-POINTS-PLAN P2) ----
+  // One mark with a clean form, selected alone, shows its own sites as
+  // handles; a corner dragged by the pointer writes one reshape event, and the
+  // clean form's corner goes where the hand let go while the ink stays exactly
+  // as it was drawn — no stroke, no summon.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0); await wait(30);
+    const last52 = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
+    const c52 = document.getElementById('canvas');
+    const pe52 = (type, x, y) => c52.dispatchEvent(new PointerEvent(type, { pointerId: 1, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1 }));
+    const drag52 = (from, to, n) => { n = n || 8; pe52('pointerdown', from.x, from.y); for (let i = 1; i <= n; i++) pe52('pointermove', from.x + ((to.x - from.x) * i) / n, from.y + ((to.y - from.y) * i) / n); pe52('pointerup', to.x, to.y); };
+    const at52 = (p, q) => !!p && !!q && Math.hypot(p.x - q.x, p.y - q.y) < 0.5;
+    const round52 = (ps) => (ps ? ps.map((p) => [Math.round(p.x), Math.round(p.y)]) : null);
+    t.stroke(t.rect(420, 260, 220, 140));
+    const box52 = last52();
+    const node52 = () => mm.session.getState().nodes.get(box52);
+    const site52 = (kind, index) => MM.magnetSites(node52(), mm.session.getState().nodes).find((x) => x.kind === kind && x.index === index).point;
+    mm.session.select([box52], Date.now()); await wait(30);
+    const drawn52 = typeof mm.handlesDrawn === 'function' ? mm.handlesDrawn() : [];
+    const ink52 = JSON.stringify(MM.strokePointsOf(node52()));
+    const corner52 = site52('corner', 2), across52 = site52('corner', 0);
+    const from52 = mm.worldToScreen(corner52.x, corner52.y);
+    const n52 = mm.session.getEvents().length;
+    drag52(from52, { x: from52.x + 60, y: from52.y + 40 });
+    await wait(40);
+    const evs52 = mm.session.getEvents().slice(n52);
+    const clean52 = MM.cleanPointsOf(node52());
+    step('52. a box selected alone shows its own sites as handles — its four corners, four edge middles and centre; its corner dragged by the pointer writes one reshape event: the clean form\'s corner goes where the hand let go, the corner across it stays, and the ink is exactly as drawn — no stroke, no summon',
+      drawn52.length === 9 && evs52.length === 1 && evs52[0].type === 'reshape' && evs52[0].id === box52 && evs52[0].handle.kind === 'corner' && evs52[0].handle.index === 2 &&
+        !!clean52 && at52(clean52[2], { x: corner52.x + 60, y: corner52.y + 40 }) && at52(clean52[0], across52) &&
+        JSON.stringify(MM.strokePointsOf(node52())) === ink52 && !mm.session.getState().summon && mm.session.getState().selection.length === 1,
+      { handles: drawn52.map((h) => h.kind + h.index), events: evs52.map((e) => e.type), clean: round52(clean52), corner: round52([corner52]), inkSame: JSON.stringify(MM.strokePointsOf(node52())) === ink52, summon: !!mm.session.getState().summon });
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };
 

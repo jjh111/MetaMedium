@@ -7340,6 +7340,14 @@ ${p.svg}</section>`),
   return { ...base, rows, cols, pages, assembly, html, reason };
 }
 
+// src/session/handles.ts
+function handlesOf(_node, _nodes) {
+  return [];
+}
+function reshapePreview(_node, _nodes, _handle, _to) {
+  return null;
+}
+
 // src/session/words.ts
 var LETTER_MAX_HEIGHT_PX = 150;
 var LETTER_MAX_WIDTH_PX = 150;
@@ -13640,6 +13648,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       case "bind":
         applyBind(ev);
         return null;
+      case "reshape":
+        return null;
       case "code":
         return applyCode(ev);
       case "dismiss": {
@@ -13845,6 +13855,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     tidy: (args) => void dispatch({ type: "tidy", ...args }),
     snap: (args) => void dispatch({ type: "snap", ...args }),
     bind: (args) => void dispatch({ type: "bind", ...args }),
+    reshape: () => false,
     snapCandidates: (ids) => candidatesAmong(ids ?? snappableIds()),
     attachCode: ({ expect, ...args }) => guarded({ type: "code", ...args }, expect),
     codeVersion,
@@ -18618,6 +18629,7 @@ export {
   getTool,
   handLabel,
   handLike,
+  handlesOf,
   has,
   hasMultipleSources,
   headingsOf,
@@ -18764,6 +18776,7 @@ export {
   relationsOf,
   resampleByArcLength,
   resemblances,
+  reshapePreview,
   resolveFrame,
   resolvesLasso,
   route,

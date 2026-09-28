@@ -391,6 +391,22 @@ type SessionEventUnion =
       participantId?: string;
     }
   | {
+      /**
+       * A handle dragged (V1-PLAN E1, CONTROL-POINTS-PLAN P2): one of the
+       * mark's own points, `handle` — `{ kind, index }` as `handlesOf` names
+       * it — let go at `to`, in the mark's OWN space (the space its ink was
+       * drawn in, before any move, scale or turn placed it). Its clean form
+       * is reshaped; the ink never is. A mark not yet snapped is snapped by
+       * the same act.
+       */
+      type: 'reshape';
+      id: string;
+      handle: { kind: string; index: number };
+      to: Point;
+      at: number;
+      participantId?: string;
+    }
+  | {
       type: 'code';
       participantId: string;
       nodeId: string;
@@ -664,6 +680,14 @@ export interface Session {
   snap(args: { ids: string[]; mode?: 'clean' | 'raw'; at: number }): void;
   /** Tie a stroke's endpoint to a magnet site on another mark (CONTROL-POINTS-PLAN P1). */
   bind(args: { strokeId: string; nodeId: string; site: { kind: string; index: number }; end: 'start' | 'end'; at: number; participantId?: string }): void;
+  /**
+   * Drag one of a mark's handles (V1-PLAN E1): `handle` as `handlesOf` names
+   * it, let go at `to` on the board. One `reshape` event — one act — and the
+   * mark's clean form is reshaped, born reshaped when it held none; the ink
+   * is never touched. False, and nothing written, when the mark has no clean
+   * form to reshape or the handle is not one of its own.
+   */
+  reshape(args: { id: string; handle: { kind: string; index: number }; to: Point; at: number; participantId?: string }): boolean;
   /**
    * Which marks read cleanly enough to be redrawn, and as what. Defaults to
    * every loose mark on the board. Marks already snapped are not offered again.
@@ -3385,6 +3409,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       case 'bind':
         applyBind(ev);
         return null;
+      case 'reshape':
+        return null;
       case 'code':
         return applyCode(ev);
       case 'dismiss': {
@@ -3666,6 +3692,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     tidy: (args) => void dispatch({ type: 'tidy', ...args }),
     snap: (args) => void dispatch({ type: 'snap', ...args }),
     bind: (args) => void dispatch({ type: 'bind', ...args }),
+    reshape: () => false,
     snapCandidates: (ids) => candidatesAmong(ids ?? snappableIds()),
     attachCode: ({ expect, ...args }) => guarded({ type: 'code', ...args }, expect),
     codeVersion,

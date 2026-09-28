@@ -46,6 +46,12 @@ export interface CleanShape {
   reasoning: string;
   /** A box drawn leaning, kept so: how far its sides lean off square, in degrees. Absent for a square-cornered box. */
   lean?: number;
+  /**
+   * Set when a hand reshaped it by one of its handles (V1-PLAN E1): the handle
+   * last dragged. A reshaped form is the hand's own geometry, not the ink's
+   * measurements redrawn, so where the mark stands is read from it.
+   */
+  reshaped?: { kind: string; index: number };
 }
 
 /** The top Tier 0 reading must reach this to be offered for snapping. */
