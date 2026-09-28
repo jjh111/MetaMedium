@@ -7,6 +7,10 @@
 //
 //     node --test metamedium-core/bench/budgets.test.mjs
 //
+// And the same budgets with two library packs in use (V1-PLAN §9 B3):
+// basics@1 and flowchart@1 used at the head of the 2,000-mark board's log, so
+// every group is matched against their definitions too.
+//
 // Each size runs in a process of its own (`budgets.mjs`): a clean heap, the
 // collector exposed, and a process that can be killed when a replay does not
 // finish — a replay is synchronous, so nothing inside the process could stop
@@ -33,9 +37,9 @@ export const BUDGETS = {
 };
 
 /** Run `budgets.mjs` for one size; resolve with its numbers, or say why there are none. */
-function measure(size, { limitMs, extra = [] }) {
+function measure(size, { limitMs, extra = [], flags = [] }) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, ['--expose-gc', ...extra, join(here, 'budgets.mjs'), `--size=${size}`], {
+    const child = spawn(process.execPath, ['--expose-gc', ...extra, join(here, 'budgets.mjs'), `--size=${size}`, ...flags], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '', stderr = '';
@@ -54,12 +58,13 @@ function measure(size, { limitMs, extra = [] }) {
   });
 }
 
-function record(size, run) {
+function record(size, run, packs = []) {
   mkdirSync(OUT_DIR, { recursive: true });
   const n = run.numbers;
   const line = {
     at: new Date().toISOString(),
     size,
+    ...(packs.length ? { packs, byPack: n ? n.state.byPack : null } : {}),
     finished: !!n,
     wallMs: run.wallMs,
     ...(n
@@ -105,4 +110,23 @@ test('5,000 marks: the board replays at all, and its numbers are recorded', { ti
   assert.ok(run.numbers, `the 5,000-mark board did not replay in ${ms(run.wallMs)} (${run.signal ? 'killed at the limit' : 'exit ' + run.code})`);
   const n = run.numbers;
   t.diagnostic(`replay ${ms(n.replay.warm.median)} (cold ${ms(n.replay.coldMs)}) · one more stroke ${ms(n.stroke.median)} / p95 ${ms(n.stroke.p95)} · held ${n.memory.heldMB} MB`);
+});
+
+const PACKS = ['basics@1', 'flowchart@1'];
+
+test('2,000 marks with two library packs in use (basics@1, flowchart@1): the same budgets', { timeout: TWO_K_LIMIT_MS + 60_000 }, async (t) => {
+  const run = await measure(2000, { limitMs: TWO_K_LIMIT_MS, flags: [`--packs=${PACKS.join(',')}`] });
+  const line = record(2000, run, PACKS);
+  t.diagnostic(JSON.stringify(line));
+  assert.ok(run.numbers, `the 2,000-mark board with packs did not finish in ${ms(run.wallMs)} (${run.signal ?? 'exit ' + run.code})`);
+  const n = run.numbers;
+  assert.deepEqual(n.state.packs, PACKS, 'the board uses the two packs');
+  const said = `with ${PACKS.join(' and ')}: replay ${ms(n.replay.warm.median)} (cold ${ms(n.replay.coldMs)}) · one more stroke ${ms(n.stroke.median)} / p95 ${ms(n.stroke.p95)} · held ${n.memory.heldMB} MB · ${n.state.byPack} groups matched by a pack`;
+  t.diagnostic(said);
+  const over = [];
+  if (!(n.replay.warm.median <= BUDGETS.replayMs)) over.push(`replay ${ms(n.replay.warm.median)} > ${BUDGETS.replayMs} ms`);
+  if (!(n.stroke.median <= BUDGETS.strokeMedianMs)) over.push(`stroke median ${ms(n.stroke.median)} > ${BUDGETS.strokeMedianMs} ms`);
+  if (!(n.stroke.p95 <= BUDGETS.strokeP95Ms)) over.push(`stroke p95 ${ms(n.stroke.p95)} > ${BUDGETS.strokeP95Ms} ms`);
+  if (!(n.memory.heldMB <= BUDGETS.heldMB)) over.push(`held ${n.memory.heldMB} MB > ${BUDGETS.heldMB} MB`);
+  assert.deepEqual(over, [], `over budget on the 2,000-mark board with packs: ${said}`);
 });
