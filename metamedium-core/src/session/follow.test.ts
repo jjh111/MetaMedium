@@ -232,6 +232,75 @@ describe('an arrow: its tip follows the box, and it still points at it', () => {
   });
 });
 
+describe("the trap: the connector's OWN form changes, and it follows again", () => {
+  it("an arrow drawn clean stands as its clean form — whose tip the rung may place a wing's length short — and that tip is carried onto the site", () => {
+    const s = createSession();
+    const a = box(s, 100, 100, 1000);
+    const b = box(s, 700, 100, 1500);
+    const ar = s.addStroke(handArrow({ x: 300, y: 160 }, { x: 697, y: 160 }, { wings: 2, headLen: 24, seed: 3, jitter: 0 }), 2000, undefined, 1);
+    s.bind({ strokeId: ar, nodeId: b, site: { kind: 'middle', index: 3 }, end: 'end', at: 3000 });
+    // The rung's tip, which the clean arrow is built from, stands short of the ink's.
+    const rough = (getRep(nodeOf(s, ar), 'reading:arrow')!.data as { tip: Point }).tip;
+    expect(dist(rough, { x: 700, y: 160 })).toBeGreaterThan(5);
+    s.snap({ ids: [ar], at: 4000 });
+    expect(getRep(nodeOf(s, ar), 'clean')).toBeDefined();
+    expectAt(endOf(s, ar, 'end'), { x: 700, y: 160 });
+    expectAt(endOf(s, ar, 'start'), { x: 300, y: 160 });
+    void a;
+  });
+
+  it('its tail dragged by its handle while its tip is bound: the form it is born reshaped with is carried back onto the site', () => {
+    const s = createSession();
+    const b = box(s, 700, 100, 1500);
+    const ar = s.addStroke(handArrow({ x: 300, y: 160 }, { x: 697, y: 160 }, { wings: 2, headLen: 24, seed: 3, jitter: 0 }), 2000, undefined, 1);
+    s.bind({ strokeId: ar, nodeId: b, site: { kind: 'middle', index: 3 }, end: 'end', at: 3000 });
+    expect(s.reshape({ id: ar, handle: { kind: 'tail', index: 0 }, to: { x: 320, y: 300 }, at: 4000 })).toBe(true);
+    expect(types(s.lastAct())).toEqual(['reshape']);
+    expectAt(endOf(s, ar, 'end'), { x: 700, y: 160 });
+    expectAt(endOf(s, ar, 'start'), { x: 320, y: 300 });
+  });
+
+  it('put back to its ink ("show the ink"), it stands as its ink again, its tip still on the site', () => {
+    const s = createSession();
+    const b = box(s, 700, 100, 1500);
+    const ar = s.addStroke(handArrow({ x: 300, y: 160 }, { x: 697, y: 160 }, { wings: 2, headLen: 24, seed: 3, jitter: 0 }), 2000, undefined, 1);
+    s.bind({ strokeId: ar, nodeId: b, site: { kind: 'middle', index: 3 }, end: 'end', at: 3000 });
+    s.snap({ ids: [ar], at: 4000 });
+    s.move({ ids: [b], dx: 40, dy: 80, at: 5000 });
+    s.snap({ ids: [ar], mode: 'raw', at: 6000 });
+    expect(getRep(nodeOf(s, ar), 'clean')).toBeUndefined();
+    expectAt(endOf(s, ar, 'end'), { x: 740, y: 240 });
+  });
+});
+
+describe('what a log can hold', () => {
+  it("a participant's proposal cannot place a mark by a 'follow' rep: where a connector's bindings carried it is the engine's to derive", () => {
+    const s = createSession();
+    const l = line(s, { x: 100, y: 100 }, { x: 300, y: 100 }, 1000);
+    const m = s.join('agent', 'llm:test', 1500, 2);
+    const before = JSON.stringify(inkNow(s, l));
+    s.propose({ participantId: m, nodeId: l, edges: [], reps: [{ modality: 'follow', data: { map: { a: 1, b: 0, c: 0, d: 1, e: 500, f: 500 } } }], at: 2000 });
+    expect(getRep(nodeOf(s, l), 'follow')).toBeUndefined();
+    expect(JSON.stringify(inkNow(s, l))).toBe(before);
+  });
+
+  it('unbind lets go of one end, and writes nothing for an end bound to nothing', () => {
+    const { s, a, b, l } = bothEnds();
+    const n = s.getEvents().length;
+    s.unbind({ strokeId: l, end: 'end', at: 4000 });
+    expect(types(s.getEvents().slice(n))).toEqual(['unbind']);
+    expect(bound(s, l)).toEqual([`start→${a} middle 1`]);
+    s.unbind({ strokeId: l, end: 'end', at: 4100 });
+    expect(s.getEvents()).toHaveLength(n + 1);
+    // Let go, the line stays where it stood; the box moved, it stays.
+    s.move({ ids: [b], dx: 0, dy: 100, at: 5000 });
+    expectAt(endOf(s, l, 'end'), { x: 700, y: 460 });
+    s.undo();
+    s.undo();
+    expect(bound(s, l)).toEqual([`end→${b} middle 3`, `start→${a} middle 1`]);
+  });
+});
+
 describe('where it stands is where everything reads it', () => {
   it('the index files it where it stands: a mark drawn beside its new place is related to it', () => {
     const { s, b, l } = oneEnd();
