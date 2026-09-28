@@ -203,13 +203,23 @@ export function layoutLayered(nodes: readonly LayeredNode[], links: readonly Lay
   });
   for (const f of forward) f.sort((x, y) => x - y);
 
-  // Ranks: the longest path along forward links, never above the node written before.
-  const rank: number[] = [];
-  for (let i = 0; i < n; i++) {
-    let r = i ? rank[i - 1] : 0;
-    for (const p of before[i]) r = Math.max(r, rank[p] + 1);
-    rank.push(r);
-  }
+  // Ranks: the longest path along forward links, never above the node written before. When no
+  // link would then cross a rank — each runs back within one — every link is made to cross one,
+  // back links too, or no spacing could make the links run the direction's way.
+  const behind: number[][] = list.map(() => []);
+  for (const [a, b] of pairs) if (a > b) behind[a].push(b);
+  const ranksOf = (strict: boolean) => {
+    const out: number[] = [];
+    for (let i = 0; i < n; i++) {
+      let r = i ? out[i - 1] : 0;
+      for (const p of before[i]) r = Math.max(r, out[p] + 1);
+      if (strict) for (const p of behind[i]) r = Math.max(r, out[p] + 1);
+      out.push(r);
+    }
+    return out;
+  };
+  let rank = ranksOf(false);
+  if (pairs.length && pairs.every(([a, b]) => rank[a] === rank[b])) rank = ranksOf(true);
   const R = n ? rank[n - 1] + 1 : 0;
   const ranks: number[][] = Array.from({ length: R }, () => []);
   for (let i = 0; i < n; i++) ranks[rank[i]].push(i);

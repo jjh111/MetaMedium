@@ -60,11 +60,13 @@
 
 import type { Bounds, Point } from '../types';
 import type { Session } from '../session/session';
+import { createSession } from '../session/session';
 import { boundsOf, getRep } from '../session/nodes';
-import { magnetSites } from '../session/magnets';
+import { magnetRadius, magnetSites } from '../session/magnets';
 import { strokeFor } from '../session/synthesize';
 import { HAND_RESOLUTION_PX } from '../recognition';
 import { FLOWCHART_TABLE, flowchartPortsOf } from './flowchart';
+import { headsOf, HEAD_AXIS_SHARE, HEAD_MAX_SHARE } from '../diagram/heads';
 import { hullOf } from './shape';
 import { UNREAD_WRITING, unescapeMermaid } from './mermaid';
 import { layoutLayered } from './layered';
@@ -233,18 +235,17 @@ function openText(text: string): { lines: Line[]; refused: MermaidRefusal[]; hea
   const lines: Line[] = [];
   const refused: MermaidRefusal[] = [];
   let header: Line | null = null, keyword = '', rest = '';
-  let i = 0;
-  // Front matter: a block between two `---` lines, before anything else.
-  const firstSaid = all.findIndex((l) => l.trim() !== '');
-  if (firstSaid >= 0 && all[firstSaid].trim() === '---') {
-    const close = all.findIndex((l, k) => k > firstSaid && l.trim() === '---');
-    const last = close >= 0 ? close : all.length - 1;
-    refused.push({ line: firstSaid + 1, text: '---', reason: `front matter (lines ${firstSaid + 1}–${last + 1}) configures mermaid.js — nothing on the board takes it` });
-    i = last + 1;
-  }
-  for (; i < all.length; i++) {
+  for (let i = 0; i < all.length; i++) {
     const t = all[i].trim();
     if (!t) continue;
+    // Front matter: a block between two `---` lines, before the diagram.
+    if (!header && t === '---') {
+      const close = all.findIndex((l, k) => k > i && l.trim() === '---');
+      const last = close >= 0 ? close : all.length - 1;
+      refused.push({ line: i + 1, text: '---', reason: `front matter (lines ${i + 1}–${last + 1}) configures mermaid.js — nothing on the board takes it` });
+      i = last;
+      continue;
+    }
     if (t.startsWith('%%{')) {
       refused.push({ line: i + 1, text: t, reason: 'a directive configures mermaid.js’s own rendering — nothing on the board takes it' });
       continue;
@@ -529,7 +530,7 @@ function readLink(c: Cursor, notes: Set<string>): LinkRef {
       }
     }
     c.i = at;
-    throw new Refuse('a label inside a link is not followed by its end');
+    throw new Refuse(`a link that opens “${opened[0]}” and a space holds a label, and this one never reaches its end (“${kind === '--' ? '-->' : kind === '==' ? '==>' : '.->'}”)`);
   }
 
   const m = c.match(/(<|o|x)?(-{2,}|={2,}|-\.+-)(>|o|x)?/y);
@@ -831,6 +832,10 @@ function triangleHead(apex: Point, out: Point, size: number): Point[] {
 interface Standing {
   id: string;
   rank: number;
+  /** A start or end: a small circle, which heads.ts also reads as a head where a connector ends on it. */
+  round: boolean;
+  /** Its ink, in canvas units. */
+  ink: Point[];
   centre: Point;
   hull: Point[];
   box: Bounds;
@@ -883,19 +888,33 @@ interface Route {
   side?: 1 | -1;
   /** It leaves its own symbols at once, rather than running back over one or along its edge. */
   clean: boolean;
-  /** Ends it shares with a head drawn apart — which heads.ts would read as its own. */
+  /** Its ends that meet another at a port along nearly its line — where heads.ts may read either as the other's head. */
   clash: number;
   /** It lies along a straight link already drawn. */
   overlaps: boolean;
   /** The other symbols it crosses. */
   crossings: number;
+  /** Read on a scratch board, a head drawn apart at one of its ends was not what heads.ts read there. */
+  misread?: boolean;
 }
+
+/** How many ways, best first, are drawn on a scratch board and read before one is given up on. */
+const VERIFIED = 16;
 
 /** What the links already routed hold: the straight segments, and each port's ends and heads drawn apart. */
 interface RouteTaken {
   straight: [Point, Point][];
-  ports: Map<string, { ends: number; heads: number }>;
+  /** Each port's ends, as the way each leaves it. */
+  ports: Map<string, { ways: Point[] }>;
 }
+
+/**
+ * Ends sharing a port lie at least this far apart, in degrees, as lines —
+ * whichever way each runs. A short connector lying within about 35° of a
+ * longer one's line where they meet, on either side of the meeting, is read
+ * as that one's head (heads.ts: small beside it, on its axis).
+ */
+const APART_DEG = 45;
 
 /** An arc's sweeps, the flattest first: each reads as an arc on a chord this long on screen (60° needs 150 px, 90° 100 px). */
 const ARC_SWEEPS: [number, number][] = [[90, 100], [120, 60], [150, 60]];
@@ -954,7 +973,7 @@ function alongEachOther(p: Point, q: Point, r: Point, s: Point, tol: number): bo
  * that reads as an arc and crosses least, and taken when it does better.
  * Deterministic: ties go by the order the ports are named.
  */
-function routeLink(a: Standing, b: Standing, others: readonly Standing[], dir: MermaidFlow, drawn: DrawnLink['drawn'], taken: RouteTaken, margin: number, scale: number): Route {
+function routeLink(a: Standing, b: Standing, others: readonly Standing[], dir: MermaidFlow, taken: RouteTaken, margin: number, scale: number, reads: (route: Route) => boolean | undefined): Route {
   const across = dir === 'LR' || dir === 'RL';
   const ahead: Port = dir === 'LR' ? 'right' : dir === 'RL' ? 'left' : dir === 'BT' ? 'top' : 'bottom';
   const behind: Port = ahead === 'right' ? 'left' : ahead === 'left' ? 'right' : ahead === 'bottom' ? 'top' : 'bottom';
@@ -977,22 +996,28 @@ function routeLink(a: Standing, b: Standing, others: readonly Standing[], dir: M
     if (l < 1e-12) return false;
     const size = Math.max(s.box.maxX - s.box.minX, s.box.maxY - s.box.minY);
     const e = 0.02 * size;
-    return outsideBy({ x: from.x + (d.x / l) * e, y: from.y + (d.y / l) * e }, s.hull) > 1e-4 * size;
+    // Clear of the edge by more than a grazing line's: about 9° off it at the least.
+    return outsideBy({ x: from.x + (d.x / l) * e, y: from.y + (d.y / l) * e }, s.hull) > 0.15 * e;
   };
   /**
-   * A head drawn apart — a triangle — is read as the head of any connector
-   * whose end touches it (diagram/heads.ts): so a port holding one holds no
-   * other end, and an end with one goes to a port no other end holds.
+   * Ends sharing a port lie APART_DEG apart as lines, or one is read as the
+   * other's head (heads.ts: a mark small beside a connector, touching its
+   * end, on its axis either side). So apart, a head drawn apart — a triangle,
+   * its centroid on its own connector's line — stands off every other one's
+   * axis too, by more than heads.ts allows (0.47 of its size against 0.3).
    */
-  const conflicts = (pa: Port, pb: Port, heads: [boolean, boolean]) =>
-    ([[a.id, pa, heads[0]], [b.id, pb, heads[1]]] as [string, Port, boolean][]).filter(([id, port, head]) => {
+  const cosApart = Math.cos((APART_DEG * Math.PI) / 180);
+  const conflicts = (pa: Port, pb: Port, ways: [Point, Point]) =>
+    ([[a.id, pa, ways[0]], [b.id, pb, ways[1]]] as [string, Port, Point][]).filter(([id, port, way]) => {
       const u = taken.ports.get(`${id}:${port}`);
-      return !!u && (u.heads > 0 || (head && u.ends > 0));
+      const l = Math.hypot(way.x, way.y) || 1;
+      return !!u && u.ways.some((w) => Math.abs(w.x * way.x + w.y * way.y) / l > cosApart);
     }).length;
   const grown = others.map((o) => ({ minX: o.box.minX - margin, minY: o.box.minY - margin, maxX: o.box.maxX + margin, maxY: o.box.maxY + margin }));
   const crosses = (pts: readonly Point[]) => grown.filter((g) => pts.some((p, i) => i > 0 && meetsBox(pts[i - 1], p, g))).length;
 
-  let best: { score: number[]; route: Route } | null = null;
+  const byScore = (p: { score: number[] }, q: { score: number[] }) => (lexLess(p.score, q.score) ? -1 : lexLess(q.score, p.score) ? 1 : 0);
+  const lines: { score: number[]; route: Route }[] = [];
   for (const pa of PORTS) {
     for (const pb of PORTS) {
       const P = a.ports[pa], Q = b.ports[pb];
@@ -1000,17 +1025,24 @@ function routeLink(a: Standing, b: Standing, others: readonly Standing[], dir: M
       if (d < 1e-9) continue;
       const v = { x: Q.x - P.x, y: Q.y - P.y };
       const clean = leaves(a, P, v) && leaves(b, Q, { x: -v.x, y: -v.y });
-      const clash = conflicts(pa, pb, [drawn === '<-->', false]);
+      const clash = conflicts(pa, pb, [v, { x: -v.x, y: -v.y }]);
       const overlaps = taken.straight.some(([r, s]) => alongEachOther(P, Q, r, s, 2 * scale));
       const crossings = crosses([P, Q]);
-      const score = [clean ? 0 : 1, clash, overlaps ? 1 : 0, crossings, pref(pa, pb), d];
-      if (!best || lexLess(score, best.score)) best = { score, route: { kind: 'straight', ports: [pa, pb], clean, clash, overlaps, crossings } };
+      lines.push({ score: [clean ? 0 : 1, clash, overlaps ? 1 : 0, crossings, pref(pa, pb), d], route: { kind: 'straight', ports: [pa, pb], clean, clash, overlaps, crossings } });
     }
   }
-  const line = best!.route;
-  if (line.clean && !line.clash && !line.overlaps && !line.crossings) return line;
+  lines.sort(byScore);
+  /** A way is taken when it is clean — and, where it meets another along nearly its line or draws a head apart, when it reads as drawn. */
+  // A way is taken when it is clean and reads as drawn (`reads`: true, false, or — past its budget — undefined).
+  const first = (cands: { route: Route }[]) => {
+    for (const c of cands) if (c.route.clean && reads(c.route)) return c.route;
+    return undefined;
+  };
+  const found = first(lines);
+  const line = found ?? { ...lines[0].route, misread: true };
+  if (!line.misread && !line.overlaps && !line.crossings) return line;
 
-  let bow: { score: number[]; route: Route } | null = null;
+  const bows: { score: number[]; route: Route }[] = [];
   for (const pa of PORTS) {
     for (const pb of PORTS) {
       const P = a.ports[pa], Q = b.ports[pb];
@@ -1020,17 +1052,19 @@ function routeLink(a: Standing, b: Standing, others: readonly Standing[], dir: M
         if (chord / scale < least) return;
         for (const s of [1, -1] as const) {
           const pts = arcThrough(P, Q, sweep, s, 24);
-          const clean = leaves(a, P, { x: pts[1].x - P.x, y: pts[1].y - P.y }) && leaves(b, Q, { x: pts[23].x - Q.x, y: pts[23].y - Q.y });
-          const clash = conflicts(pa, pb, [drawn === '<-->', drawn !== '---']);
+          const out = { x: pts[1].x - P.x, y: pts[1].y - P.y }, back = { x: pts[23].x - Q.x, y: pts[23].y - Q.y };
+          const clean = leaves(a, P, out) && leaves(b, Q, back);
+          if (!clean) continue;
+          const clash = conflicts(pa, pb, [out, back]);
           const crossings = crosses(pts);
-          const score = [clean ? 0 : 1, clash, crossings, k, pa === pb && side(pa) ? 0 : 1, pref(pa, pb), chord];
-          if (!bow || lexLess(score, bow.score)) bow = { score, route: { kind: 'arc', ports: [pa, pb], sweep, side: s, clean, clash, overlaps: false, crossings } };
+          bows.push({ score: [clash, crossings, k, pa === pb && side(pa) ? 0 : 1, pref(pa, pb), chord], route: { kind: 'arc', ports: [pa, pb], sweep, side: s, clean, clash, overlaps: false, crossings } });
         }
       });
     }
   }
-  const arc = (bow as { score: number[]; route: Route } | null)?.route;
-  if (arc && arc.clean && !arc.clash && (!line.clean || line.clash || line.overlaps || arc.crossings < line.crossings)) return arc;
+  bows.sort(byScore);
+  const arc = first(bows);
+  if (arc && (line.misread || line.overlaps || arc.crossings < line.crossings)) return arc;
   return line;
 }
 
@@ -1040,6 +1074,85 @@ const PORTS: Port[] = ['top', 'right', 'bottom', 'left'];
 function lexLess(a: readonly number[], b: readonly number[]): boolean {
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] < b[i];
   return false;
+}
+
+/** A connector's ink, and the heads drawn apart from it — each a closed triangle's ink — in canvas units. */
+function connectorInk(route: Route, P: Point, Q: Point, drawn: DrawnLink['drawn'], scale: number): { points: Point[]; heads: Point[][] } {
+  const hand = (p: Point) => ({ x: p.x / scale, y: p.y / scale });
+  const toWorld = (p: Point) => ({ x: p.x * scale, y: p.y * scale });
+  const unit = (v: Point) => {
+    const l = Math.hypot(v.x, v.y) || 1;
+    return { x: v.x / l, y: v.y / l };
+  };
+  const chord = Math.hypot(Q.x - P.x, Q.y - P.y) / scale;
+  const size = clamp(0.1 * chord, HEAD_MIN_PX, HEAD_MAX_PX);
+  const head = (at: Point, pointing: Point) => triangleHead(hand(at), pointing, size).map(toWorld);
+  if (route.kind === 'arc') {
+    // An arc, laid every few pixels along it on screen; its heads closed triangles along its ends.
+    const th = (route.sweep! * Math.PI) / 180;
+    const n = clamp(Math.round((chord * th) / (2 * Math.sin(th / 2)) / INK_STEP), 16, 300);
+    const points = arcThrough(hand(P), hand(Q), route.sweep!, route.side!, n).map(toWorld);
+    const heads: Point[][] = [];
+    if (drawn !== '---') heads.push(head(Q, unit({ x: points[n].x - points[n - 1].x, y: points[n].y - points[n - 1].y })));
+    if (drawn === '<-->') heads.push(head(P, unit({ x: points[0].x - points[1].x, y: points[0].y - points[1].y })));
+    return { points, heads };
+  }
+  if (drawn === '---') return { points: strokeFor({ shape: 'line', from: hand(P), to: hand(Q) })!.map(toWorld), heads: [] };
+  // An arrow long on screen keeps its barb in proportion: strokeFor drawn smaller, then scaled.
+  const k = Math.max(1, chord / ARROW_PROPORTION_PX);
+  const f = (p: Point) => ({ x: p.x / (scale * k), y: p.y / (scale * k) });
+  const points = strokeFor({ shape: 'arrow', from: f(P), to: f(Q) })!.map((p) => ({ x: p.x * scale * k, y: p.y * scale * k }));
+  return { points, heads: drawn === '<-->' ? [head(P, unit({ x: P.x - Q.x, y: P.y - Q.y }))] : [] };
+}
+
+/** A connector to read on a scratch board: its ink, how it runs and is drawn, and which of its ends stand on the symbols being read. */
+interface Scratch {
+  ink: { points: Point[]; heads: Point[][] };
+  route: Route;
+  drawn: DrawnLink['drawn'];
+  at: { start: boolean; end: boolean };
+}
+
+/** What each end of a connector reads as when drawn right: its own barb, a head drawn apart (by its place in the ink's heads), or no head — a symbol, at most. */
+function endsOf(route: Route, drawn: DrawnLink['drawn']): Record<'start' | 'end', 'none' | 'barb' | number> {
+  if (route.kind === 'arc') return { start: drawn === '<-->' ? 1 : 'none', end: drawn === '---' ? 'none' : 0 };
+  if (drawn === '---') return { start: 'none', end: 'none' };
+  return { start: drawn === '<-->' ? 0 : 'none', end: 'barb' };
+}
+
+/**
+ * Whether connectors read as drawn: put on a scratch board with the symbols
+ * they meet — nothing enters the board being drawn on — heads.ts must read,
+ * at every end standing on one of those symbols, the connector's own barb,
+ * its own head drawn apart, or no head but a symbol. A symbol at an end is
+ * read as a head too (a decision as a diamond, a circle as a circle), and so
+ * is a short connector along another's line where they meet; when either
+ * outranks what was drawn there, the end loses its direction.
+ */
+function readsAsDrawn(symbols: readonly Point[][], conns: readonly Scratch[], scale: number): boolean {
+  const scratch = createSession();
+  let t = 1;
+  const symbolIds = new Set(symbols.map((ink) => scratch.addStroke([...ink], t++, undefined, scale, { content: true })));
+  const placed = conns.map((c) => ({
+    c,
+    id: scratch.addStroke(c.ink.points, t++, undefined, scale, { content: true }),
+    heads: c.ink.heads.map((h) => scratch.addStroke(h, t++, undefined, scale, { content: true })),
+  }));
+  const st = scratch.getState();
+  return placed.every(({ c, id, heads }) => {
+    const read = headsOf(st, id);
+    if (!read) return false;
+    const want = endsOf(c.route, c.drawn);
+    return (['start', 'end'] as const).every((end) => {
+      if (!c.at[end]) return true;
+      const top = read[end].heads[0];
+      const w = want[end];
+      if (w === 'none') return !top || top.ids.some((x) => symbolIds.has(x));
+      // A head is its own reading — not a symbol read as a head with it for fill.
+      if (!top || top.ids.some((x) => symbolIds.has(x))) return false;
+      return top.ids.includes(w === 'barb' ? id : heads[w]);
+    });
+  });
 }
 
 /** Beside everything on the board: right of its content, level with its top. The origin when the board is empty. */
@@ -1132,78 +1245,144 @@ function drawFlowchartRead(session: Session, read: MermaidRead, opts: DrawMermai
 
   // The links, in the text's order: port to port, a head where the link has one, bound at both ends, its words on its own ink.
   const standing = new Map<string, Standing>();
+  const ends = new Map<string, DrawnEnd>();
   for (const n of nodes) {
     const f = figures.get(n.id)!;
-    const hull = hullOf(f.ink().map((p) => world(n.id, p)));
+    const ink = f.ink().map((p) => world(n.id, p));
+    const hull = hullOf(ink);
     const xs = hull.map((p) => p.x), ys = hull.map((p) => p.y);
-    const ports = Object.fromEntries(PORTS.map((p) => [p, world(n.id, f.ports[p])])) as Record<Port, Point>;
-    standing.set(n.id, { id: n.id, rank: layout.rank.get(n.id)!, centre: centreOf(n.id), hull, box: { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) }, ports });
+    // Each port where its end will stand: on the site it is bound at, so what is routed and read is what is drawn.
+    for (const p of PORTS) ends.set(`${n.id}:${p}`, endAt(n.id, p));
+    const ports = Object.fromEntries(PORTS.map((p) => [p, ends.get(`${n.id}:${p}`)!.point])) as Record<Port, Point>;
+    standing.set(n.id, { id: n.id, rank: layout.rank.get(n.id)!, round: n.symbol === 'start' || n.symbol === 'end', ink, centre: centreOf(n.id), hull, box: { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) }, ports });
   }
   const drawnLinks: DrawnLink[] = [];
-  const hand = (p: Point) => ({ x: p.x / scale, y: p.y / scale });
-  const toWorld = (p: Point) => ({ x: p.x * scale, y: p.y * scale });
   const crossing: string[] = [];
-  const unit = (v: Point) => {
+
+  const drawnOf = (l: MermaidLinkRead): DrawnLink['drawn'] => (l.head === 'forward' ? '-->' : l.head === 'both' ? '<-->' : '---');
+  // What each routed link will be as ink, and which marks heads.ts could read as a head at which end.
+  /** A mark as heads.ts weighs it for a head: its hull, box, size, middle, and how far it reaches for an end to touch it. */
+  interface Weighed {
+    hull: Point[];
+    box: Bounds;
+    size: number;
+    centre: Point;
+    reach: number;
+  }
+  /** An end as heads.ts reads it: where it is, the way out past it, and its connector's length. */
+  interface EndRead {
+    point: Point;
+    out: Point;
+    length: number;
+  }
+  interface Placed {
+    link: MermaidLinkRead;
+    route: Route;
+    drawn: DrawnLink['drawn'];
+    ink: { points: Point[]; heads: Point[][] };
+    P: Point;
+    Q: Point;
+    ends: EndRead[];
+    /** The connector, then each head drawn apart. */
+    marks: Weighed[];
+  }
+  const placed: Placed[] = [];
+  const weigh = (pts: readonly Point[]): Weighed => {
+    const hull = hullOf(pts);
+    const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+    const box = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+    const size = Math.max(box.maxX - box.minX, box.maxY - box.minY);
+    const centre = hull.length ? { x: hull.reduce((k, p) => k + p.x, 0) / hull.length, y: hull.reduce((k, p) => k + p.y, 0) / hull.length } : { x: 0, y: 0 };
+    // Touching is within the magnet radius of the mark's own size (heads.ts), here with room to spare.
+    return { hull, box, size, centre, reach: 1.5 * magnetRadius(size, scale) };
+  };
+  const unitOf = (v: Point) => {
     const l = Math.hypot(v.x, v.y) || 1;
     return { x: v.x / l, y: v.y / l };
   };
+  const placedOf = (l: MermaidLinkRead, r: Route): Placed => {
+    const a = standing.get(l.from)!, b = standing.get(l.to)!;
+    const P = a.ports[r.ports[0]], Q = b.ports[r.ports[1]];
+    const drawn = drawnOf(l);
+    const ink = connectorInk(r, P, Q, drawn, scale);
+    const pts = ink.points, n = pts.length;
+    const along = (t: number) => pts[Math.min(n - 1, Math.max(0, Math.round(t * (n - 1))))];
+    const length = Math.max(Math.hypot(Q.x - P.x, Q.y - P.y), 1e-6);
+    // The way out past each end, as heads.ts takes it: along a straight connector, along an arc's last stretch.
+    const outs = r.kind === 'arc' ? [unitOf({ x: P.x - along(0.15).x, y: P.y - along(0.15).y }), unitOf({ x: Q.x - along(0.85).x, y: Q.y - along(0.85).y })] : [unitOf({ x: P.x - Q.x, y: P.y - Q.y }), unitOf({ x: Q.x - P.x, y: Q.y - P.y })];
+    return { link: l, route: r, drawn, ink, P, Q, ends: [{ point: P, out: outs[0], length }, { point: Q, out: outs[1], length }], marks: [ink.points, ...ink.heads].map(weigh) };
+  };
+  /**
+   * Whether heads.ts could read a mark as a head at an end: it touches the
+   * end, it is small beside the end's connector, and it lies on the
+   * connector's line — its three gates (HEAD_MAX_SHARE, HEAD_AXIS_SHARE),
+   * each with room to spare — or it stands so close to the end it could be
+   * a barb's fill. Only then is anything read on a scratch board.
+   */
+  const mayRead = (e: EndRead, m: Weighed) => {
+    const off = Math.max(m.box.minX - e.point.x, 0, e.point.x - m.box.maxX, m.box.minY - e.point.y, e.point.y - m.box.maxY);
+    if (off > m.reach) return false;
+    const d = m.hull.length < 3 ? Math.min(...m.hull.map((p) => Math.hypot(p.x - e.point.x, p.y - e.point.y))) : outsideBy(e.point, m.hull);
+    if (d > m.reach || m.size > 1.2 * HEAD_MAX_SHARE * e.length) return false;
+    const v = { x: m.centre.x - e.point.x, y: m.centre.y - e.point.y };
+    const across = Math.abs(e.out.x * v.y - e.out.y * v.x), ahead = e.out.x * v.x + e.out.y * v.y;
+    return (across <= 1.5 * HEAD_AXIS_SHARE * m.size && ahead >= -1.2 * m.size) || Math.hypot(v.x, v.y) <= 0.25 * e.length;
+  };
+  const symbolWeight = new Map([...standing.values()].map((o) => [o.id, weigh(o.ink)]));
 
-  // Routes: the flows that run down the ranks first, each taking its own ports, then those that run back.
-  const onward = (l: MermaidLinkRead) => layout.rank.get(l.to)! > layout.rank.get(l.from)!;
+  // Routes: the flows from one rank to the next first, each taking its own ports, then those that skip ranks, then those that run back.
+  const span = (l: MermaidLinkRead) => layout.rank.get(l.to)! - layout.rank.get(l.from)!;
   const routes = new Map<MermaidLinkRead, Route>();
   const taken: RouteTaken = { straight: [], ports: new Map() };
-  const drawnOf = (l: MermaidLinkRead): DrawnLink['drawn'] => (l.head === 'forward' ? '-->' : l.head === 'both' ? '<-->' : '---');
-  for (const l of [...links.filter(onward), ...links.filter((x) => !onward(x))]) {
+  for (const l of [...links.filter((x) => span(x) === 1), ...links.filter((x) => span(x) > 1), ...links.filter((x) => span(x) < 1)]) {
     const a = standing.get(l.from)!, b = standing.get(l.to)!;
     const others = [...standing.values()].filter((o) => o.id !== a.id && o.id !== b.id);
     const drawn = drawnOf(l);
-    const route = routeLink(a, b, others, read.direction, drawn, taken, 0.5 * U * scale, scale);
+    // Taken outright when nothing is within heads.ts's reach of its ends and it comes within reach of no
+    // other end; else read on a scratch board with every link and symbol it is near — VERIFIED times at most.
+    let budget = VERIFIED;
+    const reads = (r: Route): boolean | undefined => {
+      const c = placedOf(l, r);
+      const involved = placed.filter((d) => c.ends.some((e) => d.marks.some((m) => mayRead(e, m))) || d.ends.some((e) => c.marks.some((m) => mayRead(e, m))));
+      const nearSymbols = others.filter((o) => c.ends.some((e) => mayRead(e, symbolWeight.get(o.id)!)));
+      // A head drawn apart must outrank the symbol it stands on, which heads.ts reads as a head there too.
+      const want = endsOf(r, drawn);
+      const outranked = ([['start', a], ['end', b]] as const).some(([end, o], k) => typeof want[end] === 'number' && mayRead(c.ends[k], symbolWeight.get(o.id)!));
+      if (!involved.length && !nearSymbols.length && !outranked) return true;
+      if (budget-- <= 0) return undefined;
+      const symbols = new Map<string, Standing>([[a.id, a], [b.id, b], ...nearSymbols.map((o) => [o.id, o] as [string, Standing])]);
+      for (const d of involved) for (const id of [d.link.from, d.link.to]) symbols.set(id, standing.get(id)!);
+      const conns: Scratch[] = [...involved, c].map((d) => ({ ink: d.ink, route: d.route, drawn: d.drawn, at: { start: true, end: true } }));
+      return readsAsDrawn([...symbols.values()].map((o) => o.ink), conns, scale);
+    };
+    const route = routeLink(a, b, others, read.direction, taken, 0.5 * U * scale, scale, reads);
+    if (route.misread) notes.push(`no way between ${l.from} and ${l.to} reads as drawn beside the links already there: read back, the link ${l.from} → ${l.to} or one beside it may say otherwise`);
     routes.set(l, route);
-    if (route.kind === 'straight') taken.straight.push([a.ports[route.ports[0]], b.ports[route.ports[1]]]);
-    const heads = route.kind === 'arc' ? [drawn === '<-->', drawn !== '---'] : [drawn === '<-->', false];
-    [[a.id, route.ports[0], heads[0]], [b.id, route.ports[1], heads[1]]].forEach(([id, port, head]) => {
+    placed.push(placedOf(l, route));
+    const P = a.ports[route.ports[0]], Q = b.ports[route.ports[1]];
+    if (route.kind === 'straight') taken.straight.push([P, Q]);
+    const pts = route.kind === 'arc' ? arcThrough(P, Q, route.sweep!, route.side!, 24) : [P, Q];
+    const ways = [{ x: pts[1].x - P.x, y: pts[1].y - P.y }, { x: pts[pts.length - 2].x - Q.x, y: pts[pts.length - 2].y - Q.y }];
+    ([[a.id, route.ports[0], ways[0]], [b.id, route.ports[1], ways[1]]] as [string, Port, Point][]).forEach(([id, port, way]) => {
       const key = `${id}:${port}`;
-      const u = taken.ports.get(key) ?? { ends: 0, heads: 0 };
-      u.ends++;
-      if (head) u.heads++;
+      const u = taken.ports.get(key) ?? { ways: [] };
+      const l = Math.hypot(way.x, way.y) || 1;
+      u.ways.push({ x: way.x / l, y: way.y / l });
       taken.ports.set(key, u);
     });
     if (route.overlaps) notes.push(`${l.from} and ${l.to} are joined more often than their sides can keep apart: the link ${l.from} → ${l.to} is drawn along another`);
-    if (route.clash) notes.push(`the link ${l.from} → ${l.to} shares a port with a head drawn apart, which reads as a head of either: read back, its direction may read otherwise`);
     if (route.crossings) crossing.push(`${l.from} → ${l.to}`);
   }
 
   // Drawn in the text's order.
   for (const l of links) {
     const route = routes.get(l)!;
-    const start = endAt(l.from, route.ports[0]), end = endAt(l.to, route.ports[1]);
+    const start = ends.get(`${l.from}:${route.ports[0]}`)!, end = ends.get(`${l.to}:${route.ports[1]}`)!;
     const P = start.point, Q = end.point;
     const drawn = drawnOf(l);
-    const chord = Math.hypot(Q.x - P.x, Q.y - P.y) / scale;
-    const headSize = clamp(0.1 * chord, HEAD_MIN_PX, HEAD_MAX_PX);
-    let points: Point[];
-    /** The heads drawn apart from the connector: [where, pointing]. */
-    const heads: [Point, Point][] = [];
-    if (route.kind === 'arc') {
-      // An arc, laid every few pixels along it on screen; its heads closed triangles along its ends.
-      const length = (chord * (route.sweep! * Math.PI)) / 180 / (2 * Math.sin((route.sweep! * Math.PI) / 360));
-      const n = clamp(Math.round(length / INK_STEP), 16, 300);
-      points = arcThrough(hand(P), hand(Q), route.sweep!, route.side!, n).map(toWorld);
-      const into = unit({ x: points[n].x - points[n - 1].x, y: points[n].y - points[n - 1].y });
-      const outOf = unit({ x: points[0].x - points[1].x, y: points[0].y - points[1].y });
-      if (drawn !== '---') heads.push([Q, into]);
-      if (drawn === '<-->') heads.push([P, outOf]);
-    } else if (drawn === '---') points = strokeFor({ shape: 'line', from: hand(P), to: hand(Q) })!.map(toWorld);
-    else {
-      // An arrow long on screen keeps its barb in proportion: strokeFor drawn smaller, then scaled.
-      const k = Math.max(1, chord / ARROW_PROPORTION_PX);
-      const f = (p: Point) => ({ x: p.x / (scale * k), y: p.y / (scale * k) });
-      points = strokeFor({ shape: 'arrow', from: f(P), to: f(Q) })!.map((p) => ({ x: p.x * scale * k, y: p.y * scale * k }));
-      if (drawn === '<-->') heads.push([P, unit({ x: P.x - Q.x, y: P.y - Q.y })]);
-    }
-    const id = session.addStroke(points, next(), pid, scale, { content: true });
-    const all = [id];
-    for (const [at, pointing] of heads) all.push(session.addStroke(triangleHead(hand(at), pointing, headSize).map(toWorld), next(), pid, scale, { content: true }));
+    const ink = connectorInk(route, P, Q, drawn, scale);
+    const id = session.addStroke(ink.points, next(), pid, scale, { content: true });
+    const all = [id, ...ink.heads.map((h) => session.addStroke(h, next(), pid, scale, { content: true }))];
     session.bind({ strokeId: id, nodeId: start.nodeId, site: start.site, end: 'start', at: next(), participantId: pid });
     session.bind({ strokeId: id, nodeId: end.nodeId, site: end.site, end: 'end', at: next(), participantId: pid });
     const words = l.label?.trim();
