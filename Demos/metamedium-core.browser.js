@@ -27,6 +27,7 @@ var MetaMediumCore = (() => {
     BARB_ROUND: () => BARB_ROUND,
     BUILTIN_COMMAND_MARK: () => BUILTIN_COMMAND_MARK,
     BUILTIN_CONCEPTS: () => BUILTIN_CONCEPTS,
+    BUILTIN_TOOLS: () => BUILTIN_TOOLS,
     BUILTIN_TYPES: () => BUILTIN_TYPES,
     COMMAND_MARK_SAMPLES: () => COMMAND_MARK_SAMPLES,
     COORD_PLACES: () => COORD_PLACES,
@@ -63,6 +64,7 @@ var MetaMediumCore = (() => {
     HEAD_MAX_SHARE: () => HEAD_MAX_SHARE,
     HERE: () => HERE,
     KINDS: () => KINDS,
+    LABELLING_IS: () => LABELLING_IS,
     LENGTH_UNITS: () => LENGTH_UNITS,
     LETTER_MAX_HEIGHT_PX: () => LETTER_MAX_HEIGHT_PX,
     LOCAL_PARTICIPANT: () => LOCAL_PARTICIPANT,
@@ -81,9 +83,12 @@ var MetaMediumCore = (() => {
     MAX_TIER0_CONFIDENCE: () => MAX_TIER0_CONFIDENCE,
     META_DIR: () => META_DIR,
     MIN_CONFIDENCE: () => MIN_CONFIDENCE,
+    MODEL_DISCOUNT: () => MODEL_DISCOUNT,
     MarkGrid: () => MarkGrid,
     MemoryStore: () => MemoryStore,
+    NAMING_IS: () => NAMING_IS,
     NOTATION_FLOOR: () => NOTATION_FLOOR,
+    NO_CONTEXT: () => NO_CONTEXT,
     NO_MATCH: () => NO_MATCH,
     ONE_BEND: () => ONE_BEND,
     OUTLINE_PATH: () => OUTLINE_PATH,
@@ -99,6 +104,7 @@ var MetaMediumCore = (() => {
     SNAPPABLE: () => SNAPPABLE,
     SNAP_CONFIDENCE: () => SNAP_CONFIDENCE,
     SNAP_MARGIN: () => SNAP_MARGIN,
+    SPECIFIC_GROUNDS: () => SPECIFIC_GROUNDS,
     STRAIGHT_RUN: () => STRAIGHT_RUN,
     STRAIGHT_TURN: () => STRAIGHT_TURN,
     SYMMETRIC_LINKS: () => SYMMETRIC_LINKS,
@@ -107,6 +113,8 @@ var MetaMediumCore = (() => {
     TIER0_PARTICIPANT: () => TIER0_PARTICIPANT,
     TIER1_LIBRARY: () => TIER1_LIBRARY,
     TO_SCALE_WITHIN: () => TO_SCALE_WITHIN,
+    USE_LIFT_MAX: () => USE_LIFT_MAX,
+    USE_LIFT_RATE: () => USE_LIFT_RATE,
     VERBS: () => VERBS,
     WORD_GAP_RATIO: () => WORD_GAP_RATIO,
     WORD_WINDOW_MS: () => WORD_WINDOW_MS,
@@ -122,12 +130,15 @@ var MetaMediumCore = (() => {
     angleClass: () => angleClass,
     applyWalls: () => applyWalls,
     arithmetic: () => arithmetic,
+    artifactsIn: () => artifactsIn,
     assignRoles: () => assignRoles,
     attachNumber: () => attachNumber,
     attachedNumberIds: () => attachedNumberIds,
     authorOf: () => authorOf,
+    baseOn: () => baseOn,
     behaviourSource: () => behaviourSource,
     behavioursOf: () => behavioursOf,
+    bestWiring: () => bestWiring,
     between: () => between,
     binarize: () => binarize,
     bindingsOf: () => bindingsOf,
@@ -159,6 +170,7 @@ var MetaMediumCore = (() => {
     compareQuantities: () => compareQuantities,
     compareSignatures: () => compareSignatures,
     complete: () => complete,
+    completionsFor: () => completionsFor,
     connectionsFor: () => connectionsFor,
     connectionsOf: () => connectionsOf,
     connectorHeads: () => connectorHeads,
@@ -177,6 +189,9 @@ var MetaMediumCore = (() => {
     createSession: () => createSession,
     createStubDecideTransport: () => createStubDecideTransport,
     decodeLog: () => decodeLog,
+    defaultHost: () => defaultHost,
+    definitionOf: () => definitionOf,
+    definitionsIn: () => definitionsIn,
     denoise: () => denoise,
     dependentsOf: () => dependentsOf,
     describeAddressed: () => describeAddressed,
@@ -206,6 +221,7 @@ var MetaMediumCore = (() => {
     describeStale: () => describeStale,
     describeStructure: () => describeStructure,
     describeTier1: () => describeTier1,
+    describeTools: () => describeTools,
     diffSheets: () => diffSheets,
     dimensionsOf: () => dimensionsOf,
     disagreement: () => disagreement,
@@ -231,12 +247,14 @@ var MetaMediumCore = (() => {
     formatQuantity: () => formatQuantity,
     frameOf: () => frameOf,
     frameOfNode: () => frameOfNode,
+    frameTemplatesFor: () => frameTemplatesFor,
     functionsOf: () => functionsOf,
     genreOf: () => genreOf,
     getBounds: () => getBounds,
     getBoundsFromStroke: () => getBoundsFromStroke,
     getFingerprint: () => getFingerprint,
     getRep: () => getRep,
+    getTool: () => getTool,
     handLabel: () => handLabel,
     has: () => has,
     hasMultipleSources: () => hasMultipleSources,
@@ -261,24 +279,30 @@ var MetaMediumCore = (() => {
     isLetterLike: () => isLetterLike,
     isParticipant: () => isParticipant,
     isRange: () => isRange,
+    isSpecific: () => isSpecific,
     isStrokeClosed: () => isStrokeClosed,
     isWord: () => isWord,
+    isWritingMark: () => isWritingMark,
     joinsRun: () => joinsRun,
     keysOf: () => keysOf2,
     kindOf: () => kindOf,
+    labelInk: () => labelInk,
     labelOf: () => labelOf,
     labelsOf: () => labelsOf,
     leadOf: () => leadOf,
     learnCommandMark: () => learnCommandMark,
     lettersOf: () => lettersOf,
     levelOf: () => levelOf2,
+    likelihoodOf: () => likelihoodOf,
     listModels: () => listModels,
     localityOf: () => localityOf,
     logPathFor: () => logPathFor,
     luminance: () => luminance,
+    madeThese: () => madeThese,
     magnetRadius: () => magnetRadius,
     magnetSites: () => magnetSites,
     magnetsNear: () => magnetsNear,
+    makersOf: () => makersOf,
     matchBrace: () => matchBrace,
     matchConcepts: () => matchConcepts,
     matchDefinition: () => matchDefinition,
@@ -287,6 +311,7 @@ var MetaMediumCore = (() => {
     mayCross: () => mayCross,
     measure: () => measure,
     mergeLogs: () => mergeLogs,
+    nameMarks: () => nameMarks,
     nearLimitOf: () => nearLimitOf,
     nearestMagnet: () => nearestMagnet,
     negateQuantity: () => negateQuantity,
@@ -298,6 +323,8 @@ var MetaMediumCore = (() => {
     noul: () => noul,
     numbersOf: () => numbersOf,
     offerPorts: () => offerPorts,
+    offersFor: () => offersFor,
+    onToolsChange: () => onToolsChange,
     otsu: () => otsu,
     outlineOf: () => outlineOf,
     paramsOf: () => paramsOf,
@@ -328,11 +355,13 @@ var MetaMediumCore = (() => {
     providerTier: () => providerTier,
     quantity: () => quantity,
     rangeOf: () => rangeOf,
+    rankOffers: () => rankOffers,
     ranked: () => ranked,
     reachAround: () => reachAround,
     readFlowchart: () => readFlowchart,
     readNumber: () => readNumber,
     readSheet: () => readSheet,
+    readingsFor: () => readingsFor,
     readingsToEdges: () => readingsToEdges,
     reasonOf: () => reasonOf,
     regionAt: () => regionAt,
@@ -341,8 +370,10 @@ var MetaMediumCore = (() => {
     regionsOverlapping: () => regionsOverlapping,
     registerNotation: () => registerNotation,
     registerPorts: () => registerPorts,
+    registerTool: () => registerTool,
     registeredNotations: () => registeredNotations,
     registeredPorts: () => registeredPorts,
+    registeredTools: () => registeredTools,
     relate: () => relate,
     relationsOf: () => relationsOf,
     resampleByArcLength: () => resampleByArcLength,
@@ -359,6 +390,7 @@ var MetaMediumCore = (() => {
     seeded: () => seeded,
     segmentsIntersect: () => segmentsIntersect,
     shapeExtent: () => shapeExtent,
+    shapesSummary: () => shapesSummary,
     sheetEntry: () => sheetEntry,
     sheetLines: () => sheetLines,
     sheetValue: () => sheetValue,
@@ -376,6 +408,7 @@ var MetaMediumCore = (() => {
     solveFigure: () => solveFigure,
     sourcesOf: () => sourcesOf,
     stanceOf: () => stanceOf,
+    standStructure: () => standStructure,
     steer: () => steer,
     step: () => step,
     stripThink: () => stripThink,
@@ -383,11 +416,16 @@ var MetaMediumCore = (() => {
     strokePointsOf: () => strokePointsOf,
     strokesIntersect: () => strokesIntersect,
     structuralSignature: () => structuralSignature,
+    takeOffer: () => takeOffer,
     textOf: () => textOf3,
+    theirMarks: () => theirMarks,
     thin: () => thin,
     tightBox: () => tightBox,
     toBytes: () => toBytes,
     toText: () => toText,
+    toolScope: () => toolScope,
+    toolsFor: () => toolsFor,
+    toolsVersion: () => toolsVersion,
     topInterpretation: () => topInterpretation,
     trace: () => trace,
     tracePaths: () => tracePaths,
@@ -397,14 +435,18 @@ var MetaMediumCore = (() => {
     typeNodeId: () => typeNodeId,
     unregisterNotation: () => unregisterNotation,
     unregisterPorts: () => unregisterPorts,
+    unregisterTool: () => unregisterTool,
+    useLift: () => useLift,
     validateRegions: () => validateRegions,
     wallBoxes: () => wallBoxes,
+    whoseInk: () => whoseInk,
     whyNotResolved: () => whyNotResolved,
     withParams: () => withParams,
     withinReach: () => withinReach,
     wordConfidence: () => wordConfidence,
     wordOf: () => wordOf,
-    worldOf: () => worldOf
+    worldOf: () => worldOf,
+    writingLine: () => writingLine
   });
 
   // src/geometry.ts
@@ -6539,8 +6581,8 @@ var MetaMediumCore = (() => {
         sides.push([r.id]);
       }
     });
-    for (let changed = true; changed && corners.length > 2; ) {
-      changed = false;
+    for (let changed2 = true; changed2 && corners.length > 2; ) {
+      changed2 = false;
       const n3 = corners.length;
       for (let k = 0; k < n3; k++) {
         const a = sub(corners[k].point, corners[(k - 1 + n3) % n3].point), b = sub(corners[(k + 1) % n3].point, corners[k].point);
@@ -6552,7 +6594,7 @@ var MetaMediumCore = (() => {
         corners = corners.filter((_, i) => i !== k);
         sides = sides.filter((_, i) => i !== k);
         sides[before < k ? before : before - 1] = merged;
-        changed = true;
+        changed2 = true;
         break;
       }
     }
@@ -7078,19 +7120,19 @@ var MetaMediumCore = (() => {
     const count3 = /* @__PURE__ */ new Map();
     for (const e of entries) count3.set(e.figure.kind, (count3.get(e.figure.kind) ?? 0) + 1);
     const seen = /* @__PURE__ */ new Map();
-    const nameOf2 = /* @__PURE__ */ new Map();
+    const nameOf3 = /* @__PURE__ */ new Map();
     for (const e of entries) {
       const k = e.figure.kind;
       const i = (seen.get(k) ?? 0) + 1;
       seen.set(k, i);
-      nameOf2.set(e.figure.id, options.names?.[e.figure.id] ?? ((count3.get(k) ?? 0) > 1 ? `${k} ${i}` : k));
+      nameOf3.set(e.figure.id, options.names?.[e.figure.id] ?? ((count3.get(k) ?? 0) > 1 ? `${k} ${i}` : k));
     }
     const drawable = [];
     const omitted = [];
     for (const e of entries) {
       const labelled = e.labels ? e.labels.some((l) => !l.declared) : true;
       const why = whyNot(e.figure, e.solution, labelled);
-      if (why) omitted.push({ id: e.figure.id, ids: [...e.figure.ids], kind: e.figure.kind, name: nameOf2.get(e.figure.id), labelled, reason: why });
+      if (why) omitted.push({ id: e.figure.id, ids: [...e.figure.ids], kind: e.figure.kind, name: nameOf3.get(e.figure.id), labelled, reason: why });
       else drawable.push(e);
     }
     const units = /* @__PURE__ */ new Map();
@@ -7121,7 +7163,7 @@ var MetaMediumCore = (() => {
         reading: reading2
       };
       const shape = e.figure.kind === "triangle" ? triangleShape(c) : e.figure.kind === "rectangle" ? rectangleShape(c) : e.figure.kind === "circle" ? circleShape(c) : e.figure.kind === "arc" ? arcShape(c) : lineShape(c);
-      const name = nameOf2.get(e.figure.id);
+      const name = nameOf3.get(e.figure.id);
       const drawnBox = unionBounds([
         expandBounds(pointBox(outlinePoints(shape.outline)), F.stroke / 2),
         ...shape.marks.map((k) => expandBounds(pointBox(k.points), F.thin / 2)),
@@ -9513,9 +9555,9 @@ ${lines.join("\n")}
     const img = new Uint8Array(mask);
     const at = (x, y) => x < 0 || y < 0 || x >= width || y >= height ? 0 : img[y * width + x];
     const toDelete = [];
-    let changed = true;
-    while (changed) {
-      changed = false;
+    let changed2 = true;
+    while (changed2) {
+      changed2 = false;
       for (let pass = 0; pass < 2; pass++) {
         toDelete.length = 0;
         for (let y = 0; y < height; y++) {
@@ -9535,7 +9577,7 @@ ${lines.join("\n")}
           }
         }
         if (toDelete.length) {
-          changed = true;
+          changed2 = true;
           for (const i of toDelete) img[i] = 0;
         }
       }
@@ -10756,14 +10798,16 @@ ${lines.join("\n")}
     label: axis === "row" ? "Line up across" : "Line up down",
     tier: 1,
     effect: { kind: "tidy", axis },
-    hint: "align and space them evenly"
+    hint: "align and space them evenly",
+    tool: "tidy"
   });
   var EQUALIZE = {
     id: "equalize",
     label: "Match sizes",
     tier: 1,
     effect: { kind: "equalize" },
-    hint: "make them the same size as the largest"
+    hint: "make them the same size as the largest",
+    tool: "tidy"
   };
   var strongest = (rels, kind, from, to) => has(rels, kind, from, to)?.strength ?? 0;
   function pairwise(scope, kind) {
@@ -10832,7 +10876,7 @@ ${lines.join("\n")}
       name: "slider",
       describes: "a knob on a track",
       conversions: [
-        { id: "control", label: "Make it a slider", tier: 1, effect: { kind: "control" }, hint: "its value is where the knob sits; drag the knob to set it" },
+        { id: "control", label: "Make it a slider", tier: 1, effect: { kind: "control" }, hint: "its value is where the knob sits; drag the knob to set it", tool: "control" },
         NAME
       ],
       match(scope) {
@@ -11041,6 +11085,7 @@ ${lines.join("\n")}
     let gestures = /* @__PURE__ */ new Map();
     let markHands = /* @__PURE__ */ new Map();
     let staleResult = null;
+    let actingTool = null;
     let generation = 0;
     let lastAt = 0;
     let counter2 = 0;
@@ -11050,7 +11095,7 @@ ${lines.join("\n")}
     const sawNumber = (name, seq) => {
       if (Number.isSafeInteger(seq) && seq > (highWater.get(name) ?? 0)) highWater.set(name, seq);
     };
-    const listeners = /* @__PURE__ */ new Set();
+    const listeners2 = /* @__PURE__ */ new Set();
     const CHECKPOINT_EVERY = 200;
     let checkpoints = [];
     const nodeCopy = (n2) => ({ ...n2, reps: n2.reps.slice(), edges: n2.edges.slice() });
@@ -11166,7 +11211,7 @@ ${lines.join("\n")}
     };
     function notify() {
       const state = getState();
-      listeners.forEach((l) => l(state));
+      listeners2.forEach((l) => l(state));
     }
     function contentBoundsList(excludeId) {
       return contentIds.filter((id) => id !== excludeId).map((id) => ({ id, bounds: boundsOf(nodes.get(id)) })).filter((c) => c.bounds !== void 0);
@@ -11379,17 +11424,17 @@ ${lines.join("\n")}
       definitionsChanged = false;
       const now = /* @__PURE__ */ new Map();
       for (const aid of artifacts) now.set(aid, definitionKeyOf(aid));
-      const changed = [];
+      const changed2 = [];
       for (const [aid, k] of now) {
         const was = definitionsSeen.get(aid);
-        if (!was || was.signature !== k.signature || was.examples !== k.examples || was.text !== k.text) changed.push(aid);
+        if (!was || was.signature !== k.signature || was.examples !== k.examples || was.text !== k.text) changed2.push(aid);
       }
       const gone = [...definitionsSeen.keys()].filter((aid) => !now.has(aid));
       definitionsSeen = now;
-      if (changed.length === 0 && gone.length === 0) return;
+      if (changed2.length === 0 && gone.length === 0) return;
       for (const c of matchable) {
         for (const aid of gone) c.scores.delete(aid);
-        for (const aid of changed) scoreAgainst(c, aid);
+        for (const aid of changed2) scoreAgainst(c, aid);
         assemble(c);
       }
     }
@@ -12624,8 +12669,9 @@ ${lines.join("\n")}
         maybeCheckpoint(i + 1);
       }
     }
-    function dispatch(raw) {
+    function dispatch(given) {
       staleResult = null;
+      const raw = actingTool !== null && given.tool === void 0 ? { ...given, tool: actingTool } : given;
       const ev = myLog === void 0 || raw.seq !== void 0 ? raw : { ...raw, origin: myLog, seq: (highWater.get(myLog) ?? 0) + 1 };
       if (ev.origin && typeof ev.seq === "number") sawNumber(ev.origin, ev.seq);
       events.push(ev);
@@ -12677,9 +12723,9 @@ ${lines.join("\n")}
       };
     }
     function subscribe(listener) {
-      listeners.add(listener);
+      listeners2.add(listener);
       return () => {
-        listeners.delete(listener);
+        listeners2.delete(listener);
       };
     }
     return {
@@ -12754,6 +12800,15 @@ ${lines.join("\n")}
       dismiss: (summonId, at) => void dispatch({ type: "dismiss", summonId, at }),
       erase: (nodeId, at) => void dispatch({ type: "erase", nodeId, at }),
       undo,
+      withTool: (toolId, fn) => {
+        const before = actingTool;
+        actingTool = toolId;
+        try {
+          return fn();
+        } finally {
+          actingTool = before;
+        }
+      },
       load: (log) => {
         generation++;
         staleResult = null;
@@ -14366,6 +14421,1022 @@ if (mm.THREE && mm.scene) {
     };
   }
 
+  // src/tools/tool.ts
+  var NO_CONTEXT = Object.freeze({ scopeIds: [], notations: [], concepts: [], recent: [] });
+
+  // src/tools/registry.ts
+  var registry3 = /* @__PURE__ */ new Map();
+  var listeners = /* @__PURE__ */ new Set();
+  var version = 0;
+  function changed() {
+    version++;
+    for (const listener of [...listeners]) listener();
+  }
+  function registerTool(tool) {
+    if (!tool || typeof tool.id !== "string" || !tool.id) throw new Error("a tool has an id");
+    if (typeof tool.offers !== "function" || typeof tool.take !== "function") {
+      throw new Error(`tool "${tool.id}": a tool says what it offers and takes what it offered`);
+    }
+    registry3.set(tool.id, tool);
+    changed();
+    return () => {
+      if (registry3.get(tool.id) === tool) unregisterTool(tool.id);
+    };
+  }
+  function unregisterTool(id) {
+    const had = registry3.delete(id);
+    if (had) changed();
+    return had;
+  }
+  function getTool(id) {
+    return registry3.get(id);
+  }
+  function registeredTools() {
+    return [...registry3.values()];
+  }
+  function toolsVersion() {
+    return version;
+  }
+  function onToolsChange(listener) {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  }
+  function offersFor(scope, ctx = NO_CONTEXT) {
+    const out = [];
+    for (const tool of registry3.values()) {
+      for (const offer of tool.offers(scope, ctx)) out.push(offer.tool === tool.id ? offer : { ...offer, tool: tool.id });
+    }
+    return out;
+  }
+  function completionsFor(scope, ctx = NO_CONTEXT) {
+    const out = [];
+    for (const tool of registry3.values()) {
+      if (!tool.completes) continue;
+      for (const offer of tool.completes(scope, ctx)) out.push(offer.tool === tool.id ? offer : { ...offer, tool: tool.id });
+    }
+    return out;
+  }
+  function toolsFor(scope, ctx = NO_CONTEXT) {
+    return registeredTools().filter((tool) => tool.offers(scope, ctx).length > 0);
+  }
+  function readingsFor(scope) {
+    const out = [];
+    for (const tool of registry3.values()) {
+      if (!tool.reads) continue;
+      for (const r of tool.reads(scope)) out.push({ ...r, tool: tool.id });
+    }
+    return out;
+  }
+  function takeOffer(offer, scope, session, at) {
+    const tool = registry3.get(offer.tool);
+    if (!tool) throw new Error(`no tool "${offer.tool}" is registered to take "${offer.key}"`);
+    return session.withTool(tool.id, () => tool.take(offer, scope, session, at)) || {};
+  }
+  function describeTools(filter = () => true) {
+    return registeredTools().filter(filter).map((tool) => `${tool.name} \u2014 ${tool.describe()}`).join("\n");
+  }
+  function defaultHost(session) {
+    return {
+      snap: "offer",
+      models: [],
+      isRead: (id) => {
+        const node = session.getState().nodes.get(id);
+        return !!node && !!transcriptOf(node);
+      },
+      isFlipped: () => false,
+      nameOf: (pid) => {
+        if (pid === LOCAL_PARTICIPANT) return "you";
+        const node = session.getState().nodes.get(pid);
+        return node && wordOf(node) || pid;
+      },
+      textNear: () => null
+    };
+  }
+  function toolScope(session, opts = {}) {
+    const state = session.getState();
+    const summon = opts.summon ?? state.summon;
+    if (!summon) throw new Error("a scope is what a summon holds, and nothing is held");
+    const content = new Set(state.contentIds);
+    return {
+      session,
+      state,
+      summon,
+      marks: summon.enclosedIds.filter((id) => content.has(id)),
+      reading: session.read(summon.enclosedIds),
+      text: (opts.text ?? "").trim(),
+      word: opts.word ?? null,
+      host: { ...defaultHost(session), ...opts.host }
+    };
+  }
+
+  // src/tools/rank.ts
+  var MODEL_DISCOUNT = 0.85;
+  var USE_LIFT_MAX = 1.25;
+  var USE_LIFT_RATE = 0.2;
+  var SPECIFIC_GROUNDS = /* @__PURE__ */ new Set(["known", "written", "proposed"]);
+  function baseOn(grounds) {
+    const c = grounds.confidence || 0;
+    switch (grounds.on) {
+      case "known":
+        return 1.4;
+      case "written":
+        return 1.35;
+      case "proposed":
+        return 1.2 + 0.1 * c;
+      case "clean":
+        return 0.6 + 0.35 * c;
+      default:
+        return 0.5 + 0.45 * c;
+    }
+  }
+  function isSpecific(item) {
+    return !!item.grounds && SPECIFIC_GROUNDS.has(item.grounds.on);
+  }
+  function useLift(n2) {
+    return Math.min(USE_LIFT_MAX, 1 + USE_LIFT_RATE * Math.log1p(Math.max(0, n2 || 0)));
+  }
+  function likelihoodOf(item, uses = {}) {
+    let l = item.base;
+    if (item.asks === "model") l *= MODEL_DISCOUNT;
+    return isSpecific(item) ? l : l * useLift(uses[item.key] || 0);
+  }
+  function rankOffers(items, uses = {}) {
+    return items.map((item) => ({ ...item, likelihood: likelihoodOf(item, uses) })).sort((a, b) => b.likelihood - a.likelihood);
+  }
+
+  // src/tools/correct.ts
+  var CORRECT = {
+    id: "correct",
+    name: "corrections",
+    describe: () => "a match refused \u2014 Not a molecule \u2014 is remembered, and a group like it is not offered as one again",
+    offers(scope) {
+      return scope.summon.suggestions.filter((sug) => sug.kind === "match").map((sug) => ({
+        key: "not:" + sug.id,
+        label: "Not a " + sug.label,
+        reason: "remembered \u2014 a group like this is not offered as one again",
+        base: 0.5,
+        tool: "correct",
+        verbs: ["not", "not a"],
+        data: { definitionId: sug.artifactId }
+      }));
+    },
+    take(offer, scope, session, at) {
+      const { definitionId } = offer.data;
+      session.correct({ ids: scope.summon.enclosedIds.slice(), definitionId, verdict: "is-not", at });
+    }
+  };
+
+  // src/tools/board.ts
+  function codeRepOf(node) {
+    for (let i = node.reps.length - 1; i >= 0; i--) {
+      if (node.reps[i].modality === "code") return node.reps[i];
+    }
+    return null;
+  }
+  function artifactsIn(board, ids) {
+    const artifacts = new Set(board.artifacts);
+    return [...new Set(ids.filter((id) => artifacts.has(id)))];
+  }
+  function definitionOf(board, artifactId) {
+    const node = board.nodes.get(artifactId);
+    const inst = node?.edges.find((e) => e.rel === "instance-of");
+    return inst ? inst.to : artifactId;
+  }
+  function definitionsIn(board, ids) {
+    return [...new Set(artifactsIn(board, ids).map((id) => definitionOf(board, id)))];
+  }
+  function isWritingMark(node, nodes) {
+    const shape = interpretationsOf(node, nodes).filter((r) => r.tier === 0 && r.basis !== "label")[0];
+    return !!shape && shape.label === "text";
+  }
+  function allWriting(scope) {
+    const nodes = scope.state.nodes;
+    return scope.marks.length > 0 && scope.marks.every((id) => {
+      const n2 = nodes.get(id);
+      return !!n2 && (isWritingMark(n2, nodes) || isWord(n2));
+    });
+  }
+  function writingLine(scope) {
+    const writing = scope.reading.concepts.find((c) => c.concept === "writing");
+    const ids = writing?.roles?.words ? writing.roles.words.slice() : [];
+    const said2 = ids.map((id) => {
+      const n2 = scope.state.nodes.get(id);
+      return n2 ? transcriptsOf(n2)[0] : void 0;
+    });
+    const read = ids.length >= 2 && said2.every((t) => !!t && !!t.text);
+    return {
+      ids,
+      said: said2,
+      read,
+      text: read ? said2.map((t) => t.text).join(" ") : "",
+      confidence: read ? Math.min(...said2.map((t) => t.confidence)) : 0
+    };
+  }
+  function unionOf(boxes) {
+    if (!boxes.length) return null;
+    return boxes.reduce((a, b) => ({ minX: Math.min(a.minX, b.minX), maxX: Math.max(a.maxX, b.maxX), minY: Math.min(a.minY, b.minY), maxY: Math.max(a.maxY, b.maxY) }));
+  }
+
+  // src/tools/text.ts
+  var TEXT = {
+    id: "text",
+    name: "text",
+    describe: () => "writing read becomes text where it is, and new writing folds into a text in place of a struck word",
+    offers(scope) {
+      const out = [];
+      const s = scope.state;
+      const line = writingLine(scope);
+      const writingOnly = allWriting(scope);
+      const saidAll = writingOnly ? scope.marks.map((id) => transcriptOf(s.nodes.get(id))).filter(Boolean) : [];
+      const folding = line.read ? line.text : saidAll.length === scope.marks.length && scope.marks.length ? saidAll.join(" ") : "";
+      const box = unionOf(scope.marks.map((id) => boundsOf(s.nodes.get(id))).filter((b) => !!b));
+      const nearText = folding && box ? scope.host.textNear(box) : null;
+      if (nearText) {
+        const grounds = { on: "written", confidence: 0.95, why: "the text it sits beside" };
+        out.push({
+          key: "fold:" + nearText,
+          label: "Fold \u201C" + folding + "\u201D into the text",
+          reason: "in place of the struck word, or after the nearest one; the writing leaves, the text keeps every version",
+          base: baseOn(grounds),
+          tool: "text",
+          grounds,
+          lead: true,
+          name: folding,
+          data: { act: "fold", text: nearText, words: folding, ids: scope.marks.slice() }
+        });
+      }
+      if (line.read) {
+        out.push({
+          key: "line-text:" + line.ids.join(","),
+          label: "Make it text \u201C" + line.text + "\u201D",
+          reason: writingOnly ? "text where the line is, fitted to the ink; flip it to see the writing" : "a file of words where the line is; the ink stays",
+          base: 0.4,
+          tool: "text",
+          verbs: ["text"],
+          data: { act: writingOnly ? "writing" : "line", text: line.text, ids: line.ids.slice() }
+        });
+      }
+      for (const id of scope.summon.enclosedIds) {
+        const n2 = s.nodes.get(id);
+        const said2 = n2 && !s.artifacts.includes(id) && !(line.read && line.ids.includes(id)) && transcriptOf(n2);
+        if (!said2) continue;
+        out.push({
+          key: "word-text:" + id,
+          label: "Make it text \u201C" + said2 + "\u201D",
+          reason: "a file of words where the writing is; the ink stays",
+          base: 0.4,
+          tool: "text",
+          verbs: ["text"],
+          data: { act: "word", text: said2, ids: [id] }
+        });
+      }
+      return out;
+    },
+    take(offer, scope, session, at) {
+      const data = offer.data;
+      const sum = scope.summon;
+      switch (data.act) {
+        // The field closes first, where it always did; the host does the rest.
+        case "fold":
+          session.dismiss(sum.id, at);
+          session.deselect(at);
+          return { host: "fold" };
+        case "line":
+        case "word":
+          session.dismiss(sum.id, at);
+          return { host: "text" };
+        case "writing":
+          return { host: "text" };
+      }
+      return {};
+    }
+  };
+
+  // src/tools/name.ts
+  var NAMING_IS = "naming makes one thing of them, a definition the library keeps and the next drawing like it is offered as; it writes no word on the ink";
+  function nameMarks(session, summonId, name, at) {
+    return session.withTool(NAME2.id, () => session.bless({ summonId, name, at }));
+  }
+  var NAME2 = {
+    id: "name",
+    name: "naming",
+    describe: () => "a word typed at marks becomes their name: one thing, a definition the next drawing like it is offered as",
+    offers: () => [],
+    completes(scope) {
+      if (!scope.word) return [];
+      const q = "\u201C" + scope.word + "\u201D";
+      return [{
+        key: "name-word",
+        label: "Name it " + q,
+        reason: q + " as the name \u2014 " + NAMING_IS,
+        base: 0.4,
+        tool: "name",
+        verbs: [],
+        place: "head",
+        name: scope.word,
+        line: "\u21B5 name it " + q + " \u2014 one thing, a definition",
+        data: { word: scope.word }
+      }];
+    },
+    take(offer, scope, session, at) {
+      const { word } = offer.data;
+      return { made: nameMarks(session, scope.summon.id, word, at) };
+    }
+  };
+
+  // src/tools/label.ts
+  var LABELLING_IS = "it makes nothing: no definition, no name the library learns, no file; undo takes it off";
+  function makersOf(others) {
+    const names = [];
+    for (const n2 of others || []) if (names.indexOf(n2) < 0) names.push(n2);
+    const who = names.length <= 1 ? names[0] || "another hand" : names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+    return { who, count: (others || []).length };
+  }
+  function theirMarks(others) {
+    const m = makersOf(others);
+    return (m.count === 1 ? "the mark " : "the " + m.count + " marks ") + m.who + " made";
+  }
+  function madeThese(others) {
+    const m = makersOf(others);
+    return m.who + (m.count === 1 ? " made this mark" : " made these " + m.count + " marks");
+  }
+  function whoseInk(scope, ids) {
+    const out = { mine: 0, others: [] };
+    for (const id of ids) {
+      const n2 = scope.state.nodes.get(id);
+      if (!n2) continue;
+      if (scope.session.isMine(id)) out.mine++;
+      else out.others.push(scope.host.nameOf(authorOf(n2)));
+    }
+    return out;
+  }
+  function labelOffer(scope, targets, word, o) {
+    const ink = whoseInk(scope, targets);
+    const q = "\u201C" + word + "\u201D";
+    const onto = o.where === "itself" ? "the writing itself, as a caption" : (ink.mine === 1 ? "the mark you made" : "each of the " + ink.mine + " marks you made") + (o.where || "");
+    const reason = ink.mine ? q + " on " + onto + ", in your ink at the board's scale" + (ink.others.length ? " \u2014 not on " + theirMarks(ink.others) + ", which is theirs to label" : "") + " \u2014 " + LABELLING_IS : "no label here \u2014 " + madeThese(ink.others) + ", and a label is a word on your own ink; taking it says so";
+    return {
+      key: o.key,
+      label: "Label it " + q,
+      reason,
+      base: o.grounds ? baseOn(o.grounds) : 0.4,
+      tool: "label",
+      ...o.grounds ? { grounds: o.grounds } : {},
+      verbs: o.verbs,
+      line: ink.mine ? "\u21B5 label it " + q + " \u2014 on your ink; makes nothing" : "\u21B5 no label \u2014 " + madeThese(ink.others) + "; a label goes on your own ink",
+      data: { word, targets }
+    };
+  }
+  function labelInk(session, args) {
+    const text = String(args.word || "").trim();
+    const s = session.getState();
+    const held = (args.ids || []).filter((id) => {
+      const n2 = s.nodes.get(id);
+      return !!n2 && !getRep(n2, "erased");
+    });
+    if (!text || !held.length) return { done: [], saying: [], refused: [] };
+    return session.withTool(LABEL.id, () => {
+      const mine = (id) => session.isMine(id);
+      const saying = held.filter((id) => {
+        const l = mine(id) && labelOf(s.nodes.get(id));
+        return !!l && l.text === text;
+      });
+      const asks = held.filter((id) => !saying.includes(id));
+      if (asks.some(mine)) {
+        if (args.summonId && s.summon && s.summon.id === args.summonId) session.dismiss(args.summonId, args.at);
+        if (session.getState().selection.length) session.deselect(args.at);
+      }
+      const done = [], refused = [];
+      for (const id of asks) {
+        if (session.label({ nodeId: id, text, at: args.at })) {
+          done.push(id);
+          continue;
+        }
+        const st = session.getState().staleResult;
+        const node = s.nodes.get(id);
+        const maker = node ? args.nameOf ? args.nameOf(authorOf(node)) : authorOf(node) : "another hand";
+        refused.push({ id, reason: st && st.what === "label" ? st.reason : "refused", detail: st && st.what === "label" ? st.detail : "", maker });
+      }
+      return { done, saying, refused };
+    });
+  }
+  var isWritingOrRead = (n2, nodes) => isWritingMark(n2, nodes) || isWord(n2) || !!transcriptOf(n2);
+  var LABEL = {
+    id: "label",
+    name: "labels",
+    describe: () => "a word written or typed goes on your own ink as a label \u2014 nothing is made, and another hand's ink is left to them",
+    offers(scope) {
+      const s = scope.state;
+      const line = writingLine(scope);
+      const writingIds = scope.marks.filter((id) => {
+        const n2 = s.nodes.get(id);
+        return !!n2 && !s.artifacts.includes(id) && isWritingOrRead(n2, s.nodes);
+      });
+      const besides = scope.marks.filter((id) => !writingIds.includes(id));
+      const words = [];
+      if (line.read) words.push({ word: line.text, from: line.ids.filter((id) => scope.marks.includes(id)), conf: line.confidence, source: line.said[0].source });
+      for (const id of writingIds) {
+        if (line.read && line.ids.includes(id)) continue;
+        const t = transcriptsOf(s.nodes.get(id))[0];
+        if (t && t.text && !words.some((w2) => w2.word === t.text)) words.push({ word: t.text, from: [id], conf: t.confidence, source: t.source });
+      }
+      const out = [];
+      for (const w2 of words) {
+        const targets = besides.length ? besides : w2.from.slice(0, 1);
+        if (!targets.length) continue;
+        out.push(labelOffer(scope, targets, w2.word, {
+          key: "label:" + w2.word,
+          verbs: ["label", "label it"],
+          where: besides.length ? ", held with the writing" : "itself",
+          grounds: { on: "written", confidence: w2.conf, why: "read from your handwriting by " + scope.host.nameOf(w2.source) }
+        }));
+      }
+      return out;
+    },
+    /** A word typed at marks: Label it, beside the name tool's Name it, at the head of what the field affords. */
+    completes(scope) {
+      if (!scope.word) return [];
+      return [{ ...labelOffer(scope, scope.marks.slice(), scope.word, { key: "label-word", verbs: [] }), place: "head" }];
+    },
+    take(offer, scope, session, at) {
+      const { word, targets } = offer.data;
+      return { detail: labelInk(session, { summonId: scope.summon.id, ids: targets, word, at, nameOf: scope.host.nameOf }) };
+    }
+  };
+
+  // src/tools/concepts.ts
+  var VERBS2 = {
+    tidy: ["line up", "align", "tidy"],
+    equalize: ["match sizes", "same size", "equalize", "equal"],
+    control: ["slider", "control"]
+  };
+  function conversionOffers(scope, toolId) {
+    const out = [];
+    for (const concept of scope.reading.concepts) {
+      for (const conv of concept.conversions) {
+        if (conv.tool !== toolId) continue;
+        const key2 = concept.concept + ":" + conv.id;
+        if (out.some((o) => o.key === key2)) continue;
+        const grounds = { on: concept.concept, confidence: concept.confidence, why: concept.reasoning };
+        out.push({
+          key: key2,
+          label: conv.label,
+          reason: conv.hint || "",
+          base: baseOn(grounds),
+          tool: toolId,
+          ...conv.tier === 2 ? { asks: "model" } : {},
+          grounds,
+          verbs: VERBS2[conv.effect.kind] ?? [],
+          data: { concept: concept.concept, effect: conv.effect }
+        });
+      }
+    }
+    return out;
+  }
+
+  // src/tools/tidy.ts
+  var TIDY = {
+    id: "tidy",
+    name: "tidy",
+    describe: () => "line marks up and space them evenly, or match their sizes; the ink untouched",
+    offers: (scope) => conversionOffers(scope, "tidy"),
+    take(offer, scope, session, at) {
+      const { effect } = offer.data;
+      const ids = scope.summon.enclosedIds.slice();
+      if (effect.kind === "tidy") session.tidy({ ids, mode: "align", axis: effect.axis, at });
+      else if (effect.kind === "equalize") session.tidy({ ids, mode: "equalize", at });
+      return { detail: { mode: effect.kind, count: ids.length } };
+    }
+  };
+
+  // src/tools/control.ts
+  var CONTROL = {
+    id: "control",
+    name: "drawn controls",
+    describe: () => "a line with a dot on it becomes a slider: its value is where the knob sits",
+    offers: (scope) => conversionOffers(scope, "control"),
+    take(_offer, scope, session, at) {
+      const id = session.bless({ summonId: scope.summon.id, name: "slider", at });
+      if (!id) return { made: null };
+      session.attachCode({ participantId: LOCAL_PARTICIPANT, nodeId: id, kind: "control", code: JSON.stringify({ min: 0, max: 1 }), at: at + 1 });
+      return { made: id };
+    }
+  };
+
+  // src/tools/clean.ts
+  function shapesSummary(cands) {
+    const counts = {};
+    cands.forEach((c) => {
+      counts[c.shape] = (counts[c.shape] || 0) + 1;
+    });
+    return Object.entries(counts).map(([k, v]) => v + " " + k + (v === 1 ? "" : "s")).join(", ");
+  }
+  var CLEAN = {
+    id: "clean",
+    name: "clean forms",
+    describe: () => "a confident, unambiguous reading redrawn from the ink's own measurements; the ink kept beneath",
+    offers(scope) {
+      if (scope.host.snap === "off") return [];
+      const cands = scope.session.snapCandidates(scope.summon.enclosedIds);
+      if (!cands.length) return [];
+      const all = cands.length === scope.summon.enclosedIds.length;
+      const grounds = { on: "clean", confidence: cands.reduce((a, o) => a + o.weight, 0) / cands.length, why: "each reads confidently as one shape" };
+      return [{
+        key: "snap",
+        label: all ? "Draw them clean" : "Draw " + cands.length + " of " + scope.summon.enclosedIds.length + " clean",
+        reason: shapesSummary(cands) + " \xB7 ink kept",
+        base: baseOn(grounds),
+        tool: "clean",
+        grounds,
+        verbs: ["clean", "snap", "draw clean"],
+        data: { ids: cands.map((c) => c.id), summary: shapesSummary(cands) }
+      }];
+    },
+    take(offer, _scope, session, at) {
+      const { ids, summary } = offer.data;
+      if (ids.length) session.snap({ ids, at });
+      return { detail: { ids, summary } };
+    }
+  };
+
+  // src/tools/graph3d.ts
+  var GRAPH3D = {
+    id: "graph3d",
+    name: "a graph in 3D",
+    describe: () => "nodes joined by edges stand as spheres and bonds, turning in the frame, each sphere named for its mark",
+    offers(scope) {
+      const { reading: reading2 } = scope;
+      if (!(reading2.genre.genre === "graph" || reading2.genre.genre === "mixed")) return [];
+      if (scope.marks.length < 2 || artifactsIn(scope.state, scope.summon.enclosedIds).length) return [];
+      const nodes = reading2.roles.filter((r) => r.role === "node").length, edges = reading2.roles.filter((r) => r.role === "edge").length;
+      if (nodes < 2 || edges < 1) return [];
+      return [{
+        key: "3d",
+        label: "Show it in 3D",
+        reason: nodes + " spheres and " + edges + " bond" + (edges === 1 ? "" : "s") + " in the frame, turning \u2014 press inside to turn it; ink over a sphere lands on its mark \u2192 then: What is this? asks which molecule",
+        base: 0.4,
+        tool: "graph3d",
+        verbs: ["3d", "show in 3d", "in 3d", "spheres"]
+      }];
+    },
+    take(_offer, scope, session, at) {
+      const sum = scope.summon;
+      const match = sum.suggestions.find((x) => x.kind === "match");
+      const made = match ? session.bless({ summonId: sum.id, suggestionId: match.id, at }) : session.bless({ summonId: sum.id, name: "graph in 3d", at });
+      if (!made) return { made: null, detail: { ok: false, error: "could not hold that group" } };
+      const built = buildGraph3D(session, made);
+      if (!built.ok) return { made, detail: { ok: false, error: built.error } };
+      session.attachCode({ participantId: built.participantId, nodeId: made, kind: "run", code: built.code, prompt: "show it in 3D", at: at + 1 });
+      session.clock({ nodeId: made, op: "play", at: at + 2 });
+      return { made, detail: { ok: true, reasoning: built.reasoning } };
+    }
+  };
+
+  // src/tools/frames.ts
+  function bestWiring(ids, nodes) {
+    const taken = /* @__PURE__ */ new Set();
+    const out = [];
+    for (const c of connectionsFor(ids, nodes)) {
+      const key2 = c.to.id + "|" + c.to.port;
+      if (taken.has(key2)) continue;
+      taken.add(key2);
+      out.push({ from: c.from, to: c.to, reasoning: c.reasoning });
+    }
+    return out;
+  }
+  function frameTemplatesFor(s, ids) {
+    const members = artifactsIn(s, ids);
+    if (!members.length) return [];
+    const kindsOf = (list) => list.map((id) => {
+      const n2 = s.nodes.get(id);
+      const r = n2 && codeRepOf(n2);
+      return r && r.data.kind || (n2 && blessedBehaviourOf(n2) ? "behaviour" : "ink");
+    }).sort().join(",");
+    const mine = kindsOf(members);
+    const said2 = ids.map((id) => {
+      const n2 = s.nodes.get(id);
+      return n2 && transcriptOf(n2);
+    }).filter((w2) => !!w2).map((w2) => w2.toLowerCase().trim());
+    const out = [];
+    for (const aid of s.artifacts) {
+      const n2 = s.nodes.get(aid);
+      if (!n2 || !isFrame(n2) || members.includes(aid)) continue;
+      const name = (wordOf(n2) || "").toLowerCase();
+      if (name && said2.includes(name)) {
+        out.push({ frame: n2, how: "name", why: "you wrote \u201C" + name + "\u201D beside them" });
+        continue;
+      }
+      if (kindsOf(frameOfNode(n2).members) === mine) out.push({ frame: n2, how: "resemblance", why: "the same kinds of thing, wired the same way" });
+    }
+    return out;
+  }
+  var FRAMES = {
+    id: "frames",
+    name: "wiring",
+    describe: () => "artifacts wired into a frame by their ports \u2014 connections offered by type and ranked by name \u2014 and a frame built once, offered again",
+    offers(scope) {
+      const s = scope.state;
+      const arts = artifactsIn(s, scope.summon.enclosedIds);
+      if (!arts.length) return [];
+      const out = [];
+      const wiring = bestWiring(arts, s.nodes);
+      if (arts.length >= 2 || wiring.length) {
+        out.push({
+          key: "frame",
+          label: "Frame these",
+          reason: wiring.length ? wiring.length + " connection" + (wiring.length === 1 ? "" : "s") + ": " + wiring.map((c) => c.from.port + " \u2192 " + c.to.port).join(", ") : arts.length + " artifacts, nothing to wire yet",
+          base: 0.5,
+          tool: "frames",
+          verbs: ["frame", "wire"],
+          data: { act: "frame" }
+        });
+      }
+      for (const tpl of frameTemplatesFor(s, scope.summon.enclosedIds)) {
+        const name = wordOf(tpl.frame) || tpl.frame.id;
+        const grounds = tpl.how === "name" ? { on: "written", confidence: 0.95, why: tpl.why } : { on: "known", confidence: 0.8, why: tpl.why };
+        out.push({
+          key: "frame-like:" + tpl.frame.id,
+          label: "Frame these like \u201C" + name + "\u201D",
+          reason: "the same wiring, on these",
+          base: baseOn(grounds),
+          tool: "frames",
+          grounds,
+          data: { act: "like", template: tpl.frame.id }
+        });
+      }
+      return out;
+    },
+    take(offer, scope, session, at) {
+      const s = session.getState();
+      const members = artifactsIn(s, scope.summon.enclosedIds);
+      const data = offer.data;
+      if (data.act === "frame") {
+        if (!members.length) return { made: null };
+        const name = scope.text.replace(/^frame\s*:?\s*/i, "");
+        const connections2 = bestWiring(members, s.nodes);
+        session.dismiss(scope.summon.id, at);
+        const made = session.frame({ ids: members, name: name || "frame", connections: connections2, at: at + 1 });
+        return { made, detail: { members: members.length } };
+      }
+      const template = s.nodes.get(data.template);
+      if (!template) return { made: null };
+      const tf = frameOfNode(template);
+      const ifaces = new Map(members.map((id) => [id, interfacesOf(s.nodes.get(id), s.nodes)]));
+      const connections = [];
+      for (const c of tf.connections) {
+        const src = members.find((id) => ifaces.get(id).offers.some((o) => o.id === c.from.port));
+        const dst = members.find((id) => id !== src && ifaces.get(id).accepts.some((a) => a.id === c.to.port));
+        if (src && dst) connections.push({ from: { id: src, port: c.from.port }, to: { id: dst, port: c.to.port }, reasoning: "as in " + (wordOf(template) || template.id) });
+      }
+      session.dismiss(scope.summon.id, at);
+      return { made: session.frame({ ids: members, name: wordOf(template) || "frame", connections, at: at + 1 }) };
+    }
+  };
+
+  // src/tools/text-edit.ts
+  var TEXT_EDIT = {
+    id: "text-edit",
+    name: "editing text",
+    describe: () => "a text is edited in place, every version kept, or flipped over to the writing it came from",
+    offers(scope) {
+      const out = [];
+      const s = scope.state;
+      for (const id of scope.summon.enclosedIds.filter((x) => s.artifacts.includes(x))) {
+        const n2 = s.nodes.get(id);
+        const rep = n2 && codeRepOf(n2);
+        if (!rep || rep.data.kind !== "text") continue;
+        out.push({
+          key: "edit-text:" + id,
+          label: "Edit the text",
+          reason: "a new version of the words; every version kept",
+          base: 0.4,
+          tool: "text-edit",
+          verbs: ["edit", "edit the text", "retype"],
+          data: { act: "edit", id }
+        });
+        if (rep.data.from === "writing") {
+          const over2 = scope.host.isFlipped(id);
+          out.push({
+            key: "flip:" + id,
+            label: over2 ? "Show the text" : "Show the ink",
+            reason: over2 ? "the text in front again" : "flip it over: the writing it came from",
+            base: 0.4,
+            tool: "text-edit",
+            verbs: ["flip", "ink", "show the ink", "show the text"],
+            data: { act: "flip", id }
+          });
+        }
+      }
+      return out;
+    },
+    take(offer, scope, session, at) {
+      const { act } = offer.data;
+      if (act === "flip") return { host: "flip" };
+      session.dismiss(scope.summon.id, at);
+      session.deselect(at);
+      return { host: "edit-text" };
+    }
+  };
+
+  // src/tools/verbs.ts
+  function playableDefinitions(scope) {
+    return definitionsIn(scope.state, scope.summon.enclosedIds).filter((defId) => {
+      const n2 = scope.state.nodes.get(defId);
+      const rep = n2 && codeRepOf(n2);
+      return !(rep && rep.data.kind !== "run" && rep.data.kind !== "js");
+    });
+  }
+  var nameOf2 = (scope, defId) => {
+    const n2 = scope.state.nodes.get(defId);
+    return n2 && wordOf(n2) || defId;
+  };
+  var VERBS3 = {
+    id: "verbs",
+    name: "words into verbs",
+    describe: () => "what a definition does, from the words beside it, a behaviour acted out, or words typed at it \u2014 read with no model where the table can",
+    offers(scope) {
+      const out = [];
+      for (const defId of playableDefinitions(scope)) {
+        const dn = scope.state.nodes.get(defId);
+        const name = nameOf2(scope, defId);
+        behavioursOf(dn).forEach((r, i) => {
+          const b = r.data;
+          if (b.blessed) return;
+          const grounds = { on: "proposed", confidence: typeof b.residual === "number" ? 1 - b.residual : 0.7, why: b.source === "demo" ? "acted out" : "read by " + scope.host.nameOf(r.source) };
+          out.push({
+            key: "use-behaviour:" + defId + ":" + i,
+            label: name + ": " + describeBehaviour(b),
+            reason: "give it in your name",
+            base: baseOn(grounds),
+            tool: "verbs",
+            grounds,
+            data: { nodeId: defId, behaviour: { terms: b.terms, source: b.source, speed: b.speed } }
+          });
+        });
+        for (const lid of scope.summon.enclosedIds) {
+          const ln = scope.state.nodes.get(lid);
+          const said2 = ln && transcriptOf(ln);
+          if (!said2) continue;
+          const parsed = parseBehaviour(said2);
+          if (!parsed.behaviour) continue;
+          const grounds = { on: "written", confidence: 0.9, why: "read from your handwriting" };
+          out.push({
+            key: "behave-said:" + defId + ":" + lid,
+            label: name + ": " + describeBehaviour(parsed.behaviour),
+            reason: "the words beside it, as what it does",
+            base: baseOn(grounds),
+            tool: "verbs",
+            grounds,
+            data: { nodeId: defId, behaviour: parsed.behaviour }
+          });
+        }
+      }
+      return out;
+    },
+    /** Words typed at a definition: what the table reads, first; the model, last, for what it could not. */
+    completes(scope) {
+      if (scope.text.length <= 3) return [];
+      const out = [];
+      const parsed = parseBehaviour(scope.text);
+      for (const defId of definitionsIn(scope.state, scope.summon.enclosedIds)) {
+        const name = nameOf2(scope, defId);
+        if (parsed.behaviour) {
+          const grounds = { on: "written", confidence: 1, why: parsed.reasoning };
+          out.push({
+            key: "behave:" + defId,
+            label: name + ": " + describeBehaviour(parsed.behaviour),
+            reason: parsed.unparsed.length ? "could not read: " + parsed.unparsed.join(", ") : "from your words \u2014 every " + name + " will",
+            base: baseOn(grounds),
+            tool: "verbs",
+            grounds,
+            place: "first",
+            data: { nodeId: defId, behaviour: parsed.behaviour }
+          });
+        }
+        if (parsed.unparsed.length && scope.host.models.length) {
+          out.push({
+            key: "behave-model:" + defId,
+            label: "Read it with the model",
+            reason: "for what the table could not: " + parsed.unparsed.join(", "),
+            base: 0.4,
+            tool: "verbs",
+            asks: "model",
+            place: "last",
+            data: { nodeId: defId, words: scope.text, model: true }
+          });
+        }
+      }
+      return out;
+    },
+    take(offer, _scope, session, at) {
+      const data = offer.data;
+      if (data.model) return { host: "behave-model" };
+      session.behave({ nodeId: data.nodeId, behaviour: data.behaviour, participantId: LOCAL_PARTICIPANT, at });
+      return {};
+    }
+  };
+
+  // src/tools/clocks.ts
+  var CLOCKS = {
+    id: "clocks",
+    name: "clocks",
+    describe: () => "a definition that can play is played, paused or reset to where it was drawn; time is never in the log",
+    offers(scope) {
+      const out = [];
+      for (const defId of playableDefinitions(scope)) {
+        const n2 = scope.state.nodes.get(defId);
+        const name = n2 && wordOf(n2) || defId;
+        const c = scope.state.clocks[defId];
+        const playing = !!(c && c.playing);
+        out.push({
+          key: "clock:" + defId,
+          label: (playing ? "Pause " : "Play ") + name,
+          reason: playing ? "hold every " + name + " where it is" : "let every " + name + " move",
+          base: 0.56,
+          tool: "clocks",
+          verbs: playing ? ["pause", "stop", "hold"] : ["play", "run", "start", "go"],
+          data: { nodeId: defId, op: playing ? "pause" : "play" }
+        });
+        if (c) {
+          out.push({
+            key: "reset:" + defId,
+            label: "Reset " + name,
+            reason: "back to t = 0, where they were drawn",
+            base: 0.4,
+            tool: "clocks",
+            verbs: ["reset", "rewind"],
+            data: { nodeId: defId, op: "reset" }
+          });
+        }
+      }
+      return out;
+    },
+    take(offer, _scope, session, at) {
+      const { nodeId, op } = offer.data;
+      session.clock({ nodeId, op, at });
+    }
+  };
+
+  // src/tools/read.ts
+  var READ = {
+    id: "read",
+    name: "reading the writing",
+    describe: () => "writing, or any ink, handed as one image to a model that can see, and what it says held on the marks",
+    asks: "model",
+    offers(scope) {
+      const s = scope.state;
+      const sees = scope.host.models.some((m) => m.sees);
+      const unread = scope.summon.enclosedIds.filter((id) => {
+        const n2 = s.nodes.get(id);
+        return !!n2 && isWritingMark(n2, s.nodes) && !scope.host.isRead(id);
+      });
+      if (unread.length) {
+        const lineIds = writingLine(scope).ids;
+        const line = lineIds.length >= 2 && lineIds.some((id) => unread.includes(id)) ? lineIds : [];
+        const single = unread.filter((id) => !line.includes(id));
+        const what = (line.length ? "a line of " + line.length + " words" : "") + (line.length && single.length ? " and " : "") + (single.length ? single.length + " mark" + (single.length === 1 ? "" : "s") + " of writing" : "");
+        const offer = {
+          key: "read",
+          label: "Read the writing",
+          reason: what + ", unread" + (sees ? "" : " \u2014 needs a model that can see"),
+          base: 0.52,
+          tool: "read",
+          asks: "model",
+          verbs: ["read"],
+          data: { line, single }
+        };
+        return [offer];
+      }
+      const ink = scope.marks.filter((id) => {
+        const n2 = s.nodes.get(id);
+        return !!n2 && !s.artifacts.includes(id) && (!!strokePointsOf(n2) || isWord(n2)) && !scope.host.isRead(id);
+      });
+      if (!ink.length) return [];
+      return [{
+        key: "read-any",
+        label: "Read as writing",
+        reason: "the ink as one image, to a model that can see \u2014 for writing the shape rung did not spot" + (sees ? "" : " \u2014 needs a model that can see"),
+        base: 0.4,
+        tool: "read",
+        asks: "model",
+        verbs: ["read", "read as writing", "parse", "writing"],
+        data: { line: ink, single: [] }
+      }];
+    },
+    take: () => ({ host: "read" })
+  };
+
+  // src/tools/what.ts
+  var WHAT = {
+    id: "what",
+    name: "what is this",
+    describe: () => "every joined model reads the group, and its readings join the canvas's own, held",
+    asks: "model",
+    offers(scope) {
+      if (!scope.marks.length) return [];
+      return [{
+        key: "what",
+        label: "What is this?",
+        reason: "every joined model reads the group; its readings join the row above" + (scope.host.models.length ? "" : " \u2014 needs a model"),
+        base: 0.36,
+        tool: "what",
+        asks: "model",
+        verbs: ["what", "what is this", "?", "read the group"],
+        data: { ids: scope.marks.slice() }
+      }];
+    },
+    take: () => ({ host: "what" })
+  };
+
+  // src/tools/duplicate.ts
+  var DUPLICATE = {
+    id: "duplicate",
+    name: "duplicate",
+    describe: () => "a copy of the held ink beside it, selected \u2014 copy and paste in one",
+    offers(scope) {
+      if (!scope.marks.length) return [];
+      return [{
+        key: "duplicate",
+        label: "Duplicate " + (scope.marks.length === 1 ? "it" : "these"),
+        reason: "a copy of the ink beside it, selected",
+        base: 0,
+        tool: "duplicate",
+        hidden: true,
+        verbs: ["dup", "duplicate", "double"],
+        data: { ids: scope.marks.slice() }
+      }];
+    },
+    take: () => ({ host: "duplicate" })
+  };
+
+  // src/tools/keep.ts
+  var KEEP = {
+    id: "keep",
+    name: "keep as drawing",
+    describe: () => "the held marks left as they are, a drawing",
+    offers(scope) {
+      if (!scope.marks.length) return [];
+      return [{
+        key: "keep",
+        label: "Keep as drawing",
+        reason: "leave the marks as they are",
+        base: 0,
+        tool: "keep",
+        hidden: true,
+        verbs: ["keep", "keep as drawing"]
+      }];
+    },
+    take(_offer, scope, session, at) {
+      const sum = scope.summon;
+      const keep = sum.suggestions.find((x) => x.kind === "keep-as-drawing");
+      if (keep) return { made: session.bless({ summonId: sum.id, suggestionId: keep.id, at }) };
+      session.dismiss(sum.id, at);
+      return {};
+    }
+  };
+
+  // src/tools/structure.ts
+  function standStructure(session, artifactId, prompt2, at) {
+    return session.withTool(STRUCTURE.id, () => {
+      const structure = buildStructure(session, artifactId);
+      if (structure.ok) session.attachCode({ participantId: structure.participantId, nodeId: artifactId, kind: "html", code: structure.code, prompt: prompt2, at });
+      return structure;
+    });
+  }
+  var STRUCTURE = {
+    id: "structure",
+    name: "the structure",
+    describe: () => "a page or a diagram from the drawing \u2014 every region in place, no words \u2014 standing at once while a model writes",
+    offers: () => [],
+    take(offer, _scope, session, at) {
+      const { artifactId, prompt: prompt2 } = offer.data;
+      const built = standStructure(session, artifactId, prompt2, at);
+      return { made: built.ok ? artifactId : null, detail: built };
+    }
+  };
+
+  // src/tools/builtin.ts
+  var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE];
+  registerTool(CORRECT);
+  registerTool(TEXT);
+  registerTool(NAME2);
+  registerTool(LABEL);
+  registerTool(TIDY);
+  registerTool(CONTROL);
+  registerTool(CLEAN);
+  registerTool(GRAPH3D);
+  registerTool(FRAMES);
+  registerTool(TEXT_EDIT);
+  registerTool(VERBS3);
+  registerTool(CLOCKS);
+  registerTool(READ);
+  registerTool(WHAT);
+  registerTool(DUPLICATE);
+  registerTool(KEEP);
+  registerTool(STRUCTURE);
+
   // src/participants/serialize.ts
   function n(v, round) {
     return round ? String(Math.round(v)) : v.toFixed(2);
@@ -15024,7 +16095,7 @@ Question: ${q}` }
       if (!prompt2) return { ok: false, error: "no prompt" };
       const state = session.getState();
       const generation = state.generation;
-      const version = session.codeVersion(args.artifactId);
+      const version2 = session.codeVersion(args.artifactId);
       const artifact = state.nodes.get(args.artifactId);
       if (!artifact) return { ok: false, error: "no such artifact" };
       const frame = frameOf(artifact);
@@ -15093,7 +16164,7 @@ ${brief}`, ids: planned.ids, build: planned.build };
         merged.regions[id2] = content;
       }
       const filled = ids.filter((id2) => merged.regions[id2]);
-      const changed = ids.filter((id2) => fill.regions[id2] && (!revising || addressed.includes(id2)));
+      const changed2 = ids.filter((id2) => fill.regions[id2] && (!revising || addressed.includes(id2)));
       if (filled.length === 0) {
         return { ok: false, error: "the model filled none of the regions", raw: result2.text };
       }
@@ -15118,7 +16189,7 @@ ${brief}`, ids: planned.ids, build: planned.build };
         // A build is not pinned to a version: several participants may each
         // offer code for the same artifact and every offer is held. Only a
         // revision, which was written from one particular version, is pinned.
-        expect: revising ? { generation, version } : { generation }
+        expect: revising ? { generation, version: version2 } : { generation }
       });
       if (!accepted) {
         return { ok: false, error: staleWhy("the canvas did not accept the code"), code, raw: result2.text };
@@ -15129,7 +16200,7 @@ ${brief}`, ids: planned.ids, build: planned.build };
         revised: revising,
         genre: planned.genre,
         filled,
-        changed,
+        changed: changed2,
         unfilled: ids.filter((x) => !merged.regions[x]),
         raw: result2.text
       };
@@ -15292,8 +16363,8 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
     const timeoutMs = options.timeoutMs ?? 6e5;
     let waiting = null;
     let counter2 = 0;
-    const listeners = /* @__PURE__ */ new Set();
-    const notify = () => listeners.forEach((l) => l(waiting?.request ?? null));
+    const listeners2 = /* @__PURE__ */ new Set();
+    const notify = () => listeners2.forEach((l) => l(waiting?.request ?? null));
     function settle(result2) {
       if (!waiting) return;
       clearTimeout(waiting.timer);
@@ -15346,8 +16417,8 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
         return true;
       },
       subscribe(listener) {
-        listeners.add(listener);
-        return () => listeners.delete(listener);
+        listeners2.add(listener);
+        return () => listeners2.delete(listener);
       }
     };
   }

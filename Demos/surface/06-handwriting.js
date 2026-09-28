@@ -70,10 +70,8 @@
     return off.toDataURL('image/png');
   }
 
-  function isWriting(node) {
-    const shape = MM.interpretationsOf(node, state.nodes).filter((r) => r.tier === 0 && r.basis !== 'label')[0];
-    return !!shape && shape.label === 'text';
-  }
+  /** Writing: the shape rung's own reading of the mark is `text` — core's one test (`MM.isWritingMark`), the tools' too. */
+  function isWriting(node) { return MM.isWritingMark(node, state.nodes); }
 
   function readOne(node, force) {
     const who = readers();

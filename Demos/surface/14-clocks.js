@@ -34,12 +34,8 @@
     return evs.length + ':' + (last ? last.type + ':' + (last.at || 0) : '');
   }
 
-  /** The definition an artifact belongs to: what it is an instance of, else itself. */
-  function definitionOf(s, artifactId) {
-    const n = s.nodes.get(artifactId);
-    const inst = n && n.edges.find((e) => e.rel === 'instance-of');
-    return inst ? inst.to : artifactId;
-  }
+  /** The definition an artifact belongs to: what it is an instance of, else itself — core's (`MM.definitionOf`), the tools' too. */
+  function definitionOf(s, artifactId) { return MM.definitionOf(s, artifactId); }
 
   /** What drives a definition: the newest behaviour a human gave it, else the built-in. */
   function behaviourOf(s, defId) {

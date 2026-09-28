@@ -41,7 +41,10 @@ export function madeThese(others: readonly string[]): string {
 }
 
 /** The held marks' ink: how many the person made, and who made each of the rest. */
-export function whoseInk(scope: Pick<ToolScope, 'session' | 'state' | 'host'>, ids: readonly string[]): { mine: number; others: string[] } {
+export function whoseInk(
+  scope: { session: Pick<ToolScope['session'], 'isMine'>; state: Pick<ToolScope['state'], 'nodes'>; host: Pick<ToolScope['host'], 'nameOf'> },
+  ids: readonly string[]
+): { mine: number; others: string[] } {
   const out = { mine: 0, others: [] as string[] };
   for (const id of ids) {
     const n = scope.state.nodes.get(id);

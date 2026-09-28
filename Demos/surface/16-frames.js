@@ -1,7 +1,7 @@
 // ===== frames =====
 // Provides: frames on the surface — wiredCodeOf/wiredBehaviourOf (the harness applied where members render
-//   and run), frame and control rendering, the knob drag, makeControl/makeFrame/frameLike for the palette,
-//   frameTemplatesFor (conjure by resemblance and by name), exportFrameFiles.
+//   and run), frame and control rendering, the knob drag, exportFrameFiles. (Making a frame or a slider,
+//   and finding a frame again, are core's `frames` and `control` tools, offered in the field.)
 // Uses: core, artifacts (frames map), render, kinds, clocks.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
@@ -41,83 +41,10 @@
   }
 
   // ===== Making them ==========================================================
-  /** The circled line and dot become a control: the drawing IS the slider. */
-  function makeControl(sum) {
-    const at = Date.now();
-    const id = session.bless({ summonId: sum.id, name: 'slider', at: at });
-    if (!id) return null;
-    session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: id, kind: 'control', code: JSON.stringify({ min: 0, max: 1 }), at: at + 1 });
-    flash('a slider — drag the knob to set it');
-    return id;
-  }
-
-  /** One connection per input port, best first, so a value feeds each place it fits without fighting. */
-  function bestWiring(ids, nodes) {
-    const taken = new Set();
-    const out = [];
-    for (const c of MM.connectionsFor(ids, nodes)) {
-      const key = c.to.id + '|' + c.to.port;
-      if (taken.has(key)) continue;
-      taken.add(key);
-      out.push({ from: c.from, to: c.to, reasoning: c.reasoning });
-    }
-    return out;
-  }
-
-  /** The artifacts among some ids, each taken to its definition once. */
-  function artifactsIn(s, ids) {
-    return [...new Set(ids.filter((id) => s.artifacts.includes(id)))];
-  }
-
-  function makeFrame(sum, name) {
-    const s = session.getState();
-    const members = artifactsIn(s, sum.enclosedIds);
-    if (!members.length) return null;
-    const connections = bestWiring(members, s.nodes);
-    const at = Date.now();
-    session.dismiss(sum.id, at);
-    const id = session.frame({ ids: members, name: name || 'frame', connections: connections, at: at + 1 });
-    if (id) flash('framed ' + members.length + ' — ' + MM.describeFrame(MM.frameOfNode(s.nodes.get(id) || session.getState().nodes.get(id)), session.getState().nodes));
-    return id;
-  }
-
-  /** A frame built once, offered again: the template's connections mapped onto members with the same ports. */
-  function frameLike(sum, template) {
-    const s = session.getState();
-    const members = artifactsIn(s, sum.enclosedIds);
-    const tf = MM.frameOfNode(template);
-    const ifaces = new Map(members.map((id) => [id, MM.interfacesOf(s.nodes.get(id), s.nodes)]));
-    const connections = [];
-    for (const c of tf.connections) {
-      const src = members.find((id) => ifaces.get(id).offers.some((o) => o.id === c.from.port));
-      const dst = members.find((id) => id !== src && ifaces.get(id).accepts.some((a) => a.id === c.to.port));
-      if (src && dst) connections.push({ from: { id: src, port: c.from.port }, to: { id: dst, port: c.to.port }, reasoning: 'as in ' + (MM.wordOf(template) || template.id) });
-    }
-    const at = Date.now();
-    session.dismiss(sum.id, at);
-    return session.frame({ ids: members, name: MM.wordOf(template) || 'frame', connections: connections, at: at + 1 });
-  }
-
-  /**
-   * Frames this loop could be: by name, when writing in the loop says a
-   * frame's name; by resemblance, when a frame's members are the same kinds.
-   */
-  function frameTemplatesFor(s, ids) {
-    const members = artifactsIn(s, ids);
-    if (!members.length) return [];
-    const kindsOf = (list) => list.map((id) => { const n = s.nodes.get(id); const r = n && codeRepOf(n); return (r && r.data.kind) || (n && MM.blessedBehaviourOf(n) ? 'behaviour' : 'ink'); }).sort().join(',');
-    const mine = kindsOf(members);
-    const said = ids.map((id) => { const n = s.nodes.get(id); return n && MM.transcriptOf(n); }).filter(Boolean).map((w) => w.toLowerCase().trim());
-    const out = [];
-    for (const aid of s.artifacts) {
-      const n = s.nodes.get(aid);
-      if (!n || !MM.isFrame(n) || members.includes(aid)) continue;
-      const name = (MM.wordOf(n) || '').toLowerCase();
-      if (name && said.includes(name)) { out.push({ frame: n, how: 'name', why: 'you wrote “' + name + '” beside them' }); continue; }
-      if (kindsOf(MM.frameOfNode(n).members) === mine) out.push({ frame: n, how: 'resemblance', why: 'the same kinds of thing, wired the same way' });
-    }
-    return out;
-  }
+  // Framing artifacts, framing them like a frame built once, and making a drawn
+  // slider are core's tools now (V1-PLAN B1: `frames`, `control` in
+  // metamedium-core/src/tools/) — offered in the field and taken there. What
+  // stays here is the surface's side: the harness applied, the knob, rendering.
 
   function exportFrameFiles(id) {
     const s = session.getState();

@@ -53,11 +53,8 @@
     // A held loop scopes the tile: what you circled, not everything.
     if (ccOpen()) syncTiles();
   }
-  function shapesSummary(cands) {
-    const counts = {};
-    cands.forEach((c) => { counts[c.shape] = (counts[c.shape] || 0) + 1; });
-    return Object.entries(counts).map(([k, v]) => v + ' ' + k + (v === 1 ? '' : 's')).join(', ');
-  }
+  /** "3 rectangles, 2 lines" — core's words (the clean tool says them in the field too). */
+  function shapesSummary(cands) { return MM.shapesSummary(cands); }
   function snapAll(ids, why) {
     if (!ids.length) return;
     session.snap({ ids: ids, at: Date.now() });

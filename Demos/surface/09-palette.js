@@ -1,14 +1,18 @@
 // ===== palette =====
 // Provides: the field — one text input at the pen tip, its geometry (fieldBox/placeField), and the
 //   ADAPTER around the reader (fieldContext → readFieldCommand → runFieldCommand, exposed as readField);
-//   the offers (conversionsFor: what this is, what it affords); the core verbs
-//   (name, copy, paste, erase; copyMarks/pasteClip/duplicateMarks, the clip); the prompts (runPrompt →
-//   a page or a program, runAsk, runDraw); the library (libraryEntries/reuseEntry/applyLibrary, targetOf);
-//   renderSummon/refreshPalette/paintField.
-// Uses: core (hand, lastPen), ui, field (readFieldCommand, verbFor, libraryMatch — pure, 09-field.js),
-//   view (usableViewport, viewportRect), models (agents, withWork, cancelReading, askModelsAbout,
-//   offerModel), snap, render, artifacts, frames, clocks, images (svgOf), text (wordToText),
-//   input (say, flash).
+//   the ADAPTER around core's tools (V1-PLAN B1): conversionsFor — what this is (readings, read here) and
+//   what it affords (MM.offersFor over the scope fieldScope gathers, toolHost the surface's facts), ranked
+//   by MM.rankOffers with this device's uses; takeOffer — the tool's act (stamped with its id) and what
+//   only the surface can do for it (HOST_ACTS, TOOL_ACTS); the core verbs (name, copy, paste, erase;
+//   copyMarks/pasteClip/duplicateMarks, the clip); the label act's words (labelMarks, labelSentence); the
+//   prompts (runPrompt → a page or a program, runAsk, runDraw); the library (libraryEntries/reuseEntry/
+//   applyLibrary, targetOf); renderSummon/refreshPalette/paintField.
+// Uses: core (hand, lastPen), ui, field (readFieldCommand, verbFor, libraryMatch, typedWord — pure,
+//   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading,
+//   askModelsAbout, offerModel), snap (snapMode), render (nameOfParticipant), artifacts (flipped), frames,
+//   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
+//   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -26,25 +30,74 @@
   // read. Nothing here asks a model except the acts that say so.
   let shownSummonId = null;
   let paletteItems = [];     // every offer for the open selection, ranked
+  let paletteScope = null;   // the scope the open field's offers were read from (V1-PLAN B1)
   let paletteIndex = -1;     // the pill the arrows chose among the visible ones; -1 is none
   let paletteNavigated = false;
   let clip = null;           // what Copy held: { strokes: [{ points }], bounds, from }
   const MAX_AFFORD = 5;      // pills shown in the affordance column before "+N more"
 
+  // ===== What the field holds: readings, and what the tools afford (V1-PLAN B1) =====
+  // What this IS is read here: a name you gave a shape like it, the words you
+  // wrote, what a model read it as, the concepts it reads as — each a reading
+  // with its number, and tapping one takes it. What it AFFORDS is every
+  // registered tool's offer for this scope (`MM.offersFor`, core's `tools/`):
+  // a new tool is a file and a line in core, and it is offered here with no
+  // change to this file. Both are ranked by one pure function in core
+  // (`MM.rankOffers`), with this device's use counts handed in. This file is
+  // the adapter: it gathers the scope, maps offers to pills, and performs
+  // what only the surface can — ask a model, open the editor, flip a text.
+
+  /** What only this surface knows, for the tools: the snap preference, the models, what is read or flipped, where texts stand. */
+  function toolHost() {
+    return {
+      snap: snapMode,
+      models: agents.map((a) => ({ name: a.name, sees: !!(a.config && a.config.vision) })),
+      isRead: (id) => { const n = session.getState().nodes.get(id); return !!n && isRead(n); },
+      isFlipped: (id) => flipped.has(id),
+      nameOf: nameOfParticipant,
+      textNear: (b) => textNear(session.getState(), b),
+    };
+  }
+
+  /** The scope the field's tools read: the open summon, what is typed, and this surface's facts. */
+  function fieldScope(s, text, word) {
+    return MM.toolScope(session, { summon: s.summon, text: text || '', word: word || null, host: toolHost() });
+  }
+
+  /** A reading, for the top row: what it stands on ranks it, exactly as it ranks an offer. */
+  function readingItem(o) {
+    return Object.assign({ certain: true, tier: 1, group: o.grounds.on, groupConf: o.grounds.confidence, groupWhy: o.grounds.why, base: MM.baseOn(o.grounds) }, o);
+  }
+
+  /** An offer as a pill: its reason the tooltip, what it stands on after that, a dot when it asks a model. */
+  function offerItem(o) {
+    const item = {
+      key: o.key, label: o.label, why: o.reason, verbs: o.verbs || [], tier: o.asks === 'model' ? 2 : 1,
+      group: o.hidden ? 'hidden' : o.grounds ? o.grounds.on : 'always',
+      groupConf: o.grounds ? o.grounds.confidence : 0, groupWhy: o.grounds ? o.grounds.why : '',
+      base: o.base, grounds: o.grounds, asks: o.asks, offer: o,
+      run: () => takeOffer(o),
+    };
+    if (o.lead) item.certain = true;
+    if (o.name !== undefined) item.name = o.name;
+    if (o.line !== undefined) item.line = o.line;
+    return item;
+  }
+
   function conversionsFor(s) {
     const sum = s.summon;
-    const reading = session.read(sum.enclosedIds);
-    const items = [];
-    const marks = sum.enclosedIds.filter((id) => s.contentIds.includes(id));
+    const scope = paletteScope = fieldScope(s, '', null);
+    const reading = scope.reading;
+    const marks = scope.marks;
+    const known = [], lined = [], worded = [], proposed = [], conceived = [];
 
     // --- What this IS: readings with their numbers. Tapping one takes it as the name. ---
     for (const sug of sum.suggestions) {
       if (sug.kind !== 'match') continue;
-      items.push({
-        key: 'sug:' + sug.id, certain: true, group: 'known', groupConf: sug.score || 1,
-        groupWhy: 'you named this shape before',
+      known.push(readingItem({
+        key: 'sug:' + sug.id, grounds: { on: 'known', confidence: sug.score || 1, why: 'you named this shape before' },
         label: sug.label + ' ' + (sug.score || 1).toFixed(2), name: sug.label,
-        why: (sug.reasoning || 'like the one you named') + ' — take it as another ' + sug.label, tier: 1,
+        why: (sug.reasoning || 'like the one you named') + ' — take it as another ' + sug.label,
         run: () => {
           const made = session.bless({ summonId: sum.id, suggestionId: sug.id, at: Date.now() });
           // A definition that holds a program hands it to its instance: a
@@ -52,94 +105,40 @@
           const entry = made && libraryEntries(session.getState()).find((e) => e.id === sug.artifactId);
           if (entry) reuseEntry(made, entry);
         },
-      });
-      // The refusal sits beside the offer: a match the engine will not stop
-      // making is a mode, and the correction is what teaches it (WP-12).
-      items.push({
-        key: 'not:' + sug.id, group: 'always', groupConf: 0, groupWhy: '', verbs: ['not', 'not a'],
-        label: 'Not a ' + sug.label, why: 'remembered — a group like this is not offered as one again', tier: 1,
-        run: () => {
-          session.correct({ ids: sum.enclosedIds.slice(), definitionId: sug.artifactId, verdict: 'is-not', at: Date.now() });
-          refreshPalette(); // the summon stays open; the refused offer is gone from it
-        },
-      });
+      }));
     }
     // A line of writing — words gathered by nearness (v10 D3) — is one thing to
     // name and one thing to make text, once every word on it has been read.
-    const writing = reading.concepts.find((c) => c.concept === 'writing');
-    const lineIds = writing && writing.roles && writing.roles.words ? writing.roles.words.slice() : [];
-    const lineSaid = lineIds.map((id) => MM.transcriptsOf(s.nodes.get(id))[0]);
-    const lineRead = lineIds.length >= 2 && lineSaid.every((t) => t && t.text);
-    const lineText = lineRead ? lineSaid.map((t) => t.text).join(' ') : '';
+    const line = MM.writingLine(scope);
     // Writing alone, taken, becomes TEXT where it is — fitted to the ink, the
     // ink underneath, editable — never a definition (v10 F8). Writing beside
     // a shape names the shape, as before.
     const allWriting = marks.length > 0 && marks.every((id) => { const n = s.nodes.get(id); return n && (isWriting(n) || MM.isWord(n)); });
-    if (lineRead) {
-      const conf = Math.min(...lineSaid.map((t) => t.confidence));
-      items.push({
-        key: 'line:' + lineIds.join(','), certain: true, group: 'written', groupConf: conf,
-        groupWhy: 'read from your handwriting by ' + nameOfParticipant(lineSaid[0].source),
-        label: '“' + lineText + '” ' + conf.toFixed(2), name: lineText,
-        why: allWriting ? 'the line you wrote — take it as text, here; the ink stays underneath' : 'the line you wrote — ' + NAMING_IS + ' — take it as the name', tier: 1,
-        run: () => { if (allWriting) writingToText(sum, lineText); else session.bless({ summonId: sum.id, name: lineText, at: Date.now() }); },
-      });
-    }
-    // Written words on or beside a text made from writing fold into it (v10 F12):
-    // in place of a struck word's gap, else after the nearest word.
-    {
-      const saidAll = allWriting ? marks.map((id) => MM.transcriptOf(s.nodes.get(id))).filter(Boolean) : [];
-      const folding = lineRead ? lineText : (saidAll.length === marks.length && marks.length ? saidAll.join(' ') : '');
-      const boxes = marks.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
-      const nearText = folding && boxes.length ? textNear(s, union(boxes)) : null;
-      if (nearText) items.push({
-        key: 'fold:' + nearText, certain: true, group: 'written', groupConf: 0.95, groupWhy: 'the text it sits beside',
-        label: 'Fold “' + folding + '” into the text', name: folding,
-        why: 'in place of the struck word, or after the nearest one; the writing leaves, the text keeps every version', tier: 1,
-        run: () => { const ids = marks.slice(); session.dismiss(sum.id, Date.now()); session.deselect(Date.now()); foldIntoText(nearText, folding, ids); say('folded “' + folding + '” into the text'); },
-      });
+    if (line.read) {
+      lined.push(readingItem({
+        key: 'line:' + line.ids.join(','), grounds: { on: 'written', confidence: line.confidence, why: 'read from your handwriting by ' + nameOfParticipant(line.said[0].source) },
+        label: '“' + line.text + '” ' + line.confidence.toFixed(2), name: line.text,
+        why: allWriting ? 'the line you wrote — take it as text, here; the ink stays underneath' : 'the line you wrote — ' + MM.NAMING_IS + ' — take it as the name',
+        run: () => { if (allWriting) writingToText(sum, line.text); else session.bless({ summonId: sum.id, name: line.text, at: Date.now() }); },
+      }));
     }
     // What the writing says: write a word beside a shape and it is the shape's name.
     {
-      const labels = reading.roles.filter((r) => r.role === 'label' && sum.enclosedIds.includes(r.id) && !(lineRead && lineIds.includes(r.id)));
+      const labels = reading.roles.filter((r) => r.role === 'label' && sum.enclosedIds.includes(r.id) && !(line.read && line.ids.includes(r.id)));
       const said = labels.map((r) => ({ r, t: MM.transcriptsOf(s.nodes.get(r.id))[0] })).filter((x) => x.t);
       for (const { r, t } of said) {
-        items.push({
-          key: 'said:' + r.id, certain: true, group: 'written', groupConf: t.confidence,
-          groupWhy: 'read from your handwriting by ' + nameOfParticipant(t.source),
+        worded.push(readingItem({
+          key: 'said:' + r.id, grounds: { on: 'written', confidence: t.confidence, why: 'read from your handwriting by ' + nameOfParticipant(t.source) },
           label: '“' + t.text + '” ' + t.confidence.toFixed(2), name: t.text,
-          why: r.targets.length ? 'the word beside it — ' + NAMING_IS + ' — take it as the name' : allWriting ? 'the word you wrote — take it as text, here; the ink stays underneath' : 'the word you wrote — ' + NAMING_IS + ' — take it as the name', tier: 1,
+          why: r.targets.length ? 'the word beside it — ' + MM.NAMING_IS + ' — take it as the name' : allWriting ? 'the word you wrote — take it as text, here; the ink stays underneath' : 'the word you wrote — ' + MM.NAMING_IS + ' — take it as the name',
           run: () => { if (allWriting && !r.targets.length) writingToText(sum, t.text); else session.bless({ summonId: sum.id, name: t.text, at: Date.now() }); },
-        });
-      }
-    }
-    // …or put on your own ink as a label (V1-PLAN L2e): the same word, on the marks
-    // held with the writing — or, with nothing else held, on the writing itself as a
-    // caption. It makes nothing, and says so; the reading above it names.
-    {
-      const writingIds = marks.filter((id) => { const n = s.nodes.get(id); return n && !s.artifacts.includes(id) && (isWriting(n) || MM.isWord(n) || !!MM.transcriptOf(n)); });
-      const besides = marks.filter((id) => !writingIds.includes(id)); // held besides the writing
-      const words = [];
-      if (lineRead) words.push({ word: lineText, from: lineIds.filter((id) => marks.includes(id)), conf: Math.min(...lineSaid.map((t) => t.confidence)), source: lineSaid[0].source });
-      for (const id of writingIds) {
-        if (lineRead && lineIds.includes(id)) continue;
-        const t = MM.transcriptsOf(s.nodes.get(id))[0];
-        if (t && t.text && !words.some((w) => w.word === t.text)) words.push({ word: t.text, from: [id], conf: t.confidence, source: t.source });
-      }
-      for (const w of words) {
-        const targets = besides.length ? besides : w.from.slice(0, 1);
-        if (!targets.length) continue;
-        items.push(labelItem(sum, targets, w.word, {
-          key: 'label:' + w.word, group: 'written', groupConf: w.conf, verbs: ['label', 'label it'],
-          groupWhy: 'read from your handwriting by ' + nameOfParticipant(w.source),
-          where: besides.length ? ', held with the writing' : 'itself',
         }));
       }
     }
     // What a model read this group as — held, attributed, and an offer to name it.
     {
       const seen = new Set();
-      const proposed = [];
+      const heard = [];
       for (const id of sum.enclosedIds) {
         const n = s.nodes.get(id);
         if (!n) continue;
@@ -148,275 +147,101 @@
           const key = r.label.toLowerCase();
           if (seen.has(key)) continue;
           seen.add(key);
-          proposed.push(r);
+          heard.push(r);
         }
       }
-      proposed.sort((a, b) => b.weight - a.weight).slice(0, 3).forEach((r) => {
-        items.push({
-          key: 'proposed:' + r.label, certain: true, group: 'proposed', groupConf: r.weight,
-          groupWhy: 'read this way by ' + r.sourceName,
+      heard.sort((a, b) => b.weight - a.weight).slice(0, 3).forEach((r) => {
+        proposed.push(readingItem({
+          key: 'proposed:' + r.label, grounds: { on: 'proposed', confidence: r.weight, why: 'read this way by ' + r.sourceName },
           label: r.label + ' ' + r.weight.toFixed(2) + ' · ' + r.sourceName, name: r.label,
-          why: r.sourceName + (r.reasoning ? ' — ' + r.reasoning.slice(0, 80) : '') + ' — take it as the name', tier: 1,
+          why: r.sourceName + (r.reasoning ? ' — ' + r.reasoning.slice(0, 80) : '') + ' — take it as the name',
           run: () => session.bless({ summonId: sum.id, name: r.label, at: Date.now() }),
-        });
+        }));
       });
     }
     // The concepts these marks read as (Tier 0): a row, a frame, a flow — each
-    // a reading with a number, and each with what it lets the engine do.
+    // a reading with a number; what each lets the engine do is its tools' offer.
     reading.concepts.slice(0, 3).forEach((concept) => {
-      items.push({
-        key: 'concept:' + concept.concept, certain: true, group: 'concept', groupConf: concept.confidence,
-        groupWhy: concept.reasoning, label: concept.concept + ' ' + concept.confidence.toFixed(2), name: concept.concept,
-        why: concept.reasoning + ' — take it as the name', tier: 1,
+      conceived.push(readingItem({
+        key: 'concept:' + concept.concept, grounds: { on: 'concept', confidence: concept.confidence, why: concept.reasoning },
+        label: concept.concept + ' ' + concept.confidence.toFixed(2), name: concept.concept,
+        why: concept.reasoning + ' — take it as the name',
         run: () => session.bless({ summonId: sum.id, name: concept.concept, at: Date.now() }),
-      });
+      }));
     });
 
-    // --- What it AFFORDS ---
-    for (const concept of reading.concepts) {
-      for (const conv of concept.conversions) {
-        if (conv.effect.kind === 'name') continue; // the reading's own pill does this
-        // A seeded brief ("Make a button…") is the field with words in it: four
-        // of them crowded the column and said nothing the reading's pill does not.
-        if (conv.effect.kind === 'prompt') continue;
-        const seen = items.find((i) => i.key === concept.concept + ':' + conv.id);
-        if (seen) continue;
-        items.push({
-          key: concept.concept + ':' + conv.id, group: concept.concept, groupConf: concept.confidence, groupWhy: concept.reasoning,
-          label: conv.label, why: conv.hint || '', tier: conv.tier,
-          verbs: conv.effect.kind === 'tidy' ? ['line up', 'align', 'tidy'] : conv.effect.kind === 'equalize' ? ['match sizes', 'same size', 'equalize', 'equal']
-            : conv.effect.kind === 'control' ? ['slider', 'control'] : [],
-          run: () => runConversion(sum, conv, concept),
-        });
-      }
-    }
-    // Drawing them clean: instant, offline, and the summon stays open so the
-    // next offer is taken from the cleaned-up marks.
-    const offers = snapMode === 'off' ? [] : session.snapCandidates(sum.enclosedIds);
-    if (offers.length) {
-      const all = offers.length === sum.enclosedIds.length;
-      items.push({
-        key: 'snap', group: 'clean', groupConf: offers.reduce((a, o) => a + o.weight, 0) / offers.length,
-        groupWhy: 'each reads confidently as one shape', verbs: ['clean', 'snap', 'draw clean'],
-        label: all ? 'Draw them clean' : 'Draw ' + offers.length + ' of ' + sum.enclosedIds.length + ' clean',
-        why: shapesSummary(offers) + ' · ink kept', tier: 1,
-        run: () => { shownSummonId = null; snapAll(offers.map((o) => o.id), shapesSummary(offers)); },
-      });
-    }
-    // Writing a model has read can become text — a file of words a frame wires into a slot. Only on request.
-    if (lineRead) {
-      items.push({
-        key: 'line-text:' + lineIds.join(','), group: 'always', groupConf: 0, groupWhy: '', verbs: ['text'],
-        label: 'Make it text “' + lineText + '”', why: allWriting ? 'text where the line is, fitted to the ink; flip it to see the writing' : 'a file of words where the line is; the ink stays', tier: 1,
-        run: () => { if (allWriting) writingToText(sum, lineText); else { session.dismiss(sum.id, Date.now()); lineToText(lineIds, lineText); } },
-      });
-    }
-    for (const lid of sum.enclosedIds) {
-      const ln = s.nodes.get(lid);
-      const said = ln && !s.artifacts.includes(lid) && !(lineRead && lineIds.includes(lid)) && MM.transcriptOf(ln);
-      if (!said) continue;
-      items.push({
-        key: 'word-text:' + lid, group: 'always', groupConf: 0, groupWhy: '', verbs: ['text'],
-        label: 'Make it text “' + said + '”', why: 'a file of words where the writing is; the ink stays', tier: 1,
-        run: () => { session.dismiss(sum.id, Date.now()); wordToText(lid); },
-      });
-    }
-    // A graph — nodes joined by edges — can stand in 3D at once: spheres and
-    // bonds in the loop's frame, from the drawing, no model (v10 D7, tier 1).
-    if ((reading.genre.genre === 'graph' || reading.genre.genre === 'mixed') && marks.length >= 2 && !artifactsIn(s, sum.enclosedIds).length) {
-      const nodesN = reading.roles.filter((r) => r.role === 'node').length, edgesN = reading.roles.filter((r) => r.role === 'edge').length;
-      if (nodesN >= 2 && edgesN >= 1) items.push({
-        key: '3d', group: 'always', groupConf: 0, groupWhy: '', verbs: ['3d', 'show in 3d', 'in 3d', 'spheres'],
-        label: 'Show it in 3D', why: nodesN + ' spheres and ' + edgesN + ' bond' + (edgesN === 1 ? '' : 's') + ' in the frame, turning — press inside to turn it; ink over a sphere lands on its mark → then: What is this? asks which molecule', tier: 1,
-        run: () => showIn3D(sum),
-      });
-    }
-    // Artifacts in the loop can be wired into a frame — and a frame built
-    // once is offered again, by the name written beside them or by resemblance.
-    {
-      const arts = artifactsIn(s, sum.enclosedIds);
-      if (arts.length) {
-        const wiring = bestWiring(arts, s.nodes);
-        if (arts.length >= 2 || wiring.length) {
-          items.push({
-            key: 'frame', group: 'always', groupConf: 0, groupWhy: '', verbs: ['frame', 'wire'],
-            label: 'Frame these', why: wiring.length ? wiring.length + ' connection' + (wiring.length === 1 ? '' : 's') + ': ' + wiring.map((c) => c.from.port + ' → ' + c.to.port).join(', ') : arts.length + ' artifacts, nothing to wire yet', tier: 1,
-            run: () => { const f = fieldInput(); const v = f ? f.value.trim().replace(/^frame\s*:?\s*/i, '') : ''; makeFrame(sum, v); },
-          });
-        }
-        for (const tpl of frameTemplatesFor(s, sum.enclosedIds)) {
-          const name = MM.wordOf(tpl.frame) || tpl.frame.id;
-          items.push({
-            key: 'frame-like:' + tpl.frame.id, group: tpl.how === 'name' ? 'written' : 'known', groupConf: tpl.how === 'name' ? 0.95 : 0.8,
-            groupWhy: tpl.why, label: 'Frame these like “' + name + '”', why: 'the same wiring, on these', tier: 1,
-            run: () => frameLike(sum, tpl.frame),
-          });
-        }
-      }
-    }
-    // A definition in the loop: what it has been offered to do, what the words
-    // beside it say it does, and its clock.
-    // A text artifact is edited, and one made from writing can be flipped to the ink (v10 F8).
-    for (const aid of sum.enclosedIds.filter((id) => s.artifacts.includes(id))) {
-      const an = s.nodes.get(aid);
-      const arep = an && codeRepOf(an);
-      if (!arep || arep.data.kind !== 'text') continue;
-      items.push({
-        key: 'edit-text:' + aid, group: 'always', groupConf: 0, groupWhy: '', verbs: ['edit', 'edit the text', 'retype'],
-        label: 'Edit the text', why: 'a new version of the words; every version kept', tier: 1,
-        run: () => { session.dismiss(sum.id, Date.now()); session.deselect(Date.now()); beginTextEdit(aid); },
-      });
-      if (arep.data.from === 'writing') items.push({
-        key: 'flip:' + aid, group: 'always', groupConf: 0, groupWhy: '', verbs: ['flip', 'ink', 'show the ink', 'show the text'],
-        label: flipped.has(aid) ? 'Show the text' : 'Show the ink', why: flipped.has(aid) ? 'the text in front again' : 'flip it over: the writing it came from', tier: 1,
-        run: () => { if (flipped.has(aid)) flipped.delete(aid); else flipped.add(aid); render(session.getState()); refreshPalette(); },
-      });
-    }
-    const defs = [...new Set(sum.enclosedIds.filter((id) => s.artifacts.includes(id)).map((id) => definitionOf(s, id)))];
-    for (const defId of defs) {
-      const dn = s.nodes.get(defId);
-      const name = MM.wordOf(dn) || defId;
-      // Only what can play plays: a drawing's tank, or a program. A page, a text, a picture has no clock to offer.
-      const drep = codeRepOf(dn);
-      if (drep && drep.data.kind !== 'run' && drep.data.kind !== 'js') continue;
-      MM.behavioursOf(dn).forEach((r, i) => {
-        if (r.data.blessed) return;
-        items.push({
-          key: 'use-behaviour:' + defId + ':' + i, group: 'proposed', groupConf: typeof r.data.residual === 'number' ? 1 - r.data.residual : 0.7,
-          groupWhy: (r.data.source === 'demo' ? 'acted out' : 'read by ' + nameOfParticipant(r.source)),
-          label: name + ': ' + MM.describeBehaviour(r.data), why: 'give it in your name', tier: 1,
-          run: () => session.behave({ nodeId: defId, behaviour: { terms: r.data.terms, source: r.data.source, speed: r.data.speed }, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() }),
-        });
-      });
-      for (const lid of sum.enclosedIds) {
-        const ln = s.nodes.get(lid);
-        const said = ln && MM.transcriptOf(ln);
-        if (!said) continue;
-        const parsed = MM.parseBehaviour(said);
-        if (!parsed.behaviour) continue;
-        items.push({
-          key: 'behave-said:' + defId + ':' + lid, group: 'written', groupConf: 0.9, groupWhy: 'read from your handwriting',
-          label: name + ': ' + MM.describeBehaviour(parsed.behaviour), why: 'the words beside it, as what it does', tier: 1,
-          run: () => session.behave({ nodeId: defId, behaviour: parsed.behaviour, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() }),
-        });
-      }
-      const c = s.clocks[defId];
-      items.push({
-        key: 'clock:' + defId, group: 'always', groupConf: 0, groupWhy: '',
-        verbs: c && c.playing ? ['pause', 'stop', 'hold'] : ['play', 'run', 'start', 'go'],
-        label: (c && c.playing ? 'Pause ' : 'Play ') + name,
-        why: c && c.playing ? 'hold every ' + name + ' where it is' : 'let every ' + name + ' move', tier: 1,
-        run: () => session.clock({ nodeId: defId, op: c && c.playing ? 'pause' : 'play', at: Date.now() }),
-      });
-      if (c) items.push({
-        key: 'reset:' + defId, group: 'always', groupConf: 0, groupWhy: '', verbs: ['reset', 'rewind'],
-        label: 'Reset ' + name, why: 'back to t = 0, where they were drawn', tier: 1,
-        run: () => session.clock({ nodeId: defId, op: 'reset', at: Date.now() }),
-      });
-    }
-    // The acts that ask a model, and say so with a dot.
-    const unread = sum.enclosedIds.filter((id) => { const n = s.nodes.get(id); return n && isWriting(n) && !isRead(n); });
-    if (unread.length) {
-      // A line of writing is read as one image, so the reader has the phrase; the rest one by one.
-      const line = lineIds.length >= 2 && lineIds.some((id) => unread.includes(id)) ? lineIds : [];
-      const single = unread.filter((id) => !line.includes(id));
-      const what = (line.length ? 'a line of ' + line.length + ' words' : '') + (line.length && single.length ? ' and ' : '') + (single.length ? single.length + ' mark' + (single.length === 1 ? '' : 's') + ' of writing' : '');
-      items.push({
-        key: 'read', group: 'always', groupConf: 0, groupWhy: '', verbs: ['read'],
-        label: 'Read the writing', why: what + ', unread' + (seeing().length ? '' : ' — needs a model that can see'), tier: 2,
-        run: () => {
-          let any = false;
-          if (line.length) any = readLine(line, true) || any;
-          single.forEach((id) => { any = readOne(s.nodes.get(id), true) || any; });
-          if (!any) offerModel('Reading writing needs a model that can see — one marked “sees”.');
-        },
-      });
-    }
-    // Writing the rung did not spot — big letters, a scrawl — can still be
-    // read: any ink, as one image, on request (v10 F5). The rung called
-    // John's h an arc and his o a triangle; the field must still offer to read them.
-    if (!unread.length) {
-      const ink = marks.filter((id) => { const n = s.nodes.get(id); return n && !s.artifacts.includes(id) && (MM.strokePointsOf(n) || MM.isWord(n)) && !isRead(n); });
-      if (ink.length) items.push({
-        key: 'read-any', group: 'always', groupConf: 0, groupWhy: '', verbs: ['read', 'read as writing', 'parse', 'writing'],
-        label: 'Read as writing', why: 'the ink as one image, to a model that can see — for writing the shape rung did not spot' + (seeing().length ? '' : ' — needs a model that can see'), tier: 2,
-        run: () => { if (!readLine(ink, true)) offerModel('Reading writing needs a model that can see — one marked “sees”.'); },
-      });
-    }
-    if (marks.length) {
-      items.push({
-        key: 'what', group: 'always', groupConf: 0, groupWhy: '', verbs: ['what', 'what is this', '?', 'read the group'],
-        label: 'What is this?', why: 'every joined model reads the group; its readings join the row above' + (agents.length ? '' : ' — needs a model'), tier: 2,
-        run: () => askModelsAbout(marks.slice()),
-      });
-    }
-    // A duplicate is copy and paste in one; it is typed, not a slot.
-    if (marks.length) {
-      items.push({
-        key: 'duplicate', group: 'hidden', groupConf: 0, groupWhy: '', verbs: ['dup', 'duplicate', 'double'],
-        label: 'Duplicate ' + (marks.length === 1 ? 'it' : 'these'), why: 'a copy of the ink beside it, selected', tier: 1,
-        run: () => duplicateMarks(sum, marks),
-      });
-      items.push({
-        key: 'keep', group: 'hidden', groupConf: 0, groupWhy: '', verbs: ['keep', 'keep as drawing'],
-        label: 'Keep as drawing', why: 'leave the marks as they are', tier: 1,
-        run: () => {
-          const keep = sum.suggestions.find((x) => x.kind === 'keep-as-drawing');
-          if (keep) session.bless({ summonId: sum.id, suggestionId: keep.id, at: Date.now() });
-          else session.dismiss(sum.id, Date.now());
-        },
-      });
-    }
-    return items;
+    // --- What it AFFORDS: every tool's offer for this scope, in the registry's order. ---
+    const offers = MM.offersFor(scope).map(offerItem);
+    // An act as particular to these marks as a reading (Fold “…” into the text)
+    // stands with the readings, where it always stood: after the line it takes.
+    const lead = offers.filter((i) => i.certain);
+    return known.concat(lined, lead, worded, proposed, conceived, offers.filter((i) => !i.certain));
   }
 
-  function runConversion(sum, conv, concept) {
-    const at = Date.now();
-    const ids = sum.enclosedIds.slice();
-    if (conv.effect.kind === 'tidy') {
-      // The field stays open: a button click never closes it (the hand chains
-      // commands — line up, then match sizes, then name). Clicking off, Esc,
-      // naming, or erasing the marks themselves ends it.
-      session.tidy({ ids: ids, mode: 'align', axis: conv.effect.axis, at: at });
-      flash('lined up ' + ids.length + ' marks');
-      refreshPalette();
-    } else if (conv.effect.kind === 'equalize') {
-      session.tidy({ ids: ids, mode: 'equalize', at: at });
-      flash('matched ' + ids.length + ' sizes');
-      refreshPalette();
-    } else if (conv.effect.kind === 'name') {
-      session.bless({ summonId: sum.id, name: concept.concept, at: at });
-    } else if (conv.effect.kind === 'prompt') {
-      // A seeded brief: it lands in the field, read like anything typed, and Enter sends it.
-      const f = fieldInput();
-      if (f) { f.value = conv.effect.seed; paintField(f.value); f.focus(); }
-    } else if (conv.effect.kind === 'control') {
-      makeControl(sum);
-    }
+  // ===== Taking an offer: the tool writes, the surface does the rest =========
+  // Core's `takeOffer` stamps what the tool writes with its id; what only this
+  // surface can do — ask a model, open the editor, flip a text, hold a clip,
+  // put words in a text's places — it does here, inside the same stamp, so
+  // whatever that writes carries the tool's id too. Then it says what happened.
+  const HOST_ACTS = {
+    // Writing becomes text where it stands: fitted to the ink when it was all writing, else a file of words.
+    text: (o, scope) => { const d = o.data; if (d.act === 'writing') writingToText(scope.summon, d.text); else if (d.act === 'line') lineToText(d.ids, d.text); else wordToText(d.ids[0]); },
+    fold: (o) => { const d = o.data; foldIntoText(d.text, d.words, d.ids); say('folded “' + d.words + '” into the text'); },
+    'edit-text': (o) => beginTextEdit(o.data.id),
+    flip: (o) => { const id = o.data.id; if (flipped.has(id)) flipped.delete(id); else flipped.add(id); render(session.getState()); refreshPalette(); },
+    read: (o) => {
+      const d = o.data, s = session.getState();
+      let any = false;
+      if (d.line.length) any = readLine(d.line, true) || any;
+      d.single.forEach((id) => { any = readOne(s.nodes.get(id), true) || any; });
+      if (!any) offerModel('Reading writing needs a model that can see — one marked “sees”.');
+    },
+    what: (o) => askModelsAbout(o.data.ids.slice()),
+    duplicate: (o, scope) => duplicateMarks(scope.summon, o.data.ids),
+    'behave-model': (o) => { const d = o.data; agents.forEach((a) => withWork('behave:' + a.id + ':' + d.nodeId, [d.nodeId], a.name + ' · reading the words', a.behave({ nodeId: d.nodeId, words: d.words, at: Date.now() })).then(() => render(session.getState()))); },
+  };
+  /** What the surface does around a tool's act: before it (the field rebuilt from what it leaves), and after (what to say). */
+  const TOOL_ACTS = {
+    // The summon stays open; the refused offer is gone from it.
+    correct: { after: () => refreshPalette() },
+    // The field stays open: a button click never closes it (the hand chains
+    // commands — line up, then match sizes, then name).
+    tidy: { after: (o, scope, t) => { flash((t.detail.mode === 'tidy' ? 'lined up ' : 'matched ') + t.detail.count + (t.detail.mode === 'tidy' ? ' marks' : ' sizes')); refreshPalette(); } },
+    control: { after: (o, scope, t) => { if (t.made) flash('a slider — drag the knob to set it'); } },
+    // Drawing them clean leaves the summon open, and the next offer is taken from the cleaned marks.
+    clean: { before: () => { shownSummonId = null; }, after: (o, scope, t) => { if (t.detail.ids.length) flash('drew ' + t.detail.ids.length + ' clean' + (t.detail.summary ? ' — ' + t.detail.summary : '')); } },
+    graph3d: { after: (o, scope, t) => say(!t.made ? 'could not hold that group' : t.detail.ok ? 'in 3D (tier 1): ' + t.detail.reasoning : 'could not stand it in 3D: ' + t.detail.error) },
+    frames: { after: (o, scope, t) => { if (o.data.act !== 'frame' || !t.made) return; const st = session.getState(); flash('framed ' + t.detail.members + ' — ' + MM.describeFrame(MM.frameOfNode(st.nodes.get(t.made)), st.nodes)); } },
+    label: { after: (o, scope, t) => { const d = t.detail; if (d.done.length || d.saying.length || d.refused.length) say(labelSentence(String(o.data.word).trim(), d.done, d.saying, d.refused)); } },
+  };
+
+  /** Take an offer: the tool's act, stamped with its id, and whatever only this surface can do for it. */
+  function takeOffer(o) {
+    const f = fieldInput();
+    // What is typed as the pill is taken: `frame: rig` names the frame.
+    const scope = Object.assign({}, paletteScope, { text: f ? f.value.trim() : '' });
+    const acts = TOOL_ACTS[o.tool] || {};
+    if (acts.before) acts.before(o, scope);
+    session.withTool(o.tool, () => {
+      const taken = MM.takeOffer(o, scope, session, Date.now());
+      if (taken.host && HOST_ACTS[taken.host]) HOST_ACTS[taken.host](o, scope, taken);
+      if (acts.after) acts.after(o, scope, taken);
+    });
   }
+
+  // A tool registered or unregistered changes what the field offers with no
+  // change to the log (R4c keys what a paint derives by the log): the
+  // registry says so, and an open field offers again.
+  MM.onToolsChange(() => refreshPalette());
 
   // ===== Ranking: the reading first, then learned use ========================
+  // The order itself is core's (`MM.rankOffers`, tools/rank.ts): pure, and
+  // asked in Node. Learned use is this device's, kept here and handed in.
   const USES_KEY = 'mm-palette-uses';
   const uses = store.get(USES_KEY) || {};
 
-  function baseLikelihood(item) {
-    const g = item.group, c = item.groupConf || 0;
-    let l;
-    if (g === 'known') l = 1.4;
-    else if (g === 'written') l = 1.35;
-    else if (g === 'proposed') l = 1.2 + 0.1 * c;
-    else if (g === 'clean') l = 0.6 + 0.35 * c;
-    else if (g === 'always') l = { read: 0.52, frame: 0.5, what: 0.36 }[item.key] || (item.key.startsWith('clock:') ? 0.56 : item.key.startsWith('not:') ? 0.5 : 0.4);
-    else if (g === 'hidden') l = 0;
-    else l = 0.5 + 0.45 * c; // a concept's conversions
-    if (item.tier === 2) l *= 0.85;
-    // Learned use lifts the GENERIC verbs toward the hand that uses them; an
-    // offer specific to these marks is not generic, and nothing learned outranks it.
-    const specific = g === 'known' || g === 'written' || g === 'proposed';
-    return specific ? l : l * Math.min(1.25, 1 + 0.2 * Math.log1p(uses[item.key] || 0));
-  }
   function rankItems(items) {
-    return items.map((i) => Object.assign(i, { likelihood: baseLikelihood(i) })).sort((a, b) => b.likelihood - a.likelihood);
+    return MM.rankOffers(items, uses);
   }
   function noteUse(item) {
     uses[item.key] = (uses[item.key] || 0) + 1;
@@ -500,7 +325,8 @@
   // ===== Name it, Label it: one word, two acts (V1-PLAN L2e) ==================
   // (`makersOf`, `theirMarks` and `madeThese` — the words for another hand's marks —
   // are the reader's, in 09-field.js, so the line before Enter and the status after it
-  // say the same thing.)
+  // say the same thing; core's label tool says them the same way, and the field's test
+  // holds the two to it.)
   // Naming BLESSES: the marks become one thing, a definition the library keeps and
   // the next drawing like it is offered as. Labelling puts a word on your own ink and
   // MAKES NOTHING — no definition, no file, nothing the matcher learns (the notes, §B,
@@ -508,94 +334,29 @@
   // twice, so the difference is said in the words the field already has — each pill's
   // tooltip says what it does and what it does not, and the reading line says what a
   // pill will do while it is pointed at or chosen by the arrows — never a new badge,
-  // row or button. Label is an offer in the row; the four core buttons stay four.
-  const NAMING_IS = 'naming makes one thing of them, a definition the library keeps and the next drawing like it is offered as; it writes no word on the ink';
-  const LABELLING_IS = 'it makes nothing: no definition, no name the library learns, no file; undo takes it off';
+  // row or button. Label is an offer in the row, from core's label tool, and Name it
+  // from its name tool (`MM.NAMING_IS`, `MM.LABELLING_IS`); the four core buttons stay four.
 
   /**
-   * The held marks' ink, for the reader and the tooltips: how many the person made, and who
-   * made each of the rest. "Is this mine?" is core's question (`session.isMine`), the one the
-   * label door asks — the person's, in this sitting or another, so the marks drawn before a
+   * The held marks' ink, for the reader: how many the person made, and who made each of
+   * the rest. "Is this mine?" is core's question (`session.isMine`), the one the label
+   * door asks — the person's, in this sitting or another, so the marks drawn before a
    * reload are still theirs (V1-PLAN L2i). Who made the rest is said as it is shown.
    */
   function whoseInk(s, ids) {
-    const out = { mine: 0, others: [] };
-    for (const id of ids) {
-      const n = s.nodes.get(id);
-      if (!n) continue;
-      if (session.isMine(id)) out.mine++;
-      else out.others.push(nameOfParticipant(authorOf(n)));
-    }
-    return out;
+    return MM.whoseInk({ session: session, state: s, host: { nameOf: nameOfParticipant } }, ids);
   }
 
   /**
-   * The Label pill: the word on each of `targets` the person made. Its tooltip says where
-   * the word goes, whose marks it will not go on, and that it makes nothing; `line` is
-   * what the reading line says while it is pointed at.
-   * @param {{key:string, group:string, groupConf:number, groupWhy?:string, verbs?:string[], where?:string}} o
-   *        `where` is said after the marks (", held with the writing"), or 'itself' for writing that captions itself
-   */
-  function labelItem(sum, targets, word, o) {
-    const s = session.getState();
-    const ink = whoseInk(s, targets);
-    const q = '“' + word + '”';
-    const onto = o.where === 'itself' ? 'the writing itself, as a caption'
-      : (ink.mine === 1 ? 'the mark you made' : 'each of the ' + ink.mine + ' marks you made') + (o.where || '');
-    const why = ink.mine
-      ? q + ' on ' + onto + ', in your ink at the board\'s scale' + (ink.others.length ? ' — not on ' + theirMarks(ink.others) + ', which is theirs to label' : '') + ' — ' + LABELLING_IS
-      : 'no label here — ' + madeThese(ink.others) + ', and a label is a word on your own ink; taking it says so';
-    return {
-      key: o.key, group: o.group, groupConf: o.groupConf, groupWhy: o.groupWhy || '', verbs: o.verbs || [],
-      label: 'Label it ' + q, why: why, tier: 1,
-      line: ink.mine ? '↵ label it ' + q + ' — on your ink; makes nothing' : '↵ no label — ' + madeThese(ink.others) + '; a label goes on your own ink',
-      run: () => labelMarks(sum, targets, word),
-    };
-  }
-
-  /** The Name pill for a typed word: the same act as `name: word`, said apart from a label. */
-  function nameWordItem(sum, word) {
-    const q = '“' + word + '”';
-    return {
-      key: 'name-word', group: 'always', groupConf: 0, groupWhy: '', verbs: [],
-      label: 'Name it ' + q, why: q + ' as the name — ' + NAMING_IS, tier: 1,
-      line: '↵ name it ' + q + ' — one thing, a definition',
-      run: () => session.bless({ summonId: sum.id, name: word, at: Date.now() }),
-    };
-  }
-
-  /**
-   * A word on the person's own ink (V1-PLAN L2e): one `label` event per mark they made —
-   * in this sitting or before a reload (L2i, `session.isMine`) — each through the
-   * session's door, which refuses another person's mark and says whose it is. Every mark
-   * is accounted for in the status line — labelled, already saying the word, or refused
-   * with the reason — never silently skipped. Nothing is made: no bless, no artifact, no
-   * file. When a word is written the field closes FIRST, so the labels
-   * are the last events in the log and undo takes them off, not the close; a mark that
-   * already says the word writes nothing, so a second Enter or tap is not a second event.
+   * A word on the person's own ink (V1-PLAN L2e): core's label act (`MM.labelInk`, stamped
+   * as the label tool's) — one `label` event per mark they made, the field closed first, a
+   * mark already saying the word left alone — and every mark accounted for in the status
+   * line: labelled, already saying it, or refused with the reason, never silently skipped.
    */
   function labelMarks(sum, ids, word) {
-    const text = String(word || '').trim();
-    const s = session.getState();
-    const held = (ids || []).filter((id) => s.nodes.get(id) && !MM.getRep(s.nodes.get(id), 'erased'));
-    if (!text || !held.length) return { done: [], saying: [], refused: [] };
-    const mine = (id) => session.isMine(id);
-    const saying = held.filter((id) => { const l = mine(id) && MM.labelOf(s.nodes.get(id)); return !!l && l.text === text; });
-    const asks = held.filter((id) => !saying.includes(id));
-    if (asks.some(mine)) {
-      const at = Date.now();
-      if (s.summon && s.summon.id === sum.id) session.dismiss(sum.id, at);
-      if (session.getState().selection.length) session.deselect(at);
-    }
-    const done = [], refused = [];
-    for (const id of asks) {
-      if (session.label({ nodeId: id, text: text, at: Date.now() })) { done.push(id); continue; }
-      const st = session.getState().staleResult;
-      const maker = s.nodes.get(id) ? nameOfParticipant(authorOf(s.nodes.get(id))) : 'another hand';
-      refused.push({ id: id, reason: st && st.what === 'label' ? st.reason : 'refused', detail: st && st.what === 'label' ? st.detail : '', maker: maker });
-    }
-    say(labelSentence(text, done, saying, refused));
-    return { done: done, saying: saying, refused: refused };
+    const r = MM.labelInk(session, { summonId: sum.id, ids: ids, word: word, at: Date.now(), nameOf: nameOfParticipant });
+    if (r.done.length || r.saying.length || r.refused.length) say(labelSentence(String(word || '').trim(), r.done, r.saying, r.refused));
+    return r;
   }
 
   /** What a label act did, in one sentence for the status line. */
@@ -654,7 +415,8 @@
       if (item) { noteUse(item); item.run(); }
       return;
     }
-    if (cmd.do === 'name') { session.bless({ summonId: sum.id, name: cmd.name, at: at }); return; }
+    // Naming is the name tool's act, whether a pill or `name: word` took it.
+    if (cmd.do === 'name') { MM.nameMarks(session, sum.id, cmd.name, at); return; }
     // The marks this summon held when Enter was read — not whatever is held when a stale
     // closure runs again, so a second run finds them already saying the word (L2e).
     if (cmd.do === 'label') { const s = session.getState(); labelMarks(sum, sum.enclosedIds.filter((id) => s.contentIds.includes(id)), cmd.text); return; }
@@ -857,37 +619,27 @@
         }
       }
     }
-    // Words typed at a definition are its behaviour, when the table can read them.
-    const defs = sum ? [...new Set(sum.enclosedIds.filter((id) => s.artifacts.includes(id)).map((id) => definitionOf(s, id)))] : [];
-    if (defs.length && q.length > 3) {
-      const parsed = MM.parseBehaviour(query);
-      for (const defId of defs) {
-        const name = MM.wordOf(s.nodes.get(defId)) || defId;
-        if (parsed.behaviour) {
-          shown = shown.filter((i) => i.key !== 'behave:' + defId);
-          shown.unshift({ key: 'behave:' + defId, group: 'written', groupConf: 1, groupWhy: parsed.reasoning, label: name + ': ' + MM.describeBehaviour(parsed.behaviour), why: parsed.unparsed.length ? 'could not read: ' + parsed.unparsed.join(', ') : 'from your words — every ' + name + ' will', tier: 0,
-            run: () => { session.behave({ nodeId: defId, behaviour: parsed.behaviour, participantId: MM.LOCAL_PARTICIPANT, at: Date.now() }); } });
-        }
-        if (parsed.unparsed.length && agents.length) {
-          shown.push({ key: 'behave-model:' + defId, group: 'always', groupConf: 0, groupWhy: '', label: 'Read it with the model', why: 'for what the table could not: ' + parsed.unparsed.join(', '), tier: 2,
-            run: () => { agents.forEach((a) => withWork('behave:' + a.id + ':' + defId, [defId], a.name + ' · reading the words', a.behave({ nodeId: defId, words: query, at: Date.now() })).then(() => render(session.getState()))); } });
-        }
-      }
-    }
-    // A word typed at marks is offered two ways, side by side (V1-PLAN L2e): Name it —
-    // one thing, a definition — and Label it — the word on your own ink, nothing made.
-    // At the head of what it affords, the pair together; `typedWord` (pure, 09-field.js)
-    // decides whether there is a word at all. An offer already standing for the same word
-    // — a reading that takes it as the name, a label from the writing — is not repeated.
+    // What is typed completes (V1-PLAN B1), from the tools that complete it, each
+    // where the field puts it: words a definition can be told first (the verb table
+    // read them), the model last (for what the table could not), and a word typed at
+    // marks two ways at the head of what it affords — Name it, one thing, a
+    // definition; Label it, the word on your own ink, nothing made (V1-PLAN L2e).
+    // `typedWord` (pure, 09-field.js) decides whether there is a word at all. An offer
+    // already standing for the same word — a reading that takes it as the name, a
+    // label from the writing — is not repeated.
     if (sum) {
       const tw = typedWord(fieldContext(query, s, paletteItems.concat(coreItems(s))));
-      if (tw) {
-        const w = tw.word.toLowerCase();
-        const pair = [nameWordItem(sum, tw.word), labelItem(sum, selectionMarks(s), tw.word, { key: 'label-word', group: 'always', groupConf: 0 })]
-          .filter((p) => !shown.some((i) => i.label === p.label || (p.key === 'name-word' && i.certain && typeof i.name === 'string' && i.name.toLowerCase() === w)));
-        const head = shown.findIndex((i) => !i.certain);
-        shown.splice(head < 0 ? shown.length : head, 0, ...pair);
+      if (!paletteScope || paletteScope.summon.id !== sum.id) paletteScope = fieldScope(s, '', null);
+      const typed = Object.assign({}, paletteScope, { text: query.trim(), word: tw ? tw.word : null });
+      const head = [];
+      for (const it of MM.completionsFor(typed).map(offerItem)) {
+        if (it.offer.place === 'first') { shown = shown.filter((i) => i.key !== it.key); shown.unshift(it); }
+        else if (it.offer.place === 'last') shown.push(it);
+        else head.push(it);
       }
+      const pair = head.filter((p) => !shown.some((i) => i.label === p.label || (typeof p.name === 'string' && i.certain && typeof i.name === 'string' && i.name.toLowerCase() === p.name.toLowerCase())));
+      const at = shown.findIndex((i) => !i.certain);
+      shown.splice(at < 0 ? shown.length : at, 0, ...pair);
     }
     return shown;
   }
@@ -1009,19 +761,6 @@
       out.push({ id: id, name: MM.wordOf(n) || id, code: rep.data.code });
     }
     return out;
-  }
-
-  /** The graph as spheres and bonds (tier 1): the loop is blessed, the program built from the drawing, played because the hand asked. */
-  function showIn3D(sum) {
-    const at = Date.now();
-    const match = sum.suggestions.find((x) => x.kind === 'match');
-    const artifactId = match ? session.bless({ summonId: sum.id, suggestionId: match.id, at: at }) : session.bless({ summonId: sum.id, name: 'graph in 3d', at: at });
-    if (!artifactId) { say('could not hold that group'); return; }
-    const built = MM.buildGraph3D(session, artifactId);
-    if (!built.ok) { say('could not stand it in 3D: ' + built.error); return; }
-    session.attachCode({ participantId: built.participantId, nodeId: artifactId, kind: 'run', code: built.code, prompt: 'show it in 3D', at: at + 1 });
-    session.clock({ nodeId: artifactId, op: 'play', at: at + 2 });
-    say('in 3D (tier 1): ' + built.reasoning);
   }
 
   /** An entry's program on a new artifact: reused, not rewritten, and running because the human asked. */
@@ -1165,9 +904,9 @@
       // Tier 1 first: the structure stands at once, in the engine's name —
       // every region in place, no words. It is what the canvas knows. A model
       // then writes the words into it; with none joined, this is the page.
-      const structure = MM.buildStructure(session, artifactId);
+      // (The structure tool's act, `MM.standStructure`: stamped with its id.)
+      const structure = MM.standStructure(session, artifactId, brief, at + 1);
       if (structure.ok) {
-        session.attachCode({ participantId: structure.participantId, nodeId: artifactId, kind: 'html', code: structure.code, prompt: brief, at: at + 1 });
         if (!agents.length) { say('the structure (tier 1): ' + structure.ids.join(', ') + ' — join a model for the words'); return; }
       } else if (!agents.length) { say('could not build the structure: ' + structure.error); return; }
     }
