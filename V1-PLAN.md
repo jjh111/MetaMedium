@@ -128,7 +128,7 @@ pre-taught*, by the same mechanism a user's own teaching uses.
 { "id": "flowchart", "version": 1, "name": "Flowchart", "notation": "flowchart",
   "describes": "processes, decisions and the flows between them",
   "definitions": [ { "name": "decision", "shapes": [ /* DrawnShape samples */ ], "role": "node",
-                     "ports": "vertices", "export": { "mermaid": "{%label%}" } } ],
+                     "ports": "vertices", "export": { "mermaid": "{label}" } } ],
   "connectors":  [ { "name": "flow", "head": "arrow", "export": { "mermaid": "-->" } } ] }
 ```
 
