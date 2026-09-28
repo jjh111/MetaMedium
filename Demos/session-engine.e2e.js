@@ -143,6 +143,7 @@ window.__setup = function(){
     if(/answering a question/.test(sys)){
       return new Response(JSON.stringify({choices:[{message:{content:'The three rectangles share edges only through the region frame you drew; nothing else relates them.'}}]}),{status:200,headers:{'content-type':'application/json'}});
     }
+    if(window.__whatReply) return reply(window.__whatReply); // a test's own readings for What is this? (U1c)
     return new Response(JSON.stringify({choices:[{message:{content:'[{"label":"page-layout","confidence":0.78,"reasoning":"three rectangles in a header/two-column arrangement"}]'}}]}),{status:200,headers:{'content-type':'application/json'}});
   };
   window.__mm.agents.splice(0); // a remembered model may have rejoined at boot
@@ -3671,6 +3672,56 @@ window.__scenario = async function(){
     if (hook57) ids57.forEach((id, i) => mm.endWork('e2e57:' + i));
     step('57c. three calls of one model in flight are one phrase in the status line — "e2e-stub is working on 3 things · Esc stops it" — not a run-on of every task',
       hook57 && /e2e-stub is working on 3 things/.test(work57) && /Esc stops it/.test(work57) && (work57.match(/reading the group/g) || []).length === 0, { hook: hook57, said: work57 });
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
+  // ---- 58. The field by the hand, whole (PLAN-USER-SURFACE U1c; audit row 3) ----
+  {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    mm.agents.length = 0; mm.agents.push(MM.createAgentParticipant(mm.session, Object.assign({}, MM.PRESETS.ollama, { model: 'e2e-stub', vision: true }), Date.now()));
+    const c58 = document.getElementById('canvas');
+    const pe58 = (type, x, y) => c58.dispatchEvent(new PointerEvent(type, { pointerId: 1, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1 }));
+    const rect58 = (el) => { if (!el || el.hidden || getComputedStyle(el).display === 'none') return null; const r = el.getBoundingClientRect(); return r.width && r.height ? { left: r.left, top: r.top, right: r.right, bottom: r.bottom } : null; };
+    const meets58 = (a, b) => !!a && !!b && a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
+    const W = innerWidth, H = innerHeight;
+    // A box near each corner of the screen, drawn before any is held — so the last stroke ends far from three of them.
+    const spots58 = { 'top left': [360, 90], 'top right': [W - 170, 90], 'bottom left': [360, H - 170], 'bottom right': [W - 250, H - 150] };
+    for (const [x, y] of Object.values(spots58)) t.stroke(t.rect(x, y, 110, 70));
+    await wait(60);
+    const tries58 = [];
+    for (const [name, [x, y]] of Object.entries(spots58)) {
+      const press = { x: x + 55, y: y };
+      pe58('pointerdown', press.x, press.y); await wait(700); pe58('pointerup', press.x, press.y); await wait(80);
+      const f = rect58(document.getElementById('summon'));
+      const mini = rect58(document.getElementById('minimap')), bar = rect58(document.getElementById('bar')), panel = rect58(document.getElementById('inspector'));
+      const dx = f ? Math.max(f.left - press.x, 0, press.x - f.right) : Infinity, dy = f ? Math.max(f.top - press.y, 0, press.y - f.bottom) : Infinity;
+      tries58.push({ name, open: !!mm.session.getState().summon && !!f, inView: !!f && f.left >= -0.5 && f.top >= -0.5 && f.right <= W + 0.5 && f.bottom <= H + 0.5,
+        offMinimap: !meets58(f, mini), offBar: !meets58(f, bar), offPanel: !meets58(f, panel), fromPress: Math.round(Math.hypot(dx, dy)) });
+      const sm = mm.session.getState().summon; if (sm) mm.session.dismiss(sm.id, Date.now());
+      if (mm.session.getState().selection.length) mm.session.deselect(Date.now()); // a hold needs nothing held
+      await wait(30);
+    }
+    step('58. the field opens by the press on the held marks — at every corner of the screen it stands within reach of the hand, whole on screen, and never over the minimap, the bar or the panel',
+      tries58.every((x) => x.open && x.inView && x.offMinimap && x.offBar && x.offPanel && x.fromPress <= 60), tries58);
+    // A model's long readings arrive: every pill stays inside the field, and the field on screen.
+    window.__whatReply = [
+      { label: 'an-entity-association-diagram-with-several-parts-and-a-long-name', confidence: 0.85, reasoning: 'a long reading' },
+      { label: 'state-transformation-of-the-whole-arrangement-drawn-here', confidence: 0.8, reasoning: 'another long one' },
+    ];
+    const [bx, by] = spots58['bottom right'];
+    pe58('pointerdown', bx + 55, by); await wait(700); pe58('pointerup', bx + 55, by); await wait(80);
+    const what58 = [...document.querySelectorAll('#summon .pill.item')].find((b) => /What is this/.test(b.textContent));
+    if (what58) what58.click();
+    for (let i = 0; i < 30 && !t.chips().some((c) => /entity/.test(c)); i++) await wait(100);
+    await wait(80);
+    const f58 = rect58(document.getElementById('summon'));
+    const pills58 = [...document.querySelectorAll('#summon .pill.item')].map((b) => { const r = b.getBoundingClientRect(); return { text: b.textContent.trim().slice(0, 30), right: Math.round(r.right), left: Math.round(r.left) }; });
+    const whole58 = !!f58 && pills58.length > 0 && pills58.every((p) => p.left >= f58.left - 0.5 && p.right <= f58.right + 0.5);
+    step('58b. after a model\'s long readings arrive every pill stands inside the field — none runs off its edge — and the field is whole on screen, off the minimap',
+      !!what58 && t.chips().some((c) => /entity/.test(c)) && whole58 && f58.right <= W + 0.5 && f58.bottom <= H + 0.5 && !meets58(f58, rect58(document.getElementById('minimap'))),
+      { what: !!what58, field: f58 && [f58.left, f58.top, f58.right, f58.bottom].map(Math.round), pills: pills58 });
+    window.__whatReply = null;
+    const sm58 = mm.session.getState().summon; if (sm58) mm.session.dismiss(sm58.id, Date.now());
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
