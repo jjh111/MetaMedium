@@ -3807,15 +3807,19 @@
   const NAMING_IS = 'naming makes one thing of them, a definition the library keeps and the next drawing like it is offered as; it writes no word on the ink';
   const LABELLING_IS = 'it makes nothing: no definition, no name the library learns, no file; undo takes it off';
 
-  /** The held marks' ink, for the reader and the tooltips: how many the person made, and who made each of the rest. */
+  /**
+   * The held marks' ink, for the reader and the tooltips: how many the person made, and who
+   * made each of the rest. "Is this mine?" is core's question (`session.isMine`), the one the
+   * label door asks — the person's, in this sitting or another, so the marks drawn before a
+   * reload are still theirs (V1-PLAN L2i). Who made the rest is said as it is shown.
+   */
   function whoseInk(s, ids) {
     const out = { mine: 0, others: [] };
     for (const id of ids) {
       const n = s.nodes.get(id);
       if (!n) continue;
-      const pid = authorOf(n);
-      if (pid === MM.LOCAL_PARTICIPANT) out.mine++;
-      else out.others.push(nameOfParticipant(pid));
+      if (session.isMine(id)) out.mine++;
+      else out.others.push(nameOfParticipant(authorOf(n)));
     }
     return out;
   }
@@ -3856,11 +3860,12 @@
   }
 
   /**
-   * A word on the person's own ink (V1-PLAN L2e): one `label` event per mark they made,
-   * each through the session's door, which refuses another hand's mark and says whose it
-   * is. Every mark is accounted for in the status line — labelled, already saying the
-   * word, or refused with the reason — never silently skipped. Nothing is made: no bless,
-   * no artifact, no file. When a word is written the field closes FIRST, so the labels
+   * A word on the person's own ink (V1-PLAN L2e): one `label` event per mark they made —
+   * in this sitting or before a reload (L2i, `session.isMine`) — each through the
+   * session's door, which refuses another person's mark and says whose it is. Every mark
+   * is accounted for in the status line — labelled, already saying the word, or refused
+   * with the reason — never silently skipped. Nothing is made: no bless, no artifact, no
+   * file. When a word is written the field closes FIRST, so the labels
    * are the last events in the log and undo takes them off, not the close; a mark that
    * already says the word writes nothing, so a second Enter or tap is not a second event.
    */
@@ -3869,7 +3874,7 @@
     const s = session.getState();
     const held = (ids || []).filter((id) => s.nodes.get(id) && !MM.getRep(s.nodes.get(id), 'erased'));
     if (!text || !held.length) return { done: [], saying: [], refused: [] };
-    const mine = (id) => authorOf(s.nodes.get(id)) === MM.LOCAL_PARTICIPANT;
+    const mine = (id) => session.isMine(id);
     const saying = held.filter((id) => { const l = mine(id) && MM.labelOf(s.nodes.get(id)); return !!l && l.text === text; });
     const asks = held.filter((id) => !saying.includes(id));
     if (asks.some(mine)) {
