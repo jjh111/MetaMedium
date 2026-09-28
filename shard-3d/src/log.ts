@@ -584,8 +584,8 @@ export interface Saying {
  * §2.1 says the plane is "a rep on the stroke with a reason", either way it
  * came to be there, and `Rep.data` is deliberately `unknown` — so the plane
  * needs no new event type and replays with the log for free. The one cost is
- * undo: `session.undo()` drops the last non-tick event, which is the propose,
- * so the shard's undo walks back until the number of strokes actually falls.
+ * undo: `session.undo()` drops this hand's last non-tick event, which is the
+ * propose, so the shard's undo takes back the whole act (`undo` below).
  */
 const PLANE_REP = 'plane';
 
@@ -805,9 +805,21 @@ export function createLog(): Log {
     return out.sort((a, b) => a.node.createdAt - b.node.createdAt || (a.id < b.id ? -1 : 1));
   }
 
-  /** The last event that is not a clock tick — what sits on top of the log. */
+  /**
+   * This hand's own events, in the order the log holds them: its log's, the
+   * ones no room's merge stamped `by`. In a room the board is every hand's log
+   * merged by time and its top may be another hand's; an act is this hand's
+   * own (V1-PLAN L2j), and core's `undo()` takes back only its own. Every act
+   * here is stamped past everything on the board (`stamp`), so the order the
+   * log holds them in is the order they were written.
+   */
+  function ownEvents(): ReadonlyArray<{ type: string; at?: number }> {
+    return (session.getEvents() as ReadonlyArray<{ type: string; at?: number; by?: string }>).filter((e) => e.by === undefined);
+  }
+
+  /** The last event of this hand's that is not a clock tick — what sits on top of its log. */
   function topEvent(): string | null {
-    const events = session.getEvents();
+    const events = ownEvents();
     for (let i = events.length - 1; i >= 0; i--) if (events[i].type !== 'tick') return events[i].type;
     return null;
   }
@@ -845,9 +857,13 @@ export function createLog(): Log {
    *
    * `undoByWalking` below is what this replaced, kept for a log whose events
    * carry no usable time at all (see its comment).
+   *
+   * The act is this hand's (V1-PLAN L2j): read off its own events, never the
+   * top of a room's board, which may be another hand's — and each
+   * `session.undo()` takes back this hand's last event, never another's.
    */
   function undo() {
-    const events = session.getEvents() as ReadonlyArray<{ type: string; at?: number }>;
+    const events = ownEvents();
     let top = events.length - 1;
     while (top >= 0 && events[top].type === 'tick') top--;
     if (top < 0) return;

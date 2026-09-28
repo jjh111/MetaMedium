@@ -9,6 +9,8 @@ import { describe, it, expect } from 'vitest';
 import { boundsOf, createSession, LocalHub, LOCAL_PARTICIPANT, topInterpretation, type SessionEvent } from 'metamedium-core';
 import { joinRoom, otherHand, refusalOf, saidInRoom, splitPrompt, BRIEF_QUESTION, legacySeatTraffic } from './room';
 import { decodeBoard } from './export';
+import { createLog } from './log';
+import { foundation } from './plane';
 
 /**
  * A seat exchange written by the pairing this file's `brief`/id rule replaced —
@@ -138,6 +140,38 @@ describe('ids that hold in the room (DIRECTOR-PLAN-W2 L1)', () => {
     const theirs = hand.session.getState();
     const lefts = theirs.contentIds.map((id) => Math.round(boundsOf(theirs.nodes.get(id)!)!.minX)).sort((a, b) => a - b);
     expect(lefts).toEqual([0, 400]);
+    room.close();
+    hand.close();
+  });
+
+  // Undo is per hand (V1-PLAN L2j): a room's board is every hand's log merged
+  // by time, and the top of it may be the other hand's. The shard's undo
+  // reads its act — the stroke and the plane held with it, one `at` — off its
+  // OWN events, and core's undo takes back its own; the other hand's mark,
+  // drawn after, stands on both boards.
+  it("undo takes back this tab's act — the stroke and its plane — never the other hand's mark drawn after it", async () => {
+    const hub = new LocalHub();
+    const log = createLog();
+    const room = joinRoom({ session: log.session, room: 'r', transport: hub.connect(), name: 'john' });
+    const hand = otherHand(hub.connect(), 'claude', 'r');
+    await settle();
+    const mine = log.add(box(0, 0, 1.2, 0.8), foundation(), 0.012, 1000);
+    await settle();
+    const theirs = hand.session.addStroke(box(300, 0, 100, 60), 5000, undefined, 1, { content: true });
+    await settle();
+    for (const s of [log.session, hand.session]) expect([...s.getState().contentIds].sort()).toEqual([mine, theirs].sort());
+    const top = log.session.getEvents()[log.session.getEvents().length - 1];
+    expect(top.by).toMatch(/^claude/); // the other hand's mark is last on this tab's board
+    log.undo();
+    await settle();
+    for (const s of [log.session, hand.session]) {
+      const st = s.getState();
+      expect(st.contentIds).toEqual([theirs]);
+      expect(st.nodes.has(mine)).toBe(false);
+    }
+    // Nothing of this tab's act is left behind — not the plane held on its stroke.
+    expect(log.session.getEvents().filter((e) => !e.by)).toEqual([]);
+    expect(log.markOf(mine)).toBeNull();
     room.close();
     hand.close();
   });
