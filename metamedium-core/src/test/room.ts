@@ -19,6 +19,16 @@
 // the logs its store holds and its own unstamped events, and a fresh session's
 // replay of that — and against each other: the same events, the same state,
 // the same lines sent. Deterministic: the same seed is the same room.
+//
+// Undo is per hand (V1-PLAN L2j). The room keeps every hand's writing beside
+// its session, as it saw it happen and independently of the engine (`Writing`):
+// every act in the order it was written — one per event, or all of a tool's
+// act (`withTool`) as one. Every undo, the reader's and every other hand's, is
+// held to it: exactly that hand's last act is taken back and nothing else on
+// its board moves, whatever the merge put last; the reader's own log
+// (`ownLog`) is always its writing, in the order written; and once another
+// board holds the log that no longer carries the act, that board holds none
+// of it.
 
 import { createSession, DEFAULT_SESSION_CONFIG, type Session, type SessionEvent } from '../session/session';
 import { LOCAL_PARTICIPANT } from '../session/nodes';
@@ -171,6 +181,91 @@ export class Clock {
 /** A session's own events: what it wrote, never what it merged in (those carry `by`). */
 export const unstamped = (s: Session): SessionEvent[] => s.getEvents().filter((e) => !e.by);
 
+/** An event's identity, for the room's bookkeeping: its authorship, or what it says when it has none. */
+export function idOf(e: SessionEvent): string {
+  if (typeof e.origin === 'string' && e.origin && typeof e.seq === 'number') return `${e.origin}#${e.seq}`;
+  const { by: _by, ...rest } = e;
+  void _by;
+  return JSON.stringify(rest);
+}
+
+/**
+ * A hand's writing as the room saw it happen, kept beside its session and
+ * independently of the engine (V1-PLAN L2j): every act in the order it was
+ * written, each as the identities of its events — one act per event, or one
+ * for everything a tool wrote inside one `withTool`. What an undo must take
+ * back is the last of these.
+ */
+export class Writing {
+  readonly acts: string[][] = [];
+  private known = new Set<string>();
+
+  /** Note what the session wrote since the last look: one act per event, or one for a tool's whole act. */
+  note(s: Session, kind: string | null): void {
+    const fresh = unstamped(s).filter((e) => e.type !== 'tick').map(idOf).filter((k) => !this.known.has(k));
+    if (!fresh.length) return;
+    for (const k of fresh) this.known.add(k);
+    if (kind === 'tool') this.acts.push(fresh);
+    else for (const k of fresh) this.acts.push([k]);
+  }
+
+  /** Every event, in the order written. */
+  order(): string[] {
+    return this.acts.flat();
+  }
+
+  /** The act an undo takes back, taken off the record. */
+  pop(): string[] {
+    const a = this.acts.pop() ?? [];
+    for (const k of a) this.known.delete(k);
+    return a;
+  }
+}
+
+/**
+ * An undo, held to the rule (V1-PLAN L2j): what it takes back is exactly this
+ * hand's last act as the room saw it written, and nothing else on the board
+ * moves — every other hand's event still stands, in the order it stood. Says
+ * what went wrong, or null.
+ */
+export function undoHeld(s: Session, w: Writing, count: (k: string) => void): string | null {
+  const before = s.getEvents().slice();
+  const want = w.acts[w.acts.length - 1] ?? [];
+  const wanted = new Set(want);
+  const own = new Set(before.filter((e) => !e.by).map(idOf));
+  if (want.some((k) => !own.has(k))) return `the room's record of this hand's writing names ${want.find((k) => !own.has(k))}, which its board does not hold`;
+  // What undo took before L2j: the last event on the board, whoever's.
+  let top = before.length - 1;
+  while (top >= 0 && before[top].type === 'tick') top--;
+  if (top >= 0 && before[top].by) count("an undo with another hand's event last on the board");
+  else if (top >= 0 && !wanted.has(idOf(before[top]))) count("an undo whose act the merge did not put last");
+  if (want.length > 1) count("an undo of a tool's act");
+  s.undo();
+  w.pop();
+  const after = s.getEvents();
+  const kept = before.filter((e) => e.by || !wanted.has(idOf(e)));
+  const same = after.length === kept.length && after.every((e, i) => idOf(e) === idOf(kept[i]) && e.by === kept[i].by);
+  if (same) return null;
+  const gone = before.filter((e) => !after.some((x) => idOf(x) === idOf(e) && x.by === e.by)).map((e) => idOf(e) + (e.by ? ' by ' + e.by : ''));
+  return `undo took back [${gone.join(', ')}], not this hand's last act [${want.join(', ')}]`;
+}
+
+/**
+ * Whether a board that holds `writer`'s log without an undone act holds none
+ * of that act — it may still, only as a copy another log carries. Null while
+ * the log it holds still carries the act (the undo has not reached it), else
+ * what it found.
+ */
+function undoReached(s: Session, held: Readonly<Record<string, readonly SessionEvent[]>>, writer: string, keys: readonly string[]): 'gone' | 'a copy' | 'still held' | null {
+  const log = held[writer];
+  if (!log) return null;
+  const set = new Set(keys);
+  if (log.some((e) => set.has(idOf(e)))) return null;
+  if (!s.getEvents().some((e) => set.has(idOf(e)))) return 'gone';
+  for (const [name, other] of Object.entries(held)) if (name !== writer && other.some((e) => set.has(idOf(e)))) return 'a copy';
+  return 'still held';
+}
+
 /**
  * Whether two values say the same thing: plain JSON first (both sides build
  * their objects the same way, so it almost always settles it, fast), and JSON
@@ -214,6 +309,10 @@ export class RemoteHand {
   stale = false;
   /** How far this hand's clock is from the room's. */
   skew: number;
+  /** What this hand wrote, act by act, as the room saw it (L2j). */
+  readonly writing = new Writing();
+  /** The reader's undos this hand has not yet heard: once it holds the reader's log without one, its board must hold none of it. */
+  readonly awaiting: string[][] = [];
   private joins = 0;
 
   constructor(private wire: Wire, public name: string, skew: number, readonly sitting: string, private clock: Clock, opts: { unnamedFirst?: boolean } = {}) {
@@ -437,8 +536,12 @@ function letter(rand: () => number, x: number, y: number): Point[] {
   return [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ({ x: x + (w * i) / 7, y: y + (i % 2 ? h : h * 0.2) + rand() * 1.5 }));
 }
 
-/** One act by a hand on its own board, at its own clock. Returns what it did, or null. */
-function act(s: Session, rand: () => number, at: number, kinds: string[]): string | null {
+/**
+ * One act by a hand on its own board, at its own clock. Returns what it did,
+ * or null. An undo goes through `undo` when one is given — the room's check
+ * of it (L2j) — else straight to the session.
+ */
+function act(s: Session, rand: () => number, at: number, kinds: string[], undo?: () => void): string | null {
   const st = s.getState();
   const content = st.contentIds;
   const pick = <T>(xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)];
@@ -453,9 +556,20 @@ function act(s: Session, rand: () => number, at: number, kinds: string[]): strin
       for (let i = 0; i < n; i++) s.addStroke(letter(rand, x + i * 22, y), at + i * 140, undefined, 1);
       return 'write';
     }
+    case 'tool': {
+      // A tool's act: several events written inside one `withTool` — one act,
+      // undone in one step (L2j). Two marks, and now and then one of them moved.
+      s.withTool('room:pair', () => {
+        const first = s.addStroke(shape(rand, x, y), at, undefined, 1);
+        s.addStroke(shape(rand, x + 170, y + 30), at, undefined, 1);
+        if (rand() < 0.5 && s.getState().contentIds.includes(first)) s.move({ ids: [first], dx: 24, dy: -12, at });
+      }, 'room:pair');
+      return 'tool';
+    }
     case 'undo':
       if (!s.getEvents().some((e) => !e.by && e.type !== 'tick')) return null;
-      s.undo();
+      if (undo) undo();
+      else s.undo();
       return 'undo';
     case 'bless': {
       if (content.length < 2) return null;
@@ -486,8 +600,8 @@ function act(s: Session, rand: () => number, at: number, kinds: string[]): strin
   return null;
 }
 
-const REMOTE_ACTS = ['draw', 'draw', 'draw', 'write', 'undo', 'bless', 'answer', 'erase', 'move', 'label'];
-const LOCAL_ACTS = ['draw', 'draw', 'write', 'undo', 'bless', 'answer', 'erase', 'move'];
+const REMOTE_ACTS = ['draw', 'draw', 'draw', 'write', 'undo', 'undo', 'bless', 'answer', 'erase', 'move', 'label', 'tool'];
+const LOCAL_ACTS = ['draw', 'draw', 'write', 'undo', 'undo', 'bless', 'answer', 'erase', 'move', 'tool'];
 
 /**
  * One room, from its seed. The readers under test join at a random moment,
@@ -525,18 +639,57 @@ export async function runRoom(o: RoomOptions): Promise<RoomReport> {
     }
   }
 
+  // ----- undo is per hand (L2j): every undo held to the hand's writing, and followed to the other boards -----
+  let me = '';
+  /** Other hands' undos the reader has not yet heard: once it holds the writer's log without the act, its board holds none of it. */
+  const theirUndos: { writer: string; keys: string[] }[] = [];
+  /** A hand's undo, held to its writing; what it took back is then awaited on the boards that hold its log. */
+  const undoRemote = (h: RemoteHand, where: string) => {
+    const keys = h.writing.acts[h.writing.acts.length - 1] ?? [];
+    const failed = undoHeld(h.session, h.writing, count);
+    if (failed) failures.push(`seed ${o.seed}, ${where}: ${h.name}'s ${failed}`);
+    else if (keys.length) theirUndos.push({ writer: h.name, keys });
+  };
+  /** Whether a board has heard an undo it awaited, and holds none of the act once it has; what is still awaited is kept. */
+  const followUndos = (s: Session, held: Readonly<Record<string, readonly SessionEvent[]>>, awaited: { writer: string; keys: string[] }[], whose: string, where: string, final = false) => {
+    for (let i = awaited.length - 1; i >= 0; i--) {
+      const u = awaited[i];
+      const r = undoReached(s, held, u.writer, u.keys);
+      if (r === null) {
+        if (final) failures.push(`seed ${o.seed}, ${where}: ${u.writer}'s undo of [${u.keys.join(', ')}] never reached ${whose}`);
+        continue;
+      }
+      awaited.splice(i, 1);
+      if (r === 'still held') failures.push(`seed ${o.seed}, ${where}: ${whose} holds ${u.writer}'s log without [${u.keys.join(', ')}] and its board still holds some of it`);
+      else count(r === 'gone' ? `an undo followed to ${whose === 'the reader' ? 'this' : "another hand's"} board: the act gone there too` : 'an undone act another log still carries');
+    }
+  };
+  /** A remote hand's board before it acts, with the reader's undos it has now heard followed. */
+  const remoteReady = async (h: RemoteHand, where: string): Promise<Session> => {
+    const s = await h.ready();
+    if (me) {
+      const awaited = h.awaiting.map((keys) => ({ writer: me, keys }));
+      followUndos(s, h.store.heldLogs(), awaited, h.name, where);
+      h.awaiting.splice(0, h.awaiting.length, ...awaited.map((u) => u.keys));
+    }
+    return s;
+  };
+
   // Let the room draw a little first, and hear itself.
   const opening = 4 + Math.floor(rand() * 6);
   for (let i = 0; i < opening; i++) {
     now += 200 + Math.floor(rand() * 1500);
     count('a wait run out', clock.advance(now));
     const h = alive()[Math.floor(rand() * alive().length)];
-    if (act(await h.ready(), rand, now + h.skew, ['draw', 'draw', 'write'])) await h.publish();
+    const s = await remoteReady(h, 'opening');
+    const did = act(s, rand, now + h.skew, ['draw', 'draw', 'write']);
+    h.writing.note(s, did);
+    if (did) await h.publish();
     for (const r of alive()) for (const from of wire.waiting(r.member)) await remoteHears(r, from);
   }
 
   // ----- the readers: the same person in the same place, one path each -----
-  const me = `${NAMES[(o.seed + 3) % NAMES.length]}me~t${o.seed % 7}`;
+  me = `${NAMES[(o.seed + 3) % NAMES.length]}me~t${o.seed % 7}`;
   const sitting = `sit-${o.seed}-me`;
   const paths: RoomPath[] = o.reference ? [o.reference, o.under] : [o.under];
   const checkpointEvery = 3 + Math.floor(rand() * 12);
@@ -553,6 +706,9 @@ export async function runRoom(o: RoomOptions): Promise<RoomReport> {
     return h;
   });
   const myAt = () => now; // this reader's clock is the room's
+  /** The path under test, and each reader's writing as the room saw it (L2j). */
+  const U = locals.length - 1;
+  const writings = locals.map(() => new Writing());
   // A few marks on the board before it joins, drawn before it had a log name
   // (the board a browser keeps has none) — carried into the room as its opening log.
   const before = Math.floor(rand() * 3);
@@ -560,9 +716,16 @@ export async function runRoom(o: RoomOptions): Promise<RoomReport> {
     now += 150;
     clock.advance(now);
     const seedAt = Math.floor(rand() * 1e9);
-    for (const h of locals) act(h.session, rng(seedAt), myAt(), ['draw']);
+    for (let k = 0; k < locals.length; k++) writings[k].note(locals[k].session, act(locals[k].session, rng(seedAt), myAt(), ['draw']));
   }
   for (let i = 0; i < locals.length; i++) await paths[i].join(locals[i]);
+  /** The reader's own log is its writing, in the order written: an undo shrinks it from the end (L2j). */
+  const ownInOrder = (where: string) => {
+    const own = paths[U].mine(locals[U]).map(idOf);
+    const wrote = writings[U].order();
+    if (own.join('\n') !== wrote.join('\n')) failures.push(`seed ${o.seed}, ${where}: the reader's log is not its writing in the order written — ${diffAt(own.join(' '), wrote.join(' '))}`);
+  };
+  ownInOrder('after joining');
 
   const check = async (where: string) => {
     count('check');
@@ -612,6 +775,7 @@ export async function runRoom(o: RoomOptions): Promise<RoomReport> {
     }
     if (merged[under]) {
       await check(where);
+      followUndos(h.session, h.store.heldLogs(), theirUndos, 'the reader', where);
       return;
     }
     // No log changed: no work, the board not so much as told.
@@ -638,14 +802,25 @@ export async function runRoom(o: RoomOptions): Promise<RoomReport> {
       if (!hs.length) continue;
       const h = hs[Math.floor(rand() * hs.length)];
       if (rand() < 0.05) { h.skew = skew(); count('a clock that jumped'); }
-      const did = act(await h.ready(), rand, now + h.skew, REMOTE_ACTS);
+      const s = await remoteReady(h, where);
+      const did = act(s, rand, now + h.skew, REMOTE_ACTS, () => undoRemote(h, where));
+      if (did !== 'undo') h.writing.note(s, did);
       if (did) { count('another hand: ' + did); await h.publish(); }
     } else if (r < 0.45) {
       // This reader acts — both paths, the same act — and sends its log.
       const seedAt = Math.floor(rand() * 1e9);
       let did: string | null = null;
-      for (const h of locals) did = act(h.session, rng(seedAt), myAt(), LOCAL_ACTS);
-      if (did) { count('this reader: ' + did); await readersPublish(); }
+      for (let i = 0; i < locals.length; i++) {
+        const h = locals[i];
+        did = act(h.session, rng(seedAt), myAt(), LOCAL_ACTS, () => {
+          const keys = writings[i].acts[writings[i].acts.length - 1] ?? [];
+          const failed = undoHeld(h.session, writings[i], i === U ? count : () => {});
+          if (failed) failures.push(`seed ${o.seed}, ${where}: ${h.label}: the reader's ${failed}`);
+          else if (i === U && keys.length) for (const r of alive()) r.awaiting.push(keys);
+        });
+        if (did !== 'undo') writings[i].note(h.session, did);
+      }
+      if (did) { count('this reader: ' + did); await readersPublish(); ownInOrder(where); }
     } else if (r < 0.72) {
       // A line reaches this reader, which merges.
       const from = wire.waiting('reader');
@@ -686,7 +861,7 @@ export async function runRoom(o: RoomOptions): Promise<RoomReport> {
     } else if (r < 0.975) {
       // A newcomer arrives — sometimes with marks drawn before it had a log name.
       const h = new RemoteHand(wire, nextName(), skew(), `sit-${o.seed}-n${step}`, clock, { unnamedFirst: rand() < 0.5 });
-      if (rand() < 0.7) for (let k = 0; k < 1 + Math.floor(rand() * 2); k++) act(h.session, rand, now + h.skew - 3000 + k * 100, ['draw', 'write']);
+      if (rand() < 0.7) for (let k = 0; k < 1 + Math.floor(rand() * 2); k++) h.writing.note(h.session, act(h.session, rand, now + h.skew - 3000 + k * 100, ['draw', 'write']));
       remotes.push(h);
       await h.enter();
       count(h.session.getEvents().some((e) => !e.origin) ? 'a newcomer with unnamed marks' : 'a newcomer');
@@ -716,6 +891,15 @@ export async function runRoom(o: RoomOptions): Promise<RoomReport> {
     }
   }
   if (!failures.length) await readersMerge('at the end');
+  // Every undo has reached every board that stayed: the reader holds none of
+  // another hand's undone acts, and no hand still in the room holds the reader's.
+  if (!failures.length) {
+    followUndos(locals[U].session, locals[U].store.heldLogs(), theirUndos, 'the reader', 'at the end', true);
+    for (const h of alive()) {
+      const s = await remoteReady(h, 'at the end');
+      followUndos(s, h.store.heldLogs(), h.awaiting.map((keys) => ({ writer: me, keys })), h.name, 'at the end', true);
+    }
+  }
   return { seed: o.seed, failures, counts };
 }
 
