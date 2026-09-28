@@ -602,6 +602,8 @@ export { handLike, seedOf, drawingsOf, drawingStrokes, HAND_TREMOR, TREMOR_OF_SI
 export type { Placement } from './packs/synthesize';
 export { followPacks, notationsInUse } from './packs/follow';
 export type { PackBoard } from './packs/follow';
+export { packBench, benchCorpus, BENCH_SEEDS, BENCH_PLACES } from './packs/bench';
+export type { BenchDrawing, BenchCorpus, BenchMiss, BenchRead, PackBenchOptions, PackBenchResult } from './packs/bench';
 
 // Agent participants — a model joins through the same channel a human uses.
 export { HERE, createAgentParticipant, parseReadings, parseCode, parseFill, parseTranscripts, parseBehaviourReply, parseProgram, readingsToEdges, MAX_READINGS } from './participants/agent';

@@ -12535,7 +12535,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       return boundingBoxDistance(fp.bounds, m.bounds) < size * config.gesture.checkProximityRatio;
     });
     if (engaged.length === 0) return null;
-    const union = engaged.reduce(
+    const union2 = engaged.reduce(
       (acc, m) => ({
         minX: Math.min(acc.minX, m.bounds.minX),
         minY: Math.min(acc.minY, m.bounds.minY),
@@ -12544,7 +12544,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       }),
       engaged[0].bounds
     );
-    const scopeSize = Math.max(union.maxX - union.minX, union.maxY - union.minY);
+    const scopeSize = Math.max(union2.maxX - union2.minX, union2.maxY - union2.minY);
     if (fp.size > scopeSize) return null;
     const recent = new Set(recentWithin(at, hand));
     const pool = candidates.filter((m) => recent.has(m.id) || engaged.some((e) => e.id === m.id));
@@ -12654,7 +12654,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
           data: { role: g.commandMark ? "command" : "check", scope: scope.source },
           source: g.commandMark ? `command-mark:${g.commandMark.name}` : "heuristic"
         });
-        const union = getBounds(
+        const union2 = getBounds(
           scope.ids.flatMap((id) => {
             const b = boundsOf(nodes.get(id));
             return [
@@ -12663,7 +12663,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
             ];
           })
         );
-        g.summon = buildSummon(scope.ids, scope.source, scope.reasoning, [node.id], union, node.id, at, g);
+        g.summon = buildSummon(scope.ids, scope.source, scope.reasoning, [node.id], union2, node.id, at, g);
         g.pendingLasso = null;
         g.markMiss = null;
         recomputeClusterCandidates();
@@ -12876,7 +12876,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     });
     if (about.length === 0) return null;
     const subject = about.map((id) => boundsOf(nodes.get(id))).filter((b) => !!b);
-    const union = subject.length ? getBounds(
+    const union2 = subject.length ? getBounds(
       subject.flatMap((b) => [
         { x: b.minX, y: b.minY },
         { x: b.maxX, y: b.maxY }
@@ -12885,10 +12885,10 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     const gap = 28;
     const width = 260;
     const bounds = {
-      minX: union.maxX + gap,
-      minY: union.minY,
-      maxX: union.maxX + gap + width,
-      maxY: union.minY + 120
+      minX: union2.maxX + gap,
+      minY: union2.minY,
+      maxX: union2.maxX + gap + width,
+      maxY: union2.minY + 120
     };
     const participant = nodes.get(ev.participantId);
     const node = createExplanationNode(
@@ -13248,14 +13248,14 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     if (members.length < 1 || !ev.name.trim()) return null;
     const pid = ev.participantId ?? LOCAL_PARTICIPANT;
     const bs = members.map((id) => boundsOf(nodes.get(id))).filter((b) => !!b);
-    const union = bs.length ? getBounds(bs.flatMap((b) => [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }])) : null;
+    const union2 = bs.length ? getBounds(bs.flatMap((b) => [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }])) : null;
     const frame = {
       id: nextId("frame"),
       reps: [
         { modality: "word", data: ev.name.trim(), source: pid },
         { modality: "frame", data: { members, connections: ev.connections.filter((c) => members.includes(c.from.id) && members.includes(c.to.id)) }, source: pid },
         { modality: "signature", data: signatureOf(members), source: TIER0_PARTICIPANT },
-        ...union ? [{ modality: "bounds", data: union, source: TIER0_PARTICIPANT }] : []
+        ...union2 ? [{ modality: "bounds", data: union2, source: TIER0_PARTICIPANT }] : []
       ],
       edges: [
         { to: pid, rel: "made-by" },
@@ -13336,13 +13336,13 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       const ids = ev.ids.filter((id) => inContent.has(id));
       const boxes = ids.map((id) => boundsOf(nodes.get(id))).filter((b) => !!b);
       if (!ids.length || !boxes.length) return null;
-      const union = boxes.reduce((a, b) => ({
+      const union2 = boxes.reduce((a, b) => ({
         minX: Math.min(a.minX, b.minX),
         minY: Math.min(a.minY, b.minY),
         maxX: Math.max(a.maxX, b.maxX),
         maxY: Math.max(a.maxY, b.maxY)
       }));
-      const summon2 = buildSummon(ids, "pointed", `you pointed at ${ids.length} mark${ids.length === 1 ? "" : "s"}`, [], union, "", ev.at, g);
+      const summon2 = buildSummon(ids, "pointed", `you pointed at ${ids.length} mark${ids.length === 1 ? "" : "s"}`, [], union2, "", ev.at, g);
       g.summon = summon2;
       g.markMiss = null;
       recomputeClusterCandidates();
@@ -16973,6 +16973,127 @@ function followPacks(board, source = shippedPack) {
   };
 }
 
+// src/packs/bench.ts
+var BENCH_SEEDS = [101, 202, 303, 404, 505, 606, 707, 808];
+var BENCH_PLACES = [
+  { k: 1, dx: 0, dy: 0 },
+  { k: 0.6, dx: 3e3, dy: 0 },
+  { k: 1.8, dx: 0, dy: 3e3 }
+];
+var T0 = 1e6;
+function boardUsing(pack) {
+  const ref = packRef(pack);
+  const s = createSession({ ...DEFAULT_SESSION_CONFIG, packs: (r) => r === ref ? pack : void 0 });
+  s.use(ref, T0);
+  return s;
+}
+function benchCorpus(drawings) {
+  const packs = /* @__PURE__ */ new Map();
+  const board = createSession({ ...DEFAULT_SESSION_CONFIG, packs: (r) => packs.get(r) });
+  return { drawings, board, ids: layOut(board, drawings.map((d) => d.strokes)), packs };
+}
+var union = (bs) => getBounds(bs.flatMap((b) => [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }]));
+function layOut(s, drawings) {
+  const boxes = drawings.map((d) => d.length ? union(d.map((st) => getBounds(st))) : { minX: 0, minY: 0, maxX: 0, maxY: 0 });
+  const size = Math.max(1, ...boxes.map((b) => Math.max(b.maxX - b.minX, b.maxY - b.minY)));
+  const cell = size * 3;
+  const across = Math.max(1, Math.ceil(Math.sqrt(drawings.length)));
+  let at = T0;
+  return drawings.map((d, i) => {
+    const b = boxes[i];
+    const dx = i % across * cell - b.minX, dy = Math.floor(i / across) * cell - b.minY;
+    return d.map((st) => s.addStroke(st.map((p) => ({ x: p.x + dx, y: p.y + dy })), at += MARK_GAP_MS, void 0, 1, { content: true }));
+  });
+}
+function signatureIn(nodes, ids) {
+  return structuralSignature(ids, nodes, (id) => topInterpretation(nodes.get(id)) ?? "art");
+}
+function packBench(pack, opts = {}) {
+  const ref = packRef(pack);
+  const seeds = opts.seeds ?? BENCH_SEEDS;
+  const places = opts.places ?? BENCH_PLACES;
+  const defs = libraryDefinitions(pack, () => createSession());
+  const idOf = new Map(defs.map((d) => [d.name, d.id]));
+  const own = [];
+  for (const def of pack.definitions) {
+    const want = idOf.get(def.name);
+    if (!want) continue;
+    const jobs = [];
+    for (const d of drawingsOf(def)) {
+      for (const seed of seeds) {
+        for (const place2 of places) {
+          jobs.push({
+            label: `${def.name} ${d.kind} ${d.index} seed ${seed} \xD7${place2.k}`,
+            strokes: drawingStrokes(def, d, seedOf(`bench:${seed}:${ref}:${def.name}:${d.kind}:${d.index}`), place2)
+          });
+        }
+      }
+    }
+    const s = boardUsing(pack);
+    const laid = layOut(s, jobs.map((j) => j.strokes));
+    const misses = [];
+    let read2 = 0;
+    laid.forEach((ids, i) => {
+      const top = s.matchesOf(ids)[0];
+      if (top && top.artifactId === want) read2++;
+      else misses.push({ drawing: jobs[i].label, top: top ? top.name : null, score: top ? top.score : 0 });
+    });
+    own.push({ definition: def.name, drawn: jobs.length, read: read2, rate: jobs.length ? read2 / jobs.length : 1, misses });
+  }
+  const ownDrawn = own.reduce((a, o) => a + o.drawn, 0);
+  const ownRead = own.reduce((a, o) => a + o.read, 0);
+  const given = opts.corpus ?? [];
+  const prepared = Array.isArray(given) ? given.length ? benchCorpus(given) : null : given;
+  const corpus = prepared ? prepared.drawings : [];
+  const falseReads = [], expected = [], same = [];
+  const missed = [];
+  if (prepared && corpus.length) {
+    const s = prepared.board;
+    const laid = prepared.ids;
+    const at = Math.max(T0, ...s.getEvents().map((e) => e.at)) + MARK_GAP_MS;
+    prepared.packs.set(ref, pack);
+    s.use(ref, at);
+    const nodes = s.getState().nodes;
+    const sameAs = (sig2, defId) => {
+      const d = defs.find((x) => x.id === defId);
+      return !!d && [d.signature, ...d.accepted].some((x) => compareSignatures(sig2, x).score >= SAME);
+    };
+    const judge = (c, ids, as, seen) => {
+      const sig2 = signatureIn(nodes, ids);
+      for (const m of s.matchesOf(ids)) {
+        if (m.pack !== ref || m.score < MATCH_FLOOR || seen.has(m.artifactId + as)) continue;
+        seen.add(m.artifactId + as);
+        const r = { label: c.label, definition: m.name, score: m.score, reasoning: m.reasoning, as };
+        if (c.is === m.name) expected.push(r);
+        else if (sameAs(sig2, m.artifactId)) same.push(r);
+        else falseReads.push(r);
+      }
+    };
+    const candidates = s.getState().clusterCandidates;
+    corpus.forEach((c, i) => {
+      const ids = laid[i];
+      if (!ids.length) return;
+      const seen = /* @__PURE__ */ new Set();
+      judge(c, ids, "held", seen);
+      const mine = new Set(ids);
+      for (const cand of candidates) if (cand.nodeIds.every((id) => mine.has(id))) judge(c, cand.nodeIds, "chipped", seen);
+      if (c.is && idOf.has(c.is) && !expected.some((r) => r.label === c.label)) {
+        const top = s.matchesOf(ids)[0];
+        missed.push({ label: c.label, is: c.is, top: top ? top.name : null, score: top ? top.score : 0 });
+      }
+    });
+    s.unuse(ref, at + 1);
+  }
+  return {
+    pack: ref,
+    own,
+    ownDrawn,
+    ownRead,
+    ownRate: ownDrawn ? ownRead / ownDrawn : 1,
+    corpus: { drawn: corpus.length, falseReads, expected, missed, same }
+  };
+}
+
 // src/participants/serialize.ts
 function n(v, round) {
   return round ? String(Math.round(v)) : v.toFixed(2);
@@ -18222,6 +18343,8 @@ export {
   ALONG_STEPS,
   BARB_CLOSED,
   BARB_ROUND,
+  BENCH_PLACES,
+  BENCH_SEEDS,
   BUILTIN_COMMAND_MARK,
   BUILTIN_CONCEPTS,
   BUILTIN_TOOLS,
@@ -18355,6 +18478,7 @@ export {
   baseOn,
   behaviourSource,
   behavioursOf,
+  benchCorpus,
   bestWiring,
   between2 as between,
   binarize,
@@ -18570,6 +18694,7 @@ export {
   otsu,
   outlineOf,
   ownLog,
+  packBench,
   packDefinitionOf,
   packOfId,
   packRef,
