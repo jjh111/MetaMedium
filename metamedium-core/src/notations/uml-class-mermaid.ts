@@ -42,12 +42,16 @@
 // reads: each class a box with two lines across it (a name, attributes,
 // methods, as Mermaid draws one), its name a label on its box and each
 // compartment's members a label on the line that opens it; each relation a
-// line from side to side, bound at both ends, with its head drawn where the
-// text puts it — a hollow triangle, a diamond (filled, in one stroke), an
-// arrow's own barb or a chevron — and each multiplicity a short piece of
-// writing ink beside its end, labelled with its words. Laid out by D3's
-// layered layout, which keeps the text's order as its reading order. Tier 1,
-// nothing derived in the log; wrap the call in `session.withTool` for one undo.
+// line from side to side — an arc around a class in the way — bound at both
+// ends, with its head drawn where the text puts it: a hollow triangle, a
+// diamond (a square turned 45°; filled, a hatch drawn right after its
+// outline), an arrow's own barb, or a filled triangle for an association on
+// an arc; and each multiplicity a dash beside its end carrying its words as a
+// label. Every mark is a confident shape, so the letter rules (session.ts)
+// gather none into a word. Laid out by D3's layered layout, which keeps the
+// text's order as its reading order; read back, what does not read as
+// written is said. Tier 1, nothing derived in the log; wrap the call in
+// `session.withTool` for one undo.
 
 import type { Bounds, Point } from '../types';
 import type { Session } from '../session/session';
