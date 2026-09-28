@@ -1226,6 +1226,67 @@ changelog and the standalone file. **R8 One platform.** The monoliths and
 index, a README that is a front page. **R9 The shard alongside.** A built
 shard published beside the canvas and opened from it into the same room.
 
+*R6 status, 28 Sep 2026: built on `w2-shard`* — `a11a5ed` (red first: the
+gate's `pencil` scenario, seven of its eight records failing on WebKit and
+Chromium — the pen's pressure on none of its 33 points, the switch unsaid and
+the tile saying `right`, a finger drawing where it should pan, a palm's touch
+taken into the pen's stroke, no magnet under a hovering pencil, a pinch
+leaving strokes with no points — and three page errors), `3ce9876`,
+`767842e`, `4c99036`, `4e44707`, `e31fba3`, `47816cf` and the commit carrying
+this line.
+**Decided by `pointerType`, never the user agent**: the rules are a pure
+fragment, `Demos/surface/07-hand.js` (14 tests in Node, in CI), and
+`07-input.js` their adapter; a mouse, or the empty type a synthesised event
+carries, is untouched. Before a pen is seen a finger draws, as it did; the
+first pen switches it, said once in the status line and kept as a preference
+the *hand* tile shows (`right · pen`) and steps one word a tap, so a finger
+can have its ink back. With the pen a finger pans past a 6 px slop (short of
+it, a tap), two pinch, a third is nothing. A palm — a touch while a pen is on
+the glass or within 500 ms of its last event anywhere on the page — is
+nothing for its whole life; a pen landing makes the fingers down palms and
+puts back a pan a heel began just before it; the minimap, the teach pad and
+the control centre's close ignore palms. Every point a pen draws carries its
+pressure in the log (`p`, core's `Point.p`, read by nothing; the drawn width
+is one width for all ink). A pencil's hover is a hover — the reading under it
+and the magnet in reach, drawn on the pen's own layer; a mouse's hover draws
+no ghost, as before. A field a finger opened does not take the focus, and
+with an on-screen keyboard up the field stays in the visible viewport, its
+pills' list held to what fits and scrolling (`fitFieldHeight`). **Found and
+fixed:** a release the board began nothing for committed a stroke with no
+points — a pinch's last finger, a palm lifting, a mouse pressed on the undo
+button and let go over the board — which threw after the event was already
+in the log, so the board then refused to save (*not saved — the browser
+refused to keep the board (TypeError …)*): on the surface as it was, an
+iPad's first pinch broke saving; a palm's points went into the pen's
+stroke, its release ending it — the board now follows one pointer; and a hold
+the system cancelled ate the next stroke's release. `node
+e2e/run.mjs pencil` (14 records, in the default run on Chromium and in CI's
+`webkit` job, which now runs `smoke pencil keep`): the pen draws with its
+pressure; the switch said once; a finger pans; two pinch and leave nothing; a
+palm during, just after and just before the pen; hover; the field by the
+pen's hold and a pill; a clean; an undo; the keyboard, told to the page as
+iPadOS tells it (a stand-in visual viewport that shrinks) — with 360 and 260
+px left the field inside, six pills scrolling in 142 of 190 px and every one
+scrolled to and hit (take the fit out and at 260 the field stands 52–300,
+two pills out of reach); the tile round, a finger drawing, a palm still
+nothing, a finger's field with no focus; the mouse untouched; a save and a
+reload with every pressure back. `QA-v1.md` §A10 is the iPad's part. Not
+done: nothing here has touched an iPad — every pencil, palm, hover and
+keyboard row is synthesised, and A10 by hand is John's; contact size is not
+read; the drawn width does not use pressure; the canvas refuses only a moving
+stylus's default, so if Scribble still cuts a stroke on the glass, a pencil's
+`touchstart` is next (at the cost of its double-tap); no `apple-touch-icon`
+for the Home Screen yet (R7's note); `keep` in CI's `webkit` job runs on
+Linux, which was not run here (on macOS, 22 and 3 named skips). Whole suite
+before the last commit: core 1,091 in 82 files, typecheck clean, both bundles
+equal to a fresh build (core's one change is `Point.p`, a type); the relay,
+field, build, board, boards and scripts tests 93 and the hand's rules 14;
+surface and app in sync; the canvas MCP smoke and the shard's (605 in 31
+files, typecheck clean) pass; the gate 534 passed and the one honest skip
+across nine scenarios (canvas 303, keep 31, boards 19, app 14, pencil 14,
+budgets 7; shard 123 + 11 + 12); WebKit smoke 4, pencil 14, keep 22 and 3
+skipped by name (boards 19 and app 14 too, not in the job).
+
 *R7 status, 27 Sep 2026: built on `w2-shard`, on R4d* — `0cc9805` (red
 first: the gate's `app` scenario and the release script's tests, failing: no
 `app/`, no `VERSION`, no script) … and the commits carrying this line. **The
