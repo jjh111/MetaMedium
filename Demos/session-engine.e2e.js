@@ -538,6 +538,9 @@ window.__scenario = async function(){
     const stO = mm.session.getState();
     step('15c. the mark across the loop takes it up: the loop is a gesture now, the marks are selected, the offers open', !!stO.summon && stO.summon.enclosedIds.length === 2 && stO.summon.scopeSource === 'lasso' && stO.selection.length === 2 && !stO.contentIds.includes(stO.summon.gestureIds[0]), stO.summon && stO.summon.scopeReasoning);
     if (stO.summon) mm.session.dismiss(stO.summon.id, Date.now());
+    // Let go of the selection too: with one standing, the small dot below would be the tap that
+    // dismisses it and never a dot (W3), and this record needs the dot inside the box.
+    if (mm.session.getState().selection.length) mm.session.deselect(Date.now());
     // Auto: a box that enclosed something when drawn is a loop-in-waiting, and is still made clean once the next stroke settles it.
     mm.setSnapMode('auto');
     const d = mm.worldToScreen(2900, 2160);

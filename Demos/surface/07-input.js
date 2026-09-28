@@ -2,7 +2,7 @@
 // Provides: pointer input (draw, pan, pinch) for the mouse, the pen and the finger — the palm ignored,
 //   the pen's pressure on every point it draws, its hover a hover (V1-PLAN R6) — keys (undo, copy,
 //   paste, erase, zoom), say()/flash() for the status line.
-// Uses: core (draws, setDraws), hand (the rules: fingerRole, palmNow, whenPenLands, PAN_SLOP_PX), view,
+// Uses: core (draws, setDraws), hand (the rules: fingerRole, palmNow, whenPenLands, releaseIs, PAN_SLOP_PX), view,
 //   snap (autoSweep, magnetQuery), render (drawLive), palette (copyMarks, pasteClip), handwriting
 //   (autoRead), artifacts (pointerFrameAt), kinds (postPointer).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -23,7 +23,8 @@
   // points into the pen's stroke, and its release ended the stroke. A mouse is one pointer, so
   // nothing a mouse does is changed by this.
   let owner = null;   // { id, type } from the press that began it; null while nothing is under way
-  let downType = '';  // the pointerType of the last press on the board — the field asks it whether to take the focus
+  let downType = '';
+  let liveFrom = null; // where the press that began `live` landed on screen, and the farthest it has gone: a tap is judged by it (W3)  // the pointerType of the last press on the board — the field asks it whether to take the focus
 
   // Pointer capture is a nicety — it keeps a stroke alive when the pointer
   // leaves the element. It is NOT allowed to be the reason a stroke fails to
@@ -234,6 +235,7 @@
     if (pf && !insideWaitingLoop(w0)) { forward = pf; postPointer(pf, 'down', e, w0); return; }
     pressBegin(e, w0);
     live = [w0];
+    liveFrom = { x: e.clientX, y: e.clientY, far: 0 };
     // The stroke may begin ON a magnet — an arrow drawn out of a box's corner.
     magnetStart = magnetQuery(w0);
     magnetHold = magnetStart;
@@ -362,6 +364,7 @@
       return;
     }
     live.push(pointOf(e));
+    if (liveFrom) liveFrom.far = Math.max(liveFrom.far, Math.hypot(e.clientX - liveFrom.x, e.clientY - liveFrom.y));
     magnetHold = magnetQuery(live[live.length - 1]); // the offer follows the pen; out of reach, it lets go
     drawLive(); // the pen and its magnet, on their own layer; the board is as it was (R4c)
   });
@@ -400,10 +403,15 @@
     live = null;
     if (!points) return;
     // The dead state: a tap while something is dismissable is the dismissal,
-    // and never a dot. Only a tap on empty ground with nothing to dismiss
-    // could be a dot — and a bare tap is not one either; a dot is drawn.
-    const tiny = points.length < 3;
-    if (tiny) { magnetStart = null; magnetHold = null; tapAt(e); return; }
+    // and never a dot — judged by how far the pointer went on screen, not by
+    // how many moves it reported (W3; the rule is 07-hand.js's releaseIs).
+    // Only a tap on empty ground with nothing to dismiss could be a dot — and
+    // a bare tap is not one either; a dot is drawn.
+    const travel = liveFrom ? Math.max(liveFrom.far, Math.hypot(e.clientX - liveFrom.x, e.clientY - liveFrom.y)) : 0;
+    liveFrom = null;
+    const s0 = session.getState();
+    const dismissable = !!(s0.summon || s0.selection.length || s0.pendingLassoId);
+    if (releaseIs({ points: points.length, travelPx: travel, dismissable: dismissable }) === 'tap') { magnetStart = null; magnetHold = null; tapAt(e); return; }
     lastTap = null;
 
     // A stroke released inside a hold lands its endpoint exactly on the site;

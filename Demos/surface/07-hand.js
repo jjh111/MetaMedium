@@ -3,7 +3,8 @@
 //   hand a pointer is, by its pointerType), fingerRole (what a finger that lands on the board
 //   does), palmNow (whether a touch now is a palm), whenPenLands (what the fingers already down
 //   become when a pen comes down, and which pan is put back), handFace and nextHand (the hand
-//   tile's face and its cycle), and the two numbers they stand on (PALM_MS, PAN_SLOP_PX).
+//   tile's face and its cycle), releaseIs (whether a release is a tap or a stroke), and the
+//   numbers they stand on (PALM_MS, PAN_SLOP_PX, TAP_SLOP_PX).
 // Uses: NOTHING. Like 09-field.js, this fragment names no closure variable, touches no DOM and
 //   asks the session nothing; 07-input.js is the adapter that gathers a record, asks, and acts.
 //   So it loads on its own in Node, which is how it is tested:
@@ -25,11 +26,33 @@
 //     whole life, whichever the preference. And a pen coming down makes every finger already
 //     down a palm; one that landed within PALM_MS before it was the palm arriving first, so the
 //     pan it made is put back.
+//   - A tap never leaves a dot (PLAN-USER-SURFACE W3). While something is dismissable — the
+//     field, a selection, a loop that waits — a press whose pointer stays within TAP_SLOP_PX of
+//     where it landed, ON SCREEN, is the dismissal, however many moves it reported: a click
+//     wobbles, and a count of points called three px of jitter ink. The mouse, the pen and a
+//     finger that draws alike. With nothing to dismiss, a dot deliberately drawn is a dot.
+//     The trap, on purpose: the dot on an i drawn while the field is open dismisses the field
+//     first — the dead state's rule; the next dot draws.
 
   /** A touch within this long of the pen's last event is a palm. Long enough for a heel that comes down as the pencil lifts between words; short enough that a finger meant to pan, once the pencil is put down, is a finger. */
   const PALM_MS = 500;
   /** A finger that pans must first move this far, in screen pixels; short of it, it is a tap. */
   const PAN_SLOP_PX = 6;
+  /** While something is dismissable, a press that travels no further than this on screen is a tap. A click's wobble: the audit measured 3 px, and 6 is still a hand that meant to click. */
+  const TAP_SLOP_PX = 8;
+
+  /**
+   * What a release on the board is.
+   * @param {{points:number, travelPx:number, dismissable:boolean}} h
+   *   points — the points the press recorded; travelPx — the farthest the pointer went from
+   *   where it landed, in screen pixels; dismissable — a field, a selection or a waiting loop stands.
+   * @returns {'tap'|'stroke'}
+   */
+  function releaseIs(h) {
+    if (h.points < 3) return 'tap'; // too short to be a mark, whatever is open
+    if (h.dismissable && h.travelPx <= TAP_SLOP_PX) return 'tap';
+    return 'stroke';
+  }
 
   /** Which hand a pointer is: 'pen', 'finger', or 'mouse' — the last is anything that is not the first two. */
   function handOfPointer(pointerType) {

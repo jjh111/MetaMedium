@@ -2111,6 +2111,21 @@ The app's icon is the old address's SVG (Chromium installs with it; no
 `app` is not in CI's `webkit` job, which runs the smoke on Linux; it passes
 here on macOS.
 
+### The user surface (`PLAN-USER-SURFACE.md`, from `UX-AUDIT-2026-09-28.md`)
+
+*W3 status, 28 Sep 2026: built on `claude/friendly-galileo-g1z8wo`* — `faab5ef`
+(red first: e2e 54 and 54b, a click off the open field or a selection with 1, 3
+and 6 px of wobble left a dot; pencil P12, the pen's and a drawing finger's; the
+rule's Node cases) and the commit carrying this line. A release is a tap or a
+stroke by `releaseIs` in `Demos/surface/07-hand.js`: under three points a tap,
+as before; while a field, a selection or a waiting loop stands, a press that
+went no further than `TAP_SLOP_PX` on screen is the dismissal; with nothing to
+dismiss a dot drawn is a dot (e2e 54c). `07-input.js` measures the farthest the
+pointer went from where it landed. One record's setup (15d) drew its dot with a
+selection still standing — now a dismissal by design — and lets go of the
+selection first; its assertion is unchanged. Not done: WebKit's run of P12
+(this machine has no WebKit build; CI's `webkit` job runs `pencil`).
+
 ### Phase 7 — review and release
 **H1** — week 1's U7 (the `hand` gate scenario) plus `QA-v1.md`, a hand
 checklist for A1–A10 with the MCP hand in the room checking each step.

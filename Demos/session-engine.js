@@ -2377,7 +2377,8 @@
 //   hand a pointer is, by its pointerType), fingerRole (what a finger that lands on the board
 //   does), palmNow (whether a touch now is a palm), whenPenLands (what the fingers already down
 //   become when a pen comes down, and which pan is put back), handFace and nextHand (the hand
-//   tile's face and its cycle), and the two numbers they stand on (PALM_MS, PAN_SLOP_PX).
+//   tile's face and its cycle), releaseIs (whether a release is a tap or a stroke), and the
+//   numbers they stand on (PALM_MS, PAN_SLOP_PX, TAP_SLOP_PX).
 // Uses: NOTHING. Like 09-field.js, this fragment names no closure variable, touches no DOM and
 //   asks the session nothing; 07-input.js is the adapter that gathers a record, asks, and acts.
 //   So it loads on its own in Node, which is how it is tested:
@@ -2399,11 +2400,33 @@
 //     whole life, whichever the preference. And a pen coming down makes every finger already
 //     down a palm; one that landed within PALM_MS before it was the palm arriving first, so the
 //     pan it made is put back.
+//   - A tap never leaves a dot (PLAN-USER-SURFACE W3). While something is dismissable — the
+//     field, a selection, a loop that waits — a press whose pointer stays within TAP_SLOP_PX of
+//     where it landed, ON SCREEN, is the dismissal, however many moves it reported: a click
+//     wobbles, and a count of points called three px of jitter ink. The mouse, the pen and a
+//     finger that draws alike. With nothing to dismiss, a dot deliberately drawn is a dot.
+//     The trap, on purpose: the dot on an i drawn while the field is open dismisses the field
+//     first — the dead state's rule; the next dot draws.
 
   /** A touch within this long of the pen's last event is a palm. Long enough for a heel that comes down as the pencil lifts between words; short enough that a finger meant to pan, once the pencil is put down, is a finger. */
   const PALM_MS = 500;
   /** A finger that pans must first move this far, in screen pixels; short of it, it is a tap. */
   const PAN_SLOP_PX = 6;
+  /** While something is dismissable, a press that travels no further than this on screen is a tap. A click's wobble: the audit measured 3 px, and 6 is still a hand that meant to click. */
+  const TAP_SLOP_PX = 8;
+
+  /**
+   * What a release on the board is.
+   * @param {{points:number, travelPx:number, dismissable:boolean}} h
+   *   points — the points the press recorded; travelPx — the farthest the pointer went from
+   *   where it landed, in screen pixels; dismissable — a field, a selection or a waiting loop stands.
+   * @returns {'tap'|'stroke'}
+   */
+  function releaseIs(h) {
+    if (h.points < 3) return 'tap'; // too short to be a mark, whatever is open
+    if (h.dismissable && h.travelPx <= TAP_SLOP_PX) return 'tap';
+    return 'stroke';
+  }
 
   /** Which hand a pointer is: 'pen', 'finger', or 'mouse' — the last is anything that is not the first two. */
   function handOfPointer(pointerType) {
@@ -2478,7 +2501,7 @@
 // Provides: pointer input (draw, pan, pinch) for the mouse, the pen and the finger — the palm ignored,
 //   the pen's pressure on every point it draws, its hover a hover (V1-PLAN R6) — keys (undo, copy,
 //   paste, erase, zoom), say()/flash() for the status line.
-// Uses: core (draws, setDraws), hand (the rules: fingerRole, palmNow, whenPenLands, PAN_SLOP_PX), view,
+// Uses: core (draws, setDraws), hand (the rules: fingerRole, palmNow, whenPenLands, releaseIs, PAN_SLOP_PX), view,
 //   snap (autoSweep, magnetQuery), render (drawLive), palette (copyMarks, pasteClip), handwriting
 //   (autoRead), artifacts (pointerFrameAt), kinds (postPointer).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -2499,7 +2522,8 @@
   // points into the pen's stroke, and its release ended the stroke. A mouse is one pointer, so
   // nothing a mouse does is changed by this.
   let owner = null;   // { id, type } from the press that began it; null while nothing is under way
-  let downType = '';  // the pointerType of the last press on the board — the field asks it whether to take the focus
+  let downType = '';
+  let liveFrom = null; // where the press that began `live` landed on screen, and the farthest it has gone: a tap is judged by it (W3)  // the pointerType of the last press on the board — the field asks it whether to take the focus
 
   // Pointer capture is a nicety — it keeps a stroke alive when the pointer
   // leaves the element. It is NOT allowed to be the reason a stroke fails to
@@ -2710,6 +2734,7 @@
     if (pf && !insideWaitingLoop(w0)) { forward = pf; postPointer(pf, 'down', e, w0); return; }
     pressBegin(e, w0);
     live = [w0];
+    liveFrom = { x: e.clientX, y: e.clientY, far: 0 };
     // The stroke may begin ON a magnet — an arrow drawn out of a box's corner.
     magnetStart = magnetQuery(w0);
     magnetHold = magnetStart;
@@ -2838,6 +2863,7 @@
       return;
     }
     live.push(pointOf(e));
+    if (liveFrom) liveFrom.far = Math.max(liveFrom.far, Math.hypot(e.clientX - liveFrom.x, e.clientY - liveFrom.y));
     magnetHold = magnetQuery(live[live.length - 1]); // the offer follows the pen; out of reach, it lets go
     drawLive(); // the pen and its magnet, on their own layer; the board is as it was (R4c)
   });
@@ -2876,10 +2902,15 @@
     live = null;
     if (!points) return;
     // The dead state: a tap while something is dismissable is the dismissal,
-    // and never a dot. Only a tap on empty ground with nothing to dismiss
-    // could be a dot — and a bare tap is not one either; a dot is drawn.
-    const tiny = points.length < 3;
-    if (tiny) { magnetStart = null; magnetHold = null; tapAt(e); return; }
+    // and never a dot — judged by how far the pointer went on screen, not by
+    // how many moves it reported (W3; the rule is 07-hand.js's releaseIs).
+    // Only a tap on empty ground with nothing to dismiss could be a dot — and
+    // a bare tap is not one either; a dot is drawn.
+    const travel = liveFrom ? Math.max(liveFrom.far, Math.hypot(e.clientX - liveFrom.x, e.clientY - liveFrom.y)) : 0;
+    liveFrom = null;
+    const s0 = session.getState();
+    const dismissable = !!(s0.summon || s0.selection.length || s0.pendingLassoId);
+    if (releaseIs({ points: points.length, travelPx: travel, dismissable: dismissable }) === 'tap') { magnetStart = null; magnetHold = null; tapAt(e); return; }
     lastTap = null;
 
     // A stroke released inside a hold lands its endpoint exactly on the site;

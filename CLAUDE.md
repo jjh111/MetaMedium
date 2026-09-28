@@ -668,7 +668,12 @@ label; its reason is the tooltip; a pill that asks a model carries a dot.
 Copy holds the
 ink (and puts it on the clipboard as SVG); Paste puts it beside the selection
 or, from the keyboard, at the pen. A tap while the field or a selection is up
-dismisses it and is never a dot. `Demos/surface/05-selection.js`,
+dismisses it and is never a dot — judged by how far the pointer went **on
+screen**, not by how many moves it reported (PLAN-USER-SURFACE W3; `releaseIs`
+and `TAP_SLOP_PX` in `07-hand.js`): a click that wobbled a few pixels used to
+leave a dot and the field open. The mouse, the pen and a finger that draws
+alike; with nothing to dismiss, a dot drawn is a dot, and the dot on an *i*
+drawn while the field is open dismisses first. `Demos/surface/05-selection.js`,
 `09-palette.js`.
 
 **The reader decides; it no longer acts** (SEAM-1, `Demos/surface/09-field.js`).
