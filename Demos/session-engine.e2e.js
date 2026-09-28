@@ -81,7 +81,7 @@ window.__setup = function(){
   window.__autoReadBefore = window.__mm.autoRead();
   window.__mm.setAutoRead(false);
   // Learned palette use is device state; a run starts from none and puts it back.
-  try { window.__usesBefore = localStorage.getItem('mm-palette-uses'); } catch (e) {}
+  try { window.__usesBefore = localStorage.getItem('mm-palette-uses'); window.__usesHereBefore = localStorage.getItem('mm-palette-uses-here'); } catch (e) {}
   window.__mm.resetUses();
   const strokeOn = window.__t.strokeOn, line = window.__t.line;
 
@@ -1292,7 +1292,7 @@ window.__scenario = async function(){
   while (mm.session.getEvents().length) mm.session.undo();
   if (window.__snapModeBefore) mm.setSnapMode(window.__snapModeBefore);
   mm.setAutoRead(!!window.__autoReadBefore);
-  try { if (window.__usesBefore) localStorage.setItem('mm-palette-uses', window.__usesBefore); } catch (e) {}
+  try { if (window.__usesBefore) localStorage.setItem('mm-palette-uses', window.__usesBefore); if (window.__usesHereBefore) localStorage.setItem('mm-palette-uses-here', window.__usesHereBefore); } catch (e) {}
   step('12. the rail follows the grammar — undoing the teach restores the check',
     mm.session.getState().commandMark === null &&
     document.getElementById('markName').textContent === 'check',
@@ -3076,6 +3076,14 @@ window.__scenario = async function(){
       /^a flowchart /.test(flowRead50[0] || '') && tops50.length === 3 && tops50.every((k) => k === 'snap') &&
         titles50.every((ti) => /first because it sits beside a flowchart: three processes, one decision/.test(ti)),
       { flowRead: flowRead50, tops: tops50, title: titles50[1] });
+    // The panel says it too: what stands beside the selection, and what that put first.
+    const panel50 = document.getElementById('inspector').textContent;
+    const ctx50 = mm.fieldContext ? mm.fieldContext() : null;
+    step('50a. the panel says what stands beside the selection and what it put first, and why',
+      /beside\s*a flowchart 0\.\d\d — three processes, one decision, three flows/.test(panel50) &&
+        /first\s*Draw them clean\s*because it sits beside a flowchart: three processes, one decision/.test(panel50) &&
+        !!ctx50 && /^notation:flowchart@/.test(ctx50.key || ''),
+      { panel: (panel50.match(/beside[\s\S]{0,220}/) || [''])[0], key: ctx50 && ctx50.key });
 
     // An offer a little ahead of the held top, then well ahead: the margin decides.
     const near50 = (base) => ({

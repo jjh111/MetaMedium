@@ -1,8 +1,9 @@
 // ===== render =====
-// Provides: queries over state, the rungs cache, render(), ink, the reading under the inspected mark,
+// Provides: queries over state, the rungs cache, render(), ink, the reading under the inspected mark
+//   (readingUnder: its readings ranked by MM.rank, as the field ranks — V1-PLAN §2.2),
 //   a hand's label on its own mark (labelsDrawn), match chips,
 //   the working dot, the explanation plane and its layout, the status line (one sentence).
-// Uses: core, view, artifacts, snap, models, palette, inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
+// Uses: core, view, artifacts, snap, models, palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
 //   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -296,6 +297,40 @@
       }
     }
     return ix.genre;
+  }
+
+  // ===== The reading under a mark, ranked as the field ranks (V1-PLAN §2.2) ==
+  // What a mark IS, as items with a base and grounds — the name it was given,
+  // the words it says, what the shape rung measured — ordered by the same
+  // `MM.rank` the field's rows are, in the context where the mark stands, so
+  // the reading under a mark and the field never disagree about what leads.
+  // Nothing ranked here can be lifted by what stands beside it today
+  // (`MM.canLift`: a name and the words are the hand's own, a shape is no
+  // concept), so a stroke reads no neighbourhood; the day something can — a
+  // pack's reading of a mark (B3) — the context is read for it, kept by the log.
+  const KNOWN_READING = { on: 'known', confidence: 1 };
+  function readingsOfMark(s, node) {
+    const items = [];
+    const word = MM.wordOf(node);
+    if (word) items.push({ key: 'word', label: word, base: MM.baseOn(KNOWN_READING), grounds: KNOWN_READING });
+    const said = MM.transcriptsOf(node)[0];
+    if (said) { const g = { on: 'written', confidence: said.confidence }; items.push({ key: 'said', label: '“' + said.text + '”', base: MM.baseOn(g), grounds: g }); }
+    // The shape rung's readings, in the order it holds them (blessed first,
+    // then by weight): a later one never stands above an earlier one. A label
+    // is its maker's word, not what the rung measured (L2b); a name is above.
+    let cap = Infinity;
+    for (const r of MM.interpretationsOf(node, s.nodes)) {
+      if (r.tier !== 0 || r.basis !== 'resemblance') continue;
+      const g = { on: 'shape', confidence: r.weight };
+      cap = Math.min(cap, MM.baseOn(g));
+      items.push({ key: 'shape:' + r.label, label: r.label, base: cap, grounds: g });
+    }
+    return items;
+  }
+  function readingUnder(s, node, id) {
+    const items = readingsOfMark(s, node);
+    if (!items.length) return MM.topInterpretation(node);
+    return MM.rank(items, MM.canLift(items) ? contextFor([id]) : MM.NO_CONTEXT)[0].label;
   }
 
   // The whole-board read: every mark's role, related over the whole board at
@@ -741,10 +776,7 @@
         // The reading of the mark the hand just made (or is over), and only
         // that one: what it is, and what it plays. Under every mark it was a
         // board of fragments; the panel has the rest.
-        const said = MM.transcriptOf(node);
-        // A label is its maker's word, not what the shape rung measured (L2b).
-        const shape = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0 && r.basis !== 'label')[0];
-        const top = MM.wordOf(node) || (said ? '“' + said + '”' : shape ? shape.label : MM.topInterpretation(node));
+        const top = readingUnder(s, node, id);
         const role = readRungs(s).roles.get(id);
         const played = role && role.role !== 'unclassified' && role.role !== top ? ' · ' + role.role : '';
         if (top) {

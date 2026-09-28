@@ -2633,10 +2633,11 @@
   function flash(msg) { say(msg, FLASH_MS); }
 
 // ===== render =====
-// Provides: queries over state, the rungs cache, render(), ink, the reading under the inspected mark,
+// Provides: queries over state, the rungs cache, render(), ink, the reading under the inspected mark
+//   (readingUnder: its readings ranked by MM.rank, as the field ranks — V1-PLAN §2.2),
 //   a hand's label on its own mark (labelsDrawn), match chips,
 //   the working dot, the explanation plane and its layout, the status line (one sentence).
-// Uses: core, view, artifacts, snap, models, palette, inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
+// Uses: core, view, artifacts, snap, models, palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
 //   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -2930,6 +2931,40 @@
       }
     }
     return ix.genre;
+  }
+
+  // ===== The reading under a mark, ranked as the field ranks (V1-PLAN §2.2) ==
+  // What a mark IS, as items with a base and grounds — the name it was given,
+  // the words it says, what the shape rung measured — ordered by the same
+  // `MM.rank` the field's rows are, in the context where the mark stands, so
+  // the reading under a mark and the field never disagree about what leads.
+  // Nothing ranked here can be lifted by what stands beside it today
+  // (`MM.canLift`: a name and the words are the hand's own, a shape is no
+  // concept), so a stroke reads no neighbourhood; the day something can — a
+  // pack's reading of a mark (B3) — the context is read for it, kept by the log.
+  const KNOWN_READING = { on: 'known', confidence: 1 };
+  function readingsOfMark(s, node) {
+    const items = [];
+    const word = MM.wordOf(node);
+    if (word) items.push({ key: 'word', label: word, base: MM.baseOn(KNOWN_READING), grounds: KNOWN_READING });
+    const said = MM.transcriptsOf(node)[0];
+    if (said) { const g = { on: 'written', confidence: said.confidence }; items.push({ key: 'said', label: '“' + said.text + '”', base: MM.baseOn(g), grounds: g }); }
+    // The shape rung's readings, in the order it holds them (blessed first,
+    // then by weight): a later one never stands above an earlier one. A label
+    // is its maker's word, not what the rung measured (L2b); a name is above.
+    let cap = Infinity;
+    for (const r of MM.interpretationsOf(node, s.nodes)) {
+      if (r.tier !== 0 || r.basis !== 'resemblance') continue;
+      const g = { on: 'shape', confidence: r.weight };
+      cap = Math.min(cap, MM.baseOn(g));
+      items.push({ key: 'shape:' + r.label, label: r.label, base: cap, grounds: g });
+    }
+    return items;
+  }
+  function readingUnder(s, node, id) {
+    const items = readingsOfMark(s, node);
+    if (!items.length) return MM.topInterpretation(node);
+    return MM.rank(items, MM.canLift(items) ? contextFor([id]) : MM.NO_CONTEXT)[0].label;
   }
 
   // The whole-board read: every mark's role, related over the whole board at
@@ -3375,10 +3410,7 @@
         // The reading of the mark the hand just made (or is over), and only
         // that one: what it is, and what it plays. Under every mark it was a
         // board of fragments; the panel has the rest.
-        const said = MM.transcriptOf(node);
-        // A label is its maker's word, not what the shape rung measured (L2b).
-        const shape = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0 && r.basis !== 'label')[0];
-        const top = MM.wordOf(node) || (said ? '“' + said + '”' : shape ? shape.label : MM.topInterpretation(node));
+        const top = readingUnder(s, node, id);
         const role = readRungs(s).roles.get(id);
         const played = role && role.role !== 'unclassified' && role.role !== top ? ' · ' + role.role : '';
         if (top) {
@@ -4297,14 +4329,18 @@
 //   ADAPTER around the reader (fieldContext → readFieldCommand → runFieldCommand, exposed as readField);
 //   the ADAPTER around core's tools (V1-PLAN B1): conversionsFor — what this is (readings, read here) and
 //   what it affords (MM.offersFor over the scope fieldScope gathers, toolHost the surface's facts), ranked
-//   by MM.rankOffers with this device's uses; takeOffer — the tool's act (stamped with its id) and what
-//   only the surface can do for it (HOST_ACTS, TOOL_ACTS); the core verbs (name, copy, paste, erase;
+//   by MM.rank (V1-PLAN §2.2, B2) with this device's uses, globally and per kind of context (usesHere), in
+//   the context beside the marks (contextFor, paletteContext — kept by the log) and held steady per
+//   context (steadyTops, runtime; afforded says what the top is among); takeOffer — the tool's act
+//   (stamped with its id) and what only the surface can do for it (HOST_ACTS, TOOL_ACTS); the core
+//   verbs (name, copy, paste, erase;
 //   copyMarks/pasteClip/duplicateMarks, the clip); the label act's words (labelMarks, labelSentence); the
 //   prompts (runPrompt → a page or a program, runAsk, runDraw); the library (libraryEntries/reuseEntry/
 //   applyLibrary, targetOf); renderSummon/refreshPalette/paintField.
 // Uses: core (hand, lastPen), ui, field (readFieldCommand, verbFor, libraryMatch, typedWord — pure,
 //   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading,
-//   askModelsAbout, offerModel), snap (snapMode), render (nameOfParticipant), artifacts (flipped), frames,
+//   askModelsAbout, offerModel), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
+//   artifacts (flipped), frames,
 //   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
 //   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
 //   hand opened the field), hand (handOfPointer).
@@ -4370,7 +4406,7 @@
       key: o.key, label: o.label, why: o.reason, verbs: o.verbs || [], tier: o.asks === 'model' ? 2 : 1,
       group: o.hidden ? 'hidden' : o.grounds ? o.grounds.on : 'always',
       groupConf: o.grounds ? o.grounds.confidence : 0, groupWhy: o.grounds ? o.grounds.why : '',
-      base: o.base, grounds: o.grounds, asks: o.asks, offer: o,
+      base: o.base, grounds: o.grounds, asks: o.asks, tool: o.tool, offer: o,
       run: () => takeOffer(o),
     };
     if (o.lead) item.certain = true;
@@ -4529,18 +4565,64 @@
   // registry says so, and an open field offers again.
   MM.onToolsChange(() => refreshPalette());
 
-  // ===== Ranking: the reading first, then learned use ========================
-  // The order itself is core's (`MM.rankOffers`, tools/rank.ts): pure, and
-  // asked in Node. Learned use is this device's, kept here and handed in.
+  // ===== Ranking: the reading first, then learned use, then what is beside ===
+  // The order itself is core's (`MM.rank`, context/rank.ts — B1's
+  // `rankOffers` with the context applied): pure, and asked in Node. What this
+  // surface keeps and hands in is the device's: learned use, globally and per
+  // kind of context (V1-PLAN §2.2 rule 4), and the top each context led with a
+  // moment ago (rule 3) — runtime, never the log.
   const USES_KEY = 'mm-palette-uses';
+  const USES_HERE_KEY = 'mm-palette-uses-here';
   const uses = store.get(USES_KEY) || {};
+  /** Learned use per kind of context: { 'notation:flowchart': { snap: 3 }, 'concept:row': { … } }. */
+  const usesHere = store.get(USES_HERE_KEY) || {};
+  /** The top offer each context led with, by the context's key and the board's generation: { key, at }. */
+  const steadyTops = new Map();
+  /** The context the open field was ranked in (V1-PLAN §2.2); NO_CONTEXT with nothing beside it. */
+  let paletteContext = MM.NO_CONTEXT;
 
-  function rankItems(items) {
-    return MM.rankOffers(items, uses);
+  /** What the steady top is among: the affordances the row shows, never a reading or a typed-only offer. */
+  const afforded = (i) => !i.certain && i.group !== 'hidden';
+
+  /**
+   * What stands beside some marks (`MM.contextAt`): kept while the log stands
+   * (R4c — `logKey`), so an undo can never leave a stale lift behind.
+   */
+  let contextKept = { key: null, ctx: null };
+  function contextFor(ids) {
+    const key = logKey() + '|' + ids.join(',');
+    if (paintReference) return MM.contextAt(session, ids);
+    if (contextKept.key !== key) contextKept = { key: key, ctx: MM.contextAt(session, ids) };
+    return contextKept.ctx;
+  }
+
+  /**
+   * The field's order: `MM.rank` with this device's use and the context, and
+   * then the steady top — within one context the offer that led a moment ago
+   * keeps the lead until another beats it by the margin. Far from any context
+   * there is no key, nothing is held, and the order is B1's.
+   */
+  function rankItems(items, ctx) {
+    const c = ctx || MM.NO_CONTEXT;
+    const ranked = MM.rank(items, c, { uses: uses, usesHere: c.kind ? usesHere[c.kind] : undefined });
+    if (!c.key) return ranked;
+    const now = Date.now();
+    const memo = c.key + '#' + session.getState().generation; // a board replaced is a new context, whatever its ids
+    const steady = MM.steadyTop(ranked, steadyTops.get(memo), { eligible: afforded, now: now });
+    const top = MM.topOf(steady, afforded);
+    for (const [k, v] of steadyTops) if (now - v.at > MM.STEADY_MS) steadyTops.delete(k);
+    if (top) steadyTops.set(memo, { key: top.key, at: now });
+    return steady;
   }
   function noteUse(item) {
     uses[item.key] = (uses[item.key] || 0) + 1;
     store.set(USES_KEY, uses);
+    const kind = paletteContext && paletteContext.kind;
+    if (kind) {
+      const here = usesHere[kind] || (usesHere[kind] = {});
+      here[item.key] = (here[item.key] || 0) + 1;
+      store.set(USES_HERE_KEY, usesHere);
+    }
   }
 
   // ===== The core verbs: the same four, in the same slots (D2, I12) ==========
@@ -4867,7 +4949,8 @@
     if (shownSummonId === sum.id) { placeField(); return; }
     shownSummonId = sum.id;
     fieldAnchor = lastPen ? { x: lastPen.x, y: lastPen.y } : null;
-    paletteItems = rankItems(conversionsFor(s));
+    paletteContext = contextFor(sum.enclosedIds);
+    paletteItems = rankItems(conversionsFor(s), paletteContext);
     paletteIndex = -1;
     paletteNavigated = false;
     summonEl.className = 'field' + (hand === 'left' ? ' left' : '');
@@ -4922,7 +5005,8 @@
     if (!s.summon || shownSummonId !== s.summon.id) return;
     const filter = fieldInput();
     if (!filter) return;
-    paletteItems = rankItems(conversionsFor(s));
+    paletteContext = contextFor(s.summon.enclosedIds);
+    paletteItems = rankItems(conversionsFor(s), paletteContext);
     paintField(filter.value);
   }
 
@@ -4931,8 +5015,10 @@
     const q = query.trim().toLowerCase();
     const s = session.getState();
     const sum = s.summon;
-    const certain = paletteItems.filter((i) => i.certain).sort((a, b) => b.groupConf - a.groupConf);
-    const afford = paletteItems.filter((i) => !i.certain && i.group !== 'hidden');
+    // Both rows in the ranked order — the order the reader walks, so the first
+    // reading shown is the one Enter takes (V1-PLAN §2.2: one `rank`, no disagreeing).
+    const certain = paletteItems.filter((i) => i.certain);
+    const afford = paletteItems.filter(afforded);
     const hit = (i) => !q || (i.label + ' ' + (i.verbs || []).join(' ') + ' ' + i.group).toLowerCase().includes(q);
     let shown = certain.filter(hit).concat(afford.filter(hit));
     // Typing the name of something the library holds completes to it: Enter
@@ -4970,8 +5056,18 @@
     return shown;
   }
 
-  function pillFor(item, i, selected) {
-    const b = ui.pill(item.label, { cls: (item.certain ? 'certain ' : '') + 'item', why: item.why + (item.groupWhy ? ' — ' + item.groupWhy : ''), model: item.tier === 2, onclick: () => { noteUse(item); item.run(); } });
+  /**
+   * Why a pill stands where it does, when what is beside the hand moved it
+   * (V1-PLAN §2.2 rule 2): "first because it sits beside a flowchart: three
+   * processes, one decision". Nothing, when nothing lifted or held it.
+   */
+  function becauseOf(item, leads) {
+    return item.because && item.because.length ? (leads ? 'first because ' : 'raised because ') + item.because.join('; ') : '';
+  }
+
+  function pillFor(item, i, selected, leads) {
+    const because = becauseOf(item, leads);
+    const b = ui.pill(item.label, { cls: (item.certain ? 'certain ' : '') + 'item', why: item.why + (item.groupWhy ? ' — ' + item.groupWhy : '') + (because ? ' — ' + because : ''), model: item.tier === 2, onclick: () => { noteUse(item); item.run(); } });
     b.setAttribute('aria-selected', String(selected));
     b.dataset.index = String(i);
     b.dataset.key = item.key; // what the reader and learned use call it: for tests, and for B2's context
@@ -5015,9 +5111,11 @@
     const chosen = paletteNavigated && shown[paletteIndex] && shown[paletteIndex].line ? shown[paletteIndex] : null;
     const sayLine = (line, quiet) => { if (readingEl) { readingEl.textContent = line || ''; readingEl.classList.toggle('quiet', !!quiet); } };
     const standingLine = () => (chosen ? sayLine(chosen.line, false) : sayLine(r.line, r.quiet));
-    let i = 0, shownAfford = 0;
+    let i = 0, shownAfford = 0, shownCertain = 0;
     for (const item of shown) {
-      const pill = pillFor(item, i, item.key === selectedKey);
+      // Which pill leads its row: the one a "first because" belongs to.
+      const leads = item.certain ? shownCertain++ === 0 : shownAfford === 0;
+      const pill = pillFor(item, i, item.key === selectedKey, leads);
       if (item.line) { pill.onmouseenter = () => sayLine(item.line, false); pill.onmouseleave = standingLine; }
       if (item.certain) certainRow.appendChild(pill);
       else if (shownAfford < MAX_AFFORD || query.trim()) { affordRow.appendChild(pill); shownAfford++; }
@@ -5325,7 +5423,8 @@
 
 // ===== inspector =====
 // Provides: the panel: a mark, an artifact, a word, the selection.
-// Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models.
+// Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models,
+//   palette (contextFor, paletteItems, afforded — what stands beside a selection, and what it put first).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -5734,6 +5833,19 @@
     // Where this stands on the map of becoming, and the rung after it (SURFACE-v10-PLAN §4).
     const rung = becomesOf(s, sum, reading);
     if (rung) html += '<div class="row"><span class="k">becomes</span><span class="v">' + esc(rung.here + ' → ' + rung.next) + '</span></div>';
+    // What stands beside it, and what that put first (V1-PLAN §2.2). Said only
+    // when something does: far from any context the panel is as it was.
+    const beside = contextFor(sum.enclosedIds);
+    if (!MM.isEmptyContext(beside)) {
+      MM.describeContext(beside).slice(0, 3).forEach((line, i) => {
+        html += '<div class="row"><span class="k">' + (i ? '' : 'beside') + '</span><span class="v">' + esc(line) + '</span></div>';
+      });
+      const lead = paletteItems.find(afforded);
+      if (lead && lead.because && lead.because.length) {
+        html += '<div class="row"><span class="k">first</span><span class="v">' + esc(lead.label) + '</span></div>' +
+          '<div class="why">' + esc('because ' + lead.because.join('; ')) + '</div>';
+      }
+    }
     if (reading.roles && reading.roles.length) {
       html += '<div class="sep"></div><div class="eyebrow">roles</div>';
       reading.roles.forEach((r) => {
@@ -10054,12 +10166,22 @@
     // For tests: pin the viewport, so narrow-screen geometry can be checked in
     // a tab that cannot resize itself.
     setTestViewport: setTestViewport,
-    resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },
+    // Learned use, globally and per kind of context, and the top each context held — all device state, reset for a run.
+    resetUses: () => {
+      for (const k of Object.keys(uses)) delete uses[k];
+      for (const k of Object.keys(usesHere)) delete usesHere[k];
+      store.del(USES_KEY); store.del(USES_HERE_KEY);
+      steadyTops.clear();
+    },
     // The open field's items, for tests (V1-PLAN B1): every one it holds, ranked, and the ones a query leaves visible, in display order.
     fieldItems: (q) => {
-      const of = (i) => ({ key: i.key, label: i.label, why: i.why + (i.groupWhy ? ' — ' + i.groupWhy : ''), tier: i.tier, certain: !!i.certain });
+      const of = (i) => ({ key: i.key, label: i.label, why: i.why + (i.groupWhy ? ' — ' + i.groupWhy : ''), tier: i.tier, certain: !!i.certain, because: (i.because || []).slice(), steady: !!i.steady });
       return session.getState().summon ? { ranked: paletteItems.map(of), shown: visibleItems(q || '').map(of) } : null;
     },
+    // What stands beside the open field's marks (V1-PLAN §2.2, B2), and the tops the contexts hold, for tests.
+    fieldContext: () => (session.getState().summon ? paletteContext : null),
+    steadyTops: () => [...steadyTops].map(([k, v]) => ({ context: k, key: v.key, at: v.at })),
+    usesHere: () => JSON.parse(JSON.stringify(usesHere)),
     // The worker runtime, for tests: what is loaded, where each body is, what broke.
     runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS, log: runtime.log, pending: runtime.pending, stepOnce: stepOnce }),
     // Programs, for tests: what a running frame reported, and the library.

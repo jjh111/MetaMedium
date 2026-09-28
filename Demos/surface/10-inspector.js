@@ -1,6 +1,7 @@
 // ===== inspector =====
 // Provides: the panel: a mark, an artifact, a word, the selection.
-// Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models.
+// Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models,
+//   palette (contextFor, paletteItems, afforded — what stands beside a selection, and what it put first).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -409,6 +410,19 @@
     // Where this stands on the map of becoming, and the rung after it (SURFACE-v10-PLAN §4).
     const rung = becomesOf(s, sum, reading);
     if (rung) html += '<div class="row"><span class="k">becomes</span><span class="v">' + esc(rung.here + ' → ' + rung.next) + '</span></div>';
+    // What stands beside it, and what that put first (V1-PLAN §2.2). Said only
+    // when something does: far from any context the panel is as it was.
+    const beside = contextFor(sum.enclosedIds);
+    if (!MM.isEmptyContext(beside)) {
+      MM.describeContext(beside).slice(0, 3).forEach((line, i) => {
+        html += '<div class="row"><span class="k">' + (i ? '' : 'beside') + '</span><span class="v">' + esc(line) + '</span></div>';
+      });
+      const lead = paletteItems.find(afforded);
+      if (lead && lead.because && lead.because.length) {
+        html += '<div class="row"><span class="k">first</span><span class="v">' + esc(lead.label) + '</span></div>' +
+          '<div class="why">' + esc('because ' + lead.because.join('; ')) + '</div>';
+      }
+    }
     if (reading.roles && reading.roles.length) {
       html += '<div class="sep"></div><div class="eyebrow">roles</div>';
       reading.roles.forEach((r) => {

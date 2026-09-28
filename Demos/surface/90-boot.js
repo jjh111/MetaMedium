@@ -50,12 +50,22 @@
     // For tests: pin the viewport, so narrow-screen geometry can be checked in
     // a tab that cannot resize itself.
     setTestViewport: setTestViewport,
-    resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },
+    // Learned use, globally and per kind of context, and the top each context held — all device state, reset for a run.
+    resetUses: () => {
+      for (const k of Object.keys(uses)) delete uses[k];
+      for (const k of Object.keys(usesHere)) delete usesHere[k];
+      store.del(USES_KEY); store.del(USES_HERE_KEY);
+      steadyTops.clear();
+    },
     // The open field's items, for tests (V1-PLAN B1): every one it holds, ranked, and the ones a query leaves visible, in display order.
     fieldItems: (q) => {
-      const of = (i) => ({ key: i.key, label: i.label, why: i.why + (i.groupWhy ? ' — ' + i.groupWhy : ''), tier: i.tier, certain: !!i.certain });
+      const of = (i) => ({ key: i.key, label: i.label, why: i.why + (i.groupWhy ? ' — ' + i.groupWhy : ''), tier: i.tier, certain: !!i.certain, because: (i.because || []).slice(), steady: !!i.steady });
       return session.getState().summon ? { ranked: paletteItems.map(of), shown: visibleItems(q || '').map(of) } : null;
     },
+    // What stands beside the open field's marks (V1-PLAN §2.2, B2), and the tops the contexts hold, for tests.
+    fieldContext: () => (session.getState().summon ? paletteContext : null),
+    steadyTops: () => [...steadyTops].map(([k, v]) => ({ context: k, key: v.key, at: v.at })),
+    usesHere: () => JSON.parse(JSON.stringify(usesHere)),
     // The worker runtime, for tests: what is loaded, where each body is, what broke.
     runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS, log: runtime.log, pending: runtime.pending, stepOnce: stepOnce }),
     // Programs, for tests: what a running frame reported, and the library.
