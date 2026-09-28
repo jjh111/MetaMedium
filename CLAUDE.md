@@ -1946,7 +1946,13 @@ selection stands), the canvas beside a mark (a name, a match chip with its
 number, a working model, an answer card — and the reading of the mark the
 hand just made, under that mark only), the panel (rows), and the status line
 (one sentence: what just happened, via `say`/`flash`, else the standing state
-in a few words). The model pane's status stays in the pane. **A match chip
+in a few words). **The status line speaks the person's words**
+(PLAN-USER-SURFACE U1b): counts as *3 marks* and *2 things made*, never
+*loose* or *artifact*; a bind as *the line is tied to the circle*
+(`tiedSentence` in `05-selection.js`), never a site's coordinates; and work
+in flight as one phrase — one call its label, several *qwen is working on 3
+things · Esc stops it* (`workingSummary` in `04-models.js`) — the detail on
+the marks' own dots. The model pane's status stays in the pane. **A match chip
 is a button** (D8): a tap on it summons the group it stands beside —
 `session.summonMarks(ids, at)`, the same summon a loop and a mark reach,
 with `scopeSource: 'pointed'` — so the second molecule is one tap from being

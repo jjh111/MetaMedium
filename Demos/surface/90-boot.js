@@ -31,6 +31,8 @@
     chromeDrawn: () => chromeDrawn.slice(),
     // The models at work, for tests: the key of every call in flight (one Enter, one act).
     working: () => [...working.keys()],
+    // A call registered as at work and let go, with no model asked — for the status line's tests (U1b).
+    beginWork: (key, ids, label) => beginWork(key, ids, label), endWork: (key) => endWork(key),
     // A hand's word on its own ink, for tests: where the last paint drew each label, and a mark's ink colour.
     labelsDrawn: () => labelsDrawn.map((l) => Object.assign({}, l)),
     // The one selected mark's own points (V1-PLAN E1), for tests: where the last paint drew each handle, in world units.

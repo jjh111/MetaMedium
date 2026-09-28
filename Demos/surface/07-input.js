@@ -474,7 +474,7 @@
       if (magnetStart) session.bind({ strokeId: id, nodeId: magnetStart.site.nodeId, site: { kind: magnetStart.site.kind, index: magnetStart.site.index }, end: 'start', at: at });
       if (magnetHold) {
         session.bind({ strokeId: id, nodeId: magnetHold.site.nodeId, site: { kind: magnetHold.site.kind, index: magnetHold.site.index }, end: 'end', at: at });
-        flash('bound — ' + MM.describeMagnet(magnetHold.site));
+        flash(tiedSentence(id, magnetHold.site, 'end'));
       }
     }
     magnetStart = null;

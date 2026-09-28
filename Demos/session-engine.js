@@ -1702,8 +1702,18 @@
     const secs = Math.round((performance.now() - w.since) / 1000);
     return w.label + (secs >= 3 ? ' · ' + secs + ' s' : '') + (secs >= 30 ? ' · Esc stops it' : '');
   }
+  /**
+   * The work in flight, in one phrase for the status line (PLAN-USER-SURFACE U1b): one call is
+   * its label; several of one model are "qwen is working on 3 things"; and Esc is said as soon
+   * as there is more than one, or one has run for a while. The detail stays on the marks' own dots.
+   */
   function workingSummary() {
-    return [...working.values()].map(workingLabel).join(' · ');
+    const all = [...working.values()];
+    if (!all.length) return '';
+    if (all.length === 1) return workingLabel(all[0]);
+    const byWho = new Map();
+    for (const w of all) { const who = String(w.label).split(' · ')[0]; byWho.set(who, (byWho.get(who) || 0) + 1); }
+    return [...byWho].map(([who, n]) => n === 1 ? who + ' is working on 1 thing' : who + ' is working on ' + n + ' things').join(', ') + ' · Esc stops it';
   }
   /** Stop every model call in flight: the hand's Esc. Nothing that landed is undone. */
   function cancelWork() {
@@ -1771,7 +1781,7 @@
   }
 
 // ===== selection =====
-// Provides: the selection as a thing on the canvas — a soft outline with
+// Provides: tiedSentence (a connector tied to a mark, said in words — U1b); the selection as a thing on the canvas — a soft outline with
 //   handles around what a loop became, and the one selected mark's own points
 //   (V1-PLAN E1); hit tests (handleAt); the drag preview the input applies
 //   while a hand moves, scales, rotates or reshapes, and what follows it —
@@ -1965,7 +1975,7 @@
       const bind = hold ? { nodeId: hold.site.nodeId, site: { kind: hold.site.kind, index: hold.site.index } } : null;
       if (!session.reshape({ id: pv.id, handle: pv.handle, to: hold ? hold.site.point : pv.to, at, bind: bind })) { render(state); return; }
       const wrote = session.getEvents().slice(n0).map((e) => e.type);
-      if (wrote.includes('bind')) flash('bound — ' + MM.describeMagnet(hold.site));
+      if (wrote.includes('bind')) flash(tiedSentence(pv.id, hold.site, pv.handle && pv.handle.kind === 'tail' ? 'start' : 'end'));
       else if (wrote.includes('unbind')) flash('let go — that end is tied to nothing now; undo ties it again');
       else if (born) flash('drawn clean and reshaped — the ink stays beneath; undo takes both back');
       return;
@@ -2046,6 +2056,21 @@
     // A connector's own end in a site's reach: the ring the pen's magnet draws, where it will bind.
     if (reshaping && pv.hold) magnetRing(pv.hold, ctx);
     ctx.restore();
+  }
+
+  /**
+   * A connector tied to a mark, in words (PLAN-USER-SURFACE U1b): "the line is tied to the
+   * circle", "the arrow's tip is tied to the box" — never a site's coordinates or an id.
+   */
+  function tiedSentence(connectorId, site, end) {
+    const words = { rectangle: 'box', ink: 'mark', text: 'writing' };
+    const s = session.getState();
+    const c = connectorId && s.nodes.get(connectorId);
+    const shape = c && MM.topInterpretation(c);
+    const what = shape === 'arrow' || shape === 'arc' || shape === 'line' ? shape : 'line';
+    const to = words[site.shape] || site.shape || 'mark';
+    const which = end === 'end' && what === 'arrow' ? 'the arrow\'s tip' : end === 'start' && what === 'arrow' ? 'the arrow\'s tail' : 'the ' + what;
+    return which + ' is tied to the ' + to + ' — undo lets it go';
   }
 
 // ===== snap =====
@@ -2986,7 +3011,7 @@
       if (magnetStart) session.bind({ strokeId: id, nodeId: magnetStart.site.nodeId, site: { kind: magnetStart.site.kind, index: magnetStart.site.index }, end: 'start', at: at });
       if (magnetHold) {
         session.bind({ strokeId: id, nodeId: magnetHold.site.nodeId, site: { kind: magnetHold.site.kind, index: magnetHold.site.index }, end: 'end', at: at });
-        flash('bound — ' + MM.describeMagnet(magnetHold.site));
+        flash(tiedSentence(id, magnetHold.site, 'end'));
       }
     }
     magnetStart = null;
@@ -4032,10 +4057,11 @@
     const ws = workingSummary();
     const hint = s.pendingLassoId ? 'cross the loop with ' + (s.commandMark ? 'your mark' : '✓') + ' to select what it holds' : '';
     const strokes = s.contentIds.length - s.artifacts.length;
-    const parts = [strokes + ' loose'];
+    // Counts in the person's words (U1b): marks and things, never "loose" or "artifact".
+    const parts = strokes ? [strokes + ' mark' + (strokes === 1 ? '' : 's')] : s.artifacts.length ? [] : ['nothing drawn yet'];
     if (s.artifacts.length) {
       const running = liveSet(s).size;
-      parts.push(s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') + (s.live.length ? ' (' + (running < s.live.length ? running + ' of ' + s.live.length + ' live, the rest parked' : s.live.length + ' live') + ')' : ''));
+      parts.push(s.artifacts.length + ' thing' + (s.artifacts.length === 1 ? '' : 's') + ' made' + (s.live.length ? ' (' + (running < s.live.length ? running + ' of ' + s.live.length + ' live, the rest parked' : s.live.length + ' live') + ')' : ''));
     }
     const fs = folderStatus();
     if (fs) parts.push(fs);
@@ -11280,6 +11306,8 @@
     chromeDrawn: () => chromeDrawn.slice(),
     // The models at work, for tests: the key of every call in flight (one Enter, one act).
     working: () => [...working.keys()],
+    // A call registered as at work and let go, with no model asked — for the status line's tests (U1b).
+    beginWork: (key, ids, label) => beginWork(key, ids, label), endWork: (key) => endWork(key),
     // A hand's word on its own ink, for tests: where the last paint drew each label, and a mark's ink colour.
     labelsDrawn: () => labelsDrawn.map((l) => Object.assign({}, l)),
     // The one selected mark's own points (V1-PLAN E1), for tests: where the last paint drew each handle, in world units.

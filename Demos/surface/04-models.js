@@ -706,8 +706,18 @@
     const secs = Math.round((performance.now() - w.since) / 1000);
     return w.label + (secs >= 3 ? ' · ' + secs + ' s' : '') + (secs >= 30 ? ' · Esc stops it' : '');
   }
+  /**
+   * The work in flight, in one phrase for the status line (PLAN-USER-SURFACE U1b): one call is
+   * its label; several of one model are "qwen is working on 3 things"; and Esc is said as soon
+   * as there is more than one, or one has run for a while. The detail stays on the marks' own dots.
+   */
   function workingSummary() {
-    return [...working.values()].map(workingLabel).join(' · ');
+    const all = [...working.values()];
+    if (!all.length) return '';
+    if (all.length === 1) return workingLabel(all[0]);
+    const byWho = new Map();
+    for (const w of all) { const who = String(w.label).split(' · ')[0]; byWho.set(who, (byWho.get(who) || 0) + 1); }
+    return [...byWho].map(([who, n]) => n === 1 ? who + ' is working on 1 thing' : who + ' is working on ' + n + ' things').join(', ') + ' · Esc stops it';
   }
   /** Stop every model call in flight: the hand's Esc. Nothing that landed is undone. */
   function cancelWork() {

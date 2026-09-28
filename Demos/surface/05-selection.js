@@ -1,5 +1,5 @@
 // ===== selection =====
-// Provides: the selection as a thing on the canvas — a soft outline with
+// Provides: tiedSentence (a connector tied to a mark, said in words — U1b); the selection as a thing on the canvas — a soft outline with
 //   handles around what a loop became, and the one selected mark's own points
 //   (V1-PLAN E1); hit tests (handleAt); the drag preview the input applies
 //   while a hand moves, scales, rotates or reshapes, and what follows it —
@@ -193,7 +193,7 @@
       const bind = hold ? { nodeId: hold.site.nodeId, site: { kind: hold.site.kind, index: hold.site.index } } : null;
       if (!session.reshape({ id: pv.id, handle: pv.handle, to: hold ? hold.site.point : pv.to, at, bind: bind })) { render(state); return; }
       const wrote = session.getEvents().slice(n0).map((e) => e.type);
-      if (wrote.includes('bind')) flash('bound — ' + MM.describeMagnet(hold.site));
+      if (wrote.includes('bind')) flash(tiedSentence(pv.id, hold.site, pv.handle && pv.handle.kind === 'tail' ? 'start' : 'end'));
       else if (wrote.includes('unbind')) flash('let go — that end is tied to nothing now; undo ties it again');
       else if (born) flash('drawn clean and reshaped — the ink stays beneath; undo takes both back');
       return;
@@ -274,4 +274,19 @@
     // A connector's own end in a site's reach: the ring the pen's magnet draws, where it will bind.
     if (reshaping && pv.hold) magnetRing(pv.hold, ctx);
     ctx.restore();
+  }
+
+  /**
+   * A connector tied to a mark, in words (PLAN-USER-SURFACE U1b): "the line is tied to the
+   * circle", "the arrow's tip is tied to the box" — never a site's coordinates or an id.
+   */
+  function tiedSentence(connectorId, site, end) {
+    const words = { rectangle: 'box', ink: 'mark', text: 'writing' };
+    const s = session.getState();
+    const c = connectorId && s.nodes.get(connectorId);
+    const shape = c && MM.topInterpretation(c);
+    const what = shape === 'arrow' || shape === 'arc' || shape === 'line' ? shape : 'line';
+    const to = words[site.shape] || site.shape || 'mark';
+    const which = end === 'end' && what === 'arrow' ? 'the arrow\'s tip' : end === 'start' && what === 'arrow' ? 'the arrow\'s tail' : 'the ' + what;
+    return which + ' is tied to the ' + to + ' — undo lets it go';
   }

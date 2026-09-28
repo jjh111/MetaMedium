@@ -2149,6 +2149,17 @@ Found on the way: a short panel no longer docked as a wall, so `fitAll` put a
 mark under it (e2e 41e) — `chromeRects` (`01-view.js`) now measures the panel
 at the height it may grow to.
 
+*U1b status, 28 Sep 2026: built on `claude/friendly-galileo-g1z8wo`* — the red
+commit (e2e 57–57c: `3 loose`; `bound — the west of the circle at (550,
+250)`; three calls of one model a run-on) and the commit carrying this line.
+The standing line counts *marks* and *things made* (`08-render.js`); a bind
+is `tiedSentence` (`05-selection.js`, used by the pen and by a handle); work
+in flight is one phrase per model with *Esc stops it* (`workingSummary`,
+`04-models.js`; `mm.beginWork`/`endWork` register a call for tests). Not
+changed: the room's and folder's own words (*live claude · you are john ·
+with fern*, *folder … · saved*), which already speak plainly, and the
+models' names, which J5 put in words.
+
 ### Phase 7 — review and release
 **H1** — week 1's U7 (the `hand` gate scenario) plus `QA-v1.md`, a hand
 checklist for A1–A10 with the MCP hand in the room checking each step.
