@@ -69,7 +69,9 @@ import { type MarkMiss, whyNotResolved } from './gesture';
 import { type Expectation, type StaleResult, describeStale } from './stale';
 import { handLabel } from './hands';
 import { DEFAULT_ERASE_CROSSINGS, type Meeting, distanceToPath, headOf, scratchedOut } from './erase';
-import { magnetRadius, ownSitesOf } from './magnets';
+import { bindingsOf, magnetRadius, ownSitesOf } from './magnets';
+import { connectorEndsOf, headApartAt } from '../diagram/heads';
+import { figuresAmong } from '../diagram/figures';
 import { type Region, regionsOf, regionsOverlapping } from './regions';
 import { type Mark, type Relation, ENGAGING_KINDS, clusters, reachAround, relate, withinReach } from '../relate/relations';
 import { MarkGrid } from '../relate/grid';
@@ -87,7 +89,7 @@ function manipulationOf(ev: Extract<SessionEvent, { type: 'move' | 'scale' | 'ro
   if (ev.type === 'scale') return { type: 'scale', about: ev.about, sx: ev.sx, sy: ev.sy };
   return { type: 'rotate', about: ev.about, radians: ev.radians };
 }
-import { isLetterLike, joinsRun, wordConfidence } from './words';
+import { FIGURE_MEET_SHARE, LETTER_TINY_PX, WORD_WINDOW_MS, endsPairUp, isLetterLike, joinsRun, longAgainst, wordConfidence, xHeightOf } from './words';
 import { type StructuralSignature, type Examples, structuralSignature, matchDefinition, addExample, MATCH_FLOOR } from './signature';
 import type { Kind } from '../kinds/kinds';
 import type { Behaviour } from '../behave/verbs';
@@ -1438,6 +1440,19 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     inContent.delete(prev);
     unfileContent(prev);
     // Places between two neighbours: number the plane again, in its order.
+    order = new Map();
+    nextOrder = 0;
+    for (const c of contentIds) order.set(c, ++nextOrder);
+    for (const c of ids) {
+      inContent.add(c);
+      fileContent(c);
+    }
+  }
+
+  /** `ids` go back on the plane just before `anchor` — letters a word let go of (W1), before the stroke that showed they were none. */
+  function contentInsertBefore(anchor: string, ids: readonly string[]) {
+    const idx = contentIds.indexOf(anchor);
+    contentIds.splice(idx < 0 ? contentIds.length : idx, 0, ...ids);
     order = new Map();
     nextOrder = 0;
     for (const c of contentIds) order.set(c, ++nextOrder);
@@ -2961,6 +2976,216 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return { node: n, bounds: fp.bounds, at: st.at, scale: sc };
   }
 
+  // ===== What is drawing, not writing (V1-PLAN §9 W1; words.ts) =====
+  //
+  // The letter rules read bounds and time; three kinds of stroke are drawing
+  // however letter-like their bounds: a connector, two halves of a figure, and
+  // a head drawn apart from its connector. Each is read on the stroke's own
+  // geometry and its neighbours', never on who drew it or how fast.
+
+  /** The pen's own bar for a connector: the magnet binds a stroke that reads as a line, an arrow or an arc at this or more (07-input.js) — a hand's arrow reads 0.6–0.9. */
+  const CONNECTOR_READING = 0.5;
+  function readsAsConnector(n: MMNode): boolean {
+    const t = topShape(n);
+    return !!t && (t.type === 'line' || t.type === 'arrow' || t.type === 'arc') && t.weight >= CONNECTOR_READING;
+  }
+
+  function strokeScaleOf(n: MMNode): number {
+    const sc = (getRep(n, 'stroke')?.data as { scale?: number } | undefined)?.scale;
+    return sc && sc > 0 ? sc : 1;
+  }
+
+  function sizeOfBounds(b: Bounds): number {
+    return Math.max(b.maxX - b.minX, b.maxY - b.minY);
+  }
+
+  /** The ink a mark stands as, path by path, each with whether it closes: a stroke's own, an artifact's members'. */
+  function inkPathsOf(n: MMNode): [Point[], boolean][] {
+    const own = standingPointsOf(n);
+    if (own) return [[own, standsClosed(n) ?? false]];
+    const out: [Point[], boolean][] = [];
+    for (const e of n.edges) {
+      if (e.rel !== 'has-part') continue;
+      const m = nodes.get(e.to);
+      const pts = m && standingPointsOf(m);
+      if (m && pts && !getRep(m, 'erased')) out.push([pts, standsClosed(m) ?? false]);
+    }
+    return out;
+  }
+
+  /**
+   * A mark that is not writing, and so can be what a connector connects: not a
+   * word, not read as words, not a stroke the rung reads as writing — and
+   * bigger than a letter, or a shape no letter is (a confident rectangle or
+   * triangle). An artifact is one unless it is text.
+   */
+  function nonWriting(n: MMNode): boolean {
+    if (isWord(n) || transcriptOf(n) || getRep(n, 'gesture') || getRep(n, 'erased')) return false;
+    if (artifacts.includes(n.id)) {
+      const code = [...n.reps].reverse().find((r) => r.modality === 'code')?.data as { kind?: string } | undefined;
+      return code?.kind !== 'text';
+    }
+    const fp = fingerprintOf(n);
+    if (!fp || topShape(n)?.type === 'text') return false;
+    return !isLetterLike(fp.bounds, strokeScaleOf(n)) || neverLetter(n);
+  }
+
+  /** Whether a letter of a run meets a mark too — any of its ink within `r` of the mark's. */
+  function letterMeets(letterId: string, m: MMNode, mb: Bounds, r: number): boolean {
+    const l = nodes.get(letterId);
+    const lb = l && boundsOf(l);
+    if (!l || !lb || boundingBoxDistance(lb, mb) > r) return false;
+    const paths = inkPathsOf(m);
+    for (const [pts] of inkPathsOf(l)) {
+      for (const p of pts) if (paths.some(([q, c]) => distanceToPath(p, q, c) <= r)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Whether this connector meets what it connects (words.ts): bound at an end
+   * to a mark that is not writing, or its ends arriving at such marks — on the
+   * mark's ink or one of its sites, or heading into it, within the mark's
+   * magnet reach. A closed mark counts at one end, met from outside it
+   * (writing inside a box is the box's). A line counts only when the connector
+   * meets something at both its ends — a line is written under and beside as
+   * often as it is connected to, and a connector runs between two things —
+   * measured as two strokes' ends meet (the reach of the smaller, as
+   * figures.ts reads it), and never a line in the same box as the connector (a
+   * member under its compartment line). Nor is the ground the run's other
+   * letters stand on too anything connected (a caption sitting on a box).
+   */
+  function meetsAtAnEnd(n: MMNode, run: readonly string[]): boolean {
+    for (const b of bindingsOf(n, nodes)) {
+      const m = b.active ? nodes.get(b.nodeId) : undefined;
+      if (m && nonWriting(m)) return true;
+    }
+    const ends = connectorEndsOf(n, nodes);
+    const nb = boundsOf(n);
+    if (!ends || !nb) return false;
+    const scale = strokeScaleOf(n);
+    const touch = HAND_RESOLUTION_PX * scale;
+    const nSize = sizeOfBounds(nb);
+    // The closed marks this connector stands inside: a line in one of them is the box's, not connected.
+    const holders = reach.query(nb).filter((id) => {
+      const h = nodes.get(id)!;
+      const hb = boundsOf(h);
+      return id !== n.id && !!hb && boundsContain(hb, nb) && (artifacts.includes(id) || (standsClosed(h) ?? false)) && nonWriting(h);
+    });
+    const meets = { closed: false, open: [false, false] };
+    ends.forEach((e, k) => {
+      for (const id of reach.around(e.point, (cell) => magnetRadius(cell, scale))) {
+        if (id === n.id || run.includes(id)) continue;
+        const m = nodes.get(id)!;
+        const mb = boundsOf(m);
+        if (!mb || !nonWriting(m)) continue;
+        const closed = artifacts.includes(id) || (standsClosed(m) ?? false);
+        const r = magnetRadius(closed ? sizeOfBounds(mb) : Math.min(nSize, sizeOfBounds(mb)), scale);
+        if (distancePointToBounds(e.point, mb) > r) continue;
+        if (closed && boundsContain(mb, nb)) continue;
+        if (!closed && holders.some((h) => boundsContain(boundsOf(nodes.get(h)!)!, mb))) continue;
+        // Where it arrives: the nearest of the mark's ink and sites.
+        let q: Point | null = null, d = Infinity;
+        for (const [pts, c] of inkPathsOf(m)) {
+          for (let i = 1; i < pts.length + (c ? 1 : 0); i++) {
+            const a = pts[i - 1], b = pts[i % pts.length];
+            const abx = b.x - a.x, aby = b.y - a.y, l2 = abx * abx + aby * aby;
+            const t = l2 > 0 ? Math.max(0, Math.min(1, ((e.point.x - a.x) * abx + (e.point.y - a.y) * aby) / l2)) : 0;
+            const x = a.x + abx * t, y = a.y + aby * t, dd = Math.hypot(e.point.x - x, e.point.y - y);
+            if (dd < d) { d = dd; q = { x, y }; }
+          }
+        }
+        // Its sites (a box's centre is off its ink) — read only when its ink is not already under the end.
+        if (d > touch) {
+          for (const site of ownSitesOf(m, nodes)) {
+            const dd = Math.hypot(site.point.x - e.point.x, site.point.y - e.point.y);
+            if (dd < d) { d = dd; q = site.point; }
+          }
+        }
+        if (!q || d > r) continue;
+        // On it, or heading into it: within 60° of the way the connector leaves through this end.
+        if (d > touch && ((q.x - e.point.x) * e.out.x + (q.y - e.point.y) * e.out.y) / d < 0.5) continue;
+        if (run.some((l) => l !== n.id && letterMeets(l, m, mb, r))) continue;
+        if (closed) meets.closed = true;
+        else meets.open[k] = true;
+      }
+    });
+    return meets.closed || (meets.open[0] && meets.open[1]);
+  }
+
+  /** Whether this connector is long against the x-height of the run it would join (words.ts). */
+  function longAgainstRun(n: MMNode, run: readonly string[]): boolean {
+    const letters = run.filter((id) => id !== n.id).map((id) => nodes.get(id)).filter((l): l is MMNode => !!l);
+    const xh = xHeightOf(letters.map((l) => {
+      const b = boundsOf(l);
+      const h = b ? b.maxY - b.minY : 0;
+      return { height: h, tiny: h / strokeScaleOf(l) < LETTER_TINY_PX, connector: readsAsConnector(l) };
+    }));
+    const b = boundsOf(n);
+    if (xh === null || !b) return false;
+    const ends = connectorEnds(n, nodes);
+    const length = Math.max(ends ? Math.hypot(ends.end.x - ends.start.x, ends.end.y - ends.start.y) : 0, sizeOfBounds(b));
+    return longAgainst(length, xh);
+  }
+
+  /** A connector is not a letter: it reads as one and meets what it connects at an end, or is long against the run's x-height. */
+  function connectorNotLetter(n: MMNode, run: readonly string[]): boolean {
+    return readsAsConnector(n) && (meetsAtAnEnd(n, run) || longAgainstRun(n, run));
+  }
+
+  /** Halves are not letters: two strokes whose ends meet, each within a share of the smaller's size of the other's, closing a figure. */
+  function closesFigure(a: MMNode, b: MMNode): boolean {
+    const pa = standingPointsOf(a), pb = standingPointsOf(b);
+    const ba = boundsOf(a), bb = boundsOf(b);
+    if (!pa || !pb || pa.length < 2 || pb.length < 2 || !ba || !bb) return false;
+    const limit = FIGURE_MEET_SHARE * Math.min(sizeOfBounds(ba), sizeOfBounds(bb));
+    if (!endsPairUp([pa[0], pa[pa.length - 1]], [pb[0], pb[pb.length - 1]], limit)) return false;
+    return figuresAmong(nodes, [a.id, b.id]).some((f) => f.shape !== 'polygon' && f.ids.includes(a.id) && f.ids.includes(b.id));
+  }
+
+  /**
+   * Two strokes that are one drawing, and neither of them a letter: halves of
+   * a figure, or a connector and its head drawn apart right before or after it
+   * — within the word window, the time a run of letters is written in.
+   */
+  function oneDrawing(a: MMNode, b: MMNode): boolean {
+    if (getRep(a, 'erased') || getRep(b, 'erased')) return false;
+    const atOf = (n: MMNode) => (getRep(n, 'stroke')?.data as { at?: number } | undefined)?.at ?? n.createdAt;
+    const together = Math.abs(atOf(b) - atOf(a)) <= WORD_WINDOW_MS;
+    return (together && (headApartAt(a, b, nodes) !== null || headApartAt(b, a, nodes) !== null)) || closesFigure(a, b);
+  }
+
+  /**
+   * Letters a later stroke showed were never letters leave their word (W1):
+   * back on the content plane just before `before` — where they were drawn,
+   * in the order drawn — related and wired as a stroke drawn there is. A word
+   * left with one letter dissolves, as it does when a letter is erased.
+   */
+  function releaseLetters(word: MMNode, ids: readonly string[], before: string) {
+    const keep = lettersOf(word).filter((id) => !ids.includes(id));
+    for (const id of ids) {
+      const n = nodes.get(id)!;
+      n.edges = n.edges.filter((e) => !(e.rel === 'part-of' && e.to === word.id));
+    }
+    if (keep.length >= 2) setWordReps(word, keep);
+    else {
+      contentSpread(word.id, keep);
+      for (const id of keep) {
+        const n = nodes.get(id)!;
+        n.edges = n.edges.filter((e) => !(e.rel === 'part-of' && e.to === word.id));
+      }
+      word.reps.push({ modality: 'status', data: 'dissolved', source: 'engine' });
+      word.edges = word.edges.filter((e) => e.rel !== 'has-part');
+    }
+    contentInsertBefore(before, ids);
+    for (const id of ids) {
+      const n = nodes.get(id)!;
+      const st = getRep(n, 'stroke')?.data as { points: Point[] };
+      addSpatialEdges(n);
+      inferWire(n, st.points, strokeScaleOf(n));
+    }
+  }
+
   /**
    * The stroke just made: does it continue a word, or start one with the strokes before it?
    *
@@ -2973,6 +3198,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
    * wrote them, so her word read as the reader's everywhere else, and the
    * label rule took her word on it for a stranger's). A board's own words name
    * its own hand as they always did, so every held log replays node for node.
+   *
+   * And a stroke that is drawing is no letter, however letter-like its bounds
+   * (W1, above): a connector, two halves of a figure, a head drawn apart. So
+   * the run is read on each stroke's ends as well as its bounds — a stroke
+   * that closes a figure with the word's last letter, or is its head, takes
+   * that letter back out of the word with it.
    */
   function absorbIntoWord(node: MMNode, fp: Fingerprint, at: number, scale: number, hand: string): boolean {
     if (!isLetterLike(fp.bounds, scale) || neverLetter(node)) return false;
@@ -2986,14 +3217,29 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         if (id !== node.id && authorOf(nodes.get(id)!) === maker) yield id;
       }
     })();
-    const prevId = mine.next().value;
+    const walked: string[] = [];
+    const behind = (k: number): string | undefined => {
+      while (walked.length <= k) {
+        const step = mine.next();
+        if (step.done) return undefined;
+        walked.push(step.value);
+      }
+      return walked[k];
+    };
+    const prevId = behind(0);
     if (!prevId) return false;
     const prev = nodes.get(prevId)!;
     const letter = { bounds: fp.bounds, at };
 
     if (isWord(prev)) {
       const letters = lettersOf(prev);
-      const lastAt = (getRep(nodes.get(letters[letters.length - 1])!, 'stroke')?.data as { at: number }).at;
+      const last = nodes.get(letters[letters.length - 1])!;
+      if (oneDrawing(last, node)) {
+        releaseLetters(prev, [last.id], node.id);
+        return false;
+      }
+      if (connectorNotLetter(node, letters)) return false;
+      const lastAt = (getRep(last, 'stroke')?.data as { at: number }).at;
       const j = joinsRun({ bounds: boundsOf(prev)!, lastAt }, letter, scale);
       if (!j.ok) return false;
       letters.push(node.id);
@@ -3008,16 +3254,29 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // Two confident shapes side by side are a drawing. A word needs a letter
     // the rung could not read as a shape — in this stroke or the one before.
     if (shapeAlone(node) && shapeAlone(prev)) return false;
+    // Nor is a stroke that is drawing a letter: halves of a figure, a head and
+    // its connector — this stroke and the one before, or that one and the one
+    // before it — and a connector (W1).
+    if (oneDrawing(prev, node)) return false;
+    const before = behind(1);
+    if (before && oneDrawing(nodes.get(before)!, prev)) return false;
+    if (connectorNotLetter(node, [prevId]) || connectorNotLetter(prev, [node.id])) return false;
     const j = joinsRun({ bounds: first.bounds, lastAt: first.at }, letter, scale);
     if (!j.ok) return false;
 
     // Gather back: the letters this hand wrote just before these two, while
-    // each still sits on the run's line and came within the window of the next.
+    // each still sits on the run's line and came within the window of the
+    // next — and is no drawing.
     const run = [first];
     let bounds = first.bounds;
-    for (let step = mine.next(); !step.done; step = mine.next()) {
-      const cand = letterCandidate(step.value, scale);
+    for (let k = 1; ; k++) {
+      const id = behind(k);
+      if (!id) break;
+      const cand = letterCandidate(id, scale);
       if (!cand) break;
+      const earlier = behind(k + 1);
+      if (earlier && oneDrawing(nodes.get(earlier)!, cand.node)) break;
+      if (connectorNotLetter(cand.node, [...run.map((r) => r.node.id), node.id])) break;
       const back = joinsRun({ bounds, lastAt: cand.at }, { bounds: cand.bounds, at: run[0].at }, cand.scale);
       if (!back.ok) break;
       run.unshift(cand);

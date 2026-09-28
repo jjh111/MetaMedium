@@ -8124,6 +8124,10 @@ function inkEndsOf(node, nodes) {
   if (!c) return null;
   return { start: c.ends[0].point, end: c.ends[1].point, tail: c.shape === "arrow" && c.ends[0].barb ? "end" : "start" };
 }
+function connectorEndsOf(node, nodes) {
+  const c = connectorOf(node, nodes);
+  return c ? c.ends.map((e) => ({ end: e.end, point: e.point, out: e.out })) : null;
+}
 var isRead = (node) => isWord(node) || !!transcriptOf(node);
 function isWriting(node, nodes, ink, hull2) {
   if (isRead(node)) return true;
@@ -8341,6 +8345,29 @@ function headsOf(state, id) {
   const conn = connectorOf(node, state.nodes);
   if (!conn) return null;
   return { id, shape: conn.shape, start: readEnd(conn, conn.ends[0], state), end: readEnd(conn, conn.ends[1], state) };
+}
+function headApartAt(connector, mark, nodes) {
+  if (connector === mark || getRep(mark, "erased") || getRep(mark, "gesture")) return null;
+  const conn = connectorOf(connector, nodes);
+  const b = boundsOf(mark);
+  const raw = strokePointsOf(mark);
+  if (!conn || !b || !raw || raw.length < 3) return null;
+  const hull2 = hullOf2(raw);
+  if (hull2.length < 2 || isWriting(mark, nodes, raw, hull2)) return null;
+  const size = Math.max(b.maxX - b.minX, b.maxY - b.minY);
+  const markScale = getRep(mark, "stroke")?.data?.scale ?? 1;
+  if (size / markScale < HAND_RESOLUTION_PX) return null;
+  const reach = magnetRadius(size, conn.scale);
+  for (const e of conn.ends) {
+    const d = hull2.length >= 3 && insideConvex2(e.point, hull2) ? 0 : distToRing2(e.point, hull2);
+    if (d > reach) continue;
+    if (chevronOf(raw, e, conn.scale)) return e.end;
+    if (size > HEAD_MAX_SHARE * conn.length) continue;
+    const c = hull2.length >= 3 ? centroidOf(hull2) : hull2[0];
+    if (Math.abs(cross5(e.out, sub6(c, e.point))) > HEAD_AXIS_SHARE * size || dot3(e.out, sub6(c, e.point)) < -size) continue;
+    if (fingerprintOf(mark)?.isClosed) return e.end;
+  }
+  return null;
 }
 function connectorHeads(state) {
   const out = [];
@@ -8572,6 +8599,21 @@ var WORD_GAP_RATIO = 0.7;
 var WORD_BAND_OVERLAP = 0.35;
 var WORD_WINDOW_MS = 3e3;
 var DASH_MAX_WIDTH_PX = 60;
+var LETTER_TINY_PX = 10;
+var FIGURE_MEET_SHARE = 0.25;
+function xHeightOf(letters) {
+  const hs = letters.filter((l) => !l.tiny && !l.connector).map((l) => l.height).sort((a, b) => a - b);
+  return hs.length ? hs[Math.floor((hs.length - 1) / 2)] : null;
+}
+function longAgainst(length, xHeight) {
+  return length >= LETTER_HEIGHT_RATIO * xHeight;
+}
+function endsPairUp(a, b, limit) {
+  const d = (p, q) => Math.hypot(p.x - q.x, p.y - q.y);
+  const straight = Math.max(d(a[0], b[0]), d(a[1], b[1]));
+  const crossed = Math.max(d(a[0], b[1]), d(a[1], b[0]));
+  return Math.min(straight, crossed) <= limit;
+}
 function isLetterLike(b, scale) {
   const h2 = (b.maxY - b.minY) / scale, w2 = (b.maxX - b.minX) / scale;
   if (h2 > LETTER_MAX_HEIGHT_PX || w2 > LETTER_MAX_WIDTH_PX) return false;
@@ -8592,7 +8634,7 @@ function joinsRun(run2, letter, scale) {
   const gap = Math.max(lb.minX - rb.maxX, rb.minX - lb.maxX, 0);
   const ref = Math.max(runH, letH) / scale;
   if (gap / scale > ref * WORD_GAP_RATIO) return { ok: false, reasoning: "too far from the last letter to be the same word" };
-  const tiny = Math.min(runH, letH) / scale < 10;
+  const tiny = Math.min(runH, letH) / scale < LETTER_TINY_PX;
   if (!tiny && (letH / runH > LETTER_HEIGHT_RATIO || runH / letH > LETTER_HEIGHT_RATIO)) return { ok: false, reasoning: "a different size from the letters beside it" };
   return { ok: true, reasoning: `beside the last letter, on its line, ${Math.round(gap / scale)}px away` };
 }
@@ -13011,6 +13053,17 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       fileContent(c);
     }
   }
+  function contentInsertBefore(anchor, ids) {
+    const idx = contentIds.indexOf(anchor);
+    contentIds.splice(idx < 0 ? contentIds.length : idx, 0, ...ids);
+    order2 = /* @__PURE__ */ new Map();
+    nextOrder = 0;
+    for (const c of contentIds) order2.set(c, ++nextOrder);
+    for (const c of ids) {
+      inContent.add(c);
+      fileContent(c);
+    }
+  }
   function fileContent(id) {
     const n2 = nodes.get(id);
     const b = n2 && boundsOf(n2);
@@ -14001,6 +14054,163 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     if (!isLetterLike(fp.bounds, sc) || neverLetter(n2)) return null;
     return { node: n2, bounds: fp.bounds, at: st.at, scale: sc };
   }
+  const CONNECTOR_READING = 0.5;
+  function readsAsConnector(n2) {
+    const t = topShape2(n2);
+    return !!t && (t.type === "line" || t.type === "arrow" || t.type === "arc") && t.weight >= CONNECTOR_READING;
+  }
+  function strokeScaleOf(n2) {
+    const sc = getRep(n2, "stroke")?.data?.scale;
+    return sc && sc > 0 ? sc : 1;
+  }
+  function sizeOfBounds2(b) {
+    return Math.max(b.maxX - b.minX, b.maxY - b.minY);
+  }
+  function inkPathsOf(n2) {
+    const own = standingPointsOf(n2);
+    if (own) return [[own, standsClosed(n2) ?? false]];
+    const out = [];
+    for (const e of n2.edges) {
+      if (e.rel !== "has-part") continue;
+      const m = nodes.get(e.to);
+      const pts = m && standingPointsOf(m);
+      if (m && pts && !getRep(m, "erased")) out.push([pts, standsClosed(m) ?? false]);
+    }
+    return out;
+  }
+  function nonWriting(n2) {
+    if (isWord(n2) || transcriptOf(n2) || getRep(n2, "gesture") || getRep(n2, "erased")) return false;
+    if (artifacts.includes(n2.id)) {
+      const code = [...n2.reps].reverse().find((r) => r.modality === "code")?.data;
+      return code?.kind !== "text";
+    }
+    const fp = fingerprintOf(n2);
+    if (!fp || topShape2(n2)?.type === "text") return false;
+    return !isLetterLike(fp.bounds, strokeScaleOf(n2)) || neverLetter(n2);
+  }
+  function letterMeets(letterId, m, mb, r) {
+    const l = nodes.get(letterId);
+    const lb = l && boundsOf(l);
+    if (!l || !lb || boundingBoxDistance(lb, mb) > r) return false;
+    const paths = inkPathsOf(m);
+    for (const [pts] of inkPathsOf(l)) {
+      for (const p of pts) if (paths.some(([q, c]) => distanceToPath(p, q, c) <= r)) return true;
+    }
+    return false;
+  }
+  function meetsAtAnEnd(n2, run2) {
+    for (const b of bindingsOf(n2, nodes)) {
+      const m = b.active ? nodes.get(b.nodeId) : void 0;
+      if (m && nonWriting(m)) return true;
+    }
+    const ends = connectorEndsOf(n2, nodes);
+    const nb = boundsOf(n2);
+    if (!ends || !nb) return false;
+    const scale = strokeScaleOf(n2);
+    const touch = HAND_RESOLUTION_PX * scale;
+    const nSize = sizeOfBounds2(nb);
+    const holders = reach.query(nb).filter((id) => {
+      const h2 = nodes.get(id);
+      const hb = boundsOf(h2);
+      return id !== n2.id && !!hb && boundsContain(hb, nb) && (artifacts.includes(id) || (standsClosed(h2) ?? false)) && nonWriting(h2);
+    });
+    const meets = { closed: false, open: [false, false] };
+    ends.forEach((e, k) => {
+      for (const id of reach.around(e.point, (cell) => magnetRadius(cell, scale))) {
+        if (id === n2.id || run2.includes(id)) continue;
+        const m = nodes.get(id);
+        const mb = boundsOf(m);
+        if (!mb || !nonWriting(m)) continue;
+        const closed = artifacts.includes(id) || (standsClosed(m) ?? false);
+        const r = magnetRadius(closed ? sizeOfBounds2(mb) : Math.min(nSize, sizeOfBounds2(mb)), scale);
+        if (distancePointToBounds(e.point, mb) > r) continue;
+        if (closed && boundsContain(mb, nb)) continue;
+        if (!closed && holders.some((h2) => boundsContain(boundsOf(nodes.get(h2)), mb))) continue;
+        let q = null, d = Infinity;
+        for (const [pts, c] of inkPathsOf(m)) {
+          for (let i = 1; i < pts.length + (c ? 1 : 0); i++) {
+            const a = pts[i - 1], b = pts[i % pts.length];
+            const abx = b.x - a.x, aby = b.y - a.y, l2 = abx * abx + aby * aby;
+            const t = l2 > 0 ? Math.max(0, Math.min(1, ((e.point.x - a.x) * abx + (e.point.y - a.y) * aby) / l2)) : 0;
+            const x = a.x + abx * t, y = a.y + aby * t, dd = Math.hypot(e.point.x - x, e.point.y - y);
+            if (dd < d) {
+              d = dd;
+              q = { x, y };
+            }
+          }
+        }
+        if (d > touch) {
+          for (const site of ownSitesOf(m, nodes)) {
+            const dd = Math.hypot(site.point.x - e.point.x, site.point.y - e.point.y);
+            if (dd < d) {
+              d = dd;
+              q = site.point;
+            }
+          }
+        }
+        if (!q || d > r) continue;
+        if (d > touch && ((q.x - e.point.x) * e.out.x + (q.y - e.point.y) * e.out.y) / d < 0.5) continue;
+        if (run2.some((l) => l !== n2.id && letterMeets(l, m, mb, r))) continue;
+        if (closed) meets.closed = true;
+        else meets.open[k] = true;
+      }
+    });
+    return meets.closed || meets.open[0] && meets.open[1];
+  }
+  function longAgainstRun(n2, run2) {
+    const letters = run2.filter((id) => id !== n2.id).map((id) => nodes.get(id)).filter((l) => !!l);
+    const xh = xHeightOf(letters.map((l) => {
+      const b2 = boundsOf(l);
+      const h2 = b2 ? b2.maxY - b2.minY : 0;
+      return { height: h2, tiny: h2 / strokeScaleOf(l) < LETTER_TINY_PX, connector: readsAsConnector(l) };
+    }));
+    const b = boundsOf(n2);
+    if (xh === null || !b) return false;
+    const ends = connectorEnds(n2, nodes);
+    const length = Math.max(ends ? Math.hypot(ends.end.x - ends.start.x, ends.end.y - ends.start.y) : 0, sizeOfBounds2(b));
+    return longAgainst(length, xh);
+  }
+  function connectorNotLetter(n2, run2) {
+    return readsAsConnector(n2) && (meetsAtAnEnd(n2, run2) || longAgainstRun(n2, run2));
+  }
+  function closesFigure(a, b) {
+    const pa = standingPointsOf(a), pb = standingPointsOf(b);
+    const ba = boundsOf(a), bb = boundsOf(b);
+    if (!pa || !pb || pa.length < 2 || pb.length < 2 || !ba || !bb) return false;
+    const limit = FIGURE_MEET_SHARE * Math.min(sizeOfBounds2(ba), sizeOfBounds2(bb));
+    if (!endsPairUp([pa[0], pa[pa.length - 1]], [pb[0], pb[pb.length - 1]], limit)) return false;
+    return figuresAmong(nodes, [a.id, b.id]).some((f) => f.shape !== "polygon" && f.ids.includes(a.id) && f.ids.includes(b.id));
+  }
+  function oneDrawing(a, b) {
+    if (getRep(a, "erased") || getRep(b, "erased")) return false;
+    const atOf2 = (n2) => getRep(n2, "stroke")?.data?.at ?? n2.createdAt;
+    const together = Math.abs(atOf2(b) - atOf2(a)) <= WORD_WINDOW_MS;
+    return together && (headApartAt(a, b, nodes) !== null || headApartAt(b, a, nodes) !== null) || closesFigure(a, b);
+  }
+  function releaseLetters(word, ids, before) {
+    const keep = lettersOf(word).filter((id) => !ids.includes(id));
+    for (const id of ids) {
+      const n2 = nodes.get(id);
+      n2.edges = n2.edges.filter((e) => !(e.rel === "part-of" && e.to === word.id));
+    }
+    if (keep.length >= 2) setWordReps(word, keep);
+    else {
+      contentSpread(word.id, keep);
+      for (const id of keep) {
+        const n2 = nodes.get(id);
+        n2.edges = n2.edges.filter((e) => !(e.rel === "part-of" && e.to === word.id));
+      }
+      word.reps.push({ modality: "status", data: "dissolved", source: "engine" });
+      word.edges = word.edges.filter((e) => e.rel !== "has-part");
+    }
+    contentInsertBefore(before, ids);
+    for (const id of ids) {
+      const n2 = nodes.get(id);
+      const st = getRep(n2, "stroke")?.data;
+      addSpatialEdges(n2);
+      inferWire(n2, st.points, strokeScaleOf(n2));
+    }
+  }
   function absorbIntoWord(node, fp, at, scale, hand) {
     if (!isLetterLike(fp.bounds, scale) || neverLetter(node)) return false;
     const maker = authorOf(node);
@@ -14010,13 +14220,28 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         if (id !== node.id && authorOf(nodes.get(id)) === maker) yield id;
       }
     })();
-    const prevId = mine.next().value;
+    const walked = [];
+    const behind = (k) => {
+      while (walked.length <= k) {
+        const step2 = mine.next();
+        if (step2.done) return void 0;
+        walked.push(step2.value);
+      }
+      return walked[k];
+    };
+    const prevId = behind(0);
     if (!prevId) return false;
     const prev = nodes.get(prevId);
     const letter = { bounds: fp.bounds, at };
     if (isWord(prev)) {
       const letters = lettersOf(prev);
-      const lastAt2 = (getRep(nodes.get(letters[letters.length - 1]), "stroke")?.data).at;
+      const last = nodes.get(letters[letters.length - 1]);
+      if (oneDrawing(last, node)) {
+        releaseLetters(prev, [last.id], node.id);
+        return false;
+      }
+      if (connectorNotLetter(node, letters)) return false;
+      const lastAt2 = (getRep(last, "stroke")?.data).at;
       const j2 = joinsRun({ bounds: boundsOf(prev), lastAt: lastAt2 }, letter, scale);
       if (!j2.ok) return false;
       letters.push(node.id);
@@ -14028,13 +14253,22 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     const first = letterCandidate(prevId, scale);
     if (!first) return false;
     if (shapeAlone(node) && shapeAlone(prev)) return false;
+    if (oneDrawing(prev, node)) return false;
+    const before = behind(1);
+    if (before && oneDrawing(nodes.get(before), prev)) return false;
+    if (connectorNotLetter(node, [prevId]) || connectorNotLetter(prev, [node.id])) return false;
     const j = joinsRun({ bounds: first.bounds, lastAt: first.at }, letter, scale);
     if (!j.ok) return false;
     const run2 = [first];
     let bounds = first.bounds;
-    for (let step2 = mine.next(); !step2.done; step2 = mine.next()) {
-      const cand = letterCandidate(step2.value, scale);
+    for (let k = 1; ; k++) {
+      const id = behind(k);
+      if (!id) break;
+      const cand = letterCandidate(id, scale);
       if (!cand) break;
+      const earlier = behind(k + 1);
+      if (earlier && oneDrawing(nodes.get(earlier), cand.node)) break;
+      if (connectorNotLetter(cand.node, [...run2.map((r) => r.node.id), node.id])) break;
       const back = joinsRun({ bounds, lastAt: cand.at }, { bounds: cand.bounds, at: run2[0].at }, cand.scale);
       if (!back.ok) break;
       run2.unshift(cand);

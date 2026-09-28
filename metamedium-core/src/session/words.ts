@@ -41,6 +41,69 @@ export const WORD_WINDOW_MS = 3000;
 
 /** A flat stroke wider than this is a rule or an underline, not a dash or a crossbar. */
 export const DASH_MAX_WIDTH_PX = 60;
+/** A stroke shorter than this on screen is a dot, a dash or a crossbar: no size to match a letter by. */
+export const LETTER_TINY_PX = 10;
+
+// ===== What is drawing, not writing (V1-PLAN §9 W1) =====
+//
+// The rules above read bounds and time, and bounds cannot tell a flow from an
+// l, nor `< >` from `( )`. Three kinds of stroke are drawing however
+// letter-like their bounds, and the session asks each of a stroke before it
+// starts or joins a word (`absorbIntoWord`, session.ts), on the stroke's own
+// geometry and its neighbours' — never on who drew it or how fast:
+//
+//   - A CONNECTOR: it reads as a line, an arrow or an arc, and an end of it
+//     meets a mark that is not writing (touching it, at a site the magnet
+//     binds, or bound — within that mark's magnet reach), or it is long
+//     against the x-height of the writing it would join. A tall l is safe on
+//     both counts: an ascender is under three x-heights (John's h, l and d
+//     stand 72–88 px over an x-height of 31–40, 2.2–2.8), and the session
+//     does not count a meeting an l makes as writing does — with a box it
+//     stands inside, with a line along the writing rather than end to end
+//     with it, or with the ground the run's other letters stand on too.
+//   - TWO HALVES: strokes whose ends meet, closing a figure (`figuresAmong`
+//     reads a triangle or a quadrilateral), each end within
+//     FIGURE_MEET_SHARE of the smaller stroke's size of the other's.
+//   - A HEAD DRAWN APART, right after its connector or right before it
+//     (`headApartAt`, heads.ts): it is its connector's, and neither is a
+//     letter.
+
+/**
+ * Two strokes close a figure, and are not letters, only when each end of one
+ * meets an end of the other within this share of the smaller stroke's own
+ * size: a diamond's quick halves meet within a tenth of a half, while a
+ * printed A's crossbar stands a whole crossbar from its legs' feet — near
+ * enough for the magnet's reach, which is why the reach alone cannot say it.
+ */
+export const FIGURE_MEET_SHARE = 0.25;
+
+/**
+ * The x-height of a run of letters: the lower median of their heights,
+ * leaving out the tiny (a dot, a dash, a crossbar) and whatever reads as a
+ * connector (a stem stands an ascender high, and whether a stroke is a stem
+ * or a flow is the question being asked). Null when nothing is left.
+ */
+export function xHeightOf(letters: readonly { height: number; tiny: boolean; connector: boolean }[]): number | null {
+  const hs = letters.filter((l) => !l.tiny && !l.connector).map((l) => l.height).sort((a, b) => a - b);
+  return hs.length ? hs[Math.floor((hs.length - 1) / 2)] : null;
+}
+
+/**
+ * Long against a run: LETTER_HEIGHT_RATIO x-heights or more. The tallest
+ * letter a hand prints — an ascender, or a descender and its bowl — is under
+ * three.
+ */
+export function longAgainst(length: number, xHeight: number): boolean {
+  return length >= LETTER_HEIGHT_RATIO * xHeight;
+}
+
+/** Whether two strokes' ends pair up — each end of one within `limit` of a different end of the other. */
+export function endsPairUp(a: readonly [{ x: number; y: number }, { x: number; y: number }], b: readonly [{ x: number; y: number }, { x: number; y: number }], limit: number): boolean {
+  const d = (p: { x: number; y: number }, q: { x: number; y: number }) => Math.hypot(p.x - q.x, p.y - q.y);
+  const straight = Math.max(d(a[0], b[0]), d(a[1], b[1]));
+  const crossed = Math.max(d(a[0], b[1]), d(a[1], b[0]));
+  return Math.min(straight, crossed) <= limit;
+}
 
 export function isLetterLike(b: Bounds, scale: number): boolean {
   const h = (b.maxY - b.minY) / scale, w = (b.maxX - b.minX) / scale;
@@ -79,7 +142,7 @@ export function joinsRun(
   const ref = Math.max(runH, letH) / scale;
   if (gap / scale > ref * WORD_GAP_RATIO) return { ok: false, reasoning: 'too far from the last letter to be the same word' };
   // Sizes should match to within an ascender — unless one of them is a dash or a dot.
-  const tiny = Math.min(runH, letH) / scale < 10;
+  const tiny = Math.min(runH, letH) / scale < LETTER_TINY_PX;
   if (!tiny && (letH / runH > LETTER_HEIGHT_RATIO || runH / letH > LETTER_HEIGHT_RATIO)) return { ok: false, reasoning: 'a different size from the letters beside it' };
   return { ok: true, reasoning: `beside the last letter, on its line, ${Math.round(gap / scale)}px away` };
 }

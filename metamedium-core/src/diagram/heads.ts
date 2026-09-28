@@ -42,7 +42,7 @@ import { boundsOf, fingerprintOf, getRep, isWord, placed, strokePointsOf, transc
 import { snapReading } from '../session/clean';
 import { magnetRadius } from '../session/magnets';
 import { calculateStraightness } from '../geometry';
-import { MAX_TIER0_CONFIDENCE } from '../recognition';
+import { HAND_RESOLUTION_PX, MAX_TIER0_CONFIDENCE } from '../recognition';
 
 /** What a connector's end can carry. */
 export type HeadKind = 'arrow' | 'triangle' | 'diamond' | 'circle';
@@ -376,6 +376,18 @@ export function inkEndsOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>): { s
   return { start: c.ends[0].point, end: c.ends[1].point, tail: c.shape === 'arrow' && c.ends[0].barb ? 'end' : 'start' };
 }
 
+/**
+ * A connector's two ends where its ink stands, each with the way the
+ * connector leaves through it — a line's and an arrow's along its chord, an
+ * arc's along its own curve there — as `headsOf` reads them. Null for
+ * anything the rung does not read as a line, an arrow or an arc. What the
+ * letter rules ask a connector's ends meet (session.ts, V1-PLAN §9 W1).
+ */
+export function connectorEndsOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>): { end: 'start' | 'end'; point: Point; out: Point }[] | null {
+  const c = connectorOf(node, nodes);
+  return c ? c.ends.map((e) => ({ end: e.end, point: e.point, out: e.out })) : null;
+}
+
 // ===== Reading a head =====
 
 interface Candidate {
@@ -682,6 +694,44 @@ export function headsOf(state: SessionState, id: string): ConnectorHeads | null 
   const conn = connectorOf(node, state.nodes);
   if (!conn) return null;
   return { id, shape: conn.shape, start: readEnd(conn, conn.ends[0], state), end: readEnd(conn, conn.ends[1], state) };
+}
+
+/**
+ * Whether `mark` is a head drawn apart at an end of `connector`, read on the
+ * two marks alone by the rules `headsOf` reads a head with: a small closed
+ * mark touching that end, on its line, at most half the connector's length —
+ * or a separate chevron, its point on the end and its arms back along the
+ * line, of any size (the last dash of a dashed line is shorter than the
+ * chevron that ends it). Never writing, never a dot below the hand's
+ * resolution (an i's), and never a fill with no outline: a scribble at a
+ * line's end is as likely a letter of the label written there. The end it
+ * sits at, or null. The letter rules ask it so a head drawn right after its
+ * connector is never a letter (session.ts, V1-PLAN §9 W1).
+ */
+export function headApartAt(connector: MMNode, mark: MMNode, nodes: ReadonlyMap<string, MMNode>): 'start' | 'end' | null {
+  if (connector === mark || getRep(mark, 'erased') || getRep(mark, 'gesture')) return null;
+  const conn = connectorOf(connector, nodes);
+  const b = boundsOf(mark);
+  const raw = strokePointsOf(mark);
+  if (!conn || !b || !raw || raw.length < 3) return null;
+  const hull = hullOf(raw);
+  if (hull.length < 2 || isWriting(mark, nodes, raw, hull)) return null;
+  const size = Math.max(b.maxX - b.minX, b.maxY - b.minY);
+  // Below the hand's resolution a mark is a dot — a point, the dot of an i
+  // over its stem — and no head.
+  const markScale = (getRep(mark, 'stroke')?.data as { scale?: number } | undefined)?.scale ?? 1;
+  if (size / markScale < HAND_RESOLUTION_PX) return null;
+  const reach = magnetRadius(size, conn.scale);
+  for (const e of conn.ends) {
+    const d = hull.length >= 3 && insideConvex(e.point, hull) ? 0 : distToRing(e.point, hull);
+    if (d > reach) continue;
+    if (chevronOf(raw, e, conn.scale)) return e.end;
+    if (size > HEAD_MAX_SHARE * conn.length) continue;
+    const c = hull.length >= 3 ? centroidOf(hull) : hull[0];
+    if (Math.abs(cross(e.out, sub(c, e.point))) > HEAD_AXIS_SHARE * size || dot(e.out, sub(c, e.point)) < -size) continue;
+    if (fingerprintOf(mark)?.isClosed) return e.end;
+  }
+  return null;
 }
 
 /** Every connector on the board, and what sits at its ends. */
