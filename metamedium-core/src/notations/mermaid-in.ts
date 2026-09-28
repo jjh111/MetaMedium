@@ -33,17 +33,24 @@
 //     declared content — it never lassoes, commands or scratches — and each is
 //     a confident shape or wider than a letter, so the letter rules
 //     (session/words.ts) gather none of them into a word.
-//   - **Each connector runs from port to port and is bound at both ends**:
-//     an arrow (`strokeFor`, its barb drawn in proportion when the arrow is
-//     long enough to lose it), a line, or for `<-->` an arrow with a small
-//     closed triangle at its tail (the shape rung reads a stroke with a barb
-//     at each end as neither). The end stands exactly on a site the mark
-//     itself offers (magnets.ts) — a process's and a data symbol's edge
-//     middles, a decision's vertices, a circle's and a stadium's cardinals,
-//     which are where the flowchart's own ports are — and the `bind` names
-//     that site, found again on replay with no notation in use. Only when a
-//     mark offers none there is the flowchart's port named instead
-//     (`port:flowchart`), and each end says which.
+//   - **Each connector runs from port to port, is bound at both ends, and
+//     reads as drawn.** Straight where a clean, clear way exists — an arrow
+//     (`strokeFor`, its barb kept in proportion past 800 px on screen, where
+//     a capped barb stops reading), a line, or for `<-->` an arrow with a
+//     closed triangle at its tail (a stroke with a barb at each end reads as
+//     neither) — else an arc bulging out from a pair of ports, its heads
+//     closed triangles. Each end stands exactly on a site the mark offers
+//     itself (magnets.ts) — a process's and a data symbol's edge middles, a
+//     decision's vertices, a circle's and a stadium's cardinals, which are
+//     where the flowchart's own ports are — and the `bind` names that site,
+//     found again on replay with no notation in use; only where a mark
+//     offers none is the flowchart's port named (`port:flowchart`), and each
+//     end says which. heads.ts reads, at a connector's end, any mark small
+//     beside it, touching the end, on its line — another connector, a head
+//     drawn apart, the symbol itself — so ends sharing a port lie 45° apart,
+//     and a way that brings any mark past those three gates is drawn first
+//     on a scratch session with everything involved and taken only when every
+//     end there reads as drawn. What cannot be made to read is said.
 //   - **Words go on their own ink.** A node's text and a link's label are
 //     each a `label` on that mark (session.label), by the importing hand,
 //     which made every mark — so the rule that a word goes only on its own
@@ -516,7 +523,7 @@ function readLink(c: Cursor, notes: Set<string>): LinkRef {
       c.ws();
       const m = c.match(closer);
       if (!m) throw new Refuse(`a label inside a link is not followed by its end (“${kind === '--' ? '-->' : kind === '==' ? '==>' : '.->'}”)`);
-      return finishTextLink(opened[0], opened[1] ?? '', m[1], text, notes);
+      return finishTextLink(opened[0], opened[1] ?? '', m[1], text);
     }
     // Unquoted: the words run to the first place the link's end stands.
     for (let k = c.i; k < c.s.length; k++) {
@@ -526,7 +533,7 @@ function readLink(c: Cursor, notes: Set<string>): LinkRef {
         text = shown(c.s.slice(c.i, k));
         if (!text) break;
         c.i = k + m[0].length;
-        return finishTextLink(opened[0], opened[1] ?? '', m[1], text, notes);
+        return finishTextLink(opened[0], opened[1] ?? '', m[1], text);
       }
     }
     c.i = at;
@@ -542,8 +549,8 @@ function readLink(c: Cursor, notes: Set<string>): LinkRef {
   return { written: m[0], start, end, style: styleOf(body), ...(label !== undefined ? { label } : {}) };
 }
 
-function finishTextLink(openedText: string, start: string, closeText: string, text: string, notes: Set<string>): LinkRef {
-  void notes;
+/** A link with its label inside it (`-- yes -->`), from what opened it and what closed it. */
+function finishTextLink(openedText: string, start: string, closeText: string, text: string): LinkRef {
   const endMark = closeText[closeText.length - 1];
   const end = (endMark === '>' || endMark === 'o' || endMark === 'x' ? endMark : '') as LinkRef['end'];
   const body = openedText.replace(/^</, '') + closeText;
@@ -818,7 +825,7 @@ function figureOf(symbol: FlowSymbol, text: string): Figure {
   }
 }
 
-/** The triangle at a `<-->`'s tail: its apex on the end, pointing out along `out`, `size` long — a closed head heads.ts reads (screen pixels). */
+/** A head drawn apart: a closed triangle, its apex on the end, pointing along `out`, `size` long — a head heads.ts reads (screen pixels). */
 function triangleHead(apex: Point, out: Point, size: number): Point[] {
   const l = Math.hypot(out.x, out.y) || 1;
   const u = { x: out.x / l, y: out.y / l };
@@ -832,8 +839,6 @@ function triangleHead(apex: Point, out: Point, size: number): Point[] {
 interface Standing {
   id: string;
   rank: number;
-  /** A start or end: a small circle, which heads.ts also reads as a head where a connector ends on it. */
-  round: boolean;
   /** Its ink, in canvas units. */
   ink: Point[];
   centre: Point;
@@ -894,14 +899,14 @@ interface Route {
   overlaps: boolean;
   /** The other symbols it crosses. */
   crossings: number;
-  /** Read on a scratch board, a head drawn apart at one of its ends was not what heads.ts read there. */
+  /** No way between its two symbols read as drawn beside the links already there: the best by the other measures, kept and said. */
   misread?: boolean;
 }
 
 /** How many ways, best first, are drawn on a scratch board and read before one is given up on. */
 const VERIFIED = 16;
 
-/** What the links already routed hold: the straight segments, and each port's ends and heads drawn apart. */
+/** What the links already routed hold: their straight segments, and the way each end leaves its port. */
 interface RouteTaken {
   straight: [Point, Point][];
   /** Each port's ends, as the way each leaves it. */
@@ -916,7 +921,7 @@ interface RouteTaken {
  */
 const APART_DEG = 45;
 
-/** An arc's sweeps, the flattest first: each reads as an arc on a chord this long on screen (60° needs 150 px, 90° 100 px). */
+/** An arc's sweeps, the flattest first, each with the shortest chord on screen it is drawn on: there the shape rung reads it as an arc at 0.92. */
 const ARC_SWEEPS: [number, number][] = [[90, 100], [120, 60], [150, 60]];
 
 /** The points of an arc from P to Q bulging to `side` (+1: left of P→Q as the screen shows it), sweeping `sweep` degrees — `n` segments. */
@@ -971,7 +976,9 @@ function alongEachOther(p: Point, q: Point, r: Point, s: Point, tol: number): bo
  * nothing — a flow back up a column, a second link between the same two
  * symbols — an arc bulging out from a pair of ports is tried, the flattest
  * that reads as an arc and crosses least, and taken when it does better.
- * Deterministic: ties go by the order the ports are named.
+ * Either is taken only when `reads` says it reads as drawn (the caller's
+ * scratch-board check; undefined past its budget). Deterministic: ties go by
+ * the order the ports are named.
  */
 function routeLink(a: Standing, b: Standing, others: readonly Standing[], dir: MermaidFlow, taken: RouteTaken, margin: number, scale: number, reads: (route: Route) => boolean | undefined): Route {
   const across = dir === 'LR' || dir === 'RL';
@@ -1032,8 +1039,7 @@ function routeLink(a: Standing, b: Standing, others: readonly Standing[], dir: M
     }
   }
   lines.sort(byScore);
-  /** A way is taken when it is clean — and, where it meets another along nearly its line or draws a head apart, when it reads as drawn. */
-  // A way is taken when it is clean and reads as drawn (`reads`: true, false, or — past its budget — undefined).
+  // A way is taken when it is clean and reads as drawn.
   const first = (cands: { route: Route }[]) => {
     for (const c of cands) if (c.route.clean && reads(c.route)) return c.route;
     return undefined;
@@ -1254,7 +1260,7 @@ function drawFlowchartRead(session: Session, read: MermaidRead, opts: DrawMermai
     // Each port where its end will stand: on the site it is bound at, so what is routed and read is what is drawn.
     for (const p of PORTS) ends.set(`${n.id}:${p}`, endAt(n.id, p));
     const ports = Object.fromEntries(PORTS.map((p) => [p, ends.get(`${n.id}:${p}`)!.point])) as Record<Port, Point>;
-    standing.set(n.id, { id: n.id, rank: layout.rank.get(n.id)!, round: n.symbol === 'start' || n.symbol === 'end', ink, centre: centreOf(n.id), hull, box: { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) }, ports });
+    standing.set(n.id, { id: n.id, rank: layout.rank.get(n.id)!, ink, centre: centreOf(n.id), hull, box: { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) }, ports });
   }
   const drawnLinks: DrawnLink[] = [];
   const crossing: string[] = [];
