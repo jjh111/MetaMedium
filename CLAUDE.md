@@ -242,7 +242,7 @@ any structural change.
 
 | Path | What it is |
 |---|---|
-| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, Mermaid out and in, and a layered layout), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*) and the LLM transport. New recognition/engine work lands HERE |
+| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, the UML class diagram, Mermaid out and in, and a layered layout), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*) and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages). Fully on the `brand/` system as of 3 Sept 2026 — its `:root` is `brand/tokens.css` under the names this page already used, so change a value THERE first |
 | `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
@@ -870,8 +870,9 @@ frozen copy of what was checked is held; nothing any input is makes it throw
 molecule, drawn three ways — bonds short of the circles, to their edges, three
 in a row), **`flowchart@1`** (names the notation and restates none of it:
 `FLOWCHART_TABLE` stays the single home of the flowchart's symbols, which
-D2's writer reads; its affinities) and **`test-molecule@1`** (tests only — a
-`test-` pack is never listed).
+D2's writer reads; its affinities), **`uml-class@1`** (names the class
+notation, restating none of `UML_CLASS_TABLE`; its affinities) and
+**`test-molecule@1`** (tests only — a `test-` pack is never listed).
 
 **A board uses a pack by an event**: `use { pack: 'basics@1' }` and `unuse`,
 through `session.use` / `unuse`; `SessionState.packs` in the order used. They
@@ -1325,6 +1326,30 @@ reads any mark small, touching and on a connector's line as its head, so a
 way that brings one past those gates is read first on a scratch session and
 taken only if every end reads as drawn. Only strokes, binds and labels enter
 the log; for one undo, wrap the call in `session.withTool` (L2j).
+
+**The UML class diagram** (V1-PLAN §3, D4; `notations/uml-class.ts`,
+`notations/uml-class-mermaid.ts`, the `uml-class@1` pack). A class is a box
+with one or two lines across it, side to side — its compartments — **read in
+the box's own frame** (the tightest box at any angle, each axis tried as the
+one its lines run along), never from the relation or role tables, which call
+a compartment line `inside` and a box holding boxes a frame (the trap). A box
+holding a mark that is no writing, or three lines across, is no class. The
+name is the writing in the top compartment, each line below a member — a
+method only when read words say so (`METHOD_WORDS`), never invented. A plain
+box is a class with only a name, read lower, and only where a compartment or
+a UML head says UML. Relations by `headsOf` past their heads, a bind first:
+hollow triangle inheritance, filled diamond composition, hollow aggregation,
+open arrow association, none a link; a head read first as a circle degrades,
+said; short writing near an end is its multiplicity, credited to the line it
+stands beside. Dashed lines are not read yet (a perception D5 needs too).
+Each class's four sides are continuous ports (`along:uml-class`). Mermaid:
+`class id["name"] { … }`, an attribute's parentheses as entities so Mermaid
+never takes it for a method, relations from the marked end, cardinalities
+quoted — and a reader for `classDiagram` that draws every mark as a confident
+shape (a class a box with two lines, its name and members labels on the box
+and lines, a multiplicity a dash) so the letter rules gather none, the round
+trip the test (`uml-class-mermaid.test.ts`). `uml-class.test.ts` is A2;
+`uml-class.bench.test.ts` the rates; `uml-class.read.test.ts` the rules.
 
 ### Spatial Graph — retired
 
