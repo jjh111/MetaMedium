@@ -392,9 +392,11 @@ async function runBudgets(browser, servers, engineName) {
       if (!page) check('R4c. the 500-mark board opens', false, opened.out);
       else {
         const eq = await equivalence(page, { strokes: 3 });
-        measured.equivalence500 = { paints: eq.checks, marks: eq.marks, differed: eq.differed };
-        check(`R4c. the 500-mark board: ${eq.marks} marks pointed at one by one, ${eq.strokes} boxes drawn and undone — what is drawn and said equals the whole-board read (${eq.checks} paints compared)`,
-          eq.differed === 0 && eq.checks >= eq.marks, eq.differed ? eq.first : { paints: eq.checks });
+        const share = eq.ink.of ? Math.round((100 * eq.ink.drawn) / eq.ink.of) : 100;
+        measured.equivalence500 = { paints: eq.checks, marks: eq.marks, differed: eq.differed, inkDrawnPct: share };
+        check(`R4c. the 500-mark board: ${eq.marks} marks pointed at one by one at zoom 1, ${eq.strokes} boxes drawn and undone, every mark held — what is drawn and said equals the whole-board read (${eq.checks} paints and tables compared; the pointed-at paints stroked ${share}% of the ink the whole-board read stroked, the minimap every mark)`,
+          eq.differed === 0 && eq.checks >= eq.marks && eq.minimap.drawn === eq.minimap.of && eq.ink.drawn < eq.ink.of,
+          eq.differed ? eq.first : { paints: eq.checks, ink: eq.ink, minimap: eq.minimap, held: eq.held });
       }
       page = null;
       await guards.context.close();

@@ -430,7 +430,10 @@
    */
   function pruneRuntime(s) {
     for (const id of [...flipped]) if (!s.live.includes(id)) flipped.delete(id);
-    for (const id of [...readGroups.keys()]) if (!s.contentIds.includes(id)) readGroups.delete(id);
+    if (readGroups.size) {
+      const inPlane = paintReference ? (id) => s.contentIds.includes(id) : ((ix) => (id) => ix.contentAt.has(id))(boardIndex());
+      for (const id of [...readGroups.keys()]) if (!inPlane(id)) readGroups.delete(id);
+    }
     for (const id of [...readWith.keys()]) if (!s.nodes.has(id)) readWith.delete(id);
     for (const key of [...askedToRead]) { const first = String(key).replace(/^line:/, '').split(',')[0]; if (!s.nodes.has(first)) askedToRead.delete(key); }
   }
@@ -566,7 +569,10 @@
   /** While a paint culls, the world box it draws within; null when it draws everything. */
   let paintView = null;
 
+  /** How many times the board has been painted, for tests: a pointer move while drawing must not paint it. */
+  let paints = 0;
   function render(s) {
+    paints++;
     state = s;
     chipHits = [];
     chromeDrawn = [];
@@ -1331,5 +1337,10 @@
     const wantKeys = new Set(want.ops.map(key)), gotKeys = new Set(got.ops.map(key));
     for (const op of got.ops) if (!wantKeys.has(key(op))) diffs.push({ what: 'drawn, and the whole-board read draws it otherwise or not at all', op: op });
     for (const op of want.ops) if (!gotKeys.has(key(op)) && onScreen(op)) diffs.push({ what: 'on screen, and not drawn', op: op });
-    return { ok: diffs.length === 0, diffs: diffs, ops: got.ops.length, of: want.ops.length, marks: s.contentIds.length };
+    const count = (ops, kind) => ops.filter((op) => op.kind === kind).length;
+    return {
+      ok: diffs.length === 0, diffs: diffs, ops: got.ops.length, of: want.ops.length, marks: s.contentIds.length,
+      // How much less a hand's paint stroked than the whole-board read, and that the minimap still shows everything.
+      ink: { drawn: count(got.ops, 'ink'), of: count(want.ops, 'ink') }, minimap: { drawn: count(got.ops, 'mini'), of: count(want.ops, 'mini') },
+    };
   }

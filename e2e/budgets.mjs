@@ -393,7 +393,7 @@ export async function equivalence(page, { strokes = 3 } = {}) {
     const s = window.__mm.session.getState(), MM = window.__mm.MM;
     return s.contentIds.map((id) => { const b = MM.boundsOf(s.nodes.get(id)); return b ? { id, x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 } : null; }).filter(Boolean);
   });
-  const found = { checks: 0, differed: 0, first: [], marks: marks.length, strokes: 0, undos: 0, roles: [] };
+  const found = { checks: 0, differed: 0, first: [], marks: marks.length, strokes: 0, undos: 0, roles: [], ink: { drawn: 0, of: 0 }, minimap: { drawn: 0, of: 0 } };
   // Every mark's role, read over its neighbourhood, against the whole-board read, and the genre.
   const roles = async (where) => {
     const r = await page.evaluate(() => window.__mm.rolesCheck());
@@ -421,7 +421,10 @@ export async function equivalence(page, { strokes = 3 } = {}) {
       window.__mm.inspect(m.id);
       return { id: m.id, c: window.__mm.paintCheck() };
     }), marks.slice(i, i + batch));
-    for (const g of got) note('pointed at ' + g.id, g.c);
+    for (const g of got) {
+      note('pointed at ' + g.id, g.c);
+      if (g.c.ink) { found.ink.drawn += g.c.ink.drawn; found.ink.of += g.c.ink.of; found.minimap.drawn += g.c.minimap.drawn; found.minimap.of += g.c.minimap.of; }
+    }
   }
   await page.evaluate(() => window.__mm.inspect(null));
   // Strokes with the real pointer, each checked; then each undone, checked.

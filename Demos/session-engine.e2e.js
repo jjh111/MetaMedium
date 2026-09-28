@@ -2893,6 +2893,29 @@ window.__scenario = async function(){
     step('48c. an answer card stands beside the mark it is about, goes with the undo, and comes back with the answer',
       card1 && card0 && card2, { card1, card0, card2, cards: mm.answerCards().length });
     sameAsWhole('a card beside the dumbbell it is about');
+    // A pointer move while drawing paints the pen, not the board; a wheel moves the view at once and paints once a frame.
+    {
+      const c48 = document.getElementById('canvas');
+      const pe = (type, x, y) => c48.dispatchEvent(new PointerEvent(type, { pointerId: 1, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1 }));
+      const p0 = mm.paints();
+      pe('pointerdown', 1000, 700);
+      for (let i = 1; i <= 30; i++) pe('pointermove', 1000 + i * 4, 700 + (i % 5));
+      const moved = mm.paints() - p0;
+      pe('pointerup', 1120, 700);
+      const released = mm.paints() - p0;
+      const line48 = lastId();
+      for (let i = 0; i < 4 && mm.session.getState().contentIds.includes(line48); i++) mm.session.undo();
+      await wait(30);
+      const panX0 = mm.view.panX, w0 = mm.paints();
+      for (let i = 0; i < 10; i++) c48.dispatchEvent(new WheelEvent('wheel', { deltaX: 5, deltaY: 0, deltaMode: 0, clientX: 700, clientY: 400, bubbles: true, cancelable: true }));
+      const wheeled = mm.paints() - w0, viewMoved = panX0 - mm.view.panX;
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const framed = mm.paints() - w0;
+      mm.setView(1, 0, 0);
+      step('48e. thirty pointer moves while drawing paint the pen and not the board; the release paints it; ten wheel events move the view at once and paint it in the next frame, once',
+        moved === 0 && released >= 1 && wheeled === 0 && Math.abs(viewMoved - 50) < 1e-6 && framed === 1,
+        { moved, released, wheeled, viewMoved, framed });
+    }
     // Another hand's line: in a room, fern draws a box and an arrow from this hand's box to hers.
     mm.session.load([]); mm.setView(1, 0, 0); await wait(30);
     const hub48 = new MM.LocalHub();
