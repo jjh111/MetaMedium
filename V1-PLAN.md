@@ -1052,7 +1052,7 @@ after the hand has left is a mode; the lift decays with distance, relative
 to the marks' size.
 
 **B2 Context — status, 28 Sep 2026: done on `w2`** — `20e11e9` (red: 17
-Node tests in `src/context/` and e2e 50–50c, against the contract with every
+Node tests in `src/context/` and e2e 50, 50b and 50c, against the contract with every
 context empty — 15 tests and 50, 50b failing, the two invariants and 50c
 passing), `06a04ee` (core), `1b78c59` (the surface), and the docs.
 `contextAt(board, ids | point)` reads what a scope sits **beside**, never its
