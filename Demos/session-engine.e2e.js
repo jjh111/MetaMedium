@@ -2943,5 +2943,242 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 49. The field's offers, golden (V1-PLAN B1) ----
+  // What the field shows for three scopes — a row of three boxes, a molecule,
+  // a line of writing — and the states they pass through (typed at, named and
+  // drawn again, read, taken as text): every pill's key, label, reason and dot
+  // in the order shown, and every item held in the order the reader walks.
+  // Captured before the offers came from registered tools; unchanged since.
+  {
+    const got49 = await window.__fieldGolden();
+    for (const name of Object.keys(window.__FIELD_GOLDEN)) {
+      const want = window.__FIELD_GOLDEN[name], have = got49[name];
+      const same = JSON.stringify(have) === JSON.stringify(want);
+      step('49. golden: ' + name + ' — the field offers what it did before B1: the same pills, keys, reasons and order',
+        same, same ? { afford: want.afford.map((p) => p.key), ranked: want.ranked } : { have: have, want: want });
+    }
+  }
+
   return R;
+};
+
+// ===========================================================================
+// The field's offers, golden (V1-PLAN B1). Captured from the surface BEFORE
+// the field's affordances came from registered tools, and asserted unchanged
+// after: for each fixture scope, the four core slots, the reading line, what
+// this is and what it affords — every pill's key, label, reason and dot, in
+// the order shown — the "+N more", and every item the field holds, hidden
+// ones too, in the ranked order the reader walks. A fixture is drawn with the
+// helpers every section uses and held the way a tap on a chip holds a group.
+// ===========================================================================
+window.__fieldGolden = async function () {
+  const t = window.__t, mm = window.__mm, MM = mm.MM;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms || 60));
+  const out = {};
+  const lastId = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
+  const pill = (b) => ({ key: b.dataset.key || null, label: (b.querySelector('span') || b).textContent, title: b.title, dot: !!b.querySelector('.dot') });
+  // Ids are minted by counter on a board with no log name and by hand once a room has named it,
+  // so every id the fixtures made is said by its part in the fixture instead.
+  const names = new Map();
+  const call = (ids, as) => ids.forEach((id, i) => names.set(id, '<' + as + (ids.length > 1 ? i + 1 : '') + '>'));
+  const capture = (q) => {
+    if (q !== undefined) t.typeIn(q);
+    const f = mm.fieldItems(q || '');
+    const row = (cls) => [...document.querySelectorAll('#summon .row.' + cls + ' .pill')].map(pill);
+    const more = document.querySelector('#summon .row.afford .more');
+    const got = { core: t.coreSlots(), line: t.readingLine(), certain: row('certain'), afford: row('afford'), more: more ? more.textContent : '', ranked: f ? f.ranked.map((i) => i.key) : null };
+    if (q !== undefined) t.typeIn('');
+    const sum = mm.session.getState().summon;
+    if (sum) sum.suggestions.forEach((sg, i) => names.set(sg.id, '<' + sg.kind + '-' + (i + 1) + '>'));
+    let json = JSON.stringify(got);
+    for (const [id, as] of [...names].sort((a, b) => b[0].length - a[0].length)) json = json.split(id).join(as);
+    return JSON.parse(json);
+  };
+  // An empty board, the stub joined, no learned use, snap offered, reading only when asked.
+  const fresh = () => {
+    mm.session.load([]); mm.setView(1, 0, 0);
+    mm.agents.length = 0;
+    mm.agents.push(MM.createAgentParticipant(mm.session, Object.assign({}, MM.PRESETS.ollama, { model: 'e2e-stub', vision: true }), Date.now()));
+    mm.resetUses();
+  };
+  const hold = async (ids) => { mm.session.summonMarks(ids, Date.now()); await wait(60); };
+  const snapBefore = mm.snapMode(), readBefore = mm.autoRead();
+  mm.setSnapMode('offer'); mm.setAutoRead(false);
+
+  // A row of three boxes: peers side by side, one a little off the line.
+  fresh();
+  const row = [];
+  for (const [x, y] of [[200, 200], [360, 204], [520, 200]]) { t.stroke(t.rect(x, y, 120, 80)); row.push(lastId()); }
+  call(row, 'box');
+  await hold(row);
+  out['row of three boxes'] = capture();
+  out['row of three boxes, "row" typed'] = capture('row');
+  out['row of three boxes, "nav" typed'] = capture('nav');
+
+  // A molecule: three circles and two lines joining them.
+  fresh();
+  const molecule = (ox) => {
+    const ids = [];
+    for (const [x, y] of [[300, 300], [500, 300], [400, 460]]) { t.stroke(t.circle(ox + x, y, 40)); ids.push(lastId()); }
+    t.stroke(t.line({ x: ox + 340, y: 300 }, { x: ox + 460, y: 300 }, 30)); ids.push(lastId());
+    t.stroke(t.line({ x: ox + 328, y: 328 }, { x: ox + 372, y: 432 }, 30)); ids.push(lastId());
+    return ids;
+  };
+  const first = molecule(0);
+  call(first, 'first');
+  await hold(first);
+  out['molecule'] = capture();
+  // Named, and drawn again: the second is known, and can be refused.
+  mm.session.bless({ summonId: mm.session.getState().summon.id, name: 'molecule', at: Date.now() });
+  const second = molecule(560);
+  call(second, 'second');
+  const def = mm.session.getState().artifacts.slice(-1);
+  call(def, 'molecule');
+  await hold(second);
+  out['molecule, the second one drawn'] = capture();
+
+  // A line of writing: three cursive words on a band, unread, then read.
+  fresh();
+  const words = [];
+  for (const [x, y, w, h, humps] of [[200, 300, 90, 28, 6], [320, 302, 110, 26, 7], [460, 300, 80, 28, 5]]) { t.stroke(t.word(x, y, w, h, humps)); words.push(lastId()); }
+  call(words, 'word');
+  await hold(words);
+  out['line of writing'] = capture();
+  window.__readReply = [{ text: 'hello wide world', confidence: 0.9 }];
+  const readPill = document.querySelector('#summon .pill[data-key="read"]');
+  if (readPill) readPill.click();
+  const heard = () => { const st = mm.session.getState(); return words.filter((id) => MM.transcriptOf(st.nodes.get(id))).length; };
+  for (let i = 0; i < 40 && heard() < 3; i++) await wait(100);
+  await wait(120);
+  out['line of writing, read'] = capture();
+  // Taken as text where it is, and held again: a text from writing.
+  const linePill = [...document.querySelectorAll('#summon .row.certain .pill')].find((b) => /^“hello wide world”/.test(b.textContent));
+  if (linePill) linePill.click();
+  await wait(60);
+  const st = mm.session.getState();
+  const text = st.artifacts[st.artifacts.length - 1];
+  if (text) { call([text], 'text'); await hold([text]); }
+  out['text made from the writing'] = capture();
+  window.__readReply = null;
+
+  mm.session.load([]); mm.setView(1, 0, 0);
+  mm.setSnapMode(snapBefore); mm.setAutoRead(readBefore);
+  return out;
+};
+
+// Today's field, captured on 27 Sep 2026 before B1 (the surface at 365865e + the test handles):
+// what each fixture's field shows, and must still show once its offers come from tools.
+window.__FIELD_GOLDEN = {
+  "row of three boxes": {
+    core: ["name", "copy", "paste", "erase"],
+    line: "↵ row 0.83 — take it as the name",
+    certain: [
+      {"key": "concept:row", "label": "row 0.83", "title": "3 comparable marks sitting side by side (overlap 0.95, similarity 1.00) — already well lined up — take it as the name — 3 comparable marks sitting side by side (overlap 0.95, similarity 1.00) — already well lined up", "dot": false},
+    ],
+    afford: [
+      {"key": "snap", "label": "Draw them clean", "title": "3 rectangles · ink kept — each reads confidently as one shape", "dot": false},
+      {"key": "row:tidy-row", "label": "Line up across", "title": "align and space them evenly — 3 comparable marks sitting side by side (overlap 0.95, similarity 1.00) — already well lined up", "dot": false},
+      {"key": "row:equalize", "label": "Match sizes", "title": "make them the same size as the largest — 3 comparable marks sitting side by side (overlap 0.95, similarity 1.00) — already well lined up", "dot": false},
+      {"key": "read-any", "label": "Read as writing", "title": "the ink as one image, to a model that can see — for writing the shape rung did not spot", "dot": true},
+      {"key": "what", "label": "What is this?", "title": "every joined model reads the group; its readings join the row above", "dot": true},
+    ],
+    more: "",
+    ranked: ["snap", "concept:row", "row:tidy-row", "row:equalize", "read-any", "what", "duplicate", "keep"],
+  },
+  "row of three boxes, \"row\" typed": {
+    core: ["name", "copy", "paste", "erase"],
+    line: "↵ row 0.83",
+    certain: [
+      {"key": "concept:row", "label": "row 0.83", "title": "3 comparable marks sitting side by side (overlap 0.95, similarity 1.00) — already well lined up — take it as the name — 3 comparable marks sitting side by side (overlap 0.95, similarity 1.00) — already well lined up", "dot": false},
+    ],
+    afford: [
+      {"key": "row:tidy-row", "label": "Line up across", "title": "align and space them evenly — 3 comparable marks sitting side by side (overlap 0.95, similarity 1.00) — already well lined up", "dot": false},
+      {"key": "row:equalize", "label": "Match sizes", "title": "make them the same size as the largest — 3 comparable marks sitting side by side (overlap 0.95, similarity 1.00) — already well lined up", "dot": false},
+    ],
+    more: "",
+    ranked: ["snap", "concept:row", "row:tidy-row", "row:equalize", "read-any", "what", "duplicate", "keep"],
+  },
+  "row of three boxes, \"nav\" typed": {
+    core: ["name", "copy", "paste", "erase"],
+    line: "↵ the structure at once (tier 1), then llm:e2e-stub writes the words",
+    certain: [],
+    afford: [
+      {"key": "name-word", "label": "Name it “nav”", "title": "“nav” as the name — naming makes one thing of them, a definition the library keeps and the next drawing like it is offered as; it writes no word on the ink", "dot": false},
+      {"key": "label-word", "label": "Label it “nav”", "title": "“nav” on each of the 3 marks you made, in your ink at the board's scale — it makes nothing: no definition, no name the library learns, no file; undo takes it off", "dot": false},
+    ],
+    more: "",
+    ranked: ["snap", "concept:row", "row:tidy-row", "row:equalize", "read-any", "what", "duplicate", "keep"],
+  },
+  "molecule": {
+    core: ["name", "copy", "paste", "erase"],
+    line: "↵ flow 0.90 — take it as the name",
+    certain: [
+      {"key": "concept:flow", "label": "flow 0.90", "title": "3 nodes joined by 2 edges — take it as the name — 3 nodes joined by 2 edges", "dot": false},
+    ],
+    afford: [
+      {"key": "snap", "label": "Draw them clean", "title": "3 circles, 2 lines · ink kept — each reads confidently as one shape", "dot": false},
+      {"key": "3d", "label": "Show it in 3D", "title": "3 spheres and 2 bonds in the frame, turning — press inside to turn it; ink over a sphere lands on its mark → then: What is this? asks which molecule", "dot": false},
+      {"key": "read-any", "label": "Read as writing", "title": "the ink as one image, to a model that can see — for writing the shape rung did not spot", "dot": true},
+      {"key": "what", "label": "What is this?", "title": "every joined model reads the group; its readings join the row above", "dot": true},
+    ],
+    more: "",
+    ranked: ["snap", "concept:flow", "3d", "read-any", "what", "duplicate", "keep"],
+  },
+  "molecule, the second one drawn": {
+    core: ["name", "copy", "paste", "erase"],
+    line: "↵ molecule 1.00 — take it as another molecule",
+    certain: [
+      {"key": "sug:<match-1>", "label": "molecule 1.00", "title": "same shapes (3×circle + 2×line); same links (5 kinds) — against the definition — take it as another molecule — you named this shape before", "dot": false},
+      {"key": "concept:flow", "label": "flow 0.90", "title": "3 nodes joined by 2 edges — take it as the name — 3 nodes joined by 2 edges", "dot": false},
+    ],
+    afford: [
+      {"key": "snap", "label": "Draw them clean", "title": "3 circles, 2 lines · ink kept — each reads confidently as one shape", "dot": false},
+      {"key": "not:<match-1>", "label": "Not a molecule", "title": "remembered — a group like this is not offered as one again", "dot": false},
+      {"key": "3d", "label": "Show it in 3D", "title": "3 spheres and 2 bonds in the frame, turning — press inside to turn it; ink over a sphere lands on its mark → then: What is this? asks which molecule", "dot": false},
+      {"key": "read-any", "label": "Read as writing", "title": "the ink as one image, to a model that can see — for writing the shape rung did not spot", "dot": true},
+      {"key": "what", "label": "What is this?", "title": "every joined model reads the group; its readings join the row above", "dot": true},
+    ],
+    more: "",
+    ranked: ["sug:<match-1>", "snap", "concept:flow", "not:<match-1>", "3d", "read-any", "what", "duplicate", "keep"],
+  },
+  "line of writing": {
+    core: ["name", "copy", "paste", "erase"],
+    line: "↵ writing 0.75 — take it as the name",
+    certain: [
+      {"key": "concept:writing", "label": "writing 0.75", "title": "3 marks of writing on one line, a word's gap apart — take it as the name — 3 marks of writing on one line, a word's gap apart", "dot": false},
+    ],
+    afford: [
+      {"key": "read", "label": "Read the writing", "title": "a line of 3 words, unread", "dot": true},
+      {"key": "what", "label": "What is this?", "title": "every joined model reads the group; its readings join the row above", "dot": true},
+    ],
+    more: "",
+    ranked: ["concept:writing", "read", "what", "duplicate", "keep"],
+  },
+  "line of writing, read": {
+    core: ["name", "copy", "paste", "erase"],
+    line: "↵ “hello wide world” 0.90 — take it as text, here; the ink stays underneath",
+    certain: [
+      {"key": "line:<word1>,<word2>,<word3>", "label": "“hello wide world” 0.90", "title": "the line you wrote — take it as text, here; the ink stays underneath — read from your handwriting by llm:e2e-stub", "dot": false},
+      {"key": "concept:writing", "label": "writing 0.75", "title": "3 marks of writing on one line, a word's gap apart — take it as the name — 3 marks of writing on one line, a word's gap apart", "dot": false},
+    ],
+    afford: [
+      {"key": "label:hello wide world", "label": "Label it “hello wide world”", "title": "“hello wide world” on the writing itself, as a caption, in your ink at the board's scale — it makes nothing: no definition, no name the library learns, no file; undo takes it off — read from your handwriting by llm:e2e-stub", "dot": false},
+      {"key": "line-text:<word1>,<word2>,<word3>", "label": "Make it text “hello wide world”", "title": "text where the line is, fitted to the ink; flip it to see the writing", "dot": false},
+      {"key": "what", "label": "What is this?", "title": "every joined model reads the group; its readings join the row above", "dot": true},
+    ],
+    more: "",
+    ranked: ["line:<word1>,<word2>,<word3>", "label:hello wide world", "concept:writing", "line-text:<word1>,<word2>,<word3>", "what", "duplicate", "keep"],
+  },
+  "text made from the writing": {
+    core: ["name", "copy", "paste", "erase"],
+    line: "",
+    certain: [],
+    afford: [
+      {"key": "edit-text:<text>", "label": "Edit the text", "title": "a new version of the words; every version kept", "dot": false},
+      {"key": "flip:<text>", "label": "Show the ink", "title": "flip it over: the writing it came from", "dot": false},
+      {"key": "what", "label": "What is this?", "title": "every joined model reads the group; its readings join the row above", "dot": true},
+    ],
+    more: "",
+    ranked: ["edit-text:<text>", "flip:<text>", "what", "duplicate", "keep"],
+  },
 };

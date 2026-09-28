@@ -896,6 +896,7 @@
     const b = ui.pill(item.label, { cls: (item.certain ? 'certain ' : '') + 'item', why: item.why + (item.groupWhy ? ' — ' + item.groupWhy : ''), model: item.tier === 2, onclick: () => { noteUse(item); item.run(); } });
     b.setAttribute('aria-selected', String(selected));
     b.dataset.index = String(i);
+    b.dataset.key = item.key; // what the reader and learned use call it: for tests, and for B2's context
     return b;
   }
 

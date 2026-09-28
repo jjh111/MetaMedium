@@ -47,6 +47,11 @@
     // a tab that cannot resize itself.
     setTestViewport: setTestViewport,
     resetUses: () => { for (const k of Object.keys(uses)) delete uses[k]; store.del(USES_KEY); },
+    // The open field's items, for tests (V1-PLAN B1): every one it holds, ranked, and the ones a query leaves visible, in display order.
+    fieldItems: (q) => {
+      const of = (i) => ({ key: i.key, label: i.label, why: i.why + (i.groupWhy ? ' — ' + i.groupWhy : ''), tier: i.tier, certain: !!i.certain });
+      return session.getState().summon ? { ranked: paletteItems.map(of), shown: visibleItems(q || '').map(of) } : null;
+    },
     // The worker runtime, for tests: what is loaded, where each body is, what broke.
     runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS, log: runtime.log, pending: runtime.pending, stepOnce: stepOnce }),
     // Programs, for tests: what a running frame reported, and the library.
