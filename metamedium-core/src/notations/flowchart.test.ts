@@ -27,6 +27,7 @@ import { offerPorts, describeNotation, NOTATION_FLOOR } from './notation';
 import type { NotationReading, NotationSymbol } from './notation';
 import { handArrow, handLine, handText, handCircle, triangleStroke, lineStroke } from '../test/strokes';
 import { inkAround, stadiumOutline, ovalOutline, diamondCorners, boxCorners, parallelogramCorners, handShape, diamondTopBottom, diamondLeftRight, boxInFour } from './fixtures/hand';
+import { drawFlowchart, FLOWCHART_VARIANTS } from './fixtures/flowchart';
 
 afterEach(() => {
   for (const n of registeredPorts()) unregisterPorts(n);
@@ -131,6 +132,16 @@ describe('symbols', () => {
     const sym = symbolOf(read(s), x);
     expect(sym).toMatchObject({ symbol: 'data', role: 'node' });
     expect(sym.reason).toMatch(/lean/);
+  });
+
+  it('a box rounded until it is nearly a stadium is held both ways — a process and a terminator, the likelier first', () => {
+    const { s, x } = underABox((s, at) => [s.addStroke(handShape(boxCorners(200, 320, 170, 60), { seed: 3, round: 0.35 }), at)], 290);
+    const sym = symbolOf(read(s), x);
+    const names = sym.readings.map((r) => r.symbol);
+    expect(names).toEqual(expect.arrayContaining(['process', 'terminator']));
+    for (const r of sym.readings.filter((y) => y.symbol === 'process' || y.symbol === 'terminator')) expect(r.confidence, r.symbol).toBeGreaterThan(0.2);
+    for (let i = 1; i < sym.readings.length; i++) expect(sym.readings[i - 1].confidence).toBeGreaterThanOrEqual(sym.readings[i].confidence);
+    expect(sym.symbol).toBe(sym.readings[0].symbol);
   });
 
   it('a box ruled in four strokes is a process', () => {
@@ -417,6 +428,25 @@ describe('the reading', () => {
     const again = createSession();
     again.load(s.getEvents());
     expect(read(again)).toEqual(first);
+  });
+
+  it('the same at any zoom: drawn zoomed out, or zoomed in, it reads alike', () => {
+    const at = (k: number) => {
+      const s = createSession();
+      // The same hand at another zoom: world units are k to a screen pixel.
+      const zoomed = { ...s, addStroke: (pts: Point[], t: number) => s.addStroke(pts.map((p) => ({ x: p.x * k, y: p.y * k })), t, undefined, k) } as Session;
+      const e = drawFlowchart(zoomed, FLOWCHART_VARIANTS[3]);
+      const r = read(s);
+      const name = new Map(Object.entries(e.symbols).map(([n, v]) => [r.symbols.find((y) => sameSet(y.ids, v.ids))?.id, n]));
+      return {
+        symbols: Object.entries(e.symbols).map(([n, v]) => `${n} ${r.symbols.find((y) => sameSet(y.ids, v.ids))?.symbol}`),
+        flows: r.connectors.map((c) => `${name.get(c.from)}→${name.get(c.to)} ${c.direction}`),
+        labels: r.labels.map((l) => `${l.where} ${l.of ? (name.get(l.of) ?? 'a flow') : '-'}`),
+      };
+    };
+    const one = at(1);
+    expect(at(2.5)).toEqual(one);
+    expect(at(0.5)).toEqual(one);
   });
 
   it('a scope reads only what it holds', () => {
