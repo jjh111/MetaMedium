@@ -41,6 +41,12 @@ unit and John sets its scope.
 
 ## 1. Where things stand
 
+**Status, 28 Sep 2026 evening:** W3, W2, U1a–U1g and U2 are built on
+`claude/friendly-galileo-g1z8wo` (off `master` after J4 and J5 landed), each
+red first, each with its dated line in `V1-PLAN.md` §9; the audit's *Walked
+again* table is U2's acceptance, for John to walk by hand. What follows is
+the plan as it was written.
+
 - `master` has phases 0, 0b, 1 (tools, context, packs) and 2 (handles, bindings
   that follow, ports/heads/figures) of `V1-PLAN.md`, and the engine side of
   diagrams: flowchart, UML class, sequence (with dashed lines), Mermaid out and
