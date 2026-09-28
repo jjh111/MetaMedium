@@ -244,6 +244,18 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   what daily use needs (boards, a versioned log, no lost work, budgets,
   first run, pencil, deploy); the ladder in eight phases, the units, how the
   agents run, and the release criteria
+- `PLAN-USER-SURFACE.md` — **the user surface, a plan for the next dev agent, 28 Sep
+  2026**: self-contained (setup, the suite, how to work, what is in flight and who
+  owns which files); W3 a tap never leaves a dot, W2 writing reads when it is
+  writing, U1a–U1g the surface speaks the user's language (the panel, the status
+  line, the field by the hand, relevant offers, Enter as the likely act, the control
+  centre grouped, help as a user guide), U2 the audit walked again; the J5 and J4
+  briefs in case the local lanes stop
+- `UX-AUDIT-2026-09-28.md` — **the canvas as a user meets it**: sixteen findings
+  from a walk of `/app/` using only what the screen gives (the models pane that
+  pops and drops the question, no way to reach Claude, the inspector as the panel,
+  the status line as a log, the field off by the minimap, Enter as a rename,
+  irrelevant offers, slugs, a stale help), and seven principles
 - `PERF.md` — **the performance baseline, 27 Sep 2026** (V1-PLAN R4a):
   the engine and the surface measured on generated boards of 500, 2,000 and
   5,000 marks, every number with its command, the hotspots ranked with
