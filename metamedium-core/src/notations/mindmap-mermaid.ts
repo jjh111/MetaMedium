@@ -243,7 +243,7 @@ export function readMindMapText(text: string): MindMapDiagramRead {
       shape = '';
       notes.add('a node with no shape is drawn as a box');
     }
-    const at = unique(id || words || `n${n}`);
+    const at = unique(id || words.replace(/\s+/g, ' ') || `n${n}`);
     while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
     const parent = stack[stack.length - 1]?.node;
     if (!parent && nodes.length) {

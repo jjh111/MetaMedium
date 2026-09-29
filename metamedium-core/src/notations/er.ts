@@ -49,7 +49,7 @@ import { MAX_TIER0_CONFIDENCE } from '../recognition';
 import type { Notation, NotationConnector, NotationLabel, NotationReading, NotationSymbol } from './notation';
 import type { Candidate } from './flowchart';
 import { figureCandidate, mayBeSide, strokeCandidate } from './flowchart';
-import { centreOf, countWord, joinSymbols, labelWriting, lineAcross, marksOf, mean, ownWords, rolesOf, symbolOf, writingOf } from './graph-kit';
+import { centreOf, countWord, joinSymbols, joinsTwo, labelWriting, lineAcross, marksOf, mean, ownWords, rolesOf, symbolOf, writingOf } from './graph-kit';
 import { insideOf, isBox, portsFor, stateShape } from './state';
 
 // ===== The table — the ER diagram's content =====
@@ -255,6 +255,7 @@ export function readEr(state: SessionState, scopeIds?: readonly string[]): ErRea
   const closed = new Map<string, Candidate>();
   const writing = new Set<string>();
   const open: string[] = [];
+  const small: string[] = [];
   const tiny = (id: string) => {
     const b = boundsOf(nodes.get(id)!);
     const scale = (getRep(nodes.get(id)!, 'stroke')?.data as { scale?: number } | undefined)?.scale ?? 1;
@@ -273,7 +274,8 @@ export function readEr(state: SessionState, scopeIds?: readonly string[]): ErRea
       else if (writingOf(m.node) || tiny(m.id)) writing.add(m.id);
       continue;
     }
-    if (writingOf(m.node) || tiny(m.id)) writing.add(m.id);
+    if (writingOf(m.node)) writing.add(m.id);
+    else if (tiny(m.id)) small.push(m.id);
     else open.push(m.id);
   }
   // Boxes ruled in several strokes.
@@ -292,6 +294,11 @@ export function readEr(state: SessionState, scopeIds?: readonly string[]): ErRea
   const containers = new Set<Candidate>();
   for (const a of boxes) for (const b of boxes) if (a !== b && insideOf(a, b)) containers.add(a);
   const candidates = boxes.filter((c) => !containers.has(c));
+  // A stroke as small as a letter that joins two boxes is a relationship between two close ones, not writing.
+  for (const id of small) {
+    if (joinsTwo(strokePointsOf(nodes.get(id)!) ?? [], candidates)) open.push(id);
+    else writing.add(id);
+  }
   const lines = open.filter((id) => !inFigure.has(id) && resemblances(nodes.get(id)!)[0]?.to !== 'type:arrow');
   const compartmented = (c: Candidate) => lines.some((id) => lineAcross(c, strokePointsOf(nodes.get(id)!) ?? []));
   const classLike = candidates.filter(compartmented);

@@ -52,7 +52,7 @@ import { MAX_TIER0_CONFIDENCE } from '../recognition';
 import type { Notation, NotationConnector, NotationReading, NotationSymbol } from './notation';
 import type { Candidate } from './flowchart';
 import { figureCandidate, mayBeSide, strokeCandidate } from './flowchart';
-import { centreOf, countWord, joinSymbols, labelWriting, lineAcross, marksOf, mean, ownWords, rolesOf, symbolOf, writingOf } from './graph-kit';
+import { centreOf, countWord, joinSymbols, joinsTwo, labelWriting, lineAcross, marksOf, mean, ownWords, rolesOf, symbolOf, writingOf } from './graph-kit';
 import { insideOf, isBox, isForeign, isRound, portsFor, stateShape } from './state';
 
 // ===== The table — the mind map's content =====
@@ -233,6 +233,7 @@ export function readMindMap(state: SessionState, scopeIds?: readonly string[]): 
   const closed = new Map<string, Candidate>();
   const writing = new Set<string>();
   const open: string[] = [];
+  const small: string[] = [];
   const tiny = (id: string) => {
     const b = boundsOf(nodes.get(id)!);
     const scale = (getRep(nodes.get(id)!, 'stroke')?.data as { scale?: number } | undefined)?.scale ?? 1;
@@ -251,7 +252,8 @@ export function readMindMap(state: SessionState, scopeIds?: readonly string[]): 
       else if (writingOf(m.node) || tiny(m.id)) writing.add(m.id);
       continue;
     }
-    if (writingOf(m.node) || tiny(m.id)) writing.add(m.id);
+    if (writingOf(m.node)) writing.add(m.id);
+    else if (tiny(m.id)) small.push(m.id);
     else open.push(m.id);
   }
   // Boxes ruled in several strokes.
@@ -269,6 +271,11 @@ export function readMindMap(state: SessionState, scopeIds?: readonly string[]): 
   if (shapes.length < 3) return null;
   const containers = new Set<Candidate>();
   for (const a of shapes) for (const b of shapes) if (a !== b && insideOf(a, b)) containers.add(a);
+  // A stroke as small as a letter that joins two shapes is a branch between two close ones, not writing.
+  for (const id of small) {
+    if (joinsTwo(strokePointsOf(nodes.get(id)!) ?? [], shapes.filter((c) => !containers.has(c)))) open.push(id);
+    else writing.add(id);
+  }
   const lines = open.filter((id) => !inFigure.has(id) && resemblances(nodes.get(id)!)[0]?.to !== 'type:arrow');
   const classLike = shapes.filter((c) => !containers.has(c) && lines.some((id) => lineAcross(c, strokePointsOf(nodes.get(id)!) ?? [])));
   const candidates = shapes.filter((c) => !containers.has(c) && !classLike.includes(c));

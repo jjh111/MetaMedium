@@ -370,6 +370,18 @@ export function lineAcross(c: Candidate, ink: readonly Point[]): boolean {
   return within >= INSIDE_SHARE && Math.max(b.maxX - b.minX, b.maxY - b.minY) >= 0.5 * short;
 }
 
+/**
+ * Whether an open stroke joins two different symbols: each end lands on one
+ * within its reach. A short line between two close shapes is as small as a
+ * letter, and is the branch it is by what it joins — never writing.
+ */
+export function joinsTwo(ink: readonly Point[], symbols: readonly Candidate[]): boolean {
+  if (ink.length < 2) return false;
+  const landed = (p: Point) => symbols.find((c) => offBox(p, c.outline.bounds) <= reachOfSymbol(c) && outside(p, c.outline.hull) <= reachOfSymbol(c));
+  const a = landed(ink[0]), b = landed(ink[ink.length - 1]);
+  return !!a && !!b && a !== b;
+}
+
 /** What a piece of writing says for a writer: its read words, then the placeholder once for any piece not read — unless the surface reads it with its line (`readWith`). Null when there is none. */
 export function saidWriting(w: { text?: string; unread: readonly string[] } | undefined, opts: MermaidOptions): { text: string | null; unread: string[] } {
   if (!w) return { text: null, unread: [] };
