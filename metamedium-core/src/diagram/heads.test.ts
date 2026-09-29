@@ -310,6 +310,29 @@ describe('what is not a head', () => {
     expect(headsOf(s.getState(), c.id)!.end.heads).toEqual([]);
   });
 
+  it('a head’s fill is the head’s, never given to the box beside it (D4)', () => {
+    // A composition: a relation long beside its class, and a diamond hatched at
+    // its end that a hand drew against the class's box, its far vertex a little
+    // inside it. The box is small enough beside a long relation to be a
+    // candidate at the end, and the first closed mark the end lies within: it
+    // took the diamond and its hatch as ITS fill, so the diamond read hollow —
+    // or as nothing (D4: heads.ts gave the fill to the first closed mark it lay
+    // within, which on a relation long beside its class is the class's own box).
+    for (const boxFirst of [true, false]) {
+      const s = createSession();
+      const end = { x: 100 + 300 * 2, y: 200 };
+      const box = () => s.addStroke(rectStroke(end.x + 10, 140, 200, 120), boxFirst ? 500 : 9500);
+      if (boxFirst) box();
+      const id = s.addStroke(lineStroke({ x: 100, y: 200 }, end, 60), 1000);
+      const outline = s.addStroke(closed(diamondAt(end)), 5000);
+      const fill = s.addStroke(hatch(diamondAt(end), 6), 9000);
+      if (!boxFirst) box();
+      const heads = headsOf(s.getState(), id)!.end.heads;
+      expect(heads[0], `box ${boxFirst ? 'first' : 'last'}: ${heads.map((h) => `${h.kind}${h.filled ? ' filled' : ''}`).join(', ')}`).toMatchObject({ kind: 'diamond', filled: true });
+      expect(heads[0].ids.sort()).toEqual([outline, fill].sort());
+    }
+  });
+
   it('a small mark beside the end, off the line’s axis, is not a head', () => {
     const s = createSession();
     const c = connector(s);
