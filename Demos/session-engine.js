@@ -4744,6 +4744,7 @@
 // Provides: the field's QUERY, pure — readFieldCommand (what Enter will do, as a named
 //   command record), and the two matchers it stands on (verbFor, libraryMatch), plus
 //   the prefix pattern (FIELD_PREFIXES), the sum (`= 24 ÷ 3`, read by readSum — DIRECTOR-PLAN-W2 M5)
+//   notationWords (a notation's reading in the person's words, N1),
 //   and typedWord (the word a typed text offers to name the selection with, or to label the
 //   person's own ink with — V1-PLAN L2e), and
 //   the words for another hand's marks a label will not go on (theirMarks, madeThese).
@@ -4784,6 +4785,8 @@
    * @property {string} [enter]     what Enter does when this item leads, said in the line
    *                                 instead of "take it as the name" (W2: writing is read)
    * @property {*} [asks]           truthy when taking it asks a model: the line carries the dot
+   * @property {string} [notation]  a reading of what the marks ARE as a diagram (a notation's id): a
+   *                                 reading, but never a name — the line does not offer it as one (N1)
    *
    * @typedef {Object} FieldContext  everything the reader is allowed to know
    * @property {string} text          what has been typed, untrimmed
@@ -4855,6 +4858,23 @@
   }
 
   /**
+   * Pure: a notation's reading, said in the person's words (V1-PLAN §3 Reading, N1). Core says a
+   * reading in one line (`describeNotation`: "a UML class diagram 0.49 — three classes, one
+   * composition"); the field shows its short name and number, the tooltip its sentence, and the
+   * panel *is* the two joined by a colon. A person says "a class diagram", never "UML".
+   * @param {string} described  `MM.describeNotation(reading)`
+   * @returns {{name:string, conf:string, label:string, said:string, is:string}}
+   */
+  function notationWords(described) {
+    const cut = String(described || '').indexOf(' — ');
+    const head = (cut < 0 ? String(described || '') : described.slice(0, cut)).replace(/^(an?) UML /, '$1 ');
+    const said = cut < 0 ? '' : described.slice(cut + 3);
+    const m = /^(.*\S)\s+(\d(?:\.\d+)?)$/.exec(head);
+    const name = m ? m[1] : head, conf = m ? m[2] : '';
+    return { name: name, conf: conf, label: conf ? name + ' ' + conf : name, said: said, is: said ? name + ': ' + said : name };
+  }
+
+  /**
    * Pure: every offer, visible or hidden, that the typed text names — by an alias or by
    * the start of its label.
    * @param {string} q
@@ -4923,7 +4943,10 @@
         if (act.asks) out.model = true;
         return out;
       }
-      if (items.some((i) => i.certain)) return { kind: 'empty', line: '↵ nothing yet — tap a reading to take it as the name', quiet: true, command: null };
+      // A notation's reading (a flowchart, a class diagram) is what the marks are, not a name to give them:
+      // with only such readings the line says a tap uses one, not that it names anything (N1).
+      if (items.some((i) => i.certain && !i.notation)) return { kind: 'empty', line: '↵ nothing yet — tap a reading to take it as the name', quiet: true, command: null };
+      if (items.some((i) => i.certain)) return { kind: 'empty', line: '↵ nothing yet — tap a reading to use it', quiet: true, command: null };
       return { kind: 'empty', line: '', quiet: true, command: null };
     }
 
@@ -5163,6 +5186,40 @@
     return item;
   }
 
+  // ===== What the marks are as a diagram: the notations' readings (V1-PLAN §3 Reading, N1) =====
+  // Each notation that reads the held marks above its floor — a flowchart, a class diagram, a sequence
+  // diagram, a state diagram, an ER diagram, a mind map — plural and ranked, read ONCE while the log stands
+  // (R4c: `logKey`, so an undo leaves no stale reading) and shared by the field's row and the panel. A
+  // reading is what the marks ARE, never a name for a definition: Enter does not take it (09-field.js), and
+  // a tap on the one Mermaid can be written from is Make it Mermaid, in that notation.
+  let notationKept = { key: null, read: null };
+  let notationReadCount = 0; // reads that were not the kept one, for a test
+  function notationsHeld(marks) {
+    const key = logKey() + '|' + marks.join(',');
+    if (!paintReference && notationKept.key === key) return notationKept.read;
+    const st = session.getState();
+    // A drawing is two marks or more and no artifact: a page or a text is not read as one (the Mermaid tool's own rule).
+    const noDrawing = marks.length < 2 || marks.some((id) => st.artifacts.includes(id));
+    if (!noDrawing) notationReadCount++;
+    const read = noDrawing ? [] : MM.notationsOf(st, marks).filter((r) => r.confidence >= MM.NOTATION_FLOOR);
+    if (!paintReference) notationKept = { key: key, read: read };
+    return read;
+  }
+
+  /** A notation's reading as a row of the field: its short name and number, the sentence its tooltip, a tap that writes its Mermaid where it can and otherwise says it. */
+  function notationItem(r, offers) {
+    const w = notationWords(MM.describeNotation(r));
+    const mer = offers.find((i) => i.key === 'mermaid');
+    const writes = !!mer && !!mer.offer.data && mer.offer.data.notation === r.notation;
+    return readingItem({
+      key: 'notation:' + r.notation, notation: r.notation,
+      grounds: { on: 'notation', confidence: r.confidence, why: r.reason },
+      label: w.label,
+      why: w.label + (w.said ? ' — ' + w.said : '') + ' — ' + (writes ? 'tap to write it as Mermaid text beside it; the drawing stays' : 'tap to say it in the status line'),
+      run: () => { if (writes) takeOffer(mer.offer); else say(w.label + (w.said ? ' — ' + w.said : '')); },
+    });
+  }
+
   function conversionsFor(s) {
     const sum = s.summon;
     const scope = paletteScope = fieldScope(s, '', null);
@@ -5257,6 +5314,8 @@
 
     // --- What it AFFORDS: every tool's offer for this scope, in the registry's order. ---
     const offers = MM.offersFor(scope).map(offerItem);
+    // What the marks are as a diagram: each notation above the floor, ranked with the rest of the readings (N1).
+    const notated = notationsHeld(marks).map((r) => notationItem(r, offers));
     // An act as particular to these marks as a reading (Fold “…” into the text)
     // stands with the readings, where it always stood: after the line it takes.
     const lead = offers.filter((i) => i.certain);
@@ -5282,7 +5341,7 @@
       if (concept) conceived.splice(at, 1, reads); else conceived.unshift(reads);
       for (const i of offers) if (i.key === 'read' || i.key === 'what') i.group = 'hidden';
     }
-    const items = known.concat(lined, lead, worded, proposed, conceived, offers.filter((i) => !i.certain));
+    const items = known.concat(lined, lead, worded, proposed, notated, conceived, offers.filter((i) => !i.certain));
     // A pill that asks a model none here can answer says what it needs, inline, while it is pointed at (J5).
     for (const it of items) {
       if (it.asks !== 'model' || it.line) continue;
@@ -6789,6 +6848,18 @@
     // Writing becomes what Enter does with it: read, then text, a name or a label (W2, U2's walk).
     const shapes0 = ids.map((id) => MM.topInterpretation(s.nodes.get(id))).filter(Boolean);
     if (shapes0.length && shapes0.every((x) => x === 'text')) return { here: 'writing' + (concept && concept.concept === 'writing' ? ' ' + concept.confidence.toFixed(2) : ''), next: 'read it · then text, a name or a label' };
+    // A drawing that reads as a diagram says which (V1-PLAN §3 Reading, N1): the first reading is what it is,
+    // any other above the floor is said beside it; what it becomes is Mermaid, or tidied, or a name.
+    const notated = notationsHeld(ids.filter((id) => s.contentIds.includes(id)));
+    if (notated.length) {
+      const words = notated.map((r) => notationWords(MM.describeNotation(r)));
+      const offered = (key) => paletteItems.some((i) => i.key === key);
+      return {
+        here: words[0].name,
+        is: words[0].is + (words.length > 1 ? ' · or ' + words.slice(1).map((x) => x.label).join(', ') : ''),
+        next: (offered('mermaid') ? 'Make it Mermaid · ' : '') + (offered('snap') ? 'draw them clean · ' : '') + 'a name',
+      };
+    }
     // Show it in 3D only when the field offers it: circles joined by lines (U1d).
     if (genre === 'graph' || genre === 'mixed') return { here: 'a structure, a graph' + (concept ? ' (' + concept.concept + ')' : ''), next: (paletteItems.some((i) => i.key === '3d') ? 'Show it in 3D · ' : '') + 'a brief builds the diagram, then a model writes the words' };
     if (genre === 'layout') return { here: 'a structure, a layout' + (concept ? ' (' + concept.concept + ')' : ''), next: 'a brief builds the page at once, then a model writes the words' };
@@ -6823,7 +6894,8 @@
     const mathsSays = mathsPanel(s, sum.enclosedIds);
     // Where this stands on the map of becoming, and the rung after it (SURFACE-v10-PLAN §4).
     const rung = becomesOf(s, sum, reading);
-    if (rung) top += '<div class="row"><span class="k">becomes</span><span class="v">' + esc(rung.here + ' → ' + rung.next) + '</span></div>';
+    if (rung && rung.is) top += '<div class="row"><span class="k">is</span><span class="v">' + esc(rung.is) + '</span></div><div class="row"><span class="k">becomes</span><span class="v">' + esc(rung.next) + '</span></div>';
+    else if (rung) top += '<div class="row"><span class="k">becomes</span><span class="v">' + esc(rung.here + ' → ' + rung.next) + '</span></div>';
     // What stands beside it, and what that put first (V1-PLAN §2.2). Said only
     // when something does: far from any context the panel is as it was.
     const beside = contextFor(sum.enclosedIds);
@@ -12288,6 +12360,8 @@
     },
     // What stands beside the open field's marks (V1-PLAN §2.2, B2), and the tops the contexts hold, for tests.
     paletteContext: () => (session.getState().summon ? paletteContext : null),
+    // How many times the held marks were read for notations (N1): once while the log stands, shared by the field and the panel.
+    notationReads: () => notationReadCount,
     steadyTops: () => [...steadyTops].map(([k, v]) => ({ context: k, key: v.key, at: v.at })),
     usesHere: () => JSON.parse(JSON.stringify(usesHere)),
     // The worker runtime, for tests: what is loaded, where each body is, what broke.

@@ -24648,6 +24648,8 @@ function baseOn(grounds) {
       return 1.2 + 0.1 * c;
     case "clean":
       return 0.6 + 0.35 * c;
+    case "notation":
+      return 0.75 + 0.4 * c;
     default:
       return 0.5 + 0.45 * c;
   }

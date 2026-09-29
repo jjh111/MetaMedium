@@ -4526,6 +4526,155 @@ window.__scenario = async function(){
     mm.session.load([]);
   }
 
+  // ---- 67. The diagram notations read on the surface (V1-PLAN §3 Reading, N1; acceptance A1–A3) ----
+  // A drawing held that reads as a notation — a flowchart, a class diagram, a sequence diagram, a state
+  // diagram, an ER diagram, a mind map — says so where the person looks: the field's "what this is" row
+  // leads with the reading in a short name (*a class diagram 0.92*; the full sentence is the tooltip), and
+  // the panel's *is* and *becomes* rows say it in plain words. Readings are plural and ranked, above the
+  // notations' floor; a reading is not a name (Enter never takes it as one), and tapping the one Mermaid
+  // can be written from is Make it Mermaid. Each drawing is a Mermaid text drawn as ink by the engine
+  // (`drawMermaid`), so the drawing is what a hand's would be; a held scope is read once per log.
+  {
+    const FLOW67 = 'flowchart TD\n    a["Start"] --> b{"Ok?"}\n    b --> c["Go"]\n    b --> d["Stop"]\n';
+    const CLASS67 = 'classDiagram\n    direction LR\n    class c1["Customer"] {\n        +name: String\n    }\n    class c2["Order"] {\n        +date: Date\n        +total() Money\n    }\n    class c3["Item"]\n    c1 "1" --> "*" c2 : places\n    c2 "1" *-- "1..*" c3\n';
+    const SEQ67 = 'sequenceDiagram\n    actor u1 as Customer\n    participant u2 as Shop\n    actor u3 as Courier\n    u1->>u2: order\n    u2->>u3: ship\n    u3-->>u1: deliver\n';
+    const STATE67 = 'stateDiagram-v2\n    state "Idle" as a1\n    state "Working" as a2\n    state "Blocked" as a3\n    state "Done" as a4\n    [*] --> a1\n    a1 --> a2: start\n    a2 --> a2: tick\n    a2 --> a3: wait\n    a2 --> a4: finish\n    a3 --> a2: resume\n    a4 --> [*]\n';
+    const ER67 = 'erDiagram\n    a1["Author"]\n    a2["Book"]\n    a3["Review"]\n    a4["Shelf"]\n    a1 ||--o{ a2 : "writes"\n    a2 ||--|{ a3 : "gets"\n    a2 |o--o| a4 : "sits on"\n';
+    const MIND67 = 'mindmap\n    a1(("Plan"))\n        a2["Read"]\n            a4["Books"]\n            a5["Papers"]\n        a3(("Write"))\n            a6["Draft"]\n        a7["Ship"]\n';
+    // The person's short name for each notation (the reading's own is "UML class diagram").
+    const SAYS67 = { flowchart: 'a flowchart', 'uml-class': 'a class diagram', sequence: 'a sequence diagram', state: 'a state diagram', er: 'an ER diagram', mindmap: 'a mind map' };
+    const fresh67 = () => {
+      const sm = mm.session.getState().summon; if (sm) mm.session.dismiss(sm.id, Date.now());
+      mm.session.load([]); mm.setView(1, 0, 0); mm.resetUses(); mm.mermaidFrom(null);
+    };
+    const draw67 = (text, origin) => {
+      const before = new Set(mm.session.getState().contentIds);
+      mm.session.withTool('e2e', () => MM.drawMermaid(mm.session, text, { at: Date.now(), scale: 1, origin: origin }));
+      return mm.session.getState().contentIds.filter((id) => !before.has(id));
+    };
+    const hold67 = async (ids) => {
+      const sm = mm.session.getState().summon; if (sm) mm.session.dismiss(sm.id, Date.now());
+      mm.session.summonMarks(ids.slice(), Date.now()); await wait(90);
+    };
+    const certain67 = () => [...document.querySelectorAll('#summon .row.certain .pill')];
+    const notes67 = () => certain67().filter((b) => /^notation:/.test(b.dataset.key || ''));
+    const panel67 = () => document.getElementById('inspector').textContent;
+    const said67 = (r) => MM.describeNotation(r).split(' — ').slice(1).join(' — ');
+    const each67 = [
+      ['67. a flowchart held reads as one: the field leads with a flowchart, the sentence its tooltip, and the panel says what it is and what it becomes', 'flowchart', FLOW67],
+      ['67a. a class diagram held: a class diagram, in the person\'s words — not "UML" — first', 'uml-class', CLASS67],
+      ['67b. a sequence diagram held: a sequence diagram first', 'sequence', SEQ67],
+      ['67c. a state diagram held: a state diagram first, the flowchart it also reads as behind it', 'state', STATE67],
+      ['67d. an ER diagram held: an ER diagram first', 'er', ER67],
+      ['67e. a mind map held: a mind map first', 'mindmap', MIND67],
+    ];
+    for (const [name, id, text] of each67) {
+      fresh67();
+      const ids = draw67(text);
+      await hold67(ids);
+      const read = MM.notationsOf(mm.session.getState(), ids);
+      const first = certain67()[0];
+      const label = first ? first.textContent.trim() : '';
+      const p = panel67();
+      const short = SAYS67[id];
+      const isRow = new RegExp('is\\s*' + short + ': ' + (read[0] ? said67(read[0]).replace(/[()*+?.]/g, '\\$&') : '')).test(p);
+      step(name,
+        !!read[0] && read[0].notation === id && !!first && first.dataset.key === 'notation:' + id &&
+          new RegExp('^' + short + ' 0\\.\\d\\d$').test(label) && first.title.includes(said67(read[0])) && !/UML/.test(label) &&
+          isRow && /becomes\s*Make it Mermaid/.test(p),
+        { read: read.map(MM.describeNotation), first: label, title: first && first.title, panel: (p.match(/holds[\s\S]{0,260}/) || [''])[0] });
+    }
+
+    // Plural and ranked: a flowchart drawn beside a class diagram, both held, reads as both — the likelier first.
+    fresh67();
+    const flowIds67 = draw67(FLOW67);
+    const classIds67 = draw67(CLASS67, { x: 1500, y: 0 });
+    const both67 = flowIds67.concat(classIds67);
+    await hold67(both67);
+    const readBoth67 = MM.notationsOf(mm.session.getState(), both67).filter((r) => r.confidence >= MM.NOTATION_FLOOR);
+    const pills67 = notes67();
+    const confs67 = pills67.map((b) => Number((b.textContent.match(/0\.\d\d/) || ['0'])[0]));
+    const panelBoth67 = panel67();
+    step('67f. a flowchart beside a class diagram, both held, reads as both, ranked — the likelier first, each with its number, and the panel says the first and the other',
+      readBoth67.length >= 2 && pills67.length === readBoth67.length && pills67.map((b) => b.dataset.key).join() === readBoth67.map((r) => 'notation:' + r.notation).join() &&
+        confs67.every((c, i) => i === 0 || confs67[i - 1] >= c) && pills67.some((b) => /^a flowchart /.test(b.textContent.trim())) && pills67.some((b) => /^a class diagram /.test(b.textContent.trim())) &&
+        /is\s*a (class diagram|flowchart): /.test(panelBoth67) && /or a (flowchart|class diagram) 0\.\d\d/.test(panelBoth67),
+      { read: readBoth67.map(MM.describeNotation), pills: pills67.map((b) => b.textContent.trim()), panel: (panelBoth67.match(/holds[\s\S]{0,300}/) || [''])[0] });
+
+    // A reading is not a name: Enter takes the likely act and names nothing; the line does not offer the reading as a name.
+    fresh67();
+    const flow67 = draw67(FLOW67);
+    await hold67(flow67);
+    const line67 = t.readingLine();
+    const blessed67 = () => mm.session.getEvents().filter((e) => e.type === 'bless').length;
+    const bless0 = blessed67();
+    t.typeEnter(''); await wait(80);
+    step('67g. with a flowchart held, ↵ is the likely act and never the reading as a name: the line names an act, and Enter blesses nothing',
+      /^↵ \S/.test(line67) && !/flowchart/i.test(line67) && !/as the name|name it/.test(line67) && blessed67() === bless0,
+      { line: line67, blessed: blessed67() - bless0 });
+
+    // Tapping the reading Mermaid can be written from is Make it Mermaid, in that notation: the text beside the drawing, one act.
+    fresh67();
+    const flowT67 = draw67(FLOW67);
+    await hold67(flowT67);
+    const events67 = mm.session.getEvents().length;
+    const tap67 = notes67().find((b) => b.dataset.key === 'notation:flowchart');
+    const wantText67 = MM.toMermaid(MM.notationsOf(mm.session.getState(), flowT67)[0]);
+    if (tap67) tap67.click();
+    await wait(80);
+    const st67 = mm.session.getState();
+    const mer67 = st67.artifacts.map((id) => codeRepOfNode(st67.nodes.get(id))).filter((r) => r && r.data.kind === 'mermaid');
+    const acts67 = new Set(mm.session.getEvents().slice(events67).filter((e) => e.type !== 'dismiss' && e.type !== 'deselect').map((e) => e.act));
+    step('67h. tapping a flowchart reading takes Make it Mermaid in that notation: the text the notation says stands beside the drawing, in one act, and one undo takes it away — no name is given',
+      !!tap67 && mer67.length === 1 && !!wantText67 && mer67[0].data.code === wantText67.text && acts67.size === 1 && !st67.artifacts.some((id) => MM.wordOf(st67.nodes.get(id)) === 'flowchart') && (mm.session.undo(), mm.session.getState().artifacts.length === 0),
+      { tapped: !!tap67, artifacts: mer67.length, code: mer67[0] && mer67[0].data.code, acts: [...acts67] });
+
+    // The runner-up is said, not made: Make it Mermaid writes the likeliest reading, and a tap on the other says its sentence.
+    fresh67();
+    const fl2 = draw67(FLOW67);
+    const cl2 = draw67(CLASS67, { x: 1500, y: 0 });
+    await hold67(fl2.concat(cl2));
+    const runner67 = notes67()[1];
+    const events67b = mm.session.getEvents().length;
+    if (runner67) runner67.click();
+    await wait(60);
+    const status67 = document.getElementById('status').textContent;
+    step('67i. a tap on the reading Mermaid is not written from says it in the status line and writes nothing',
+      !!runner67 && mm.session.getEvents().length === events67b && /flowchart/.test(status67) && mm.session.getState().artifacts.length === 0,
+      { runner: runner67 && runner67.textContent.trim(), status: status67, events: mm.session.getEvents().length - events67b });
+
+    // What is not a diagram reads as none: a row of boxes and a molecule leave the row as e2e 49 holds it.
+    fresh67();
+    const row67 = [];
+    for (const [x, y] of [[200, 200], [360, 204], [520, 200]]) { t.stroke(t.rect(x, y, 120, 80)); row67.push(mm.session.getState().contentIds.slice(-1)[0]); }
+    await hold67(row67);
+    const rowNotes67 = notes67().length, rowPanel67 = panel67();
+    fresh67();
+    const mol67 = [];
+    for (const [x, y] of [[300, 300], [500, 300], [400, 460]]) { t.stroke(t.circle(x, y, 40)); mol67.push(mm.session.getState().contentIds.slice(-1)[0]); }
+    t.stroke(t.line({ x: 340, y: 300 }, { x: 460, y: 300 }, 30)); mol67.push(mm.session.getState().contentIds.slice(-1)[0]);
+    t.stroke(t.line({ x: 328, y: 328 }, { x: 372, y: 432 }, 30)); mol67.push(mm.session.getState().contentIds.slice(-1)[0]);
+    await hold67(mol67);
+    step('67j. a row of boxes and a molecule read as no notation: no reading in the row, no notation said in the panel',
+      rowNotes67 === 0 && notes67().length === 0 && !/is\s*an? (flowchart|class diagram|sequence diagram|state diagram|ER diagram|mind map)/.test(rowPanel67 + panel67()),
+      { row: rowNotes67, molecule: notes67().length });
+
+    // Read once per log: the field and the panel share one read of the held scope, and a repaint reads nothing again.
+    fresh67();
+    const flowC67 = draw67(FLOW67);
+    const reads67 = () => (mm.notationReads ? mm.notationReads() : -1);
+    const n0 = reads67();
+    await hold67(flowC67);
+    const afterHold67 = reads67() - n0;
+    mm.setView(1, 30, 20); await wait(60); mm.setView(1, 0, 0); await wait(60);
+    for (const [x, y] of [[300, 120], [320, 140], [340, 160]]) document.getElementById('canvas').dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons: 0 }));
+    await wait(60);
+    const afterRepaint67 = reads67() - n0;
+    step('67k. the held scope is read for notations once while the log stands — the field and the panel share it, and a pan and a repaint read nothing again',
+      afterHold67 === 1 && afterRepaint67 === 1, { afterHold: afterHold67, afterRepaint: afterRepaint67 });
+    fresh67();
+  }
+
   return R;
 };
 

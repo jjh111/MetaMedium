@@ -21,8 +21,8 @@ import { fileURLToPath } from 'node:url';
 import * as MM from '../metamedium-core.node.mjs';
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '09-field.js'), 'utf8');
-const { readFieldCommand, verbFor, libraryMatch, typedWord, theirMarks, madeThese } = new Function(
-  src + '\n  return { readFieldCommand, verbFor, libraryMatch, typedWord, theirMarks, madeThese };'
+const { readFieldCommand, verbFor, libraryMatch, typedWord, theirMarks, madeThese, notationWords } = new Function(
+  src + '\n  return { readFieldCommand, verbFor, libraryMatch, typedWord, theirMarks, madeThese, notationWords };'
 )();
 
 /** A board with nothing on it but the four core verbs and one reading. */
@@ -468,4 +468,36 @@ test('= against the board: a name the page defines', () => {
   const r = readFieldCommand(ctx({ text: '= A ÷ 3', maths }));
   assert.equal(r.kind, 'maths');
   assert.match(r.line, /^↵ A ÷ 3 = 12/);
+});
+
+// A notation's reading, in the person's words (V1-PLAN §3 Reading, N1): core says it in one line
+// (`describeNotation`); the field and the panel say its short name, its number and its sentence apart.
+test('notationWords: a reading said in the person\'s words — no UML, the number apart, the sentence for the tooltip', () => {
+  const flow = notationWords('a flowchart 0.92 — three processes, one decision, three flows');
+  assert.deepEqual(flow, { name: 'a flowchart', conf: '0.92', label: 'a flowchart 0.92', said: 'three processes, one decision, three flows', is: 'a flowchart: three processes, one decision, three flows' });
+  const cls = notationWords('a UML class diagram 0.49 — three classes, one composition');
+  assert.equal(cls.name, 'a class diagram');
+  assert.equal(cls.label, 'a class diagram 0.49');
+  assert.equal(cls.is, 'a class diagram: three classes, one composition');
+  assert.equal(notationWords('an ER diagram 0.67 — four entities').label, 'an ER diagram 0.67');
+  assert.equal(notationWords('a mind map 0.72').said, '', 'a reading with no sentence says none');
+  assert.equal(notationWords('a mind map 0.72').is, 'a mind map');
+});
+
+test('a notation reading is never what Enter takes: with only readings held Enter does nothing, and the line says a tap uses one', () => {
+  const only = [
+    { key: 'notation:flowchart', certain: true, notation: 'flowchart', label: 'a flowchart 0.84', why: 'a flowchart 0.84 — three processes' },
+    { key: 'name', label: 'Name…', verbs: [], why: 'Name — hold it as a thing you can use again' },
+  ];
+  const r = readFieldCommand(ctx({ items: only }));
+  assert.equal(r.command, null);
+  assert.equal(r.quiet, true);
+  assert.match(r.line, /tap a reading/);
+  assert.doesNotMatch(r.line, /as the name/, 'a notation reading is not a name');
+  // Beside a reading that IS a name, the old line stands.
+  const named = readFieldCommand(ctx({ items: [only[0], { key: 'sug:1', certain: true, name: 'molecule', label: 'molecule 0.92', why: 'x' }, only[1]] }));
+  assert.match(named.line, /take it as the name/);
+  // And the likely act is the first act, with a notation reading first in the row.
+  const act = readFieldCommand(ctx({ items: [only[0], ITEMS[1]] }));
+  assert.equal(act.command.key, 'snap');
 });

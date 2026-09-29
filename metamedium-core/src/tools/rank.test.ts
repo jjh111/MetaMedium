@@ -18,6 +18,14 @@ describe('the field’s order', () => {
     expect(baseOn({ on: 'row', confidence: 0.83 })).toBe(0.5 + 0.45 * 0.83);
   });
 
+  it('a notation — the whole drawing read as a flowchart — outranks the concept it is built of, and stays under what the hand named, wrote or a model read', () => {
+    // From the notations' floor up a notation stands with the firmest concept it is made of, and a flowchart at the bench's 0.78 leads the flow at 0.90 (N1).
+    expect(baseOn({ on: 'notation', confidence: 0.78 })).toBeGreaterThan(baseOn({ on: 'flow', confidence: 0.9 }));
+    expect(baseOn({ on: 'notation', confidence: 0.5 })).toBeGreaterThanOrEqual(baseOn({ on: 'flow', confidence: 1 }) - 1e-12);
+    expect(baseOn({ on: 'notation', confidence: 1 })).toBeLessThan(baseOn({ on: 'proposed', confidence: 0 }));
+    expect(isSpecific({ grounds: { on: 'notation', confidence: 0.8 } })).toBe(false);
+  });
+
   it('asking a model costs a little; a seat is asked like the canvas', () => {
     expect(likelihoodOf(item('what', 0.36, { asks: 'model' }))).toBe(0.36 * MODEL_DISCOUNT);
     expect(likelihoodOf(item('decide', 0.36, { asks: 'seat' }))).toBe(0.36);

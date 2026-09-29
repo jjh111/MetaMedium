@@ -48,9 +48,12 @@ export interface Rankable {
 
 /**
  * The base likelihood of an item standing on a reading of these marks:
- * `known` 1.4, `written` 1.35, `proposed` 1.2 + 0.1c, `clean` 0.6 + 0.35c, and
- * a concept — a row, a flow, writing — 0.5 + 0.45c, for its own reading and
- * for each conversion it affords.
+ * `known` 1.4, `written` 1.35, `proposed` 1.2 + 0.1c, a notation — the whole
+ * drawing read as a flowchart or a class diagram — 0.75 + 0.4c, `clean`
+ * 0.6 + 0.35c, and a concept — a row, a flow, writing — 0.5 + 0.45c, for its
+ * own reading and for each conversion it affords. A notation is a reading of
+ * what a drawing IS, made of the concepts it holds, so from the notations'
+ * floor up it stands with the firmest of them and under what a model read.
  */
 export function baseOn(grounds: Pick<Grounds, 'on' | 'confidence'>): number {
   const c = grounds.confidence || 0;
@@ -59,6 +62,7 @@ export function baseOn(grounds: Pick<Grounds, 'on' | 'confidence'>): number {
     case 'written': return 1.35;
     case 'proposed': return 1.2 + 0.1 * c;
     case 'clean': return 0.6 + 0.35 * c;
+    case 'notation': return 0.75 + 0.4 * c;
     default: return 0.5 + 0.45 * c;
   }
 }

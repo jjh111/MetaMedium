@@ -91,6 +91,40 @@
     return item;
   }
 
+  // ===== What the marks are as a diagram: the notations' readings (V1-PLAN §3 Reading, N1) =====
+  // Each notation that reads the held marks above its floor — a flowchart, a class diagram, a sequence
+  // diagram, a state diagram, an ER diagram, a mind map — plural and ranked, read ONCE while the log stands
+  // (R4c: `logKey`, so an undo leaves no stale reading) and shared by the field's row and the panel. A
+  // reading is what the marks ARE, never a name for a definition: Enter does not take it (09-field.js), and
+  // a tap on the one Mermaid can be written from is Make it Mermaid, in that notation.
+  let notationKept = { key: null, read: null };
+  let notationReadCount = 0; // reads that were not the kept one, for a test
+  function notationsHeld(marks) {
+    const key = logKey() + '|' + marks.join(',');
+    if (!paintReference && notationKept.key === key) return notationKept.read;
+    const st = session.getState();
+    // A drawing is two marks or more and no artifact: a page or a text is not read as one (the Mermaid tool's own rule).
+    const noDrawing = marks.length < 2 || marks.some((id) => st.artifacts.includes(id));
+    if (!noDrawing) notationReadCount++;
+    const read = noDrawing ? [] : MM.notationsOf(st, marks).filter((r) => r.confidence >= MM.NOTATION_FLOOR);
+    if (!paintReference) notationKept = { key: key, read: read };
+    return read;
+  }
+
+  /** A notation's reading as a row of the field: its short name and number, the sentence its tooltip, a tap that writes its Mermaid where it can and otherwise says it. */
+  function notationItem(r, offers) {
+    const w = notationWords(MM.describeNotation(r));
+    const mer = offers.find((i) => i.key === 'mermaid');
+    const writes = !!mer && !!mer.offer.data && mer.offer.data.notation === r.notation;
+    return readingItem({
+      key: 'notation:' + r.notation, notation: r.notation,
+      grounds: { on: 'notation', confidence: r.confidence, why: r.reason },
+      label: w.label,
+      why: w.label + (w.said ? ' — ' + w.said : '') + ' — ' + (writes ? 'tap to write it as Mermaid text beside it; the drawing stays' : 'tap to say it in the status line'),
+      run: () => { if (writes) takeOffer(mer.offer); else say(w.label + (w.said ? ' — ' + w.said : '')); },
+    });
+  }
+
   function conversionsFor(s) {
     const sum = s.summon;
     const scope = paletteScope = fieldScope(s, '', null);
@@ -185,6 +219,8 @@
 
     // --- What it AFFORDS: every tool's offer for this scope, in the registry's order. ---
     const offers = MM.offersFor(scope).map(offerItem);
+    // What the marks are as a diagram: each notation above the floor, ranked with the rest of the readings (N1).
+    const notated = notationsHeld(marks).map((r) => notationItem(r, offers));
     // An act as particular to these marks as a reading (Fold “…” into the text)
     // stands with the readings, where it always stood: after the line it takes.
     const lead = offers.filter((i) => i.certain);
@@ -210,7 +246,7 @@
       if (concept) conceived.splice(at, 1, reads); else conceived.unshift(reads);
       for (const i of offers) if (i.key === 'read' || i.key === 'what') i.group = 'hidden';
     }
-    const items = known.concat(lined, lead, worded, proposed, conceived, offers.filter((i) => !i.certain));
+    const items = known.concat(lined, lead, worded, proposed, notated, conceived, offers.filter((i) => !i.certain));
     // A pill that asks a model none here can answer says what it needs, inline, while it is pointed at (J5).
     for (const it of items) {
       if (it.asks !== 'model' || it.line) continue;
