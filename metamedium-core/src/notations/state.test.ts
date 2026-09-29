@@ -37,6 +37,9 @@ interface TransitionView {
   self: boolean;
 }
 
+/** Each of these reads a few dozen boards through every registered notation: more than vitest's five seconds on a loaded machine. */
+const SLOW = 60_000;
+
 const sameSet = (a: readonly string[], b: readonly string[]) => [...a].sort().join('|') === [...b].sort().join('|');
 const stateOf = (s: Session): NotationReading | undefined => notationsOf(s.getState()).find((r) => r.notation === 'state');
 const symbolFor = (r: NotationReading, mark: string) => (r.symbols as unknown as SymbolView[]).find((p) => p.ids.includes(mark));
@@ -132,7 +135,7 @@ describe('the state board is no other diagram above the floor — the flowchart 
       for (const r of notationsOf(s.getState())) if (r.notation !== 'state' && r.notation !== 'flowchart' && r.confidence >= NOTATION_FLOOR) above.push(`seed ${v.seed}: ${r.notation} ${r.confidence.toFixed(2)}`);
     }
     expect(above).toEqual([]);
-  });
+  }, SLOW);
 });
 
 describe('the negatives: nothing else reads as a state diagram above the floor', () => {
@@ -145,7 +148,7 @@ describe('the negatives: nothing else reads as a state diagram above the floor',
       if (r && r.confidence >= NOTATION_FLOOR) above.push(`seed ${v.seed}: ${r.confidence.toFixed(2)} — ${r.summary}`);
     }
     expect(above).toEqual([]);
-  });
+  }, SLOW);
 
   it('the class bench — its six-class board and A2, every hand', () => {
     const above: string[] = [];
@@ -158,7 +161,7 @@ describe('the negatives: nothing else reads as a state diagram above the floor',
       }
     }
     expect(above).toEqual([]);
-  });
+  }, SLOW);
 
   it('the sequence board — every hand', () => {
     const above: string[] = [];
@@ -169,7 +172,7 @@ describe('the negatives: nothing else reads as a state diagram above the floor',
       if (r && r.confidence >= NOTATION_FLOOR) above.push(`${v.style} seed ${v.seed}: ${r.confidence.toFixed(2)} — ${r.summary}`);
     }
     expect(above).toEqual([]);
-  });
+  }, SLOW);
 
   const against = (name: string, draw: (s: Session, seed: number) => unknown) =>
     it(name, () => {
@@ -181,7 +184,7 @@ describe('the negatives: nothing else reads as a state diagram above the floor',
         if (r && r.confidence >= NOTATION_FLOOR) above.push(`seed ${seed}: ${r.confidence.toFixed(2)} — ${r.summary}`);
       }
       expect(above).toEqual([]);
-    });
+    }, SLOW);
   against('a UI wireframe: boxes in a frame, lines of text, nothing joined by an arrow', drawWireframe);
   against('the canonical molecule', drawMolecule);
   against('a line of writing', drawWriting);

@@ -62,8 +62,8 @@ import type { Role } from '../diagram/roles';
 import { MAX_TIER0_CONFIDENCE } from '../recognition';
 import type { Notation, NotationConnector, NotationEnd, NotationReading, NotationSymbol } from './notation';
 import type { Candidate } from './flowchart';
-import { figureCandidate, mayBeSide, outlineOf, reachOfSymbol, scaleOf, strokeCandidate } from './flowchart';
-import { offSquare, outside, perimeterOf, ramp } from './shape';
+import { figureCandidate, mayBeSide, offBox, outlineOf, reachOfSymbol, scaleOf, strokeCandidate } from './flowchart';
+import { hullOf, offSquare, outside, perimeterOf, ramp, tightBox } from './shape';
 import { centreOf, countWord, inkOf, joinSymbols, labelWriting, marksOf, mean, median, pathLength, rolesOf, symbolOf, writingOf } from './graph-kit';
 
 // ===== The table — the state diagram's content =====
@@ -169,31 +169,46 @@ export interface StateReading extends NotationReading {
 
 // ===== Candidates: what could be a symbol =====
 
+/**
+ * How compact a stroke is and how densely it is drawn — the two cheap
+ * measures, from its hull alone, that say whether it could be a spot: no
+ * corner search yet, which is what costs (`outlineOf`).
+ */
+function spotOf(node: MMNode): { pts: Point[]; aspect: number; ratio: number } | null {
+  const pts = strokePointsOf(node);
+  if (!pts || pts.length < 3) return null;
+  const hull = hullOf(pts);
+  if (hull.length < 3) return null;
+  const box = tightBox(hull);
+  const perimeter = perimeterOf(hull);
+  if (!box || !(perimeter > 0)) return null;
+  return { pts, aspect: box.long / Math.max(1e-9, box.short), ratio: pathLength(pts) / perimeter };
+}
+
 /** A compact, dense mark — a spot filled solid — as a candidate, whatever the shape rung called it. */
 function blobCandidate(node: MMNode): Candidate | null {
-  const pts = strokePointsOf(node);
-  const fp = fingerprintOf(node);
-  if (!pts || !fp || pts.length < 3) return null;
-  const o = outlineOf(pts);
-  if (!o) return null;
-  const compact = 1 - ramp(o.aspect, BLOB_ASPECT[0], BLOB_ASPECT[1]);
+  const m = spotOf(node);
+  if (!m) return null;
+  const compact = 1 - ramp(m.aspect, BLOB_ASPECT[0], BLOB_ASPECT[1]);
+  if (compact < 0.3) return null;
   const top = resemblances(node)[0]?.to;
-  const ratio = pathLength(pts) / Math.max(1e-9, perimeterOf(o.hull));
-  const dense = top === 'type:dot' ? DOT_FILLED : ramp(ratio, FILLED_PATH[0], FILLED_PATH[1]);
+  const dense = top === 'type:dot' ? DOT_FILLED : ramp(m.ratio, FILLED_PATH[0], FILLED_PATH[1]);
   const score = compact * dense;
   if (score < 0.3) return null;
-  const why = top === 'type:dot' ? 'a tap — a dot' : `a mark filled solid — its ink runs ${ratio.toFixed(1)} times round its outline, ${o.aspect.toFixed(1)}:1`;
+  const o = outlineOf(m.pts);
+  if (!o) return null;
+  const why = top === 'type:dot' ? 'a tap — a dot' : `a mark filled solid — its ink runs ${m.ratio.toFixed(1)} times round its outline, ${o.aspect.toFixed(1)}:1`;
   return { id: node.id, ids: [node.id], marks: [node.id], outline: o, scale: scaleOf(node), shapes: [{ symbol: 'round', score, why }], lead: '', fit: 1 };
 }
 
 /** A compact small mark — dense or not — as a candidate: what may stand inside a ring and make it a bullseye. */
 function compactCandidate(node: MMNode): Candidate | null {
-  const pts = strokePointsOf(node);
-  if (!pts || pts.length < 3) return null;
-  const o = outlineOf(pts);
-  if (!o) return null;
-  const compact = 1 - ramp(o.aspect, BLOB_ASPECT[0], BLOB_ASPECT[1]);
+  const m = spotOf(node);
+  if (!m) return null;
+  const compact = 1 - ramp(m.aspect, BLOB_ASPECT[0], BLOB_ASPECT[1]);
   if (compact < 0.5) return null;
+  const o = outlineOf(m.pts);
+  if (!o) return null;
   return { id: node.id, ids: [node.id], marks: [node.id], outline: o, scale: scaleOf(node), shapes: [{ symbol: 'round', score: compact, why: `a small mark, ${o.aspect.toFixed(1)}:1` }], lead: '', fit: 1 };
 }
 
@@ -278,10 +293,12 @@ function loopOf(node: MMNode, states: readonly Candidate[], nodes: ReadonlyMap<s
   const bound = (end: 'start' | 'end') => bindings.find((b) => b.end === end);
   let best: { s: Candidate; d: number[]; far: number; near: number } | null = null;
   for (const s of states) {
-    const d = pts.map((p) => outside(p, s.outline.hull));
     const reach = reachOfSymbol(s);
-    const [d0, d1] = [d[0], d[d.length - 1]];
     const tied = [bound('start'), bound('end')].every((b) => !!b && (s.ids.includes(b.nodeId) || s.marks.includes(b.nodeId)));
+    // The cheap test first: both ends near the state's box, before every point is measured against its outline.
+    if (!tied && (offBox(pts[0], s.outline.bounds) > reach || offBox(pts[pts.length - 1], s.outline.bounds) > reach)) continue;
+    const d = pts.map((p) => outside(p, s.outline.hull));
+    const [d0, d1] = [d[0], d[d.length - 1]];
     if (!tied && (d0 > reach || d1 > reach)) continue;
     const far = Math.max(...d);
     const need = Math.max(LOOP_OUT * s.outline.size, LOOP_OUT_PX * scale);
@@ -457,8 +474,19 @@ export function readState(state: SessionState, scopeIds?: readonly string[]): St
   const foreign = [...closed.values()].filter((c) => isForeign(c) && !blobs.has(c.id) && !spots.includes(c)).length;
   if (!states.length) return null;
 
-  // 5. Transitions: arrows between what stands; then loops out of a state and back.
+  // 5. What only a state diagram has: a dot or a ring that could be an initial or a final state, or a loop out of a state and back.
+  //    Without any of it the drawing is boxes and arrows — a flowchart's — and reads as no state diagram here, so the joining (the
+  //    costly part, every arrow's heads) is not begun.
   const pending = [...dots, ...hollow];
+  const loopable = [...open.filter((id) => !inFigure.has(id)), ...[...writing].filter((id) => !isWord(nodes.get(id)!) && !transcriptOf(nodes.get(id)!) && !!fingerprintOf(nodes.get(id)!) && !fingerprintOf(nodes.get(id)!)!.isClosed)];
+  const loops: Loop[] = [];
+  for (const id of loopable) {
+    const l = loopOf(nodes.get(id)!, states, nodes);
+    if (l && (l.barbs.start || l.barbs.end)) loops.push(l);
+  }
+  if (!pending.length && !finalCandidates.length && !loops.length) return null;
+
+  // 6. Transitions: arrows between what stands; then the loops.
   const symbols = [...states, ...finalCandidates, ...pending];
   const symbolOfMark = new Map<string, Candidate>();
   for (const c of symbols) for (const id of [...c.ids, ...c.marks]) symbolOfMark.set(id, c);
@@ -469,13 +497,8 @@ export function readState(state: SessionState, scopeIds?: readonly string[]): St
     if (k.directed) transitions.push({ ...k, self: false });
     else pointers.push(k.id);
   }
-
-  const loops: Loop[] = [];
-  const asLoops = [...joined.loose, ...[...writing].filter((id) => !isWord(nodes.get(id)!) && !transcriptOf(nodes.get(id)!) && !!fingerprintOf(nodes.get(id)!) && !fingerprintOf(nodes.get(id)!)!.isClosed)];
-  for (const id of asLoops) {
-    const l = loopOf(nodes.get(id)!, states, nodes);
-    if (l && (l.barbs.start || l.barbs.end)) loops.push(l);
-  }
+  const connectorIds = new Set(joined.connectors.map((k) => k.id));
+  for (let i = loops.length - 1; i >= 0; i--) if (connectorIds.has(loops[i].id)) loops.splice(i, 1);
   const loopIds = new Set(loops.map((l) => l.id));
   for (const l of loops) {
     const both = l.barbs.start && l.barbs.end;
@@ -499,7 +522,7 @@ export function readState(state: SessionState, scopeIds?: readonly string[]): St
     loopIds.add(l.id);
   }
 
-  // 6. Initial and final: a dot a transition leaves, a ring one arrives at.
+  // 7. Initial and final: a dot a transition leaves, a ring one arrives at.
   const outsOf = (c: Candidate) => transitions.filter((k) => k.from === c.id && k.to !== c.id).length;
   const insOf = (c: Candidate) => transitions.filter((k) => k.to === c.id && k.from !== c.id).length;
   const placedSymbols: { c: Candidate; symbol: SymbolName; sure: number; why: string; score: number }[] = [];
@@ -549,7 +572,7 @@ export function readState(state: SessionState, scopeIds?: readonly string[]): St
     return { ...symbolOf(c, p.symbol, role, confidence, p.why, [], words), symbol: p.symbol } as StateSymbol;
   });
 
-  // 7. Labels: writing inside a state names it; beside a transition it is the event.
+  // 8. Labels: writing inside a state names it; beside a transition it is the event.
   const owned = new Set<string>();
   for (const s of out) for (const id of s.ids) owned.add(id);
   for (const c of pending) if (!isPlaced.has(c)) for (const id of c.ids) if (writingOf(nodes.get(id)!)) writing.add(id);
@@ -562,7 +585,7 @@ export function readState(state: SessionState, scopeIds?: readonly string[]): St
     role: STATE_TABLE.label.role as Role,
   });
 
-  // 8. Roles: what every mark in the scope plays — one of the six.
+  // 9. Roles: what every mark in the scope plays — one of the six.
   const edgeMarks = joined.edgeMarks;
   const { roles, weight, unplaced } = rolesOf(
     scope,
@@ -576,7 +599,7 @@ export function readState(state: SessionState, scopeIds?: readonly string[]): St
     edgeMarks
   );
 
-  // 9. Is it a state diagram, and how surely.
+  // 10. Is it a state diagram, and how surely.
   const stateOnes = out.filter((s) => s.symbol === 'state');
   if (!stateOnes.length) return null;
   const joinedIds = new Set(transitions.flatMap((k) => [k.from, k.to]));

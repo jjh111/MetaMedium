@@ -542,6 +542,39 @@ export {
   HELD_ARROW,
 } from './notations/sequence';
 export type { SequenceReading, SequenceParticipant, SequenceMessage, MessageKind } from './notations/sequence';
+// The state notation (V1-PLAN §3, D5's state half): a state is a round-cornered
+// box, the initial state a small dot scribbled solid, the final a ring with a
+// mark inside it, a transition an arrow between them — or a loop out of a state
+// and back, its barb measured — each end read past its head. What makes it a
+// state diagram rather than the flowchart's boxes and arrows is what a
+// flowchart has no symbol for: the reading's confidence is its structure
+// scaled by that evidence. Its content is STATE_TABLE, which the state@1 pack
+// names; its stateDiagram-v2 writer and reader are state-mermaid.ts,
+// registered with D2's writers and D3's readers.
+export {
+  STATE,
+  STATE_TABLE,
+  readState,
+  statePortsOf,
+  FILLED_PATH,
+  BLOB_ASPECT,
+  DOT_FILLED,
+  SMALL_BESIDE,
+  INNER_SHARE,
+  INNER_CENTRED,
+  LOOP_OUT,
+  LOOP_OUT_PX,
+  LOOP_STANDS_OUT,
+  BARB_SHARE,
+  BARB_PX,
+  ROUNDED_BY,
+  ROUNDED_EXTENT,
+  ROUNDED_UPRIGHT,
+  EVIDENCE,
+  PLAIN_SHARE,
+  FOREIGN_PENALTY,
+} from './notations/state';
+export type { StateReading, StateSymbol, StateTransition } from './notations/state';
 export { stanceOf, cornersOf, tightBox } from './notations/shape';
 // Dashed lines (V1-PLAN §3, D5) — short straight strokes in a row read as one
 // line, derived like figures: each dash's ends in the row's corridor, each a
@@ -587,6 +620,14 @@ export { writeUmlClass, readClassDiagramText, CLASS_DIAGRAM_READER, memberLine }
 export { writeSequence, readSequenceText, SEQUENCE_READER, sequenceText, BLANK_WORDS } from './notations/sequence-mermaid';
 export type { SequenceDiagramRead, SequenceNodeRead, SequenceLinkRead, DrawnSequenceLink } from './notations/sequence-mermaid';
 export type { LayeredNode, LayeredLink, LayeredOptions, LayeredLayout, LayeredBack, LayeredDirection } from './notations/layered';
+// The state diagram in Mermaid, both ways (D5): `stateDiagram-v2` written from
+// a reading — states in reading order with their names, transitions by what
+// they join, the initial dot and the final ring both `[*]` — and read back and
+// drawn as ink the notation reads: rounded boxes, a dot scribbled solid, a ring
+// round a second, arrows bound at both ends, a loop out of a state and back.
+export { writeState, readStateText, STATE_READER, stateText, INITIAL_ID, FINAL_ID } from './notations/state-mermaid';
+export type { StateDiagramRead, StateNodeRead, StateLinkRead, DrawnStateLink } from './notations/state-mermaid';
+
 
 // Concepts — the meaning-mappings, as a library rather than as code paths.
 export { matchConcepts, BUILTIN_CONCEPTS } from './concepts/concept';
