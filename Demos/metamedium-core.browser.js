@@ -17634,7 +17634,11 @@ var MetaMediumCore = (() => {
     const L = pathLength2(pts);
     if (L < LINE_MIN_PX * scale) return null;
     const hooks = hooksOf(pts, scale);
-    const heads = headsOf(state, id);
+    const iA = hooks?.start ? hooks.iA : 0, iB = hooks?.end ? hooks.iB : pts.length - 1;
+    const dev = iB > iA + 2 ? deviation(pts, iA, iB) : Infinity;
+    if (dev > STRAIGHT_DEV) return null;
+    const both = !!hooks?.start && !!hooks?.end;
+    const heads = both ? null : headsOf(state, id);
     const apartAt = (e) => {
       const h2 = heads?.[e].heads[0];
       return h2 ? { tip: h2.tip, ids: h2.ids.filter((x) => x !== id) } : null;
@@ -17643,10 +17647,8 @@ var MetaMediumCore = (() => {
     const start = hooks?.start ? "hook" : sa ? "apart" : null;
     const end = hooks?.end ? "hook" : sb ? "apart" : null;
     if (!start || !end) return null;
-    const iA = hooks?.start ? hooks.iA : 0, iB = hooks?.end ? hooks.iB : pts.length - 1;
     const a = start === "apart" && sa ? sa.tip : pts[iA];
     const b = end === "apart" && sb ? sb.tip : pts[iB];
-    const dev = iB > iA + 2 ? deviation(pts, iA, iB) : Infinity;
     const owned = [...start === "apart" && sa ? sa.ids : [], ...end === "apart" && sb ? sb.ids : []];
     return { id, ids: [id, ...owned], a, b, length: dist9(a, b), dev, heads: { start, end }, scale };
   }
@@ -17769,10 +17771,19 @@ var MetaMediumCore = (() => {
         ...extra
       });
     };
+    const meets2 = (p, b) => {
+      const grow2 = Math.max(FOLD_NEAR * p.short, NEAR_PX * p.scale) + tolOf(p), pb = p.outline.bounds;
+      return b.maxX >= pb.minX - grow2 && b.minX <= pb.maxX + grow2 && b.maxY >= pb.minY - grow2 && b.minY <= pb.maxY + grow2;
+    };
+    const nearby = (b) => pieces.some((p) => meets2(p, b));
     const shafts = [];
     const rest = [];
     for (const o of open) {
-      const sh = shaftOf(state, o.id, o.node, o.scale);
+      const pts = strokePointsOf(o.node);
+      if (!pts || !nearby(boxOf3(pts))) continue;
+      const m = mid6(pts[0], pts[pts.length - 1]), mb = { minX: m.x, maxX: m.x, minY: m.y, maxY: m.y };
+      const stands = pieces.some((p) => meets2(p, mb) && (outside(m, p.hull) === 0 || distToPath(m, p.ring) <= Math.max(FOLD_NEAR * p.short, NEAR_PX * p.scale)));
+      const sh = stands ? shaftOf(state, o.id, o.node, o.scale) : null;
       if (sh && sh.dev <= STRAIGHT_DEV) shafts.push(sh);
       else rest.push(o);
     }
@@ -17855,7 +17866,7 @@ var MetaMediumCore = (() => {
       }
     }
     for (const c of closed) {
-      if (owned.has(c.id)) continue;
+      if (owned.has(c.id) || !pieces.some((p) => p.id !== c.id && p.size > c.outline.size && meets2(p, c.outline.bounds))) continue;
       const pts = strokePointsOf(c.node) ?? [];
       const tri = biggestTriangle(c.outline.hull);
       if (!tri || c.outline.three < 0.75) continue;

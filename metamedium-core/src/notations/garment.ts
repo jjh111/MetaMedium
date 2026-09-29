@@ -354,7 +354,12 @@ function shaftOf(state: SessionState, id: string, node: MMNode, scale: number): 
   const L = pathLength(pts);
   if (L < LINE_MIN_PX * scale) return null;
   const hooks = hooksOf(pts, scale);
-  const heads = headsOf(state, id);
+  // The shaft, between the hooks it has of its own (or the stroke's ends): straight, or no line with a head at each end. The cheap test before headsOf.
+  const iA = hooks?.start ? hooks.iA : 0, iB = hooks?.end ? hooks.iB : pts.length - 1;
+  const dev = iB > iA + 2 ? deviation(pts, iA, iB) : Infinity;
+  if (dev > STRAIGHT_DEV) return null;
+  const both = !!hooks?.start && !!hooks?.end;
+  const heads = both ? null : headsOf(state, id);
   const apartAt = (e: 'start' | 'end') => {
     const h = heads?.[e].heads[0];
     return h ? { tip: h.tip, ids: h.ids.filter((x) => x !== id) } : null;
@@ -363,11 +368,9 @@ function shaftOf(state: SessionState, id: string, node: MMNode, scale: number): 
   const start = hooks?.start ? 'hook' : sa ? 'apart' : null;
   const end = hooks?.end ? 'hook' : sb ? 'apart' : null;
   if (!start || !end) return null;
-  // The shaft's tips: where the hooked ends' tips are, else the line's own ends (or the head's tip).
-  const iA = hooks?.start ? hooks.iA : 0, iB = hooks?.end ? hooks.iB : pts.length - 1;
+  // The shaft's tips: where the hooked ends' tips are, else the head's tip (a chevron drawn apart), else the line's own end.
   const a = start === 'apart' && sa ? sa.tip : pts[iA];
   const b = end === 'apart' && sb ? sb.tip : pts[iB];
-  const dev = iB > iA + 2 ? deviation(pts, iA, iB) : Infinity;
   const owned = [...(start === 'apart' && sa ? sa.ids : []), ...(end === 'apart' && sb ? sb.ids : [])];
   return { id, ids: [id, ...owned], a, b, length: dist(a, b), dev, heads: { start, end }, scale };
 }
@@ -514,11 +517,22 @@ export function readGarment(state: SessionState, scopeIds?: readonly string[]): 
     });
   };
 
-  // 4. Lines with a head at each end: a fold along an edge, else a grain line inside the piece.
+  // 4. Lines with a head at each end: a fold along an edge, else a grain line inside the piece. Only what stands by an
+  // outline of a piece's size is looked at: a flowchart's arrows run between its boxes, not inside them.
+  const meets = (p: Piece, b: Bounds) => {
+    const grow = Math.max(FOLD_NEAR * p.short, NEAR_PX * p.scale) + tolOf(p), pb = p.outline.bounds;
+    return b.maxX >= pb.minX - grow && b.minX <= pb.maxX + grow && b.maxY >= pb.minY - grow && b.minY <= pb.maxY + grow;
+  };
+  const nearby = (b: Bounds) => pieces.some((p) => meets(p, b));
   const shafts: Shaft[] = [];
   const rest: typeof open = [];
   for (const o of open) {
-    const sh = shaftOf(state, o.id, o.node, o.scale);
+    const pts = strokePointsOf(o.node);
+    if (!pts || !nearby(boxOf(pts))) continue;
+    // A grain line's middle is inside a piece, a fold's is by its outline: an arrow between two boxes is neither.
+    const m = mid(pts[0], pts[pts.length - 1]), mb = { minX: m.x, maxX: m.x, minY: m.y, maxY: m.y };
+    const stands = pieces.some((p) => meets(p, mb) && (outside(m, p.hull) === 0 || distToPath(m, p.ring) <= Math.max(FOLD_NEAR * p.short, NEAR_PX * p.scale)));
+    const sh = stands ? shaftOf(state, o.id, o.node, o.scale) : null;
     if (sh && sh.dev <= STRAIGHT_DEV) shafts.push(sh);
     else rest.push(o);
   }
@@ -608,7 +622,7 @@ export function readGarment(state: SessionState, scopeIds?: readonly string[]): 
   }
   // Closed marks: a wedge from an edge is a dart, a small one on the outline a notch.
   for (const c of closed) {
-    if (owned.has(c.id)) continue;
+    if (owned.has(c.id) || !pieces.some((p) => p.id !== c.id && p.size > c.outline.size && meets(p, c.outline.bounds))) continue;
     const pts = strokePointsOf(c.node) ?? [];
     const tri = biggestTriangle(c.outline.hull);
     if (!tri || c.outline.three < 0.75) continue;
