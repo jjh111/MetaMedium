@@ -81,7 +81,9 @@ describe('the git store', () => {
     await store.appendLog('me', events);
     await store.appendLog('me', events);
     const logText = gh.files[logPathFor('me')];
-    expect(logText.split('\n').filter(Boolean)).toHaveLength(2);
+    // A header line (R2, version 1) and the two events, appended once each — the header written once.
+    expect(logText.split('\n').filter(Boolean)).toHaveLength(3);
+    expect(logText.split('\n')[0]).toContain('metamedium-log');
     const puts = gh.calls.filter((c) => c.method === 'PUT' && /jsonl/.test(c.url));
     expect(puts).toHaveLength(2);
     expect((puts[1].body as { message: string }).message).toMatch(/me, 1 event/);

@@ -10,8 +10,9 @@ import type { SessionEvent } from '../session/session';
 import { kindOf } from '../kinds/kinds';
 import {
   type Capabilities, type Entry, type Store,
-  LOG_DIR, ReadOnlyError, decodeLog, encodeLog, isCanvasFile, logPathFor, participantOfLog, toBytes, toText,
+  LOG_DIR, ReadOnlyError, decodeLog, isCanvasFile, logPathFor, participantOfLog, toBytes, toText,
 } from './seam';
+import { appendToLogText } from './format';
 
 /** What this store needs from a file: its bytes, its size, its modified time. */
 export interface FileLike {
@@ -114,8 +115,10 @@ export class FolderStore implements Store {
     // the write lands at the old end. A backend without it gets the whole
     // file rewritten, which is the same bytes.
     const existing = await (await h.getFile()).text();
+    // Worked out before the file is opened for writing: a log of a newer version is refused (R2) with the file untouched.
+    const next = appendToLogText(existing, events, { source: path });
     const w = await h.createWritable({ keepExistingData: false });
-    await w.write(toBytes(existing + encodeLog(events)));
+    await w.write(toBytes(next));
     await w.close();
   }
 
@@ -132,7 +135,7 @@ export class FolderStore implements Store {
       if (handle.kind !== 'file') continue;
       const who = participantOfLog(`${LOG_DIR}/${name}`);
       if (!who) continue;
-      out[who] = decodeLog(toText(await (await handle.getFile()).text())).events;
+      out[who] = decodeLog(toText(await (await handle.getFile()).text()), { source: `${LOG_DIR}/${name}` }).events;
     }
     return out;
   }

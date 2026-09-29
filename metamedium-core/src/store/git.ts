@@ -13,8 +13,9 @@ import type { SessionEvent } from '../session/session';
 import { kindOf } from '../kinds/kinds';
 import {
   type Capabilities, type Entry, type Store,
-  ReadOnlyError, decodeLog, encodeLog, isCanvasFile, logPathFor, participantOfLog, toBytes, toText,
+  ReadOnlyError, decodeLog, isCanvasFile, logPathFor, participantOfLog, toBytes, toText,
 } from './seam';
+import { appendToLogText } from './format';
 
 export type GitFetcher = (url: string, init?: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<{
   ok: boolean;
@@ -143,7 +144,7 @@ export class GitStore implements Store {
     if (events.length === 0) return;
     const path = logPathFor(participant);
     const existing = await this.contents(path);
-    const text = (existing ? toText(existing.content) : '') + encodeLog(events);
+    const text = appendToLogText(existing ? toText(existing.content) : '', events, { source: path });
     await this.write(path, text, `metamedium: ${participant}, ${events.length} event${events.length === 1 ? '' : 's'}`);
   }
 
@@ -154,7 +155,7 @@ export class GitStore implements Store {
       const who = participantOfLog(path);
       if (!who) continue;
       const c = await this.contents(path);
-      if (c) out[who] = decodeLog(toText(c.content)).events;
+      if (c) out[who] = decodeLog(toText(c.content), { source: path }).events;
     }
     return out;
   }

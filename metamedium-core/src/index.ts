@@ -326,6 +326,9 @@ export { sittingName, sittingToken, handLabel } from './session/hands';
 // The storage seam: the canvas is a folder; per-participant logs; backends (WP-11).
 export { MemoryStore, ReadOnlyError, logPathFor, participantOfLog, encodeLog, decodeLog, isCanvasFile, toBytes, toText, META_DIR, LOG_DIR, LOG_EXT } from './store/seam';
 export type { Store, Entry, Capabilities } from './store/seam';
+// The log format (V1-PLAN R2): a header line, version 0 and 1 read, a newer version refused in a sentence.
+export { LOG_FORMAT, LOG_VERSION, LogFormatError, logHeader, encodeLogTail, appendToLogText } from './store/format';
+export type { LogHeader, LogWriteOptions, DecodedLog } from './store/format';
 export { StaticStore, MANIFEST_PATH } from './store/static';
 export type { Fetcher, Manifest } from './store/static';
 export { FolderStore, SKIP_DIRS, DEFAULT_FILE_LIMIT } from './store/folder';

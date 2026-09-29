@@ -9819,6 +9819,76 @@ function rowOf(kind) {
   return KINDS.find((k) => k.kind === kind);
 }
 
+// src/store/format.ts
+var LOG_FORMAT = "metamedium-log";
+var LOG_VERSION = 1;
+function logHeader(opts = {}) {
+  const h2 = { type: "format", format: LOG_FORMAT, version: LOG_VERSION };
+  if (opts.app) h2.app = opts.app;
+  return h2;
+}
+var LogFormatError = class extends Error {
+  constructor(found, raw, app, source) {
+    const what = source ? `\u201C${source}\u201D` : "this log";
+    const by = app ? `, written by MetaMedium ${app}` : "";
+    const reads2 = LOG_VERSION > 1 ? `versions 0 to ${LOG_VERSION}` : "versions 0 and 1";
+    super(found === null ? `${what} begins with a log header that names no version this build can read (${JSON.stringify(raw)})${by} \u2014 this build reads ${reads2}, so nothing of it was read` : `${what} is a version ${found} log${by} \u2014 this build reads ${reads2}, so nothing of it was read; open it with a newer MetaMedium`);
+    this.name = "LogFormatError";
+    this.found = found;
+    this.supported = LOG_VERSION;
+    this.app = app;
+    this.source = source;
+  }
+};
+function encodeLogTail(events) {
+  return events.map((ev) => JSON.stringify(ev)).join("\n") + (events.length ? "\n" : "");
+}
+function encodeLog(events, opts = {}) {
+  return JSON.stringify(logHeader(opts)) + "\n" + encodeLogTail(events);
+}
+function isHeader(v) {
+  return !!v && typeof v === "object" && v.format === LOG_FORMAT;
+}
+function decodeLog(text, opts = {}) {
+  const events = [];
+  let skipped = 0;
+  let version2 = 0;
+  let app;
+  let seen = false;
+  for (const line of text.split("\n")) {
+    const l = line.trim();
+    if (!l) continue;
+    let v;
+    try {
+      v = JSON.parse(l);
+    } catch {
+      skipped++;
+      continue;
+    }
+    if (isHeader(v)) {
+      const n2 = v.version;
+      const theirApp = typeof v.app === "string" ? v.app : void 0;
+      if (typeof n2 !== "number" || !Number.isInteger(n2) || n2 < 1) throw new LogFormatError(null, n2, theirApp, opts.source);
+      if (n2 > LOG_VERSION) throw new LogFormatError(n2, n2, theirApp, opts.source);
+      if (!seen) {
+        version2 = n2;
+        app = theirApp;
+        seen = true;
+      }
+      continue;
+    }
+    events.push(v);
+  }
+  return app === void 0 ? { events, skipped, version: version2 } : { events, skipped, version: version2, app };
+}
+function appendToLogText(existing, events, opts = {}) {
+  if (!existing.trim()) return encodeLog(events, opts);
+  const d = decodeLog(existing, { source: opts.source });
+  const joined = existing.endsWith("\n") ? existing : existing + "\n";
+  if (d.version >= 1) return joined + encodeLogTail(events);
+  return JSON.stringify(logHeader(opts)) + "\n" + joined + encodeLogTail(events);
+}
+
 // src/store/seam.ts
 var META_DIR = ".metamedium";
 var LOG_DIR = `${META_DIR}/logs`;
@@ -9830,23 +9900,6 @@ function logPathFor(participant) {
 function participantOfLog(path) {
   if (!path.startsWith(LOG_DIR + "/") || !path.endsWith(LOG_EXT)) return null;
   return path.slice(LOG_DIR.length + 1, -LOG_EXT.length);
-}
-function encodeLog(events) {
-  return events.map((ev) => JSON.stringify(ev)).join("\n") + (events.length ? "\n" : "");
-}
-function decodeLog(text) {
-  const events = [];
-  let skipped = 0;
-  for (const line of text.split("\n")) {
-    const l = line.trim();
-    if (!l) continue;
-    try {
-      events.push(JSON.parse(l));
-    } catch {
-      skipped++;
-    }
-  }
-  return { events, skipped };
 }
 function isCanvasFile(path) {
   if (path === META_DIR || path.startsWith(META_DIR + "/")) return null;
@@ -9901,21 +9954,13 @@ var MemoryStore = class {
     if (events.length === 0) return;
     const path = logPathFor(participant);
     const prev = this.files.get(path);
-    const next = encoder.encode(encodeLog(events));
-    if (!prev) {
-      this.files.set(path, next);
-      return;
-    }
-    const joined = new Uint8Array(prev.length + next.length);
-    joined.set(prev, 0);
-    joined.set(next, prev.length);
-    this.files.set(path, joined);
+    this.files.set(path, encoder.encode(appendToLogText(prev ? toText(prev) : "", events, { source: path })));
   }
   async readLogs() {
     const out = {};
     for (const [path, bytes] of this.files) {
       const who = participantOfLog(path);
-      if (who) out[who] = decodeLog(toText(bytes)).events;
+      if (who) out[who] = decodeLog(toText(bytes), { source: path }).events;
     }
     return out;
   }
@@ -10814,7 +10859,7 @@ var StaticStore = class {
       if (!who) continue;
       const r = await this.fetcher(this.url(path));
       if (!r.ok) continue;
-      out[who] = decodeLog(await r.text()).events;
+      out[who] = decodeLog(await r.text(), { source: path }).events;
     }
     return out;
   }
@@ -10890,8 +10935,9 @@ var FolderStore = class {
     const h2 = await this.fileHandle(path, true);
     if (!h2.createWritable) throw new ReadOnlyError(`append to ${participant}'s log`);
     const existing = await (await h2.getFile()).text();
+    const next = appendToLogText(existing, events, { source: path });
     const w2 = await h2.createWritable({ keepExistingData: false });
-    await w2.write(toBytes(existing + encodeLog(events)));
+    await w2.write(toBytes(next));
     await w2.close();
   }
   async readLogs() {
@@ -10907,7 +10953,7 @@ var FolderStore = class {
       if (handle.kind !== "file") continue;
       const who = participantOfLog(`${LOG_DIR}/${name}`);
       if (!who) continue;
-      out[who] = decodeLog(toText(await (await handle.getFile()).text())).events;
+      out[who] = decodeLog(toText(await (await handle.getFile()).text()), { source: `${LOG_DIR}/${name}` }).events;
     }
     return out;
   }
@@ -11019,7 +11065,7 @@ var GitStore = class {
     if (events.length === 0) return;
     const path = logPathFor(participant);
     const existing = await this.contents(path);
-    const text = (existing ? toText(existing.content) : "") + encodeLog(events);
+    const text = appendToLogText(existing ? toText(existing.content) : "", events, { source: path });
     await this.write(path, text, `metamedium: ${participant}, ${events.length} event${events.length === 1 ? "" : "s"}`);
   }
   async readLogs() {
@@ -11029,7 +11075,7 @@ var GitStore = class {
       const who = participantOfLog(path);
       if (!who) continue;
       const c = await this.contents(path);
-      if (c) out[who] = decodeLog(toText(c.content)).events;
+      if (c) out[who] = decodeLog(toText(c.content), { source: path }).events;
     }
     return out;
   }
@@ -28790,6 +28836,8 @@ export {
   LOCAL_TIMEOUT_MS,
   LOG_DIR,
   LOG_EXT,
+  LOG_FORMAT,
+  LOG_VERSION,
   LOOP_OUT,
   LOOP_OUT_PX,
   LOOP_PENALTY,
@@ -28799,6 +28847,7 @@ export {
   LiveMerge,
   LiveStore,
   LocalHub,
+  LogFormatError,
   MAGNET_SCREEN_PX,
   MAGNET_SIZE_FRACTION,
   MANIFEST_PATH,
@@ -28924,6 +28973,7 @@ export {
   analyzeCornerAngles,
   analyzeStroke,
   angleClass,
+  appendToLogText,
   applyWalls,
   arcThrough,
   arithmetic,
@@ -29054,6 +29104,7 @@ export {
   elementsOf,
   enclosedBy,
   encodeLog,
+  encodeLogTail,
   endOfHandle,
   erPortsOf,
   evaluateChain,
@@ -29149,6 +29200,7 @@ export {
   listModels,
   listedPacks,
   localityOf,
+  logHeader,
   logPathFor,
   luminance,
   madeThese,

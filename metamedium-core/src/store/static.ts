@@ -89,7 +89,7 @@ export class StaticStore implements Store {
       if (!who) continue;
       const r = await this.fetcher(this.url(path));
       if (!r.ok) continue; // a listed log that is gone is an empty log, not a failure to open the canvas
-      out[who] = decodeLog(await r.text()).events;
+      out[who] = decodeLog(await r.text(), { source: path }).events;
     }
     return out;
   }

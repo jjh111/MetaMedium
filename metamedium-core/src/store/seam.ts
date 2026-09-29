@@ -8,7 +8,8 @@
 //
 //   1. **Discovery is a list of known kinds.** `list()` returns every file
 //      the kinds table recognises, recursively; anything else is not there.
-//   2. **Logs are per participant, append-only, one event per line.** Nobody
+//   2. **Logs are per participant, append-only, one event per line** (a header
+//      line first, since R2 — format.ts). Nobody
 //      writes anyone else's file, so there is nothing to lock and nothing to
 //      merge by hand — `mergeLogs` is the merge.
 //   3. **A backend says what it can do.** A read-only backend rejects writes
@@ -19,6 +20,10 @@
 
 import type { SessionEvent } from '../session/session';
 import { type Kind, kindOf } from '../kinds/kinds';
+import { appendToLogText, decodeLog, encodeLog } from './format';
+
+// The log format is format.ts's (R2); these stay importable from here.
+export { decodeLog, encodeLog };
 
 export interface Entry {
   /** Path within the folder, `/`-separated, no leading slash. */
@@ -63,23 +68,6 @@ export function logPathFor(participant: string): string {
 export function participantOfLog(path: string): string | null {
   if (!path.startsWith(LOG_DIR + '/') || !path.endsWith(LOG_EXT)) return null;
   return path.slice(LOG_DIR.length + 1, -LOG_EXT.length);
-}
-
-/** One event per line. A trailing newline, so appends concatenate. */
-export function encodeLog(events: readonly SessionEvent[]): string {
-  return events.map((ev) => JSON.stringify(ev)).join('\n') + (events.length ? '\n' : '');
-}
-
-/** Lines back into events; a broken line is skipped and counted, never fatal. */
-export function decodeLog(text: string): { events: SessionEvent[]; skipped: number } {
-  const events: SessionEvent[] = [];
-  let skipped = 0;
-  for (const line of text.split('\n')) {
-    const l = line.trim();
-    if (!l) continue;
-    try { events.push(JSON.parse(l) as SessionEvent); } catch { skipped++; }
-  }
-  return { events, skipped };
 }
 
 /** Whether a path is one the canvas should show: a known kind, outside the meta directory. */
@@ -152,18 +140,14 @@ export class MemoryStore implements Store {
     if (events.length === 0) return;
     const path = logPathFor(participant);
     const prev = this.files.get(path);
-    const next = encoder.encode(encodeLog(events));
-    if (!prev) { this.files.set(path, next); return; }
-    const joined = new Uint8Array(prev.length + next.length);
-    joined.set(prev, 0); joined.set(next, prev.length);
-    this.files.set(path, joined);
+    this.files.set(path, encoder.encode(appendToLogText(prev ? toText(prev) : '', events, { source: path })));
   }
 
   async readLogs(): Promise<Record<string, SessionEvent[]>> {
     const out: Record<string, SessionEvent[]> = {};
     for (const [path, bytes] of this.files) {
       const who = participantOfLog(path);
-      if (who) out[who] = decodeLog(toText(bytes)).events;
+      if (who) out[who] = decodeLog(toText(bytes), { source: path }).events;
     }
     return out;
   }
