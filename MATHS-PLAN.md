@@ -261,8 +261,23 @@ advancing 7 × 8.2, so 22.5 × 56.8 in of piece and labels take 4 across and
 612 × 792 pt with the square exactly 1 in. 29 tests (truesize 18, print 11);
 maths 168 in 8 files; core 844 in 65 (815 in 63). Not yet: the surface
 (M5's *draw it to scale* and the export pane); several figures assembled
-into one piece, which would mean solving them together; grain lines, notches
-and seam allowance (M6); leaving out a page with nothing on it.
+into one piece, which would mean solving them together; leaving out a page with
+nothing on it. *(Grain lines, notches, darts, folds and seam allowance are M6's,
+below.)*
+
+**Status, 29 Sep 2026: M6 built** — the garment pattern piece. `notations/garment.ts`
+reads a piece and its grain line, fold, notches, darts and seam allowance from the
+geometry (each a relation to the outline, so code, never a pack definition;
+`garment@1` names it), and `maths/garment.ts` says what they come to once numbers are
+written on the piece: the cutting size against the sewing size — the numbers rule the
+outline they are on, the allowance is the page's `Add ½″ seam allowance` or else the
+ink's own offset at the drawing's scale, said to be the ink's, and where both stand the
+page rules and the ink's is said beside it — a fold's half (*cut on the fold, opened
+36″ across*), and each mark's size on the piece's true sides. True size prints the
+cutting line dashed exactly the allowance out, the grain line, the notches, the darts
+and the fold. `V1-PLAN.md` §9 M6 has the units, the numbers and what it found; CLAUDE.md
+*The garment pattern piece* the rules. Not yet: a piece of curved or unlabelled sides
+(M4 fixes rectangles and triangles), and several pieces laid out together on a page.
 
 ## 5. The middle layer — seats that judge
 

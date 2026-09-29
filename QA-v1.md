@@ -254,7 +254,10 @@ keyboard, Scribble, rotation, and drawing a whole figure by hand.
 | Type a page of steps as text (`A. Bust 36`, `1. A ÷ 3 = 12 + 2 = 14`, …) | each step shows its check at the end of its own line; change A and only the steps that depend on it change; undo puts them back |
 | Hold the marks and type `= 24 ÷ 3` in the field | the line says *24 ÷ 3 = 8* before Enter; Enter puts it on the board as text |
 | Write the unit (`24″`) and open *export* | *true-size.svg* and *print.html* are ready: print the pages at 100% and measure the test square on each (M5–M7) |
-| *When M6 lands* | the garment pack's pattern pieces read as such — A4's last row, by hand |
+| Draw a panel with the pencil, a second outline all round it a finger's width out, a line down the middle with an arrowhead at each end, two ticks across the left edge and a narrow wedge standing on the top edge; hold it | the field leads with *a garment pattern piece* and its tooltip says *one grain line, two notches, one dart, a seam allowance*; nothing of it is read as a flowchart (M6) |
+| Write `18″` and `26″` in the gap between the outlines and `Add ½″ seam allowance` on a page beside it | a chip below the piece says *cut 19 × 27″ · sewn 18 × 26″*, for a moment and while you point at it; the panel says it, the ink's own offset beside the page's, the grain, the notches and the dart with their sizes; **the ticks divide nothing** — the side still says 26″ |
+| Open *export* → *true-size.svg*, then *print.html* | the cutting line dashed exactly ½″ out, the grain line with a head at each end, the notches and the dart where you drew them; print at 100% and measure the test square (M6, M7) |
+| Draw an arrow along an edge instead of the outline round it | the piece is *cut on the fold*: the chip says how wide it opens, and true size prints the half you drew and says so |
 
 ### 6. Portrait, and the end
 

@@ -2247,6 +2247,79 @@ README line and CLAUDE.md, not a test — the test that holds is *a note is not 
 measurement* (`examples.test.mjs`), which passes with prose; `dimension.ts` and
 `solve.ts` still read numbers in a note beside a figure by design.
 
+*Status, 29 Sep 2026 (branch `unit/m6-garment`):* **M6 built** — the garment pack. Red
+`2c402a7` (the pattern board as a fixture, 24 hands; the notation's test and bench; the
+packs' tests naming `garment@1` — 112 failing), built `55b1433`; red `3fb236b` (the
+maths — 8 of 10 failing), built `3170ea4`; red `17569ae` (a notch divides an edge),
+fix `c971c83`; e2e 51's golden `857d3c7`, e2e 68 and HELP `e6a2642`; two measured
+cuts in the reading's cost, `c0f3cc5` and `3bf33bf`. **Which of the six is a pack
+definition and which is code: all six are code** — each is a relation to the piece's
+outline (a grain line inside it, a fold along it, a notch across it, a dart standing
+on it, a seam allowance off it the same distance all round) and two need a head kind
+or an orientation; a signature is a bag of shapes and links, and *a box with an arrow
+in it* is the same signature as *a piece with a grain line* (the trap). So `garment@1`
+names the notation (`GARMENT_TABLE`, its single home), has no definitions and no
+ports (a piece's marks are not places a line is tied), and its affinity lifts clean
+forms and the maths beside a piece. **The notation** (`notations/garment.ts`; the
+sixth reading beside the flowchart, class, sequence, state, ER and mind map, so N1
+shows it in the field's *what this is* row and the panel with no surface change:
+*a garment pattern piece 0.83 — one piece: one grain line, two notches, one dart, a
+seam allowance*): a **piece** is a closed outline of some size; a **grain line** a
+straight line with a head at each end inside it (a chevron at each end, or a hook at
+each end of one stroke — `hooksOf`, on the stroke's own points, because the shape
+rung and `headsOf` see only the far end of the second); a **fold** the same line
+along an edge; a **notch** a short tick across the outline, square to it, or a small
+wedge on it; a **dart** a narrow wedge from an edge, closed or a V of one stroke; a
+**seam allowance** an outline the same distance off all round, *measured*. Its
+confidence is its evidence: the grain line alone settles it, two notches, a dart or a
+seam allowance alone do not. **The maths** (`maths/garment.ts`; `boardMaths(…).garment`,
+a chip, the panel, `trueSize`): the numbers rule the outline they are written on (in
+the piece: sewing size; outside the cutting line: cutting size, the other reading said
+as *or, if 18 × 26″ is the finished size, cut at 19 × 27″*); the allowance is the
+page's `Add ½″ seam allowance` when there is one, else the ink's own offset at the
+drawing's scale said to be the ink's, and where both stand the page rules and the
+ink's is said beside it; a fold halves the piece (*cut on the fold, opened 36″
+across, 18″ as drawn*); the grain, each notch and each dart are measured on the
+piece's true sides by an affine map of the ink's corners; and true size prints the
+other outline dashed exactly the allowance out (or in), the grain line with a head at
+each end, the notches, the darts, the fold marked and said, in the SVG and in what a
+print covers. **Tests:** core `garment.test.ts` 104 (24 hands × read, marks, roles, a
+name from writing, four negatives, the board reads as no other diagram),
+`garment.bench.test.ts` 5 (its own drawings read 144/144 at 1×, 0.6× and 1.8×
+elsewhere on the page; the recognition corpus, 36 flowcharts, the class, sequence,
+state, ER and mind-map boards, wireframes, molecules, writing, rows and hubs read none
+above the floor), `maths/garment.test.ts` 11, the packs' three (`validate.test.ts`,
+`pack.test.ts`, and the garment board joins `bench.test.ts`'s corpus, which
+`garment@1` and every other pack read as nothing) — core 2,442 in 127 files; e2e
+68–68h, 9 records (canvas 423 passed, 2 skipped; the whole gate 712 passed, 12 skipped,
+the budgets' five by name on a machine at calibration 70 ms; shard typecheck and
+`scripts/examples.mjs --check` green; WebKit not run here). **By design:** e2e 51's
+expected list of packs gained `garment@1`, and `pack.test.ts` used `garment@1` as its
+example of a pack this build lacks (now `garment@2`). **Found for other owners:** (1)
+**a tick across an edge divides it into parts** (`withParts` in `dimension.ts`: the
+parts a whole is made of), so a 26″ written beside the middle of a side with two
+notches on it was the length of the part between them and the side fixed by nothing —
+found drawing the piece with the pointer; M6 leaves a notch, a dart, a fold and a grain
+line's drawn-apart heads out of what the solver is handed (`garmentNotFigures`), but a
+*dimension line* drawn across an edge is still a divider, which is right for a cutting
+layout and wrong for anything else that ticks an edge. (2) **A number in the gap
+between two outlines is a piece label** (M3a: a number inside a closed mark), not a
+side's length, unless it stands near a side's middle — a `26″` written in the gap a
+hundred pixels off the middle of the left side scored 0.50 as the outline's identity
+against 0.43 as the side's length, so the maths says the figure is unlabelled and true
+size waits. Worth a look before John writes his own. (3)
+**Not built:** a quadrilateral is not fixed by its sides (M4), so a trapezoid panel or
+a bodice with a curved neckline says its marks and no sizes and is not printed — the
+pattern pieces true size can print are rectangles and triangles; a dashed cutting line
+(short strokes in a row, `dashedLines`) is not read as an outline; a dart made of two
+loose lines meeting at a point is not read (a closed wedge or a V of one stroke is); a
+double notch reads as two; the cutting line offsets a convex polygon (miter joins) and
+a circle's is not drawn; a piece labelled on both outlines takes the inner. (4)
+`scripts/examples.mjs`'s pattern page is a right triangle and a page of steps, not a
+garment piece, and was left alone; a fifth example (a pattern piece with its
+allowance) would be the way to show the pack, and needs `boards/examples/index.json`
+and e2e 65's list to grow with it.
+
 ### Phase 5 — seats
 J1–J3 as `DIRECTOR-PLAN-W2.md` §3, with §6's addition.
 
