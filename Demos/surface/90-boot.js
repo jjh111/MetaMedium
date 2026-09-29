@@ -120,6 +120,13 @@
   };
 
 
+  // Mermaid (V1-PLAN D2, D3), for tests: the library a frame loads (a stand-in, or the CDN's again), what a frame said of itself, what Draw it drew.
+  Object.assign(window.__mm, {
+    mermaidFrom: mermaidFrom,
+    mermaidState: (id) => (mermaidStates.has(id) ? Object.assign({}, mermaidStates.get(id)) : null),
+    mermaidLast: mermaidLast,
+  });
+
   // The board this browser keeps hears every change FIRST, before the paint:
   // a release on a big board paints for seconds, and the record of the stroke
   // must be the browser's before then (V1-PLAN R3, the kill test).

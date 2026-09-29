@@ -658,7 +658,18 @@
 
   /** How many times the board has been painted, for tests: a pointer move while drawing must not paint it. */
   let paints = 0;
+  /**
+   * A tool that writes hundreds of events in one act — Draw it from a Mermaid text (D3) — holds the paint
+   * until it has written them: every event still reaches the journal and every other listener, and the board
+   * is painted once, after. Painted per event, a 45-node diagram took seven seconds of paints.
+   */
+  let paintHeld = 0;
+  function holdPaint(fn) {
+    paintHeld++;
+    try { return fn(); } finally { if (--paintHeld === 0) render(session.getState()); }
+  }
   function render(s) {
+    if (paintHeld) { state = s; return; }
     paints++;
     state = s;
     chipHits = [];

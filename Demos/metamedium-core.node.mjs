@@ -22198,11 +22198,11 @@ var TEXT_EDIT = {
     for (const id of scope.summon.enclosedIds.filter((x) => s.artifacts.includes(x))) {
       const n2 = s.nodes.get(id);
       const rep = n2 && codeRepOf(n2);
-      if (!rep || rep.data.kind !== "text") continue;
+      if (!rep || rep.data.kind !== "text" && rep.data.kind !== "mermaid") continue;
       out.push({
         key: "edit-text:" + id,
         label: "Edit the text",
-        reason: "a new version of the words; every version kept",
+        reason: rep.data.kind === "mermaid" ? "a new version of the Mermaid; every version kept" : "a new version of the words; every version kept",
         base: 0.4,
         tool: "text-edit",
         verbs: ["edit", "edit the text", "retype"],

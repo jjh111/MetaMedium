@@ -62,6 +62,17 @@ describe('the Draw it tool', () => {
     expect(drawItOf(s)!.reason).toMatch(/sequence diagram/);
   });
 
+  it('the same artifact can be edited in words — Edit the text, after Draw it — so a person can change the diagram before drawing it', () => {
+    const s = createSession(DEFAULT_SESSION_CONFIG);
+    const id = standIn(s, FLOWCHART_MERMAID_READ);
+    hold(s, [id]);
+    const offers = rankOffers(offersFor(toolScope(s)));
+    const edit = offers.find((o) => o.key === 'edit-text:' + id)!;
+    expect(edit).toMatchObject({ label: 'Edit the text', tool: 'text-edit' });
+    expect(edit.reason).toMatch(/Mermaid/);
+    expect(offers.indexOf(edit)).toBeGreaterThan(offers.findIndex((o) => o.key === 'mermaid-draw'));
+  });
+
   it('taking it writes nothing itself: it names the act the host performs, with the text and the artifact', () => {
     const s = createSession(DEFAULT_SESSION_CONFIG);
     const id = standIn(s, FLOWCHART_MERMAID_READ);

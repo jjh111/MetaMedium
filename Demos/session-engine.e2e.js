@@ -3890,7 +3890,7 @@ window.__scenario = async function(){
       for (let i = 0; i < path.length - 1; i++) p = p.concat(t.line(path[i], path[i + 1], 26).slice(i ? 1 : 0));
       return p;
     };
-    const arrowDown62 = (x, y0, y1) => t.line({ x: x, y: y0 }, { x: x, y: y1 }, 40).concat(t.line({ x: x, y: y1 }, { x: x - 14, y: y1 - 20 }, 16).slice(1));
+    const arrowDown62 = (x, y0, y1) => t.line({ x: x, y: y0 }, { x: x, y: y1 }, 40).concat(t.line({ x: x, y: y1 }, { x: x - 10, y: y1 - 14 }, 16).slice(1));
     t.stroke(t.rect(200, 100, 160, 70)); keep62();
     t.stroke(arrowDown62(280, 174, 236)); keep62();
     t.stroke(t.rect(200, 240, 160, 70)); keep62();
@@ -4038,7 +4038,7 @@ window.__scenario = async function(){
       for (let i = 0; i < path.length - 1; i++) p = p.concat(t.line(path[i], path[i + 1], 26).slice(i ? 1 : 0));
       return p;
     };
-    const arrowDown63 = (x, y0, y1) => t.line({ x: x, y: y0 }, { x: x, y: y1 }, 40).concat(t.line({ x: x, y: y1 }, { x: x - 14, y: y1 - 20 }, 16).slice(1));
+    const arrowDown63 = (x, y0, y1) => t.line({ x: x, y: y0 }, { x: x, y: y1 }, 40).concat(t.line({ x: x, y: y1 }, { x: x - 10, y: y1 - 14 }, 16).slice(1));
     t.stroke(t.rect(200, 100, 160, 70)); keep63();
     t.stroke(arrowDown63(280, 174, 236)); keep63();
     t.stroke(t.rect(200, 240, 160, 70)); keep63();

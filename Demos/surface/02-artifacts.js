@@ -6,7 +6,7 @@
 // closure's; no imports, no exports, no build step beyond the concatenation.
 
   /** Kinds that render as a figure on the board rather than as a page: no plate, clear ground. */
-  const FIGURE_KINDS = new Set(['run', 'svg', 'text']);
+  const FIGURE_KINDS = new Set(['run', 'svg', 'text', 'mermaid']);
 
   // ===== The live plane: artifacts that render and run ====================
   // Generated code becomes real DOM in an iframe, positioned in world space
@@ -94,8 +94,9 @@
         const iframe = document.createElement('iframe');
         // Two sandboxes, never both: a page keeps its origin and runs no script,
         // so ink can hit-test into it; a program runs scripts in an opaque
-        // origin and reports its parts back (SURFACE-v9-PLAN D7).
-        iframe.setAttribute('sandbox', kind === 'run' ? 'allow-scripts' : 'allow-same-origin');
+        // origin and reports its parts back (SURFACE-v9-PLAN D7). A diagram said
+        // as Mermaid is drawn by a library in the second, and reports its nodes.
+        iframe.setAttribute('sandbox', kind === 'run' || kind === 'mermaid' ? 'allow-scripts' : 'allow-same-origin');
         iframe.setAttribute('scrolling', 'no');
         iframe.title = MM.wordOf(node) || id;
         iframe.onload = sizeFramesToScreen; // the type is set for the screen as soon as the document is there
@@ -128,7 +129,8 @@
       // came on. A page is theme-independent and rebuilds for nothing.
       const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code) +
         (kind === 'run' ? ':' + (playing ? 'run' : 'still') : '') +
-        (FIGURE_KINDS.has(kind) ? ':' + (document.documentElement.getAttribute('data-theme') || '') : '');
+        (FIGURE_KINDS.has(kind) ? ':' + (document.documentElement.getAttribute('data-theme') || '') : '') +
+        (kind === 'mermaid' ? ':' + hashOf(mermaidSourcesNow().join('|')) : '');
       if (!f.parked && f.codeAt !== stamp) {
         // A document that CHANGES gets a new element. Assigning srcdoc twice
         // in one tick — the source card at import, the harness at play — lost
@@ -143,7 +145,7 @@
           f.iframe = next;
         }
         f.codeAt = stamp;
-        if (kind === 'run') reported.delete(id);
+        if (kind === 'run' || kind === 'mermaid') { reported.delete(id); mermaidStates.delete(id); }
         f.iframe.srcdoc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h, { id: id, playing: playing });
       }
     }
@@ -187,11 +189,16 @@
     const fr = node && MM.frameOf(node);
     const found = new Set();
     if (!f || !fr) return [];
-    // A program reports its own parts; the ink lands on those.
-    if (f.kind === 'run') {
+    // A program reports its own parts; the ink lands on those. So does a diagram
+    // said as Mermaid, its parts named for Mermaid ids and read back to the marks
+    // they were written from (`mermaidPartNames`, 25-mermaid.js).
+    if (f.kind === 'run' || f.kind === 'mermaid') {
       const x0 = bounds.minX - fr.x, y0 = bounds.minY - fr.y, x1 = bounds.maxX - fr.x, y1 = bounds.maxY - fr.y;
       for (const r of reportedRegions(artifactId)) {
-        if (r.x < x1 && r.x + r.w > x0 && r.y < y1 && r.y + r.h > y0) found.add(r.id);
+        if (r.x < x1 && r.x + r.w > x0 && r.y < y1 && r.y + r.h > y0) {
+          if (f.kind === 'mermaid') for (const name of mermaidPartNames(artifactId, r.id)) found.add(name);
+          else found.add(r.id);
+        }
       }
       return [...found];
     }
