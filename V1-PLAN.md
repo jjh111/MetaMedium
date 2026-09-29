@@ -2378,6 +2378,38 @@ named *Show it in 3D* the field no longer offered (56d) and said writing
 ### Phase 7 — review and release
 **H1** — week 1's U7 (the `hand` gate scenario) plus `QA-v1.md`, a hand
 checklist for A1–A10 with the MCP hand in the room checking each step.
+*Status, 29 Sep 2026 (branch `unit/h1-hand`):* **H1 built.** Red `48d1cae`
+(`e2e/hand.mjs` alone; the runner: *nothing to run — pick from …*), then the
+runner `a0d3df0`, §4 `7f8731d`, §6 and A7 `8afdee2`…`094fda0`, the one
+deliberate ask, the minimap and the 3D `1344291`, the invariant and the skips
+`9a71007`, `QA-v1.md` and the README `63cac30`. **`hand`** is a gate
+scenario in the default run: a relay of its own on a free port (`:8020`
+refused and counted), `Demos/mcp.mjs` over stdio in room `mcp-test`, a tab as
+*john*, and a counting model of the gate's own; 30 records, 24 passing and 6
+skipped by name, about a minute. It walks QA-v10 §4, §6 and §7 and acceptance
+A7 (a sentence, a reading, a transcript and a label landing on the right marks
+after an undo and a reload; a field left open and a loop that waits under the
+hand's stroke; a reload as a new sitting and the same person), with every
+generated stroke said `synthetic` and John's own handwriting (§1–§3) and a
+small model that fails (§5 row 2) as skips by name. **The invariant** (*Tier 1
+before a model*): the gate's model is asked once, by *What is this?* (H1.19,
+with the working dot up while the call is out), and H1.Y holds the count to
+that one, with no brief parked, the seat not taken and no real model
+attempted; mutation checked (auto-read on in the tab fails H1.19 and H1.Y).
+**`QA-v1.md`** is the hand checklist for A1–A10: each scenario's steps a
+person walks, and a column for which tool the hand uses and what it should
+say. **Found:** (1) the hand's own `canvas_look` printed a reading another
+hand proposed — or its own — as though the engine had read it: fixed in
+`Demos/mcp.mjs` (`467759b`, then `9dacd98` for the first fix's own fault, a
+name John gave read as the hand's), each red first (`8afdee2`, `1344291`);
+(2) **for the surface's owner: a reading the hand proposes is held and
+attributed on the tab but never shown in the field's *what this is* row** — a
+hand is a tier 0 voice and `conversionsFor` (`09-palette.js`) leaves tier 0
+out, so it lands and shows nowhere (`QA-v10` §6 row 4 says it joins as
+*· claude*); a skip by name, *known* (H1.10b), that turns into a pass the day
+it shows; (3) `QA-v10` §4's *1 selected* predates per-hand gestures — the
+hand's look never says *selected* or *the field is open* about John's field
+(H1.3). Not run: WebKit (unavailable here); the scenario is Chromium's.
 **V1** — the review of use: John and the drafter on real work, on John's
 machine; the faults written up as `NOTES-V1-REVIEW.md`. **V2** — its fixes,
 each with its regression. **V3** — the whitepaper's v1 figures (week 1's
