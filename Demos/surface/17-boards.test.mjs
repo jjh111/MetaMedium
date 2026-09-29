@@ -22,6 +22,7 @@ const NAMES = [
   'newBoardEntry', 'copyName', 'copyEntry', 'renamed', 'trashed', 'restored', 'pickBoard', 'nextAfter',
   'emptyTrashPlan', 'agoWords', 'sizeWords', 'countMarks', 'statsOf', 'statsAfter', 'kindWords', 'placeEntry',
   'placesPlan', 'boardRows', 'leaveVerdict', 'switchPlan', 'boardTitle', 'boardSearch',
+  'EXAMPLES_BASE', 'exampleUrl', 'exampleRows', 'exampleName', 'starterOf',
 ];
 const file = join(dirname(fileURLToPath(import.meta.url)), '17-boards.js');
 // Loaded as the browser loads it. While the fragment is not written, every
@@ -300,4 +301,67 @@ test('at random: new, rename, copy, trash, restore and empty — ids stay unique
       for (const id of made) assert.ok(ids.includes(id) || emptied.has(id), `run ${run}, step ${step}: ${id} is on the list, in the trash, or was emptied`);
     }
   }
+});
+
+// ----- The examples (V1-PLAN R5) ---------------------------------------------------------------
+// boards/examples/index.json lists the boards a first-time hand can open from the pane. The list
+// is READ, not trusted: a row that could not be opened is left out, never thrown at, and a file
+// name can only ever be one of the folder's own.
+
+const INDEX = {
+  starter: 'molecule',
+  examples: [
+    { id: 'flowchart', name: 'Flowchart', says: 'boxes and arrows, read as a flowchart, with its Mermaid beside it', file: 'flowchart.jsonl', marks: 16 },
+    { id: 'molecule', name: 'Molecule', says: 'the Basics pack: a bubble and a molecule, nothing taught', file: 'molecule.jsonl', marks: 1 },
+    { id: 'pattern-page', name: 'Pattern page', says: 'a right triangle that says its long side', file: 'pattern-page.jsonl', marks: 0 },
+  ],
+};
+
+test('an example is fetched from the examples folder, beside the site\'s Demos — from the app and from the old address alike', () => {
+  assert.equal(B.EXAMPLES_BASE, '../boards/examples/');
+  assert.equal(B.exampleUrl('flowchart.jsonl'), '../boards/examples/flowchart.jsonl');
+  assert.equal(B.exampleUrl('index.json'), '../boards/examples/index.json');
+});
+
+test('the rows of the pane: each example with what it shows and how big it is, in the index\'s order', () => {
+  const rows = B.exampleRows(INDEX);
+  assert.deepEqual(rows.map((r) => r.id), ['flowchart', 'molecule', 'pattern-page']);
+  assert.deepEqual(rows[0], { id: 'flowchart', name: 'Flowchart', says: INDEX.examples[0].says, file: 'flowchart.jsonl', words: '16 marks' });
+  assert.equal(rows[1].words, '1 mark');
+  assert.equal(rows[2].words, 'empty');
+});
+
+test('a list that cannot be read is no rows, and a row that cannot be opened is left out — nothing throws', () => {
+  for (const bad of [null, undefined, 'x', 7, [], {}, { examples: 'no' }, { examples: [null, 3, 'x', {}] }]) assert.deepEqual(B.exampleRows(bad), [], JSON.stringify(bad));
+  const rows = B.exampleRows({ examples: [
+    { id: 'a', name: 'A', file: 'a.jsonl', marks: 2 },
+    { id: 'b', name: '', file: 'b.jsonl' },                 // no name
+    { id: 'c', name: 'C', file: '../c.jsonl' },             // out of the folder
+    { id: 'd', name: 'D', file: 'sub/d.jsonl' },            // a path is not a file name
+    { id: 'e', name: 'E', file: 'e.txt' },                  // not a log
+    { id: 'f', name: 'F', file: 'https://x.test/f.jsonl' }, // another site's
+    { id: 'a', name: 'again', file: 'a.jsonl' },            // twice
+    { id: 'g', name: 'G', file: 'g.jsonl', marks: -3 },
+  ] });
+  assert.deepEqual(rows.map((r) => r.id), ['a', 'g']);
+  assert.equal(rows[0].says, '');
+  assert.equal(rows[1].words, '', 'a count that makes no sense is not shown as one');
+});
+
+test('the name of a board made from an example: named for it, and a second is numbered — a name in the trash is taken', () => {
+  const row = B.exampleRows(INDEX)[0];
+  assert.equal(B.exampleName([], row), 'Flowchart example');
+  const one = [board('a', 'My board'), board('b', 'Flowchart example')];
+  assert.equal(B.exampleName(one, row), 'Flowchart example 2');
+  const two = one.concat([board('c', 'Flowchart example 2', { trashed: 5 })]);
+  assert.equal(B.exampleName(two, row), 'Flowchart example 3');
+  assert.equal(B.exampleName([{ id: 'folder:x', kind: 'folder', name: 'Flowchart example' }], row), 'Flowchart example', 'a place is not a board');
+});
+
+test('the starter is the index\'s own choice when it can be opened; else the first example; else none', () => {
+  assert.equal(B.starterOf(INDEX), 'molecule');
+  assert.equal(B.starterOf({ starter: 'gone', examples: INDEX.examples }), 'flowchart');
+  assert.equal(B.starterOf({ examples: INDEX.examples.slice(1) }), 'molecule');
+  assert.equal(B.starterOf({ starter: 'x', examples: [] }), null);
+  assert.equal(B.starterOf(null), null);
 });

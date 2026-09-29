@@ -489,6 +489,106 @@ export async function boardsTest(browser, servers, ctx) {
   return guards;
 }
 
+/**
+ * The first run (V1-PLAN R5): a browser that has never opened the app. The board it opens is EMPTY —
+ * a returning hand is never surprised, and nothing is written for a hand that only looked — and its
+ * panel says the loop and offers one tap, *start from an example*, which makes a board of its own
+ * (a copy) from the starter: the molecule, using the Basics pack. The boards pane lists every example.
+ * `?fresh=1`, the harness's start, stays an empty board; a board with marks is what comes back.
+ */
+export async function firstRunTest(browser, servers, ctx) {
+  const { freshContext, steps } = ctx;
+  const check = (name, ok, detail) => steps.push({ name, ok: !!ok, detail });
+  const origin = servers.staticOrigin;
+  const url = `${origin}/Demos/session-engine.html?nosw=1`;
+  const guards = await freshContext(browser, { origins: [origin], label: 'first-run' });
+  const page = await guards.context.newPage();
+  const state = (pg) => pg.evaluate(() => {
+    const s = window.__mm.session.getState();
+    return {
+      events: window.__mm.session.getEvents().length,
+      strokes: window.__mm.session.getEvents().filter((e) => e.type === 'stroke').length,
+      packs: s.packs,
+      matches: s.clusterCandidates.flatMap((c) => c.matches.map((m) => m.name + '·' + m.pack)),
+      panel: (document.getElementById('inspector') || {}).textContent || '',
+      start: !!document.querySelector('#inspector button[data-example-start]'),
+      more: !!document.querySelector('#inspector button[data-example-more]'),
+      b: window.__mm.boards(),
+    };
+  });
+  try {
+    // ---- N18. the first open: an empty board, the loop, one tap ------------------------
+    await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+    await waitReady(page);
+    await sleep(300);
+    const a = await state(page);
+    const kept = a.b.list.filter((e) => e.kind === 'board');
+    const store0 = await page.evaluate((id) => window.__mm.boardsStore(id), a.b.current);
+    check('N18. a browser that has never opened the app opens ONE empty board, "My board" — nothing is drawn or written for it — whose panel says draw, hold, choose and offers to start from an example',
+      kept.length === 1 && kept[0].name === 'My board' && a.events === 0 && (store0.log || []).length === 0 && /draw a few marks/.test(a.panel) && /press and hold/.test(a.panel) && a.start && a.more,
+      { boards: kept.map((e) => e.name), events: a.events, stored: (store0.log || []).length, start: a.start, more: a.more, panel: a.panel.slice(0, 120) });
+    // The pane lists the examples.
+    await openBoardsPane(page);
+    await page.waitForSelector('#boardsPanel .bdExamples .bdItem', { timeout: 10000 }).catch(() => {});
+    const listed = await page.evaluate(() => [...document.querySelectorAll('#boardsPanel .bdExamples .bdItem')].map((r) => ({ id: r.dataset.example, text: r.textContent.replace(/\s+/g, ' ').trim() })));
+    await closeBoardsPane(page);
+    check('N18b. the boards pane lists the examples — flowchart, class diagram, molecule, pattern page — each with what it shows and how many marks it holds',
+      listed.map((r) => r.id).join() === 'flowchart,class-diagram,molecule,pattern-page' && listed.every((r) => /\d+ marks/.test(r.text)),
+      listed);
+    // One tap on the panel's start.
+    const first = a.b.current;
+    await page.click('#inspector button[data-example-start]');
+    await page.waitForFunction((was) => { const b = window.__mm.boards(); return b.ready && !b.switching && !b.busy && b.current && b.current !== was && window.__mm.board().ready; }, first, { timeout: 20000, polling: 50 });
+    await sleep(200);
+    const b = await state(page);
+    const made = b.b.list.find((e) => e.id === b.b.current);
+    const homeStore = await page.evaluate((id) => window.__mm.boardsStore(id), first);
+    check('N18c. one tap on the panel makes a board of its own from the starter — "Molecule example", using the Basics pack, its molecules matched by the pack with nothing taught — and "My board" stays on the list, as empty as it was',
+      !!made && made.name === 'Molecule example' && JSON.stringify(b.packs) === '["basics@1"]' && b.strokes >= 10 && b.matches.length >= 2 && b.matches.every((m) => m === 'molecule·basics@1')
+        && b.b.list.some((e) => e.id === first && !e.trashed) && (homeStore.log || []).length === 0,
+      { made: made && made.name, packs: b.packs, strokes: b.strokes, matches: b.matches, home: (homeStore.log || []).length });
+    // It is the hand's own board now: kept, and what comes back on a reload.
+    await page.evaluate(() => window.__mm.boardIdle());
+    await page.reload({ waitUntil: 'load' });
+    await waitReady(page);
+    await sleep(300);
+    const c = await state(page);
+    check('N18d. it is kept like any board: a reload opens it again, whole — the marks, the pack — and the panel no longer offers a start, there being marks',
+      c.b.current === b.b.current && c.strokes === b.strokes && JSON.stringify(c.packs) === '["basics@1"]' && !c.start,
+      { current: c.b.current === b.b.current, strokes: [b.strokes, c.strokes], packs: c.packs, start: c.start });
+  } catch (err) {
+    check('N18. the first run ran to its end', false, { error: String(err && err.stack ? err.stack : err) });
+    await ctx.screenshot(page, 'boards-first-run');
+  }
+  await page.close().catch(() => {});
+  // A returning hand: a board with marks is what opens — never replaced, never offered an example over it — and `?fresh=1` is still empty.
+  const back = await freshContext(browser, { origins: [origin], label: 'first-run-returning' });
+  const p2 = await back.context.newPage();
+  try {
+    await p2.goto(url, { waitUntil: 'load', timeout: 60000 });
+    await waitReady(p2);
+    const rand = rng(18);
+    for (let i = 0; i < 2; i++) await drawPath(p2, boxPath(cellBox(i, rand)));
+    await p2.evaluate(() => window.__mm.boardIdle());
+    await p2.reload({ waitUntil: 'load' });
+    await waitReady(p2);
+    await sleep(300);
+    const r = await state(p2);
+    await p2.goto(url + '&fresh=1', { waitUntil: 'load' });
+    await waitReady(p2);
+    await sleep(300);
+    const f = await state(p2);
+    check('N18e. a returning hand is not surprised: a board with two boxes comes back with two boxes and no example on the list but the pane’s; and ?fresh=1 — the harness’s start — is an empty board using no pack',
+      r.strokes === 2 && !r.start && r.b.list.filter((e) => e.kind === 'board').length === 1 && f.events === 0 && f.packs.length === 0,
+      { back: { strokes: r.strokes, start: r.start, boards: r.b.list.filter((e) => e.kind === 'board').length }, fresh: { events: f.events, packs: f.packs } });
+  } catch (err) {
+    check('N18e. the returning hand ran to its end', false, { error: String(err && err.stack ? err.stack : err) });
+    await ctx.screenshot(p2, 'boards-first-run-returning');
+  }
+  await p2.close().catch(() => {});
+  return [guards, back];
+}
+
 /** The scenario the gate runs. */
 export async function runBoards(browser, servers, ctx) {
   const steps = [];
@@ -496,5 +596,8 @@ export async function runBoards(browser, servers, ctx) {
   const t = Date.now();
   const guards = await boardsTest(browser, servers, { ...ctx, steps });
   measured['boards s'] = +((Date.now() - t) / 1000).toFixed(1);
-  return { steps, guards: [guards], measured };
+  const t2 = Date.now();
+  const first = await firstRunTest(browser, servers, { ...ctx, steps });
+  measured['first run s'] = +((Date.now() - t2) / 1000).toFixed(1);
+  return { steps, guards: [guards, ...first], measured };
 }
