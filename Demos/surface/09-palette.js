@@ -253,6 +253,9 @@
       if (!any) say('nothing there to read — the marks held have no ink an image can be made of');
     },
     what: (o) => askModelsAbout(o.data.ids.slice()),
+    // The maths tool's acts (M5): the sizes said and left showing beside their figure, the drawing printed at its real size.
+    'maths-show': (o) => mathsShow(o.data),
+    'maths-print': () => mathsPrint(),
     duplicate: (o, scope) => duplicateMarks(scope.summon, o.data.ids),
     'behave-model': (o) => { const d = o.data; agents.forEach((a) => withWork('behave:' + a.id + ':' + d.nodeId, [d.nodeId], modelWords(a) + ' · reading the words', a.behave({ nodeId: d.nodeId, words: d.words, at: Date.now() })).then(() => render(session.getState()))); },
   };
@@ -506,6 +509,8 @@
       // A thunk: reading the drawing's genre costs a pass over the marks, and most
       // keystrokes settle on a verb or a name long before the brief.
       target: () => targetOf(sum, text).target,
+      // A thunk too: `= 24 ÷ 3` is read by core against the board's own page (M5), and only when a sum is typed.
+      maths: (body) => MM.evaluateTyped(body, mathsFor(s).board),
     };
   }
 
@@ -518,6 +523,8 @@
       if (item) { noteUse(item); item.run(); }
       return;
     }
+    // A sum typed after `=`: its words, result and all, stand on the board as text beside the marks held (M5).
+    if (cmd.do === 'maths') { mathsWrite(sum, cmd.words); return; }
     // Naming is the name tool's act, whether a pill or `name: word` took it.
     if (cmd.do === 'name') { MM.nameMarks(session, sum.id, cmd.name, at); return; }
     // The marks this summon held when Enter was read — not whatever is held when a stale

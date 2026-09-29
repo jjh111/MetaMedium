@@ -3961,14 +3961,33 @@ window.__scenario = async function(){
     fresh64();
     const APRON64 = ['A. Bust 36', 'B. Top to waist 20', 'C. Top to bottom 46', 'Add seam allowance', '1. A ÷ 3 = 12 + 2 = 14', '2. ① ÷ 2 = 14 ÷ 2 = 7', '3. B 20 + 2 = 22', '4. C 48', '5. A 38"', '6. (C × 2) − B 72"'];
     const page64 = mm.typeText({ x: 420, y: 140 }, APRON64.join('\n'), { w: 360, h: 300 });
-    await wait(100);
+    await wait(600); // the page’s frame loads, and the chips are measured against its own lines
     const stepTexts64 = () => Object.fromEntries(chipsOf('step').map((c) => [c.key, c.text]));
     const first64 = stepTexts64();
     const ys64 = chipsOf('step').map((c) => c.y);
-    step('64e. the sample page’s steps each show their check beside their own line: 14″, 7″ and 22″ agree, 4 and 5 and 6 agree with their allowance and say the other reading',
+    // Where the page's own lines stand, from its frame's document — found by the words of each line, not by counting rows —
+    // in world units: the middle of the line and the right end of its words.
+    const lineBox64 = (words) => {
+      const fr = MM.frameOf(mm.session.getState().nodes.get(page64)), f = mm.frames.get(page64);
+      const pre = f && f.iframe && f.iframe.contentDocument && f.iframe.contentDocument.querySelector('pre.src');
+      if (!fr || !pre) return null;
+      const walk = pre.ownerDocument.createTreeWalker(pre, NodeFilter.SHOW_TEXT);
+      const all = []; for (let n = walk.nextNode(); n; n = walk.nextNode()) all.push(n);
+      const text = all.map((n) => n.nodeValue).join('');
+      const at = text.indexOf(words);
+      if (at < 0) return null;
+      let acc = 0; const r = pre.ownerDocument.createRange(); let a = false, z = false;
+      for (const n of all) { const len = n.nodeValue.length; if (!a && at < acc + len) { r.setStart(n, at - acc); a = true; } if (a && at + words.length <= acc + len) { r.setEnd(n, at + words.length - acc); z = true; break; } acc += len; }
+      const rects = z ? [...r.getClientRects()] : [];
+      return rects.length ? { top: fr.y + rects[0].top, bottom: fr.y + rects[0].bottom, right: fr.x + Math.max(...rects.map((q) => q.right)) } : null;
+    };
+    const stepLines64 = ['1. A ÷ 3 = 12 + 2 = 14', '2. ① ÷ 2 = 14 ÷ 2 = 7', '3. B 20 + 2 = 22', '4. C 48', '5. A 38"', '6. (C × 2) − B 72"'];
+    const boxes64 = stepLines64.map(lineBox64);
+    const beside64 = chipsOf('step').map((c, i) => { const b = boxes64[i]; return !!b && c.y >= b.top - 2 && c.y <= b.bottom + 2 && c.x >= b.right && c.x - b.right < 40; });
+    step('64e. the sample page’s steps each show their check beside their own line — on that line, just past the end of its words: 14″, 7″ and 22″ agree, 4 and 5 and 6 agree with their allowance and say the other reading',
       Object.keys(first64).length === 6 && first64['step:1'] === '✓ 14″' && first64['step:2'] === '✓ 7″' && first64['step:3'] === '✓ 22″' && first64['step:4'] === '✓ 48″ · or 46″'
-        && first64['step:6'] === '✓ 72″ · or 74″' && ys64.every((y, i) => !i || y > ys64[i - 1]) && chipsOf('step').every((c) => c.x >= 780),
-      { steps: first64, ys: ys64 });
+        && first64['step:6'] === '✓ 72″ · or 74″' && ys64.every((y, i) => !i || y > ys64[i - 1]) && beside64.length === 6 && beside64.every(Boolean),
+      { steps: first64, ys: ys64, lines: boxes64, beside: beside64 });
     sameAsWhole('the page’s step chips — the maths');
     // Changing A changes what depends on it: 1, 2 and 5 — and nothing else.
     const page38 = APRON64.map((l) => (l === 'A. Bust 36' ? 'A. Bust 38' : l)).join('\n');

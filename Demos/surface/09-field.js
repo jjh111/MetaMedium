@@ -1,8 +1,9 @@
 // ===== field (the reader) =====
 // Provides: the field's QUERY, pure — readFieldCommand (what Enter will do, as a named
 //   command record), and the two matchers it stands on (verbFor, libraryMatch), plus
-//   the prefix pattern (FIELD_PREFIXES) and typedWord (the word a typed text offers to
-//   name the selection with, or to label the person's own ink with — V1-PLAN L2e), and
+//   the prefix pattern (FIELD_PREFIXES), the sum (`= 24 ÷ 3`, read by readSum — DIRECTOR-PLAN-W2 M5)
+//   and typedWord (the word a typed text offers to name the selection with, or to label the
+//   person's own ink with — V1-PLAN L2e), and
 //   the words for another hand's marks a label will not go on (theirMarks, madeThese).
 // Uses: NOTHING. This fragment names no closure variable, touches no DOM, and asks the
 //   session nothing. Everything it needs arrives in a FieldContext record; everything it
@@ -62,9 +63,14 @@
    *           costs a pass over the marks, and most keystrokes settle on a verb, a name or
    *           a prefix long before the brief. Called at most once, and only on the branch
    *           that needs it.
+   * @property {function(string): ({ok:true,words:string,result:string,also?:string}|{ok:false,reason:string})} [maths]
+   *           what a sum typed after `=` comes to, read against the board's page by core
+   *           (`evaluateTyped`): the words that would stand on the board and their result, or why
+   *           not. A thunk too — the reader names nothing outside itself, and reads a sum only
+   *           on the branch that needs one (M5).
    *
    * @typedef {Object} FieldCommand  what Enter will do, named rather than closed over
-   * @property {'take'|'name'|'label'|'ask-what'|'ask'|'draw'|'build'|'library'|'behave'|'need-model'} do
+   * @property {'take'|'name'|'label'|'ask-what'|'ask'|'draw'|'build'|'library'|'behave'|'need-model'|'maths'} do
    *
    * @typedef {Object} FieldReading  the reader's whole answer
    * @property {string} kind        empty|default|name|label|what|ask|draw|brief|structure|verb|library|behaviour|blocked|page|run|program|new
@@ -78,6 +84,8 @@
   const FIELD_PREFIXES = /^(ask|draw|page|run|program|new|name|what|label)\s*:\s*([\s\S]*)$/i;
   /** The same acts typed bare, before their colon: a command half-typed, never a word to put on marks. */
   const PREFIX_WORDS = /^(ask|draw|page|run|program|new|name|what|label)$/i;
+  /** A sum: `=` and what follows, spaced or not (`= 24 ÷ 3`, `=(39+6)/2`). */
+  const SUM = /^=\s*([\s\S]*)$/;
   /** The longest word the row offers as a pill; a longer one is still taken by its prefix and Enter. */
   const WORD_MAX = 40;
 
@@ -177,6 +185,11 @@
       return { kind: 'empty', line: '', quiet: true, command: null };
     }
 
+    // A sum: `=` says the rest is arithmetic, read by core against the page — no model, and
+    // nothing to guess. The line says the result before Enter; Enter stands it on the board.
+    const sum = SUM.exec(text);
+    if (sum) return readSum(sum[1].trim(), c);
+
     // A prefix spells the act out, so nothing has to be guessed.
     const m = FIELD_PREFIXES.exec(text);
     if (m) {
@@ -240,6 +253,28 @@
   }
 
   /**
+   * Pure: `= 24 ÷ 3`, read by the thunk the adapter gives (core's `evaluateTyped`). Says the
+   * result before Enter and what Enter does with it — the words, result and all, stand on the
+   * board as text — or, quietly, why it cannot: nothing typed yet, or a sum core could not read.
+   * The smallest honest act: a text is words the hand can edit, and it is a line of the page,
+   * so its own check follows the measurements it names.
+   * @param {string} body
+   * @param {FieldContext} c
+   * @returns {FieldReading}
+   */
+  function readSum(body, c) {
+    if (!body) return { kind: 'maths', line: '↵ = … type a sum, like = 24 ÷ 3', quiet: true, command: null };
+    if (typeof c.maths !== 'function') return { kind: 'maths', line: '↵ = … the maths is not here', quiet: true, command: null };
+    const r = c.maths(body);
+    if (!r || !r.ok) return { kind: 'maths', line: '↵ = ' + ((r && r.reason) || 'cannot read that as a sum'), quiet: true, command: null };
+    return {
+      kind: 'maths',
+      line: '↵ ' + r.words + ' — put it on the board as text' + (r.also ? ' · or ' + r.also : ''),
+      command: { do: 'maths', words: r.words },
+    };
+  }
+
+  /**
    * Pure: `label: word`, read against the held ink. Three answers, each said before Enter:
    * the word on each of your marks; on yours and not on another hand's (named); or on
    * none, said quietly — and Enter still runs, so the adapter says the refusal in the
@@ -277,6 +312,7 @@
     const c = ctx || {};
     const text = (c.text || '').trim();
     if (!c.open || c.revising || !text) return null;
+    if (SUM.test(text)) return null; // a sum is arithmetic, never a word
     const ink = c.marks || {};
     if (!((ink.mine || 0) + (ink.others || []).length)) return null;
     const m = FIELD_PREFIXES.exec(text);

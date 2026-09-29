@@ -812,6 +812,8 @@
     paintView = null;
 
     renderLabels(s, inspectedId, ix, vb);
+    // What the board's numbers say, beside its figures and its page (M5, 25-maths.js).
+    renderMaths(s, ix, vb);
 
     if (s.summon) {
       for (const gid of s.summon.gestureIds) {
@@ -1420,7 +1422,7 @@
     // above an artifact) — meets the canvas. Generous on purpose: a hand's
     // paint must draw everything this calls on screen.
     const vp = screenWorld(0);
-    const carry = { ink: wpx(8) + 4, ghost: wpx(8) + 4, match: wpx(4), read: wpx(4), card: wpx(4), label: wpx(24), chrome: wpx(40), reading: wpx(24) };
+    const carry = { ink: wpx(8) + 4, ghost: wpx(8) + 4, match: wpx(4), read: wpx(4), card: wpx(4), label: wpx(24), chrome: wpx(40), reading: wpx(24), maths: wpx(4) };
     const reach = (bx, op) => {
       const m = carry[op.kind] || wpx(8), words = op.text && (op.kind === 'reading' || op.kind === 'chrome' || op.kind === 'label') ? op.text.length * wpx(9) : 0;
       return { minX: bx.minX - m, minY: bx.minY - m, maxX: bx.maxX + m + words, maxY: bx.maxY + m };
