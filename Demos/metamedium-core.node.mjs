@@ -14827,7 +14827,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     stroke.edges = stroke.edges.filter((e) => !(e.rel === "bound-to" && e.end === ev.end));
     stroke.reps = stroke.reps.filter((r) => !(r.modality === "bound" && r.data.end === ev.end));
     if (!stroke.edges.some((e) => e.rel === "bound-to" && e.to === was)) noFollowerOf(was, stroke.id);
-    reroute([ev.strokeId]);
+    if (routeRepOf(stroke)) putRoute(stroke);
   }
   function refollow(id) {
     const node = nodes.get(id);

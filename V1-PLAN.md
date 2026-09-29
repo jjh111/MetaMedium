@@ -1925,7 +1925,7 @@ the two honest skips): held flowchart offered *Tidy the diagram*; one act of
 `tidy` and `route` events, every one the tool's; every route orthogonal in at
 most four turns; the flowchart and its Mermaid and the ink as they were; the
 paint's routes with the ink faint; two boxes dragged re-route in one `move`;
-one undo, then one more, takes it all away. **By design** the three tests that
+one undo, then one more, takes it all away. **The whole gate** with it: 687 passed, 0 failed, 13 skipped across 12 scenarios in 448 s (the budgets' five skipped by name — another gate was running on the machine; the canvas and pencil scenarios rerun after the last change to the bundle). **By design** the three tests that
 pinned *Mermaid* / *Draw it* as the last tools and `describe.test.ts`'s tool
 list moved by one place (routing is last; the field's order and e2e 49's golden
 stand). **Found:** (1) a separate head drawn apart — Mermaid in's arcs, `<-->`
