@@ -121,15 +121,15 @@ export const PORTS_FLOOR = 0.4;
 
 const MAX = MAX_TIER0_CONFIDENCE;
 const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
-const count = (n: number) => WORDS[n] ?? String(n);
+export const count = (n: number) => WORDS[n] ?? String(n);
 const deg = (x: number) => `${Math.max(0, Math.round(x))}°`;
-const an = (word: string) => `${/^[aeiou]/.test(word) ? 'an' : 'a'} ${word}`;
+export const an = (word: string) => `${/^[aeiou]/.test(word) ? 'an' : 'a'} ${word}`;
 const pct = (x: number) => `${Math.round(x * 100)}%`;
-const scaleOf = (node: MMNode) => (getRep(node, 'stroke')?.data as { scale?: number } | undefined)?.scale ?? 1;
+export const scaleOf = (node: MMNode) => (getRep(node, 'stroke')?.data as { scale?: number } | undefined)?.scale ?? 1;
 
 // ===== Reading one outline =====
 
-interface Outline {
+export interface Outline {
   hull: Point[];
   bounds: Bounds;
   size: number;
@@ -141,7 +141,7 @@ interface Outline {
   frame: { centre: Point; axis: Point; long: number; short: number } | null;
 }
 
-function outlineOf(points: readonly Point[]): Outline | null {
+export function outlineOf(points: readonly Point[]): Outline | null {
   const hull = hullOf(points);
   if (hull.length < 3) return null;
   const A = areaOf(hull);
@@ -164,7 +164,7 @@ function outlineOf(points: readonly Point[]): Outline | null {
 }
 
 /** How much the outline reads as each shape symbol, and why — 0 where it does not. `round` is a start or end in waiting: whether it is one depends on the chart. */
-function shapeScores(o: Outline): { symbol: SymbolName | 'round'; score: number; why: string }[] {
+export function shapeScores(o: Outline): { symbol: SymbolName | 'round'; score: number; why: string }[] {
   const out: { symbol: SymbolName | 'round'; score: number; why: string }[] = [];
   const notThree = 1 - ramp(o.three, THREE_CORNERED[0], THREE_CORNERED[1]);
   const cornered = ramp(o.four, CORNERED[0], CORNERED[1]) * notThree;
@@ -242,7 +242,7 @@ function portOutline(c: Candidate, nodes: ReadonlyMap<string, MMNode>): Outline 
 
 // ===== Candidates: what could be a symbol =====
 
-interface Candidate {
+export interface Candidate {
   /** What stands for it — a stroke, a word, or a figure of several loose strokes. */
   id: string;
   /** The strokes it is drawn with. */
@@ -266,7 +266,7 @@ const topCore = (c: Candidate) => {
 };
 
 /** A closed stroke as a candidate. */
-function strokeCandidate(node: MMNode): Candidate | null {
+export function strokeCandidate(node: MMNode): Candidate | null {
   const pts = strokePointsOf(node);
   const fp = fingerprintOf(node);
   if (!pts || !fp || pts.length < 3) return null;
@@ -281,7 +281,7 @@ function strokeCandidate(node: MMNode): Candidate | null {
 }
 
 /** Several strokes whose ends meet, as a candidate. */
-function figureCandidate(f: InkFigure, id: string, marks: string[], scale: number, lead: string): Candidate | null {
+export function figureCandidate(f: InkFigure, id: string, marks: string[], scale: number, lead: string): Candidate | null {
   if (f.vertices.length !== 4) return null;
   const o = outlineOf(f.vertices);
   if (!o) return null;
@@ -322,7 +322,7 @@ function readingsOf(c: Candidate): SymbolReading[] {
 let reading = 0;
 
 /** An open loose stroke that could be a ruled side of a figure (figures.ts reads no arrow, writing, dot or closed stroke). */
-function mayBeSide(n: MMNode): boolean {
+export function mayBeSide(n: MMNode): boolean {
   if (!getRep(n, 'stroke') || getRep(n, 'erased') || getRep(n, 'gesture') || n.edges.some((e) => e.rel === 'part-of')) return false;
   const fp = fingerprintOf(n);
   const top = resemblances(n)[0]?.to;
@@ -444,12 +444,12 @@ interface Mark {
 }
 
 /** Writing: a word, a mark somebody has read, or a stroke the shape rung reads as text. */
-function isWriting(node: MMNode): boolean {
+export function isWriting(node: MMNode): boolean {
   if (isWord(node) || transcriptOf(node)) return true;
   return resemblances(node)[0]?.to === 'type:text';
 }
 
-function centreOf(b: Bounds): Point {
+export function centreOf(b: Bounds): Point {
   return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
 }
 
@@ -459,7 +459,7 @@ function centreOf(b: Bounds): Point {
  * same words however the log was merged. A figure's strokes each carry the
  * word the hand labelled them with, so it is said once.
  */
-function ownWords(nodes: ReadonlyMap<string, MMNode>, ids: readonly string[]): string | undefined {
+export function ownWords(nodes: ReadonlyMap<string, MMNode>, ids: readonly string[]): string | undefined {
   const words: string[] = [];
   for (const id of [...new Set(ids)].sort()) {
     const n = nodes.get(id);
@@ -470,27 +470,27 @@ function ownWords(nodes: ReadonlyMap<string, MMNode>, ids: readonly string[]): s
 }
 
 /** How far a point stands from a box: 0 inside it. The cheap test in front of every hull and path distance. */
-function offBox(p: Point, b: Bounds): number {
+export function offBox(p: Point, b: Bounds): number {
   return Math.hypot(Math.max(0, b.minX - p.x, p.x - b.maxX), Math.max(0, b.minY - p.y, p.y - b.maxY));
 }
 
 /** How far apart two boxes stand: 0 when they touch or overlap. */
-function boxGap(a: Bounds, b: Bounds): number {
+export function boxGap(a: Bounds, b: Bounds): number {
   return Math.hypot(Math.max(0, b.minX - a.maxX, a.minX - b.maxX), Math.max(0, b.minY - a.maxY, a.minY - b.maxY));
 }
 
-function boundsOfPoints(pts: readonly Point[]): Bounds {
+export function boundsOfPoints(pts: readonly Point[]): Bounds {
   const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
   return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
 }
 
 /** The nine places on a box a label is measured from: its centre, corners and edge middles. */
-function boxPoints(b: Bounds): Point[] {
+export function boxPoints(b: Bounds): Point[] {
   const xs = [b.minX, (b.minX + b.maxX) / 2, b.maxX], ys = [b.minY, (b.minY + b.maxY) / 2, b.maxY];
   return xs.flatMap((x) => ys.map((y) => ({ x, y })));
 }
 
-const reachOfSymbol = (c: Candidate) => Math.max(magnetRadius(c.outline.size, c.scale), c.outline.size * DEFAULT_SESSION_CONFIG.wireEndpointRatio);
+export const reachOfSymbol = (c: Candidate) => Math.max(magnetRadius(c.outline.size, c.scale), c.outline.size * DEFAULT_SESSION_CONFIG.wireEndpointRatio);
 
 /**
  * The flowchart a scope makes — the board's content plane when no scope is
@@ -817,7 +817,7 @@ export function readFlowchart(state: SessionState, scopeIds?: readonly string[])
   };
 }
 
-interface ResolvedEnd {
+export interface ResolvedEnd {
   symbol?: Candidate;
   head?: HeadReading;
   quality: number;
@@ -825,7 +825,7 @@ interface ResolvedEnd {
 }
 
 /** One end of a connector: a magnet's bind first; else past its head, the nearest symbol within reach. */
-function endOf(
+export function endOf(
   e: ConnectorHeads['start'],
   connectorId: string,
   bindings: ReturnType<typeof activeBindingsOf>,

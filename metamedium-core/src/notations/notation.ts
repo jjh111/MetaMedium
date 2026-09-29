@@ -42,6 +42,7 @@ import { ROLES } from '../diagram/roles';
 import { FLOWCHART } from './flowchart';
 import { UML_CLASS } from './uml-class';
 import { SEQUENCE } from './sequence';
+import { STATE } from './state';
 
 /** A symbol a notation knows, and which of the six roles it plays. */
 export interface NotationSymbolDef {
@@ -306,3 +307,4 @@ export function describeNotation(r: NotationReading): string {
 registerNotation(FLOWCHART);
 registerNotation(UML_CLASS);
 registerNotation(SEQUENCE);
+registerNotation(STATE);

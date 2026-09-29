@@ -91,7 +91,7 @@ export function filledDot(cx: number, cy: number, r: number, o: { style?: 'spira
   const jitter = o.jitter ?? 0.6;
   const pts: Point[] = [];
   if ((o.style ?? 'spiral') === 'spiral') {
-    const turns = Math.max(2.5, r / 3.2);
+    const turns = Math.max(3, r / 2);
     const n = Math.round(turns * 28);
     const a0 = rand() * Math.PI * 2;
     for (let i = 0; i <= n; i++) {
@@ -103,7 +103,7 @@ export function filledDot(cx: number, cy: number, r: number, o: { style?: 'spira
     return pts;
   }
   // Back and forth across the circle, top to bottom, each pass a few pixels lower.
-  const passes = Math.max(5, Math.round(r / 1.8));
+  const passes = Math.max(6, Math.round(r / 1.4));
   for (let k = 0; k <= passes; k++) {
     const y = -r * 0.92 + (1.84 * r * k) / passes;
     const half = Math.sqrt(Math.max(0, r * r - y * y)) * 0.94;
@@ -148,7 +148,7 @@ export function drawState(s: Session, v: StateVariant, t0 = 1000): StateExpected
   const seed = (k: number) => v.seed * 100 + k;
   const start = (k: number) => (v.seed * 0.37 + k * 0.23) % 1;
   const arrow = (from: Point, to: Point, k: number) => handArrow(from, to, { wings: 2, headLen: 15, seed: seed(k), jitter: j * 0.6 });
-  const words = (x: number, y: number, w: number, h: number, k: number) => handText(x, y, w, h, { seed: seed(k), humps: Math.max(2, Math.round(w / 20)), jitter: 1 });
+  const words = (x: number, y: number, w: number, h: number, k: number) => handText(x, y, w, h, { seed: seed(k), humps: Math.max(4, Math.round(w / 15)), jitter: 1 });
 
   // 1. The states, first on every hand: rounded boxes.
   const box = (name: keyof typeof BOX, k: number) => {
@@ -171,21 +171,21 @@ export function drawState(s: Session, v: StateVariant, t0 = 1000): StateExpected
   // 3. The transitions.
   const t0id = draw(arrow({ x: DOT.cx + DOT.r + 6, y: DOT.cy }, { x: BOX.Idle.cx - BOX.Idle.w / 2 - 2, y: BOX.Idle.cy }, 11));
   const t1 = draw(arrow({ x: BOX.Idle.cx + BOX.Idle.w / 2 + 2, y: BOX.Idle.cy }, { x: BOX.Running.cx - BOX.Running.w / 2 - 2, y: BOX.Running.cy }, 12));
-  const l1 = draw(words(BOX.Idle.cx + 95, BOX.Idle.cy - 34, 52, 17, 21));
+  const l1 = draw(words(BOX.Idle.cx + 95, BOX.Idle.cy - 34, 52, 21, 21));
   const top = BOX.Running.cy - BOX.Running.h / 2;
-  const t2 = draw(loopOver(BOX.Running.cx - 26, BOX.Running.cx + 26, top - 1, 44, { seed: seed(13), jitter: Math.min(j * 0.5, 1.2) }));
-  const l2 = draw(words(BOX.Running.cx - 22, top - 74, 44, 17, 22));
+  const t2 = draw(loopOver(BOX.Running.cx - 26, BOX.Running.cx + 26, top - 5, 44, { seed: seed(13), jitter: Math.min(j * 0.5, 1.2) }));
+  const l2 = draw(words(BOX.Running.cx - 22, top - 74, 44, 21, 22));
   const t3 = draw(arrow({ x: BOX.Running.cx + BOX.Running.w / 2 + 2, y: BOX.Running.cy }, { x: FINAL.cx - FINAL.r - 2, y: FINAL.cy }, 14));
-  const l3 = draw(words(BOX.Running.cx + 112, BOX.Running.cy - 34, 48, 17, 23));
+  const l3 = draw(words(BOX.Running.cx + 112, BOX.Running.cy - 34, 48, 21, 23));
   const t4 = draw(arrow({ x: BOX.Running.cx, y: BOX.Running.cy + BOX.Running.h / 2 + 2 }, { x: BOX.Paused.cx, y: BOX.Paused.cy - BOX.Paused.h / 2 - 2 }, 15));
-  const l4 = draw(words(BOX.Running.cx + 16, 250, 48, 17, 24));
+  const l4 = draw(words(BOX.Running.cx + 16, 250, 48, 21, 24));
   const t5 = draw(arrow({ x: BOX.Paused.cx - BOX.Paused.w / 2 - 2, y: BOX.Paused.cy }, { x: BOX.Idle.cx + 6, y: BOX.Idle.cy + BOX.Idle.h / 2 + 2 }, 16));
-  const l5 = draw(words(BOX.Idle.cx + 70, 302, 62, 17, 25));
+  const l5 = draw(words(BOX.Idle.cx + 108, 300, 62, 21, 25));
 
   // 4. The names, in the boxes.
-  const n1 = draw(words(BOX.Idle.cx - 20, BOX.Idle.cy - 10, 40, 19, 31));
-  const n2 = draw(words(BOX.Running.cx - 30, BOX.Running.cy - 10, 60, 19, 32));
-  const n3 = draw(words(BOX.Paused.cx - 26, BOX.Paused.cy - 10, 52, 19, 33));
+  const n1 = draw(words(BOX.Idle.cx - 20, BOX.Idle.cy - 10, 40, 22, 31));
+  const n2 = draw(words(BOX.Running.cx - 30, BOX.Running.cy - 10, 60, 22, 32));
+  const n3 = draw(words(BOX.Paused.cx - 26, BOX.Paused.cy - 10, 52, 22, 33));
 
   return {
     states: { Idle: { box: [idle], name: [n1] }, Running: { box: [running], name: [n2] }, Paused: { box: [paused], name: [n3] } },
