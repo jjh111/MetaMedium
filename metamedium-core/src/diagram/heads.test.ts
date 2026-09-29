@@ -15,6 +15,7 @@ import { headsOf, connectorHeads, FILLED_AT } from './heads';
 import type { HeadReading } from './heads';
 import { lineStroke, circleStroke, triangleStroke, rectStroke, handArrow, handPolygon, handText } from '../test/strokes';
 import type { Point } from '../types';
+import { getRep } from '../session/nodes';
 
 // ===== Drawing heads =====
 
@@ -104,6 +105,19 @@ describe('the arrow’s own barb', () => {
     const s = createSession();
     const id = s.addStroke(handArrow({ x: 100, y: 200 }, { x: 400, y: 200 }, { wings: 1, seed: 2 }), 1000);
     expect(top(s, id)).toMatchObject({ kind: 'arrow', filled: false });
+  });
+
+  it('its end is the tip the rung read: one definition of where the ink points (S2)', () => {
+    // The rung's tip used to sit a wing's length short of the ink's, and this
+    // module found the ink's again on its own; now they are one point.
+    for (const [wings, headLen, headAt] of [[2, 40, 'end'], [2, 28, 'end'], [2, 40, 'start'], [1, 28, 'end']] as const) {
+      const s = createSession();
+      const id = s.addStroke(handArrow({ x: 100, y: 200 }, { x: 500, y: 240 }, { wings, headLen, headAt, seed: 2 }), 1000);
+      const meta = getRep(s.getState().nodes.get(id)!, 'reading:arrow')!.data as { tip: Point; tail: Point; head: 'end' | 'start' };
+      const h = headsOf(s.getState(), id)!;
+      const tipEnd = meta.head === 'start' ? h.start : h.end;
+      expect(tipEnd.point, `${wings} wings, ${headLen}, head at ${headAt}`).toEqual(meta.tip);
+    }
   });
 
   it('a barb drawn head first sits at the stroke’s start', () => {

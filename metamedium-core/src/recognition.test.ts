@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { analyzeStroke, matchPrimitiveFromLibrary, MAX_TIER0_CONFIDENCE } from './recognition';
+import { analyzeStroke, matchPrimitiveFromLibrary, MAX_TIER0_CONFIDENCE, HAND_RESOLUTION_PX } from './recognition';
 import { getFingerprint } from './geometry';
 import { lineStroke, circleStroke, arcStroke, rectStroke, triangleStroke, handRect, handTriangle, handPolygon, handLine, handArrow, handArc } from './test/strokes';
 import type { Point } from './types';
@@ -276,5 +276,39 @@ describe('a wide arc is an arc; a line is still a line (S1)', () => {
         expect(analyzeStroke(pts).results[0]?.type, `${w}×${h} seed ${seed}`).not.toBe('arc');
       }
     }
+  });
+});
+
+describe('an arrow is read where its ink points (S2)', () => {
+  const drawnTip = (len: number) => ({ x: len, y: len * 0.1 });
+
+  it('the rung’s tip is the ink the pen reached farthest along the shaft, not a wing’s length short', () => {
+    // E2's finding: a two-wing head comes back to the tip between its wings, and
+    // the corner the rung measured sat up to a wing's length short of it.
+    const off: string[] = [];
+    for (const len of [220, 400]) {
+      for (const wings of [1, 2] as const) {
+        for (const headLen of [28, 40]) {
+          for (const headAt of ['end', 'start'] as const) {
+            for (const seed of [1, 2, 3]) {
+              const to = drawnTip(len), from = { x: 0, y: 0 };
+              const pts = handArrow(headAt === 'end' ? from : to, headAt === 'end' ? to : from, { wings, headLen, seed, headAt });
+              const arrow = analyzeStroke(pts).results.find((r) => r.type === 'arrow');
+              const meta = arrow?.meta as { tip: Point; tail: Point } | undefined;
+              if (!meta) continue; // a head the rung misses is the next finding's
+              const gap = Math.hypot(meta.tip.x - to.x, meta.tip.y - to.y);
+              if (gap > HAND_RESOLUTION_PX) off.push(`${len} w${wings} h${headLen} ${headAt} s${seed}: tip ${gap.toFixed(1)} off the ink's`);
+            }
+          }
+        }
+      }
+    }
+    expect(off).toEqual([]);
+  });
+
+  it('the tip is one of the stroke’s own points', () => {
+    const pts = handArrow({ x: 0, y: 0 }, { x: 400, y: 40 }, { wings: 2, headLen: 40, seed: 2 });
+    const meta = analyzeStroke(pts).results.find((r) => r.type === 'arrow')?.meta as { tip: Point };
+    expect(pts.some((p) => p.x === meta.tip.x && p.y === meta.tip.y)).toBe(true);
   });
 });
