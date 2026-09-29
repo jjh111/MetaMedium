@@ -39,6 +39,9 @@ const umlOf = (s: Session): NotationReading | undefined => notationsOf(s.getStat
 /** The class a reading holds for an expected one: the symbol drawn with its box. */
 const classFor = (r: NotationReading, want: ClassExpected['classes'][string]) => (r.symbols as unknown as ClassView[]).find((c) => want.box.every((id) => c.ids.includes(id)));
 
+/** These read a few dozen boards through every registered notation: more than vitest's five seconds on a loaded machine. */
+const SLOW = 120_000;
+
 describe('A2 — two classes with compartments and an inheritance arrow', () => {
   for (const v of CLASS_VARIANTS.slice(0, 12)) {
     const label = `seed ${v.seed} jitter ${v.jitter} tilt ${v.tilt}`;
@@ -138,7 +141,7 @@ describe('the negatives: nothing else reads as a class diagram above the floor',
       if (r && r.confidence >= NOTATION_FLOOR) above.push(`seed ${v.seed}: ${r.confidence.toFixed(2)} — ${r.summary}`);
     }
     expect(above).toEqual([]);
-  });
+  }, SLOW);
 
   const against = (name: string, draw: (s: Session, seed: number) => unknown) =>
     it(name, () => {
@@ -150,7 +153,7 @@ describe('the negatives: nothing else reads as a class diagram above the floor',
         if (r && r.confidence >= NOTATION_FLOOR) above.push(`seed ${seed}: ${r.confidence.toFixed(2)} — ${r.summary}`);
       }
       expect(above).toEqual([]);
-    });
+    }, SLOW);
   against('a UI wireframe: a frame holding a row of boxes is not a class', drawWireframe);
   against('the canonical molecule', drawMolecule);
   against('a line of writing', drawWriting);

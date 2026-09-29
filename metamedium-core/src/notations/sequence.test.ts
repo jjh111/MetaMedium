@@ -51,6 +51,9 @@ function readAll(s: Session, e: SequenceExpected) {
   e.messages.forEach((m, i) => m.label.forEach((id) => read(id, A3_WORDS.messages[i])));
 }
 
+/** These read a few dozen boards through every registered notation: more than vitest's five seconds on a loaded machine. */
+const SLOW = 120_000;
+
 describe('A3 — three lifelines and four messages', () => {
   for (const v of BOXES) {
     const label = `${v.style} lifelines, seed ${v.seed} jitter ${v.jitter} tilt ${v.tilt} chevron after ${v.headAfter} ms`;
@@ -125,7 +128,7 @@ describe('A3 — three lifelines and four messages', () => {
       readAll(s, e);
       expect(toMermaid(sequenceOf(s)!)!.text, `seed ${v.seed}`).toBe(A3_ACTOR_MERMAID_READ);
     }
-  });
+  }, SLOW);
 });
 
 describe('the negatives: nothing else reads as a sequence diagram above the floor', () => {
@@ -138,7 +141,7 @@ describe('the negatives: nothing else reads as a sequence diagram above the floo
       if (r && r.confidence >= NOTATION_FLOOR) above.push(`seed ${v.seed}: ${r.confidence.toFixed(2)} — ${r.summary}`);
     }
     expect(above).toEqual([]);
-  });
+  }, SLOW);
 
   it('the class bench — its six-class board and A2, every hand', () => {
     const above: string[] = [];
@@ -151,7 +154,7 @@ describe('the negatives: nothing else reads as a sequence diagram above the floo
       }
     }
     expect(above).toEqual([]);
-  });
+  }, SLOW);
 
   const against = (name: string, draw: (s: Session, seed: number) => unknown) =>
     it(name, () => {
@@ -163,7 +166,7 @@ describe('the negatives: nothing else reads as a sequence diagram above the floo
         if (r && r.confidence >= NOTATION_FLOOR) above.push(`seed ${seed}: ${r.confidence.toFixed(2)} — ${r.summary}`);
       }
       expect(above).toEqual([]);
-    });
+    }, SLOW);
   against('a UI wireframe: boxes in a frame, lines of text, nothing hanging from a box', drawWireframe);
   against('the canonical molecule', drawMolecule);
   against('a line of writing', drawWriting);
