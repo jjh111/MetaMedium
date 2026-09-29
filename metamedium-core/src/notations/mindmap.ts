@@ -42,10 +42,9 @@
 import type { Bounds, Point } from '../types';
 import type { SessionState } from '../session/session';
 import type { MMNode } from '../session/nodes';
-import { fingerprintOf, getRep, isWord, resemblances, strokePointsOf, transcriptOf } from '../session/nodes';
+import { boundsOf, fingerprintOf, getRep, isWord, resemblances, strokePointsOf, transcriptOf } from '../session/nodes';
 import type { NotationPort, NotationPorts } from '../session/ports';
 import { isLetterLike } from '../session/words';
-import { boundsOf } from '../session/nodes';
 import { figuresAmong } from '../diagram/figures';
 import type { Role } from '../diagram/roles';
 import { MAX_TIER0_CONFIDENCE } from '../recognition';
@@ -87,7 +86,6 @@ export const MINDMAP_TABLE = {
 } as const;
 
 export type MindMapShape = keyof typeof MINDMAP_TABLE.shapes;
-const SHAPES = Object.keys(MINDMAP_TABLE.shapes) as MindMapShape[];
 type SymbolName = keyof typeof MINDMAP_TABLE.symbols;
 const SYMBOLS = Object.keys(MINDMAP_TABLE.symbols) as SymbolName[];
 
@@ -485,7 +483,6 @@ export function readMindMap(state: SessionState, scopeIds?: readonly string[]): 
 
 /** The shapes a Mermaid writer brackets a node with. */
 export const shapeTokens = (shape: MindMapShape) => MINDMAP_TABLE.shapes[shape];
-export { SHAPES };
 
 // ===== The notation =====
 

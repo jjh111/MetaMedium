@@ -92,7 +92,6 @@ export const ER_TABLE = {
 } as const;
 
 export type Cardinality = keyof typeof ER_TABLE.cardinalities;
-const CARDINALITIES = Object.keys(ER_TABLE.cardinalities) as Cardinality[];
 
 /**
  * How many a piece of writing says, or null where it says nothing of the four:
@@ -229,7 +228,7 @@ function wordsOfMark(node: MMNode): string | undefined {
 }
 
 /** A line of writing's words: its pieces' in order, none read → no text. */
-function writingOf2(nodes: ReadonlyMap<string, MMNode>, ids: readonly string[], joiner: string, own?: string): ErWriting {
+function writingWords(nodes: ReadonlyMap<string, MMNode>, ids: readonly string[], joiner: string, own?: string): ErWriting {
   const parts: string[] = own?.trim() ? [own.trim()] : [];
   const unread: string[] = [];
   for (const id of ids) {
@@ -398,16 +397,16 @@ export function readEr(state: SessionState, scopeIds?: readonly string[]): ErRea
       const side = r.sides[at];
       if (!side.multiplicity) continue;
       const ordered = inReading(side.multiplicity.ids);
-      const w = writingOf2(nodes, ordered, '');
+      const w = writingWords(nodes, ordered, '');
       side.multiplicity = w;
       side.cardinality = cardinalityOf(w.text);
     }
     const own = (getRep(nodes.get(r.id)!, 'label')?.data as { text?: string } | undefined)?.text?.trim();
-    if (r.labels.length || own) r.verb = writingOf2(nodes, inReading(r.labels), ' ', own);
+    if (r.labels.length || own) r.verb = writingWords(nodes, inReading(r.labels), ' ', own);
   }
   for (const s of out) {
     const inside = labels.filter((l) => l.of === s.id && l.where === 'inside').map((l) => l.id);
-    s.name = writingOf2(nodes, inside, ' ', s.text);
+    s.name = writingWords(nodes, inside, ' ', s.text);
   }
 
   // 5. Roles: what every mark in the scope plays — one of the six.
@@ -487,7 +486,6 @@ export function readEr(state: SessionState, scopeIds?: readonly string[]): ErRea
 
 /** How many an end says, as words for a sentence. */
 export const saysOf = (c: Cardinality | null): string => (c ? ER_TABLE.cardinalities[c].says : 'not said');
-export { CARDINALITIES };
 
 // ===== The notation =====
 

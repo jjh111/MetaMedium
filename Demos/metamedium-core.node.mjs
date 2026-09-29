@@ -18780,7 +18780,6 @@ var ER_TABLE = {
   unsaid: "zero-many",
   mermaid: { header: "erDiagram", direction: "TB" }
 };
-var CARDINALITIES = Object.keys(ER_TABLE.cardinalities);
 function cardinalityOf(text) {
   if (!text) return null;
   const t = text.toLowerCase().replace(/[\s_]+/g, "").replace(/[–—‒−]/g, "-").replace(/…/g, "..").replace(/(?<=\d)(?:to|-|,)(?=[\d*nm])/g, "..").replace(/[×✱✳∗＊]/g, "*");
@@ -18825,7 +18824,7 @@ function wordsOfMark3(node) {
   const t = (transcriptOf(node) ?? labelOf(node)?.text)?.trim();
   return t ? t : void 0;
 }
-function writingOf2(nodes, ids, joiner, own) {
+function writingWords(nodes, ids, joiner, own) {
   const parts = own?.trim() ? [own.trim()] : [];
   const unread = [];
   for (const id of ids) {
@@ -18970,16 +18969,16 @@ function readEr(state, scopeIds) {
       const side = r.sides[at];
       if (!side.multiplicity) continue;
       const ordered2 = inReading(side.multiplicity.ids);
-      const w2 = writingOf2(nodes, ordered2, "");
+      const w2 = writingWords(nodes, ordered2, "");
       side.multiplicity = w2;
       side.cardinality = cardinalityOf(w2.text);
     }
     const own = getRep(nodes.get(r.id), "label")?.data?.text?.trim();
-    if (r.labels.length || own) r.verb = writingOf2(nodes, inReading(r.labels), " ", own);
+    if (r.labels.length || own) r.verb = writingWords(nodes, inReading(r.labels), " ", own);
   }
   for (const s of out) {
     const inside = labels.filter((l) => l.of === s.id && l.where === "inside").map((l) => l.id);
-    s.name = writingOf2(nodes, inside, " ", s.text);
+    s.name = writingWords(nodes, inside, " ", s.text);
   }
   for (const l of kept2) if (isMultiplicity.has(l.id)) l.role = ER_TABLE.labels.multiplicity.role;
   const { roles, weight, unplaced: unplaced2 } = rolesOf2(
@@ -19080,7 +19079,6 @@ var MINDMAP_TABLE = {
   },
   mermaid: { header: "mindmap", indent: "    " }
 };
-var SHAPES = Object.keys(MINDMAP_TABLE.shapes);
 var SYMBOLS3 = Object.keys(MINDMAP_TABLE.symbols);
 var LETTER_PX3 = 40;
 var PORTS_FLOOR6 = 0.4;
@@ -19119,7 +19117,7 @@ function wordsOfMark4(node) {
   const t = (transcriptOf(node) ?? getRep(node, "label")?.data?.text)?.trim();
   return t ? t : void 0;
 }
-function writingWords(nodes, ids, own) {
+function writingWords2(nodes, ids, own) {
   const parts = own?.trim() ? [own.trim()] : [];
   const unread = [];
   for (const id of ids) {
@@ -19290,7 +19288,7 @@ function readMindMap(state, scopeIds) {
   });
   for (const s of out) {
     const inside = labels.filter((l) => l.of === s.id && l.where === "inside").map((l) => l.id);
-    s.name = writingWords(nodes, inside, s.text);
+    s.name = writingWords2(nodes, inside, s.text);
   }
   const written2 = branches.filter((k) => k.labels.length > 0 || k.text).length;
   const { roles, weight, unplaced: unplaced2 } = rolesOf2(
@@ -19697,7 +19695,7 @@ var COUNT3 = ["no", "one", "two", "three", "four", "five", "six", "seven", "eigh
 var count6 = (n2) => COUNT3[n2] ?? String(n2);
 var list2 = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 var some = (xs, max = 4) => xs.length > max ? `${xs.slice(0, max).join(", ")} and ${count6(xs.length - max)} more` : list2(xs);
-var SHAPES2 = [
+var SHAPES = [
   ...Object.entries(FLOWCHART_TABLE.symbols).map(([symbol, d]) => ({ open: d.mermaid.open, close: d.mermaid.close, symbol })),
   { open: "(", close: ")", symbol: "process", otherwise: "a box with round edges" },
   { open: "[[", close: "]]", symbol: "process", otherwise: "a subroutine" },
@@ -19708,7 +19706,7 @@ var SHAPES2 = [
   { open: "[/", close: "\\]", symbol: "process", otherwise: "a trapezoid" },
   { open: "[\\", close: "/]", symbol: "process", otherwise: "a trapezoid upside down" }
 ];
-var OPENS = [...new Set(SHAPES2.map((s) => s.open))].sort((a, b) => b.length - a.length);
+var OPENS = [...new Set(SHAPES.map((s) => s.open))].sort((a, b) => b.length - a.length);
 var ID = /[\p{L}\p{N}_](?:[\p{L}\p{N}_]|-(?=[\p{L}\p{N}_]))*/uy;
 var NOT_DRAWN = [
   [/^subgraph\b/, "a subgraph\u2019s frame is not drawn yet \u2014 the nodes and links inside it are"],
@@ -19774,7 +19772,7 @@ function readNode(c, notes) {
   let ref = { id };
   if (open) {
     c.take(open);
-    const shapes = SHAPES2.filter((s) => s.open === open);
+    const shapes = SHAPES.filter((s) => s.open === open);
     let text;
     let shape;
     const lead = c.i;
@@ -19994,7 +19992,7 @@ function readFlowchartText(text) {
       `drawn ${direction === "RL" ? "right to left" : "bottom to top"}, as the header asks \u2014 read back, a drawing says ${direction === "RL" ? "LR" : "TD"} by the way its flows run, and lists its nodes as they stand ${direction === "RL" ? "left to right" : "top to bottom"}`
     );
   for (const [what, ids] of otherwise) {
-    const sym = SHAPES2.find((s) => s.otherwise === what).symbol;
+    const sym = SHAPES.find((s) => s.otherwise === what).symbol;
     said3.push(`${what} has no symbol of its own in a flowchart, so ${ids.length === 1 ? "it is" : "they are"} drawn as ${sym === "data" ? "a data symbol" : "a process"}: ${some(ids)}`);
   }
   if (styled.dotted.length) said3.push(`the board has no dotted line: ${styled.dotted.length === 1 ? "a dotted link is" : "dotted links are"} drawn plain \u2014 ${some(styled.dotted)}`);
