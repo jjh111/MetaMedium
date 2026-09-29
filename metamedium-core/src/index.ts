@@ -250,6 +250,13 @@ export { trueSize, COORD_PLACES } from './maths/truesize';
 export type { TrueSize, TrueSizeOptions, TrueSizeFigure, TrueSizeSide, TrueSizeOmission, SolvedFigures } from './maths/truesize';
 export { printTiled, PAPERS } from './maths/print';
 export type { Paper, Orientation, PaperSize, PrintOptions, PrintPage, PrintJob } from './maths/print';
+// The maths on the board (M5): what is said beside a figure and a page — a chip
+// on each derived side, on a label that cannot hold, on each step's check — as
+// data a surface draws; the panel's words; and `=` typed in the field as a sum
+// read against the page. `boardMathsOf` keeps the board's maths while its log
+// stands. Derived: nothing enters the log.
+export { boardMaths, boardMathsOf, mathsChips, mathsSaid, evaluateTyped, CHIP_OFFSET, STEP_GAP } from './maths/board';
+export type { MathsChip, MathsChipKind, MathsSaid, TypedMaths } from './maths/board';
 
 // Magnets — the places a mark offers attachment, derived from its clean form.
 export { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet, siteOf, MAGNET_SCREEN_PX, MAGNET_SIZE_FRACTION } from './session/magnets';

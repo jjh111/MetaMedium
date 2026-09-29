@@ -407,3 +407,65 @@ test('…and a reading that names is never Enter\'s, even leading (U1e)', () => 
   assert.notEqual(r.command && r.command.key, 'sug:1');
   assert.doesNotMatch(r.line, /take it as/);
 });
+
+// ---- M5: = is the sum you type (DIRECTOR-PLAN-W2 M5; MATHS-PLAN §4) ----
+// `= 24 ÷ 3` reads as an expression and the line says its result before Enter. What
+// evaluates it is core's (`ctx.maths`, a thunk the adapter gives — the reader still
+// names nothing outside itself); what Enter does is the smallest honest act: the
+// words, result and all, stand on the board as text beside the marks held.
+
+test('= reads a sum, says its result before Enter, and Enter puts the words on the board as text', () => {
+  const maths = (t) => (t === '24 ÷ 3' ? { ok: true, words: '24 ÷ 3 = 8', result: '8' } : { ok: false, reason: 'no' });
+  const r = readFieldCommand(ctx({ text: '= 24 ÷ 3', maths }));
+  assert.equal(r.kind, 'maths');
+  assert.equal(r.line, '↵ 24 ÷ 3 = 8 — put it on the board as text');
+  assert.deepEqual(r.command, { do: 'maths', words: '24 ÷ 3 = 8' });
+  assert.equal(r.quiet, undefined);
+  // The reader hands the thunk what was typed after the =, trimmed — and the = with no space is the same.
+  const seen = [];
+  readFieldCommand(ctx({ text: '=(39+6)/2', maths: (t) => { seen.push(t); return { ok: false, reason: 'x' }; } }));
+  assert.deepEqual(seen, ['(39+6)/2']);
+});
+
+test('= outranks a verb, a name and the brief, and needs no model', () => {
+  const maths = () => ({ ok: true, words: '2 + 2 = 4', result: '4' });
+  const r = readFieldCommand(ctx({ text: '= 2 + 2', maths, models: ['qwen3'], library: [{ id: 'a', name: 'sum' }] }));
+  assert.equal(r.kind, 'maths');
+  assert.equal(r.model, undefined);
+});
+
+test('= says a second reading when the writing allows two', () => {
+  const r = readFieldCommand(ctx({ text: '= 3–6 + 1', maths: () => ({ ok: true, words: '3–6 + 1 = 4–7', result: '4–7', also: '3 − 6 + 1 = −2' }) }));
+  assert.equal(r.line, '↵ 3–6 + 1 = 4–7 — put it on the board as text · or 3 − 6 + 1 = −2');
+});
+
+test('= that cannot be read says why, quietly, and Enter does nothing; with nothing after it, it asks for a sum', () => {
+  const bad = readFieldCommand(ctx({ text: '= Waist ÷ 2', maths: () => ({ ok: false, reason: 'Waist is not on this sheet' }) }));
+  assert.equal(bad.kind, 'maths');
+  assert.equal(bad.quiet, true);
+  assert.equal(bad.command, null);
+  assert.equal(bad.line, '↵ = Waist is not on this sheet');
+  const empty = readFieldCommand(ctx({ text: '=', maths: () => { throw new Error('nothing to read'); } }));
+  assert.equal(empty.quiet, true);
+  assert.equal(empty.command, null);
+  assert.match(empty.line, /type a sum/);
+  const none = readFieldCommand(ctx({ text: '= 2 + 2' }));
+  assert.equal(none.quiet, true);
+  assert.equal(none.command, null);
+});
+
+test('typedWord: a typed = is a sum, never a word to name or label with', () => {
+  assert.equal(typedWord(ctx({ text: '= 24' })), null);
+  assert.equal(typedWord(ctx({ text: '=24' })), null);
+});
+
+// Composed as the adapter composes them, with the committed core bundle: what the field says
+// before Enter is what core evaluated against the board's own page.
+test('= against the board: a name the page defines', () => {
+  const s = MM.createSession();
+  s.import({ kind: 'text', path: 't/1.txt', name: 'page', bounds: { minX: 0, maxX: 300, minY: 0, maxY: 60 }, code: 'A. Bust 36\nB. Top to waist 20', at: 1 });
+  const maths = (t) => MM.evaluateTyped('= ' + t, MM.boardMaths(s.getState()));
+  const r = readFieldCommand(ctx({ text: '= A ÷ 3', maths }));
+  assert.equal(r.kind, 'maths');
+  assert.match(r.line, /^↵ A ÷ 3 = 12/);
+});

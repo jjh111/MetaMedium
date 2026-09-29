@@ -96,7 +96,12 @@ keyboard, Scribble, rotation, and drawing a whole figure by hand.
 | Write the measurements in a column with the pencil (*bust 92*, *waist 74*, …), palm down | each gathers into a word or a line; nothing from the palm |
 | Circle a line and take *Read the writing* (with a model that can see) | the words it reads land on the marks, as with a mouse |
 | Draw a right triangle | read *triangle*; the panel's *maths* gives its angles (one right) and its sides |
-| *When M5–M7 land* | the page's steps checked, the triangle answered, a measurement changed and everything re-derived, the piece printed at true size — A4's other rows, by hand |
+| Write `24` beside the long leg and `8` beside the short one (read, or typed as text), and draw a small square in the right-angle corner | the long side says `25.30` beside it for a moment; point at the triangle and it is back; the panel says *legs of 24 and 8 make the long side 25.30*, and its working is behind *details* (M5) |
+| Write a third `24` beside the long side | *labelled 24; legs of 24 and 8 make it 25.30, 1.30 longer (5%)* stands beside that number, and stays |
+| Type a page of steps as text (`A. Bust 36`, `1. A ÷ 3 = 12 + 2 = 14`, …) | each step shows its check at the end of its own line; change A and only the steps that depend on it change; undo puts them back |
+| Hold the marks and type `= 24 ÷ 3` in the field | the line says *24 ÷ 3 = 8* before Enter; Enter puts it on the board as text |
+| Write the unit (`24″`) and open *export* | *true-size.svg* and *print.html* are ready: print the pages at 100% and measure the test square on each (M5–M7) |
+| *When M6 lands* | the garment pack's pattern pieces read as such — A4's last row, by hand |
 
 ### 6. Portrait, and the end
 

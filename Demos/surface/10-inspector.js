@@ -115,6 +115,9 @@
     // below, behind details.
     let top = markSummary(s, node, id, { isArtifact: isArtifact, isLive: isLive, isWordNode: isWordNode, author: author, authorName: authorName });
     let html = '';
+    // What the board's numbers say of this mark — its figure's answer, its page's checks — in plain lines, every value's formula behind details (M5).
+    const mathsSays = mathsPanel(s, [id]);
+    if (mathsSays) top += mathsSays.top;
 
     html += '<div class="row"><span class="k">id</span><span class="v">' + esc(id) + '</span></div>';
     html += '<div class="row"><span class="k">by</span><span class="v ' +
@@ -345,7 +348,7 @@
     // The maths: what follows from the reading, measured from the ink. A
     // circle has a radius; a triangle's angles add to 180°. Arithmetic on a
     // reading, not a reading — no confidence, nothing to argue with.
-    const maths = !isArtifact && MM.strokePointsOf(node) ? MM.measure(node, s.nodes) : null;
+    const maths = !isArtifact && MM.strokePointsOf(node) ? MM.measure(node, s.nodes, mathsFor(s).board || undefined) : null;
     if (maths && maths.measures.length) {
       html += '<div class="sep"></div><div class="eyebrow">maths <span class="srccount">' + esc(maths.shape) + '</span></div>';
       const shown = maths.measures.filter((x) => x.key !== 'centreY');
@@ -355,6 +358,8 @@
         html += '<div class="row"><span class="k">' + esc(x.label) + '</span><span class="v">' + v + '</span></div>';
       });
     }
+
+    if (mathsSays) html += mathsSays.details;
 
     const fp = MM.fingerprintOf(node);
     if (fp) {
@@ -484,6 +489,8 @@
       html += '<div class="row"><span class="k">genre</span><span class="v">' + esc(reading.genre.genre) + '</span></div>';
       html += '<div class="why">' + esc(reading.genre.reasoning) + '</div>';
     }
+    // What the numbers written on these marks say — the answer in plain lines, the working behind details (M5).
+    const mathsSays = mathsPanel(s, sum.enclosedIds);
     // Where this stands on the map of becoming, and the rung after it (SURFACE-v10-PLAN §4).
     const rung = becomesOf(s, sum, reading);
     if (rung) top += '<div class="row"><span class="k">becomes</span><span class="v">' + esc(rung.here + ' → ' + rung.next) + '</span></div>';
@@ -500,6 +507,7 @@
           '<div class="why">' + esc('because ' + lead.because.join('; ')) + '</div>';
       }
     }
+    if (mathsSays) top += mathsSays.top;
     if (reading.roles && reading.roles.length) {
       html += '<div class="sep"></div><div class="eyebrow">roles</div>';
       reading.roles.forEach((r) => {
@@ -555,6 +563,7 @@
       if (strongest) html += '<div class="why">' + esc(strongest.kind + ': ' + strongest.reasoning) + '</div>';
     }
 
+    if (mathsSays) html += mathsSays.details;
     showPanel(top + inspectDetails(html));
   }
 

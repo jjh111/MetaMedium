@@ -1846,6 +1846,44 @@ alignment marks both neighbours print, grid labels, a map, a measured test
 square (1 in, or 2 cm) on every page and one HTML that prints a page per
 sheet; the 22″ × 56″ piece is 28 Letter pages; 29 tests, core 844
 (`MATHS-PLAN.md` §4). The offers and the export pane are M5's.
+*Status, 29 Sep 2026:* **M5 built** (branch `worktree-agent-a6a9ff4be236c9f76`; red
+`04acc73`, built `4a1418b`, `b83d6ec`, `2a991b3`, `9eb4450`, `b8e83d2`). **Core:**
+`maths/board.ts` decides what is said beside a figure and a page, as data a
+surface draws — a chip on each derived side (outside, where a label stands), a
+label that cannot hold said in the solver's own sentence right of its number,
+each step's check at the right of its own line (*✓ 14″*, *✗ 14.67″ · written
+12*, *✓ 48″ · or 46″*), `mathsSaid` for the panel, `evaluateTyped` for `=` —
+and the `maths` tool offers *Show the sizes*, *Check the steps* and *Print at
+true size* (host acts, nothing written; they stand on `written` so they lead;
+none for e2e 49's three scopes, whose golden is unchanged; `describe.test.ts`
+names the tool by design, `b83d6ec`). **Surface:** `25-maths.js` draws the
+chips — for a moment after a change, while the hand points at the marks, while
+*Show the sizes* was asked (the ghost rule, v10 F4); **a problem stands at
+rest**, an answer does not — the panel says the answer in plain lines with
+every formula behind *details* and speaks the drawing's unit, `=` in the field
+says its result before Enter and Enter puts the words on the board as text
+(one act), and the export pane has a row for *true-size.svg* and *print.html*.
+Never an answer card. **Tests:** core `board.test.ts` 19 and `tools/maths.test.ts`
+8 (core 1,737 in 108 files — six heavy notation tests time out at 5 s under a
+load of 11 and pass at a longer timeout); `09-field.test.mjs` 39 (6 new); e2e
+64–64g, 10 records (canvas alone 365 passed, 1 skipped; in the whole gate 370
+passed, 2 skipped, and the gate 624 passed, 0 failed, 6 skipped — five of them
+the budgets, skipped by name on a machine at load 7; WebKit not run here). **Found
+for other owners:** (1) **`dimensionsOf` and `solveBoard` are quadratic in the
+figures** — right angles, the parts a side is cut into and the relations of every
+marked figure walk each figure against every other — so ONE number on PERF.md's
+2,000-mark board cost 2.1 s a stroke (150–450 ms at 500); M5 keeps it off by
+reading only the ink beside a number (`drawingsBeside`: 4 ms with the number in
+an empty place, 10 ms beside a dense drawing), but a single connected drawing of
+thousands of marks would still pay — grid those walks in M3/M4's code before a
+board like that is real. (2) A number typed by double-click is a 320 × 120 frame
+whose *centre* is what attaches; a typed number wants a frame sized to its
+words. (3) Not built, and named: *Draw it to scale* (an `svg` artifact at true
+size), *make it a slider* from a range, *24in* typed with a side selected making
+it that side's length, *hypotenuse?* answering, and the `HERE` clause that numbers
+are computed by the canvas, never a model. (4) A text that is parked (past the
+live budget) has no frame to measure, so its step chips stand at core's even
+division of the frame.
 
 ### Phase 5 — seats
 J1–J3 as `DIRECTOR-PLAN-W2.md` §3, with §6's addition.
