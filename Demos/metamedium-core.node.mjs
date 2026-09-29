@@ -17440,9 +17440,21 @@ var len3 = (v, unit6) => `${num(v)}${unitSuffix(unit6, 1)}`;
 function sideName2(frame, k) {
   return `${len3(frame.lengths[k], frame.unit)} side`;
 }
-function garmentMaths(state, board) {
-  const reading7 = readGarment(state);
-  if (!reading7 || reading7.confidence < NOTATION_FLOOR) return [];
+function garmentOf(state) {
+  const r = readGarment(state);
+  return r && r.confidence >= NOTATION_FLOOR ? r : null;
+}
+function garmentNotFigures(reading7) {
+  const out = /* @__PURE__ */ new Set();
+  for (const s of reading7.symbols) {
+    if (s.symbol === "notch" || s.symbol === "dart" || s.symbol === "fold") s.ids.forEach((id) => out.add(id));
+    else if (s.symbol === "grain") s.ids.filter((id) => id !== s.id).forEach((id) => out.add(id));
+  }
+  return out;
+}
+function garmentMaths(state, board, read2 = garmentOf(state)) {
+  const reading7 = read2 && read2.confidence >= NOTATION_FLOOR ? read2 : null;
+  if (!reading7) return [];
   const figureOf3 = (id) => board.figures.find((f) => f.figure.ids.length === 1 && f.figure.ids[0] === id);
   const allowance = (() => {
     for (const e of board.sheet.entries) if (e.kind === "heading" && e.allowance && !isRange(e.allowance.amount)) return e.allowance;
@@ -18513,8 +18525,11 @@ function boardMaths(state) {
       ...state,
       contentIds: state.contentIds.filter((id) => near.has(id) || keep.has(id) || isWriting6(state, id))
     };
-    const solved = solveBoard(narrowed, { figures: figuresOf(narrowed) });
-    const garment = garmentMaths(narrowed, solved);
+    const piece = garmentOf(narrowed);
+    const apart = piece ? garmentNotFigures(piece) : null;
+    const solving = apart ? { ...narrowed, contentIds: narrowed.contentIds.filter((id) => !apart.has(id)) } : narrowed;
+    const solved = solveBoard(solving, { figures: figuresOf(solving) });
+    const garment = piece ? garmentMaths(narrowed, solved, piece) : [];
     return garment.length ? { ...solved, garment } : solved;
   }
   const sheet = readSheet(sheetLines(state, { except: [] }));

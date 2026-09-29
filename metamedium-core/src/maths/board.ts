@@ -43,7 +43,7 @@ import { checkWritten, readSheet } from './sheet';
 import type { CheckEntry, Sheet, StepEntry } from './sheet';
 import type { ChainReading } from './expr';
 import { solveBoard } from './solve';
-import { garmentMaths } from './garment';
+import { garmentMaths, garmentNotFigures, garmentOf } from './garment';
 import type { BoardMaths, Conflict, FigureMaths, SolvedValue } from './solve';
 import { formatNumber, formatQuantity, unitSuffix } from './quantity';
 import type { Quantity } from './quantity';
@@ -129,9 +129,13 @@ export function boardMaths(state: SessionState): BoardMaths | null {
       ...state,
       contentIds: state.contentIds.filter((id) => near.has(id) || keep.has(id) || isWriting(state, id)),
     };
-    const solved = solveBoard(narrowed, { figures: figuresOf(narrowed) });
-    // A pattern piece among the figures says what its cutting line, fold and marks come to (M6).
-    const garment = garmentMaths(narrowed, solved);
+    // A pattern piece among the figures says what its cutting line, fold and marks come to (M6); its notches,
+    // darts and fold are no figures of their own to solve, or a tick across an edge would divide it into parts.
+    const piece = garmentOf(narrowed);
+    const apart = piece ? garmentNotFigures(piece) : null;
+    const solving = apart ? { ...narrowed, contentIds: narrowed.contentIds.filter((id) => !apart.has(id)) } : narrowed;
+    const solved = solveBoard(solving, { figures: figuresOf(solving) });
+    const garment = piece ? garmentMaths(narrowed, solved, piece) : [];
     return garment.length ? { ...solved, garment } : solved;
   }
   // No number stands on a mark, so none is left out of the page.

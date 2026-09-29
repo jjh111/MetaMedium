@@ -40,7 +40,7 @@
 import type { Bounds, Point } from '../types';
 import type { SessionState } from '../session/session';
 import { NOTATION_FLOOR } from '../notations/notation';
-import type { GarmentMark } from '../notations/garment';
+import type { GarmentMark, GarmentReading } from '../notations/garment';
 import { PARALLEL_DEG, readGarment } from '../notations/garment';
 import type { Figure, FigureKind } from './dimension';
 import type { BoardMaths, FigureMaths } from './solve';
@@ -294,15 +294,38 @@ function sideName(frame: TrueFrame, k: number): string {
 
 // ===== The board's =====
 
+/** The notation's reading of a board, when it says a pattern piece: null below the floor it says nothing above. */
+export function garmentOf(state: SessionState): GarmentReading | null {
+  const r = readGarment(state);
+  return r && r.confidence >= NOTATION_FLOOR ? r : null;
+}
+
+/**
+ * The marks of a pattern piece that are no figure with a size of their own: a
+ * notch, a dart and a fold — where they stand is measured on the piece — and
+ * the heads drawn apart at the ends of a grain line. Left out of the figures
+ * the solver is handed, so a tick across an edge never divides that edge into
+ * parts (a label written beside the middle of the side would then be the length
+ * of a part between two notches, and the side fixed by nothing).
+ */
+export function garmentNotFigures(reading: GarmentReading): Set<string> {
+  const out = new Set<string>();
+  for (const s of reading.symbols) {
+    if (s.symbol === 'notch' || s.symbol === 'dart' || s.symbol === 'fold') s.ids.forEach((id) => out.add(id));
+    else if (s.symbol === 'grain') s.ids.filter((id) => id !== s.id).forEach((id) => out.add(id));
+  }
+  return out;
+}
+
 /**
  * What the pattern pieces of a board come to: for each piece the notation
  * reads above its floor, its sizes, its fold, its marks' numbers, in plain
  * lines with every value's reason behind. Reads the session's notation and the
  * solved board and changes nothing in either.
  */
-export function garmentMaths(state: SessionState, board: BoardMaths): GarmentPieceMaths[] {
-  const reading = readGarment(state);
-  if (!reading || reading.confidence < NOTATION_FLOOR) return [];
+export function garmentMaths(state: SessionState, board: BoardMaths, read: GarmentReading | null = garmentOf(state)): GarmentPieceMaths[] {
+  const reading = read && read.confidence >= NOTATION_FLOOR ? read : null;
+  if (!reading) return [];
   const figureOf = (id: string) => board.figures.find((f) => f.figure.ids.length === 1 && f.figure.ids[0] === id);
   const allowance = (() => {
     for (const e of board.sheet.entries) if (e.kind === 'heading' && e.allowance && !isRange(e.allowance.amount)) return e.allowance;
