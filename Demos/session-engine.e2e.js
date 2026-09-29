@@ -1309,6 +1309,100 @@ window.__scenario = async function(){
     document.getElementById('markName').textContent === 'check',
     { mark: mm.session.getState().commandMark, chip: document.getElementById('markName').textContent });
 
+  // ---- 65. Examples: boards made from the engine, opened as boards of your own (V1-PLAN R5) ----
+  // boards/examples/ holds a flowchart with its Mermaid beside it, a class diagram, a molecule from the
+  // Basics pack and a pattern page with a right triangle. The boards pane lists them; opening one makes
+  // a NEW board named for it — a copy, so it can be drawn on at once, and the example is never written —
+  // and an empty board's panel offers the starter in one tap. Read by the engine as it would a hand's.
+  // It stands here, before the rooms (28 …): from a room a board opens in a page of its own, and this run has one page.
+  {
+    const bd65 = () => window.__mm.boards();
+    const mx = window.__mmMaths || { chipsDrawn: () => [] };
+    const settled65 = async (pred, ms) => { const end = Date.now() + (ms || 15000); while (Date.now() < end) { const b = bd65(); if (b.ready && !b.switching && !b.busy && pred(b)) return true; await wait(50); } return false; };
+    const kept65 = () => bd65().list.filter((e) => e.kind === 'board' && !e.trashed);
+    const strokes65 = () => mm.session.getEvents().filter((e) => e.type === 'stroke').length;
+    const paneOpen65 = async () => { mm.openCC(); await wait(20); const p = document.getElementById('boardsPanel'); if (p.hasAttribute('hidden')) document.getElementById('boardsBtn').click(); for (let i = 0; i < 60 && !p.querySelector('.bdExamples .bdItem'); i++) await wait(50); return p; };
+    const openExample65 = async (id) => {
+      const p = await paneOpen65();
+      const before = kept65().map((e) => e.id);
+      const btn = p.querySelector('button[data-example-open="' + id + '"]');
+      if (btn) btn.click();
+      const ok = !!btn && await settled65((b) => b.current && !before.includes(b.current) && kept65().some((e) => e.id === b.current));
+      return { ok, id: bd65().current, name: bd65().name };
+    };
+    const topNotation65 = () => { const r = MM.notationsOf(mm.session.getState()).sort((a, b) => b.confidence - a.confidence)[0]; return r ? r.notation : null; };
+    const text65 = async (f) => { const r = await window.__realFetch('../boards/examples/' + f, { cache: 'no-store' }); return r.ok ? r.text() : ''; };
+    // From an empty board: what the panel offers, and what the pane lists.
+    mm.session.load([]); mm.setView(1, 0, 0); await wait(80);
+    const home65 = bd65().current;
+    const text65Index = await text65('index.json');
+    const index65 = (() => { try { return JSON.parse(text65Index); } catch (err) { return { starter: null, examples: [1, 2, 3, 4].map((n) => ({ name: '?', marks: 0 })) }; } })();
+    const panel65 = document.getElementById('inspector');
+    const start65 = panel65.querySelector('button[data-example-start]');
+    step('65. an empty board’s panel keeps its three lines and offers to start from an example in one tap — and to see more of them',
+      !!start65 && /example/i.test(start65.textContent) && /draw a few marks/.test(panel65.textContent) && !!panel65.querySelector('button[data-example-more]'),
+      { text: panel65.textContent.slice(0, 200), start: !!start65 });
+    const pane65 = await paneOpen65();
+    const rows65 = [...pane65.querySelectorAll('.bdExamples .bdItem')].map((r) => ({ id: r.dataset.example, text: r.textContent.replace(/\s+/g, ' ').trim() }));
+    step('65a. the boards pane has an Examples section: a flowchart, a class diagram, a molecule and a pattern page, each saying what it shows and how many marks it holds, under the boards the browser keeps',
+      rows65.map((r) => r.id).join() === 'flowchart,class-diagram,molecule,pattern-page' && rows65.every((r, i) => r.text.includes(index65.examples[i].name) && new RegExp(index65.examples[i].marks + ' marks').test(r.text))
+        && !!pane65.querySelector('.bdExamples .bdLabel') && /example/i.test(pane65.querySelector('.bdExamples .bdLabel').textContent),
+      rows65);
+    // A flowchart: a board of its own, named for it, holding its marks, read as a flowchart with its Mermaid beside it.
+    const flow65 = await openExample65('flowchart');
+    const st65 = mm.session.getState();
+    const arts65 = st65.artifacts.map((id) => MM.getRep(st65.nodes.get(id), 'code')).filter(Boolean).map((r) => r.data.kind);
+    step('65b. opening the flowchart makes a new board named "Flowchart example" — it holds the example’s marks, reads as a flowchart, and its Mermaid stands beside it as an artifact; the pane closes',
+      flow65.ok && flow65.name === 'Flowchart example' && flow65.id !== home65 && strokes65() === index65.examples[0].marks && topNotation65() === 'flowchart' && arts65.includes('mermaid')
+        && document.getElementById('boardsPanel').hasAttribute('hidden'),
+      { flow65, strokes: strokes65(), notation: topNotation65(), artifacts: arts65 });
+    // A copy: drawn on, and the example is as it was — opened again it is whole, and the file is the same bytes.
+    const fileBefore65 = await text65('flowchart.jsonl');
+    t.stroke(t.line({ x: 900, y: 100 }, { x: 1000, y: 160 }, 30)); await wait(40);
+    const drawn65 = strokes65();
+    const again65 = await openExample65('flowchart');
+    const fileAfter65 = await text65('flowchart.jsonl');
+    step('65c. the example is never written: drawn on, the copy holds one mark more; opened again it is a second board, "Flowchart example 2", whole as it was — and the file is the same bytes',
+      drawn65 === index65.examples[0].marks + 1 && again65.ok && again65.name === 'Flowchart example 2' && again65.id !== flow65.id && strokes65() === index65.examples[0].marks && fileBefore65 === fileAfter65,
+      { drawn: drawn65, again: again65, strokes: strokes65(), same: fileBefore65 === fileAfter65 });
+    // The board the hand came from is as it was.
+    const back65 = await (async () => { window.__mm.switchBoard(home65); return settled65((b) => b.current === home65); })();
+    // (A board opened re-teaches the device's mark unless its own log does — the harness taught one — so a `teach` is not a mark drawn.)
+    step('65d. the board the hand came from is as it was — nothing drawn on it, on the list beside the two it made; the copies were not made from it',
+      back65 && mm.session.getEvents().every((e) => e.type === 'teach') && strokes65() === 0 && kept65().length >= 3 && kept65().some((e) => e.id === home65),
+      { back: back65, events: mm.session.getEvents().map((e) => e.type), boards: kept65().map((e) => e.name) });
+    // The starter: one tap in the empty panel — the molecule, using the Basics pack, matched with nothing taught.
+    await wait(60);
+    const startBtn65 = document.getElementById('inspector').querySelector('button[data-example-start]');
+    const before65 = kept65().map((e) => e.id);
+    if (startBtn65) startBtn65.click();
+    const started65 = await settled65((b) => b.current && !before65.includes(b.current));
+    const stM65 = mm.session.getState();
+    const matches65 = stM65.clusterCandidates.flatMap((c) => c.matches.map((m) => m.name + '·' + m.pack));
+    step('65e. one tap on the panel’s start opens the starter — "Molecule example", using the Basics pack, its molecules matched by the pack with nothing taught; the board it was tapped on is left as it was',
+      !!startBtn65 && started65 && bd65().name === 'Molecule example' && index65.starter === 'molecule' && JSON.stringify(stM65.packs) === '["basics@1"]' && matches65.length >= 2 && matches65.every((m) => m === 'molecule·basics@1'),
+      { started: started65, name: bd65().name, packs: stM65.packs, matches: matches65 });
+    // A class diagram and a pattern page, read as what they are.
+    await openExample65('class-diagram');
+    const cls65 = topNotation65();
+    await openExample65('pattern-page');
+    await wait(150);
+    // The sizes show for a moment after a change and while the hand points at the marks (the ghost rule): point at the long side, then at the page.
+    const st65f = mm.session.getState();
+    mm.inspect(st65f.contentIds[2]); await wait(60);
+    const sides65 = mx.chipsDrawn().filter((c) => c.kind === 'side');
+    const page65 = st65f.artifacts.find((id) => /Bust/.test((MM.getRep(st65f.nodes.get(id), 'code') || { data: { code: '' } }).data.code));
+    mm.inspect(page65); await wait(60);
+    const steps65 = mx.chipsDrawn().filter((c) => c.kind === 'step');
+    mm.inspect(null);
+    step('65f. the class diagram reads as a UML class diagram, and the pattern page says its sizes: 25.30 beside the long side of the triangle and a check at the end of each step',
+      cls65 === 'uml-class' && sides65.length === 1 && /25\.3/.test(sides65[0].text) && steps65.length >= 3 && steps65.every((c) => /^✓/.test(c.text)),
+      { class: cls65, sides: sides65.map((c) => c.text), steps: steps65.map((c) => c.text) });
+    // Put the harness back where it was.
+    window.__mm.switchBoard(home65); await settled65((b) => b.current === home65);
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   // ---- 28. A live room: another hand's log arrives live, its ink in its own colour ----
   {
     mm.session.load([]); mm.setView(1, 0, 0);
@@ -4324,92 +4418,6 @@ window.__scenario = async function(){
     const emptyRow64 = document.querySelector('#exportPanel [data-mathsout="svg"]');
     step('64g2. with no labelled figure the row is there and says why it waits', !!emptyRow64 && emptyRow64.disabled && /label/i.test(emptyRow64.title) && mx.trueSizeSvg() === null, emptyRow64 && emptyRow64.title);
     fresh64();
-  }
-
-  // ---- 65. Examples: boards made from the engine, opened as boards of your own (V1-PLAN R5) ----
-  // boards/examples/ holds a flowchart with its Mermaid beside it, a class diagram, a molecule from the
-  // Basics pack and a pattern page with a right triangle. The boards pane lists them; opening one makes
-  // a NEW board named for it — a copy, so it can be drawn on at once, and the example is never written —
-  // and an empty board's panel offers the starter in one tap. Read by the engine as it would a hand's.
-  {
-    const bd65 = () => window.__mm.boards();
-    const mx = window.__mmMaths || { chipsDrawn: () => [] };
-    const settled65 = async (pred, ms) => { const end = Date.now() + (ms || 15000); while (Date.now() < end) { const b = bd65(); if (b.ready && !b.switching && !b.busy && pred(b)) return true; await wait(50); } return false; };
-    const kept65 = () => bd65().list.filter((e) => e.kind === 'board' && !e.trashed);
-    const strokes65 = () => mm.session.getEvents().filter((e) => e.type === 'stroke').length;
-    const paneOpen65 = async () => { mm.openCC(); await wait(20); const p = document.getElementById('boardsPanel'); if (p.hasAttribute('hidden')) document.getElementById('boardsBtn').click(); for (let i = 0; i < 60 && !p.querySelector('.bdExamples .bdItem'); i++) await wait(50); return p; };
-    const openExample65 = async (id) => {
-      const p = await paneOpen65();
-      const before = kept65().map((e) => e.id);
-      const btn = p.querySelector('button[data-example-open="' + id + '"]');
-      if (btn) btn.click();
-      const ok = !!btn && await settled65((b) => b.current && !before.includes(b.current) && kept65().some((e) => e.id === b.current));
-      return { ok, id: bd65().current, name: bd65().name };
-    };
-    const topNotation65 = () => { const r = MM.notationsOf(mm.session.getState()).sort((a, b) => b.confidence - a.confidence)[0]; return r ? r.notation : null; };
-    const text65 = async (f) => { const r = await window.__realFetch('../boards/examples/' + f, { cache: 'no-store' }); return r.ok ? r.text() : ''; };
-    // From an empty board: what the panel offers, and what the pane lists.
-    mm.session.load([]); mm.setView(1, 0, 0); await wait(80);
-    const home65 = bd65().current;
-    const text65Index = await text65('index.json');
-    const index65 = (() => { try { return JSON.parse(text65Index); } catch (err) { return { starter: null, examples: [1, 2, 3, 4].map((n) => ({ name: '?', marks: 0 })) }; } })();
-    const panel65 = document.getElementById('inspector');
-    const start65 = panel65.querySelector('button[data-example-start]');
-    step('65. an empty board’s panel keeps its three lines and offers to start from an example in one tap — and to see more of them',
-      !!start65 && /example/i.test(start65.textContent) && /draw a few marks/.test(panel65.textContent) && !!panel65.querySelector('button[data-example-more]'),
-      { text: panel65.textContent.slice(0, 200), start: !!start65 });
-    const pane65 = await paneOpen65();
-    const rows65 = [...pane65.querySelectorAll('.bdExamples .bdItem')].map((r) => ({ id: r.dataset.example, text: r.textContent.replace(/\s+/g, ' ').trim() }));
-    step('65a. the boards pane has an Examples section: a flowchart, a class diagram, a molecule and a pattern page, each saying what it shows and how many marks it holds, under the boards the browser keeps',
-      rows65.map((r) => r.id).join() === 'flowchart,class-diagram,molecule,pattern-page' && rows65.every((r, i) => r.text.includes(index65.examples[i].name) && new RegExp(index65.examples[i].marks + ' marks').test(r.text))
-        && !!pane65.querySelector('.bdExamples .bdLabel') && /example/i.test(pane65.querySelector('.bdExamples .bdLabel').textContent),
-      rows65);
-    // A flowchart: a board of its own, named for it, holding its marks, read as a flowchart with its Mermaid beside it.
-    const flow65 = await openExample65('flowchart');
-    const st65 = mm.session.getState();
-    const arts65 = st65.artifacts.map((id) => MM.getRep(st65.nodes.get(id), 'code')).filter(Boolean).map((r) => r.data.kind);
-    step('65b. opening the flowchart makes a new board named "Flowchart example" — it holds the example’s marks, reads as a flowchart, and its Mermaid stands beside it as an artifact; the pane closes',
-      flow65.ok && flow65.name === 'Flowchart example' && flow65.id !== home65 && strokes65() === index65.examples[0].marks && topNotation65() === 'flowchart' && arts65.includes('mermaid')
-        && document.getElementById('boardsPanel').hasAttribute('hidden'),
-      { flow65, strokes: strokes65(), notation: topNotation65(), artifacts: arts65 });
-    // A copy: drawn on, and the example is as it was — opened again it is whole, and the file is the same bytes.
-    const fileBefore65 = await text65('flowchart.jsonl');
-    t.stroke(t.line({ x: 900, y: 100 }, { x: 1000, y: 160 }, 30)); await wait(40);
-    const drawn65 = strokes65();
-    const again65 = await openExample65('flowchart');
-    const fileAfter65 = await text65('flowchart.jsonl');
-    step('65c. the example is never written: drawn on, the copy holds one mark more; opened again it is a second board, "Flowchart example 2", whole as it was — and the file is the same bytes',
-      drawn65 === index65.examples[0].marks + 1 && again65.ok && again65.name === 'Flowchart example 2' && again65.id !== flow65.id && strokes65() === index65.examples[0].marks && fileBefore65 === fileAfter65,
-      { drawn: drawn65, again: again65, strokes: strokes65(), same: fileBefore65 === fileAfter65 });
-    // The board the hand came from is as it was.
-    const back65 = await (async () => { window.__mm.switchBoard(home65); return settled65((b) => b.current === home65); })();
-    step('65d. the board the hand came from is as it was — empty, on the list beside the two it made; the copies were not made from it',
-      back65 && mm.session.getEvents().length === 0 && kept65().length >= 3 && kept65().some((e) => e.id === home65),
-      { back: back65, events: mm.session.getEvents().length, boards: kept65().map((e) => e.name) });
-    // The starter: one tap in the empty panel — the molecule, using the Basics pack, matched with nothing taught.
-    await wait(60);
-    const startBtn65 = document.getElementById('inspector').querySelector('button[data-example-start]');
-    const before65 = kept65().map((e) => e.id);
-    if (startBtn65) startBtn65.click();
-    const started65 = await settled65((b) => b.current && !before65.includes(b.current));
-    const stM65 = mm.session.getState();
-    const matches65 = stM65.clusterCandidates.flatMap((c) => c.matches.map((m) => m.name + '·' + m.pack));
-    step('65e. one tap on the panel’s start opens the starter — "Molecule example", using the Basics pack, its molecules matched by the pack with nothing taught; the board it was tapped on is left as it was',
-      !!startBtn65 && started65 && bd65().name === 'Molecule example' && index65.starter === 'molecule' && JSON.stringify(stM65.packs) === '["basics@1"]' && matches65.length >= 2 && matches65.every((m) => m === 'molecule·basics@1'),
-      { started: started65, name: bd65().name, packs: stM65.packs, matches: matches65 });
-    // A class diagram and a pattern page, read as what they are.
-    await openExample65('class-diagram');
-    const cls65 = topNotation65();
-    await openExample65('pattern-page');
-    await wait(150);
-    const sides65 = mx.chipsDrawn().filter((c) => c.kind === 'side');
-    const steps65 = mx.chipsDrawn().filter((c) => c.kind === 'step');
-    step('65f. the class diagram reads as a UML class diagram, and the pattern page says its sizes: 25.30 beside the long side of the triangle and a check at the end of each step',
-      cls65 === 'uml-class' && sides65.length === 1 && /25\.3/.test(sides65[0].text) && steps65.length >= 3 && steps65.every((c) => /^✓/.test(c.text)),
-      { class: cls65, sides: sides65.map((c) => c.text), steps: steps65.map((c) => c.text) });
-    // Put the harness back where it was.
-    window.__mm.switchBoard(home65); await settled65((b) => b.current === home65);
-    mm.session.load([]); mm.setView(1, 0, 0);
   }
 
   return R;

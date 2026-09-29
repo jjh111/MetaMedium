@@ -222,7 +222,7 @@ html, body {
 #boardsPanel .bdHead { display: flex; gap: 7px; margin-bottom: 8px; }
 #boardsPanel .bdHead button { flex: 1; }
 #boardsPanel .bdLabel { font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--dim); margin: 9px 0 4px; }
-#boardsPanel .bdPlaces, #boardsPanel .bdTrash { margin-top: 8px; border-top: 1px solid var(--edge); }
+#boardsPanel .bdExamples, #boardsPanel .bdPlaces, #boardsPanel .bdTrash { margin-top: 8px; border-top: 1px solid var(--edge); }
 #boardsPanel .bdItem { padding: 5px 7px; border: 1px solid transparent; border-radius: 6px; }
 #boardsPanel .bdItem + .bdItem { margin-top: 2px; }
 #boardsPanel .bdItem.here { border-color: var(--rule); background: rgba(var(--gold-rgb), 0.07); }

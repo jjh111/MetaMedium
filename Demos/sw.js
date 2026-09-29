@@ -31,8 +31,16 @@ const SHELL = [
   '../Demos/surface/surface.css',
   '../Demos/metamedium-core.browser.js',
 ];
-// The help pane's text: kept for offline when it answers, never the reason a shell is not kept.
-const EXTRA = ['../HELP.md'];
+// The help pane's text, and the boards pane's examples (R5: the index and each log, so an example opens with no network
+// after one visit): kept for offline when they answer, never the reason a shell is not kept.
+const EXTRA = [
+  '../HELP.md',
+  '../boards/examples/index.json',
+  '../boards/examples/flowchart.jsonl',
+  '../boards/examples/class-diagram.jsonl',
+  '../boards/examples/molecule.jsonl',
+  '../boards/examples/pattern-page.jsonl',
+];
 
 // `reload`: the release's own files, never a copy the browser's HTTP cache still holds.
 const fresh = (u) => new Request(u, { cache: 'reload' });

@@ -7,7 +7,10 @@
 //   plainly), agoWords / sizeWords / kindWords / boardRows (what the pane shows), countMarks / statsOf
 //   / statsAfter (what a board holds, kept up as records land), placeEntry / placesPlan (folders,
 //   repositories and sites as recent places), leaveVerdict (whether the board on screen may be left),
-//   switchPlan (what opening an entry does), boardTitle / boardSearch (the page's title and address).
+//   switchPlan (what opening an entry does), boardTitle / boardSearch (the page's title and address),
+//   and the examples (R5) — EXAMPLES_BASE / exampleUrl (where boards/examples stands from the page),
+//   exampleRows (the pane's Examples, read from the index and never trusted), exampleName (what a board
+//   made from one is called), starterOf (which one a first run's tap opens).
 // Uses: NOTHING. Like 17-board.js (R3's journal: ONE board's log) this fragment names no closure
 //   variable and touches no DOM, no storage and no session; 17-folder.js is the adapter (IndexedDB,
 //   the lock, the switch) and 22-boards.js the pane. Tested on its own in Node:
@@ -266,6 +269,51 @@
     if (!isKept(e)) return { go: 'place', id: e.id };
     if (o.onBoard && o.current === e.id) return { go: 'here', id: e.id };
     return { go: o.onBoard ? 'switch' : 'navigate', id: e.id, restore: !!e.trashed };
+  }
+
+  // ----- The examples (V1-PLAN R5) ---------------------------------------------------------------
+  // boards/examples/ is a folder of logs and an index (scripts/examples.mjs makes them). Opening one is
+  // opening a COPY: the adapter reads the file and makes a board of its own from its events, so the example
+  // is never written, and what a hand draws on the copy is the hand's. The index is read, not trusted.
+
+  /** Where the examples stand, from the app (/app/) and the old address alike: both sit one folder below the site's root, as Demos/ does. */
+  const EXAMPLES_BASE = '../boards/examples/';
+  const exampleUrl = (file) => EXAMPLES_BASE + file;
+  /** A log's file name as the examples folder holds one: a name and .jsonl, never a path and never another site's. */
+  const EXAMPLE_FILE = /^[a-z0-9][a-z0-9-]*\.jsonl$/;
+
+  /**
+   * The rows the pane shows for the examples, in the index's order: an id, a name, what it shows, the file,
+   * and what it holds in words. A list that cannot be read is no rows; a row with no name, an id seen
+   * before, or a file that is not one of the folder's logs is left out — nothing throws.
+   */
+  function exampleRows(index) {
+    const list = index && typeof index === 'object' && Array.isArray(index.examples) ? index.examples : [];
+    const seen = new Set();
+    const rows = [];
+    for (const e of list) {
+      if (!e || typeof e !== 'object' || typeof e.id !== 'string' || !e.id || seen.has(e.id)) continue;
+      const name = boardName(e.name);
+      if (!name || typeof e.file !== 'string' || !EXAMPLE_FILE.test(e.file)) continue;
+      seen.add(e.id);
+      const n = e.marks;
+      rows.push({ id: e.id, name, says: typeof e.says === 'string' ? e.says : '', file: e.file, words: Number.isInteger(n) && n >= 0 ? marksWords({ events: n, marks: n }) : '' });
+    }
+    return rows;
+  }
+  /** What a board made from an example is called: "Flowchart example", then "Flowchart example 2" … (a name in the trash is taken). */
+  function exampleName(entries, row) {
+    const stem = (boardName(row && row.name) || 'Board').slice(0, BOARD_NAME_MAX - 20).trim() + ' example';
+    const taken = new Set((entries || []).filter(isKept).map((e) => e.name));
+    if (!taken.has(stem)) return stem;
+    for (let n = 2; ; n++) if (!taken.has(stem + ' ' + n)) return stem + ' ' + n;
+  }
+  /** The example a first run's tap opens: the index's own choice when it can be opened, else the first one, else none. */
+  function starterOf(index) {
+    const rows = exampleRows(index);
+    if (!rows.length) return null;
+    const want = index && index.starter;
+    return rows.some((r) => r.id === want) ? want : rows[0].id;
   }
 
   /** The page's title: the board's name first. */

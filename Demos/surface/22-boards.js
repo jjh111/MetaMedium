@@ -2,12 +2,16 @@
 // Provides: the boards pane under the bar (V1-PLAN §9 R1) — the boards this browser keeps, each with
 //   when it last changed and roughly how big it is, the board on screen marked; New board, a board
 //   from a log file, open, rename, duplicate, delete (to the trash), restore, and emptying the trash
-//   said plainly before it happens; the folders, repositories and sites opened lately, by kind.
+//   said plainly before it happens; the folders, repositories and sites opened lately, by kind;
+//   and the examples (V1-PLAN R5): a few boards made by the engine, each opened as a NEW board of
+//   your own, a copy — the example is never written — and the empty board's panel start (the
+//   starter, one tap; *more examples* opens this pane).
 //   renderBoardsPane (the adapter calls it when the list changes).
 // Uses: ui (pane, chip), controls (tiles.boards, togglePanel/closePanel), boards list (boardRows,
 //   sizeWords, isKept), folder (the boards adapter: boards, board, onBoardHere, switchBoard, newBoard,
 //   renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash, emptyTrash, boardFromFile,
-//   rereadBoards, boardEntryName, exportLogNow), input (flash).
+//   rereadBoards, boardEntryName, exportLogNow), input (flash, say), board (journalEvents), the
+//   inspector's element (the panel's start), boards list (exampleUrl, exampleRows, exampleName, starterOf).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -34,6 +38,7 @@
       paintBoardsPane();
       // Another tab may have changed the list, and what its boards hold, since this page read it.
       rereadBoards();
+      loadExamples();
     };
   }
 
@@ -127,6 +132,7 @@
     else if (boards.how !== 'indexeddb') frag.appendChild(bdEl('p', 'hint', 'this browser will not let the page keep boards (a private window, or site data blocked)'));
     const list = frag.appendChild(bdEl('div', 'bdBoards'));
     for (const r of rows.boards) list.appendChild(boardRowEl(r));
+    frag.appendChild(examplesEl(many));
     if (rows.places.length) {
       const pl = frag.appendChild(bdEl('div', 'bdPlaces'));
       pl.appendChild(bdEl('div', 'bdLabel', 'recent places'));
@@ -152,6 +158,82 @@
     bdList.replaceChildren(frag);
     paintBoardsSaid();
   }
+
+  // ----- The examples (V1-PLAN R5) ---------------------------------------------------------------
+  // The index is read once a page (and again while it has not been read), from boards/examples/, which
+  // the service worker keeps for offline. Opening one reads its log and makes a board from its events
+  // through the adapter's own door (newBoard) — a copy under an id of its own, named for the example, so
+  // the example is never written and the hand draws on it at once.
+  const examples = { state: 'idle', index: null, rows: [], loading: null, opening: false };
+  function loadExamples() {
+    if (examples.loading) return examples.loading;
+    if (examples.state === 'ready') return Promise.resolve();
+    examples.state = 'loading';
+    examples.loading = fetch(exampleUrl('index.json'), { cache: 'no-cache' })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+      .then((index) => { examples.index = index; examples.rows = exampleRows(index); examples.state = examples.rows.length ? 'ready' : 'failed'; })
+      .catch(() => { examples.index = null; examples.rows = []; examples.state = 'failed'; })
+      .then(() => { examples.loading = null; renderBoardsPane(); });
+    return examples.loading;
+  }
+  function examplesEl(many) {
+    const box = bdEl('div', 'bdExamples');
+    box.appendChild(bdEl('div', 'bdLabel', 'examples'));
+    if (examples.state === 'idle' || examples.state === 'loading') box.appendChild(bdEl('p', 'hint', 'reading the examples…'));
+    else if (examples.state === 'failed') box.appendChild(bdEl('p', 'hint', 'the examples could not be read — this page keeps them for offline once it has been online'));
+    for (const r of examples.rows) {
+      const row = bdEl('div', 'bdItem bdExample');
+      row.dataset.example = r.id;
+      const open = bdButton(r.name, 'bdName', { exampleOpen: r.id }, 'a new board of your own, made from this example — the example itself is never changed');
+      if (!many) open.disabled = true;
+      row.appendChild(bdEl('div', 'bdTop')).appendChild(open);
+      row.appendChild(document.createTextNode(' '));
+      row.appendChild(bdEl('div', 'bdMeta', [r.says, r.words].filter(Boolean).join(' · ')));
+      box.appendChild(row);
+    }
+    return box;
+  }
+  /**
+   * Open an example as a board of its own. Resolves the entry made, or false with the reason said
+   * through `o.said` (the pane's line, or the status line's) — never thrown, never a board half made.
+   */
+  async function openExample(id, o) {
+    o = o || {};
+    const report = (v) => { const words = typeof v === 'string' ? v : v.words; if (o.said) o.said(v); else say(words); };
+    if (examples.opening) return false;
+    examples.opening = true;
+    try {
+      await loadExamples();
+      const row = examples.rows.find((r) => r.id === id);
+      if (!row) { report('the examples could not be read — this page keeps them for offline once it has been online'); return false; }
+      let events = null;
+      try {
+        const res = await fetch(exampleUrl(row.file), { cache: 'no-cache' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const d = journalEvents(await res.text());
+        events = d.bad ? null : d.events;
+      } catch (err) { report('could not read the “' + row.name + '” example (' + ((err && err.message) || err) + ') — it opens once this page has been online'); return false; }
+      if (!events || !events.length || !events.every((ev) => ev && typeof ev.type === 'string')) { report('the “' + row.name + '” example is not a board’s log'); return false; }
+      return await newBoard({ name: exampleName([...boards.entries.values()], row), events: events, force: !!o.force, said: o.said || ((v) => say(v.words)) });
+    } finally { examples.opening = false; }
+  }
+  async function exampleFromPane(id, force) {
+    paneSay(null);
+    const made = await openExample(id, { force: !!force, said: (v) => paneSay(v, () => exampleFromPane(id, true)) });
+    if (made) { closePanel(boardsPanel, tiles.boards); flash('“' + made.name + '” — a board of your own, made from the example; the example is as it was'); }
+  }
+  // The empty board's panel offers the starter in one tap, and more of them (10-inspector.js): its buttons carry no
+  // data-act, so the panel's own handler never takes them for a mark's.
+  inspectorEl.addEventListener('click', async (e) => {
+    const b = e.target.closest && e.target.closest('button[data-example-start], button[data-example-more]');
+    if (!b) return;
+    if (b.hasAttribute('data-example-more')) { if (boardsPanel && boardsPanel.hasAttribute('hidden')) tiles.boards.onclick(); return; }
+    await loadExamples();
+    const id = starterOf(examples.index);
+    if (!id) { say('the examples could not be read — this page keeps them for offline once it has been online'); return; }
+    const made = await openExample(id);
+    if (made) flash('“' + made.name + '” — a board of your own, made from the example; the board before stays in boards');
+  });
 
   /** The pane's own line: what just happened, or why not — with the ways out as buttons in it. */
   function paneSay(v, retry) {
@@ -198,6 +280,7 @@
       const d = b.dataset;
       try {
         if (d.open !== undefined) await openFromPane(d.open);
+        else if (d.exampleOpen !== undefined) await exampleFromPane(d.exampleOpen);
         else if (d.boardNew !== undefined) await newFromPane();
         else if (d.boardFile !== undefined) { bdFile.value = ''; bdFile.click(); }
         else if (d.rename !== undefined) {

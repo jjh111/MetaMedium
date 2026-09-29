@@ -94,6 +94,9 @@
           '<li><b>press and hold one</b> — it is held with what it sits with</li>' +
           '<li><b>choose what it becomes</b> — tap a pill, or type in the field</li>' +
           '</ol>' +
+          // R5: the first run's one tap — a board of your own made from the starter example (22-boards.js takes it).
+          '<div class="acts"><button class="mini" type="button" data-example-start title="a new board of your own with something already drawn — the starter example, yours to draw on">start from an example</button>' +
+          '<button class="mini" type="button" data-example-more title="a flowchart, a class diagram, a molecule and a pattern page — in the boards pane">more examples</button></div>' +
           '<div class="why">the canvas reads every mark as you draw it; a model is asked only when you ask one</div>');
         return;
       }
