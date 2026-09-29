@@ -36,12 +36,13 @@ library packs a board uses by an event (B3, *Library packs*). Editing: one
 selected mark's own points reshape its clean form (E1, *Handles*), and bound
 arrows follow what they are bound to, derived from the bindings, never logged
 (E2). Diagrams, in core: the flowchart (D1), the UML class diagram (D4) and
-the sequence diagram with the dashed lines it reads and the state diagram (D5), each a
+the sequence diagram with the dashed lines it reads and the state diagram (D5), the ER
+diagram and the mind map (D6), each a
 notation with its pack, its bench and its Mermaid out (D2) and in (D3,
 with a layered layout); and W1 keeps a diagram's own strokes from erasing or
 being swallowed. What is next is each diagram and the maths **on the
 surface** — the field saying *a flowchart 0.73*, a Mermaid artifact, *Draw
-it* from Mermaid, maths offers — then S2, state and ER, first run, a review
+it* from Mermaid, maths offers — then S2, first run, a review
 of use, and v1.0.0 (`V1-PLAN.md` §8–§9, every unit with its dated status
 line).
 
@@ -303,7 +304,7 @@ any structural change.
 
 | Path | What it is |
 |---|---|
-| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, the UML class diagram, the sequence diagram and the dashed lines it reads, the state diagram, Mermaid out and in, and a layered layout), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*), **magnets, handles and bindings that follow** (`src/session/magnets.ts`, `handles.ts`, `follow.ts` with `affine.ts` and `manipulate.ts`; under *Magnets and bindings* and *Handles*) and the LLM transport. New recognition/engine work lands HERE |
+| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, the UML class diagram, the sequence diagram and the dashed lines it reads, the state diagram, the ER diagram, the mind map, Mermaid out and in, and a layered layout), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*), **magnets, handles and bindings that follow** (`src/session/magnets.ts`, `handles.ts`, `follow.ts` with `affine.ts` and `manipulate.ts`; under *Magnets and bindings* and *Handles*) and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages). Fully on the `brand/` system as of 3 Sept 2026 — its `:root` is `brand/tokens.css` under the names this page already used, so change a value THERE first |
 | `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
@@ -961,8 +962,10 @@ D2's writer reads; its affinities), **`uml-class@1`** (names the class
 notation, restating none of `UML_CLASS_TABLE`; its affinities),
 **`sequence@1`** (names the sequence notation, restating none of
 `SEQUENCE_TABLE`; its affinities), **`state@1`** (names the state notation,
-restating none of `STATE_TABLE`; its affinities) and **`test-molecule@1`** (tests only — a
-`test-` pack is never listed).
+restating none of `STATE_TABLE`; its affinities), **`er@1`** (names the ER
+notation, restating none of `ER_TABLE`; its affinities), **`mindmap@1`** (names
+the mind-map notation, restating none of `MINDMAP_TABLE`; its affinities) and
+**`test-molecule@1`** (tests only — a `test-` pack is never listed).
 
 **A board uses a pack by an event**: `use { pack: 'basics@1' }` and `unuse`,
 through `session.use` / `unuse`; `SessionState.packs` in the order used. They
@@ -1686,6 +1689,100 @@ its border), a loop out of a state's side bound at both ends — the ink ends
 exactly on its site, because a bound end is carried onto its site and an end
 left a wing's length off distorts the loop — and reads it all back. The state@1
 pack names the notation and restates none of its table.
+
+### The ER diagram (V1-PLAN D6)
+
+> `metamedium-core/src/notations/er.ts` (the reading, `ER_TABLE`),
+> `er-mermaid.ts` (the writer, the reader, the drawing), `graph-kit.ts`,
+> `packs/shipped/er.ts`, `fixtures/er.ts`, `er.mermaid.ts` and
+> `er.mermaid-in.ts`, `er.test.ts` (the board, A5), `er.read.test.ts`,
+> `er.bench.test.ts`, `er-mermaid.test.ts`.
+
+An **entity** is a box with its name written in it — one closed stroke the
+rung reads as a box, or strokes ruled into one — and a **relationship** a plain
+line from one entity to another, its ends read past any head and a magnet's bind
+first (`graph-kit.ts`, the flowchart's joining), no head, its **verb** the writing
+beside its middle and a **multiplicity** the short writing near each end (`1`,
+`*`, `0..1`, `1..*`; the pieces of one end are read together). A relationship has
+no direction of its own: it stands from the entity first in reading order. Where
+a multiplicity has been read it says how many, as one of four **cardinalities**
+(`ER_TABLE.cardinalities`: exactly one, zero or one, zero or more, one or more —
+Mermaid's crow's-foot tokens, `cardinalityOf` reads the words); a crow's foot
+drawn as ink is not read, the writing is what says how many. **What makes it an
+ER diagram, and not the flowchart, class diagram or mind map every box-and-line
+drawing is:** boxes with nothing in them but a name, joined by lines with no head,
+a multiplicity at their ends and a verb beside them. The reading's confidence is
+its structure scaled by that evidence (`EVIDENCE`), so boxes and plain lines
+alone are held under the floor; a box with a line across it holds compartments
+(a class's, `lineAcross`: a line that lies inside the box — one that crosses it
+or bows round it does not), and a connector with a head or an arrow drawn
+between boxes counts against it or never reaches the joining (a board of arrows
+returns before the costly part). A stroke as small as a letter that joins two
+different symbols, each end within reach of one, is a relationship however short
+(`joinsTwo`) — a 40 px branch between two close shapes was written off as
+writing. An entity offers its border as one closed continuous port
+(`along:er`). Mermaid: `erDiagram`, `direction LR` when the relationships run
+across, `id["name"]`, each relationship `<from> <left>--<right> <to> : "verb"`
+with the crow's-foot tokens the writing at each end says — written as zero or
+more where nothing says how many, said in the notes, and `""` for a relationship
+with no verb, which Mermaid wants; entities in reading order of the page as it
+was meant to stand (a hand's page leans, so the entities' centres are turned
+back by the median lean of the lines that run across) — **by columns when it runs
+across and by rows when it runs down**, because a layered layout keeps a rank in
+a column, which is what makes a text drawn and written again keep its order; the
+reader takes `NAME`, `NAME["alias"]`, quoted names, the symbol tokens and the
+words Mermaid has for each cardinality, and a `..` or `optionally to` line as a
+plain one (said), and refuses with their lines an entity's attributes (a box
+carries a name), a title and styles. The drawing: a box with its name on its own
+ink, the layered layout, each relationship a plain line (an arc round an entity
+in the way) bound at both ends at a place along the border, its verb a label on
+its own ink and a dash beside each end labelled with the words that say how many
+— each entity tall enough for the ends that share a side — read back. Not read:
+Chen's relationship diamonds (V1-PLAN §3 named them; the notation is the
+crow's-foot one), attributes, a dashed line. The bench (`er.bench.test.ts`, 36
+hands of the board): read 36/36, first 36/36 (0.65–0.67); entities 144/144, names
+144/144, relationships 108/108, multiplicities 108/108, verbs 108/108, at three
+corner roundnesses; the flowchart bench, the class bench, the sequence and state
+boards, a wireframe, the molecule and a line of writing: highest 0.08, none above
+the floor.
+
+### The mind map (V1-PLAN D6)
+
+> `metamedium-core/src/notations/mindmap.ts` (the reading, `MINDMAP_TABLE`),
+> `mindmap-mermaid.ts` (the writer, the reader, the drawing), `graph-kit.ts`,
+> `packs/shipped/mindmap.ts`, `fixtures/mindmap.ts`, `mindmap.mermaid.ts` and
+> `mindmap.mermaid-in.ts`, `mindmap.test.ts` (the board, A6),
+> `mindmap.read.test.ts`, `mindmap.bench.test.ts`, `mindmap-mermaid.test.ts`.
+
+A **node** is a closed shape with its word written in it — a circle or an oval,
+which Mermaid brackets `((…))`, or a box, corners square or round, `[…]` — and a
+**branch** a plain line from one node to another, read as an ER diagram's
+relationship is. The **root** is the most central node of the tree (the least
+total distance to the others; then most branches, a circle, the larger), and every
+other node hangs from the one nearer it; a node's branches are taken in the order
+a hand reads round it — clockwise from the top round the root, clockwise from the
+way it faces (away from its parent) round any other (`children`). **What makes it
+a mind map, and not the ER diagram's boxes or the molecule's bubbles:** a word in
+every node (a molecule has none), a hub with three branches and branches that go
+on past it, and lines with nothing beside them — a multiplicity or a verb on a
+line counts against it (`WRITTEN_PENALTY`), as do a head, a compartment and a line
+that closes a loop so the shapes are a graph and no tree. Bare words on a branch —
+a hand's other kind of mind map — are not read; the nodes are shapes. A node
+offers its border as one closed continuous port (`along:mindmap`). Mermaid:
+`mindmap`, the tree as indentation, each node `id((“words”))` or `id["words"]`,
+quoted and escaped, D2's ids; the reader takes the shapes Mermaid takes (a
+rounded box, a bang, a cloud, a hexagon and words with no shape are drawn as a
+circle or a box, said) and refuses with their lines an icon, a class, a title and
+a second root with what is under it; the drawing fans the tree round the root in
+rings — a subtree a share of its parent's wedge in proportion to its leaves,
+capped, its children over the wedge in the order written, so read back the order is
+the text's — each node its words on its own ink, each branch a line bound at both
+ends at a place along the border. A text rooted away from its centre reads back
+re-rooted, said. The bench (`mindmap.bench.test.ts`, 36 hands of the board): read
+36/36, first 36/36 (0.68–0.69); nodes 252/252, root, words, shapes, depths 252/252,
+branches 216/216, the order round every node 252/252, at three corner roundnesses;
+the flowchart, class, sequence, state and ER boards, a wireframe and a line of
+writing: highest 0.05, the molecule 0.24, none above the floor.
 
 ### Spatial Graph — retired
 
