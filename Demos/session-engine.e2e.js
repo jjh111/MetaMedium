@@ -3184,7 +3184,7 @@ window.__scenario = async function(){
     const marked51 = !!pane51.querySelector('.pkItem.used[data-pack="basics@1"]');
     const faceIn51 = face51();
     step('51. the packs tile stands with the Helpers in the control centre (U1f; it was the last tile before the centre was grouped); its pane lists what this build ships and never a test pack; use writes one use event, and the board uses basics@1 — the tile and the pane say so',
-      grid51.includes('packsBtn') && JSON.stringify(listed51) === '["basics@1","flowchart@1","uml-class@1","sequence@1"]' && tapped51 && uses51.length === 1 && uses51[0].pack === 'basics@1' &&
+      grid51.includes('packsBtn') && JSON.stringify(listed51) === '["basics@1","flowchart@1","uml-class@1","sequence@1","state@1","er@1","mindmap@1"]' && tapped51 && uses51.length === 1 && uses51[0].pack === 'basics@1' &&
         JSON.stringify(mm.session.getState().packs) === '["basics@1"]' && faceIn51 === 'basics' && marked51,
       { lastTiles: grid51.slice(-3), listed: listed51, uses: uses51.map((e) => e.pack), face: faceIn51, marked: marked51 });
     await closePacks51();
