@@ -2056,6 +2056,45 @@ on the director's branch describes and this branch does not have) reads the mark
 as the likeliest registered notation with a writer, so it should offer the three
 new ones with no surface change — unverified here; the field's *what this is* row and the panel's
 *becomes* row saying *an ER diagram 0.66* are the surface unit still to come.
+*N1 status, 29 Sep 2026:* **the six notations read on the surface** (§3 *Reading*;
+A1–A3's *it reads as a …*). *Red first:* `b023fab` — e2e 67 (a Mermaid text drawn
+for each notation and held: the field's row leads with it, the panel says it,
+plural and ranked, a tap, Enter, the read count) 10 of 12 failing, and
+`notationWords` in Node; then `8c7084d` (core: `baseOn` knows a notation, its
+test) and `eaa9abe` (the surface). **Built:** `notationsHeld` (`09-palette.js`)
+reads `notationsOf` over the held marks only — two or more, no artifact, the
+Mermaid tool's own rule — above `NOTATION_FLOOR`, **once per log** (`logKey`,
+shared by the field and the panel; e2e 67k counts it: one read for a hold, a pan
+and a repaint read nothing); `notationItem` puts each reading in the field's
+*what this is* row in the person's words (*a flowchart 0.92*, *a class diagram
+0.92*, *an ER diagram 0.67* — `notationWords`, pure, in `09-field.js`: no "UML"),
+core's whole sentence the tooltip; the panel (`becomesOf`, `10-inspector.js`)
+says *is — a flowchart: three processes, one decision, three flows · or a class
+diagram 0.35* and *becomes — Make it Mermaid · draw them clean · a name*.
+**What a tap does — the choice:** it is a reading of what the marks ARE and not a
+name for a definition, so it has no `act` and Enter never takes it (with only
+such readings held the line says *tap a reading to use it*, never *as the name*);
+a tap on the reading the Mermaid tool writes from takes *Make it Mermaid*, in that
+notation, through the tool's own stamp — the honest act a notation has — and a tap
+on a runner-up (a flowchart beside a class diagram reads as both, the class first)
+says its sentence in the status line and writes nothing, since `mermaidFor`
+writes the likeliest reading; extending the tool to write a chosen one is a small
+later unit if John wants it. **Ranking:** `baseOn` gained `notation` (0.75 + 0.4c),
+so from the floor up a notation stands with the firmest concept it is made of —
+*a flowchart 0.92* leads *flow 0.90*, and an ER diagram at 0.67 does too — and
+under what a model read (the first cut, 0.6 + 0.45c, let *flow* lead an ER
+diagram; e2e 67d found it). **e2e 49's golden is unchanged**: a row of boxes and a
+molecule read as no notation above the floor (the molecule is *a mind map 0.23*),
+writing as none; e2e 50 stands (three boxes beside a flowchart read as none).
+Counts: e2e 67–67k, 12 records (`canvas` 406 passed, 0 failed, 2 skipped on the
+merged tree), core `rank.test.ts` one more, `09-field.test.mjs` two more. *Found,
+for other owners:* a drawing's readings are cheap for the six drawn by
+`drawMermaid` (12–78 ms for 7–27 marks) but the Mermaid tool's own `offers()` reads
+`notationsOf` again for the same marks — twice per held scope, once by the tool
+and once by the surface; handing the tool the surface's reading through the
+`ToolHost` would halve it, and matters only for a held scope of hundreds of marks.
+A class diagram alone also reads as *a flowchart 0.35* (its boxes and lines) — below
+the floor, said nowhere, as intended.
 **D7 Routing** — orthogonal connectors between ports and *tidy the diagram*.
 **D8 The repair demo** — `CONTROL-POINTS-PLAN.md` P4; *needs John:* one
 photograph of a hand-drawn flowchart.

@@ -48,7 +48,7 @@ a page*, below; e2e 64); and a drawing that reads as a diagram is offered
 board's ink, the export pane writes the file, and *Draw it* puts a Mermaid
 text back on the board as marks that read as the same diagram (*Mermaid on
 the surface*, below; e2e 62–63). **And the hand is in the gate** (H1, `node e2e/run.mjs hand`, *The MCP hand*, below): QA-v10's machine rows walked headless with
-`Demos/mcp.mjs` in a room of its own, and `QA-v1.md` is the hand checklist for A1–A10. **And the state diagram, the ER diagram and the mind map** (D5's second half, D6) read, each with its pack and its Mermaid out and in; **and a first run** (R5): example boards in the boards pane and *start from an example* on an empty board. What is next is routing (D7), a review
+`Demos/mcp.mjs` in a room of its own, and `QA-v1.md` is the hand checklist for A1–A10. **And the state diagram, the ER diagram and the mind map** (D5's second half, D6) read, each with its pack and its Mermaid out and in; **and every notation reads on the surface** (N1: the field's *what this is* row and the panel's *is* / *becomes* say *a flowchart 0.92*, *a class diagram*, *an ER diagram* …, e2e 67); **and a first run** (R5): example boards in the boards pane and *start from an example* on an empty board. What is next is routing (D7), a review
 of use, and v1.0.0 (`V1-PLAN.md`
 §8–§9, every unit with its dated status line).
 
@@ -736,7 +736,20 @@ hand joins at tier 0, so `isHeardReading` — not `tier > 0` — lets its `canva
 in, and `isShapeRungReading` is what the rung itself measured; F1, `session/interpretations.ts`); and **what it affords** — Draw them clean, Line up, Frame these,
 Play A, Not a molecule …, ranked by the reading, by use and by what stands
 beside them, the rest a keystroke away: each an offer from a registered tool
-(see *Tools* and *Context*, below). A word typed, or writing read, is offered two ways side by
+(see *Tools* and *Context*, below). **A drawing that reads as a diagram says so in *what this is***
+(V1-PLAN §3 *Reading*, N1; `notationItem` and `notationsHeld` in `09-palette.js`, `notationWords`
+in `09-field.js`): each notation that reads the held marks above `NOTATION_FLOOR`, plural and ranked, in
+the person's words — *a flowchart 0.92*, *a class diagram 0.49*, never "UML" — with core's whole sentence
+(*three processes, one decision, three flows*) as the tooltip. **A notation is what the marks ARE, not a name**:
+it has no `act`, so Enter never takes it (with only such readings held the line says *tap a reading to use it*,
+never *as the name*; the item carries `notation`), and a tap on the reading Mermaid can be written from — the
+one *Make it Mermaid* is offered for — takes that offer, in that notation; a tap on another says its sentence in the
+status line and writes nothing (`mermaidFor` writes the likeliest). It ranks with the other readings by `baseOn`'s
+`notation` (0.75 + 0.4c: from the floor up with the firmest concept it is made of, so *a flowchart* leads *flow*,
+and under what a model read). The held scope is read **once while the log stands** (`notationsHeld`, keyed by
+`logKey()`, shared by the field and the panel; `mm.notationReads()` counts the reads, e2e 67k), only for two marks or
+more and no artifact — the Mermaid tool's own rule; a row of boxes, a molecule and writing read as none above the floor, so e2e
+49's golden stands. A word typed, or writing read, is offered two ways side by
 side — *Name it* and *Label it* (see *A label*, below). A pill carries a
 label; its reason is the tooltip; a pill that asks a model carries a dot.
 **The field opens by
@@ -2161,7 +2174,9 @@ closed by default on narrow screens). **It speaks to the person first**
 (PLAN-USER-SURFACE U1a; `markSummary` in `10-inspector.js`): what the mark,
 the thing or the selection *is* and what it *becomes*, in two or three plain
 lines — no id, no tier, no coordinate — with the act at hand (*draw it
-clean*, *read it*, a clock's *play*). The inspector — ids, tiers, the
+clean*, *read it*, a clock's *play*). **A selection that reads as a diagram says *is* and *becomes*** (N1; `becomesOf` in
+`10-inspector.js`): *is — a flowchart: three processes, one decision, three flows · or a class diagram 0.35*,
+*becomes — Make it Mermaid · draw them clean · a name*, the acts named only when the field offers them. The inspector — ids, tiers, the
 ladder, *read as*, relations, *maths*, *measured*, roles — is behind
 **details**, closed by default and remembered on this device
 (`mm-inspect`). Its room is its own however little it says: the free ground

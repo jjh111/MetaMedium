@@ -4573,7 +4573,8 @@ window.__scenario = async function(){
     await hold67(flowC67);
     const afterHold67 = reads67() - n0;
     mm.setView(1, 30, 20); await wait(60); mm.setView(1, 0, 0); await wait(60);
-    mm.session.select([flowC67[0]], Date.now()); await wait(40);
+    for (const [x, y] of [[300, 120], [320, 140], [340, 160]]) document.getElementById('canvas').dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons: 0 }));
+    await wait(60);
     const afterRepaint67 = reads67() - n0;
     step('67k. the held scope is read for notations once while the log stands — the field and the panel share it, and a pan and a repaint read nothing again',
       afterHold67 === 1 && afterRepaint67 === 1, { afterHold: afterHold67, afterRepaint: afterRepaint67 });

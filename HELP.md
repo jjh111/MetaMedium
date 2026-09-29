@@ -27,7 +27,12 @@ flowchart, a class diagram and a pattern page wait too.
   held marks one thing the canvas remembers, and offers again when you draw
   one like it), **Copy**, **Paste**, **Erase**.
 - **What this is** — the readings, each with how sure it is (*row 0.83*,
-  *molecule 0.92*). Tap one to take it as the name.
+  *molecule 0.92*). Tap one to take it as the name. A drawing that reads as a
+  diagram says so too — *a flowchart 0.84*, *a class diagram 0.49*, beside each
+  other when it reads two ways; point at one for what it saw (*three processes,
+  one decision, five flows*). A diagram is not a name, so Enter never takes it
+  as one; tap it and the canvas says it, or, for the one it can write, makes the
+  Mermaid text (below). The panel says the same under **is**.
 - **What it can become** — the acts: *Draw them clean*, *Line up across*,
   *Match sizes*, *Show it in 3D*, *Frame these*, … A pill with a dot asks a
   model.
@@ -50,7 +55,8 @@ flowchart, a class diagram and a pattern page wait too.
   model read them; then make them text, a name, or a label.
 - **Type text**: double-click empty ground.
 - **Say a diagram as text**: hold a drawing that reads as a flowchart, a class
-  diagram or a sequence diagram and choose **Make it Mermaid**. A Mermaid text
+  diagram, a sequence diagram, a state diagram, an ER diagram or a mind map and
+  choose **Make it Mermaid** (or tap its reading in *what this is*). A Mermaid text
   stands beside it, drawn as a diagram in your ink (the text shows when the
   diagram cannot be drawn), and ink over a node of it lands on the mark it came
   from. Double-click the text, or hold it and choose **Edit the text**, to change
