@@ -233,6 +233,25 @@ function resampleByArcLength(points, n2, closed = false) {
   }
   return out;
 }
+function inkTipIndex(points, head, tail, hint, near) {
+  const L = Math.hypot(hint.x - tail.x, hint.y - tail.y);
+  if (!(L > 0) || points.length === 0) return head === "start" ? 0 : Math.max(0, points.length - 1);
+  const ux = (hint.x - tail.x) / L, uy = (hint.y - tail.y) / L;
+  const along = (p) => (p.x - tail.x) * ux + (p.y - tail.y) * uy;
+  const order2 = head === "start" ? points.map((_, i) => points.length - 1 - i) : points.map((_, i) => i);
+  let far = -Infinity;
+  for (const p of points) far = Math.max(far, along(p));
+  let at = order2.findIndex((i) => along(points[i]) >= far - near);
+  if (at < 0) at = order2.length - 1;
+  while (at + 1 < order2.length && along(points[order2[at + 1]]) >= along(points[order2[at]])) at++;
+  return order2[at];
+}
+function arrowTipIndex(points, arrow, near) {
+  const head = arrow.head === "start" ? "start" : "end";
+  const order2 = head === "start" ? points.map((_, i) => points.length - 1 - i) : points.map((_, i) => i);
+  const exact = order2.find((i) => points[i].x === arrow.tip.x && points[i].y === arrow.tip.y);
+  return exact !== void 0 ? exact : inkTipIndex(points, head, arrow.tail, arrow.tip, near);
+}
 function countCorners(points, optionsOrThreshold = {}, closed) {
   const opts = {
     ...DEFAULT_CORNER_OPTIONS,
@@ -619,17 +638,19 @@ function evenBowOf(fp, points, scale) {
   const evidence = ramp(bow.sweep, ARC_SWEEP[0], ARC_SWEEP[1]) * ramp(bow.sagitta / scale, ARC_BULGE_PX[0], ARC_BULGE_PX[1]) * ramp(bow.even, ARC_EVEN[0], ARC_EVEN[1]) * (1 - ramp(bow.residual, ARC_RESIDUAL[0], ARC_RESIDUAL[1])) * fit(fp.corners, 0, 2.5);
   return { evidence, bow };
 }
-function detectLine(fp, points, scale = 1, even2 = evenBowOf(fp, points, scale)) {
+function detectLine(fp, points, scale = 1, even2 = evenBowOf(fp, points, scale), head = null) {
   if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
   const straight = ramp(fp.straightness, 0.55, 0.95);
   const corners = fit(fp.corners, 0, 3);
-  const confidence = (straight * 0.7 + corners * 0.3) * (1 - even2.evidence);
+  const seen = head?.by === "seen" ? head : null;
+  const confidence = (straight * 0.7 + corners * 0.3) * (1 - even2.evidence) * (1 - (seen?.fit ?? 0));
   const bows = even2.bow && even2.evidence >= 0.05 ? `, but it bows evenly like an arc of ${Math.round(even2.bow.sweep)}\xB0` : "";
+  const headed = seen && seen.fit >= 0.05 ? `, but its ${seen.head} draws back like an arrow's head` : "";
   return result(
     "line",
     "Line",
     confidence,
-    `open, straightness ${fp.straightness.toFixed(2)}, ${fp.corners} corner(s)${bows}`
+    `open, straightness ${fp.straightness.toFixed(2)}, ${fp.corners} corner(s)${bows}${headed}`
   );
 }
 function detectArc(fp, points, scale = 1, even2 = evenBowOf(fp, points, scale)) {
@@ -705,8 +726,29 @@ function detectText(fp, points, scale = 1) {
     `open, turns ${fp.corners} times, fills ${(fp.extent * 100).toFixed(0)}% of a ${fp.aspectRatio.toFixed(1)}:1 box \u2014 writing, not a shape`
   );
 }
-function detectArrow(fp, points, scale = 1) {
+function detectArrow(fp, points, scale = 1, best = readHead(fp, points, scale)) {
+  if (!best) return null;
+  const end = best.head === "end" ? points[0] : points[points.length - 1];
+  const at = points[inkTipIndex(points, best.head, end, best.tip, HAND_RESOLUTION_PX * scale)];
+  const tail = { x: end.x, y: end.y }, tip = { x: at.x, y: at.y };
+  return result(
+    "arrow",
+    "Arrow",
+    best.fit,
+    `a straight shaft (${best.straight.toFixed(2)}) with a ${Math.round(best.sharpest * 180 / Math.PI)}\xB0 barb at the ${best.head}, the barb ${best.barb.ratio.toFixed(2)} of the shaft`,
+    { head: best.head, tip, tail, barb: best.barb.reach }
+  );
+}
+var HEAD_SHARE_SEEN = 0.1;
+function readHead(fp, points, scale) {
   if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
+  const corners = headByCorners(fp, points, scale);
+  if (corners && (corners.share ?? 0) >= HEAD_SHARE_SEEN) return { ...corners, by: "corners" };
+  const seen = headSeenOf(fp, points, scale);
+  if (seen && (!corners || seen.fit > corners.fit)) return { ...seen, by: "seen" };
+  return corners ? { ...corners, by: "corners" } : null;
+}
+function headByCorners(fp, points, scale) {
   const corners = fp.cornerData ?? [];
   if (corners.length === 0 || corners.length > 4) return null;
   const HEAD3 = 0.42;
@@ -722,36 +764,79 @@ function detectArrow(fp, points, scale = 1) {
     const straight = calculateStraightness(shaft);
     const sharpest = Math.max(...cs.map((c) => c.angle));
     const shaftOk = ramp(straight, 0.72, 0.95);
-    const barbOk = ramp(sharpest, 95 * Math.PI / 180, 140 * Math.PI / 180);
+    const barbOk = ramp(sharpest, BARB_TURN[0], BARB_TURN[1]);
     const headLen = head === "end" ? 1 - first : first;
     if (headLen < 0.06) return null;
     const shortHead = 1 - ramp(headLen, 0.3, 0.45);
     const tipIdx = Math.round(first * 99);
     const tail = head === "end" ? path[0] : path[99];
     const barb = barbOf(path, tipIdx, head, tail, scale);
-    const shortBarb = Math.max(
-      1 - ramp(barb.ratio, BARB_OF_SHAFT[0], BARB_OF_SHAFT[1]),
-      1 - ramp(barb.reach / scale, BARB_FLICK_PX[0], BARB_FLICK_PX[1])
-    );
     return {
-      fit: (shaftOk * 0.5 + barbOk * 0.35 + shortHead * 0.15) * shortBarb,
+      fit: (shaftOk * 0.5 + barbOk * 0.35 + shortHead * 0.15) * shortBarb(barb, scale),
+      share: headLen,
       head,
       tip: path[tipIdx],
-      tail,
       straight,
       sharpest,
       barb
     };
   };
-  const best = [tryHead("end", atEnd), tryHead("start", atStart)].filter((x) => !!x).sort((a, b) => b.fit - a.fit)[0];
-  if (!best) return null;
-  return result(
-    "arrow",
-    "Arrow",
-    best.fit,
-    `a straight shaft (${best.straight.toFixed(2)}) with a ${Math.round(best.sharpest * 180 / Math.PI)}\xB0 barb at the ${best.head}, the barb ${best.barb.ratio.toFixed(2)} of the shaft`,
-    { head: best.head, tip: best.tip, tail: best.tail, barb: best.barb.reach }
+  return [tryHead("end", atEnd), tryHead("start", atStart)].filter((x) => !!x).sort((a, b) => b.fit - a.fit)[0] ?? null;
+}
+function shortBarb(barb, scale) {
+  return Math.max(
+    1 - ramp(barb.ratio, BARB_OF_SHAFT[0], BARB_OF_SHAFT[1]),
+    1 - ramp(barb.reach / scale, BARB_FLICK_PX[0], BARB_FLICK_PX[1])
   );
+}
+var BARB_TURN = [95 * Math.PI / 180, 140 * Math.PI / 180];
+var BARB_MIN_PX = 12;
+var HEAD_SEEN_STRAIGHT = 0.5;
+var HEAD_SEEN_POINTS = 2e3;
+function headSeenOf(fp, points, scale) {
+  if (fp.isClosed || fp.straightness < HEAD_SEEN_STRAIGHT || points.length < 4) return null;
+  let total = 0;
+  for (let i = 1; i < points.length; i++) total += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+  if (!(total > 0)) return null;
+  const step2 = Math.max(2 * scale, total / HEAD_SEEN_POINTS);
+  const dense = resampleByArcLength(points, Math.max(8, Math.round(total / step2) + 1));
+  const near = HAND_RESOLUTION_PX * scale;
+  const seen = (head) => {
+    const pts = head === "end" ? dense : dense.slice().reverse();
+    const tail = pts[0];
+    let farAt = 0, farD = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const d = Math.hypot(pts[i].x - tail.x, pts[i].y - tail.y);
+      if (d > farD) {
+        farD = d;
+        farAt = i;
+      }
+    }
+    if (!(farD > 0)) return null;
+    const at = inkTipIndex(pts, "end", tail, pts[farAt], near);
+    const tip = pts[at];
+    const shaftLen = Math.hypot(tip.x - tail.x, tip.y - tail.y);
+    if (!(shaftLen > 0)) return null;
+    const ux = (tip.x - tail.x) / shaftLen, uy = (tip.y - tail.y) / shaftLen;
+    let reach = 0, wing = tip, barbPath = 0;
+    for (let i = at + 1; i < pts.length; i++) {
+      barbPath += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+      const d = Math.hypot(pts[i].x - tip.x, pts[i].y - tip.y);
+      if (d > reach) {
+        reach = d;
+        wing = pts[i];
+      }
+    }
+    if (reach / scale < BARB_MIN_PX) return null;
+    const back = ((tip.x - wing.x) * ux + (tip.y - wing.y) * uy) / reach;
+    const sharpest = Math.PI - Math.acos(Math.max(-1, Math.min(1, back)));
+    const straight = calculateStraightness(pts.slice(0, at + 1));
+    const barb = { reach, shaft: shaftLen, ratio: reach / shaftLen };
+    const shortHead = 1 - ramp(barbPath / total, 0.3, 0.45);
+    const fit3 = (ramp(straight, 0.72, 0.95) * 0.5 + ramp(sharpest, BARB_TURN[0], BARB_TURN[1]) * 0.35 + shortHead * 0.15) * shortBarb(barb, scale);
+    return fit3 > 0 ? { fit: fit3, head, tip, straight, sharpest, barb } : null;
+  };
+  return [seen("end"), seen("start")].filter((x) => !!x).sort((a, b) => b.fit - a.fit)[0] ?? null;
 }
 var BARB_OF_SHAFT = [0.3, 0.45];
 var BARB_FLICK_PX = [16, 32];
@@ -776,15 +861,16 @@ function analyzeStroke(points, scale = 1) {
     return { fingerprint, results: dot6 ? [dot6] : [] };
   }
   const even2 = evenBowOf(fingerprint, points, scale);
+  const head = readHead(fingerprint, points, scale);
   const results = [
-    detectLine(fingerprint, points, scale, even2),
+    detectLine(fingerprint, points, scale, even2, head),
     detectArc(fingerprint, points, scale, even2),
     detectTriangle(fingerprint),
     detectRectangle(fingerprint),
     detectCircle(fingerprint, points, scale),
     detectDot(fingerprint, scale),
     detectText(fingerprint, points, scale),
-    detectArrow(fingerprint, points, scale)
+    detectArrow(fingerprint, points, scale, head)
   ].filter((r) => r !== null);
   results.sort((a, b) => b.confidence - a.confidence);
   return { fingerprint, results };
@@ -1768,7 +1854,7 @@ function strokeFor(s) {
     seg(s.from, s.to, Math.max(12, Math.round(len2 / 6)), out2, false);
     if (s.shape === "arrow") {
       const ux = (s.to.x - s.from.x) / len2, uy = (s.to.y - s.from.y) / len2;
-      const barb = Math.max(8, Math.min(len2 * 0.2, 40));
+      const barb = Math.max(8, Math.min(len2 * 0.2, Math.max(40, len2 / 30)));
       const wing = (side) => ({
         x: s.to.x - barb * (ux * Math.cos(0.5) - side * uy * Math.sin(0.5)),
         y: s.to.y - barb * (uy * Math.cos(0.5) + side * ux * Math.sin(0.5))
@@ -4076,7 +4162,26 @@ function formOf(node, nodes) {
   const reading4 = snapReading(node, nodes);
   const ideal = reading4.ok ? idealize(node, reading4.shape)?.points : void 0;
   if (ideal && ideal.length >= 2 && reading4.shape) return { shape: reading4.shape, points: placed(node, ideal), held: null };
-  return { shape: "ink", points: ink, held: null };
+  const corners = inkCornersOf(node, ink);
+  return { shape: "ink", points: ink, held: null, ...corners ? { corners } : {} };
+}
+var INK_CORNERED = 0.8;
+var INK_NOT_THREE = 0.74;
+var INK_CORNER_TURN = [35, 145];
+function inkCornersOf(node, ink) {
+  if (!fingerprintOf(node)?.isClosed) return null;
+  const hull2 = hullOf(ink);
+  if (hull2.length < 4) return null;
+  const { share, three, quad } = cornersOf(hull2);
+  if (quad.length !== 4 || share < INK_CORNERED || three > INK_NOT_THREE) return null;
+  const v = roundFrom(quad, "top");
+  for (let i = 0; i < 4; i++) {
+    const a = v[(i + 3) % 4], b = v[i], c = v[(i + 1) % 4];
+    const ux = a.x - b.x, uy = a.y - b.y, wx = c.x - b.x, wy = c.y - b.y;
+    const angle = Math.acos(Math.max(-1, Math.min(1, (ux * wx + uy * wy) / (Math.hypot(ux, uy) * Math.hypot(wx, wy) || 1)))) * 180 / Math.PI;
+    if (angle < INK_CORNER_TURN[0] || angle > INK_CORNER_TURN[1]) return null;
+  }
+  return v;
 }
 function magnetSites(node, nodes) {
   const out = ownSitesOf(node, nodes);
@@ -4154,8 +4259,13 @@ function ownSitesOf(node, nodes) {
       add5("point", heldCentre ?? centre3, "the dot");
       break;
     default:
-      boundsSites(add5, b);
-      add5("centre", centre3, "the centre of the mark\u2019s bounds");
+      if (form.corners) {
+        form.corners.forEach((p) => add5("corner", p, "a corner of the mark\u2019s outline \u2014 its four corners hold it"));
+        add5("centre", mid2(form.corners[0], form.corners[2]), "the centre of the mark\u2019s four corners");
+      } else {
+        boundsSites(add5, b);
+        add5("centre", centre3, "the centre of the mark\u2019s bounds");
+      }
       break;
   }
   return out;
@@ -4326,17 +4436,11 @@ function distanceToPath(p, path, closed = false) {
 }
 function headOf(points, arrow, near) {
   if (!arrow.tip || !arrow.tail || points.length < 3) return null;
-  const { tip: rough, tail } = arrow;
-  const L = Math.hypot(rough.x - tail.x, rough.y - tail.y);
-  if (!(L > 0)) return null;
-  const ux = (rough.x - tail.x) / L, uy = (rough.y - tail.y) / L;
-  const along = (p) => (p.x - tail.x) * ux + (p.y - tail.y) * uy;
+  const { tail } = arrow;
   const order2 = arrow.head === "start" ? points.map((_, i) => points.length - 1 - i) : points.map((_, i) => i);
-  let far = -Infinity;
-  for (const p of points) far = Math.max(far, along(p));
-  let k = order2.findIndex((i) => along(points[i]) >= far - near);
+  const at = arrowTipIndex(points, { head: arrow.head, tip: arrow.tip, tail }, near);
+  const k = order2.indexOf(at);
   if (k < 0) return null;
-  while (k + 1 < order2.length && along(points[order2[k + 1]]) >= along(points[order2[k]])) k++;
   const tip = points[order2[k]];
   let reach = 0;
   for (let j = k; j < order2.length; j++) {
@@ -8086,17 +8190,9 @@ function connectorOf(node, nodes) {
     const meta = getRep(node, "reading:arrow")?.data;
     const raw = getRep(node, "stroke")?.data?.points;
     if (meta?.tip && meta.tail && raw && raw.length === pts.length) {
-      const [roughTip, tail] = placed(node, [meta.tip, meta.tail]);
-      const heading = unit2(sub6(roughTip, tail));
-      const reachOut = (p) => dot3(sub6(p, tail), heading);
-      const far = Math.max(...pts.map(reachOut));
-      const near = magnetRadius(0, scale) / 2;
+      const [, tail] = placed(node, [meta.tip, meta.tail]);
       const headAtEnd = meta.head !== "start";
-      const order2 = headAtEnd ? pts.map((_, i) => i) : pts.map((_, i) => pts.length - 1 - i);
-      let at = order2.findIndex((i) => reachOut(pts[i]) >= far - near);
-      if (at < 0) at = order2.length - 1;
-      while (at + 1 < order2.length && reachOut(pts[order2[at + 1]]) >= reachOut(pts[order2[at]])) at++;
-      const k = order2[at];
+      const k = arrowTipIndex(raw, { head: meta.head, tip: meta.tip, tail: meta.tail }, HAND_RESOLUTION_PX * scale);
       const tip = pts[k];
       const barb = headAtEnd ? pts.slice(k) : pts.slice(0, k + 1).reverse();
       const u = unit2(sub6(tip, tail));
@@ -8263,12 +8359,14 @@ function readEnd(conn, e, state) {
     const oneStroke = pathLength2 > OUTLINE_PATH * perimeter(c.hull);
     const fills = oneStroke ? [] : fillsIn(c.hull, others.filter((o) => o.id !== c.id && !used.has(o.id) && !isRead(o.node)), 0.1 * c.size);
     used.add(c.id);
-    fills.forEach((f) => used.add(f.id));
     const hull2 = hullOf2([...c.ink, ...fills.flatMap((f) => f.ink)]);
+    const shapes = shapesOf(hull2, e.out);
+    if (!shapes.length) continue;
+    fills.forEach((f) => used.add(f.id));
     const fill = oneStroke ? fillOf(hull2, [], [c.ink]) : fillOf(hull2, [c.ink], fills.map((f) => f.ink));
     const ids = [c.id, ...fills.map((f) => f.id)];
     const tip = farAlong(hull2, e.point, e.out);
-    for (const s of shapesOf(hull2, e.out)) {
+    for (const s of shapes) {
       withFill({ kind: s.kind, score: s.score * c.touch * c.axis, ids, tip, lead: `a closed ${s.kind} touching its ${e.end} \u2014 ${s.why}${oneStroke ? ", outline and fill in one stroke" : ""}` }, fill, push);
     }
   }
