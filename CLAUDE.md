@@ -36,7 +36,7 @@ library packs a board uses by an event (B3, *Library packs*). Editing: one
 selected mark's own points reshape its clean form (E1, *Handles*), and bound
 arrows follow what they are bound to, derived from the bindings, never logged
 (E2). Diagrams, in core: the flowchart (D1), the UML class diagram (D4) and
-the sequence diagram with the dashed lines it reads (D5's first half), each a
+the sequence diagram with the dashed lines it reads and the state diagram (D5), each a
 notation with its pack, its bench and its Mermaid out (D2) and in (D3,
 with a layered layout); and W1 keeps a diagram's own strokes from erasing or
 being swallowed. What is next is each diagram and the maths **on the
@@ -303,7 +303,7 @@ any structural change.
 
 | Path | What it is |
 |---|---|
-| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, the UML class diagram, the sequence diagram and the dashed lines it reads, Mermaid out and in, and a layered layout), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*), **magnets, handles and bindings that follow** (`src/session/magnets.ts`, `handles.ts`, `follow.ts` with `affine.ts` and `manipulate.ts`; under *Magnets and bindings* and *Handles*) and the LLM transport. New recognition/engine work lands HERE |
+| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, the UML class diagram, the sequence diagram and the dashed lines it reads, the state diagram, Mermaid out and in, and a layered layout), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*), **magnets, handles and bindings that follow** (`src/session/magnets.ts`, `handles.ts`, `follow.ts` with `affine.ts` and `manipulate.ts`; under *Magnets and bindings* and *Handles*) and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages). Fully on the `brand/` system as of 3 Sept 2026 — its `:root` is `brand/tokens.css` under the names this page already used, so change a value THERE first |
 | `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
@@ -960,7 +960,8 @@ in a row), **`flowchart@1`** (names the notation and restates none of it:
 D2's writer reads; its affinities), **`uml-class@1`** (names the class
 notation, restating none of `UML_CLASS_TABLE`; its affinities),
 **`sequence@1`** (names the sequence notation, restating none of
-`SEQUENCE_TABLE`; its affinities) and **`test-molecule@1`** (tests only — a
+`SEQUENCE_TABLE`; its affinities), **`state@1`** (names the state notation,
+restating none of `STATE_TABLE`; its affinities) and **`test-molecule@1`** (tests only — a
 `test-` pack is never listed).
 
 **A board uses a pack by an event**: `use { pack: 'basics@1' }` and `unuse`,
@@ -1633,6 +1634,58 @@ as dashes with a triangle apart — the round trip the test
 (`sequence-mermaid.test.ts`). `sequence.test.ts` is A3;
 `sequence.bench.test.ts` the rates; `sequence.read.test.ts` the rules;
 `dashes.test.ts` the dash bench.
+
+### The state diagram (V1-PLAN D5, the state half)
+
+> `metamedium-core/src/notations/state.ts` (the reading, `STATE_TABLE`),
+> `state-mermaid.ts` (the writer, the reader, the drawing), `graph-kit.ts`
+> (what the graph notations share), `box-routing.ts` (sides, arcs and spread
+> ends), `packs/shipped/state.ts`, `fixtures/state.ts` and `state.mermaid.ts`,
+> `state.test.ts` (the board, A4), `state.read.test.ts`, `state.bench.test.ts`,
+> `state-mermaid.test.ts`.
+
+A **state** is a round-cornered box — one closed stroke the rung reads as a
+box (a hand's rounded box is a rectangle to it), a stadium, or a circle not
+small beside the others, known also by how fully it fills its tightest box
+(`stateShape`) — its name the writing in it; a box holding a state is a
+composite's frame and is left out. The **initial state** is a small dot
+scribbled solid and the **final state** a ring with a mark inside it — a
+scribbled dot, a tap, a second ring — read from the ink alone: the rung calls
+a scribbled dot an arc, writing, a rectangle or nothing, so a mark is a spot
+by being compact and dense (its path runs a good many times its hull's
+perimeter, `FILLED_PATH`) and a ring holding one a bullseye; a ring and its
+dot drawn quickly are gathered into a **word** by the letter rules and are
+read from the word's letters (`bullseyeWord`). A **transition** is an arrow
+between two of these, each end read past its head — a small mark heads.ts
+calls a circle head at an end is the dot or ring it lands on — and a
+**self-transition** is a loop out of a state and back, one open stroke both of
+whose ends land on one state, its barb measured where it comes back (the
+rung finds an arc and heads.ts no head on it, as for a sequence diagram's
+self-message); a line with no head is none. **What makes it a state diagram,
+and not the flowchart every box-and-arrow drawing is:** the reading's
+confidence is its structure (every symbol joined, every transition pointing)
+scaled by the evidence a flowchart has no symbol for — the solid initial dot,
+the final ring, a loop, round corners (`EVIDENCE`) — so plain boxes and arrows
+are the flowchart's and read here as nothing, a drawing with only round
+corners is held under the floor, and one with a dot, a ring or a loop reads
+above it; a decision or a data symbol on the board counts against it
+(`FOREIGN_PENALTY`). The reading returns before its costly part when none of
+that is there, which is also what keeps a fourth notation from slowing every
+other bench. Read from the geometry, never the relation or role tables (the
+trap: they call a dot beside an arrow's tail its head). A state offers its
+border as one closed continuous port (`along:state`), a dot scribbled solid
+its four cardinals (`port:state`). Mermaid: `stateDiagram-v2`, `direction LR`
+when the transitions run across, `state "name" as id`, `a --> b: words`, the
+dot and the ring both `[*]` (said in the notes where several fold into one or
+a transition runs the other way); the reader takes a hand's forms (`state X`,
+`X : words`) and refuses with its line a composite's frame (its contents read
+flat), a choice, a fork, a join, a note, concurrent regions and styles; it
+draws rounded boxes, the dot as one solid spiral, the final as a ring round a
+second spiral, arrows bound at both ends (a box's own site, else a place along
+its border), a loop out of a state's side bound at both ends — the ink ends
+exactly on its site, because a bound end is carried onto its site and an end
+left a wing's length off distorts the loop — and reads it all back. The state@1
+pack names the notation and restates none of its table.
 
 ### Spatial Graph — retired
 

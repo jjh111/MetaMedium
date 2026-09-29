@@ -1775,6 +1775,94 @@ golden list of packs must add `sequence@1` (and `uml-class@1`) when the
 bundles are rebuilt; the bundles are not committed here. The state half can
 reuse the loop reading (a state's self-transition), `headsApart` and the
 held barb; its transitions are solid, so dashes are not needed there.
+*D5 status (the state half), 29 Sep 2026:* D5's state core built on
+`worktree-agent-a078449d3d735bcd9` (`6f0480c` red — the state board as a core
+test, 109 of 116 failing — then `2ce9367`, `037463b`, `c5334d0`, `37a9288`,
+`2cc2b81`); the field's and the panel's display, the `mermaid` kind's render
+of a `stateDiagram-v2` and *Draw it* are the surface's, still to come.
+`notations/state.ts`: a **state** is a round-cornered box — a closed stroke the
+rung reads as a rectangle, a stadium, or a circle not small beside the others,
+known also by how fully it fills its own tightest box (a hand's rounded box is
+between the flowchart's box and stadium measures and reads as either,
+unsurely) — its name the writing in it; a box holding a state is a composite's
+frame (a container). The **initial state** is a small dot scribbled solid and
+the **final** a ring with a mark inside it — read from the ink alone: the rung
+calls a scribbled dot an arc, writing, a rectangle or nothing (never a dot),
+so a mark is a spot by being compact and dense (its path runs 1.6–2.4 times its
+hull's perimeter, `FILLED_PATH`) and a ring holding one, a tap or a second ring
+a bullseye; a ring and its dot drawn within the word window are gathered into
+a word by the letter rules and are read from the word's letters; a hollow small
+ring is an initial or a final by which way its transition runs, less surely. A
+**transition** is an arrow between two of these, each end read past its head
+(a small mark heads.ts calls a circle head at an end is the dot or the ring it
+lands on, `landed`), a bind first; a **self-transition** is a loop out of a
+state and back — one open stroke both of whose ends land on one state,
+standing out `LOOP_OUT` of its size, its barb measured where it folds back out
+(heads.ts finds no head on it and the rung reads an arc, or nothing); a line
+with no head is no transition. **The trap, and the rule:** boxes and arrows
+are what a flowchart is, so the reading's confidence is its structure scaled by
+what a flowchart has no symbol for (`EVIDENCE`: a solid initial dot, a final
+ring, a loop, round corners), plain boxes and arrows are the flowchart's and
+read here as nothing, round corners alone are held under the floor, and a
+decision or a data symbol counts against it; the reading returns before the
+costly joining when none of that stands. A state offers its border as one
+closed continuous port (`along:state`), a dot its four cardinals (`port:state`).
+`notations/state-mermaid.ts`: the writer (`stateDiagram-v2`, `direction LR`
+when the transitions run across, `state "name" as id`, transitions by the
+states they join, the dot and the ring both `[*]`, D2's ids, escapes and
+placeholder; several initials or finals fold into one `[*]` and a transition
+into an initial or out of a final runs the other way in Mermaid, each said);
+the reader (a hand's forms; a composite's frame, a choice, a fork, a join, a
+note, concurrent regions and styles refused with their lines, a composite's
+contents read flat) drawn by D3's layered layout — rounded boxes, the dot as
+one solid spiral, the final as a ring round a second spiral, arrows bound at
+both ends (a box's own site, else a place along its border; arcs around a state
+in the way with closed-triangle heads), a loop out of a state's side bound at
+both ends — read back, what does not read as written is said. `state@1`
+(`packs/shipped/state.ts`) names the notation and restates none of
+`STATE_TABLE`; its affinities lift clean forms and lining up; its ports follow
+it on the pen. `graph-kit.ts` (the joining of symbols by connectors, the label
+pass, roles, a writer's words — flowchart.ts only exports what it reuses) and
+`box-routing.ts` (a copy of the class reader's sides, arcs and spread ends,
+shared with D6) are new. The bench (`state.bench.test.ts`, 36 hands of the
+board): read 36/36, first 36/36 (0.83–0.85); states 108/108, names 108/108,
+initial 36/36, final 36/36, arrows 180/180, loops 36/36, labels 216/216; the
+ring and its dot drawn quickly (gathered into a word) the same; **states with
+square corners read 36/36 above the floor with every symbol right but first
+only 12/36** — a flowchart reads a square box better than anything and says
+0.82–0.87 to the state diagram's 0.77–0.80; both are said. The flowchart
+bench, the class bench, the sequence board, a wireframe, the molecule and a
+line of writing: highest 0.12, none above the floor. The round trip
+(`state-mermaid.test.ts`): the goldens (`fixtures/state.mermaid.ts`, by hand)
+and six texts come back exactly, every hand of the board exported before and
+after its writing is read, 50 seeded random diagrams at 1× (40) and 0.25× and
+4× (10), twelve hands exported and drawn back read the same. packBench:
+`state@1` has no definitions; the corpus, now 3,930 drawings with the state
+boards, 0 false reads for every pack; basics@1 96/96 and test-molecule@1 48/48
+unchanged. Found, for their owners: **a loop whose ends cross its own state's
+outline three times is a scratch that erases the state** (`session/erase.ts`;
+the fixture stops the loop 5 px short, the reader's drawing is bound at both
+ends) — the same hazard D5's sequence half found for a self-message; **a bound
+end is carried onto its site (`follow`), so a connector's ink that ends off
+its site is drawn back distorted** — a loop's last wing tip, three pixels
+of ink, bent a whole loop (`session/follow.ts`; the drawing now ends its ink on
+the site); **the letter rules gather a ring and the dot drawn in it into a
+word** (`session/words.ts`; read through here, as the flowchart reads a
+gathered diamond); **the shape rung never calls a scribbled dot a dot** — an arc
+0.55, writing 0.5–0.8, a rectangle or nothing — so anything that must know a
+dot reads its ink; **a fourth registered notation is a few per cent on every
+test that draws and reads** (`mermaid-in.test.ts`'s caps and 60-chart cases sit
+at 3.7–4.3 s against vitest's 5 s here, and fail on master too under load).
+The surface's half must know: `notationsOf(state, scope)` gives a `StateReading`
+(each symbol's `symbol` — `state`, `initial`, `final` — `rounded`, `labels`;
+each transition's `self`, `from`, `to`, `labels`; `evidence`, `foreign`);
+`toMermaid` maps each Mermaid state id to its box (`ids`, `marks`) and
+`links[i]` to transition i — the initial and final have no id, they are `[*]`;
+`drawMermaid` inside `session.withTool`, as D3; a state's name and a
+transition's words are labels on their own ink; a bind at `along:state` or
+`port:state` is found again while the notation is known (always) and offered to
+the pen only while the pack is in use; and e2e 51's golden list of packs must
+add `state@1` when the bundles are rebuilt.
 **D7 Routing** — orthogonal connectors between ports and *tidy the diagram*.
 **D8 The repair demo** — `CONTROL-POINTS-PLAN.md` P4; *needs John:* one
 photograph of a hand-drawn flowchart.
