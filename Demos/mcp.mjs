@@ -160,6 +160,8 @@ function codeRepOf(node) {
 // In this hand's own session its own proposals are the local participant's,
 // whose word is "local"; it is named by the name it goes by in the room.
 function readBy(x) {
+  // A name somebody gave (a blessing) is theirs and no reading of anyone's: it says nothing here, as it never did.
+  if (x.blessed) return x.tier ? ' · ' + x.sourceName : '';
   const who = x.source === MM.LOCAL_PARTICIPANT ? label(ME) : x.sourceName;
   return x.tier || (who && who !== 'engine') ? ' · ' + who : '';
 }
