@@ -3909,8 +3909,8 @@ function pick2(c) {
 function sheetEntry(sheet, key2) {
   const k = key2.trim();
   const live = (e) => (e.kind === "definition" || e.kind === "step") && !e.conflict;
-  const direct = sheet.entries.find((e) => live(e) && e.key === k);
-  if (direct) return direct;
+  const direct2 = sheet.entries.find((e) => live(e) && e.key === k);
+  if (direct2) return direct2;
   const n2 = normName(k.replace(/^step\s+/i, "").replace(/[.)]$/, ""));
   return sheet.entries.find((e) => {
     if (!live(e)) return false;
@@ -5293,8 +5293,8 @@ function candidatesFor(num2, figures) {
         const shorter = Math.min(dist2(v, next), dist2(v, prev));
         if (shorter < 1e-6) return;
         const offset = dist2(p, v) / shorter;
-        const within = insideFigure(f, p);
-        const confidence = 1 / (1 + 4 * offset * offset) * (within ? 1 : 0.5);
+        const within2 = insideFigure(f, p);
+        const confidence = 1 / (1 + 4 * offset * offset) * (within2 ? 1 : 0.5);
         out.push({
           figure: f.id,
           kind: "angle",
@@ -5302,7 +5302,7 @@ function candidatesFor(num2, figures) {
           label: `the angle at ${vName(k)}`,
           confidence,
           offset,
-          reason: `the angle at ${vName(k)} of the ${f.kind}: ${pct(offset)} of its shorter side from the corner, ${within ? "inside it" : "outside it"}`
+          reason: `the angle at ${vName(k)} of the ${f.kind}: ${pct(offset)} of its shorter side from the corner, ${within2 ? "inside it" : "outside it"}`
         });
       });
     }
@@ -5689,8 +5689,8 @@ function lawOfCosines(a, b, C) {
   const c2 = a * a + b * b - 2 * a * b * Math.cos(C * DEG3);
   return c2 > TOL ? Math.sqrt(c2) : null;
 }
-function angleFrom(a, b, opposite) {
-  const c = (a * a + b * b - opposite * opposite) / (2 * a * b);
+function angleFrom(a, b, opposite2) {
+  const c = (a * a + b * b - opposite2 * opposite2) / (2 * a * b);
   if (c < -1 - 1e-12 || c > 1 + 1e-12) return null;
   return Math.acos(Math.max(-1, Math.min(1, c))) / DEG3;
 }
@@ -8840,11 +8840,11 @@ function withFill(base, fill, push, shown2 = fill.cover) {
     make(false, 1 - p);
   }
 }
-function fillsIn(hull2, cands, grow) {
+function fillsIn(hull2, cands, grow2) {
   const c = centroidOf(hull2);
   const bigger = hull2.map((p) => {
     const d = unit2(sub6(p, c));
-    return { x: p.x + d.x * grow, y: p.y + d.y * grow };
+    return { x: p.x + d.x * grow2, y: p.y + d.y * grow2 };
   });
   return cands.filter((m) => m.ink.length > 0 && m.ink.filter((p) => insideConvex2(p, bigger)).length >= 0.8 * m.ink.length);
 }
@@ -8853,7 +8853,7 @@ function readEnd(conn, e, state) {
   const heads = [];
   const push = (h2) => heads.push(h2);
   const artifacts = new Set(state.artifacts);
-  const within = HEAD_MAX_SHARE * conn.length + magnetRadius(HEAD_MAX_SHARE * conn.length, conn.scale);
+  const within2 = HEAD_MAX_SHARE * conn.length + magnetRadius(HEAD_MAX_SHARE * conn.length, conn.scale);
   const others = [];
   for (const id of state.contentIds) {
     if (id === conn.id || artifacts.has(id)) continue;
@@ -8862,7 +8862,7 @@ function readEnd(conn, e, state) {
     const b = boundsOf(node);
     if (!b) continue;
     const dx = Math.max(b.minX - e.point.x, 0, e.point.x - b.maxX), dy = Math.max(b.minY - e.point.y, 0, e.point.y - b.maxY);
-    if (Math.hypot(dx, dy) > within) continue;
+    if (Math.hypot(dx, dy) > within2) continue;
     others.push({ id, node, ink: strokePointsOf(node) ?? [] });
   }
   const used = /* @__PURE__ */ new Set();
@@ -9242,6 +9242,418 @@ function followPreview(nodes, changed2, boundBy = boundByIndex(nodes)) {
     }
   );
   return out;
+}
+
+// src/diagram/route.ts
+var ROUTE_MAX_TURNS = 4;
+var STUB_PX = 18;
+var STUB_SHARE = 0.15;
+var MIN_OBSTACLE_PX = 24;
+var WINDOW_SHARE = 0.5;
+var MAX_BLOCKS = 24;
+var HEAD_SPREAD = 0.5;
+var EPS = 1e-6;
+var DIRS = ["right", "down", "left", "up"];
+var VEC = [{ x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }];
+var idx = (d) => DIRS.indexOf(d);
+var opposite = (d) => (d + 2) % 4;
+var INTERIOR = 0.25;
+var CORNER = 0.98;
+function outwardOf(point2, box, toward2) {
+  const cx2 = (box.minX + box.maxX) / 2, cy2 = (box.minY + box.maxY) / 2;
+  const hw = (box.maxX - box.minX) / 2, hh = (box.maxY - box.minY) / 2;
+  const ox = hw > EPS ? (point2.x - cx2) / hw : 0, oy = hh > EPS ? (point2.y - cy2) / hh : 0;
+  const ax = Math.abs(ox), ay = Math.abs(oy);
+  const dx = toward2.x - point2.x, dy = toward2.y - point2.y;
+  const facing = (among) => {
+    let best = among[0], score2 = -Infinity;
+    for (const d of among) {
+      const v = VEC[idx(d)], s = v.x * dx + v.y * dy;
+      if (s > score2) {
+        best = d;
+        score2 = s;
+      }
+    }
+    return best;
+  };
+  if (Math.max(ax, ay) < INTERIOR) return facing(DIRS);
+  if (ax >= CORNER && ay >= CORNER) return facing([ox > 0 ? "right" : "left", oy > 0 ? "down" : "up"]);
+  return ax > ay ? ox > 0 ? "right" : "left" : oy > 0 ? "down" : "up";
+}
+var grow = (r, by) => ({ minX: r.minX - by, minY: r.minY - by, maxX: r.maxX + by, maxY: r.maxY + by });
+var insideOpen = (p, r) => p.x > r.minX + EPS && p.x < r.maxX - EPS && p.y > r.minY + EPS && p.y < r.maxY - EPS;
+function crosses(a, b, r) {
+  if (Math.abs(a.y - b.y) < EPS) return a.y > r.minY + EPS && a.y < r.maxY - EPS && Math.max(a.x, b.x) > r.minX + EPS && Math.min(a.x, b.x) < r.maxX - EPS;
+  return a.x > r.minX + EPS && a.x < r.maxX - EPS && Math.max(a.y, b.y) > r.minY + EPS && Math.min(a.y, b.y) < r.maxY - EPS;
+}
+function exitLength(p, box, dir) {
+  if (!box) return 0;
+  const v = VEC[dir];
+  const d = v.x > 0 ? box.maxX - p.x : v.x < 0 ? p.x - box.minX : v.y > 0 ? box.maxY - p.y : p.y - box.minY;
+  return d > EPS ? d : 0;
+}
+function simplify(pts) {
+  const out = [];
+  for (const p of pts) {
+    const last = out[out.length - 1];
+    if (last && Math.abs(last.x - p.x) < EPS && Math.abs(last.y - p.y) < EPS) continue;
+    out.push(p);
+    while (out.length >= 3) {
+      const a = out[out.length - 3], b = out[out.length - 2], c = out[out.length - 1];
+      const sameX = Math.abs(a.x - b.x) < EPS && Math.abs(b.x - c.x) < EPS, sameY = Math.abs(a.y - b.y) < EPS && Math.abs(b.y - c.y) < EPS;
+      if (!sameX && !sameY) break;
+      out.splice(out.length - 2, 1);
+    }
+  }
+  return out;
+}
+var Heap = class {
+  constructor() {
+    this.cost = [];
+    this.seq = [];
+    this.item = [];
+    this.n = 0;
+    this.counter = 0;
+  }
+  get size() {
+    return this.n;
+  }
+  less(i, j) {
+    return this.cost[i] < this.cost[j] || this.cost[i] === this.cost[j] && this.seq[i] < this.seq[j];
+  }
+  swap(i, j) {
+    [this.cost[i], this.cost[j]] = [this.cost[j], this.cost[i]];
+    [this.seq[i], this.seq[j]] = [this.seq[j], this.seq[i]];
+    [this.item[i], this.item[j]] = [this.item[j], this.item[i]];
+  }
+  push(cost, item) {
+    let i = this.n++;
+    this.cost[i] = cost;
+    this.seq[i] = this.counter++;
+    this.item[i] = item;
+    while (i > 0) {
+      const p = i - 1 >> 1;
+      if (!this.less(i, p)) break;
+      this.swap(i, p);
+      i = p;
+    }
+  }
+  pop() {
+    const out = { cost: this.cost[0], item: this.item[0] };
+    this.n--;
+    if (this.n > 0) {
+      this.cost[0] = this.cost[this.n];
+      this.seq[0] = this.seq[this.n];
+      this.item[0] = this.item[this.n];
+      let i = 0;
+      for (; ; ) {
+        const l = 2 * i + 1, r = l + 1;
+        let m = i;
+        if (l < this.n && this.less(l, m)) m = l;
+        if (r < this.n && this.less(r, m)) m = r;
+        if (m === i) break;
+        this.swap(i, m);
+        i = m;
+      }
+    }
+    return out;
+  }
+};
+function search(a, b, blockers, stub) {
+  const da = idx(a.dir), db = idx(b.dir);
+  const la = exitLength(a.point, a.box, da) + stub, lb = exitLength(b.point, b.box, db) + stub;
+  const p1 = { x: a.point.x + VEC[da].x * la, y: a.point.y + VEC[da].y * la };
+  const p22 = { x: b.point.x + VEC[db].x * lb, y: b.point.y + VEC[db].y * lb };
+  const grown = blockers.map((r) => grow(r, stub / 2));
+  if (grown.some((g) => insideOpen(p1, g) || insideOpen(p22, g))) return null;
+  const xs = /* @__PURE__ */ new Set([p1.x, p22.x, (p1.x + p22.x) / 2]);
+  const ys = /* @__PURE__ */ new Set([p1.y, p22.y, (p1.y + p22.y) / 2]);
+  for (const r of blockers) {
+    xs.add(r.minX - stub);
+    xs.add(r.maxX + stub);
+    ys.add(r.minY - stub);
+    ys.add(r.maxY + stub);
+  }
+  const X = [...xs].sort((p, q) => p - q), Y = [...ys].sort((p, q) => p - q);
+  const nx = X.length, ny = Y.length;
+  const ix1 = X.indexOf(p1.x), iy1 = Y.indexOf(p1.y), ix2 = X.indexOf(p22.x), iy2 = Y.indexOf(p22.y);
+  if (ix1 < 0 || iy1 < 0 || ix2 < 0 || iy2 < 0) return null;
+  const turn2 = 4 * stub + 0.2 * (Math.abs(p1.x - p22.x) + Math.abs(p1.y - p22.y));
+  const state = (i, j, d) => (i * ny + j) * 4 + d;
+  const total = nx * ny * 4;
+  const dist10 = new Float64Array(total).fill(Infinity);
+  const prev = new Int32Array(total).fill(-1);
+  const done = new Uint8Array(total);
+  const heap = new Heap();
+  const start = state(ix1, iy1, da), goal = state(ix2, iy2, opposite(db));
+  dist10[start] = 0;
+  heap.push(0, start);
+  while (heap.size) {
+    const { cost, item } = heap.pop();
+    if (done[item]) continue;
+    done[item] = 1;
+    if (item === goal) break;
+    const d = item % 4, cell = (item - d) / 4, j = cell % ny, i = (cell - j) / ny;
+    const relax = (to2, c) => {
+      if (c < dist10[to2] - 1e-9) {
+        dist10[to2] = c;
+        prev[to2] = item;
+        heap.push(c, to2);
+      }
+    };
+    for (const nd of [(d + 1) % 4, (d + 3) % 4]) relax(state(i, j, nd), cost + turn2);
+    const ni = i + VEC[d].x, nj = j + VEC[d].y;
+    if (ni < 0 || nj < 0 || ni >= nx || nj >= ny) continue;
+    const from = { x: X[i], y: Y[j] }, to = { x: X[ni], y: Y[nj] };
+    if (grown.some((g) => crosses(from, to, g))) continue;
+    relax(state(ni, nj, d), cost + Math.abs(to.x - from.x) + Math.abs(to.y - from.y));
+  }
+  if (!done[goal]) return null;
+  const nodes = [];
+  for (let s = goal; s >= 0; s = prev[s]) {
+    const d = s % 4, cell = (s - d) / 4, j = cell % ny, i = (cell - j) / ny;
+    nodes.push({ x: X[i], y: Y[j] });
+  }
+  nodes.reverse();
+  const line = simplify([a.point, ...nodes, b.point]);
+  if (line.length - 2 > ROUTE_MAX_TURNS) return null;
+  for (const r of blockers) {
+    const g = grow(r, stub / 2);
+    if (r !== a.box && crosses(a.point, p1, g)) return null;
+    if (r !== b.box && crosses(p22, b.point, g)) return null;
+  }
+  return line;
+}
+function direct(a, b, stub) {
+  const da = idx(a.dir), db = idx(b.dir);
+  const la = exitLength(a.point, a.box, da) + stub, lb = exitLength(b.point, b.box, db) + stub;
+  const p1 = { x: a.point.x + VEC[da].x * la, y: a.point.y + VEC[da].y * la };
+  const p22 = { x: b.point.x + VEC[db].x * lb, y: b.point.y + VEC[db].y * lb };
+  const horizontal = (d) => d === 0 || d === 2;
+  const mid9 = horizontal(da) && horizontal(db) ? [{ x: (p1.x + p22.x) / 2, y: p1.y }, { x: (p1.x + p22.x) / 2, y: p22.y }] : !horizontal(da) && !horizontal(db) ? [{ x: p1.x, y: (p1.y + p22.y) / 2 }, { x: p22.x, y: (p1.y + p22.y) / 2 }] : horizontal(da) ? [{ x: p22.x, y: p1.y }] : [{ x: p1.x, y: p22.y }];
+  return simplify([a.point, p1, ...mid9, p22, b.point]);
+}
+var sayTurns = (n2) => n2 === 0 ? "straight across" : n2 === 1 ? "one turn" : `${n2} turns`;
+var sayList = (ids) => ids.length <= 3 ? ids.join(", ") : `${ids.slice(0, 3).join(", ")} and ${ids.length - 3} more`;
+function routeBetween(a, b, blocks, scale = 1) {
+  const size = (e) => e.box ? Math.min(e.box.maxX - e.box.minX, e.box.maxY - e.box.minY) : 0;
+  const sides = [size(a), size(b)].filter((v) => v > 0);
+  const base = Math.max(STUB_PX * scale, sides.length ? STUB_SHARE * Math.min(...sides) : 0);
+  const own = [a.box, b.box].filter((r) => !!r);
+  const ranked2 = blocks.slice().sort((p, q) => dist22(centreOf2(p.box), a.point) + dist22(centreOf2(p.box), b.point) - (dist22(centreOf2(q.box), a.point) + dist22(centreOf2(q.box), b.point)) || (p.id < q.id ? -1 : 1)).slice(0, MAX_BLOCKS);
+  const levels = [1, 0.5, 0.25].map((f) => Math.max(base * f, 3 * scale));
+  const say = (points2, blocked) => {
+    const turns = points2.length - 2;
+    const way = `out of the ${a.dir}, in at the ${b.dir} \u2014 ${sayTurns(turns)}`;
+    return {
+      points: points2,
+      turns,
+      avoided: blocked.length === 0,
+      blocked,
+      reasoning: blocked.length === 0 ? `${way}, clear of the other marks` : `${way}; could not avoid ${sayList(blocked)}`
+    };
+  };
+  for (const stub of levels) {
+    const found = search(a, b, [...own, ...ranked2.map((r) => r.box)], stub);
+    if (found) return say(found, []);
+  }
+  const through = (points2) => ranked2.filter((r) => points2.some((p, i) => i > 0 && crosses(points2[i - 1], p, r.box))).map((r) => r.id);
+  for (const stub of levels) {
+    const found = search(a, b, own, stub);
+    if (found) return say(found, through(found));
+  }
+  const points = direct(a, b, levels[levels.length - 1]);
+  return say(points, through(points));
+}
+var centreOf2 = (r) => ({ x: (r.minX + r.maxX) / 2, y: (r.minY + r.maxY) / 2 });
+var dist22 = (p, q) => (p.x - q.x) ** 2 + (p.y - q.y) ** 2;
+function routeRepOf(node) {
+  const d = getRep(node, "route")?.data;
+  return d && Array.isArray(d.points) ? d : void 0;
+}
+function routeStands(node) {
+  const r = routeRepOf(node);
+  return !!r && r.points.length >= 2;
+}
+function routable(node, nodes) {
+  if (!getRep(node, "stroke") || getRep(node, "erased")) return false;
+  const held2 = activeBindingsOf(node, nodes).filter((b) => (b.end === "start" || b.end === "end") && b.nodeId !== node.id);
+  const at = (end) => {
+    const b = held2.find((x) => x.end === end);
+    const t = b && nodes.get(b.nodeId);
+    return !!t && !!boundSiteOf(t, nodes, b.site) && !!boundsOf(t);
+  };
+  return at("start") && at("end");
+}
+var strokeScale2 = (node) => {
+  const s = getRep(node, "stroke")?.data?.scale;
+  return s && s > 0 ? s : 1;
+};
+var isArrow = (node) => cleanOf(node)?.shape === "arrow" || !!getRep(node, "reading:arrow");
+var meets = (p, q) => p.minX <= q.maxX && q.minX <= p.maxX && p.minY <= q.maxY && q.minY <= p.maxY;
+var within = (inner, outer, slack = 0) => inner.minX >= outer.minX - slack && inner.maxX <= outer.maxX + slack && inner.minY >= outer.minY - slack && inner.maxY <= outer.maxY + slack;
+function headOf2(points, barb) {
+  const tip = points[points.length - 1], prev = points[points.length - 2];
+  const len2 = Math.hypot(tip.x - prev.x, tip.y - prev.y);
+  if (len2 < EPS) return void 0;
+  const ux = (tip.x - prev.x) / len2, uy = (tip.y - prev.y) / len2;
+  const reach = Math.min(barb, 0.45 * len2);
+  const wing = (side) => ({
+    x: tip.x - reach * (ux * Math.cos(HEAD_SPREAD) - side * uy * Math.sin(HEAD_SPREAD)),
+    y: tip.y - reach * (uy * Math.cos(HEAD_SPREAD) + side * ux * Math.sin(HEAD_SPREAD))
+  });
+  return { tip: { ...tip }, wings: [wing(1), wing(-1)] };
+}
+var idle = (why) => ({ points: [], from: "start", turns: 0, avoided: true, blocked: [], window: { minX: 0, minY: 0, maxX: 0, maxY: 0 }, seen: [], reasoning: why });
+function deriveRoute(node, nodes, near) {
+  const held2 = activeBindingsOf(node, nodes).filter((b2) => (b2.end === "start" || b2.end === "end") && b2.nodeId !== node.id);
+  const bs = held2.find((b2) => b2.end === "start"), be = held2.find((b2) => b2.end === "end");
+  if (!bs || !be) return idle("an end is tied to nothing, so there is nothing to route between");
+  const ts = nodes.get(bs.nodeId), te = nodes.get(be.nodeId);
+  const ss = ts && boundSiteOf(ts, nodes, bs.site), se = te && boundSiteOf(te, nodes, be.site);
+  const boxS = ts && boundsOf(ts), boxE = te && boundsOf(te);
+  if (!ts || !te || !ss || !se || !boxS || !boxE) return idle("a mark it is tied to no longer offers the place it was tied at");
+  const arrow = isArrow(node);
+  const tail = arrow ? connectorEnds(node, nodes)?.tail ?? "start" : "start";
+  const [first, last] = tail === "start" ? [{ site: ss, box: boxS, id: bs.nodeId }, { site: se, box: boxE, id: be.nodeId }] : [{ site: se, box: boxE, id: be.nodeId }, { site: ss, box: boxS, id: bs.nodeId }];
+  const scale = strokeScale2(node);
+  const a = { point: { ...first.site.point }, dir: outwardOf(first.site.point, first.box, last.site.point), box: first.box };
+  const b = { point: { ...last.site.point }, dir: outwardOf(last.site.point, last.box, first.site.point), box: last.box };
+  const lo = { x: Math.min(a.point.x, b.point.x), y: Math.min(a.point.y, b.point.y) }, hi = { x: Math.max(a.point.x, b.point.x), y: Math.max(a.point.y, b.point.y) };
+  const pad = Math.max(4 * STUB_PX * scale, WINDOW_SHARE * Math.max(hi.x - lo.x, hi.y - lo.y));
+  const window = { minX: Math.min(lo.x, first.box.minX, last.box.minX) - pad, minY: Math.min(lo.y, first.box.minY, last.box.minY) - pad, maxX: Math.max(hi.x, first.box.maxX, last.box.maxX) + pad, maxY: Math.max(hi.y, first.box.maxY, last.box.maxY) + pad };
+  const blocks = [];
+  const seen = [];
+  const minSide = MIN_OBSTACLE_PX * scale;
+  for (const id of near(window)) {
+    if (id === node.id || id === bs.nodeId || id === be.nodeId) continue;
+    const m = nodes.get(id);
+    if (!m || getRep(m, "erased") || !getRep(m, "stroke")) continue;
+    seen.push(id);
+    if (bindingsOf(m).length || !standsClosed(m)) continue;
+    const box2 = boundsOf(m);
+    if (!box2 || box2.maxX - box2.minX < minSide || box2.maxY - box2.minY < minSide) continue;
+    if (within(boxS, box2) || within(boxE, box2) || within(box2, boxS) || within(box2, boxE)) continue;
+    blocks.push({ id, box: box2 });
+  }
+  seen.sort();
+  const path = routeBetween(a, b, blocks, scale);
+  const head = arrow ? headOf2(path.points, getRep(node, "reading:arrow")?.data?.barb ?? 18 * scale) : void 0;
+  const all = path.points;
+  const box = {
+    minX: Math.min(window.minX, ...all.map((p) => p.x)),
+    minY: Math.min(window.minY, ...all.map((p) => p.y)),
+    maxX: Math.max(window.maxX, ...all.map((p) => p.x)),
+    maxY: Math.max(window.maxY, ...all.map((p) => p.y))
+  };
+  return {
+    points: path.points,
+    from: tail,
+    ...head ? { head } : {},
+    turns: path.turns,
+    avoided: path.avoided,
+    blocked: path.blocked,
+    window: box,
+    seen,
+    reasoning: path.reasoning
+  };
+}
+function routeAffectedBy(node, rep, nodes, touched) {
+  const ties = new Set(bindingsOf(node).map((b) => b.nodeId));
+  for (const id of touched) {
+    if (id === node.id || ties.has(id) || rep.seen.includes(id)) return true;
+    const m = nodes.get(id);
+    const b = m && boundsOf(m);
+    if (b && meets(b, rep.window)) return true;
+  }
+  return false;
+}
+var RANK_SPREAD = 4;
+var RANK_BAND = 1;
+function tidyPlanOf(nodes, reading7) {
+  const items = [];
+  const figures = [];
+  for (const s of reading7.symbols) {
+    if (s.ids.length !== 1) {
+      figures.push(s.id);
+      continue;
+    }
+    const n2 = nodes.get(s.ids[0]);
+    const b = n2 && boundsOf(n2);
+    if (b) items.push({ id: s.ids[0], sym: s.id, cx: (b.minX + b.maxX) / 2, cy: (b.minY + b.maxY) / 2, w: b.maxX - b.minX, h: b.maxY - b.minY });
+  }
+  const bySym = new Map(items.map((i) => [i.sym, i]));
+  let dx = 0, dy = 0;
+  for (const c of reading7.connectors) {
+    const p = bySym.get(c.from), q = bySym.get(c.to);
+    if (p && q) {
+      dx += Math.abs(p.cx - q.cx);
+      dy += Math.abs(p.cy - q.cy);
+    }
+  }
+  const flow = dy >= dx ? "down" : "across";
+  const along = (i) => flow === "down" ? i.cy : i.cx;
+  const extent = (i) => flow === "down" ? i.h : i.w;
+  const across2 = (i) => flow === "down" ? i.cx : i.cy;
+  const out = /* @__PURE__ */ new Map();
+  const joined = /* @__PURE__ */ new Set();
+  for (const c of reading7.connectors) {
+    const p = bySym.get(c.from), q = bySym.get(c.to);
+    if (!p || !q || p === q) continue;
+    const forward = c.direction === "forward" || c.direction === "both" || along(p) <= along(q);
+    const [u, v] = forward ? [p, q] : [q, p];
+    if (!out.has(u.sym)) out.set(u.sym, []);
+    out.get(u.sym).push(v.sym);
+    joined.add(u.sym);
+    joined.add(v.sym);
+  }
+  const state = /* @__PURE__ */ new Map();
+  const order2 = [];
+  const dag = /* @__PURE__ */ new Map();
+  const visit = (u) => {
+    state.set(u, 1);
+    for (const v of out.get(u) ?? []) {
+      if (state.get(v) === 1) continue;
+      (dag.get(u) ?? dag.set(u, []).get(u)).push(v);
+      if (!state.has(v)) visit(v);
+    }
+    state.set(u, 2);
+    order2.push(u);
+  };
+  for (const s of reading7.symbols) if (joined.has(s.id) && !state.has(s.id)) visit(s.id);
+  const rank2 = /* @__PURE__ */ new Map();
+  for (const u of order2.slice().reverse()) {
+    const r = rank2.get(u) ?? 0;
+    rank2.set(u, r);
+    for (const v of dag.get(u) ?? []) rank2.set(v, Math.max(rank2.get(v) ?? 0, r + 1));
+  }
+  const byRank = /* @__PURE__ */ new Map();
+  for (const [sym, r] of rank2) {
+    const it = bySym.get(sym);
+    if (it) (byRank.get(r) ?? byRank.set(r, []).get(r)).push(it);
+  }
+  const ranks = [];
+  for (const r of [...byRank.keys()].sort((p, q) => p - q)) {
+    const sorted = byRank.get(r).slice().sort((p, q) => along(p) - along(q) || (p.id < q.id ? -1 : 1));
+    let cur = [];
+    const flush = () => {
+      if (cur.length > 1) {
+        const cs = cur.map(along);
+        const small = Math.min(...cur.map(extent));
+        if (Math.max(...cs) - Math.min(...cs) <= RANK_SPREAD * small) {
+          ranks.push({ ids: cur.slice().sort((p, q) => across2(p) - across2(q) || (p.id < q.id ? -1 : 1)).map((i) => i.id), axis: flow === "down" ? "row" : "column", spread: Math.max(...cs) - Math.min(...cs) });
+        }
+      }
+      cur = [];
+    };
+    for (const it of sorted) {
+      const last = cur[cur.length - 1];
+      if (last && along(it) - along(last) > RANK_BAND * Math.min(extent(it), extent(last)) * RANK_SPREAD) flush();
+      cur.push(it);
+    }
+    flush();
+  }
+  return { flow, ranks, figures };
 }
 
 // src/session/words.ts
@@ -10994,7 +11406,7 @@ function alongSegment(a, b, p) {
   const q = { x: a.x + dx * t, y: a.y + dy * t };
   return { t, off: Math.hypot(p.x - q.x, p.y - q.y) };
 }
-function centreOf2(node) {
+function centreOf3(node) {
   const b = boundsOf(node);
   return b ? { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 } : null;
 }
@@ -11021,7 +11433,7 @@ function sliderOf(ids, nodes, scale = 1) {
     const ends = endsOf(tr);
     if (!ends) continue;
     for (const k of knobs) {
-      const c = centreOf2(k);
+      const c = centreOf3(k);
       if (!c) continue;
       const { t, off } = alongSegment(ends.a, ends.b, c);
       const trackLen = Math.hypot(ends.b.x - ends.a.x, ends.b.y - ends.a.y);
@@ -13579,17 +13991,17 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     fileContent(id);
   }
   function removeFromContent(id) {
-    const idx = contentIds.indexOf(id);
-    if (idx < 0) return;
-    contentIds.splice(idx, 1);
+    const idx2 = contentIds.indexOf(id);
+    if (idx2 < 0) return;
+    contentIds.splice(idx2, 1);
     inContent.delete(id);
     order2.delete(id);
     unfileContent(id);
   }
   function contentReplace(prev, next) {
-    const idx = contentIds.indexOf(prev);
+    const idx2 = contentIds.indexOf(prev);
     const place2 = order2.get(prev);
-    contentIds.splice(idx, 1, next);
+    contentIds.splice(idx2, 1, next);
     inContent.delete(prev);
     order2.delete(prev);
     unfileContent(prev);
@@ -13598,9 +14010,9 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     fileContent(next);
   }
   function contentSpread(prev, ids) {
-    const idx = contentIds.indexOf(prev);
-    if (idx < 0) return;
-    contentIds.splice(idx, 1, ...ids);
+    const idx2 = contentIds.indexOf(prev);
+    if (idx2 < 0) return;
+    contentIds.splice(idx2, 1, ...ids);
     inContent.delete(prev);
     unfileContent(prev);
     order2 = /* @__PURE__ */ new Map();
@@ -13612,8 +14024,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     }
   }
   function contentInsertBefore(anchor, ids) {
-    const idx = contentIds.indexOf(anchor);
-    contentIds.splice(idx < 0 ? contentIds.length : idx, 0, ...ids);
+    const idx2 = contentIds.indexOf(anchor);
+    contentIds.splice(idx2 < 0 ? contentIds.length : idx2, 0, ...ids);
     order2 = /* @__PURE__ */ new Map();
     nextOrder = 0;
     for (const c of contentIds) order2.set(c, ++nextOrder);
@@ -13847,9 +14259,9 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         if (id === node.id) continue;
         const bounds = boundsOf(nodes.get(id));
         const size = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
-        const within = Math.max(floor, size * config.wireEndpointRatio);
+        const within2 = Math.max(floor, size * config.wireEndpointRatio);
         const d = distancePointToBounds(p, bounds);
-        if (!(d < within)) continue;
+        if (!(d < within2)) continue;
         const place2 = order2.get(id);
         if (!best || d < best.d || d === best.d && place2 < bestPlace) {
           best = { id, d };
@@ -14243,6 +14655,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   }
   function applyErase(ev) {
     eraseNode(ev.nodeId, ev.at);
+    reroute([ev.nodeId]);
   }
   function eraseNode(nodeId, at) {
     const node = nodes.get(nodeId);
@@ -14312,7 +14725,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       });
     }
     for (const r of ev.reps ?? []) {
-      if (r.modality === "follow") continue;
+      if (r.modality === "follow" || r.modality === "route") continue;
       node.reps.push({
         modality: r.modality,
         data: r.reasoning === void 0 ? r.data : { ...r.data, reasoning: r.reasoning },
@@ -14517,6 +14930,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     stroke.edges = stroke.edges.filter((e) => !(e.rel === "bound-to" && e.end === ev.end));
     stroke.reps = stroke.reps.filter((r) => !(r.modality === "bound" && r.data.end === ev.end));
     if (!stroke.edges.some((e) => e.rel === "bound-to" && e.to === was)) noFollowerOf(was, stroke.id);
+    if (routeRepOf(stroke)) putRoute(stroke);
   }
   function refollow(id) {
     const node = nodes.get(id);
@@ -14532,7 +14946,41 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   function followFrom(changed2) {
     if (!boundBy.size || !changed2.length) return false;
     const isBound = (id) => !!nodes.get(id)?.edges.some((e) => e.rel === "bound-to");
-    return followThrough(changed2, (id) => boundBy.get(id) ?? [], isBound, refollow) > 0;
+    const moved2 = [];
+    const n2 = followThrough(changed2, (id) => boundBy.get(id) ?? [], isBound, (id) => {
+      const did = refollow(id);
+      if (did) moved2.push(id);
+      return did;
+    });
+    reroute(changed2.concat(moved2));
+    return n2 > 0;
+  }
+  function reroute(touched) {
+    if (!boundBy.size || !touched.length) return;
+    const routed = /* @__PURE__ */ new Set();
+    for (const set of boundBy.values()) for (const id of set) routed.add(id);
+    for (const id of [...routed].sort()) {
+      const node = nodes.get(id);
+      const rep = node && routeRepOf(node);
+      if (!node || !rep || !routeAffectedBy(node, rep, nodes, touched)) continue;
+      putRoute(node);
+    }
+  }
+  function putRoute(node, source = "engine") {
+    const next = deriveRoute(node, nodes, (box) => ink.query(box));
+    node.reps = node.reps.filter((r) => r.modality !== "route");
+    node.reps.push({ modality: "route", data: next, source });
+  }
+  function applyRoute(ev) {
+    for (const id of Array.isArray(ev.ids) ? ev.ids : []) {
+      const node = nodes.get(id);
+      if (!node) continue;
+      if (ev.mode === "raw") {
+        node.reps = node.reps.filter((r) => r.modality !== "route");
+      } else if (routable(node, nodes)) {
+        putRoute(node, ev.participantId ?? "engine");
+      }
+    }
   }
   function rewire(node) {
     const old = node.edges.filter((e) => e.rel === "connects").map((e) => e.to);
@@ -14673,7 +15121,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       const hb = boundsOf(h2);
       return id !== n2.id && !!hb && boundsContain(hb, nb) && (artifacts.includes(id) || (standsClosed(h2) ?? false)) && nonWriting(h2);
     });
-    const meets = { closed: false, open: [false, false] };
+    const meets2 = { closed: false, open: [false, false] };
     ends.forEach((e, k) => {
       for (const id of reach.around(e.point, (cell) => magnetRadius(cell, scale))) {
         if (id === n2.id || run2.includes(id)) continue;
@@ -14710,11 +15158,11 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         if (!q || d > r) continue;
         if (d > touch && ((q.x - e.point.x) * e.out.x + (q.y - e.point.y) * e.out.y) / d < 0.5) continue;
         if (run2.some((l) => l !== n2.id && letterMeets(l, m, mb, r))) continue;
-        if (closed) meets.closed = true;
-        else meets.open[k] = true;
+        if (closed) meets2.closed = true;
+        else meets2.open[k] = true;
       }
     });
-    return meets.closed || meets.open[0] && meets.open[1];
+    return meets2.closed || meets2.open[0] && meets2.open[1];
   }
   function longAgainstRun(n2, run2) {
     const letters = run2.filter((id) => id !== n2.id).map((id) => nodes.get(id)).filter((l) => !!l);
@@ -15261,8 +15709,11 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   }
   function applyByType(ev) {
     switch (ev.type) {
-      case "stroke":
-        return applyStroke(ev);
+      case "stroke": {
+        const id = applyStroke(ev);
+        reroute([id]);
+        return id;
+      }
       case "bless":
         return applyBless(ev);
       case "join":
@@ -15323,6 +15774,9 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         return null;
       case "unbind":
         applyUnbind(ev);
+        return null;
+      case "route":
+        applyRoute(ev);
         return null;
       case "reshape":
         applyReshape(ev);
@@ -15556,6 +16010,16 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       const stroke = args && nodes.get(args.strokeId);
       if (!stroke || !stroke.edges.some((e) => e.rel === "bound-to" && e.end === args.end)) return;
       dispatch({ type: "unbind", strokeId: args.strokeId, end: args.end, at: args.at, ...args.participantId !== void 0 ? { participantId: args.participantId } : {} });
+    },
+    route: (args) => {
+      const raw = args?.mode === "raw";
+      const ids = (Array.isArray(args?.ids) ? args.ids : []).filter((id) => {
+        const n2 = nodes.get(id);
+        return !!n2 && (raw ? !!routeRepOf(n2) : !routeRepOf(n2) && routable(n2, nodes));
+      });
+      if (!ids.length) return 0;
+      dispatch({ type: "route", ids, ...raw ? { mode: "raw" } : {}, at: args.at, ...args.participantId !== void 0 ? { participantId: args.participantId } : {} });
+      return ids.length;
     },
     reshape: (args) => {
       const node = args && nodes.get(args.id);
@@ -15855,8 +16319,8 @@ function endsMeet(a, ea, ties, b) {
   const eb = endsOf2(b);
   if (!eb) return { start: false, end: false };
   const reach = 1.5 * magnetRadius(Math.min(sizeOf3(a), sizeOf3(b)), Math.max(scaleOf2(a), scaleOf2(b)));
-  const meets = (p, end) => eb.some((q) => Math.hypot(p.x - q.x, p.y - q.y) <= reach) || ties.some((t) => t.to === b.id && (!t.end || t.end === end));
-  return { start: meets(ea[0], "start"), end: meets(ea[1], "end") };
+  const meets2 = (p, end) => eb.some((q) => Math.hypot(p.x - q.x, p.y - q.y) <= reach) || ties.some((t) => t.to === b.id && (!t.end || t.end === end));
+  return { start: meets2(ea[0], "start"), end: meets2(ea[1], "end") };
 }
 function sideCluster(node, nodes, max = 12) {
   const out = [node.id];
@@ -15920,7 +16384,7 @@ function isWriting4(node) {
   if (isWord(node) || transcriptOf(node)) return true;
   return resemblances(node)[0]?.to === "type:text";
 }
-function centreOf3(b) {
+function centreOf4(b) {
   return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
 }
 function ownWords(nodes, ids) {
@@ -15987,7 +16451,7 @@ function readFlowchart(state, scopeIds) {
   }
   const containers = /* @__PURE__ */ new Set();
   const inside = (a, b) => {
-    const c = centreOf3(b.outline.bounds);
+    const c = centreOf4(b.outline.bounds);
     return b.outline.size < a.outline.size && offBox(c, a.outline.bounds) === 0 && outside(c, a.outline.hull) === 0;
   };
   for (const a of candidates) {
@@ -16087,7 +16551,7 @@ function readFlowchart(state, scopeIds) {
     else {
       const other = plain[0].from === c.id ? plain[0].to : plain[0].from;
       const o = symbols.find((x) => x.id === other);
-      const above = centreOf3(c.outline.bounds).y <= centreOf3(o.outline.bounds).y;
+      const above = centreOf4(c.outline.bounds).y <= centreOf4(o.outline.bounds).y;
       [symbol, sure, why] = [above ? "start" : "end", 0.7, `a line with no head joins it, and it sits ${above ? "above" : "below"} what it joins`];
     }
     const size = `${Math.round(c.outline.size / median4 * 100)}% the size of the chart\u2019s other symbols`;
@@ -16130,7 +16594,7 @@ function readFlowchart(state, scopeIds) {
     if (!writing.has(m.id) || symbolOfMark.has(m.id)) continue;
     const b = boundsOf(m.node);
     if (!b) continue;
-    const c = centreOf3(b);
+    const c = centreOf4(b);
     const size = Math.max(b.maxX - b.minX, b.maxY - b.minY);
     const text = transcriptOf(m.node) ?? labelOf(m.node)?.text;
     const home = out.filter((s) => offBox(c, s.bounds) === 0 && outside(c, s.outline) === 0 && Math.max(s.bounds.maxX - s.bounds.minX, s.bounds.maxY - s.bounds.minY) > size).sort((p, q) => (p.bounds.maxX - p.bounds.minX) * (p.bounds.maxY - p.bounds.minY) - (q.bounds.maxX - q.bounds.minX) * (q.bounds.maxY - q.bounds.minY))[0];
@@ -16348,9 +16812,9 @@ function inReadingOrder(items, boundsOf2, keyOf, across2 = false) {
     out.push(...band.map((x) => x.t));
     band = [];
   };
-  const within = (v, [lo, hi]) => v >= lo && v <= hi;
+  const within2 = (v, [lo, hi]) => v >= lo && v <= hi;
   for (const x of placed2) {
-    if (band.length && !within(main(x.b), extent(band[0].b)) && !within(main(band[0].b), extent(x.b))) close();
+    if (band.length && !within2(main(x.b), extent(band[0].b)) && !within2(main(band[0].b), extent(x.b))) close();
     band.push(x);
   }
   close();
@@ -16589,7 +17053,7 @@ var DEGREE = 180 / Math.PI;
 var scaleOf3 = (node) => getRep(node, "stroke")?.data?.scale ?? 1;
 var sub7 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
 var dot4 = (a, b) => a.x * b.x + a.y * b.y;
-var centreOf4 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
+var centreOf5 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
 var sizeOfBounds = (b) => Math.max(b.maxX - b.minX, b.maxY - b.minY);
 var mean2 = (xs) => xs.reduce((a, x) => a + x, 0) / Math.max(1, xs.length);
 var METHOD_WORDS = /[\p{L}\p{N}_$]\([^()]*\)/u;
@@ -16714,8 +17178,8 @@ function memberKind(text) {
 }
 var reading2 = 0;
 function linesOfBox(box, strokes) {
-  const grow = 0.3 * box.size;
-  const near = strokes.filter((s) => s.bounds.minX >= box.bounds.minX - grow && s.bounds.maxX <= box.bounds.maxX + grow && s.bounds.minY >= box.bounds.minY - grow && s.bounds.maxY <= box.bounds.maxY + grow);
+  const grow2 = 0.3 * box.size;
+  const near = strokes.filter((s) => s.bounds.minX >= box.bounds.minX - grow2 && s.bounds.maxX <= box.bounds.maxX + grow2 && s.bounds.minY >= box.bounds.minY - grow2 && s.bounds.maxY <= box.bounds.maxY + grow2);
   let best = null;
   for (const f of framesOf(box)) {
     const lines = near.map((s) => compartmentLineOf(s.id, s.pts, f, s.scale)).filter((l) => !!l && l.score >= COMPARTMENT_FLOOR);
@@ -16863,7 +17327,7 @@ function readUmlClass(state, scopeIds) {
   for (const id of scope) {
     const node = nodes.get(id);
     const b = boundsOf(node);
-    marks.set(id, { id, node, bounds: b, centre: centreOf4(b), scale: isWord(node) ? scaleOf3(nodes.get(lettersOf(node)[0]) ?? node) : scaleOf3(node) });
+    marks.set(id, { id, node, bounds: b, centre: centreOf5(b), scale: isWord(node) ? scaleOf3(nodes.get(lettersOf(node)[0]) ?? node) : scaleOf3(node) });
   }
   const candidates = [];
   const open = [];
@@ -16889,7 +17353,7 @@ function readUmlClass(state, scopeIds) {
   }
   if (!candidates.length) return null;
   const holds2 = (a, b) => {
-    const c = centreOf4(b.shape.bounds);
+    const c = centreOf5(b.shape.bounds);
     return b.shape.size < a.shape.size && offBox2(c, a.shape.bounds) === 0 && outside(c, a.shape.hull) === 0;
   };
   const containers = new Set(candidates.filter((a) => candidates.some((b) => a !== b && holds2(a, b))));
@@ -16979,8 +17443,8 @@ function readUmlClass(state, scopeIds) {
   }
   const kept2 = classes.filter((c) => !demoted.has(c));
   if (demoted.size) for (const c of demoted) for (const id of c.box) classOfMark.delete(id);
-  const headOf2 = /* @__PURE__ */ new Set();
-  for (const [id, h2] of heads) for (const e of [h2.start, h2.end]) for (const x of e.heads[0]?.ids ?? []) if (x !== id && heads.has(x)) headOf2.add(x);
+  const headOf3 = /* @__PURE__ */ new Set();
+  for (const [id, h2] of heads) for (const e of [h2.start, h2.end]) for (const x of e.heads[0]?.ids ?? []) if (x !== id && heads.has(x)) headOf3.add(x);
   const relations = [];
   const pointers = [];
   const edgeMarks = /* @__PURE__ */ new Map();
@@ -17002,8 +17466,8 @@ function readUmlClass(state, scopeIds) {
     if (heads2[0] && !heads2[0].filled && heads2[0].kind !== "arrow") {
       const outline = heads2[0].ids.find((x) => x !== id && marks.has(x));
       const ob = outline ? marks.get(outline).bounds : void 0;
-      const grow = ob ? 0.2 * sizeOfBounds(ob) : 0;
-      const fills = ob ? [...marks.values()].filter((m) => m.id !== outline && m.id !== id && !classOfMark.has(m.id) && !isWord(m.node) && !!strokePointsOf(m.node) && m.bounds.minX >= ob.minX - grow && m.bounds.maxX <= ob.maxX + grow && m.bounds.minY >= ob.minY - grow && m.bounds.maxY <= ob.maxY + grow) : [];
+      const grow2 = ob ? 0.2 * sizeOfBounds(ob) : 0;
+      const fills = ob ? [...marks.values()].filter((m) => m.id !== outline && m.id !== id && !classOfMark.has(m.id) && !isWord(m.node) && !!strokePointsOf(m.node) && m.bounds.minX >= ob.minX - grow2 && m.bounds.maxX <= ob.maxX + grow2 && m.bounds.minY >= ob.minY - grow2 && m.bounds.maxY <= ob.maxY + grow2) : [];
       if (fills.length) {
         const h2 = headApart(nodes.get(id), e.end, [marks.get(outline).node, ...fills.map((m) => m.node)]);
         if (h2 && h2.filled && h2.kind === heads2[0].kind) heads2 = [{ ...h2, ids: [outline, ...fills.map((m) => m.id)], reason: `${h2.reason} \u2014 read apart from the class beside it, which heads.ts gave its fill` }, ...heads2];
@@ -17040,7 +17504,7 @@ function readUmlClass(state, scopeIds) {
     };
   };
   for (const [id, h2] of heads) {
-    if (headOf2.has(id)) continue;
+    if (headOf3.has(id)) continue;
     const node = nodes.get(id);
     const pts = strokePointsOf(node);
     const length = Math.max(1e-6, Math.hypot(pts[pts.length - 1].x - pts[0].x, pts[pts.length - 1].y - pts[0].y));
@@ -17104,7 +17568,7 @@ function readUmlClass(state, scopeIds) {
   const joined = relations.filter((r) => inSet.has(byId.get(r.from)) && inSet.has(byId.get(r.to)));
   const leftOut = relations.filter((r) => !joined.includes(r));
   const labels = [];
-  const taken = /* @__PURE__ */ new Set([...relations.flatMap((r) => r.ids), ...pointers, ...edgeMarks.keys(), ...usedWords, ...headOf2]);
+  const taken = /* @__PURE__ */ new Set([...relations.flatMap((r) => r.ids), ...pointers, ...edgeMarks.keys(), ...usedWords, ...headOf3]);
   const outsideWriting = [...marks.values()].filter((m) => {
     if (insideOf3.has(m.id) || boxMarks.has(m.id) || lineIds.has(m.id) || inFigure.has(m.id) || taken.has(m.id)) return false;
     if (isWriting5(m.node)) return true;
@@ -17530,14 +17994,14 @@ function clear(run2, others, crossing, heads) {
     { x: f.centre.x + f.axis.x * hi, y: f.centre.y + f.axis.y * hi }
   ];
   const box = run2.reduce((b, d) => ({ minX: Math.min(b.minX, d.bounds.minX), minY: Math.min(b.minY, d.bounds.minY), maxX: Math.max(b.maxX, d.bounds.maxX), maxY: Math.max(b.maxY, d.bounds.maxY) }), { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity });
-  const grow = f.dash + f.touch;
+  const grow2 = f.dash + f.touch;
   const joined = /* @__PURE__ */ new Set();
   const blocked = /* @__PURE__ */ new Set();
   const why = [];
   for (const m of others) {
     if (mine.has(m.id) || m.size > SMALL_MARK * f.dash) continue;
     const b = m.bounds;
-    if (b.minX > box.maxX + grow || b.maxX < box.minX - grow || b.minY > box.maxY + grow || b.maxY < box.minY - grow) continue;
+    if (b.minX > box.maxX + grow2 || b.maxX < box.minX - grow2 || b.minY > box.maxY + grow2 || b.maxY < box.minY - grow2) continue;
     if (crossing(m.id, f.axis) || heads(m, run2)) continue;
     const atEnd = ends.some((e) => distToPolyline(e, m.ink) <= 2 * f.touch);
     f.placed.forEach((p, k) => {
@@ -17743,7 +18207,7 @@ var scaleOf5 = (node) => getRep(node, "stroke")?.data?.scale ?? 1;
 var atOf2 = (node) => getRep(node, "stroke")?.data?.at ?? node.createdAt;
 var sub9 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
 var dist9 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-var centreOf5 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
+var centreOf6 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
 var sizeOfBounds2 = (b) => Math.max(b.maxX - b.minX, b.maxY - b.minY);
 var mean3 = (xs) => xs.reduce((a, x) => a + x, 0) / Math.max(1, xs.length);
 var boundsOfPoints2 = (pts) => {
@@ -17813,7 +18277,7 @@ function figureOf(head, open, used) {
   const s = head.size;
   const hand = s / head.scale;
   if (hand < HEAD_PX[0] || hand > HEAD_PX[1]) return null;
-  const c = centreOf5(head.bounds);
+  const c = centreOf6(head.bounds);
   const region = { minX: c.x - 2.2 * s, maxX: c.x + 2.2 * s, minY: head.bounds.minY + 0.3 * s, maxY: head.bounds.maxY + 3.5 * s };
   const reach = Math.max(0.35 * s, 4 * head.scale);
   const near = open.filter((o) => !used.has(o.id) && o.size <= 3 * s && o.bounds.minX >= region.minX && o.bounds.maxX <= region.maxX && o.bounds.minY >= region.minY && o.bounds.maxY <= region.maxY);
@@ -17925,13 +18389,13 @@ function loopHeads(loop, lineX, side, others) {
   const out = pts.map((p) => side * (p.x - lineX(p.y)));
   const far = Math.max(...out);
   const legOf = (which) => {
-    const idx = which === "end" ? pts.map((_, i) => i) : pts.map((_, i) => pts.length - 1 - i);
+    const idx2 = which === "end" ? pts.map((_, i) => i) : pts.map((_, i) => pts.length - 1 - i);
     let f = 0;
-    idx.forEach((i, k2) => {
+    idx2.forEach((i, k2) => {
       if (out[i] >= 0.7 * far) f = k2;
     });
-    const tail = idx.slice(f);
-    const endPoint = pts[idx[idx.length - 1]];
+    const tail = idx2.slice(f);
+    const endPoint = pts[idx2[idx2.length - 1]];
     const plain = { end: which, point: { ...endPoint }, reason: `a plain ${which}: nothing sits there` };
     if (tail.length < 3) return plain;
     let k = 0;
@@ -18001,7 +18465,7 @@ function readSequence(state, scopeIds, opts = {}) {
   for (const id of scope) {
     const node = nodes.get(id);
     const b = boundsOf(node);
-    marks.set(id, { id, node, bounds: b, centre: centreOf5(b), scale: isWord(node) ? scaleOf5(nodes.get(lettersOf(node)[0]) ?? node) : scaleOf5(node) });
+    marks.set(id, { id, node, bounds: b, centre: centreOf6(b), scale: isWord(node) ? scaleOf5(nodes.get(lettersOf(node)[0]) ?? node) : scaleOf5(node) });
   }
   const strokes = /* @__PURE__ */ new Map();
   const addStroke = (id, mark) => {
@@ -18070,7 +18534,7 @@ function readSequence(state, scopeIds, opts = {}) {
       f.ids.forEach((id) => used.add(id));
     }
   }
-  const holds2 = (a, b) => b.bounds !== a.bounds && sizeOfBounds2(b.bounds) < sizeOfBounds2(a.bounds) && offBox3(centreOf5(b.bounds), a.bounds) === 0 && outside(centreOf5(b.bounds), a.outline) === 0;
+  const holds2 = (a, b) => b.bounds !== a.bounds && sizeOfBounds2(b.bounds) < sizeOfBounds2(a.bounds) && offBox3(centreOf6(b.bounds), a.bounds) === 0 && outside(centreOf6(b.bounds), a.outline) === 0;
   const frames = new Set(heads.filter((a) => heads.some((b) => a !== b && holds2(a, b))));
   const candidates = heads.filter((h2) => !frames.has(h2));
   if (candidates.length < least) return null;
@@ -18595,7 +19059,7 @@ function labelWriting(nodes, inp) {
     if (!inp.writing.has(m.id) || inp.owned.has(m.id)) continue;
     const b = boundsOf(m.node);
     if (!b) continue;
-    const c = centreOf3(b);
+    const c = centreOf4(b);
     const size = sized(b);
     const text = transcriptOf(m.node) ?? void 0;
     const own = m.node && getRep(m.node, "label")?.data?.text;
@@ -18701,10 +19165,10 @@ var INSIDE_SLACK = 0.05;
 function lineAcross(c, ink) {
   if (ink.length < 2) return false;
   const slack = INSIDE_SLACK * c.outline.size;
-  const within = ink.filter((p) => outside(p, c.outline.hull) <= slack).length / ink.length;
+  const within2 = ink.filter((p) => outside(p, c.outline.hull) <= slack).length / ink.length;
   const b = boundsOfPoints(ink);
   const short = Math.min(c.outline.bounds.maxX - c.outline.bounds.minX, c.outline.bounds.maxY - c.outline.bounds.minY);
-  return within >= INSIDE_SHARE && Math.max(b.maxX - b.minX, b.maxY - b.minY) >= 0.5 * short;
+  return within2 >= INSIDE_SHARE && Math.max(b.maxX - b.minX, b.maxY - b.minY) >= 0.5 * short;
 }
 function joinsTwo(ink, symbols) {
   if (ink.length < 2) return false;
@@ -18817,10 +19281,10 @@ function bullseyeWord(word, nodes) {
   if (parts.some((x) => !x.o)) return null;
   const ring2 = [...parts].sort((a, b) => b.o.size - a.o.size)[0];
   if (ring2.o.aspect > BLOB_ASPECT[0] || ring2.o.extent < 0.7) return null;
-  const cr = centreOf3(ring2.o.bounds);
+  const cr = centreOf4(ring2.o.bounds);
   const inside = parts.filter((x) => x !== ring2).every((x) => {
     const share = x.o.size / ring2.o.size;
-    const cx2 = centreOf3(x.o.bounds);
+    const cx2 = centreOf4(x.o.bounds);
     return share >= INNER_SHARE[0] && share <= INNER_SHARE[1] && outside(cx2, ring2.o.hull) === 0 && Math.hypot(cx2.x - cr.x, cx2.y - cr.y) <= INNER_CENTRED * ring2.o.size;
   });
   if (!inside) return null;
@@ -18851,16 +19315,16 @@ var isRound = (c) => topShape2(c) === "round";
 var isForeign = (c) => topShape2(c) === "decision" || topShape2(c) === "data";
 var isBox = (c) => !isForeign(c) && !isRound(c) && stateShape(c).score > 0.05;
 function insideOf2(a, b) {
-  const c = centreOf3(b.outline.bounds);
+  const c = centreOf4(b.outline.bounds);
   return b.outline.size < a.outline.size && outside(c, a.outline.hull) === 0;
 }
 function loopBarb(pts, d, which, far, scale) {
-  const idx = which === "end" ? pts.map((_, i) => i) : pts.map((_, i) => pts.length - 1 - i);
+  const idx2 = which === "end" ? pts.map((_, i) => i) : pts.map((_, i) => pts.length - 1 - i);
   let f = 0;
-  idx.forEach((i, k2) => {
+  idx2.forEach((i, k2) => {
     if (d[i] >= 0.7 * far) f = k2;
   });
-  const tail = idx.slice(f);
+  const tail = idx2.slice(f);
   if (tail.length < 3) return null;
   let k = 0;
   tail.forEach((i, j) => {
@@ -19019,7 +19483,7 @@ function readState(state, scopeIds) {
       if (x === ring2 || taken.has(x) || finals.some((f) => f.c === x)) return false;
       const share = x.outline.size / ring2.outline.size;
       if (share < INNER_SHARE[0] || share > INNER_SHARE[1]) return false;
-      const cx2 = centreOf3(x.outline.bounds), cr = centreOf3(ring2.outline.bounds);
+      const cx2 = centreOf4(x.outline.bounds), cr = centreOf4(ring2.outline.bounds);
       return outside(cx2, ring2.outline.hull) === 0 && Math.hypot(cx2.x - cr.x, cx2.y - cr.y) <= INNER_CENTRED * ring2.outline.size;
     });
     if (!inner) continue;
@@ -19385,7 +19849,7 @@ function readEr(state, scopeIds) {
   const byId = new Map(entities.map((c) => [c.id, c]));
   const headed = joined.connectors.filter((k) => k.directed).length;
   const relationships = joined.connectors.map((k) => {
-    const a = centreOf3(byId.get(k.from).outline.bounds), b = centreOf3(byId.get(k.to).outline.bounds);
+    const a = centreOf4(byId.get(k.from).outline.bounds), b = centreOf4(byId.get(k.to).outline.bounds);
     const across2 = Math.abs(b.x - a.x) >= Math.abs(b.y - a.y);
     const swap = across2 ? b.x < a.x : b.y < a.y;
     const [from, to] = swap ? [k.to, k.from] : [k.from, k.to];
@@ -19426,7 +19890,7 @@ function readEr(state, scopeIds) {
     if (!r) continue;
     const P = r.ends.from.point, Q = r.ends.to.point;
     const len2 = Math.max(1e-6, Math.hypot(Q.x - P.x, Q.y - P.y));
-    const mid9 = centreOf3(l.bounds);
+    const mid9 = centreOf4(l.bounds);
     const t = ((mid9.x - P.x) * (Q.x - P.x) + (mid9.y - P.y) * (Q.y - P.y)) / (len2 * len2);
     const middle = t > 0.5 - MIDDLE_SHARE / 2 && t < 0.5 + MIDDLE_SHARE / 2;
     const atEnd = t <= END_SHARE2 || t >= 1 - END_SHARE2;
@@ -19715,7 +20179,7 @@ function readMindMap(state, scopeIds) {
       inTree.add(k.id);
     }
   }
-  const centre3 = (id) => centreOf3(byId.get(id).outline.bounds);
+  const centre3 = (id) => centreOf4(byId.get(id).outline.bounds);
   const children = new Map(group2.map((c) => [c.id, []]));
   for (const [child, p] of parent) children.get(p).push(child);
   for (const [id, kids] of children) {
@@ -20695,7 +21159,7 @@ function routeLink(a, b, others, dir, taken, margin, scale, reads2) {
     return !!u && u.ways.some((w2) => Math.abs(w2.x * way.x + w2.y * way.y) / l > cosApart);
   }).length;
   const grown = others.map((o) => ({ minX: o.box.minX - margin, minY: o.box.minY - margin, maxX: o.box.maxX + margin, maxY: o.box.maxY + margin }));
-  const crosses = (pts) => grown.filter((g) => pts.some((p, i) => i > 0 && meetsBox(pts[i - 1], p, g))).length;
+  const crosses2 = (pts) => grown.filter((g) => pts.some((p, i) => i > 0 && meetsBox(pts[i - 1], p, g))).length;
   const byScore = (p, q) => lexLess(p.score, q.score) ? -1 : lexLess(q.score, p.score) ? 1 : 0;
   const lines = [];
   for (const pa of PORTS) {
@@ -20707,7 +21171,7 @@ function routeLink(a, b, others, dir, taken, margin, scale, reads2) {
       const clean = leaves(a, P, v) && leaves(b, Q, { x: -v.x, y: -v.y });
       const clash = conflicts(pa, pb, [v, { x: -v.x, y: -v.y }]);
       const overlaps = taken.straight.some(([r, s]) => alongEachOther(P, Q, r, s, 2 * scale));
-      const crossings2 = crosses([P, Q]);
+      const crossings2 = crosses2([P, Q]);
       lines.push({ score: [clean ? 0 : 1, clash, overlaps ? 1 : 0, crossings2, pref(pa, pb), d], route: { kind: "straight", ports: [pa, pb], clean, clash, overlaps, crossings: crossings2 } });
     }
   }
@@ -20733,7 +21197,7 @@ function routeLink(a, b, others, dir, taken, margin, scale, reads2) {
           const clean = leaves(a, P, out) && leaves(b, Q, back);
           if (!clean) continue;
           const clash = conflicts(pa, pb, [out, back]);
-          const crossings2 = crosses(pts);
+          const crossings2 = crosses2(pts);
           bows.push({ score: [clash, crossings2, k, pa === pb && side(pa) ? 0 : 1, pref(pa, pb), chord], route: { kind: "arc", ports: [pa, pb], sweep, side: s, clean, clash, overlaps: false, crossings: crossings2 } });
         }
       });
@@ -20843,8 +21307,8 @@ function drawFlowchartRead(session, read2, opts) {
     { direction: read2.direction, rankGap: RANK_GAP * U * scale, nodeGap: NODE_GAP * U * scale }
   );
   const origin = opts.origin ?? besideContent(session, CORE_MIN * U * scale);
-  const centreOf8 = (id) => add3(origin, layout.at.get(id));
-  const world = (id, p) => add3(centreOf8(id), { x: p.x * scale, y: p.y * scale });
+  const centreOf10 = (id) => add3(origin, layout.at.get(id));
+  const world = (id, p) => add3(centreOf10(id), { x: p.x * scale, y: p.y * scale });
   const made = /* @__PURE__ */ new Map();
   const first = (n2) => n2.symbol === "process" || n2.symbol === "decision" || n2.symbol === "data" ? 0 : 1;
   for (const n2 of [...nodes].sort((p, q) => first(p) - first(q))) {
@@ -20888,7 +21352,7 @@ function drawFlowchartRead(session, read2, opts) {
     const xs = hull2.map((p) => p.x), ys = hull2.map((p) => p.y);
     for (const p of PORTS) ends.set(`${n2.id}:${p}`, endAt(n2.id, p));
     const ports = Object.fromEntries(PORTS.map((p) => [p, ends.get(`${n2.id}:${p}`).point]));
-    standing2.set(n2.id, { id: n2.id, rank: layout.rank.get(n2.id), ink, centre: centreOf8(n2.id), hull: hull2, box: { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) }, ports });
+    standing2.set(n2.id, { id: n2.id, rank: layout.rank.get(n2.id), ink, centre: centreOf10(n2.id), hull: hull2, box: { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) }, ports });
   }
   const drawnLinks = [];
   const crossing = [];
@@ -22401,7 +22865,7 @@ function stateText(text, opts = {}) {
   const body = lines.join("<br>").replace(/^ /, "#32;").replace(/ $/, "#32;");
   return body.length ? body : "#32;";
 }
-var centreOf6 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
+var centreOf7 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
 function writeState(reading7, opts = {}) {
   const r = reading7;
   const symbols = r.symbols;
@@ -22412,7 +22876,7 @@ function writeState(reading7, opts = {}) {
   let down = 0, acrossSum = 0, downward = 0;
   const moving = transitions.filter((k) => k.from !== k.to);
   for (const k of moving) {
-    const a = centreOf6(byId.get(k.from).bounds), b = centreOf6(byId.get(k.to).bounds);
+    const a = centreOf7(byId.get(k.from).bounds), b = centreOf7(byId.get(k.to).bounds);
     down += Math.abs(b.y - a.y);
     acrossSum += Math.abs(b.x - a.x);
     if (Math.abs(b.y - a.y) >= Math.abs(b.x - a.x)) downward++;
@@ -22863,14 +23327,14 @@ function drawStateRead(session, read2, opts) {
   const drawn = [];
   const crossing = [];
   const unbound = [];
-  const outwardOf = (side) => side === "top" ? { x: 0, y: -1 } : side === "right" ? { x: 1, y: 0 } : side === "bottom" ? { x: 0, y: 1 } : { x: -1, y: 0 };
+  const outwardOf2 = (side) => side === "top" ? { x: 0, y: -1 } : side === "right" ? { x: 1, y: 0 } : side === "bottom" ? { x: 0, y: 1 } : { x: -1, y: 0 };
   for (const l of links) {
     const label = l.label?.trim();
     if (l.self) {
       const down = r.direction === "TD" || r.direction === "BT";
       const side = down ? "right" : "top";
       const b = standing2.get(l.from).box;
-      const n2 = outwardOf(side);
+      const n2 = outwardOf2(side);
       const tangent = { x: -n2.y, y: n2.x };
       const mid9 = { x: side === "right" ? b.maxX : (b.minX + b.maxX) / 2, y: side === "top" ? b.minY : (b.minY + b.maxY) / 2 };
       const w2 = LOOP_W2 * U, h2 = LOOP_H2 * U, bb = BARB2 * U;
@@ -25240,8 +25704,106 @@ var MERMAID_DRAW = {
   }
 };
 
+// src/tools/route.ts
+var TIDY_TOLERANCE = 0.5;
+var LEFT_AS_DRAWN = /* @__PURE__ */ new Set(["sequence"]);
+function diagramOf(state, ids) {
+  for (const reading7 of notationsOf(state, ids)) {
+    if (reading7.confidence < NOTATION_FLOOR || LEFT_AS_DRAWN.has(reading7.notation)) continue;
+    const tied = reading7.connectors.map((c) => c.id).filter((id) => routable(state.nodes.get(id), state.nodes));
+    if (!tied.length) continue;
+    const toRoute = tied.filter((id) => !routeRepOf(state.nodes.get(id)));
+    const routed = tied.filter((id) => !!routeRepOf(state.nodes.get(id)));
+    const plan = tidyPlanOf(state.nodes, reading7);
+    return { reading: reading7, toRoute, routed, plan, unaligned: plan.ranks.filter((r) => r.spread > TIDY_TOLERANCE) };
+  }
+  return null;
+}
+var reasonOf2 = (reading7) => `${describeNotation(reading7)} \u2014 connectors at right angles between their ports; your ink stays faint beneath`;
+var centreOf8 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
+function tidyDiagram(session, reading7, at) {
+  let ranks = 0;
+  const plan = tidyPlanOf(session.getState().nodes, reading7);
+  for (const rank2 of plan.ranks) {
+    if (rank2.spread <= TIDY_TOLERANCE) continue;
+    const before = new Map(rank2.ids.map((id) => [id, centreOf8(boundsOf(session.getState().nodes.get(id)))]));
+    session.tidy({ ids: rank2.ids, mode: "align", axis: rank2.axis, at });
+    ranks++;
+    const state2 = session.getState();
+    for (const id of rank2.ids) {
+      const now = boundsOf(state2.nodes.get(id));
+      const was = before.get(id);
+      if (!now) continue;
+      const c = centreOf8(now), dx = c.x - was.x, dy = c.y - was.y;
+      if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) continue;
+      const words = reading7.labels.filter((l) => l.of === id && l.id !== id && state2.contentIds.includes(l.id)).map((l) => l.id);
+      if (words.length) session.move({ ids: words, dx, dy, at });
+    }
+  }
+  const state = session.getState();
+  const ids = reading7.connectors.map((c) => c.id).filter((id) => state.nodes.get(id) && routable(state.nodes.get(id), state.nodes) && !routeRepOf(state.nodes.get(id)));
+  return { ranks, routed: session.route({ ids, at }) };
+}
+var ROUTE = {
+  id: "route",
+  name: "routing",
+  describe: () => "connectors drawn at right angles between their ports, or the whole diagram tidied \u2014 its symbols lined up and its connectors routed; the ink kept faint beneath",
+  offers(scope) {
+    if (scope.marks.length < 2) return [];
+    if (scope.marks.some((id) => scope.state.artifacts.includes(id))) return [];
+    const d = diagramOf(scope.state, scope.marks);
+    if (!d) return [];
+    const out = [];
+    const n2 = d.reading.notation;
+    if (d.toRoute.length || d.unaligned.length) {
+      out.push({
+        key: "tidy-diagram",
+        label: "Tidy the diagram",
+        reason: reasonOf2(d.reading),
+        base: 0.32,
+        tool: "route",
+        verbs: ["tidy the diagram", "tidy diagram", "tidy up the diagram"],
+        data: { notation: n2 }
+      });
+    }
+    if (d.toRoute.length) {
+      out.push({
+        key: "route",
+        label: "Route the connectors",
+        reason: reasonOf2(d.reading),
+        base: 0.28,
+        tool: "route",
+        verbs: ["route", "orthogonal", "right angles"],
+        data: { notation: n2 }
+      });
+    }
+    if (d.routed.length) {
+      out.push({
+        key: "unroute",
+        label: "Show the connectors as drawn",
+        reason: `${d.routed.length === 1 ? "the routed connector" : d.routed.length + " routed connectors"} back as you drew ${d.routed.length === 1 ? "it" : "them"} \u2014 the routing taken off, your ink in front again`,
+        base: 0.12,
+        tool: "route",
+        verbs: ["unroute", "as drawn", "show the ink"],
+        data: { notation: n2 }
+      });
+    }
+    return out;
+  },
+  take(offer, scope, session, at) {
+    const notation = offer.data?.notation;
+    const state = session.getState();
+    const d = diagramOf(state, scope.marks);
+    if (!d || notation && d.reading.notation !== notation) return { detail: { ok: false, error: "the marks held no longer read as a diagram with connectors to route" } };
+    if (offer.key === "unroute") return { detail: { ok: true, unrouted: session.route({ ids: d.routed, mode: "raw", at }) } };
+    if (offer.key === "route") return { detail: { ok: true, routed: session.route({ ids: d.toRoute, at }) } };
+    const done = tidyDiagram(session, d.reading, at);
+    return { detail: { ok: true, ...done, notation: d.reading.notation } };
+  }
+};
+
 // src/tools/builtin.ts
-var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW];
+var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE];
 registerTool(CORRECT);
 registerTool(TEXT);
 registerTool(NAME2);
@@ -25262,6 +25824,7 @@ registerTool(STRUCTURE);
 registerTool(MATHS);
 registerTool(MERMAID);
 registerTool(MERMAID_DRAW);
+registerTool(ROUTE);
 
 // src/context/context.ts
 var CONTEXT_FADE = 2.5;
@@ -27060,7 +27623,7 @@ function isFlat(answer, margin = FLAT_MARGIN) {
     why: `${order2[0].of} ${p2(order2[0].p)} leads ${order2[1].of} ${p2(order2[1].p)} by ${p2(lead)}`
   };
 }
-function reasonOf2(question, answer) {
+function reasonOf3(question, answer) {
   const dist10 = ranked(answer).map((d) => `${d.of} ${p2(d.p)}`).join(" \xB7 ");
   if (answer.kind === "noul") return `asked \u201C${question.ask}\u201D \u2014 ${dist10}`;
   if (answer.kind === "score") {
@@ -27116,7 +27679,7 @@ function createDecideParticipant(session, transport, at = 0, options = {}) {
         continue;
       }
       const { flat, why } = isFlat(answer, margin);
-      rows.push({ question: q, answer, flat, flatWhy: why, reason: reasonOf2(q, answer), held: false });
+      rows.push({ question: q, answer, flat, flatWhy: why, reason: reasonOf3(q, answer), held: false });
     }
     const state = session.getState();
     if (state.generation !== snapshot) {
@@ -27272,7 +27835,7 @@ function describeRoute(r) {
 
 // src/notations/er-mermaid.ts
 var T4 = ER_TABLE;
-var centreOf7 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
+var centreOf9 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
 var PREPROCESSED4 = /style|classDef/;
 var MAX_LEAN = 15 * Math.PI / 180;
 function leanOf(lines) {
@@ -27290,16 +27853,16 @@ function writeEr(reading7, opts = {}) {
   let down = 0, acrossSum = 0, downward = 0;
   const moving = rels.filter((k) => k.from !== k.to);
   for (const k of moving) {
-    const a = centreOf7(byId.get(k.from).bounds), b = centreOf7(byId.get(k.to).bounds);
+    const a = centreOf9(byId.get(k.from).bounds), b = centreOf9(byId.get(k.to).bounds);
     down += Math.abs(b.y - a.y);
     acrossSum += Math.abs(b.x - a.x);
     if (Math.abs(b.y - a.y) >= Math.abs(b.x - a.x)) downward++;
   }
   const direction = opts.direction ? { value: opts.direction, reason: "asked for" } : !moving.length ? { value: "TD", reason: "no relationship between two entities to follow" } : acrossSum > down ? { value: "LR", reason: `the relationships run across \u2014 between what they join, ${Math.round(acrossSum)} across against ${Math.round(down)} down; ${moving.length - downward} of ${moving.length} more across than down` } : { value: "TD", reason: `the relationships run down \u2014 between what they join, ${Math.round(down)} down against ${Math.round(acrossSum)} across; ${downward} of ${moving.length} more down than across` };
   const across2 = direction.value === "LR";
-  const lean = leanOf(moving.map((k) => [centreOf7(byId.get(k.from).bounds), centreOf7(byId.get(k.to).bounds)]));
+  const lean = leanOf(moving.map((k) => [centreOf9(byId.get(k.from).bounds), centreOf9(byId.get(k.to).bounds)]));
   const upright = new Map(entities.map((s) => {
-    const c = centreOf7(s.bounds), w2 = s.bounds.maxX - s.bounds.minX, h2 = s.bounds.maxY - s.bounds.minY;
+    const c = centreOf9(s.bounds), w2 = s.bounds.maxX - s.bounds.minX, h2 = s.bounds.maxY - s.bounds.minY;
     const p = { x: c.x * Math.cos(-lean) - c.y * Math.sin(-lean), y: c.x * Math.sin(-lean) + c.y * Math.cos(-lean) };
     return [s.id, { minX: p.x - w2 / 2, maxX: p.x + w2 / 2, minY: p.y - h2 / 2, maxY: p.y + h2 / 2 }];
   }));
@@ -28198,6 +28761,7 @@ export {
   HEAD_COMPACT,
   HEAD_MAX_SHARE,
   HEAD_OF,
+  HEAD_SPREAD,
   HELD_ARROW,
   HERE,
   INITIAL_ID,
@@ -28238,6 +28802,7 @@ export {
   MANIFEST_PATH,
   MARK_GAP_MS,
   MATCH_FLOOR,
+  MAX_BLOCKS,
   MAX_COMPARTMENT_LINES,
   MAX_DRAWN,
   MAX_FIGURE_STROKES,
@@ -28261,6 +28826,7 @@ export {
   MIN_CONFIDENCE,
   MIN_DASHES,
   MIN_EXTENT_PX,
+  MIN_OBSTACLE_PX,
   MIN_REPLY_TOKENS,
   MODEL_DISCOUNT,
   MODEL_LIST_TIMEOUT_MS,
@@ -28284,6 +28850,8 @@ export {
   PLAIN_CLASS,
   PLAIN_SHARE,
   PRESETS,
+  RANK_BAND,
+  RANK_SPREAD,
   RECENT_EVENTS_MAX,
   RECENT_MS,
   RECENT_SAME_TOOL,
@@ -28293,6 +28861,7 @@ export {
   ROUNDED_EXTENT,
   ROUNDED_UPRIGHT,
   ROUND_ENOUGH,
+  ROUTE_MAX_TURNS,
   ReadOnlyError,
   SEAT_NAME,
   SEAT_PICTURE,
@@ -28321,6 +28890,8 @@ export {
   STEP_GAP,
   STRAIGHT_RUN,
   STRAIGHT_TURN,
+  STUB_PX,
+  STUB_SHARE,
   SYMMETRIC_LINKS,
   StaticStore,
   TARGETED,
@@ -28334,6 +28905,7 @@ export {
   USE_LIFT_MAX,
   USE_LIFT_RATE,
   VERBS,
+  WINDOW_SHARE,
   WORD_GAP_RATIO,
   WORD_WINDOW_MS,
   WRITING_SPAN,
@@ -28438,6 +29010,7 @@ export {
   definitionsIn,
   denoise,
   dependentsOf,
+  deriveRoute,
   describeAddressed,
   describeAuthorshipCollision,
   describeBehaviour,
@@ -28626,6 +29199,7 @@ export {
   onToolsChange,
   otsu,
   outlineOf,
+  outwardOf,
   ownLog,
   ownSitesOf,
   packBench,
@@ -28690,7 +29264,7 @@ export {
   readUmlClass,
   readingsFor,
   readingsToEdges,
-  reasonOf2 as reasonOf,
+  reasonOf3 as reasonOf,
   refusalOf,
   regionAt,
   regionIdsIn,
@@ -28715,7 +29289,12 @@ export {
   reshapedClean,
   resolveFrame,
   resolvesLasso,
+  routable,
   route,
+  routeAffectedBy,
+  routeBetween,
+  routeRepOf,
+  routeStands,
   rowOf,
   runsOf,
   sameExpr,
@@ -28771,6 +29350,7 @@ export {
   textOf3 as textOf,
   theirMarks,
   thin,
+  tidyPlanOf,
   tightBox,
   toBytes,
   toMermaid,

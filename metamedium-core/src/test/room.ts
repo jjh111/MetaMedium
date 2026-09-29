@@ -632,6 +632,26 @@ function act(s: Session, rand: () => number, at: number, kinds: string[], undo?:
       // A connector's own bound end dragged off its site lets go of it, in the same act (E2).
       return s.lastAct().some((e) => e.type === 'unbind') ? 'reshape, letting go of a site' : 'reshape';
     }
+    case 'route': {
+      // A connector routed (D7): tied at both ends first when it is not, then the route derived —
+      // and, now and then, a mark it is tied to moved, or its routing taken off. A polyline is derived
+      // from the board, so every board that merges the line must derive the same one.
+      const tie = bindable(s, rand);
+      if (!tie) return null;
+      const other = s.getState().contentIds.filter((id) => id !== tie.connector && id !== tie.target && !!getRep(s.getState().nodes.get(id)!, 'stroke'));
+      if (!other.length) return null;
+      const far = pick(other);
+      const sites = magnetSites(s.getState().nodes.get(far)!, s.getState().nodes).filter((x) => !x.notation);
+      if (!sites.length) return null;
+      const site = pick(sites);
+      s.bind({ strokeId: tie.connector, nodeId: tie.target, site: tie.site, end: tie.end, at });
+      s.bind({ strokeId: tie.connector, nodeId: far, site: { kind: site.kind, index: site.index }, end: tie.end === 'start' ? 'end' : 'start', at: at + 5 });
+      if (!s.route({ ids: [tie.connector], at: at + 10 })) return null;
+      const r = rand();
+      if (r < 0.4) s.move({ ids: [tie.target], dx: (rand() - 0.5) * 160, dy: (rand() - 0.5) * 160, at: at + 20 });
+      else if (r < 0.55) s.route({ ids: [tie.connector], mode: 'raw', at: at + 20 });
+      return 'route';
+    }
     case 'bind':
     case 'follow': {
       // A connector's end tied to a site on another mark (P1) — and, for a
@@ -667,8 +687,8 @@ function bindable(s: Session, rand: () => number): { connector: string; target: 
   return { connector, target, site: { kind: site.kind, index: site.index }, end: rand() < 0.5 ? 'start' : 'end' };
 }
 
-const REMOTE_ACTS = ['draw', 'draw', 'draw', 'write', 'undo', 'undo', 'bless', 'answer', 'erase', 'move', 'label', 'tool', 'reshape', 'bind', 'follow'];
-const LOCAL_ACTS = ['draw', 'draw', 'write', 'undo', 'undo', 'bless', 'answer', 'erase', 'move', 'tool', 'reshape', 'bind', 'follow'];
+const REMOTE_ACTS = ['draw', 'draw', 'draw', 'write', 'undo', 'undo', 'bless', 'answer', 'erase', 'move', 'label', 'tool', 'reshape', 'bind', 'follow', 'route'];
+const LOCAL_ACTS = ['draw', 'draw', 'write', 'undo', 'undo', 'bless', 'answer', 'erase', 'move', 'tool', 'reshape', 'bind', 'follow', 'route'];
 
 /**
  * One room, from its seed. The readers under test join at a random moment,

@@ -4432,6 +4432,100 @@ window.__scenario = async function(){
     fresh64();
   }
 
+  // ---------------------------------------------------------------------------
+  // 66. Routing (V1-PLAN §3, §9 D7). A flowchart drawn with its arrows tied,
+  // held, and *Tidy the diagram* taken: the symbols of a rank are lined up and
+  // every connector is routed orthogonally between its ports — the route
+  // drawn in front, the hand's ink faint beneath — in ONE act. The drawing
+  // reads as the same flowchart and says the same Mermaid; a box dragged
+  // re-routes what is tied to it (the one move event; the route is derived,
+  // never logged); one undo takes the tidy away.
+  // ---------------------------------------------------------------------------
+  {
+    mm.session.load([]); mm.setView(1, 0, 0); mm.resetUses(); await wait(30);
+    const s66 = mm.session;
+    const nodes66 = () => s66.getState().nodes;
+    MM.drawMermaid(s66, 'flowchart TD\n A[Start] --> B{Ok?}\n B --> C[Go]\n B --> D[Stop]', { at: Date.now(), origin: { x: 360, y: 90 } });
+    await wait(40);
+    const reading66 = () => MM.notationsOf(s66.getState())[0];
+    const symbol66 = (text) => reading66().symbols.find((x) => x.text === text);
+    const centreY66 = (text) => { const b = MM.boundsOf(nodes66().get(symbol66(text).ids[0])); return (b.minY + b.maxY) / 2; };
+    const orthogonal66 = (pts) => pts.length >= 2 && pts.every((p, i) => i === 0 || (Math.abs(p.x - pts[i - 1].x) < 1e-9) !== (Math.abs(p.y - pts[i - 1].y) < 1e-9));
+    const routeOf66 = (id) => MM.routeRepOf(nodes66().get(id));
+    const connectors66 = () => reading66().connectors.map((c) => c.id);
+    const said66 = () => { const r = reading66(); const m = MM.toMermaid(r); return r.notation + '|' + r.summary + '|' + (m && m.text); };
+    const inkOf66 = () => connectors66().map((id) => JSON.stringify(MM.getRep(nodes66().get(id), 'stroke').data)).join('|');
+    // Stop is knocked out of its rank, then everything is held.
+    const stop66 = symbol66('Stop');
+    s66.move({ ids: stop66.ids, dx: 0, dy: 70, at: Date.now() }); await wait(30);
+    const ink66 = inkOf66();
+    const was66 = said66();
+    const sum66 = s66.getState().summon; if (sum66) s66.dismiss(sum66.id, Date.now());
+    s66.summonMarks(s66.getState().contentIds.slice(), Date.now()); await wait(80);
+    const pill66 = (key) => document.querySelector('#summon .pill.item[data-key="' + key + '"]');
+    const tidy66 = pill66('tidy-diagram');
+    step('66. a flowchart with its arrows tied, held, is offered Tidy the diagram — and Route the connectors — and the offer says what the marks read as',
+      !!tidy66 && /Tidy the diagram/.test(tidy66.textContent) && /flowchart/.test(tidy66.title) && !tidy66.querySelector('.dot') && !!pill66('route'),
+      { label: tidy66 && tidy66.textContent, title: tidy66 && tidy66.title, route: !!pill66('route') });
+    const n66 = s66.getEvents().length;
+    const gapBefore66 = Math.abs(centreY66('Stop') - centreY66('Go'));
+    if (tidy66) tidy66.click();
+    await wait(80);
+    const wrote66 = s66.getEvents().slice(n66);
+    const afterTidy66 = s66.getEvents().length;
+    const routes66 = connectors66().map(routeOf66);
+    step('66a. taking it is one act: the symbols of the rank lined up and a route for each of the three connectors, every event the tool\'s',
+      gapBefore66 > 50 && Math.abs(centreY66('Stop') - centreY66('Go')) < 1 && routes66.length === 3 && routes66.every(Boolean) &&
+      wrote66.some((e) => e.type === 'tidy') && wrote66.some((e) => e.type === 'route') && new Set(wrote66.map((e) => e.act)).size === 1 && wrote66.every((e) => e.tool === 'route' && e.offer === 'tidy-diagram'),
+      { before: gapBefore66, after: Math.abs(centreY66('Stop') - centreY66('Go')), types: wrote66.map((e) => e.type), acts: [...new Set(wrote66.map((e) => e.act))] });
+    step('66b. every connector is orthogonal — each of its segments runs along an axis — in at most four turns',
+      routes66.every((r) => r && orthogonal66(r.points) && r.turns <= 4),
+      routes66.map((r) => r && { turns: r.turns, pts: r.points.length }));
+    step('66c. the drawing reads as it did — the same flowchart, the same flows, the same Mermaid — and the hand\'s ink is exactly as drawn',
+      said66() === was66 && inkOf66() === ink66,
+      { was: was66, now: said66() });
+    const drawn66 = mm.routesDrawn();
+    step('66d. the paint draws each route in front — orthogonal, on the board — with the ink faint beneath it',
+      drawn66.length === 3 && drawn66.every((d) => orthogonal66(d.points) && d.faint === true),
+      drawn66.map((d) => ({ id: d.id, faint: d.faint, n: d.points.length })));
+    // A box dragged by the pointer: the routes tied to it follow, derived — one move event.
+    const sumB66 = s66.getState().summon; if (sumB66) s66.dismiss(sumB66.id, Date.now());
+    // Two boxes held move as one (a lone box shows its own points, and a press near one reshapes).
+    s66.select(symbol66('Go').ids.concat(symbol66('Stop').ids), Date.now()); await wait(30);
+    const routesBefore66 = JSON.stringify(connectors66().map((id) => routeOf66(id).points));
+    const goBox66 = MM.boundsOf(nodes66().get(symbol66('Go').ids[0]));
+    const stopBox66 = MM.boundsOf(nodes66().get(symbol66('Stop').ids[0]));
+    // A press between the two, inside the held outline and away from its corners and knob.
+    const from66 = mm.worldToScreen((goBox66.maxX + stopBox66.minX) / 2, (goBox66.minY + goBox66.maxY) / 2);
+    const c66 = document.getElementById('canvas');
+    const pe66 = (type, x, y) => c66.dispatchEvent(new PointerEvent(type, { pointerId: 1, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1 }));
+    const m66 = s66.getEvents().length;
+    pe66('pointerdown', from66.x, from66.y);
+    for (let i = 1; i <= 8; i++) pe66('pointermove', from66.x - 10 * i, from66.y + 6 * i);
+    pe66('pointerup', from66.x - 80, from66.y + 48);
+    await wait(60);
+    const moved66 = s66.getEvents().slice(m66).map((e) => e.type);
+    const st66 = s66.getState();
+    const rerouted66 = connectors66().map((id) => routeOf66(id));
+    const onSites66 = connectors66().every((id, i) => MM.bindingsOf(nodes66().get(id)).every((b) => {
+      const p = MM.boundSiteOf(st66.nodes.get(b.nodeId), st66.nodes, b.site).point, pts = rerouted66[i].points;
+      return [pts[0], pts[pts.length - 1]].some((e) => Math.hypot(e.x - p.x, e.y - p.y) < 1e-6);
+    }));
+    step('66e. a box dragged re-routes what is tied to it: one move event, each route derived again — orthogonal, on the sites where they stand now',
+      JSON.stringify(moved66) === '["move"]' && JSON.stringify(rerouted66.map((r) => r.points)) !== routesBefore66 && rerouted66.every((r) => orthogonal66(r.points)) && onSites66,
+      { events: moved66, changed: JSON.stringify(rerouted66.map((r) => r.points)) !== routesBefore66, onSites: onSites66 });
+    s66.undo();
+    const back66 = JSON.stringify(connectors66().map((id) => routeOf66(id).points)) === routesBefore66;
+    // Closing the field and holding the two boxes were acts of their own; then ONE undo takes the whole tidy.
+    while (s66.getEvents().length > afterTidy66 && ['dismiss', 'select', 'deselect'].includes(s66.getEvents()[s66.getEvents().length - 1].type)) s66.undo();
+    const atTidy66 = s66.getEvents().length === afterTidy66;
+    s66.undo();
+    step('66f. one undo springs the box and the routes back, and one more takes the whole tidy away — the symbols out of their rank again and no connector routed',
+      back66 && atTidy66 && s66.getEvents().length === n66 && connectors66().every((id) => !routeOf66(id)) && Math.abs(centreY66('Stop') - centreY66('Go')) > 50,
+      { back: back66, atTidy: atTidy66, events: s66.getEvents().length, expected: n66 });
+    mm.session.load([]);
+  }
+
   return R;
 };
 

@@ -2057,6 +2057,67 @@ as the likeliest registered notation with a writer, so it should offer the three
 new ones with no surface change — unverified here; the field's *what this is* row and the panel's
 *becomes* row saying *an ER diagram 0.66* are the surface unit still to come.
 **D7 Routing** — orthogonal connectors between ports and *tidy the diagram*.
+*Status, 29 Sep 2026 (branch `unit/d7-routing`):* **D7 built.** Red `3874a08`
+(`diagram/route.test.ts`, `tools/route.test.ts` and e2e 66 alone: *Cannot find
+module './route'*), core `659d1b0`, the surface `3ff61f0`, the room oracle
+`852c5ac`, then docs. **The choice the plan left open:** a `route` event marks
+connectors as routed (a `'route'` rep; `mode: 'raw'` takes it off, as `snap`
+has its `raw`), and the polyline is **derived on every replay, never logged and
+never carried** — from the sites the ends are bound to where they stand and the
+marks in the way, in the apply path at the follow's own triggers (`followFrom`,
+and a stroke drawn, an unbind, an erase), only when a change can reach the
+route (the connector or its targets changed, a mark it was routed among, or one
+stands in the window it was read in). E2's status line said it: the follow is a
+similarity of the whole connector and a route is not, so the ink follows as it
+always did and the route is found again from `boundSiteOf`, never stretched.
+**What reads a connector still reads its ink** (its ends, wires, heads and the
+notation's reading), so a routed flowchart reads and says the same Mermaid — the
+route is a form drawn in front, the ink faint beneath, never replaced.
+`diagram/route.ts`: `outwardOf` (a box's edge middle straight out, a corner
+along the side that faces the other end, a decision's vertex outward, a site
+in a mark's middle toward the other end), `routeBetween` (pure, deterministic;
+a stub, then a search over the lines the marks in the way leave open — fewest
+turns, then shortest, at most `ROUTE_MAX_TURNS`; shorter stubs, then the
+symbols alone, then a direct elbow, and *could not avoid …* said with the marks
+named — it never fails to draw), `deriveRoute` (the arrow's head kept at the
+tip), `tidyPlanOf` (the symbols by rank — the longest way from where the flows
+begin, a loop's back flow left out — each rank of two or more within reach a
+row or column). `tools/route.ts`, appended last in `builtin.ts`: *Tidy the
+diagram* (tidy's alignment, the writing on a symbol carried with it, every tied
+connector routed — one act, one undo), *Route the connectors*, *Show the
+connectors as drawn*; offered only for a notation reading with connectors tied
+at both ends, not for e2e 49's three scopes, a molecule, a loose-arrow
+flowchart or a sequence diagram (its messages are level by definition).
+The surface (`08-render.js`, `05-selection.js`): route in front, ink and clean
+form faint beneath, the mark filed by the box its route runs in, a drag drawn
+routed from where it takes what the connector is tied to. **Tests:** core
+1,790 in 112 files (`route` 19, the tool 5, the room oracle runs `route` among
+its acts — 250 seeds hold, 161 routes made, agreeing with a replay from zero
+and from a checkpoint), typecheck clean, both bundles equal to a fresh build;
+relay, field, build, board and release tests 140; surface, app and examples in
+sync (the example logs are unchanged: nothing they hold routes); the canvas
+MCP smoke passes; the shard typechecks; **e2e 66–66f** (canvas 399 passed and
+the two honest skips): held flowchart offered *Tidy the diagram*; one act of
+`tidy` and `route` events, every one the tool's; every route orthogonal in at
+most four turns; the flowchart and its Mermaid and the ink as they were; the
+paint's routes with the ink faint; two boxes dragged re-route in one `move`;
+one undo, then one more, takes it all away. **The whole gate** with it: 687 passed, 0 failed, 13 skipped across 12 scenarios in 448 s (the budgets' five skipped by name — another gate was running on the machine; the canvas and pencil scenarios rerun after the last change to the bundle). **By design** the three tests that
+pinned *Mermaid* / *Draw it* as the last tools and `describe.test.ts`'s tool
+list moved by one place (routing is last; the field's order and e2e 49's golden
+stand). **Found:** (1) a separate head drawn apart — Mermaid in's arcs, `<-->`
+starts — is bound to nothing and does not follow, so a routed arc keeps its
+triangle where it was: a routed connector's head is drawn only for an arrow
+the rung reads; (2) writing beside a connector (`of` a connector) stays where it
+was written, and a route may pass through it — tidy carries only what labels a
+symbol; (3) what hits, scratches and relates a routed connector is still its
+ink (the route is in front, not where it stands); the day a hand must point at
+the route, `standingPointsOf` is the seam; (4) a multi-stroke symbol is left
+where it stands by *Tidy* (`session.tidy` places whole marks); (5) the marks in
+the way are the closed marks in a window, at most `MAX_BLOCKS`, so a route can
+cross a mark outside it; (6) for the state, ER and mind-map notations: routing
+is generic over `NotationReading.connectors`, so they get it with no work
+once their connectors are bound at ports (`along:` and `port:` ports read their
+outward from the box of the mark).
 **D8 The repair demo** — `CONTROL-POINTS-PLAN.md` P4; *needs John:* one
 photograph of a hand-drawn flowchart.
 

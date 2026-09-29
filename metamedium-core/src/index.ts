@@ -296,6 +296,11 @@ export {
   FOLLOW_VISITS,
 } from './session/follow';
 export type { ConnectorEnds, FollowRep, Tie } from './session/follow';
+export {
+  ROUTE_MAX_TURNS, STUB_PX, STUB_SHARE, MIN_OBSTACLE_PX, WINDOW_SHARE, MAX_BLOCKS, HEAD_SPREAD, RANK_BAND, RANK_SPREAD,
+  outwardOf, routeBetween, deriveRoute, routeRepOf, routeStands, routable, routeAffectedBy, tidyPlanOf,
+} from './diagram/route';
+export type { Dir, RouteEnd, RouteBlock, RoutePath, RouteRep, TidyPlan } from './diagram/route';
 export { boundSiteOf, ownSitesOf } from './session/magnets';
 export { followMapOf, placementOf } from './session/nodes';
 // A move, a scale or a turn as a pure function of a mark: what the reducer

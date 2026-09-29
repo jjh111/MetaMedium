@@ -81,6 +81,7 @@ import { BUILTIN_COMMAND_MARK, matchesCommandMark } from './commandmark';
 import { type SnapReading, idealize, snapReading, cleanOf } from './clean';
 import { reshapePreview, reshapedClean } from './handles';
 import { connectorEnds, followed, followThrough, releasedBy, reshapeDecision } from './follow';
+import { deriveRoute, routable, routeAffectedBy, routeRepOf } from '../diagram/route';
 import { type Manipulation, manipulableOf, manipulatedReps, markFrameOf } from './manipulate';
 
 /** A move, scale or turn event as the manipulation it writes. */
@@ -422,6 +423,21 @@ type SessionEventUnion =
     }
   | {
       /**
+       * Route connectors (V1-PLAN D7; diagram/route.ts): each connector named
+       * that has both ends tied is marked as routed — a `'route'` rep whose
+       * polyline is DERIVED from the sites its ends are bound to, wherever
+       * they stand, and from the marks in its way, so no coordinate is ever
+       * in the log. `'raw'` takes the routing off again (`snap`'s own
+       * counterpart): the ink was never touched, and stands in front once more.
+       */
+      type: 'route';
+      ids: string[];
+      mode?: 'route' | 'raw';
+      at: number;
+      participantId?: string;
+    }
+  | {
+      /**
        * A handle dragged (V1-PLAN E1, CONTROL-POINTS-PLAN P2): one of the
        * mark's own points, `handle` — `{ kind, index }` as `handlesOf` names
        * it — let go at `to`, in the mark's OWN space (the space its ink was
@@ -721,6 +737,15 @@ export interface Session {
    * bound to nothing.
    */
   unbind(args: { strokeId: string; end: 'start' | 'end'; at: number; participantId?: string }): void;
+  /**
+   * Route connectors (V1-PLAN D7): draw each connector named — one with both
+   * ends tied — at right angles between the sites it is tied to, its ink kept
+   * faint beneath (`mode: 'route'`, the default); or take the routing off
+   * again (`'raw'`). One `route` event, and its route derived on every replay
+   * from where the sites stand, so a box moved carries it. Returns how many
+   * connectors it changed; nothing is written when that is none.
+   */
+  route(args: { ids: string[]; mode?: 'route' | 'raw'; at: number; participantId?: string }): number;
   /**
    * Drag one of a mark's handles (V1-PLAN E1): `handle` as `handlesOf` names
    * it, let go at `to` on the board. One `reshape` event — one act — and the
@@ -2425,6 +2450,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
   function applyErase(ev: Extract<SessionEvent, { type: 'erase' }>) {
     eraseNode(ev.nodeId, ev.at);
+    // A route tied to it stands no more, and one that went round it is found again (D7).
+    reroute([ev.nodeId]);
   }
 
   function eraseNode(nodeId: string, at: number) {
@@ -2526,7 +2553,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     for (const r of ev.reps ?? []) {
       // Where a connector's bindings carried it is the engine's to derive
       // (V1-PLAN E2), never a reading a participant offers.
-      if (r.modality === 'follow') continue;
+      if (r.modality === 'follow' || r.modality === 'route') continue;
       node.reps.push({
         modality: r.modality,
         data: r.reasoning === undefined ? r.data : { ...(r.data as object), reasoning: r.reasoning },
@@ -2821,6 +2848,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     stroke.edges = stroke.edges.filter((e) => !(e.rel === 'bound-to' && e.end === ev.end));
     stroke.reps = stroke.reps.filter((r) => !(r.modality === 'bound' && (r.data as { end?: string }).end === ev.end));
     if (!stroke.edges.some((e) => e.rel === 'bound-to' && e.to === was)) noFollowerOf(was, stroke.id);
+    // A routed connector with an end let go has nothing to route between (D7) — found here, not by
+    // way of what is tied to what, since it may have let go of its last tie.
+    if (routeRepOf(stroke)) putRoute(stroke);
   }
 
   // ===== Bindings follow (V1-PLAN E2; follow.ts) =====
@@ -2851,7 +2881,56 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function followFrom(changed: readonly string[]): boolean {
     if (!boundBy.size || !changed.length) return false;
     const isBound = (id: string) => !!nodes.get(id)?.edges.some((e) => e.rel === 'bound-to');
-    return followThrough(changed, (id) => boundBy.get(id) ?? [], isBound, refollow) > 0;
+    const moved: string[] = [];
+    const n = followThrough(changed, (id) => boundBy.get(id) ?? [], isBound, (id) => {
+      const did = refollow(id);
+      if (did) moved.push(id);
+      return did;
+    });
+    // What is routed is derived again from where the sites stand now (D7).
+    reroute(changed.concat(moved));
+    return n > 0;
+  }
+
+  // ===== Routing (V1-PLAN D7; diagram/route.ts) =====
+
+  /**
+   * The routed connectors' polylines, derived again where a change can have
+   * changed them: each connector bound to something that holds a `'route'`
+   * rep, when it or a mark it is tied to changed, or a mark it was routed among
+   * did, or one stands now in the window it was routed in. The rep is replaced,
+   * never changed in place. Nothing at all on a board with no binding.
+   */
+  function reroute(touched: readonly string[]): void {
+    if (!boundBy.size || !touched.length) return;
+    const routed = new Set<string>();
+    for (const set of boundBy.values()) for (const id of set) routed.add(id);
+    for (const id of [...routed].sort()) {
+      const node = nodes.get(id);
+      const rep = node && routeRepOf(node);
+      if (!node || !rep || !routeAffectedBy(node, rep, nodes, touched)) continue;
+      putRoute(node);
+    }
+  }
+
+  /** The route a connector stands as now, held on it as a rep of its own (replacing the one it held). */
+  function putRoute(node: MMNode, source: string = 'engine') {
+    const next = deriveRoute(node, nodes, (box) => ink.query(box));
+    node.reps = node.reps.filter((r) => r.modality !== 'route');
+    node.reps.push({ modality: 'route', data: next, source });
+  }
+
+  /** The connectors routed, or their routing taken off (V1-PLAN D7). */
+  function applyRoute(ev: Extract<SessionEvent, { type: 'route' }>) {
+    for (const id of Array.isArray(ev.ids) ? ev.ids : []) {
+      const node = nodes.get(id);
+      if (!node) continue;
+      if (ev.mode === 'raw') {
+        node.reps = node.reps.filter((r) => r.modality !== 'route');
+      } else if (routable(node, nodes)) {
+        putRoute(node, ev.participantId ?? 'engine');
+      }
+    }
   }
 
   /**
@@ -3845,8 +3924,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
   function applyByType(ev: SessionEvent): string | null {
     switch (ev.type) {
-      case 'stroke':
-        return applyStroke(ev);
+      case 'stroke': {
+        const id = applyStroke(ev);
+        // A mark drawn where a route was read among the marks in its way derives it again (D7).
+        reroute([id]);
+        return id;
+      }
       case 'bless':
         return applyBless(ev);
       case 'join':
@@ -3907,6 +3990,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         return null;
       case 'unbind':
         applyUnbind(ev);
+        return null;
+      case 'route':
+        applyRoute(ev);
         return null;
       case 'reshape':
         applyReshape(ev);
@@ -4223,6 +4309,18 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       const stroke = args && nodes.get(args.strokeId);
       if (!stroke || !stroke.edges.some((e) => e.rel === 'bound-to' && e.end === args.end)) return;
       dispatch({ type: 'unbind', strokeId: args.strokeId, end: args.end, at: args.at, ...(args.participantId !== undefined ? { participantId: args.participantId } : {}) });
+    },
+    route: (args) => {
+      // Only what would change is written: a connector with both ends tied and not routed yet,
+      // or (`'raw'`) one that is routed — never an event that does nothing.
+      const raw = args?.mode === 'raw';
+      const ids = (Array.isArray(args?.ids) ? args.ids : []).filter((id) => {
+        const n = nodes.get(id);
+        return !!n && (raw ? !!routeRepOf(n) : !routeRepOf(n) && routable(n, nodes));
+      });
+      if (!ids.length) return 0;
+      dispatch({ type: 'route', ids, ...(raw ? { mode: 'raw' as const } : {}), at: args.at, ...(args.participantId !== undefined ? { participantId: args.participantId } : {}) });
+      return ids.length;
     },
     reshape: (args) => {
       // The same function the replay runs, so what the hand was shown is what
