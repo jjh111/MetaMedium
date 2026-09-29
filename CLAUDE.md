@@ -535,7 +535,16 @@ definitions, steps, headings (an *Add …* heading is an allowance, read both
 ways), labels and checks; it is a pure function of its lines, so a changed
 measurement re-derives exactly what depends on it (`diffSheets`), and
 `gather.ts` collects the lines from text artifacts and read writing without
-touching the session. Tier 1: no model computes a number.
+touching the session. Tier 1: no model computes a number. **Prose is not maths**
+(F2, `proseToNotes` in `sheet.ts`): the grammar reads a colon as `=`, a dash as a
+minus and a run of words as a name, so a note (*Draw a box: then an arrow - and it
+reads*, a numbered list of steps in words) parsed as a check or a step whose operands
+were words, and stood a `?` at rest. A line is maths only when it looks like it — no
+operator has two words for its operands, a line with no label needs an operator and
+every name in it defined on the page, a labelled one (`1. Waist ÷ 4`, the person's
+word that this is a step) may name what the page lacks, and a line typed after `=`
+(`{ text, maths: true }`) is read whatever it says, so *Waist is not on this sheet*
+is still said. What fails is a `note`, in no step, check or chip (e2e 64h).
 
 **Dimensions and solving** (M3a, M4). `maths/dimension.ts` offers a number
 beside a mark as one of its measures, ranked by its distance to a side's
@@ -720,8 +729,10 @@ buttons at the left, Name · Copy · Paste · Erase, always the same four in
 the same slots (a circle with a mark in it; the name is the tooltip and the
 reading line while the pointer rests on one); then, stacked to their right,
 **what this is** — readings with their numbers (*molecule 0.92*, *“Pricing”
-0.92*, *page-layout 0.78 · GLM*, *row 0.81*), and tapping one takes it as
-the name; and **what it affords** — Draw them clean, Line up, Frame these,
+0.92*, *page-layout 0.78 · GLM*, *a pump 0.80 · claude*, *row 0.81*), and tapping one takes it as
+the name (another voice's reading is told by its author, never its tier: an MCP
+hand joins at tier 0, so `isHeardReading` — not `tier > 0` — lets its `canvas_propose`
+in, and `isShapeRungReading` is what the rung itself measured; F1, `session/interpretations.ts`); and **what it affords** — Draw them clean, Line up, Frame these,
 Play A, Not a molecule …, ranked by the reading, by use and by what stands
 beside them, the rest a keystroke away: each an offer from a registered tool
 (see *Tools* and *Context*, below). A word typed, or writing read, is offered two ways side by
@@ -2884,7 +2895,7 @@ the session began), the hand still works from the shell: run `mcp.mjs` with
 its stdin fed by `tail -f` on a command file and its stdout to an output
 file, append one JSON-RPC line per call, read the reply — the same ten
 tools, one process kept alive across turns. `QA-v10.md` is the hand test
-run that way, with the hand in the room checking each step. **The gate walks its machine half** (`node e2e/run.mjs hand`, H1: the hand over stdio in a room of its own, QA-v10 §4, §6, §7, acceptance A7), and `QA-v1.md` is the hand checklist for all ten scenarios. Its `canvas_look` says who read a mark — a reading another hand proposed, or its own, is said after the number (*gate 0.70 · claude*), never the engine's own shape rung, and never a name someone gave (H1.10). A reading a hand proposes is held on the tab and attributed, but **the field's *what this is* row leaves it out** — a hand is a tier 0 voice and `conversionsFor` skips tier 0 (a known gap, `hand` H1.10b, a skip by name until it shows).
+run that way, with the hand in the room checking each step. **The gate walks its machine half** (`node e2e/run.mjs hand`, H1: the hand over stdio in a room of its own, QA-v10 §4, §6, §7, acceptance A7), and `QA-v1.md` is the hand checklist for all ten scenarios. Its `canvas_look` says who read a mark — a reading another hand proposed, or its own, is said after the number (*gate 0.70 · claude*), never the engine's own shape rung, and never a name someone gave (H1.10). A reading a hand proposes is held on the tab and attributed, and **the field's *what this is* row shows it with its author** (*gate 0.70 · claude*, `hand` H1.10b; F1): a hand is a tier 0 voice, so the row asks `isHeardReading` (by who said it) and not the tier, and the rung's own readings stay the engine's (`isShapeRungReading`).
 
 ### The shard's hand, and the model seat (SHARD-3D-PUSH-2 G5)
 

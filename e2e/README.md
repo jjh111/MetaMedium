@@ -314,10 +314,10 @@ and two lines shown in 3D and the hand's look saying one running program;
 
 **What it found**, for the owners: the hand's own `canvas_look` printed a
 reading it or another hand proposed as though the engine had read it (fixed in
-`Demos/mcp.mjs`, H1.10); a reading the hand proposes is held and attributed on
-the tab but **the field's *what this is* row never shows it**, because a hand is
-a tier 0 voice and `conversionsFor` in `09-palette.js` leaves tier 0 out — a
-skip by name (H1.10b, *known*) that turns into a pass the day it shows;
+`Demos/mcp.mjs`, H1.10); a reading the hand proposes was held and attributed on
+the tab but **the field's *what this is* row never showed it**, because a hand is
+a tier 0 voice and `conversionsFor` in `09-palette.js` left tier 0 out — a
+skip by name (H1.10b, *known*) until F1 made it a pass (`isHeardReading`, core);
 and `QA-v10.md` §4's *1 selected* predates per-hand gestures (L2h): a hand's
 look says neither *selected* nor *the field is open* for another hand's field,
 which is what H1.3 holds and `QA-v1.md` says.

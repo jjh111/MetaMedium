@@ -123,7 +123,7 @@ John's own strokes, the same table:
 | Draw a box | — | `canvas_draw` a circle beside it with a `why`: the circle lands in the hand's colour with a card beside it, *with claude* in the status. `canvas_look`: John's box is `stroke:<his name>~<sitting>:N`, the id his own tab gave it |
 | — | — | `canvas_say` about that id: the card lands beside **his box**, and on no other mark |
 | Write a word | — | `canvas_see`, `canvas_transcribe` it: the transcript pill is on the word with **no model joined** |
-| Circle both hands' marks, take the loop | the readings row | `canvas_propose` a reading with a confidence: it is held on his box and `canvas_look` says *gate 0.70 · claude*. (The field's row does not show a hand's proposal yet — a known gap, `e2e/hand.mjs` H1.10b) |
+| Circle both hands' marks, take the loop | the readings row | `canvas_propose` a reading with a confidence: it is held on his box and `canvas_look` says *gate 0.70 · claude*. The field's *what this is* row shows it too, as *gate 0.70 · claude* (`e2e/hand.mjs` H1.10b) |
 | Undo once | only John's last mark goes; the hand's stay | `canvas_look` no longer lists it, still lists the hand's; the next mark he draws has a **new** number, never the undone one's |
 | — | *sun* above the hand's circle, in its colour, scaling as the board zooms | `canvas_label` its own circle *sun*; then `canvas_label` his box: **refused, the reply naming whose ink it is** |
 | Hold his box and the hand's circle, type `label: inlet` | the line says *↵ label it “inlet” — on yours, not the mark claude made*; Enter puts it on his box alone | `canvas_look`: the box `labelled “inlet”`, by him; the circle with only its own *sun* |
