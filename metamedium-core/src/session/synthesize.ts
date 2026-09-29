@@ -40,8 +40,13 @@ export function strokeFor(s: DrawnShape): Point[] | null {
       const ux = (s.to.x - s.from.x) / len, uy = (s.to.y - s.from.y) / len;
       // A fifth of the shaft at most: the arrow detector reads the head as a
       // window at the end of the stroke, and two wings drawn back and forth
-      // are three barb-lengths of it.
-      const barb = Math.max(8, Math.min(len * 0.2, 40));
+      // are three barb-lengths of it. A hand's head is about 40 units however
+      // long the shaft, until it would be under a thirtieth of it — a barb
+      // that small on a long shaft is a sliver of the stroke (a long arrow
+      // read as a line at 40 past 1,200), and a clean arrow keeps a barb of a
+      // fortieth to a fifth of its shaft (`clean.ts`, `handles.ts`) — so past
+      // that it grows with the shaft.
+      const barb = Math.max(8, Math.min(len * 0.2, Math.max(40, len / 30)));
       const wing = (side: number): Point => ({
         x: s.to.x - barb * (ux * Math.cos(0.5) - side * uy * Math.sin(0.5)),
         y: s.to.y - barb * (uy * Math.cos(0.5) + side * ux * Math.sin(0.5)),
