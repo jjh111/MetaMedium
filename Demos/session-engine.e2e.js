@@ -4675,6 +4675,143 @@ window.__scenario = async function(){
     fresh67();
   }
 
+  // ---- 68. The garment pattern piece (V1-PLAN §9 M6; acceptance A4; MATHS-PLAN §1) ----
+  // A pattern piece drawn the way a drafter draws one — a cutting line standing off it all round, the piece
+  // outlined inside, its grain line an arrow at both ends, two notches across its left edge, a dart standing on
+  // its top edge — reads as a garment pattern piece in the field (a notation, N1: what the marks ARE, never a
+  // name), and with 18 and 26 written on it and a page saying ½″ of seam allowance it says what it is cut at and
+  // sewn at, beside itself, and puts its cutting line, grain line, notches and dart on the true-size export.
+  // Drawn with real pointer strokes; a change of the allowance flows and undo puts it back.
+  {
+    const fresh68 = () => {
+      const sm = mm.session.getState().summon; if (sm) mm.session.dismiss(sm.id, Date.now());
+      mm.session.load([]); mm.setView(1, 0, 0); mm.resetUses();
+    };
+    const lastId68 = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
+    const drawn68 = (pts) => { t.stroke(pts); return lastId68(); };
+    const poly68 = (...ps) => ps.slice(1).reduce((acc, p, i) => acc.concat(t.line(ps[i], p, 10).slice(i ? 1 : 0)), []);
+    // The piece: 360 by 520 at (420, 180); its cutting line 28 out all round, drawn first so that it encloses nothing.
+    const P68 = { x: 420, y: 180, w: 360, h: 520 };
+    const drawPiece68 = (o) => {
+      const all = [];
+      let seam = null;
+      if (o.edge !== 'fold') seam = drawn68(t.rect(P68.x - 28, P68.y - 28, P68.w + 56, P68.h + 56));
+      const piece = drawn68(t.rect(P68.x, P68.y, P68.w, P68.h));
+      // The grain line: a shaft with a chevron drawn at each end.
+      const grain = [drawn68(t.line({ x: 600, y: 250 }, { x: 600, y: 630 }, 40)), drawn68(poly68({ x: 589, y: 269 }, { x: 600, y: 250 }, { x: 611, y: 269 })), drawn68(poly68({ x: 589, y: 611 }, { x: 600, y: 630 }, { x: 611, y: 611 }))];
+      const notches = [350, 520].map((y) => drawn68(t.line({ x: 408, y }, { x: 434, y }, 12)));
+      const dart = drawn68(poly68({ x: 490, y: 180 }, { x: 515, y: 350 }, { x: 540, y: 180 }));
+      let fold = null;
+      if (o.edge === 'fold') fold = [drawn68(t.line({ x: 794, y: 240 }, { x: 794, y: 640 }, 40)), drawn68(poly68({ x: 783, y: 259 }, { x: 794, y: 240 }, { x: 805, y: 259 })), drawn68(poly68({ x: 783, y: 621 }, { x: 794, y: 640 }, { x: 805, y: 621 }))];
+      all.push(...(seam ? [seam] : []), piece, ...grain, ...notches, dart, ...(fold || []));
+      return { all, piece, seam, grain, notches, dart, fold };
+    };
+    const hold68 = async (ids) => {
+      const sm = mm.session.getState().summon; if (sm) mm.session.dismiss(sm.id, Date.now());
+      mm.session.summonMarks(ids.slice(), Date.now()); await wait(90);
+    };
+    const chipsOf68 = (kind) => (window.__mmMaths ? window.__mmMaths.chipsDrawn() : []).filter((c) => c.kind === kind);
+    const panel68 = () => document.getElementById('inspector').textContent;
+    const count68 = (r, name) => (r ? r.symbols.filter((s) => s.symbol === name).length : -1);
+
+    // Drawn, held: it reads as a garment pattern piece, and the field says so.
+    fresh68();
+    const d68 = drawPiece68({});
+    await hold68(d68.all);
+    const read68 = MM.notationsOf(mm.session.getState(), d68.all);
+    const pills68 = [...document.querySelectorAll('#summon .row.certain .pill')].filter((b) => /^notation:/.test(b.dataset.key || ''));
+    const first68 = pills68[0];
+    const said68 = read68[0] ? MM.describeNotation(read68[0]).split(' — ').slice(1).join(' — ') : '';
+    step('68. a pattern piece drawn with a cutting line, a grain line, two notches and a dart reads as a garment pattern piece: the field leads with it, the sentence its tooltip, and the panel says what it is',
+      !!read68[0] && read68[0].notation === 'garment' && read68[0].confidence >= MM.NOTATION_FLOOR && !!first68 && first68.dataset.key === 'notation:garment' &&
+        /^a garment pattern piece 0\.\d\d$/.test(first68.textContent.trim()) && first68.title.includes(said68) && /one grain line, two notches, one dart, a seam allowance/.test(said68) &&
+        /is\s*a garment pattern piece: one piece/.test(panel68()),
+      { read: read68.map(MM.describeNotation), first: first68 && first68.textContent.trim(), title: first68 && first68.title, panel: (panel68().match(/holds[\s\S]{0,260}/) || [''])[0] });
+    const g68 = MM.readGarment(mm.session.getState(), d68.all);
+    step('68a. each mark is the thing it is: the outline the piece, the cutting line its seam allowance, the arrow at both ends the grain line, the ticks notches, the wedge the dart',
+      !!g68 && count68(g68, 'piece') === 1 && count68(g68, 'seam') === 1 && count68(g68, 'grain') === 1 && count68(g68, 'notch') === 2 && count68(g68, 'dart') === 1 && count68(g68, 'fold') === 0 &&
+        g68.pieces[0] === d68.piece && g68.symbols.find((s) => s.symbol === 'seam').id === d68.seam && g68.symbols.find((s) => s.symbol === 'dart').id === d68.dart,
+      g68 && g68.symbols.map((s) => s.symbol + ' ' + s.id));
+
+    // A box with one arrow in it is a flow in a frame, not a piece: nothing reads as a garment.
+    fresh68();
+    const box68 = [drawn68(t.rect(420, 180, 360, 520)), drawn68(t.line({ x: 600, y: 250 }, { x: 600, y: 630 }, 40).concat(poly68({ x: 589, y: 611 }, { x: 600, y: 630 }, { x: 611, y: 611 }).slice(1)))];
+    await hold68(box68);
+    step('68b. a box with one arrow in it reads as no garment pattern piece: no reading in the field for it', MM.readGarment(mm.session.getState(), box68) === null && !document.querySelector('#summon .pill[data-key="notation:garment"]'), null);
+
+    // Numbers in the gap between the outlines and a page saying ½″: cut and sewn, beside the piece.
+    fresh68();
+    const p68 = drawPiece68({});
+    mm.typeText({ x: 590, y: P68.y - 26 }, '18″', { w: 40, h: 22 });
+    mm.typeText({ x: P68.x - 26, y: 420 }, '26″', { w: 24, h: 20 });
+    const page68 = mm.typeText({ x: 900, y: 220 }, 'Add ½″ seam allowance', { w: 300, h: 30 });
+    await wait(120);
+    const mx = window.__mmMaths || { chipsDrawn: () => [], settle: () => {}, trueSizeSvg: () => null, printJob: () => null };
+    const chip68 = chipsOf68('garment');
+    step('68c. with 18 and 26 written on the piece and a page saying ½″ of seam allowance, a chip beside the piece says cut 19 × 27″ · sewn 18 × 26″ — below it, for a moment',
+      chip68.length === 1 && chip68[0].text === 'cut 19 × 27″ · sewn 18 × 26″' && chip68[0].y > P68.y + P68.h && chip68[0].standing === false && mm.answerCards().length === 0,
+      mx.chipsDrawn().map((c) => c.kind + ' ' + c.text));
+    sameAsWhole('the pattern piece and its chip — the maths');
+    mx.settle();
+    const settled68 = chipsOf68('garment').length;
+    mm.inspect(p68.piece);
+    const hovered68 = chipsOf68('garment').length;
+    const panelText68 = panel68();
+    mm.inspect(null);
+    step('68d. the chip is shown for a moment and while the hand points at the piece — and the panel always says it: cut and sewn, the ½″ the page says and the ink’s 1.4″, the grain, two notches and the dart',
+      settled68 === 0 && hovered68 === 1 && /cut at 19 × 27″, sewn at 18 × 26″/.test(panelText68) && /the ink stands 1\.\d+″ off/.test(panelText68) && /the grain runs along the 26″ sides/.test(panelText68) && /2 notches/.test(panelText68) && /a dart 2\.\d+″ wide/.test(panelText68),
+      { settled: settled68, hovered: hovered68, panel: panelText68.slice(0, 400) });
+
+    // True size: the cutting line dashed, the grain line, both notches and the dart — and in what a print covers.
+    const svg68 = mx.trueSizeSvg();
+    const board68 = MM.boardMathsOf(mm.session);
+    const doc68 = board68 ? MM.trueSize(board68) : null;
+    const job68 = mx.printJob();
+    const row68 = document.querySelector('#exportPanel [data-mathsout="svg"]');
+    const has68 = (svg, kind) => (svg.match(new RegExp('<path data-garment="' + kind + '"(?![^>]*data-part)', 'g')) || []).length;
+    step('68e. the true-size export carries the piece’s marks: the cutting line dashed, the grain line with a head at each end, two notches, the dart — in the SVG and in what a print covers, none of them left out as figures with no numbers',
+      !!svg68 && has68(svg68, 'grain') === 1 && has68(svg68, 'notch') === 2 && has68(svg68, 'dart') === 1 && /<path data-garment="seam"[^>]*stroke-dasharray/.test(svg68) &&
+        !!doc68 && doc68.print.markup.includes('data-garment="grain"') && doc68.omitted.length === 0 && !!job68 && job68.pages > 0 && !!row68 && !row68.disabled,
+      { svg: svg68 && svg68.slice(0, 160), omitted: doc68 && doc68.omitted.map((o) => o.reason), pages: job68 && job68.pages });
+
+    // The allowance is the page's: change it and the cut size flows; undo puts it back.
+    mm.editText(page68, 'Add 1″ seam allowance'); await wait(100);
+    const changed68 = chipsOf68('garment').map((c) => c.text);
+    mm.session.undo(); await wait(100);
+    step('68f. changing the page’s allowance to 1″ says cut 20 × 28″ · sewn 18 × 26″, and undo puts ½″ back — change flows and the ink stays',
+      changed68.length === 1 && changed68[0] === 'cut 20 × 28″ · sewn 18 × 26″' && chipsOf68('garment')[0] && chipsOf68('garment')[0].text === 'cut 19 × 27″ · sewn 18 × 26″',
+      { changed: changed68, back: chipsOf68('garment').map((c) => c.text) });
+
+    // The pack: garment@1 names the notation and adds nothing to recognition — the reading is the same with it in use as
+    // without — and what the piece asks for, its sizes, is offered either way (the packs pane lists it: e2e 51).
+    const before68 = MM.notationsOf(mm.session.getState(), p68.all)[0];
+    const used68 = mm.session.use('garment@1', Date.now());
+    await hold68(p68.all);
+    const after68 = MM.notationsOf(mm.session.getState(), p68.all)[0];
+    const sizes68 = [...document.querySelectorAll('#summon .pill.item')].some((b) => /Show the sizes/.test(b.textContent));
+    step('68g. garment@1 can be used for the piece — nothing refused, the reading exactly what it was without it, and the field still offers Show the sizes',
+      !used68 && mm.session.getState().packs.join() === 'garment@1' && after68.notation === 'garment' && after68.confidence === before68.confidence && sizes68,
+      { used: used68, packs: mm.session.getState().packs, before: before68.confidence, after: after68.confidence, sizes: sizes68 });
+    mm.session.unuse('garment@1', Date.now());
+
+    // A fold: an arrow with a head at each end along an edge halves the piece — cut on the fold, opened twice as wide.
+    fresh68();
+    const f68 = drawPiece68({ edge: 'fold' });
+    mm.typeText({ x: 590, y: P68.y - 30 }, '18″', { w: 40, h: 22 });
+    mm.typeText({ x: P68.x - 60, y: 420 }, '26″', { w: 44, h: 22 });
+    await wait(120);
+    const gf68 = MM.readGarment(mm.session.getState(), f68.all);
+    const foldChip68 = chipsOf68('garment').map((c) => c.text);
+    const svgF68 = mx.trueSizeSvg();
+    const docF68 = MM.boardMathsOf(mm.session) ? MM.trueSize(MM.boardMathsOf(mm.session)) : null;
+    step('68h. a piece with an arrow along its right edge is cut on the fold: a chip says opened 36″ across, and the true-size page prints the half as drawn and says so',
+      !!gf68 && count68(gf68, 'fold') === 1 && count68(gf68, 'seam') === 0 && foldChip68.length === 1 && foldChip68[0] === 'cut on the fold · 36″ across opened' &&
+        !!svgF68 && has68(svgF68, 'fold') === 1 && !!docF68 && /cut on the fold, opened 36″ across/.test(docF68.title) && docF68.notes.join(' ').includes('opened it is 36″ across'),
+      { chips: foldChip68, title: docF68 && docF68.title, notes: docF68 && docF68.notes });
+    fresh68();
+  }
+
+
   return R;
 };
 
