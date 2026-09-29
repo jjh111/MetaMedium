@@ -2395,7 +2395,7 @@ small model that fails (§5 row 2) as skips by name. **The invariant** (*Tier 1
 before a model*): the gate's model is asked once, by *What is this?* (H1.19,
 with the working dot up while the call is out), and H1.Y holds the count to
 that one, with no brief parked, the seat not taken and no real model
-attempted; mutation checked (auto-read on in the tab fails H1.19 and H1.Y).
+attempted; mutation checked (auto-read on in the tab fails H1.19 and H1.Y). **The whole gate** with it: 668 passed, 0 failed, 13 skipped across 12 scenarios in 448 s (the budgets' five skipped by name — load 3.1 on 4 cores).
 **`QA-v1.md`** is the hand checklist for A1–A10: each scenario's steps a
 person walks, and a column for which tool the hand uses and what it should
 say. **Found:** (1) the hand's own `canvas_look` printed a reading another
