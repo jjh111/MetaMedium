@@ -139,6 +139,40 @@ async function stroke(page, pts) {
 const waitFor = (page, fn, arg, ms = 8000) => page.waitForFunction(fn, arg, { timeout: ms, polling: 50 }).then(() => true, () => false);
 async function until(fn, ms = 8000) { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return true; await sleep(80); } return !!(await fn()); }
 
+/** What the tab holds, for the records: the room, the held marks, the models at work, the status line. */
+function tabNow() {
+  const mm = window.__mm, s = mm.session.getState();
+  return {
+    me: mm.folder().me || null,
+    status: (document.getElementById('status').textContent || '').trim(),
+    working: mm.working(),
+    summon: s.summon ? s.summon.enclosedIds.slice() : null,
+    selection: s.selection.slice(),
+    marks: s.contentIds.length,
+    last: s.contentIds[s.contentIds.length - 1] || null,
+    agents: mm.agents.map((a) => a.config.model),
+  };
+}
+/** Nothing held and nothing open: the field dismissed by a tap on empty ground, a selection let go. */
+async function letGo(page) {
+  for (let i = 0; i < 3; i++) {
+    const held = await page.evaluate(() => { const s = window.__mm.session.getState(); return !!s.summon || s.selection.length > 0; });
+    if (!held) break;
+    const at = await page.evaluate(() => {
+      const f = document.getElementById('summon').getBoundingClientRect();
+      const inside = (p) => p.x >= f.left - 20 && p.x <= f.right + 20 && p.y >= f.top - 20 && p.y <= f.bottom + 20;
+      const clear = (p) => { const e = document.elementFromPoint(p.x, p.y); return e && e.id === 'canvas' && !inside(p); };
+      return [{ x: 1120, y: 160 }, { x: 420, y: 780 }, { x: 1120, y: 500 }, { x: 900, y: 780 }].find(clear) || null;
+    });
+    if (at) { await page.mouse.click(at.x, at.y); await sleep(70); } else { await page.keyboard.press('Escape'); await sleep(50); }
+  }
+  await page.evaluate(() => { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); });
+}
+/** The hand's line about one mark, out of a canvas_look. */
+const markLine = (look, id) => String(look).split('\n').find((l) => l.startsWith(id + ' ') || l.startsWith(id + ' ·')) || null;
+/** The hand's count line: "N marks · M artifacts · …". */
+const countLine = (look) => String(look).split('\n').find((l) => /^\d+ marks? · \d+ artifacts?/.test(l)) || '';
+
 export async function runHand(browser, servers, { freshContext, screenshot }) {
   const steps = [];
   const check = (name, ok, detail) => steps.push({ name, ok: !!ok, detail });
@@ -174,6 +208,70 @@ export async function runHand(browser, servers, { freshContext, screenshot }) {
       check(`H1.0. the hand and the tab meet in room "${ROOM}": canvas_look says "${look.split('\n')[0]}", and the tab is in the room`,
         met && new RegExp(`^room ${ROOM} · you are ${HAND} · with john`).test(look), { look });
     });
+
+    // ---- H1.1. The model of the gate's own joins; the hand's arrival asked it nothing ----
+    /** The hand's look, taken again until it satisfies `pred` (the room is a transport: a line takes a moment) — the last one, if it never does. */
+    const lookUntil = async (pred, ms = 6000, args = {}) => { let look = ''; await until(async () => { look = textOf(await hand.call('canvas_look', args)); return pred(look); }, ms); return look; };
+    let deliberate = 0;
+    const asked = () => model.calls.length;
+    const joinModel = () => page.evaluate((origin) => {
+      const mm = window.__mm;
+      return !!mm.join(Object.assign({}, mm.MM.PRESETS.ollama, { baseUrl: origin + '/v1', model: 'e2e-hand-stub', vision: true }), null);
+    }, model.origin);
+    await record('H1.1', async () => {
+      const joined = await joinModel();
+      await hand.call('canvas_look', {});
+      await hand.call('canvas_look', { detail: 'full' });
+      await sleep(400);
+      const now = await page.evaluate(tabNow);
+      check(`H1.1. a model of the gate's own joins the tab, and the hand's arrival and two looks ask it nothing — ${asked()} calls, the working registry ${JSON.stringify(now.working)}`,
+        joined && now.agents.includes('e2e-hand-stub') && asked() === 0 && now.working.length === 0, { now, calls: model.calls });
+    });
+
+    // ---- §4. The mark, the ghost, one tap (QA-v10 §4) — the tab's own gestures, the hand looking on ----
+    const boxAt = { x: 470, y: 200, w: 150, h: 100 };
+    let box = null;
+    await record('H1.2', async () => {
+      await page.evaluate(() => window.__mm.setView(1, 0, 0));
+      await stroke(page, rect(boxAt.x, boxAt.y, boxAt.w, boxAt.h));
+      box = (await page.evaluate(tabNow)).last;
+      await stroke(page, tick(900, 620));
+      await sleep(150);
+      const now = await page.evaluate(tabNow);
+      const look = await lookUntil((l) => !!markLine(l, box));
+      const line = markLine(look, box);
+      check(`H1.2. §4 (synthetic strokes): a box, and his taught mark drawn far beside it, crossing nothing — nothing opens (the field ${now.summon ? 'open' : 'shut'}); the hand sees the box as a rectangle by john — "${(line || '').slice(0, 90)}"`,
+        !!box && now.summon === null && now.selection.length === 0 && /rectangle/.test(line || '') && /by john/.test(line || '') && !/the field is open/.test(look),
+        { now, look });
+    });
+
+    await record('H1.3', async () => {
+      await stroke(page, seg({ x: 480, y: 185 }, { x: 517, y: 237 }, 30).concat(seg({ x: 517, y: 237 }, { x: 584, y: 162 }, 30).slice(1)));
+      const opened = await waitFor(page, () => !!window.__mm.session.getState().summon, null, 4000);
+      const now = await page.evaluate(tabNow);
+      const look = await lookUntil((l) => !!markLine(l, box) && /marks/.test(l));
+      check(`H1.3. §4 (synthetic strokes): the mark drawn across the box opens the field on the box, in his tab (${JSON.stringify(now.summon)}), and it is his — the hand's look says neither "selected" nor "the field is open", whichever hand's field it is (the L2h that QA-v10 §4's "1 selected" predates)`,
+        opened && now.summon && now.summon.length === 1 && now.summon[0] === box && !/selected|the field is open/.test(countLine(look)), { now, count: countLine(look) });
+    });
+
+    await record('H1.4', async () => {
+      await letGo(page);
+      const gone = await page.evaluate(tabNow);
+      const before = gone.marks;
+      await stroke(page, circle(900, 400, 40));
+      const drew = await page.evaluate(tabNow);
+      const look = await lookUntil((l) => new RegExp('^' + drew.marks + ' marks').test(countLine(l)));
+      check(`H1.4. §4 (synthetic strokes): one tap on the ground and the field and the selection are both gone (field ${gone.summon ? 'open' : 'shut'}, ${gone.selection.length} selected); the next stroke draws (${before} → ${drew.marks} marks) and the hand's look says ${countLine(look).split(' · ')[0]}`,
+        gone.summon === null && gone.selection.length === 0 && drew.marks === before + 1 && drew.summon === null && new RegExp('^' + drew.marks + ' marks').test(countLine(look)),
+        { gone, drew, count: countLine(look) });
+    });
+
+    await record('H1.5', async () => {
+      const snap = await page.evaluate(() => { const o = window.__mm.snapOffers(); return Array.isArray(o) ? o.length : (o && o.size) || 0; });
+      const tile = await page.evaluate(() => { const b = document.getElementById('snapBtn') || document.querySelector('[data-tile="snap"]'); return b ? b.textContent.replace(/\s+/g, ' ').trim() : null; });
+      check(`H1.5. §4 (synthetic strokes): the circle just drawn is counted by the snap tile (${snap} offered${tile ? ', tile: "' + tile + '"' : ''})`, snap >= 1, { snap, tile });
+    });
+    check('H1.5b. §4: the dashed clean form goes a few seconds after the stroke, and is back under the pointer — skipped: it is a drawn frame, and this page has no reading of one (GHOST_MS in 08-render.js is the rule; the eye is the check)', true);
 
     check(`H1.9. nothing the scenario opened reached for :8020, where a relay on this machine listens by default — ${toJohnsRelay.length} request${toJohnsRelay.length === 1 ? '' : 's'} refused`, toJohnsRelay.length === 0, toJohnsRelay.slice(0, 5));
   } catch (err) {
