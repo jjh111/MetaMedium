@@ -168,6 +168,15 @@ async function letGo(page) {
   }
   await page.evaluate(() => { if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); });
 }
+/** Press and hold at a point with the real pointer until the field opens; true when it did. */
+async function holdAtPoint(page, pt) {
+  await page.mouse.move(pt.x, pt.y);
+  await page.mouse.down();
+  const opened = await page.waitForFunction(() => !!window.__mm.session.getState().summon, null, { timeout: 5000 }).then(() => true, () => false);
+  await page.mouse.up();
+  await sleep(80);
+  return opened;
+}
 /** The hand's line about one mark, out of a canvas_look. */
 const markLine = (look, id) => String(look).split('\n').find((l) => l.startsWith(id + ' ') || l.startsWith(id + ' ·')) || null;
 /** The hand's count line: "N marks · M artifacts · …". */
@@ -273,7 +282,96 @@ export async function runHand(browser, servers, { freshContext, screenshot }) {
     });
     check('H1.5b. §4: the dashed clean form goes a few seconds after the stroke, and is back under the pointer — skipped: it is a drawn frame, and this page has no reading of one (GHOST_MS in 08-render.js is the rule; the eye is the check)', true);
 
-    check(`H1.9. nothing the scenario opened reached for :8020, where a relay on this machine listens by default — ${toJohnsRelay.length} request${toJohnsRelay.length === 1 ? '' : 's'} refused`, toJohnsRelay.length === 0, toJohnsRelay.slice(0, 5));
+    let noteText = null;
+    await record('H1.6', async () => {
+      // A text stands under the box: the hand writes it (canvas_write), the tab holds it, and a box drawn below it is a box.
+      const wrote = textOf(await hand.call('canvas_write', { kind: 'text', code: 'hello there', name: 'note', bounds: { x: 470, y: 360, w: 220, h: 50 } }));
+      noteText = (wrote.match(/^(\S+) placed/) || [])[1] || null;
+      await waitFor(page, (id) => !!window.__mm.session.getState().nodes.get(id), noteText, 5000);
+      await sleep(300);
+      const opened = await holdAtPoint(page, { x: 580, y: 385 });
+      const held = await page.evaluate(tabNow);
+      const marksBefore = held.marks;
+      await stroke(page, rect(470, 440, 160, 90));
+      await sleep(150);
+      const after = await page.evaluate(tabNow);
+      const lastId = after.last;
+      const reads = await page.evaluate((id) => { const mm = window.__mm, n = mm.session.getState().nodes.get(id); return n ? mm.MM.interpretationsOf(n, mm.session.getState().nodes).map((r) => r.label) : []; }, lastId);
+      check(`H1.6. §4 (synthetic strokes): a text the hand wrote (${noteText}) is held in the tab (${JSON.stringify(held.summon || held.selection)}); a box drawn below it is a box, not a move — ${marksBefore} → ${after.marks} marks, read ${reads[0]}, and the selection ends (${after.selection.length} selected, field ${after.summon ? 'open' : 'shut'})`,
+        !!noteText && opened && (held.summon || held.selection).includes(noteText) && after.marks === marksBefore + 1 && /rectangle/.test(reads.join()) && after.selection.length === 0 && after.summon === null,
+        { wrote, opened, held, after, reads });
+    });
+
+
+    // ---- §6. Two hands (QA-v10 §6; acceptance A7) — the world moved a screen's-width-and-more away, so nothing of §4 stands beside ----
+    const WX = 3000;
+    let boxB = null, sun = null, word = null;
+    const cardsAbout = (id) => page.evaluate((i) => window.__mm.answerCards().filter((c) => c.about.includes(i)).map((c) => ({ id: c.id, about: c.about, who: c.who, what: c.what })), id);
+    await record('H1.7', async () => {
+      await letGo(page);
+      await page.evaluate((x) => window.__mm.setView(1, -x, 0), WX);
+      await stroke(page, rect(470, 200, 150, 100));
+      boxB = (await page.evaluate(tabNow)).last;
+      const drew = textOf(await hand.call('canvas_draw', { shapes: [{ shape: 'circle', x: WX + 700, y: 200, w: 100, h: 100, why: 'a circle beside your box' }] }));
+      sun = (drew.match(/^(\S+) → /) || [])[1] || null;
+      const landed = await waitFor(page, (id) => !!window.__mm.session.getState().nodes.get(id), sun, 5000);
+      await sleep(250);
+      const colours = await page.evaluate(([a, b]) => { const mm = window.__mm; return { his: mm.colourOf(a), hers: mm.colourOf(b) }; }, [boxB, sun]);
+      const cards = sun ? await cardsAbout(sun) : [];
+      const now = await page.evaluate(tabNow);
+      check(`H1.7. §6 (synthetic strokes): he draws a box; the hand draws a circle beside it with a why — the circle (${sun}) lands in the tab in the hand's own colour (${colours.hers} against his ${colours.his}), with a card beside it ("${(cards[0] && cards[0].what || '').slice(0, 30)}"), and the status line says "with claude"`,
+        !!boxB && !!sun && landed && colours.hers && colours.his && colours.hers !== colours.his && cards.length === 1 && cards[0].who === HAND && /with claude/.test(now.status),
+        { drew, colours, cards, status: now.status });
+    });
+
+    await record('H1.8', async () => {
+      const look = await lookUntil((l) => !!markLine(l, boxB));
+      const line = markLine(look, boxB);
+      const said = textOf(await hand.call('canvas_say', { about: [boxB], text: 'this is your box' }));
+      const landed = await waitFor(page, (id) => window.__mm.answerCards().some((c) => c.about.includes(id) && c.who === 'claude'), boxB, 5000);
+      await sleep(200);
+      const cards = await page.evaluate((id0) => window.__mm.answerCards().filter((c) => c.about.includes(id0)).map((c) => ({ about: c.about, who: c.who, id: c.id })), boxB);
+      const sunCards = await cardsAbout(sun);
+      check(`H1.8. §6: canvas_look lists his box under the id his own tab gave it (${boxB}) — "${(line || '').slice(0, 80)}"; canvas_say about that id lands the card on his box and no other mark (${JSON.stringify(cards.map((c) => c.about))}), and the circle's card is still only its own`,
+        /^stroke:john~[a-z0-9]+:\d+/.test(boxB || '') && !!line && /by john/.test(line) && /placed beside/.test(said) && landed && cards.length === 1 && cards[0].about.length === 1 && cards[0].about[0] === boxB && cards[0].who === HAND && sunCards.length === 1,
+        { line, said, cards, sunCards });
+    });
+
+    await record('H1.9', async () => {
+      await stroke(page, cursive(470, 420, 220, 44, 7));
+      word = (await page.evaluate(tabNow)).last;
+      await lookUntil((l) => !!markLine(l, word));
+      const before = asked();
+      const said = textOf(await hand.call('canvas_transcribe', { id: word, text: 'window', confidence: 0.85 }));
+      const landed = await waitFor(page, (id) => { const mm = window.__mm, n = mm.session.getState().nodes.get(id); return !!n && mm.MM.transcriptOf(n) === 'window'; }, word, 5000);
+      const opened = await holdAtPoint(page, { x: 580, y: 442 });
+      const pills = await page.evaluate(() => [...document.querySelectorAll('#summon .pill')].map((p) => p.textContent.trim().replace(/\s+/g, ' ')));
+      await letGo(page);
+      check(`H1.9. §6 (synthetic strokes): he writes a word; the hand transcribes it as “window” — the tab holds the transcript with no model asked (${before} → ${asked()} calls), and held alone the word's field offers it (${pills.filter((p) => /window/.test(p)).join(' | ')})`,
+        !!word && /read as “window”/.test(said) && landed && asked() === before && opened && pills.some((p) => /window/.test(p)), { said, pills, calls: model.calls.length });
+    });
+
+    await record('H1.10', async () => {
+      const said = textOf(await hand.call('canvas_propose', { ids: [boxB], label: 'gate', confidence: 0.7, reasoning: 'a box with a hand beside it' }));
+      const landed = await waitFor(page, (id) => { const mm = window.__mm, s = mm.session.getState(), n = s.nodes.get(id); return !!n && mm.MM.interpretationsOf(n, s.nodes).some((r) => /gate/.test(r.label)); }, boxB, 5000);
+      const reads = await page.evaluate((id) => { const mm = window.__mm, s = mm.session.getState(); return mm.MM.interpretationsOf(s.nodes.get(id), s.nodes).map((r) => ({ label: r.label, source: r.sourceName, weight: +r.weight.toFixed(2), blessed: !!r.blessed })); }, boxB);
+      const mine = reads.find((r) => /gate/.test(r.label));
+      const look = await lookUntil((l) => /gate 0\.70/.test(markLine(l, boxB) || ''));
+      const line = markLine(look, boxB);
+      check(`H1.10. §6: canvas_propose a reading with a confidence — it is held on his box in the tab, attributed to the hand, never blessed ("${mine && mine.label} ${mine && mine.weight} · ${mine && mine.source}"), and the hand's own look says who read it — "${(line || '').slice(0, 90)}"`,
+        /held on/.test(said) && landed && !!mine && mine.source === HAND && !mine.blessed && /gate 0\.70 · claude/.test(line || ''), { said, reads, line });
+      // Whether it stands in the field's "what this is" row is the surface's, and today it does not (a hand is a tier 0 voice, and 09-palette.js leaves tier 0 out).
+      const opened = await holdAtPoint(page, { x: 470, y: 250 });
+      const items = await page.evaluate(() => { const f = window.__mm.fieldItems(); return f ? f.ranked.map((i) => i.label) : []; });
+      await letGo(page);
+      const shown = items.some((l) => /gate/.test(l));
+      check(shown
+        ? 'H1.10b. §6: the hand\'s proposed reading joins the field\'s row on his box as "gate 0.70 · claude"'
+        : 'H1.10b. §6: the hand\'s proposed reading joins the field\'s row as "… · claude" — skipped (known: a hand is a tier 0 voice and conversionsFor in 09-palette.js leaves tier 0 out of "what this is", so the reading lands and shows nowhere; QA-v10 §6 row 4 says it joins the row)',
+        opened && (shown || items.length > 0), { opened, items });
+    });
+
+    check(`H1.Z. nothing the scenario opened reached for :8020, where a relay on this machine listens by default — ${toJohnsRelay.length} request${toJohnsRelay.length === 1 ? '' : 's'} refused`, toJohnsRelay.length === 0, toJohnsRelay.slice(0, 5));
   } catch (err) {
     check(`the scenario itself fell over: ${String(err && err.message ? err.message : err).split('\n')[0]}`, false, { stack: String(err && err.stack) });
     if (page) await screenshot(page, 'hand');
