@@ -4202,6 +4202,35 @@
     return out;
   }
 
+  /**
+   * Where a label stands INSIDE its mark, when the mark is a closed form and the words fit in it (V1-PLAN D3,
+   * words inside symbols): centred on the form, the whole box the words fill — with a little air — inside its
+   * outline, so a diamond or a circle, whose corners take less than a box's, holds fewer words than a box. The
+   * outline is the clean form the mark holds, else its own ink when that closes. Anything else — an open mark,
+   * an artifact, a word too long for the form — is a caption above the mark, as a label has always been.
+   */
+  function labelInside(node, size, w) {
+    let outline = MM.cleanPointsOf(node);
+    if (!outline || outline.length < 3 || !(MM.cleanOf(node) || {}).closed) {
+      const fp = MM.fingerprintOf(node);
+      outline = fp && fp.isClosed ? MM.strokePointsOf(node) : null;
+    }
+    if (!outline || outline.length < 4) return null;
+    const bb = MM.getBounds(outline);
+    const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2;
+    const hw = w / 2 + size * 0.3, hh = size * 0.62;
+    const within = (px, py) => {
+      let inside = false;
+      for (let i = 0, j = outline.length - 1; i < outline.length; j = i++) {
+        const a = outline[i], b = outline[j];
+        if ((a.y > py) !== (b.y > py) && px < ((b.x - a.x) * (py - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+      }
+      return inside;
+    };
+    for (const [px, py] of [[cx - hw, cy - hh], [cx + hw, cy - hh], [cx - hw, cy + hh], [cx + hw, cy + hh]]) if (!within(px, py)) return null;
+    return { x: cx - w / 2, y: cy + size * 0.32 };
+  }
+
   function drawLabel(s, node, lab, placedBy, inspectedId, pv, vb) {
     const b0 = MM.boundsOf(node);
     if (!b0) return;
@@ -4212,14 +4241,16 @@
     const size = labelSizeOf(node);
     // Above the artifact's own name when that chrome is showing, else just above the mark.
     const raised = chromeDrawn.includes(node.id) ? wpx(24) : 0;
-    const x = b.minX, y = b.minY - size * 0.45 - raised;
     const colour = colourOf(node);
     const who = nameOfParticipant(lab.source || authorOf(node));
     const whoShown = node.id === inspectedId || placedBy === inspectedId;
     ctx.font = size.toFixed(3) + "px 'Space Grotesk', system-ui, sans-serif";
     const w = ctx.measureText(lab.text).width;
+    // Inside a closed mark the words fit in, else above it. A body in a running tank carries its words above: it moves.
+    const within = pl ? null : labelInside(node, size, w);
+    const x = within ? within.x : b.minX, y = within ? within.y : b.minY - size * 0.45 - raised;
     // Where it stands is said wherever it is; it is drawn when it reaches the screen.
-    labelsDrawn.push({ id: node.id, text: lab.text, x: x, y: y, w: w, size: size, px: size * view.zoom, colour: colour, who: who, whoShown: whoShown });
+    labelsDrawn.push({ id: node.id, text: lab.text, x: x, y: y, w: w, size: size, px: size * view.zoom, colour: colour, who: who, whoShown: whoShown, inside: !!within });
     const reach = { minX: x, minY: y - size * 1.2, maxX: x + w + (whoShown ? size + wpx(11) * (who.length + 3) : 0), maxY: y + size * 0.5 };
     if (vb && !held && !pl && !boxMeets(reach, vb)) return;
     if (held) { ctx.save(); applyPreview(pv); }

@@ -1933,8 +1933,12 @@ window.__scenario = async function(){
     await wait(30);
     const at1 = drawn39().find(l => l.id === box39);
     const bb39 = MM.boundsOf(mm.session.getState().nodes.get(box39));
-    step('39. a hand labels its own mark: the word is drawn beside it, above its top edge, in the ink\'s own colour',
-      took39 === box39 && !!at1 && at1.text === 'inlet' && at1.y < bb39.minY && Math.abs(at1.x - bb39.minX) < 1 && !!at1.colour && at1.colour === colour39(box39) && at1.colour === ink39(),
+    // By design (V1-PLAN D3, words inside symbols; 08-render.js `labelInside`): the box is a closed mark and the word fits in it,
+    // so it is drawn INSIDE, centred — it was drawn above the top edge before. A word that does not fit still stands above (39g).
+    step('39. a hand labels its own mark: the word is drawn in it, centred, where it fits — in the ink\'s own colour',
+      took39 === box39 && !!at1 && at1.text === 'inlet' && at1.inside === true
+        && at1.x > bb39.minX && at1.x + at1.w < bb39.maxX && at1.y > bb39.minY && at1.y < bb39.maxY
+        && Math.abs(at1.x + at1.w / 2 - (bb39.minX + bb39.maxX) / 2) < 1 && !!at1.colour && at1.colour === colour39(box39) && at1.colour === ink39(),
       { took: took39, label: at1, bounds: bb39, ink: colour39(box39), token: ink39() });
     mm.setView(2, 0, 0); await wait(30);
     const at2 = drawn39().find(l => l.id === box39);
@@ -1983,6 +1987,21 @@ window.__scenario = async function(){
     step('39f. another hand\'s word on its own ink is drawn in that hand\'s colour, attributed to it',
       !!kite39 && kite39.text === 'kite' && kite39.colour === mm.handColour('fern') && kite39.who === 'fern' && kite39.colour !== colour39(box39),
       { kite: kite39, hue: mm.handColour('fern') });
+    // A word too long for the form it labels is a caption above the mark, as a label has always been; an open mark has no inside.
+    mm.session.load([]);
+    t.stroke(t.rect(300, 220, 60, 36));
+    const small39 = mm.session.getState().contentIds[0];
+    mm.session.label({ nodeId: small39, text: 'a long word for a small box', at: Date.now() });
+    t.stroke(t.line({ x: 500, y: 300 }, { x: 700, y: 300 }, 30));
+    const open39 = mm.session.getState().contentIds[1];
+    mm.session.label({ nodeId: open39, text: 'open', at: Date.now() + 1 });
+    await wait(30);
+    const sm39 = drawn39().find(l => l.id === small39), op39 = drawn39().find(l => l.id === open39);
+    const sb39 = MM.boundsOf(mm.session.getState().nodes.get(small39)), ob39 = MM.boundsOf(mm.session.getState().nodes.get(open39));
+    step('39g. a word too long for its box, and a word on an open line, are captions above the mark, at its top-left, as they always were',
+      !!sm39 && sm39.inside === false && sm39.y < sb39.minY && Math.abs(sm39.x - sb39.minX) < 1
+        && !!op39 && op39.inside === false && op39.y < ob39.minY && Math.abs(op39.x - ob39.minX) < 1,
+      { small: sm39, smallBounds: sb39, open: op39, openBounds: ob39 });
     mm.setThemeMode(theme39);
     mm.session.load([]); mm.setView(1, 0, 0);
   }
@@ -4088,6 +4107,11 @@ window.__scenario = async function(){
     step('63b. Draw it draws the text as ink the engine reads as a flowchart — five symbols and four flows, the new one saying Done',
       !!drawn63 && drawn63.notation === 'flowchart' && !!reading63 && reading63.notation === 'flowchart' && reading63.symbols.length === 5 && reading63.connectors.length === 4 && words63.includes('Done'),
       { notation: drawn63 && drawn63.notation, read: reading63 && MM.describeNotation(reading63), words: words63 });
+    const done63 = mm.labelsDrawn().find((l) => l.text === 'Done' && marks63.includes(l.id));
+    const doneBox63 = done63 && MM.boundsOf(st63.nodes.get(done63.id));
+    step('63b2. the word of a drawn symbol stands inside the symbol, not above it — “Done” centred in its box',
+      !!done63 && done63.inside === true && !!doneBox63 && done63.x > doneBox63.minX && done63.x + done63.w < doneBox63.maxX && done63.y > doneBox63.minY && done63.y < doneBox63.maxY,
+      { label: done63, box: doneBox63 });
     const drawnBox63 = MM.getBounds(marks63.flatMap((id) => { const b = MM.boundsOf(st63.nodes.get(id)); return b ? [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }] : []; }));
     const onScreen63 = mm.worldToScreen(drawnBox63.minX, drawnBox63.minY), onScreenEnd63 = mm.worldToScreen(drawnBox63.maxX, drawnBox63.maxY);
     const artFrame63 = MM.frameOf(st63.nodes.get(aid63));
