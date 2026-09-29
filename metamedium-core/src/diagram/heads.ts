@@ -576,12 +576,17 @@ function readEnd(conn: Connector, e: EndGeom, state: SessionState): ConnectorEnd
     const oneStroke = pathLength > OUTLINE_PATH * perimeter(c.hull);
     const fills = oneStroke ? [] : fillsIn(c.hull, others.filter((o) => o.id !== c.id && !used.has(o.id) && !isRead(o.node)), 0.1 * c.size);
     used.add(c.id);
-    fills.forEach((f) => used.add(f.id));
     const hull = hullOf([...c.ink, ...fills.flatMap((f) => f.ink)]);
+    const shapes = shapesOf(hull, e.out);
+    // A closed mark that reads as no head — the class's own box, touching the
+    // end of a long relation — is nobody's head, and what lies inside it is
+    // not its fill: it is left for the mark it belongs to (D4, S2).
+    if (!shapes.length) continue;
+    fills.forEach((f) => used.add(f.id));
     const fill = oneStroke ? fillOf(hull, [], [c.ink]) : fillOf(hull, [c.ink], fills.map((f) => f.ink));
     const ids = [c.id, ...fills.map((f) => f.id)];
     const tip = farAlong(hull, e.point, e.out);
-    for (const s of shapesOf(hull, e.out)) {
+    for (const s of shapes) {
       withFill({ kind: s.kind, score: s.score * c.touch * c.axis, ids, tip, lead: `a closed ${s.kind} touching its ${e.end} — ${s.why}${oneStroke ? ', outline and fill in one stroke' : ''}` }, fill, push);
     }
   }
