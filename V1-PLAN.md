@@ -2146,6 +2146,60 @@ changelog and the standalone file. **R8 One platform.** The monoliths and
 index, a README that is a front page. **R9 The shard alongside.** A built
 shard published beside the canvas and opened from it into the same room.
 
+*R5 status, 29 Sep 2026: built on `unit/r5-first-run`* — `f46d555` (red first:
+the examples' Node test 10 of 10 failing with `scripts/examples.mjs` unwritten,
+five new cases in `17-boards.test.mjs`, e2e 65–65f in the canvas scenario and
+N18–N18e in `boards`, the panel with no *start from an example*, the pane with
+no *examples*), `a4b4e9b`, `d39068d`, then the docs.
+**Examples:** four boards a first-time hand can open — a flowchart with its
+Mermaid beside it, a class diagram, a molecule from `basics@1` (two molecules
+and a lone bubble, nothing taught) and a pattern page (a right triangle with 24
+and 8 on its legs, a page of ten steps) — each a **log made by
+`scripts/examples.mjs` from the engine and never drawn** (`drawMermaid`,
+`strokeFor` with `handLike`'s seeded tremor, `use`, the surface's own texts, the
+Mermaid taken through the tool's `takeOffer`; a fixed clock, no randomness), so
+they show what the engine reads today: `--check` is in CI's `core` job beside the
+other drift checks and `scripts/examples.test.mjs` (12) replays each and asks the
+engine — a flowchart reads as one and says the same Mermaid, the class diagram
+as UML, the molecule matched by the pack, the pattern page 25.30″ with a check
+on every step, each opening with nothing held. The boards pane lists them under
+*examples* (`exampleRows`, `exampleName`, `starterOf`, `EXAMPLES_BASE` in
+`17-boards.js`, five more Node cases, 22 in all; the pane in `22-boards.js`), and
+**opening one makes a new board of your own** — a copy under its own id, named
+*Flowchart example* then *Flowchart example 2*, through the adapter's `newBoard`,
+so the example is never written; the service worker keeps the index and each log
+for offline (`EXTRA` in `Demos/sw.js`).
+**The decision, and why: the first run stays an empty board.** The panel keeps
+its three lines and gains one tap, *start from an example* (the starter, the
+molecule, using the Basics pack), and *more examples* (the pane). The other
+choice — the starter as the first board — would have kept "nothing is ever lost"
+too, but a hand who only looked would find marks on a board they did not make and
+be one undo from the empty board every acceptance scenario and every gate
+scenario (`keep`, `boards`, `app`, the kill test) starts from; a first board with
+events is also a board with something to lose. An empty first board writes
+nothing, surprises no returning hand (a board with marks is what comes back, and
+its panel offers no start), leaves `?fresh=1` as the harness needs it, and costs a
+first-time hand one tap on a panel they are already reading; the board it was
+tapped on stays on the list, empty. **HELP.md checked against the surface** as it
+stands: it named no packs at all, said the models' *live* tile under the wrong
+group, and did not say the examples — fixed, not rewritten; the shortcuts are as
+`07-input.js` and `09-palette.js` have them. e2e 65 stands before the canvas
+run's rooms (the run has one page and a board opened from a room opens in a page
+of its own; the log is empty there by record 12, so nothing is lost by it).
+**Found for other owners:** (1) a board opened in a page where the device has a
+taught mark gets a `teach` event beside its log, so e2e 65d asks for *nothing
+drawn* and not *no events*; (2) prose in a text artifact is read by the maths —
+a colon made a line a definition and a dash a minus, both showing as a standing
+`?` at rest — so a note on a drawing must be written without them (`examples.mjs`
+says so; M5's owner may want prose lines told from steps by more than their
+shape); (3) core's vitest suite has a 5 s default timeout that the notation
+benches overrun on a loaded machine (two to seven of them, a different set each
+run; every one passes with `--testTimeout=60000`) — nothing changed in core here.
+Tests: `examples.test.mjs` 12, `17-boards.test.mjs` 22 (17 before), canvas e2e
+392 passed and 2 skipped (7 new, 65–65f), `boards` 25 (5 new, N18–N18e); the
+whole gate on Chromium 656 passed, 0 failed, 7 skipped in 392 s (the 2 honest
+ones, and the budgets' five, skipped by name — load 5.1 on 4 cores).
+
 *R6 status, 28 Sep 2026: built on `w2-shard`* — `a11a5ed` (red first: the
 gate's `pencil` scenario, seven of its eight records failing on WebKit and
 Chromium — the pen's pressure on none of its 33 points, the switch unsaid and
