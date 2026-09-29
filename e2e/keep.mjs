@@ -422,8 +422,10 @@ export async function blockedTest(browser, servers, ctx) {
     const { readFileSync } = await import('node:fs');
     const file = readFileSync(await download.path(), 'utf8');
     const lines = file.split('\n').filter(Boolean);
-    check(`B2. "export the log" in the line hands over the whole board as a file (${lines.length} of ${events} events, ${download.suggestedFilename()})`,
-      download.suggestedFilename() === 'canvas.jsonl' && lines.length === events && lines.every((l) => { try { return !!JSON.parse(l).type; } catch (e) { return false; } }),
+    // Since R2 the file is version 1: its first line is the header, and every line after it is an event.
+    const isHeader = (l) => { try { const h = JSON.parse(l); return h.format === 'metamedium-log' && h.version === 1; } catch (e) { return false; } };
+    check(`B2. "export the log" in the line hands over the whole board as a file (${lines.length - 1} of ${events} events after its version 1 header, ${download.suggestedFilename()})`,
+      download.suggestedFilename() === 'canvas.jsonl' && isHeader(lines[0]) && lines.length === events + 1 && lines.slice(1).every((l) => { try { return !!JSON.parse(l).type; } catch (e) { return false; } }),
       { lines: lines.length, events });
 
     // The other way out: a folder keeps the board from now on — carried in, not replaced.

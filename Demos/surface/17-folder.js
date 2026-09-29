@@ -6,7 +6,10 @@
 //   browser keeps when there is no folder (V1-PLAN R3, R1) — the adapter over 17-board.js's journal
 //   and 17-boards.js's list: IndexedDB (openBoard, persistBoard, flushBoard, forgetLocalLog; the list:
 //   switchBoard, newBoard, renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash,
-//   emptyTrash, boardFromFile, resetBoard, rememberPlace, openPlace), the view per board, browser
+//   emptyTrash, boardFromFile, resetBoard, rememberPlace, openPlace), the log format's surface (R2:
+//   readLogText — a log's text as events or the sentence for a version this build does not read —
+//   logWrite, logFileNote; a folder whose log is of a newer version is refused before it is opened),
+//   the view per board, browser
 //   storage where there is no IndexedDB, the one import of browser storage's old copy, the lock one
 //   tab holds per board, and what the status line says when a save fails (boardWarning, keepBoardIn).
 // Uses: core, board (createJournal, openPlan, troubleOf, troubleWords, journalEvents, journalFold,
@@ -264,6 +267,15 @@
       const v = await readyToLeave();
       if (v && v.kind !== 'not-kept') { say(v.words + (v.kind === 'unsaved' ? ' — or "open a folder" in the line, which carries it in' : '')); return null; }
     }
+    // A log of a newer version than this build reads (R2) is refused here, before the board on screen is
+    // left and before anything could be written over it: half a log is a wrong board.
+    let logs = {};
+    let readFailed = '';
+    try { logs = await store.readLogs(); }
+    catch (err) {
+      if (err && err.name === 'LogFormatError') { say(err.message); return null; }
+      readFailed = 'could not read the logs: ' + (err.message || err);
+    }
     // From here this page's log is the folder's or the room's: the board this
     // browser keeps stays as it was (where the hand left it too), and is not written again from this page.
     leaveBoard();
@@ -273,8 +285,7 @@
     // A folder is written under the device's own stable name, whatever a live
     // sitting in this page load was called.
     if (folder.how !== 'live') folder.me = deviceParticipant();
-    let logs = {};
-    try { logs = await store.readLogs(); } catch (err) { folder.error = 'could not read the logs: ' + (err.message || err); }
+    folder.error = readFailed;
     if (carry) {
       const mine = folder.how === 'live' ? folder.me : MM.participantOfLog(MM.logPathFor(folder.me));
       logs = Object.assign({}, logs, { [mine]: (logs[mine] || []).concat(carry) });
@@ -381,7 +392,7 @@
     }
     if (folder.store && folder.store.capabilities().write) {
       const mine = myLogNow();
-      const text = MM.encodeLog(mine);
+      const text = MM.encodeLog(mine, logWrite());
       if (text === folder.lastSave) return;
       folder.saving = true;
       try { await folder.store.write(MM.logPathFor(folder.me), text); folder.lastSave = text; folder.error = ''; setFolderTrouble(null); }
@@ -1277,19 +1288,40 @@
     boardsChanged();
     return { gone: got.map((g) => g.id), kept: plan.gone.map((e) => e.id).filter((x) => !got.some((g) => g.id === x)).concat(plan.kept.map((e) => e.id)) };
   }
-  /** A log file as a new board: one event per line (as *export* writes it), or a JSON array. */
+  /**
+   * A log file's text as events (R2): version 1 with its header, version 0 — bare events, every log kept
+   * before the header — or the old JSON array. `{ events }` for a log, `{ refused }` with the sentence for
+   * a version this build does not read, `{ notLog }` for anything else. One reader for the boards pane's
+   * file, the examples and any other text that is meant to be a log.
+   */
+  function readLogText(text, source) {
+    const t = String(text || '').trim();
+    let events = null;
+    if (t.startsWith('[')) { try { const a = JSON.parse(t); if (Array.isArray(a)) events = a; } catch (err) { events = null; } }
+    else {
+      try { const d = MM.decodeLog(text, { source }); events = d.skipped ? null : d.events; }
+      catch (err) { if (err && err.name === 'LogFormatError') return { refused: err.message }; throw err; }
+    }
+    if (!events || !events.length || !events.every((ev) => ev && typeof ev.type === 'string')) return { notLog: true };
+    return { events };
+  }
+  /** What a log written by this page says of itself in the status line: the version, and that an older app opens it. */
+  function logFileNote() { return ' · log version ' + MM.LOG_VERSION + ' — an older MetaMedium opens it too'; }
+  /** What every log this page writes is written with. */
+  function logWrite() {
+    const app = ((document.querySelector('meta[name="metamedium-version"]') || {}).content || '').trim();
+    return app ? { app } : {};
+  }
+  /** A log file as a new board: one event per line (as *export* writes it, header first), or a JSON array. */
   async function boardFromFile(file, o) {
     const text = await file.text();
-    let events = null;
-    const t = text.trim();
-    if (t.startsWith('[')) { try { const a = JSON.parse(t); if (Array.isArray(a)) events = a; } catch (err) { events = null; } }
-    else { const d = journalEvents(text); events = d.bad ? null : d.events; }
-    if (!events || !events.length || !events.every((ev) => ev && typeof ev.type === 'string')) {
-      const v = { kind: 'file', words: '“' + file.name + '” is not a board’s log — one event per line, as export writes it', ways: [] };
+    const r = readLogText(text, file.name);
+    if (!r.events) {
+      const v = { kind: 'file', words: r.refused || '“' + file.name + '” is not a board’s log — one event per line, as export writes it', ways: [] };
       if (o && o.said) o.said(v); else say(v.words);
       return false;
     }
-    return newBoard(Object.assign({}, o, { name: String(file.name || '').replace(/\.[^.]*$/, '') || null, events }));
+    return newBoard(Object.assign({}, o, { name: String(file.name || '').replace(/\.[^.]*$/, '') || null, events: r.events }));
   }
   /**
    * Reset: a fresh board, never one tap from losing this one. The board on
@@ -1371,8 +1403,8 @@
   /** The other way out: the whole log, as a file to keep. */
   function exportLogNow() {
     const evs = session.getEvents();
-    downloadText('canvas.jsonl', MM.encodeLog(evs), 'application/json');
-    flash('canvas.jsonl — the whole board, ' + evs.length + ' events, to keep');
+    downloadText('canvas.jsonl', MM.encodeLog(evs, logWrite()), 'application/json');
+    flash('canvas.jsonl — the whole board, ' + evs.length + ' events, to keep' + logFileNote());
   }
   statusEl.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('button[data-way]');

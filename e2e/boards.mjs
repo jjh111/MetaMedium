@@ -589,6 +589,117 @@ export async function firstRunTest(browser, servers, ctx) {
   return [guards, back];
 }
 
+/**
+ * The log format (V1-PLAN R2). A log written by the page is version 1 — a header line, then the
+ * events — and says so in the status line, with the decision that a week-old MetaMedium still opens it
+ * (core's `format.test.ts` proves that against master's bundle from the day before); every reader
+ * takes version 0, today's bare events, as well; a version this build does not know is refused in a
+ * sentence naming both versions, whether it comes as a board's file or as a folder's log, and nothing
+ * of it is read or written over. A folder whose log is version 0 is written back as version 1.
+ */
+export async function logFormatTest(browser, servers, ctx) {
+  const { freshContext, steps } = ctx;
+  const check = (name, ok, detail) => steps.push({ name, ok: !!ok, detail });
+  const url = `${servers.staticOrigin}/Demos/session-engine.html?nosw=1`;
+  const guards = await freshContext(browser, { origins: [servers.staticOrigin], label: 'log-format' });
+  const page = await guards.context.newPage();
+  try {
+    await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+    await waitReady(page);
+    const rand = rng(19);
+    for (let i = 0; i < 2; i++) await drawPath(page, boxPath(cellBox(i, rand)));
+    await page.evaluate(() => window.__mm.boardIdle());
+    const want = await page.evaluate(() => JSON.stringify(window.__mm.session.getEvents()));
+    const version = await page.evaluate(() => (document.querySelector('meta[name="metamedium-version"]') || {}).content || '');
+
+    // ---- N19. a log out is version 1, and says so ---------------------------------------
+    await page.click('#ccBtn');
+    await page.click('#exportBtn');
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }), page.click('#exportPanel button[data-export="log"]')]);
+    const file = readFileSync(await download.path(), 'utf8');
+    const lines = file.split('\n').filter(Boolean);
+    const head = JSON.parse(lines[0]);
+    const said = await statusText(page);
+    check('N19. the log the export pane writes is version 1: a header line naming the format, the version and the app that wrote it, then every event; and the status line says the version and that an older MetaMedium opens it too',
+      head.format === 'metamedium-log' && head.version === 1 && head.app === version && JSON.stringify(lines.slice(1).map((l) => JSON.parse(l))) === want &&
+        /log version 1/.test(said) && /older MetaMedium opens it too/.test(said),
+      { head, events: lines.length - 1, app: version, said });
+
+    // ---- N19b. version 1 back, and version 0 too --------------------------------------
+    const fromFile = async (name, text) => {
+      await openBoardsPane(page);
+      const before = (await boardsNow(page)).list.map((e) => e.id);
+      await page.setInputFiles('#boardsFile', { name, mimeType: 'application/json', buffer: Buffer.from(text, 'utf8') });
+      const got = await page.waitForFunction((b4) => {
+        const x = window.__mm.boards();
+        const e = x.list.find((y) => y.kind === 'board' && !b4.includes(y.id));
+        return e && x.current === e.id && !x.switching && !x.busy && window.__mm.board().ready ? { id: e.id, name: e.name } : false;
+      }, before, { timeout: 15000, polling: 50 }).then((h) => h.jsonValue()).catch(() => null);
+      return { before, got, log: got ? await page.evaluate(() => JSON.stringify(window.__mm.session.getEvents())) : null };
+    };
+    const v1 = await fromFile('v1.jsonl', file);
+    check('N19b. a version 1 file is a board from "from a file…" — every event equal, the header nowhere among them',
+      !!v1.got && v1.got.name === 'v1' && v1.log === want && !/"format":"metamedium-log"/.test(v1.log), { got: v1.got, same: v1.log === want });
+    const v0 = await fromFile('v0.jsonl', lines.slice(1).join('\n') + '\n');
+    check('N19c. and a version 0 file — bare events, as every log kept before the header is — is a board too, every event equal',
+      !!v0.got && v0.got.name === 'v0' && v0.log === want, { got: v0.got, same: v0.log === want });
+
+    // ---- N19d. a version this build does not know is refused, in a sentence ---------------
+    const future = JSON.stringify({ type: 'format', format: 'metamedium-log', version: 2, app: '9.9.9' }) + '\n' + lines.slice(1).join('\n') + '\n';
+    await openBoardsPane(page);
+    const boards19 = (await boardsNow(page)).list.map((e) => e.id);
+    await page.setInputFiles('#boardsFile', { name: 'future.jsonl', mimeType: 'application/json', buffer: Buffer.from(future, 'utf8') });
+    await page.waitForFunction(() => /version 2/.test((document.getElementById('boardsStatus') || {}).textContent || ''), null, { timeout: 10000 }).catch(() => {});
+    const refused = await page.evaluate(() => ({
+      said: ((document.getElementById('boardsStatus') || {}).textContent || '').replace(/\s+/g, ' ').trim(),
+      list: window.__mm.boards().list.filter((e) => e.kind === 'board').map((e) => e.id),
+      current: window.__mm.boards().current,
+    }));
+    check('N19d. a file of version 2 is refused in the boards pane with a sentence naming both versions and what wrote it — no board is made, and the one on screen is as it was',
+      /future\.jsonl/.test(refused.said) && /version 2/.test(refused.said) && /versions 0 and 1/.test(refused.said) && /9\.9\.9/.test(refused.said) &&
+        JSON.stringify(refused.list) === JSON.stringify(boards19.filter((id) => refused.list.includes(id))) && refused.list.length === boards19.length && refused.current === (await boardsNow(page)).current,
+      refused);
+
+    // ---- N19e. a folder whose log is of a newer version is refused whole; a version 0 one is written back as 1 -----
+    const folderOut = await page.evaluate(async (futureText) => {
+      const mm = window.__mm;
+      const store = new mm.MM.MemoryStore({ [mm.MM.logPathFor(mm.folder().me)]: futureText });
+      const path = store.paths().find((p) => p.endsWith('.jsonl'));
+      const before = mm.session.getEvents().length;
+      const opened = await mm.openStore(store, 'store', 'newer');
+      return {
+        opened: !!opened, before, after: mm.session.getEvents().length,
+        untouched: (await store.read(path)) === futureText,
+        status: document.getElementById('status').textContent,
+        onFolder: !!mm.folder().store,
+      };
+    }, future);
+    check('N19e. a folder holding a log of version 2 is not opened — its sentence in the status line, the board on screen kept, the file never written over',
+      !folderOut.opened && !folderOut.onFolder && folderOut.after === folderOut.before && folderOut.untouched && /version 2/.test(folderOut.status) && /versions 0 and 1/.test(folderOut.status), folderOut);
+    // A folder this hand wrote as version 0: it opens as it always did, and its next save is version 1 with every old event kept.
+    const legacy = lines.slice(1).join('\n') + '\n';
+    const upgraded = await page.evaluate(async (legacyText) => {
+      const mm = window.__mm;
+      const path = mm.MM.logPathFor(mm.folder().me);
+      const store = new mm.MM.MemoryStore({ [path]: legacyText });
+      const opened = await mm.openStore(store, 'store', 'older');
+      const marks = mm.session.getEvents().filter((e) => e.type === 'stroke').length;
+      const asOpened = (await store.read(path)) === legacyText;
+      mm.session.addStroke([{ x: 10, y: 10, t: 0 }, { x: 110, y: 12, t: 30 }, { x: 210, y: 10, t: 60 }], 1);
+      await mm.saveNow();
+      const text = String(await store.read(path));
+      return { opened: !!opened, marks, asOpened, first: text.split('\n')[0], lines: text.split('\n').filter(Boolean).length, old: legacyText.split('\n').filter(Boolean).length };
+    }, legacy);
+    check('N19f. a folder whose log is version 0 opens as it always did, its file as written until its hand writes; the save after is version 1 — the header, every old event, the new one',
+      upgraded.opened && upgraded.marks === 2 && upgraded.asOpened && /"format":"metamedium-log"/.test(upgraded.first) && /"version":1/.test(upgraded.first) && upgraded.lines === upgraded.old + 2, upgraded);
+  } catch (err) {
+    check('N19. the log format test ran to its end', false, { error: String(err && err.stack ? err.stack : err) });
+    await ctx.screenshot(page, 'boards-log-format');
+  }
+  await page.close().catch(() => {});
+  return guards;
+}
+
 /** The scenario the gate runs. */
 export async function runBoards(browser, servers, ctx) {
   const steps = [];
@@ -599,5 +710,8 @@ export async function runBoards(browser, servers, ctx) {
   const t2 = Date.now();
   const first = await firstRunTest(browser, servers, { ...ctx, steps });
   measured['first run s'] = +((Date.now() - t2) / 1000).toFixed(1);
-  return { steps, guards: [guards, ...first], measured };
+  const t3 = Date.now();
+  const format = await logFormatTest(browser, servers, { ...ctx, steps });
+  measured['log format s'] = +((Date.now() - t3) / 1000).toFixed(1);
+  return { steps, guards: [guards, ...first, format], measured };
 }

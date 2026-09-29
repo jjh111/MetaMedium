@@ -10,7 +10,7 @@
 // Uses: ui (pane, chip), controls (tiles.boards, togglePanel/closePanel), boards list (boardRows,
 //   sizeWords, isKept), folder (the boards adapter: boards, board, onBoardHere, switchBoard, newBoard,
 //   renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash, emptyTrash, boardFromFile,
-//   rereadBoards, boardEntryName, exportLogNow), input (flash, say), board (journalEvents), the
+//   rereadBoards, boardEntryName, exportLogNow, readLogText), input (flash, say), the
 //   inspector's element (the panel's start), boards list (exampleUrl, exampleRows, exampleName, starterOf).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
@@ -206,14 +206,14 @@
       await loadExamples();
       const row = examples.rows.find((r) => r.id === id);
       if (!row) { report('the examples could not be read — this page keeps them for offline once it has been online'); return false; }
-      let events = null;
+      let read = null;
       try {
         const res = await fetch(exampleUrl(row.file), { cache: 'no-cache' });
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        const d = journalEvents(await res.text());
-        events = d.bad ? null : d.events;
+        read = readLogText(await res.text(), row.name);
       } catch (err) { report('could not read the “' + row.name + '” example (' + ((err && err.message) || err) + ') — it opens once this page has been online'); return false; }
-      if (!events || !events.length || !events.every((ev) => ev && typeof ev.type === 'string')) { report('the “' + row.name + '” example is not a board’s log'); return false; }
+      if (!read.events) { report(read.refused || 'the “' + row.name + '” example is not a board’s log'); return false; }
+      const events = read.events;
       return await newBoard({ name: exampleName([...boards.entries.values()], row), events: events, force: !!o.force, said: o.said || ((v) => say(v.words)) });
     } finally { examples.opening = false; }
   }

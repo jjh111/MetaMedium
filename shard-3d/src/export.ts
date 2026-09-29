@@ -7,8 +7,9 @@
 // drawn above it* — and until this file existed the only way to look at one was
 // a screenshot and a hook dump.
 //
-// **The format is the canvas's, unchanged**: `encodeLog` of the session's own
-// events, one JSON event per line (`metamedium-core/src/store/seam.ts`). That
+// **The format is the canvas's** (`metamedium-core/src/store/format.ts`: version 1, a
+// header line and then `encodeLog` of the session's own events, one JSON event
+// per line; a log with no header is version 0 and reads as ever). That
 // is what `.metamedium/logs/*.log` holds, what the canvas's export pane writes
 // as `canvas.jsonl`, and what `mergeLogs` reads — so a board exported from
 // either surface is the same kind of thing, and a shard board can be opened in
@@ -32,9 +33,13 @@ export function encodeBoard(events: readonly SessionEvent[]): string {
   return encodeLog(events);
 }
 
-/** A file back into events. A broken line is skipped and counted, never fatal. */
-export function decodeBoard(text: string): { events: SessionEvent[]; skipped: number } {
-  return decodeLog(text);
+/**
+ * A file back into events. A broken line is skipped and counted, never fatal.
+ * A log of a version newer than this build reads throws `LogFormatError`, whose
+ * message is the sentence (V1-PLAN R2) — nothing of it is read.
+ */
+export function decodeBoard(text: string, source?: string): { events: SessionEvent[]; skipped: number } {
+  return decodeLog(text, { source });
 }
 
 /**

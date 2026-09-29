@@ -2119,7 +2119,14 @@ function exportBoard(): { name: string; events: number } {
  * `confirm: false`, because they have already decided.
  */
 function openBoard(text: string, o: { confirm?: boolean; what?: string } = {}): { events: number; skipped: number } | null {
-  const { events, skipped } = decodeBoard(text);
+  let decoded: ReturnType<typeof decodeBoard>;
+  try { decoded = decodeBoard(text, o.what); }
+  catch (err) {
+    // A log of a version newer than this build reads (R2): its sentence, and the board as it was.
+    if (err instanceof Error && err.name === 'LogFormatError') { panel.say(err.message); report(); return null; }
+    throw err;
+  }
+  const { events, skipped } = decoded;
   if (!events.length) {
     panel.say(`${o.what ?? 'that file'} holds no events the shard can read${skipped ? ` — ${skipped} lines were not JSON` : ''}`);
     report();

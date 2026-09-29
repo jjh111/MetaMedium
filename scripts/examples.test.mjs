@@ -60,10 +60,12 @@ test('the index names every example: an id, a name, what it shows, its file and 
   }
 });
 
-test('each file is a log as export writes it: one event per line, every line an event, a trailing newline, nothing key-shaped', () => {
+test('each file is a log as export writes it: a version 1 header, then one event per line, every line an event, a trailing newline, nothing key-shaped', () => {
   for (const id of IDS) {
     const text = linesOf(id);
     assert.ok(text.endsWith('\n'), id);
+    assert.equal(JSON.parse(text.split('\n')[0]).format, 'metamedium-log', `${id}: the first line is the log's header`);
+    assert.equal(MM.decodeLog(text).version, 1, id);
     const lines = text.split('\n').slice(0, -1);
     assert.ok(lines.every((l) => l.trim()), `${id}: no blank line`);
     const events = lines.map((l) => JSON.parse(l));

@@ -182,6 +182,6 @@
     const n = session.getState().contentIds.length;
     if (which === 'svg') { downloadText('board.svg', exportBoardSVG(), 'image/svg+xml'); flash('board.svg — ' + n + ' marks as paths'); }
     else if (which === 'png') exportBoardPNG().then((blob) => { if (blob) { downloadBlob('board.png', blob); flash('board.png — the canvas as pixels'); } });
-    else if (which === 'log') { const evs = session.getEvents(); downloadText('canvas.jsonl', MM.encodeLog(evs), 'application/json'); flash('canvas.jsonl — ' + evs.length + ' events'); }
+    else if (which === 'log') { const evs = session.getEvents(); downloadText('canvas.jsonl', MM.encodeLog(evs, logWrite()), 'application/json'); flash('canvas.jsonl — ' + evs.length + ' events' + logFileNote()); }
     closePanel(exportPanel, exportBtn);
   });
