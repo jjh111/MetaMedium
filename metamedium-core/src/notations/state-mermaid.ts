@@ -417,16 +417,16 @@ const ARROW_PROPORTION_PX = 800;
 /** A closed triangle drawn apart at an arc's end, in text sizes. */
 const HEAD = 1.2;
 
-const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-const scaled = (a: Point, k: number): Point => ({ x: a.x * k, y: a.y * k });
-const sub = (a: Point, b: Point): Point => ({ x: a.x - b.x, y: a.y - b.y });
-const unit = (v: Point): Point => {
+export const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+export const scaled = (a: Point, k: number): Point => ({ x: a.x * k, y: a.y * k });
+export const sub = (a: Point, b: Point): Point => ({ x: a.x - b.x, y: a.y - b.y });
+export const unit = (v: Point): Point => {
   const l = Math.hypot(v.x, v.y);
   return l > 1e-12 ? { x: v.x / l, y: v.y / l } : { x: 1, y: 0 };
 };
 
 /** A path walked as ink: every `step` along it — closed, back to its start. */
-function inkAlong(points: readonly Point[], step: number, closed = false): Point[] {
+export function inkAlong(points: readonly Point[], step: number, closed = false): Point[] {
   const ring = closed ? [...points, points[0]] : [...points];
   const out: Point[] = [{ ...ring[0] }];
   for (let i = 1; i < ring.length; i++) {
@@ -472,7 +472,7 @@ function triangleAt(apex: Point, dir: Point, len: number, step: number): Point[]
 }
 
 /** Beside everything on the board: right of its content, level with its top. The origin when the board is empty. */
-function besideContent(session: Session, margin: number): Point {
+export function besideContent(session: Session, margin: number): Point {
   const st = session.getState();
   let minY = Infinity, maxX = -Infinity;
   for (const id of st.contentIds) {
@@ -486,17 +486,17 @@ function besideContent(session: Session, margin: number): Point {
 }
 
 /** A closed border as a span: the points with the first repeated, the length to each. */
-function spanOf(points: readonly Point[]) {
+export function spanOf(points: readonly Point[]) {
   const pts = points.map((p) => ({ x: p.x, y: p.y }));
   pts.push({ ...pts[0] });
   const cum = [0];
   for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
   return { pts, cum, length: cum[cum.length - 1] };
 }
-type Span = ReturnType<typeof spanOf>;
+export type Span = ReturnType<typeof spanOf>;
 
 /** The nearest point on the border to `at`, as a share of its length. */
-function shareAt(span: Span, at: Point): number {
+export function shareAt(span: Span, at: Point): number {
   let best = Infinity, bestT = 0;
   for (let i = 1; i < span.pts.length; i++) {
     const a = span.pts[i - 1], b = span.pts[i];
@@ -513,7 +513,7 @@ function shareAt(span: Span, at: Point): number {
 }
 
 /** The point a share along the border. */
-function pointAtShare(span: Span, t: number): Point {
+export function pointAtShare(span: Span, t: number): Point {
   const target = t * span.length;
   let i = 1;
   while (i < span.cum.length - 1 && span.cum[i] < target) i++;

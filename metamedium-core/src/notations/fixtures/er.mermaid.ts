@@ -5,10 +5,11 @@
 // the board must export. The ids are the marks' own, said in Mermaid as D2
 // says them: an entity is its box's stroke (`stroke_1`), its name an alias.
 // The relationships run across the page, so it says `direction LR`. Entities
-// come in reading order — the drawing's columns, left to right, Order above
-// Invoice — then the relationships by the entities they join, the first
-// standing to the left of the second, each end's cardinality as the words at
-// that end say it.
+// come in reading order — the drawing's rows, each left to right: Customer,
+// Order and Line item, then Invoice beneath — of the page as it was meant to
+// stand (a hand's page leans a little); then the relationships by the
+// entities they join, the first standing to the left of the second or above
+// it, each end's cardinality as the words at that end say it.
 //
 // A cardinality is Mermaid's own crow's-foot token: `||` exactly one, `|o` /
 // `o|` zero or one, `}o` / `o{` zero or more, `}|` / `|{` one or more, the

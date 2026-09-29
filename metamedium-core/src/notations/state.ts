@@ -258,7 +258,7 @@ function bullseyeWord(word: MMNode, nodes: ReadonlyMap<string, MMNode>): Candida
  * a stadium and reads as either, unsurely, so it is also known by how fully
  * it fills its own tightest box and how square it stands to the page.
  */
-function stateShape(c: Candidate): { score: number; why: string } {
+export function stateShape(c: Candidate): { score: number; why: string } {
   let best = { score: 0, why: '' };
   for (const s of c.shapes) if ((s.symbol === 'process' || s.symbol === 'terminator') && s.score > best.score) best = { score: s.score, why: s.why };
   const o = c.outline;
@@ -270,12 +270,12 @@ function stateShape(c: Candidate): { score: number; why: string } {
   return best;
 }
 
-const topShape = (c: Candidate) => c.shapes[0]?.symbol;
-const isRound = (c: Candidate) => topShape(c) === 'round';
-const isForeign = (c: Candidate) => topShape(c) === 'decision' || topShape(c) === 'data';
-const isBox = (c: Candidate) => !isForeign(c) && !isRound(c) && stateShape(c).score > 0.05;
+export const topShape = (c: Candidate) => c.shapes[0]?.symbol;
+export const isRound = (c: Candidate) => topShape(c) === 'round';
+export const isForeign = (c: Candidate) => topShape(c) === 'decision' || topShape(c) === 'data';
+export const isBox = (c: Candidate) => !isForeign(c) && !isRound(c) && stateShape(c).score > 0.05;
 
-function insideOf(a: Candidate, b: Candidate): boolean {
+export function insideOf(a: Candidate, b: Candidate): boolean {
   const c = centreOf(b.outline.bounds);
   return b.outline.size < a.outline.size && outside(c, a.outline.hull) === 0;
 }
@@ -384,14 +384,14 @@ function loopOf(node: MMNode, states: readonly Candidate[], nodes: ReadonlyMap<s
  * the form is where the mark stands and a binding at its border must follow
  * it there (V1-PLAN E2); else the ink's, as the state was read.
  */
-function borderOf(c: Candidate, nodes: ReadonlyMap<string, MMNode>): Point[] {
+export function borderOf(c: Candidate, nodes: ReadonlyMap<string, MMNode>): Point[] {
   const n = c.ids.length === 1 ? nodes.get(c.ids[0]) : undefined;
   const form = n && cleanOf(n) ? cleanPointsOf(n) : undefined;
   const o = (form && form.length >= 3 ? outlineOf(form) : null) ?? c.outline;
   return o.hull.map((p) => ({ x: p.x, y: p.y }));
 }
 
-function portsFor(c: Candidate, nodes: ReadonlyMap<string, MMNode>): NotationPort[] {
+export function portsFor(c: Candidate, nodes: ReadonlyMap<string, MMNode>): NotationPort[] {
   return [{ name: 'border', along: borderOf(c, nodes), closed: true, reasoning: 'anywhere along the state’s border' }];
 }
 

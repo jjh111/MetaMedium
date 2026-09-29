@@ -868,3 +868,37 @@ export type { SerializeOptions } from './participants/serialize';
 
 // Types
 export type * from './types';
+
+// The ER diagram (V1-PLAN §3, D6): an entity is a box with its name written in
+// it, a relationship a plain line between two of them, its verb beside the
+// middle and a multiplicity at each end — the writing that says how many, read
+// as one of four cardinalities. What makes it an ER diagram rather than the
+// flowchart's or the class diagram's boxes and lines is what they lack: lines
+// with no head, boxes with nothing in them but a name, a multiplicity at the
+// ends. Its content is ER_TABLE, which the er@1 pack names; its erDiagram
+// writer and reader are er-mermaid.ts, registered with D2's writers and D3's
+// readers.
+export {
+  ER,
+  ER_TABLE,
+  readEr,
+  erPortsOf,
+  cardinalityOf,
+  saysOf,
+  END_SHARE as ER_END_SHARE,
+  MULTIPLICITY_SHARE,
+  MIDDLE_SHARE,
+  LETTER_PX as ER_LETTER_PX,
+  EVIDENCE as ER_EVIDENCE,
+  PLAIN_SHARE as ER_PLAIN_SHARE,
+  CLASSLIKE_PENALTY,
+  HEADED_PENALTY,
+} from './notations/er';
+export type { ErReading, ErEntity, ErRelationship, ErEnd, ErWriting, Cardinality } from './notations/er';
+// The ER diagram in Mermaid, both ways (D6): `erDiagram` written from a reading
+// — entities in reading order with their names, relationships by what they
+// join with the crow's-foot token each end says — and read back and drawn as
+// ink the notation reads: boxes, plain lines bound at both ends, a dash beside
+// each end carrying its multiplicity, the verb on the line.
+export { writeEr, readErText, ER_READER, cardinalityOfToken } from './notations/er-mermaid';
+export type { ErDiagramRead, ErNodeRead, ErLinkRead, DrawnErLink } from './notations/er-mermaid';
