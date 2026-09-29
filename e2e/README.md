@@ -14,7 +14,7 @@ exits nonzero if anything in it failed.
 
 ```bash
 cd e2e && npm ci && npx playwright install chromium   # once
-node run.mjs            # from anywhere: the default eleven (canvas, keep, boards, app, pencil, models, seat, budgets, shard, demo, demo2)
+node run.mjs            # from anywhere: the default twelve (canvas, keep, boards, app, pencil, models, seat, hand, budgets, shard, demo, demo2)
 cd e2e && npm run e2e   # the same thing
 
 npx playwright install webkit                   # once, for WebKit
@@ -42,12 +42,13 @@ guessing. Pick scenarios by name to run one: `node e2e/run.mjs canvas`,
 | `pencil` | pencil and tablet — `pencil.mjs`, written here: the pen and fingers synthesised in the page as iPadOS delivers them, and the keyboard as it tells the page | `Demos/session-engine.html?nosw=1` at 1180 × 820, in one context, reloaded once |
 | `models` | a hosted model is asked, and says why when it cannot be (V1-PLAN J5) — `models.mjs`, written here: the models pane and the field driven with the real pointer against `startModelStub` (`servers.mjs`), an OpenAI-compatible endpoint on 127.0.0.1 answering in OpenRouter's recorded shapes (`metamedium-core/src/llm/fixtures/`); nothing on this machine is probed — Ollama's list is a stand-in in the page, LM Studio does not answer | `app/`, in one context, reloaded once |
 | `seat` | the canvas's seat — `seat.mjs`, written here: Claude Code over MCP as the model the field asks, with a relay of its own, `Demos/mcp.mjs` as the answerer over stdio and `Demos/seat-watch.mjs` beside it | `Demos/session-engine.html?live=claude&relay=…&nosw=1`, in one context, reloaded once, and a second page for *with Claude* |
+| `hand` | the hand in the gate (V1-PLAN H1) — `hand.mjs`, written here: QA-v10's machine rows with `Demos/mcp.mjs` as a hand over stdio in room `mcp-test`, a relay of its own, a tab as *john*, and a counting model of the gate's own | `Demos/session-engine.html?live=mcp-test&relay=…&nosw=1`, in one context, reloaded once |
 | `budgets` | the surface's budgets and the equivalence check — `budgets.mjs`, written here, not a page harness | `Demos/session-engine.html?folder=…`, the bench's boards served from memory, a context each |
 
 `--browser chromium` (the default) or `--browser webkit` picks the engine, and
 the run's `e2e.json` records which as `browser` / `browserVersion`. `smoke` is
-**opt-in**: a bare `node run.mjs` runs the ten Chromium scenarios (`canvas`,
-`keep`, `boards`, `app`, `pencil`, `models`, `seat`, `budgets`, `shard`, `demo`, `demo2`) and
+**opt-in**: a bare `node run.mjs` runs the twelve Chromium scenarios (`canvas`,
+`keep`, `boards`, `app`, `pencil`, `models`, `seat`, `hand`, `budgets`, `shard`, `demo`, `demo2`) and
 nothing else, so the default gate needs no second engine installed. CI's
 `webkit` job runs `smoke`, `pencil` and `keep` on WebKit.
 
@@ -270,6 +271,56 @@ brief still paired by its own id, the seat's readings still on the boxes;
 **J4.7** *with Claude* in the Live pane joins the room and takes the seat in
 one act, *Claude is here and will read for you*; **J4.8** nothing reached
 `:8020`.
+
+### The hand in the gate: `hand`
+
+`hand.mjs` (V1-PLAN H1, acceptance A7; week 1's U7) is the use-review's
+machine half: `QA-v10.md`'s rows that a machine can walk, with the MCP hand in
+the room. A relay of its own on a free port — never `:8020`; a request there is
+refused and counted (H1.Z) — `Demos/mcp.mjs` as a hand called *claude* in room
+`mcp-test`, spoken to over stdio the way Claude Code speaks to it, and a tab on
+the static server named *john* (the name the *live* pane would give it), its
+pointer the harness's. **A model of the gate's own** joins the tab — an
+OpenAI-compatible endpoint on a free port that counts what reaches it and waits
+a moment before it answers — so the invariant is measurable: *Tier 1 before a
+model* (DIRECTOR-PLAN-W1 U7). Nothing a hand or a person does short of asking
+may reach it; it is asked once, by *What is this?* (H1.19), and H1.Y holds the
+count to that one, the working registry empty, no brief parked, the seat not
+taken, no real model reached. (Mutation checked: with auto-read switched on in
+the tab, H1.19 and H1.Y fail.) Every stroke a record draws is generated and
+says `synthetic` in its name; the rows that need John's own handwriting are
+**skips by name** (H1.S1–S3, the writing of §1–§3; H1.S4, a small model that
+fails on its own terms) and so is the ghost's timing (H1.5b, a drawn frame).
+Thirty records, twenty-four passing and six skipped, about a minute:
+**H1.0** the hand and the tab meet; **H1.1** the model joins and the hand's
+arrival and looks ask it nothing; **H1.2–H1.6** §4 — a mark beside a box that
+crosses nothing opens nothing, across it the field opens on the box and is his
+alone (the hand's look never says *selected* or *the field is open*), one tap
+lets go and the next stroke draws, the snap tile counts the circle, a box drawn
+below a held text (which the hand wrote) is a box; **H1.7–H1.18** §6 and A7 —
+the hand's circle lands in its own colour with its card, a sentence lands on his
+box alone under the id his own tab gave it, a transcript lands on his word with
+no model asked, a proposed reading is held and attributed, one undo takes only
+his last mark and his next number is new, the hand labels its own circle and is
+refused on his box, his `label:` says before Enter what it will not go on, a
+field left open stays open under the hand's line and `name: pair` makes the
+thing his, a loop that waits waits under the hand's stroke, a reload is a new
+sitting and the same person (the board back under its old ids, a label on a
+mark drawn before it, the hand's own refused), and after undo and reload a
+sentence and a reading land on the marks they were about; **H1.19** the one
+deliberate ask; **H1.20–H1.21** §7 — the minimap and a tap on it, three circles
+and two lines shown in 3D and the hand's look saying one running program;
+**H1.Y** the invariant; **H1.Z** nothing reached `:8020`.
+
+**What it found**, for the owners: the hand's own `canvas_look` printed a
+reading it or another hand proposed as though the engine had read it (fixed in
+`Demos/mcp.mjs`, H1.10); a reading the hand proposes is held and attributed on
+the tab but **the field's *what this is* row never shows it**, because a hand is
+a tier 0 voice and `conversionsFor` in `09-palette.js` leaves tier 0 out — a
+skip by name (H1.10b, *known*) that turns into a pass the day it shows;
+and `QA-v10.md` §4's *1 selected* predates per-hand gestures (L2h): a hand's
+look says neither *selected* nor *the field is open* for another hand's field,
+which is what H1.3 holds and `QA-v1.md` says.
 
 ## What it refuses to do
 
