@@ -38,6 +38,7 @@ import { sheetLines } from './gather';
 import { checkWritten, readSheet } from './sheet';
 import type { Sheet, StepCheck } from './sheet';
 import type { LengthUnit, Quantity } from './quantity';
+import type { GarmentPieceMaths } from './garment';
 import { compareQuantities, convertQuantity, formatNumber, formatQuantity, unitSuffix } from './quantity';
 
 // ===== What a solution says =====
@@ -1158,6 +1159,8 @@ export interface BoardMaths {
   sheet: Sheet;
   /** Every figure on the board, labelled or not, each solved on its own. */
   figures: FigureMaths[];
+  /** The pattern pieces among them (M6, maths/garment.ts): what their seam allowance, fold and marks come to. Absent when the board has none. */
+  garment?: GarmentPieceMaths[];
 }
 
 export interface SolveBoardOptions {

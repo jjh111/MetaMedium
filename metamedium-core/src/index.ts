@@ -257,6 +257,9 @@ export type { Paper, Orientation, PaperSize, PrintOptions, PrintPage, PrintJob }
 // stands. Derived: nothing enters the log.
 export { boardMaths, boardMathsOf, mathsChips, mathsSaid, evaluateTyped, CHIP_OFFSET, STEP_GAP } from './maths/board';
 export type { MathsChip, MathsChipKind, MathsSaid, TypedMaths } from './maths/board';
+// What a pattern piece's marks come to in numbers, and what true size prints of them (M6).
+export { garmentMaths, garmentDecor, offsetPolygon, affineFit, applyAffine, INK_AGREES as GARMENT_INK_AGREES } from './maths/garment';
+export type { GarmentPieceMaths, GarmentSeam, GarmentFold, GarmentDims, GarmentNotchMaths, GarmentDartMaths, GarmentDrawn, GarmentDecor } from './maths/garment';
 
 // Magnets — the places a mark offers attachment, derived from its clean form.
 export { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet, siteOf, MAGNET_SCREEN_PX, MAGNET_SIZE_FRACTION } from './session/magnets';

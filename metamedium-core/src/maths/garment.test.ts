@@ -15,7 +15,7 @@
 // own strokes out of its list of what it could not draw.
 
 import { describe, it, expect } from 'vitest';
-import type { Bounds, Point } from '../types';
+import type { Bounds } from '../types';
 import { createSession } from '../session/session';
 import type { Session } from '../session/session';
 import { drawGarment, GARMENT_VARIANTS } from '../notations/fixtures/garment';
