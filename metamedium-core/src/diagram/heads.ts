@@ -41,7 +41,7 @@ import type { MMNode } from '../session/nodes';
 import { boundsOf, fingerprintOf, getRep, isWord, placed, strokePointsOf, transcriptOf } from '../session/nodes';
 import { snapReading } from '../session/clean';
 import { magnetRadius } from '../session/magnets';
-import { calculateStraightness } from '../geometry';
+import { arrowTipIndex, calculateStraightness } from '../geometry';
 import { HAND_RESOLUTION_PX, MAX_TIER0_CONFIDENCE } from '../recognition';
 
 /** What a connector's end can carry. */
@@ -322,22 +322,13 @@ function connectorOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>): Connecto
     const meta = getRep(node, 'reading:arrow')?.data as { head?: string; tip?: Point; tail?: Point } | undefined;
     const raw = (getRep(node, 'stroke')?.data as { points?: Point[] } | undefined)?.points;
     if (meta?.tip && meta.tail && raw && raw.length === pts.length) {
-      const [roughTip, tail] = placed(node, [meta.tip, meta.tail]);
-      // The rung places the tip where it measured the barb's first turn, which
-      // can sit a wing's length short of it. The tip is the ink's farthest
-      // point along the shaft, where the pen FIRST reaches it coming from the
-      // tail — a two-wing barb comes back to the tip between its wings — and
-      // the barb is the ink from there on.
-      const heading = unit(sub(roughTip, tail));
-      const reachOut = (p: Point) => dot(sub(p, tail), heading);
-      const far = Math.max(...pts.map(reachOut));
-      const near = magnetRadius(0, scale) / 2;
+      const [, tail] = placed(node, [meta.tip, meta.tail]);
+      // The rung's tip is the ink the pen first reached farthest along the
+      // shaft (S2: `inkTipIndex`, geometry.ts), one of the stroke's own points
+      // — a two-wing barb comes back to the tip between its wings — and the
+      // barb is the ink from there on.
       const headAtEnd = meta.head !== 'start';
-      const order = headAtEnd ? pts.map((_, i) => i) : pts.map((_, i) => pts.length - 1 - i);
-      let at = order.findIndex((i) => reachOut(pts[i]) >= far - near);
-      if (at < 0) at = order.length - 1;
-      while (at + 1 < order.length && reachOut(pts[order[at + 1]]) >= reachOut(pts[order[at]])) at++;
-      const k = order[at];
+      const k = arrowTipIndex(raw, { head: meta.head, tip: meta.tip, tail: meta.tail }, HAND_RESOLUTION_PX * scale);
       const tip = pts[k];
       const barb = headAtEnd ? pts.slice(k) : pts.slice(0, k + 1).reverse();
       const u = unit(sub(tip, tail));

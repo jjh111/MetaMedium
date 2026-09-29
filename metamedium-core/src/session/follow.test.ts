@@ -233,15 +233,17 @@ describe('an arrow: its tip follows the box, and it still points at it', () => {
 });
 
 describe("the trap: the connector's OWN form changes, and it follows again", () => {
-  it("an arrow drawn clean stands as its clean form — whose tip the rung may place a wing's length short — and that tip is carried onto the site", () => {
+  it("an arrow drawn clean stands as its clean form — built from the rung's tip, which is the ink's since S2 — and that tip is carried onto the site", () => {
     const s = createSession();
     const a = box(s, 100, 100, 1000);
     const b = box(s, 700, 100, 1500);
     const ar = s.addStroke(handArrow({ x: 300, y: 160 }, { x: 697, y: 160 }, { wings: 2, headLen: 24, seed: 3, jitter: 0 }), 2000, undefined, 1);
     s.bind({ strokeId: ar, nodeId: b, site: { kind: 'middle', index: 3 }, end: 'end', at: 3000 });
-    // The rung's tip, which the clean arrow is built from, stands short of the ink's.
+    // The rung's tip, which the clean arrow is built from, is the ink's (it stood
+    // a wing's length short of it before S2): the point the pen drew to, not
+    // the site it is about to be carried onto.
     const rough = (getRep(nodeOf(s, ar), 'reading:arrow')!.data as { tip: Point }).tip;
-    expect(dist(rough, { x: 700, y: 160 })).toBeGreaterThan(5);
+    expect(dist(rough, { x: 697, y: 160 })).toBeLessThan(2);
     s.snap({ ids: [ar], at: 4000 });
     expect(getRep(nodeOf(s, ar), 'clean')).toBeDefined();
     expectAt(endOf(s, ar, 'end'), { x: 700, y: 160 });

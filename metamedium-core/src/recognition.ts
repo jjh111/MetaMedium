@@ -6,7 +6,7 @@
 
 import type { Point, Fingerprint, RecognitionResult, StrokeAnalysis } from './types';
 import type { Bow } from './geometry';
-import { getFingerprint, checkOvershoot, calculateStraightness, resampleByArcLength, bowOf } from './geometry';
+import { getFingerprint, checkOvershoot, calculateStraightness, resampleByArcLength, bowOf, inkTipIndex } from './geometry';
 
 // ===== Evidence =====
 //
@@ -312,13 +312,22 @@ function detectArrow(fp: Fingerprint, points: Point[], scale = 1): RecognitionRe
     .sort((a, b) => b.fit - a.fit)[0];
   if (!best) return null;
 
+  // Where the ink points, not where the head's first corner turned: a two-wing
+  // barb comes back to the tip between its wings, and the corner the rung
+  // measured can sit a wing's length short of it (V1-PLAN S2). The tip is the
+  // stroke's own point the pen first reached farthest along the shaft, and
+  // the tail is the stroke's own end at the other side.
+  const end = best.head === 'end' ? points[0] : points[points.length - 1];
+  const at = points[inkTipIndex(points, best.head, end, best.tip, HAND_RESOLUTION_PX * scale)];
+  const tail = { x: end.x, y: end.y }, tip = { x: at.x, y: at.y };
+
   return result(
     'arrow',
     'Arrow',
     best.fit,
     `a straight shaft (${best.straight.toFixed(2)}) with a ${Math.round((best.sharpest * 180) / Math.PI)}° barb at the ${best.head}, ` +
       `the barb ${best.barb.ratio.toFixed(2)} of the shaft`,
-    { head: best.head, tip: best.tip, tail: best.tail, barb: best.barb.reach }
+    { head: best.head, tip, tail, barb: best.barb.reach }
   );
 }
 

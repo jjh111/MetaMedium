@@ -39,6 +39,7 @@
 // own reach, read as the pen reads it.
 
 import type { Bounds, Point } from '../types';
+import { arrowTipIndex } from '../geometry';
 
 /** Crossings required before a stroke is read as scratching a mark out. */
 export const DEFAULT_ERASE_CROSSINGS = 3;
@@ -142,17 +143,13 @@ export interface Meeting {
  */
 export function headOf(points: Point[], arrow: { head?: string; tip?: Point; tail?: Point }, near: number): Meeting | null {
   if (!arrow.tip || !arrow.tail || points.length < 3) return null;
-  const { tip: rough, tail } = arrow;
-  const L = Math.hypot(rough.x - tail.x, rough.y - tail.y);
-  if (!(L > 0)) return null;
-  const ux = (rough.x - tail.x) / L, uy = (rough.y - tail.y) / L;
-  const along = (p: Point) => (p.x - tail.x) * ux + (p.y - tail.y) * uy;
+  const { tail } = arrow;
   const order = arrow.head === 'start' ? points.map((_, i) => points.length - 1 - i) : points.map((_, i) => i);
-  let far = -Infinity;
-  for (const p of points) far = Math.max(far, along(p));
-  let k = order.findIndex((i) => along(points[i]) >= far - near);
+  // The rung's own tip, found in the stroke by the one definition of where the
+  // ink points (`arrowTipIndex`, geometry.ts).
+  const at = arrowTipIndex(points, { head: arrow.head, tip: arrow.tip, tail }, near);
+  const k = order.indexOf(at);
   if (k < 0) return null;
-  while (k + 1 < order.length && along(points[order[k + 1]]) >= along(points[order[k]])) k++;
   const tip = points[order[k]];
   let reach = 0;
   for (let j = k; j < order.length; j++) {

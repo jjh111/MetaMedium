@@ -404,6 +404,46 @@ export function resampleByArcLength(points: Point[], n: number, closed = false):
 }
 
 /**
+ * Where an arrow's ink points: the index of its tip in the stroke, the ink the
+ * pen FIRST reached farthest along the shaft, coming from the tail (V1-PLAN
+ * S2). A two-wing barb comes back to the tip between its wings, so the last
+ * point of the farthest reach is a wing's; an arm drawn square off the shaft
+ * never gets farther along it, so the first of the reach is the shaft's own.
+ * `hint` says which way the shaft runs (tail to it), `near` is how close to the
+ * farthest reach counts as reaching it — the hand's resolution. The one home
+ * of the tip: the rung reads it (`analyzeStroke`), the ends of a connector
+ * (`diagram/heads.ts`) and the arrow's own head at a scratch (`session/erase.ts`)
+ * find the same point again with `arrowTipIndex`.
+ */
+export function inkTipIndex(points: readonly Point[], head: 'end' | 'start', tail: Point, hint: Point, near: number): number {
+  const L = Math.hypot(hint.x - tail.x, hint.y - tail.y);
+  if (!(L > 0) || points.length === 0) return head === 'start' ? 0 : Math.max(0, points.length - 1);
+  const ux = (hint.x - tail.x) / L, uy = (hint.y - tail.y) / L;
+  const along = (p: Point) => (p.x - tail.x) * ux + (p.y - tail.y) * uy;
+  const order = head === 'start' ? points.map((_, i) => points.length - 1 - i) : points.map((_, i) => i);
+  let far = -Infinity;
+  for (const p of points) far = Math.max(far, along(p));
+  let at = order.findIndex((i) => along(points[i]) >= far - near);
+  if (at < 0) at = order.length - 1;
+  // From there to the crest, so a hand's wobble on the way in is not the tip.
+  while (at + 1 < order.length && along(points[order[at + 1]]) >= along(points[order[at]])) at++;
+  return order[at];
+}
+
+/**
+ * The index of an arrow's tip in `points`, given the reading the rung kept:
+ * its `tip` is one of the stroke's own points, so it is found exactly — the
+ * first such point in the direction the pen drew the head — and only a tip
+ * that is not one (a reading from elsewhere) is found again by `inkTipIndex`.
+ */
+export function arrowTipIndex(points: readonly Point[], arrow: { head?: string; tip: Point; tail: Point }, near: number): number {
+  const head = arrow.head === 'start' ? 'start' : 'end';
+  const order = head === 'start' ? points.map((_, i) => points.length - 1 - i) : points.map((_, i) => i);
+  const exact = order.find((i) => points[i].x === arrow.tip.x && points[i].y === arrow.tip.y);
+  return exact !== undefined ? exact : inkTipIndex(points, head, arrow.tail, arrow.tip, near);
+}
+
+/**
  * Corners, measured along the path rather than along the point array.
  *
  * Two properties the previous implementation lacked, both of which showed up as
