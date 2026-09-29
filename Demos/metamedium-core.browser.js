@@ -467,6 +467,7 @@ var MetaMediumCore = (() => {
     memberKind: () => memberKind,
     memberLine: () => memberLine,
     mergeLogs: () => mergeLogs,
+    mermaidFor: () => mermaidFor,
     mermaidIds: () => mermaidIds,
     mermaidReaders: () => mermaidReaders,
     mermaidString: () => mermaidString,
@@ -551,7 +552,7 @@ var MetaMediumCore = (() => {
     readUmlClass: () => readUmlClass,
     readingsFor: () => readingsFor,
     readingsToEdges: () => readingsToEdges,
-    reasonOf: () => reasonOf,
+    reasonOf: () => reasonOf2,
     refusalOf: () => refusalOf,
     regionAt: () => regionAt,
     regionIdsIn: () => regionIdsIn,
@@ -6026,12 +6027,12 @@ var MetaMediumCore = (() => {
   var UNIT_NAMES2 = { in: "inches", ft: "feet", cm: "centimetres", mm: "millimetres", m: "metres" };
   function scaleOf(labels, unit4) {
     const ratios = [];
-    const counted = /* @__PURE__ */ new Set();
+    const counted2 = /* @__PURE__ */ new Set();
     for (const { figure, label } of labels) {
       if (label.declared || !isLengthKey(label.key) || isRange(label.value) || label.value.dim !== (unit4 ? 1 : label.value.dim)) continue;
       if (label.number) {
-        if (counted.has(label.number)) continue;
-        counted.add(label.number);
+        if (counted2.has(label.number)) continue;
+        counted2.add(label.number);
       }
       const ink = inkMeasure(figure, label.key);
       if (!ink || ink <= 0) continue;
@@ -8909,9 +8910,9 @@ ${p.svg}</section>`),
     const form = cleanFormOf(node, nodes);
     if (!form) return [];
     const shape = form.clean.shape;
-    const standing = form.held ? node : holding(node, form.clean, form.confidence);
+    const standing2 = form.held ? node : holding(node, form.clean, form.confidence);
     const out = [];
-    for (const site of magnetSites(standing, nodes)) {
+    for (const site of magnetSites(standing2, nodes)) {
       if (site.notation || !hasHandle(shape, site)) continue;
       out.push({ nodeId: node.id, shape, kind: site.kind, index: site.index, point: site.point, reasoning: wordsFor(shape, site.kind) });
     }
@@ -9988,7 +9989,13 @@ ${p.svg}</section>`),
     // A program that renders itself (a three.js scene, a 2D drawing) in a
     // scripts-only, opaque-origin frame with a clear background, and REPORTS
     // its parts — named things at named places — so ink over it lands on them.
-    { kind: "run", extensions: ["run.js"], mime: "text/javascript", renderer: "run", addressing: "parts", textual: true }
+    { kind: "run", extensions: ["run.js"], mime: "text/javascript", renderer: "run", addressing: "parts", textual: true },
+    // A diagram said as Mermaid text (V1-PLAN §3, D2): drawn by mermaid.js in the
+    // same scripts-only, opaque-origin frame a program runs in, which REPORTS each
+    // node as a part — named for the marks it was written from — so ink over the
+    // rendered diagram lands on them. The text always stands, drawn or not; and a
+    // text is data, never code: nothing here is played.
+    { kind: "mermaid", extensions: ["mmd", "mermaid"], mime: "text/vnd.mermaid", renderer: "mermaid", addressing: "parts", textual: true }
   ];
   function kindOf(path) {
     const lower = path.toLowerCase();
@@ -20074,7 +20081,7 @@ ${lines.join("\n")}
       notes.push(`${id}\u2019s ${port} is on no site its mark offers: bound at the nearest (${best ? `${best.site.kind} ${best.site.index}` : "none"})`);
       return { nodeId, site: best?.site ?? { kind: "centre", index: 0 }, of: "mark", port, point: want };
     };
-    const standing = /* @__PURE__ */ new Map();
+    const standing2 = /* @__PURE__ */ new Map();
     const ends = /* @__PURE__ */ new Map();
     for (const n2 of nodes) {
       const f = figures.get(n2.id);
@@ -20083,7 +20090,7 @@ ${lines.join("\n")}
       const xs = hull2.map((p) => p.x), ys = hull2.map((p) => p.y);
       for (const p of PORTS) ends.set(`${n2.id}:${p}`, endAt(n2.id, p));
       const ports = Object.fromEntries(PORTS.map((p) => [p, ends.get(`${n2.id}:${p}`).point]));
-      standing.set(n2.id, { id: n2.id, rank: layout.rank.get(n2.id), ink, centre: centreOf6(n2.id), hull: hull2, box: { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) }, ports });
+      standing2.set(n2.id, { id: n2.id, rank: layout.rank.get(n2.id), ink, centre: centreOf6(n2.id), hull: hull2, box: { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) }, ports });
     }
     const drawnLinks = [];
     const crossing = [];
@@ -20102,7 +20109,7 @@ ${lines.join("\n")}
       return { x: v.x / l, y: v.y / l };
     };
     const placedOf = (l, r) => {
-      const a = standing.get(l.from), b2 = standing.get(l.to);
+      const a = standing2.get(l.from), b2 = standing2.get(l.to);
       const P = a.ports[r.ports[0]], Q = b2.ports[r.ports[1]];
       const drawn = drawnOf(l);
       const ink = connectorInk(r, P, Q, drawn, scale);
@@ -20121,13 +20128,13 @@ ${lines.join("\n")}
       const across2 = Math.abs(e.out.x * v.y - e.out.y * v.x), ahead = e.out.x * v.x + e.out.y * v.y;
       return across2 <= 1.5 * HEAD_AXIS_SHARE * m.size && ahead >= -1.2 * m.size || Math.hypot(v.x, v.y) <= 0.25 * e.length;
     };
-    const symbolWeight = new Map([...standing.values()].map((o) => [o.id, weigh(o.ink)]));
+    const symbolWeight = new Map([...standing2.values()].map((o) => [o.id, weigh(o.ink)]));
     const span = (l) => layout.rank.get(l.to) - layout.rank.get(l.from);
     const routes = /* @__PURE__ */ new Map();
     const taken = { straight: [], ports: /* @__PURE__ */ new Map() };
     for (const l of [...links.filter((x) => span(x) === 1), ...links.filter((x) => span(x) > 1), ...links.filter((x) => span(x) < 1)]) {
-      const a = standing.get(l.from), b2 = standing.get(l.to);
-      const others = [...standing.values()].filter((o) => o.id !== a.id && o.id !== b2.id);
+      const a = standing2.get(l.from), b2 = standing2.get(l.to);
+      const others = [...standing2.values()].filter((o) => o.id !== a.id && o.id !== b2.id);
       const drawn = drawnOf(l);
       let budget = VERIFIED;
       const reads2 = (r) => {
@@ -20139,7 +20146,7 @@ ${lines.join("\n")}
         if (!involved.length && !nearSymbols.length && !outranked) return true;
         if (budget-- <= 0) return void 0;
         const symbols = new Map([[a.id, a], [b2.id, b2], ...nearSymbols.map((o) => [o.id, o])]);
-        for (const d of involved) for (const id of [d.link.from, d.link.to]) symbols.set(id, standing.get(id));
+        for (const d of involved) for (const id of [d.link.from, d.link.to]) symbols.set(id, standing2.get(id));
         const conns = [...involved, c].map((d) => ({ ink: d.ink, route: d.route, drawn: d.drawn, at: { start: true, end: true } }));
         return readsAsDrawn([...symbols.values()].map((o) => o.ink), conns, scale);
       };
@@ -20773,17 +20780,17 @@ ${lines.join("\n")}
       { direction: r.direction, rankGap: RANK_GAP2 * U * scale, nodeGap: NODE_GAP2 * U * scale }
     );
     const origin = opts.origin ?? besideContent2(session, CLASS_MIN * U * scale);
-    const standing = /* @__PURE__ */ new Map();
+    const standing2 = /* @__PURE__ */ new Map();
     for (const n2 of nodes) {
       const c = add4(origin, layout.at.get(n2.id));
       const z = sizes.get(n2.id);
-      standing.set(n2.id, { id: n2.id, rank: layout.rank.get(n2.id), box: { minX: c.x - z.w * scale / 2, maxX: c.x + z.w * scale / 2, minY: c.y - z.h * scale / 2, maxY: c.y + z.h * scale / 2 } });
+      standing2.set(n2.id, { id: n2.id, rank: layout.rank.get(n2.id), box: { minX: c.x - z.w * scale / 2, maxX: c.x + z.w * scale / 2, minY: c.y - z.h * scale / 2, maxY: c.y + z.h * scale / 2 } });
     }
     const ids = {};
     const placeholder = [];
     const drawnMarks = [];
     for (const n2 of nodes) {
-      const k = standing.get(n2.id), z = sizes.get(n2.id);
+      const k = standing2.get(n2.id), z = sizes.get(n2.id);
       const b = k.box;
       const box = session.addStroke(strokeFor({ shape: "rectangle", x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY }), next(), pid, scale, { content: true });
       k.mark = box;
@@ -20808,8 +20815,8 @@ ${lines.join("\n")}
     const crossesOf = (pts, others) => others.filter((o) => pts.some((p, i) => i > 0 && meetsBox2(pts[i - 1], p, grown(o.box)))).length;
     const leavesBoth = (sa, d, sb, e) => d.x * outward2[sa].x + d.y * outward2[sa].y > 0.2 * Math.hypot(d.x, d.y) && e.x * outward2[sb].x + e.y * outward2[sb].y > 0.2 * Math.hypot(e.x, e.y);
     for (const l of links) {
-      const a = standing.get(l.left), b = standing.get(l.right);
-      const others = [...standing.values()].filter((o) => o !== a && o !== b);
+      const a = standing2.get(l.left), b = standing2.get(l.right);
+      const others = [...standing2.values()].filter((o) => o !== a && o !== b);
       const pref = (sa, sb) => {
         if (a.rank === b.rank) {
           const aFirst = across2 ? a.box.minY < b.box.minY : a.box.minX < b.box.minX;
@@ -20862,7 +20869,7 @@ ${lines.join("\n")}
     const onSide = /* @__PURE__ */ new Map();
     for (const l of links) {
       const [sa, sb] = sidesOfLink.get(l);
-      const a = standing.get(l.left), b = standing.get(l.right);
+      const a = standing2.get(l.left), b = standing2.get(l.right);
       for (const [k, s, other, which] of [[a, sa, b, 0], [b, sb, a, 1]]) {
         const key2 = `${k.id}:${s}`;
         const list5 = onSide.get(key2) ?? [];
@@ -20873,7 +20880,7 @@ ${lines.join("\n")}
     const endPoint = /* @__PURE__ */ new Map();
     for (const [key2, list5] of onSide) {
       const [cls, side] = key2.split(/:(?=[a-z]+$)/);
-      const [p, q] = sideEnds(standing.get(cls).box, side);
+      const [p, q] = sideEnds(standing2.get(cls).box, side);
       const d = { x: q.x - p.x, y: q.y - p.y };
       const along = (x) => ((x.x - p.x) * d.x + (x.y - p.y) * d.y) / (d.x * d.x + d.y * d.y);
       list5.sort((m, n2) => along(m.toward) - along(n2.toward) || m.l.index - n2.l.index);
@@ -23280,11 +23287,11 @@ if (mm.THREE && mm.scene) {
       for (const id of scope.summon.enclosedIds.filter((x) => s.artifacts.includes(x))) {
         const n2 = s.nodes.get(id);
         const rep = n2 && codeRepOf(n2);
-        if (!rep || rep.data.kind !== "text") continue;
+        if (!rep || rep.data.kind !== "text" && rep.data.kind !== "mermaid") continue;
         out.push({
           key: "edit-text:" + id,
           label: "Edit the text",
-          reason: "a new version of the words; every version kept",
+          reason: rep.data.kind === "mermaid" ? "a new version of the Mermaid; every version kept" : "a new version of the words; every version kept",
           base: 0.4,
           tool: "text-edit",
           verbs: ["edit", "edit the text", "retype"],
@@ -23667,8 +23674,106 @@ if (mm.THREE && mm.scene) {
     }
   };
 
+  // src/tools/mermaid.ts
+  var MIN_W = 320;
+  var MIN_H = 240;
+  var MAX_W = 900;
+  var MAX_H = 900;
+  var GAP_SHARE = 0.12;
+  var MIN_GAP = 48;
+  function mermaidFor(state, ids, isRead2 = () => false) {
+    const words = (id) => isRead2(id) && !transcriptOf(state.nodes.get(id));
+    for (const reading4 of notationsOf(state, ids)) {
+      if (reading4.confidence < NOTATION_FLOOR) continue;
+      const said3 = toMermaid(reading4, { readWith: words });
+      if (said3) return { reading: reading4, said: said3 };
+    }
+    return null;
+  }
+  var mermaidOf = (scope) => mermaidFor(scope.state, scope.marks, scope.host.isRead);
+  function standing(scope, text) {
+    const s = scope.state;
+    return s.artifacts.some((id) => {
+      const n2 = s.nodes.get(id);
+      const rep = n2 && codeRepOf(n2);
+      return !!rep && rep.data.kind === "mermaid" && rep.data.code === text;
+    });
+  }
+  var reasonOf = (reading4) => `${describeNotation(reading4)} \u2014 as Mermaid text beside it; the drawing stays`;
+  var MERMAID = {
+    id: "mermaid",
+    name: "Mermaid",
+    describe: () => "a drawing that reads as a flowchart, a class diagram or a sequence diagram said as Mermaid text, an artifact beside it that draws the diagram; the drawing stays",
+    offers(scope) {
+      if (scope.marks.length < 2) return [];
+      if (scope.marks.some((id) => scope.state.artifacts.includes(id))) return [];
+      const m = mermaidOf(scope);
+      if (!m || standing(scope, m.said.text)) return [];
+      return [{
+        key: "mermaid",
+        label: "Make it Mermaid",
+        reason: reasonOf(m.reading),
+        base: 0.35,
+        tool: "mermaid",
+        verbs: ["mermaid", "mmd", "as mermaid"],
+        data: { notation: m.reading.notation }
+      }];
+    },
+    take(_offer, scope, session, at) {
+      const m = mermaidOf(scope);
+      if (!m) return { made: null, detail: { ok: false, error: "the marks held no longer read as a diagram" } };
+      const box = unionOf(scope.marks.map((id) => boundsOf(scope.state.nodes.get(id))).filter((b) => !!b));
+      if (!box) return { made: null, detail: { ok: false, error: "the marks held have nowhere to stand beside" } };
+      const w2 = Math.min(MAX_W, Math.max(MIN_W, box.maxX - box.minX));
+      const h2 = Math.min(MAX_H, Math.max(MIN_H, box.maxY - box.minY));
+      const x = box.maxX + Math.max(MIN_GAP, (box.maxX - box.minX) * GAP_SHARE);
+      const path = `${m.reading.notation}.mmd`;
+      const made = session.import({ kind: "mermaid", path, name: path, bounds: { minX: x, minY: box.minY, maxX: x + w2, maxY: box.minY + h2 }, code: m.said.text, at });
+      return { made, detail: { ok: !!made, notation: m.reading.notation, diagram: m.said.diagram, text: m.said.text, notes: m.said.notes, reading: describeNotation(m.reading) } };
+    }
+  };
+
+  // src/tools/mermaid-draw.ts
+  var THINGS = { sequence: ["participant", "participants"], "uml-class": ["class", "classes"] };
+  var LINKS = { sequence: ["message", "messages"] };
+  var counted = (n2, [one, many]) => `${n2} ${n2 === 1 ? one : many}`;
+  function withArticle(name) {
+    const acronym = /^[A-Z]{2,}\b/.test(name);
+    const said3 = acronym ? name : name.toLowerCase();
+    return `${!acronym && /^[aeio]/.test(said3) ? "an" : "a"} ${said3}`;
+  }
+  var MERMAID_DRAW = {
+    id: "mermaid-draw",
+    name: "drawing from Mermaid",
+    describe: () => "a Mermaid text, read as a flowchart, a class diagram or a sequence diagram, drawn as marks that read back as the same diagram; the text stays",
+    offers(scope) {
+      if (scope.marks.length !== 1) return [];
+      const id = scope.marks[0];
+      if (!scope.state.artifacts.includes(id)) return [];
+      const node = scope.state.nodes.get(id);
+      const rep = node && codeRepOf(node);
+      if (!rep || rep.data.kind !== "mermaid" || !rep.data.code) return [];
+      const read2 = readMermaid(rep.data.code);
+      if (!read2.notation) return [];
+      const name = notationById(read2.notation)?.name ?? read2.notation;
+      const what = `${counted(read2.nodes.length, THINGS[read2.notation] ?? ["node", "nodes"])} and ${counted(read2.links.length, LINKS[read2.notation] ?? ["link", "links"])} read as ${withArticle(name)}`;
+      return [{
+        key: "mermaid-draw",
+        label: "Draw it",
+        reason: `${what} \u2014 drawn as marks the canvas reads back as the same diagram; the text stays`,
+        base: 0.95,
+        tool: "mermaid-draw",
+        verbs: ["draw it", "ink it"],
+        data: { artifact: id, notation: read2.notation }
+      }];
+    },
+    take(offer) {
+      return { host: "mermaid-draw", detail: offer.data };
+    }
+  };
+
   // src/tools/builtin.ts
-  var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS];
+  var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW];
   registerTool(CORRECT);
   registerTool(TEXT);
   registerTool(NAME2);
@@ -23687,6 +23792,8 @@ if (mm.THREE && mm.scene) {
   registerTool(KEEP);
   registerTool(STRUCTURE);
   registerTool(MATHS);
+  registerTool(MERMAID);
+  registerTool(MERMAID_DRAW);
 
   // src/context/context.ts
   var CONTEXT_FADE = 2.5;
@@ -25485,7 +25592,7 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
       why: `${order2[0].of} ${p2(order2[0].p)} leads ${order2[1].of} ${p2(order2[1].p)} by ${p2(lead)}`
     };
   }
-  function reasonOf(question, answer) {
+  function reasonOf2(question, answer) {
     const dist10 = ranked(answer).map((d) => `${d.of} ${p2(d.p)}`).join(" \xB7 ");
     if (answer.kind === "noul") return `asked \u201C${question.ask}\u201D \u2014 ${dist10}`;
     if (answer.kind === "score") {
@@ -25541,7 +25648,7 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
           continue;
         }
         const { flat, why } = isFlat(answer, margin);
-        rows.push({ question: q, answer, flat, flatWhy: why, reason: reasonOf(q, answer), held: false });
+        rows.push({ question: q, answer, flat, flatWhy: why, reason: reasonOf2(q, answer), held: false });
       }
       const state = session.getState();
       if (state.generation !== snapshot) {

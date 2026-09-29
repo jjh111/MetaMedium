@@ -33,7 +33,7 @@
   function editText(id, text) {
     const n = session.getState().nodes.get(id);
     const rep = n && codeRepOf(n);
-    return session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: id, kind: 'text', code: text, from: rep && rep.data.from, at: Date.now() });
+    return session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: id, kind: rep && rep.data.kind === 'mermaid' ? 'mermaid' : 'text', code: text, from: rep && rep.data.from, at: Date.now() });
   }
 
   /** A written word (its transcript) becomes a text artifact where the writing is; the ink stays. */
@@ -172,7 +172,8 @@
     if (id) {
       const n = s.nodes.get(id);
       const rep = n && codeRepOf(n);
-      if (!rep || rep.data.kind !== 'text') return false;
+      // A text is edited in place; so is a Mermaid text, a new version of the same kind (D2).
+      if (!rep || (rep.data.kind !== 'text' && rep.data.kind !== 'mermaid')) return false;
       bounds = MM.boundsOf(n); text = rep.data.code;
     } else {
       bounds = { minX: at.x, minY: at.y, maxX: at.x + TEXT_W, maxY: at.y + TEXT_H };
@@ -196,7 +197,7 @@
       const rep = n && codeRepOf(n);
       if (rep && rep.data.code === text) return e.id; // unchanged: no event
       editText(e.id, text);
-      flash('text revised — every version is kept; undo drops this one');
+      flash(rep && rep.data.kind === 'mermaid' ? 'Mermaid revised — drawn again; every version is kept, and undo drops this one' : 'text revised — every version is kept; undo drops this one');
       return e.id;
     }
     if (!text.trim()) return null;

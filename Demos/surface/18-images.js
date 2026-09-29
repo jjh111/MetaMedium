@@ -66,7 +66,10 @@
     if (!row) { flash(name + ': not a kind the canvas knows'); return null; }
     const w = size || 360, h = Math.round((size || 360) * 0.66);
     const path = IMPORT_DIR + '/' + safeName(name);
-    return session.import({ kind: row.kind, path: path, name: safeName(name), bounds: { minX: at.x, minY: at.y, maxX: at.x + w, maxY: at.y + h }, code: text, at: Date.now() });
+    const id = session.import({ kind: row.kind, path: path, name: safeName(name), bounds: { minX: at.x, minY: at.y, maxX: at.x + w, maxY: at.y + h }, code: text, at: Date.now() });
+    // A Mermaid text dropped or pasted is held where it lands, so Draw it is in the field at once (D3's surface).
+    if (id && row.kind === 'mermaid') mermaidImported(id, safeName(name));
+    return id;
   }
 
   /** A file from a drop, a paste, the picker or a camera. */

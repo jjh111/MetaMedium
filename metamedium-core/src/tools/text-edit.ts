@@ -18,11 +18,12 @@ export const TEXT_EDIT: Tool = {
     for (const id of scope.summon.enclosedIds.filter((x) => s.artifacts.includes(x))) {
       const n = s.nodes.get(id);
       const rep = n && codeRepOf(n);
-      if (!rep || rep.data.kind !== 'text') continue;
+      // A text, and a Mermaid text — a diagram said in words (D2) — are edited the same way.
+      if (!rep || (rep.data.kind !== 'text' && rep.data.kind !== 'mermaid')) continue;
       out.push({
         key: 'edit-text:' + id,
         label: 'Edit the text',
-        reason: 'a new version of the words; every version kept',
+        reason: rep.data.kind === 'mermaid' ? 'a new version of the Mermaid; every version kept' : 'a new version of the words; every version kept',
         base: 0.4,
         tool: 'text-edit',
         verbs: ['edit', 'edit the text', 'retype'],

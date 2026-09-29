@@ -1545,6 +1545,33 @@ diagram maps back through `ids` (the symbol's id — a figure's is
 `figure:a+b`, not a node) and `marks` (its real strokes); `links[i]` is
 Mermaid's link `i`; `unread` is what *Read the writing* would read first;
 pass `readWith` for words read with their line; the text ends in a newline.
+*Status, 29 Sep 2026 (D2's surface, `worktree-agent-a35e1c2ccf0ea1cb6`):* the
+tool, the `mermaid` kind, its frame in the `run` sandbox and the export pane
+are built. Red first (`1db61f7`: `kindOf('flow.mmd')` undefined and the tool's
+module missing; `73c0cb5`: e2e 62–63, `mm.mermaidFrom is not a function`), then
+`4af4c79` (the kind, `tools/mermaid.ts`, one registration line appended at the
+end so e2e 49's golden and the field's order stand — the canvas scenario's 49,
+50 and 51 pass unchanged), `b44a293` (`mermaidFor`, the one home for what reads
+as a diagram worth saying, shared by the tool, the export row and the frame's
+part names) and `16e3102` (the surface). The frame loads mermaid.js as three.js
+is loaded — pinned 11.4.0, cdnjs then jsdelivr — beside its text, `strict`,
+nothing played; **the text always stands** (shown at once, kept with a note when
+the library cannot load or read it, hidden only behind a drawn diagram, whose
+strokes are the board's ink); each node is a part named for its Mermaid id and
+ink over it is read back to the marks (`mermaidPartNames`, `25-mermaid.js`). The
+render is asserted when the library loads and skipped by name when it cannot:
+62c runs the plumbing against a stand-in the gate serves
+(`e2e/fixtures/mermaid-standin.js`, a test double of the library's contract),
+62d the real library — **skipped here: this container cannot reach either CDN**;
+it was run once by hand with the real mermaid 11.4.0 (from the npm tarball)
+answering the CDN's URL, and passes — 62e the text standing with no library,
+62f a refused text, 62g the export row's file equal to the golden. e2e 62–62g2:
+ten records. Core: `tools/mermaid.test.ts` 9, `kinds.test.ts` +1. Found, for
+their owners: the MCP hand's `canvas_write` already places kind `mermaid`
+(`MM.rowOf`) but its error message does not name it (`Demos/mcp.mjs`); a figure
+symbol (a decision drawn in two strokes) is one part naming its strokes; and a
+board of two diagrams names parts only for the diagram the tool made this
+sitting (the whole-board reading says one text, not two).
 **D3 Mermaid in** — the parser, the layered layout, drawing
 through `strokeFor` with bindings. *Red first:* export of import is the
 original text, normalised; import of export reads as the same notation.
@@ -1607,6 +1634,47 @@ with `readMermaid` and offer *Draw it* only when `notation` is set; say
 to select or fit (`bounds`); words are labels, which the surface draws
 above a mark's top-left, not inside a symbol; declared content leaves an
 open field standing; at most 60 nodes and 120 links, the rest said.
+*Status, 29 Sep 2026 (D3's surface, `worktree-agent-a35e1c2ccf0ea1cb6`):* *Draw
+it* is built. Red first (`60ca34d`: `tools/mermaid-draw.ts` missing; e2e 63 in
+`73c0cb5`), then `2ce0955` (the tool: one `mermaid` artifact held alone whose
+text `readMermaid` reads, first among what it affords; taking it names the host
+act), `16e3102` (the host act, `drawMermaidFrom` in `25-mermaid.js`: `drawMermaid`
+inside the tool's stamp, `at` now, `scale` 1/zoom, `origin` right of every mark
+on the board, the field closed, the drawn marks selected and the view fitted,
+one sentence in the status line — *drew a flowchart from a.mmd: 60 nodes and 59
+links — the text holds 64 nodes and the board draws 60 at most…*, each refused
+line with its number and words — never thrown; a dropped or pasted `.mmd` held
+where it lands, *Edit the text* on a mermaid artifact so the round trip is by
+hand) and `b6f529b` (words inside symbols). **The paint is held while the
+diagram is written** (`holdPaint`, `08-render.js`): 300 events painted one by
+one took 7.6 s at 45 nodes on the surface, and one paint takes 0.5 s — the plan's
+"synchronous, ~0.4 s at 45 nodes" was the engine's, not the page's. **Words
+inside symbols is a real change of the label rule, made narrowly and by design**
+(`labelInside`, `08-render.js`): a label on a closed mark — the clean form it
+holds, else its own closed ink — is drawn centred inside when the whole box the
+words fill is inside the outline (a diamond and a circle hold fewer than a box);
+an open mark, an artifact, a body in a running tank and a word too long are
+captions above the mark as before. Golden changed by design: e2e 39 asserted the
+old place for a word that fits (above the top edge, at the box's left) and now
+asserts it inside and centred; 39g keeps the old rule covered; no other label
+record asserts a place. e2e 63–63h: ten records — the editor opened on the
+artifact and a new version keeping its kind, Draw it first with what the text
+reads as, five symbols and four flows read back as a flowchart with the new
+node's word inside its symbol, beside everything and selected and fitted, the
+sentence, one act and one undo, a style line refused with its line and the rest
+drawn, no offer for an unknown text or a text file, and the caps said. The whole gate:
+629 passed, 0 failed, 7 skipped in 603 s — canvas 370 and two skips (25d, 62d), keep 31,
+boards 20, app 14, pencil 16, models 19, seat 12, budgets 1 and its five measures
+skipped by name (load 5.0 on 4 cores), shard 123 + 11 + 12; core 1,727 in 108
+files (a first run under that load timed out two of the notations' heaviest,
+mermaid-in's caps and a seeded chart, at five seconds; alone and on the rerun all
+pass); typecheck clean in core and the shard; relay, field, build, board and
+release tests 117; surface and app in sync, both bundles equal a fresh build; the
+canvas MCP smoke passes; WebKit not run (unavailable here). Found, for their owners: the first arrow of e2e 50's flowchart — a
+20-unit wing on a 62-unit shaft — is written `---` by D2 (no head read), the
+other two `-->`; `62` and `63` draw a 14-unit wing so all three flows read, and
+record 50 is unchanged. Probably the barb's share of a short shaft
+(`BARB_OF_SHAFT`); not investigated.
 **D4 UML class**, **D5 sequence and state**, **D6 ER and mind map** — one
 notation module and pack each, each with its golden Mermaid and its bench.
 *D4 status, 28 Sep 2026:* D4's core built on `w2-maths` (`27e5ac0` red —

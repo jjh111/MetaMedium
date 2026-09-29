@@ -1,5 +1,5 @@
 // ===== kinds =====
-// Provides: documentForKind (the renderers: every kind as a document ink can address), postPointer (a hand forwarded into a playing frame), the worker runtime
+// Provides: documentForKind (the renderers: every kind as a document ink can address), the mermaid harness (mermaidFrom, mermaidStates), postPointer (a hand forwarded into a playing frame), the worker runtime
 //   (a blessed `js` artifact's code runs in a worker with a budget; a throw or a hang pauses its clock
 //   with the reason), runtimeOffset, runtimeBroken, syncRuntime.
 // Uses: core (session, esc), artifacts (frames, documentFor).
@@ -212,6 +212,120 @@
       '</head><body><script>' + script + '<\/script></body></html>';
   }
 
+  // ===== A diagram said as Mermaid: the mermaid harness (V1-PLAN D2's surface) ====
+  // A `mermaid` artifact is a text. Its frame is the run sandbox's twin — scripts
+  // allowed, opaque origin, clear ground — loading mermaid.js the way three.js is
+  // loaded (from a CDN, beside the text, never before it) and drawing the text
+  // with it. The TEXT ALWAYS STANDS: it is shown at once, stays when the library
+  // cannot load or cannot read it, and says which; only a diagram that was drawn
+  // takes its place. Each node of the diagram is reported as a part named for its
+  // Mermaid id, the way a program reports its parts, so ink over the diagram
+  // lands on the node (`mermaidPartNames` in 25-mermaid.js says which marks).
+  // The text is data and nothing here runs it: mermaid's `strict` level, in a
+  // frame that can reach neither the page nor its keys. Nothing is played.
+  const MERMAID_CDNS = [
+    'https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js',
+    'https://cdn.jsdelivr.net/npm/mermaid@11.4.0/dist/mermaid.min.js',
+  ];
+  let mermaidSources = null; // a test's library instead of the CDN's (`mermaidFrom`)
+  /** What each mermaid frame last said of itself: { state: 'rendered' | 'unavailable' | 'refused', why, shown: 'diagram' | 'text' }. Runtime, never the log. */
+  const mermaidStates = new Map();
+  const mermaidSourcesNow = () => (mermaidSources && mermaidSources.length ? mermaidSources : MERMAID_CDNS);
+  /** Load the diagram library from these URLs (a test's stand-in), or from the CDN's when none: the frames draw again. Returns what it was. */
+  function mermaidFrom(urls) {
+    const before = mermaidSources;
+    mermaidSources = Array.isArray(urls) && urls.length ? urls.slice() : null;
+    if (JSON.stringify(before) !== JSON.stringify(mermaidSources)) render(session.getState());
+    return before;
+  }
+
+  const MERMAID_HARNESS = [
+    '(function(){',
+    '  var W = __W__, H = __H__, ID = __ID__, TEXT = __TEXT__, SRC = __SRC__;',
+    '  var out = document.getElementById("out"), src = document.getElementById("src"), note = document.getElementById("note");',
+    '  function post(m){ m.mm = true; m.id = ID; parent.postMessage(m, "*"); }',
+    '  // The text stands, and says why the diagram is not there.',
+    '  function stands(state, why, said){ note.textContent = said; note.hidden = false; src.hidden = false; out.hidden = true; post({ type: "mermaid", state: state, why: why, shown: "text" }); }',
+    '  window.onerror = function(msg){ stands("unavailable", String(msg), "the diagram could not be drawn — " + msg); };',
+    '  var NODE = /^(?:flowchart|classId|stateDiagram|state|erDiagram|entity)-(.+)-\\d+$/;',
+    '  function unionOf(els){',
+    '    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;',
+    '    for (var i = 0; i < els.length; i++){ var r = els[i].getBoundingClientRect(); if (!(r.width > 0 || r.height > 0)) continue; x0 = Math.min(x0, r.left); y0 = Math.min(y0, r.top); x1 = Math.max(x1, r.right); y1 = Math.max(y1, r.bottom); }',
+    '    return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;',
+    '  }',
+    '  // Each node of the diagram is a part named for its Mermaid id: a flowchart\'s and a class\'s by the id mermaid gives its group, a participant by the name on its box and its lifeline.',
+    '  function partsOf(svg){',
+    '    var parts = [], seen = {}, i, els = svg.querySelectorAll("[id]");',
+    '    for (i = 0; i < els.length; i++){',
+    '      var m = NODE.exec(els[i].id);',
+    '      if (m && !seen[m[1]]){ seen[m[1]] = 1; var b = unionOf([els[i]]); if (b) parts.push({ id: m[1], x: b.x, y: b.y, w: b.w, h: b.h }); }',
+    '    }',
+    '    var named = svg.querySelectorAll("rect.actor[name], line.actor-line[name]"), byName = {}, order = [];',
+    '    for (i = 0; i < named.length; i++){ var n = named[i].getAttribute("name"); if (!byName[n]){ byName[n] = []; order.push(n); } byName[n].push(named[i]); }',
+    '    for (i = 0; i < order.length; i++){ var u = unionOf(byName[order[i]]); if (u && !seen[order[i]]) parts.push({ id: order[i], x: u.x, y: u.y, w: u.w, h: u.h }); }',
+    '    return parts;',
+    '  }',
+    '  function show(markup){',
+    '    out.innerHTML = markup;',
+    '    var svg = out.querySelector("svg");',
+    '    if (!svg) return stands("refused", "no diagram came back", "the diagram could not be drawn — nothing came back");',
+    '    svg.setAttribute("width", W); svg.setAttribute("height", H); svg.style.maxWidth = "none"; svg.style.display = "block";',
+    '    src.hidden = true; note.hidden = true; out.hidden = false;',
+    '    var parts = partsOf(svg);',
+    '    post({ type: "regions", regions: parts });',
+    '    post({ type: "mermaid", state: "rendered", why: "", shown: "diagram" });',
+    '    // Fonts arrive after the first layout and move the boxes: the parts are read again.',
+    '    setTimeout(function(){ post({ type: "regions", regions: partsOf(svg) }); }, 600);',
+    '  }',
+    '  function refused(e){',
+    '    var why = String(e && e.message || e).split("\\n")[0];',
+    '    stands("refused", why, "Mermaid could not read this — " + why);',
+    '  }',
+    '  function draw(){',
+    '    var lib = window.mermaid;',
+    '    try {',
+    '      lib.initialize({ startOnLoad: false, securityLevel: "strict", theme: "base", suppressErrorRendering: true, flowchart: { htmlLabels: false }, themeVariables: { fontFamily: "IBM Plex Mono, ui-monospace, Menlo, monospace", fontSize: "14px" } });',
+    '      Promise.resolve(lib.render("mm-" + String(ID).replace(/\\W/g, "_"), TEXT)).then(function(r){ show(r.svg); }, refused);',
+    '    } catch (e) { refused(e); }',
+    '  }',
+    '  // The library is loaded beside the text, from each source in turn; a source that is slow is given up on.',
+    '  function load(i){',
+    '    if (window.mermaid) return draw();',
+    '    if (i >= SRC.length) return stands("unavailable", "the diagram library did not load", "the diagram could not be drawn — the diagram library did not load; this is its text");',
+    '    var s = document.createElement("script"), done = false;',
+    '    function next(){ if (done) return; done = true; load(i + 1); }',
+    '    s.src = SRC[i]; s.async = true;',
+    '    s.onload = function(){ if (done) return; done = true; if (window.mermaid) draw(); else load(i + 1); };',
+    '    s.onerror = next;',
+    '    setTimeout(next, 8000);',
+    '    document.head.appendChild(s);',
+    '  }',
+    '  load(0);',
+    '})();',
+  ].join('\n');
+
+  /** A mermaid artifact's document: its text standing, and the harness that draws it in place of the text when it can. */
+  function mermaidDocument(id, text, w, h) {
+    const safe = (s) => JSON.stringify(String(s)).replace(/<\//g, '<\\/');
+    const ink = C ? C.ink : '#e8e4d9';
+    // Function replacers: a `$&` in the text is text, not a pattern.
+    const script = MERMAID_HARNESS.replace('__W__', () => String(Math.round(w))).replace('__H__', () => String(Math.round(h))).replace('__ID__', () => safe(id)).replace('__SRC__', () => JSON.stringify(mermaidSourcesNow()).replace(/<\//g, '<\\/')).replace('__TEXT__', () => safe(text)); // the text last: whatever it says is text
+    const css = 'html,body{margin:0;padding:0;background:transparent;overflow:hidden;color:' + ink + ';}' +
+      '#mmroot{position:relative;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px;overflow:hidden;font:11px/1.45 "IBM Plex Mono",ui-monospace,Menlo,monospace;}' +
+      '#src{margin:0;padding:0.55em 0.75em;white-space:pre-wrap;word-break:break-word;font:inherit;}' +
+      '#note{margin:0;padding:0.3em 0.75em;opacity:0.6;font:inherit;}' +
+      '#out{position:absolute;left:0;top:0;}' +
+      // The diagram in the board's own ink, on a clear ground: fills and strokes are the ink's, whatever theme mermaid drew in.
+      '#out .node rect,#out .node polygon,#out .node circle,#out .node ellipse,#out .node path,#out .actor,#out .classGroup rect{fill:transparent !important;stroke:' + ink + ' !important;}' +
+      '#out text,#out tspan,#out .nodeLabel,#out .label text{fill:' + ink + ' !important;color:' + ink + ';stroke:none !important;}' +
+      '#out .flowchart-link,#out .edgePath path,#out path.relation,#out .messageLine0,#out .messageLine1,#out .actor-line,#out .divider path{stroke:' + ink + ' !important;}' +
+      '#out marker path,#out marker circle,#out .arrowMarkerPath,#out #arrowhead path{fill:' + ink + ' !important;stroke:' + ink + ' !important;}' +
+      '#out .edgeLabel,#out .edgeLabel rect,#out .labelBkg,#out .cluster rect{fill:transparent !important;background:transparent !important;}';
+    return '<!doctype html><html><head><meta charset="utf-8"><style>' + css + '</style></head><body>' +
+      '<div id="mmroot"><pre id="src">' + esc(text) + '</pre><p id="note" hidden></p><div id="out" hidden></div></div>' +
+      '<script>' + script + '<\/script></body></html>';
+  }
+
   // What a running frame says: its parts, or that it broke.
   addEventListener('message', (e) => {
     const m = e.data;
@@ -219,6 +333,15 @@
     const f = frames.get(m.id);
     if (!f || !f.iframe || f.iframe.contentWindow !== e.source) return; // only the frame that owns the id
     if (m.type === 'regions' && Array.isArray(m.regions)) { reported.set(m.id, m.regions); return; }
+    // A diagram that was not drawn is not a broken program: the text stands and the frame says why (D2).
+    if (m.type === 'mermaid') {
+      mermaidStates.set(m.id, { state: String(m.state), why: String(m.why || ''), shown: m.shown === 'diagram' ? 'diagram' : 'text' });
+      if (m.state === 'refused') {
+        const node = state.nodes.get(m.id);
+        flash((node && MM.wordOf(node) || 'the diagram') + ': Mermaid could not read it — ' + String(m.why || '').slice(0, 120));
+      }
+      return;
+    }
     if (m.type === 'error') { markBroken(m.id, 'threw: ' + m.error); }
   });
   function reportedRegions(id) { return reported.get(id) || []; }
@@ -284,6 +407,8 @@
       if (ctx && ctx.playing) return runDocument(ctx.id, code, w, h);
       return regionsDocument(code, MM.addressablesOf('js', code), w, h);
     }
+    // A diagram said as Mermaid: its text stands, and the library draws it in place of the text when it can.
+    if (kind === 'mermaid') return mermaidDocument(ctx && ctx.id || '', code, w, h);
     if (kind === 'png' || kind === 'jpg') {
       const url = rep.data.path ? imageUrlFor(rep.data.path) : null;
       return '<!doctype html><html><head><meta charset="utf-8"><style>' + SOURCE_CSS +

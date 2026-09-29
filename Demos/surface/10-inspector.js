@@ -109,7 +109,7 @@
     const author = authorOf(node);
     const authorName = nameOfParticipant(author);
     const eyebrow = '<div class="eyebrow">' +
-      (isLive ? (codeKindOf(node) === 'html' ? 'living page' : 'living ' + codeKindOf(node)) : isArtifact ? 'artifact' : isWordNode ? 'word' : 'mark') + '</div>';
+      (isLive ? (codeKindOf(node) === 'html' ? 'living page' : codeKindOf(node) === 'mermaid' ? 'a diagram in words' : 'living ' + codeKindOf(node)) : isArtifact ? 'artifact' : isWordNode ? 'word' : 'mark') + '</div>';
     // What the person reads first (U1a): what it is and what it can become, in a few plain
     // lines. Everything the engine holds about it — ids, tiers, relations, measures — is
     // below, behind details.
@@ -405,9 +405,9 @@
       const name = MM.wordOf(node);
       const rep = codeRepOf(node);
       const kind = rep ? (rep.data.kind || 'html') : null;
-      const what = !rep ? 'a thing you named' : kind === 'html' ? 'a page' : kind === 'run' ? 'a program' : kind === 'text' ? 'text' : kind === 'png' || kind === 'jpg' ? 'a picture' : 'a ' + kind + ' file';
+      const what = !rep ? 'a thing you named' : kind === 'html' ? 'a page' : kind === 'run' ? 'a program' : kind === 'text' ? 'text' : kind === 'mermaid' ? 'a diagram written in Mermaid' : kind === 'png' || kind === 'jpg' ? 'a picture' : 'a ' + kind + ' file';
       out += row('is', (name ? '“' + name + '”, ' : '') + what + (members ? ' made of ' + members + ' mark' + (members === 1 ? '' : 's') : '') + (o.author !== MM.LOCAL_PARTICIPANT ? ', by ' + o.authorName : ''));
-      out += row('becomes', !rep ? 'another drawing like it is offered as one · a brief builds on it · its tank plays' : 'draw over it to change a part · a brief is a new version');
+      out += row('becomes', !rep ? 'another drawing like it is offered as one · a brief builds on it · its tank plays' : kind === 'mermaid' ? 'Draw it puts it on the board as marks · edit the text for a new version' : 'draw over it to change a part · a brief is a new version');
       return out;
     }
     const shapeRead = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0 && r.basis !== 'label')[0];
@@ -447,8 +447,8 @@
       const rep = a && codeRepOf(a);
       if (rep) {
         const kind = rep.data.kind || 'html';
-        const what = kind === 'run' ? (rep.data.code && rep.data.code.startsWith(MM.GRAPH3D_MARK) ? 'a 3D thing' : 'a program') : kind === 'html' ? 'a page' : kind === 'text' ? 'text' : kind === 'png' || kind === 'jpg' ? 'a picture' : 'a ' + kind + ' file';
-        return { here: 'an artifact, ' + what, next: 'ink over it addresses its parts · a brief is a new version · wire it in a frame' };
+        const what = kind === 'run' ? (rep.data.code && rep.data.code.startsWith(MM.GRAPH3D_MARK) ? 'a 3D thing' : 'a program') : kind === 'html' ? 'a page' : kind === 'text' ? 'text' : kind === 'mermaid' ? 'a diagram written in Mermaid' : kind === 'png' || kind === 'jpg' ? 'a picture' : 'a ' + kind + ' file';
+        return { here: 'an artifact, ' + what, next: kind === 'mermaid' ? (paletteItems.some((i) => i.key === 'mermaid-draw') ? 'Draw it puts it on the board as marks · ' : '') + 'edit the text for a new version · ink over a node addresses its marks' : 'ink over it addresses its parts · a brief is a new version · wire it in a frame' };
       }
       return { here: 'a definition' + (MM.wordOf(a) ? ' “' + MM.wordOf(a) + '”' : ''), next: 'another like it is matched · a brief builds on it · its tank plays' };
     }

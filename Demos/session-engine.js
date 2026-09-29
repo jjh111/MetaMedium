@@ -532,7 +532,7 @@
 // closure's; no imports, no exports, no build step beyond the concatenation.
 
   /** Kinds that render as a figure on the board rather than as a page: no plate, clear ground. */
-  const FIGURE_KINDS = new Set(['run', 'svg', 'text']);
+  const FIGURE_KINDS = new Set(['run', 'svg', 'text', 'mermaid']);
 
   // ===== The live plane: artifacts that render and run ====================
   // Generated code becomes real DOM in an iframe, positioned in world space
@@ -620,8 +620,9 @@
         const iframe = document.createElement('iframe');
         // Two sandboxes, never both: a page keeps its origin and runs no script,
         // so ink can hit-test into it; a program runs scripts in an opaque
-        // origin and reports its parts back (SURFACE-v9-PLAN D7).
-        iframe.setAttribute('sandbox', kind === 'run' ? 'allow-scripts' : 'allow-same-origin');
+        // origin and reports its parts back (SURFACE-v9-PLAN D7). A diagram said
+        // as Mermaid is drawn by a library in the second, and reports its nodes.
+        iframe.setAttribute('sandbox', kind === 'run' || kind === 'mermaid' ? 'allow-scripts' : 'allow-same-origin');
         iframe.setAttribute('scrolling', 'no');
         iframe.title = MM.wordOf(node) || id;
         iframe.onload = sizeFramesToScreen; // the type is set for the screen as soon as the document is there
@@ -654,7 +655,8 @@
       // came on. A page is theme-independent and rebuilds for nothing.
       const stamp = rep.data.at + ':' + Math.round(fr.w) + 'x' + Math.round(fr.h) + ':' + hashOf(code) +
         (kind === 'run' ? ':' + (playing ? 'run' : 'still') : '') +
-        (FIGURE_KINDS.has(kind) ? ':' + (document.documentElement.getAttribute('data-theme') || '') : '');
+        (FIGURE_KINDS.has(kind) ? ':' + (document.documentElement.getAttribute('data-theme') || '') : '') +
+        (kind === 'mermaid' ? ':' + hashOf(mermaidSourcesNow().join('|')) : '');
       if (!f.parked && f.codeAt !== stamp) {
         // A document that CHANGES gets a new element. Assigning srcdoc twice
         // in one tick — the source card at import, the harness at play — lost
@@ -669,7 +671,7 @@
           f.iframe = next;
         }
         f.codeAt = stamp;
-        if (kind === 'run') reported.delete(id);
+        if (kind === 'run' || kind === 'mermaid') { reported.delete(id); mermaidStates.delete(id); }
         f.iframe.srcdoc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h, { id: id, playing: playing });
       }
     }
@@ -713,11 +715,16 @@
     const fr = node && MM.frameOf(node);
     const found = new Set();
     if (!f || !fr) return [];
-    // A program reports its own parts; the ink lands on those.
-    if (f.kind === 'run') {
+    // A program reports its own parts; the ink lands on those. So does a diagram
+    // said as Mermaid, its parts named for Mermaid ids and read back to the marks
+    // they were written from (`mermaidPartNames`, 25-mermaid.js).
+    if (f.kind === 'run' || f.kind === 'mermaid') {
       const x0 = bounds.minX - fr.x, y0 = bounds.minY - fr.y, x1 = bounds.maxX - fr.x, y1 = bounds.maxY - fr.y;
       for (const r of reportedRegions(artifactId)) {
-        if (r.x < x1 && r.x + r.w > x0 && r.y < y1 && r.y + r.h > y0) found.add(r.id);
+        if (r.x < x1 && r.x + r.w > x0 && r.y < y1 && r.y + r.h > y0) {
+          if (f.kind === 'mermaid') for (const name of mermaidPartNames(artifactId, r.id)) found.add(name);
+          else found.add(r.id);
+        }
       }
       return [...found];
     }
@@ -3872,7 +3879,18 @@
 
   /** How many times the board has been painted, for tests: a pointer move while drawing must not paint it. */
   let paints = 0;
+  /**
+   * A tool that writes hundreds of events in one act — Draw it from a Mermaid text (D3) — holds the paint
+   * until it has written them: every event still reaches the journal and every other listener, and the board
+   * is painted once, after. Painted per event, a 45-node diagram took seven seconds of paints.
+   */
+  let paintHeld = 0;
+  function holdPaint(fn) {
+    paintHeld++;
+    try { return fn(); } finally { if (--paintHeld === 0) render(session.getState()); }
+  }
   function render(s) {
+    if (paintHeld) { state = s; return; }
     paints++;
     state = s;
     chipHits = [];
@@ -4186,6 +4204,35 @@
     return out;
   }
 
+  /**
+   * Where a label stands INSIDE its mark, when the mark is a closed form and the words fit in it (V1-PLAN D3,
+   * words inside symbols): centred on the form, the whole box the words fill — with a little air — inside its
+   * outline, so a diamond or a circle, whose corners take less than a box's, holds fewer words than a box. The
+   * outline is the clean form the mark holds, else its own ink when that closes. Anything else — an open mark,
+   * an artifact, a word too long for the form — is a caption above the mark, as a label has always been.
+   */
+  function labelInside(node, size, w) {
+    let outline = MM.cleanPointsOf(node);
+    if (!outline || outline.length < 3 || !(MM.cleanOf(node) || {}).closed) {
+      const fp = MM.fingerprintOf(node);
+      outline = fp && fp.isClosed ? MM.strokePointsOf(node) : null;
+    }
+    if (!outline || outline.length < 4) return null;
+    const bb = MM.getBounds(outline);
+    const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2;
+    const hw = w / 2 + size * 0.3, hh = size * 0.62;
+    const within = (px, py) => {
+      let inside = false;
+      for (let i = 0, j = outline.length - 1; i < outline.length; j = i++) {
+        const a = outline[i], b = outline[j];
+        if ((a.y > py) !== (b.y > py) && px < ((b.x - a.x) * (py - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+      }
+      return inside;
+    };
+    for (const [px, py] of [[cx - hw, cy - hh], [cx + hw, cy - hh], [cx - hw, cy + hh], [cx + hw, cy + hh]]) if (!within(px, py)) return null;
+    return { x: cx - w / 2, y: cy + size * 0.32 };
+  }
+
   function drawLabel(s, node, lab, placedBy, inspectedId, pv, vb) {
     const b0 = MM.boundsOf(node);
     if (!b0) return;
@@ -4196,14 +4243,16 @@
     const size = labelSizeOf(node);
     // Above the artifact's own name when that chrome is showing, else just above the mark.
     const raised = chromeDrawn.includes(node.id) ? wpx(24) : 0;
-    const x = b.minX, y = b.minY - size * 0.45 - raised;
     const colour = colourOf(node);
     const who = nameOfParticipant(lab.source || authorOf(node));
     const whoShown = node.id === inspectedId || placedBy === inspectedId;
     ctx.font = size.toFixed(3) + "px 'Space Grotesk', system-ui, sans-serif";
     const w = ctx.measureText(lab.text).width;
+    // Inside a closed mark the words fit in, else above it. A body in a running tank carries its words above: it moves.
+    const within = pl ? null : labelInside(node, size, w);
+    const x = within ? within.x : b.minX, y = within ? within.y : b.minY - size * 0.45 - raised;
     // Where it stands is said wherever it is; it is drawn when it reaches the screen.
-    labelsDrawn.push({ id: node.id, text: lab.text, x: x, y: y, w: w, size: size, px: size * view.zoom, colour: colour, who: who, whoShown: whoShown });
+    labelsDrawn.push({ id: node.id, text: lab.text, x: x, y: y, w: w, size: size, px: size * view.zoom, colour: colour, who: who, whoShown: whoShown, inside: !!within });
     const reach = { minX: x, minY: y - size * 1.2, maxX: x + w + (whoShown ? size + wpx(11) * (who.length + 3) : 0), maxY: y + size * 0.5 };
     if (vb && !held && !pl && !boxMeets(reach, vb)) return;
     if (held) { ctx.save(); applyPreview(pv); }
@@ -5243,6 +5292,8 @@
     'maths-show': (o) => mathsShow(o.data),
     'maths-print': () => mathsPrint(),
     duplicate: (o, scope) => duplicateMarks(scope.summon, o.data.ids),
+    // A Mermaid text drawn as ink, at this zoom and beside everything (25-mermaid.js).
+    'mermaid-draw': (o) => drawMermaidFrom(o.data.artifact),
     'behave-model': (o) => { const d = o.data; agents.forEach((a) => withWork('behave:' + a.id + ':' + d.nodeId, [d.nodeId], modelWords(a) + ' · reading the words', a.behave({ nodeId: d.nodeId, words: d.words, at: Date.now() })).then(() => render(session.getState()))); },
   };
   /** What the surface does around a tool's act: before it (the field rebuilt from what it leaves), and after (what to say). */
@@ -5257,6 +5308,8 @@
     clean: { before: () => { shownSummonId = null; }, after: (o, scope, t) => { if (t.detail.ids.length) flash('drew ' + t.detail.ids.length + ' clean' + (t.detail.summary ? ' — ' + t.detail.summary : '')); } },
     graph3d: { after: (o, scope, t) => say(!t.made ? 'could not hold that group' : t.detail.ok ? 'in 3D (tier 1): ' + t.detail.reasoning : 'could not stand it in 3D: ' + t.detail.error) },
     frames: { after: (o, scope, t) => { if (o.data.act !== 'frame' || !t.made) return; const st = session.getState(); flash('framed ' + t.detail.members + ' — ' + MM.describeFrame(MM.frameOfNode(st.nodes.get(t.made)), st.nodes)); } },
+    // The drawing said as Mermaid stands beside it: say so, remember which marks it was written from, and keep the field.
+    mermaid: { after: (o, scope, t) => { if (!t.made) { say(t.detail.error); return; } mermaidMadeFrom.set(t.made, scope.marks.slice()); flash('the drawing as Mermaid, beside it — ' + t.detail.reading + '; Draw it puts it back as marks'); refreshPalette(); } },
     label: { after: (o, scope, t) => { const d = t.detail; if (d.done.length || d.saying.length || d.refused.length) say(labelSentence(String(o.data.word).trim(), d.done, d.saying, d.refused)); } },
   };
 
@@ -6346,7 +6399,7 @@
     const author = authorOf(node);
     const authorName = nameOfParticipant(author);
     const eyebrow = '<div class="eyebrow">' +
-      (isLive ? (codeKindOf(node) === 'html' ? 'living page' : 'living ' + codeKindOf(node)) : isArtifact ? 'artifact' : isWordNode ? 'word' : 'mark') + '</div>';
+      (isLive ? (codeKindOf(node) === 'html' ? 'living page' : codeKindOf(node) === 'mermaid' ? 'a diagram in words' : 'living ' + codeKindOf(node)) : isArtifact ? 'artifact' : isWordNode ? 'word' : 'mark') + '</div>';
     // What the person reads first (U1a): what it is and what it can become, in a few plain
     // lines. Everything the engine holds about it — ids, tiers, relations, measures — is
     // below, behind details.
@@ -6642,9 +6695,9 @@
       const name = MM.wordOf(node);
       const rep = codeRepOf(node);
       const kind = rep ? (rep.data.kind || 'html') : null;
-      const what = !rep ? 'a thing you named' : kind === 'html' ? 'a page' : kind === 'run' ? 'a program' : kind === 'text' ? 'text' : kind === 'png' || kind === 'jpg' ? 'a picture' : 'a ' + kind + ' file';
+      const what = !rep ? 'a thing you named' : kind === 'html' ? 'a page' : kind === 'run' ? 'a program' : kind === 'text' ? 'text' : kind === 'mermaid' ? 'a diagram written in Mermaid' : kind === 'png' || kind === 'jpg' ? 'a picture' : 'a ' + kind + ' file';
       out += row('is', (name ? '“' + name + '”, ' : '') + what + (members ? ' made of ' + members + ' mark' + (members === 1 ? '' : 's') : '') + (o.author !== MM.LOCAL_PARTICIPANT ? ', by ' + o.authorName : ''));
-      out += row('becomes', !rep ? 'another drawing like it is offered as one · a brief builds on it · its tank plays' : 'draw over it to change a part · a brief is a new version');
+      out += row('becomes', !rep ? 'another drawing like it is offered as one · a brief builds on it · its tank plays' : kind === 'mermaid' ? 'Draw it puts it on the board as marks · edit the text for a new version' : 'draw over it to change a part · a brief is a new version');
       return out;
     }
     const shapeRead = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0 && r.basis !== 'label')[0];
@@ -6684,8 +6737,8 @@
       const rep = a && codeRepOf(a);
       if (rep) {
         const kind = rep.data.kind || 'html';
-        const what = kind === 'run' ? (rep.data.code && rep.data.code.startsWith(MM.GRAPH3D_MARK) ? 'a 3D thing' : 'a program') : kind === 'html' ? 'a page' : kind === 'text' ? 'text' : kind === 'png' || kind === 'jpg' ? 'a picture' : 'a ' + kind + ' file';
-        return { here: 'an artifact, ' + what, next: 'ink over it addresses its parts · a brief is a new version · wire it in a frame' };
+        const what = kind === 'run' ? (rep.data.code && rep.data.code.startsWith(MM.GRAPH3D_MARK) ? 'a 3D thing' : 'a program') : kind === 'html' ? 'a page' : kind === 'text' ? 'text' : kind === 'mermaid' ? 'a diagram written in Mermaid' : kind === 'png' || kind === 'jpg' ? 'a picture' : 'a ' + kind + ' file';
+        return { here: 'an artifact, ' + what, next: kind === 'mermaid' ? (paletteItems.some((i) => i.key === 'mermaid-draw') ? 'Draw it puts it on the board as marks · ' : '') + 'edit the text for a new version · ink over a node addresses its marks' : 'ink over it addresses its parts · a brief is a new version · wire it in a frame' };
       }
       return { here: 'a definition' + (MM.wordOf(a) ? ' “' + MM.wordOf(a) + '”' : ''), next: 'another like it is matched · a brief builds on it · its tank plays' };
     }
@@ -6875,7 +6928,7 @@
   canvas.addEventListener('pointerdown', () => { if (rp.rec && rp.timer) { rpStop(); rpCaption.innerHTML = '<b>' + (rp.step + 1) + '.</b> ' + esc(rp.rec.steps[rp.step].caption) + ' <span style="color:var(--dim)">— continuing from here with your marks</span>'; } });
 
 // ===== kinds =====
-// Provides: documentForKind (the renderers: every kind as a document ink can address), postPointer (a hand forwarded into a playing frame), the worker runtime
+// Provides: documentForKind (the renderers: every kind as a document ink can address), the mermaid harness (mermaidFrom, mermaidStates), postPointer (a hand forwarded into a playing frame), the worker runtime
 //   (a blessed `js` artifact's code runs in a worker with a budget; a throw or a hang pauses its clock
 //   with the reason), runtimeOffset, runtimeBroken, syncRuntime.
 // Uses: core (session, esc), artifacts (frames, documentFor).
@@ -7088,6 +7141,120 @@
       '</head><body><script>' + script + '<\/script></body></html>';
   }
 
+  // ===== A diagram said as Mermaid: the mermaid harness (V1-PLAN D2's surface) ====
+  // A `mermaid` artifact is a text. Its frame is the run sandbox's twin — scripts
+  // allowed, opaque origin, clear ground — loading mermaid.js the way three.js is
+  // loaded (from a CDN, beside the text, never before it) and drawing the text
+  // with it. The TEXT ALWAYS STANDS: it is shown at once, stays when the library
+  // cannot load or cannot read it, and says which; only a diagram that was drawn
+  // takes its place. Each node of the diagram is reported as a part named for its
+  // Mermaid id, the way a program reports its parts, so ink over the diagram
+  // lands on the node (`mermaidPartNames` in 25-mermaid.js says which marks).
+  // The text is data and nothing here runs it: mermaid's `strict` level, in a
+  // frame that can reach neither the page nor its keys. Nothing is played.
+  const MERMAID_CDNS = [
+    'https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.0/mermaid.min.js',
+    'https://cdn.jsdelivr.net/npm/mermaid@11.4.0/dist/mermaid.min.js',
+  ];
+  let mermaidSources = null; // a test's library instead of the CDN's (`mermaidFrom`)
+  /** What each mermaid frame last said of itself: { state: 'rendered' | 'unavailable' | 'refused', why, shown: 'diagram' | 'text' }. Runtime, never the log. */
+  const mermaidStates = new Map();
+  const mermaidSourcesNow = () => (mermaidSources && mermaidSources.length ? mermaidSources : MERMAID_CDNS);
+  /** Load the diagram library from these URLs (a test's stand-in), or from the CDN's when none: the frames draw again. Returns what it was. */
+  function mermaidFrom(urls) {
+    const before = mermaidSources;
+    mermaidSources = Array.isArray(urls) && urls.length ? urls.slice() : null;
+    if (JSON.stringify(before) !== JSON.stringify(mermaidSources)) render(session.getState());
+    return before;
+  }
+
+  const MERMAID_HARNESS = [
+    '(function(){',
+    '  var W = __W__, H = __H__, ID = __ID__, TEXT = __TEXT__, SRC = __SRC__;',
+    '  var out = document.getElementById("out"), src = document.getElementById("src"), note = document.getElementById("note");',
+    '  function post(m){ m.mm = true; m.id = ID; parent.postMessage(m, "*"); }',
+    '  // The text stands, and says why the diagram is not there.',
+    '  function stands(state, why, said){ note.textContent = said; note.hidden = false; src.hidden = false; out.hidden = true; post({ type: "mermaid", state: state, why: why, shown: "text" }); }',
+    '  window.onerror = function(msg){ stands("unavailable", String(msg), "the diagram could not be drawn — " + msg); };',
+    '  var NODE = /^(?:flowchart|classId|stateDiagram|state|erDiagram|entity)-(.+)-\\d+$/;',
+    '  function unionOf(els){',
+    '    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;',
+    '    for (var i = 0; i < els.length; i++){ var r = els[i].getBoundingClientRect(); if (!(r.width > 0 || r.height > 0)) continue; x0 = Math.min(x0, r.left); y0 = Math.min(y0, r.top); x1 = Math.max(x1, r.right); y1 = Math.max(y1, r.bottom); }',
+    '    return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;',
+    '  }',
+    '  // Each node of the diagram is a part named for its Mermaid id: a flowchart\'s and a class\'s by the id mermaid gives its group, a participant by the name on its box and its lifeline.',
+    '  function partsOf(svg){',
+    '    var parts = [], seen = {}, i, els = svg.querySelectorAll("[id]");',
+    '    for (i = 0; i < els.length; i++){',
+    '      var m = NODE.exec(els[i].id);',
+    '      if (m && !seen[m[1]]){ seen[m[1]] = 1; var b = unionOf([els[i]]); if (b) parts.push({ id: m[1], x: b.x, y: b.y, w: b.w, h: b.h }); }',
+    '    }',
+    '    var named = svg.querySelectorAll("rect.actor[name], line.actor-line[name]"), byName = {}, order = [];',
+    '    for (i = 0; i < named.length; i++){ var n = named[i].getAttribute("name"); if (!byName[n]){ byName[n] = []; order.push(n); } byName[n].push(named[i]); }',
+    '    for (i = 0; i < order.length; i++){ var u = unionOf(byName[order[i]]); if (u && !seen[order[i]]) parts.push({ id: order[i], x: u.x, y: u.y, w: u.w, h: u.h }); }',
+    '    return parts;',
+    '  }',
+    '  function show(markup){',
+    '    out.innerHTML = markup;',
+    '    var svg = out.querySelector("svg");',
+    '    if (!svg) return stands("refused", "no diagram came back", "the diagram could not be drawn — nothing came back");',
+    '    svg.setAttribute("width", W); svg.setAttribute("height", H); svg.style.maxWidth = "none"; svg.style.display = "block";',
+    '    src.hidden = true; note.hidden = true; out.hidden = false;',
+    '    var parts = partsOf(svg);',
+    '    post({ type: "regions", regions: parts });',
+    '    post({ type: "mermaid", state: "rendered", why: "", shown: "diagram" });',
+    '    // Fonts arrive after the first layout and move the boxes: the parts are read again.',
+    '    setTimeout(function(){ post({ type: "regions", regions: partsOf(svg) }); }, 600);',
+    '  }',
+    '  function refused(e){',
+    '    var why = String(e && e.message || e).split("\\n")[0];',
+    '    stands("refused", why, "Mermaid could not read this — " + why);',
+    '  }',
+    '  function draw(){',
+    '    var lib = window.mermaid;',
+    '    try {',
+    '      lib.initialize({ startOnLoad: false, securityLevel: "strict", theme: "base", suppressErrorRendering: true, flowchart: { htmlLabels: false }, themeVariables: { fontFamily: "IBM Plex Mono, ui-monospace, Menlo, monospace", fontSize: "14px" } });',
+    '      Promise.resolve(lib.render("mm-" + String(ID).replace(/\\W/g, "_"), TEXT)).then(function(r){ show(r.svg); }, refused);',
+    '    } catch (e) { refused(e); }',
+    '  }',
+    '  // The library is loaded beside the text, from each source in turn; a source that is slow is given up on.',
+    '  function load(i){',
+    '    if (window.mermaid) return draw();',
+    '    if (i >= SRC.length) return stands("unavailable", "the diagram library did not load", "the diagram could not be drawn — the diagram library did not load; this is its text");',
+    '    var s = document.createElement("script"), done = false;',
+    '    function next(){ if (done) return; done = true; load(i + 1); }',
+    '    s.src = SRC[i]; s.async = true;',
+    '    s.onload = function(){ if (done) return; done = true; if (window.mermaid) draw(); else load(i + 1); };',
+    '    s.onerror = next;',
+    '    setTimeout(next, 8000);',
+    '    document.head.appendChild(s);',
+    '  }',
+    '  load(0);',
+    '})();',
+  ].join('\n');
+
+  /** A mermaid artifact's document: its text standing, and the harness that draws it in place of the text when it can. */
+  function mermaidDocument(id, text, w, h) {
+    const safe = (s) => JSON.stringify(String(s)).replace(/<\//g, '<\\/');
+    const ink = C ? C.ink : '#e8e4d9';
+    // Function replacers: a `$&` in the text is text, not a pattern.
+    const script = MERMAID_HARNESS.replace('__W__', () => String(Math.round(w))).replace('__H__', () => String(Math.round(h))).replace('__ID__', () => safe(id)).replace('__SRC__', () => JSON.stringify(mermaidSourcesNow()).replace(/<\//g, '<\\/')).replace('__TEXT__', () => safe(text)); // the text last: whatever it says is text
+    const css = 'html,body{margin:0;padding:0;background:transparent;overflow:hidden;color:' + ink + ';}' +
+      '#mmroot{position:relative;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px;overflow:hidden;font:11px/1.45 "IBM Plex Mono",ui-monospace,Menlo,monospace;}' +
+      '#src{margin:0;padding:0.55em 0.75em;white-space:pre-wrap;word-break:break-word;font:inherit;}' +
+      '#note{margin:0;padding:0.3em 0.75em;opacity:0.6;font:inherit;}' +
+      '#out{position:absolute;left:0;top:0;}' +
+      // The diagram in the board's own ink, on a clear ground: fills and strokes are the ink's, whatever theme mermaid drew in.
+      '#out .node rect,#out .node polygon,#out .node circle,#out .node ellipse,#out .node path,#out .actor,#out .classGroup rect{fill:transparent !important;stroke:' + ink + ' !important;}' +
+      '#out text,#out tspan,#out .nodeLabel,#out .label text{fill:' + ink + ' !important;color:' + ink + ';stroke:none !important;}' +
+      '#out .flowchart-link,#out .edgePath path,#out path.relation,#out .messageLine0,#out .messageLine1,#out .actor-line,#out .divider path{stroke:' + ink + ' !important;}' +
+      '#out marker path,#out marker circle,#out .arrowMarkerPath,#out #arrowhead path{fill:' + ink + ' !important;stroke:' + ink + ' !important;}' +
+      '#out .edgeLabel,#out .edgeLabel rect,#out .labelBkg,#out .cluster rect{fill:transparent !important;background:transparent !important;}';
+    return '<!doctype html><html><head><meta charset="utf-8"><style>' + css + '</style></head><body>' +
+      '<div id="mmroot"><pre id="src">' + esc(text) + '</pre><p id="note" hidden></p><div id="out" hidden></div></div>' +
+      '<script>' + script + '<\/script></body></html>';
+  }
+
   // What a running frame says: its parts, or that it broke.
   addEventListener('message', (e) => {
     const m = e.data;
@@ -7095,6 +7262,15 @@
     const f = frames.get(m.id);
     if (!f || !f.iframe || f.iframe.contentWindow !== e.source) return; // only the frame that owns the id
     if (m.type === 'regions' && Array.isArray(m.regions)) { reported.set(m.id, m.regions); return; }
+    // A diagram that was not drawn is not a broken program: the text stands and the frame says why (D2).
+    if (m.type === 'mermaid') {
+      mermaidStates.set(m.id, { state: String(m.state), why: String(m.why || ''), shown: m.shown === 'diagram' ? 'diagram' : 'text' });
+      if (m.state === 'refused') {
+        const node = state.nodes.get(m.id);
+        flash((node && MM.wordOf(node) || 'the diagram') + ': Mermaid could not read it — ' + String(m.why || '').slice(0, 120));
+      }
+      return;
+    }
     if (m.type === 'error') { markBroken(m.id, 'threw: ' + m.error); }
   });
   function reportedRegions(id) { return reported.get(id) || []; }
@@ -7160,6 +7336,8 @@
       if (ctx && ctx.playing) return runDocument(ctx.id, code, w, h);
       return regionsDocument(code, MM.addressablesOf('js', code), w, h);
     }
+    // A diagram said as Mermaid: its text stands, and the library draws it in place of the text when it can.
+    if (kind === 'mermaid') return mermaidDocument(ctx && ctx.id || '', code, w, h);
     if (kind === 'png' || kind === 'jpg') {
       const url = rep.data.path ? imageUrlFor(rep.data.path) : null;
       return '<!doctype html><html><head><meta charset="utf-8"><style>' + SOURCE_CSS +
@@ -10155,7 +10333,10 @@
     if (!row) { flash(name + ': not a kind the canvas knows'); return null; }
     const w = size || 360, h = Math.round((size || 360) * 0.66);
     const path = IMPORT_DIR + '/' + safeName(name);
-    return session.import({ kind: row.kind, path: path, name: safeName(name), bounds: { minX: at.x, minY: at.y, maxX: at.x + w, maxY: at.y + h }, code: text, at: Date.now() });
+    const id = session.import({ kind: row.kind, path: path, name: safeName(name), bounds: { minX: at.x, minY: at.y, maxX: at.x + w, maxY: at.y + h }, code: text, at: Date.now() });
+    // A Mermaid text dropped or pasted is held where it lands, so Draw it is in the field at once (D3's surface).
+    if (id && row.kind === 'mermaid') mermaidImported(id, safeName(name));
+    return id;
   }
 
   /** A file from a drop, a paste, the picker or a camera. */
@@ -10307,7 +10488,7 @@
   function editText(id, text) {
     const n = session.getState().nodes.get(id);
     const rep = n && codeRepOf(n);
-    return session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: id, kind: 'text', code: text, from: rep && rep.data.from, at: Date.now() });
+    return session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: id, kind: rep && rep.data.kind === 'mermaid' ? 'mermaid' : 'text', code: text, from: rep && rep.data.from, at: Date.now() });
   }
 
   /** A written word (its transcript) becomes a text artifact where the writing is; the ink stays. */
@@ -10446,7 +10627,8 @@
     if (id) {
       const n = s.nodes.get(id);
       const rep = n && codeRepOf(n);
-      if (!rep || rep.data.kind !== 'text') return false;
+      // A text is edited in place; so is a Mermaid text, a new version of the same kind (D2).
+      if (!rep || (rep.data.kind !== 'text' && rep.data.kind !== 'mermaid')) return false;
       bounds = MM.boundsOf(n); text = rep.data.code;
     } else {
       bounds = { minX: at.x, minY: at.y, maxX: at.x + TEXT_W, maxY: at.y + TEXT_H };
@@ -10470,7 +10652,7 @@
       const rep = n && codeRepOf(n);
       if (rep && rep.data.code === text) return e.id; // unchanged: no event
       editText(e.id, text);
-      flash('text revised — every version is kept; undo drops this one');
+      flash(rep && rep.data.kind === 'mermaid' ? 'Mermaid revised — drawn again; every version is kept, and undo drops this one' : 'text revised — every version is kept; undo drops this one');
       return e.id;
     }
     if (!text.trim()) return null;
@@ -11681,6 +11863,180 @@
     printJob: () => { const j = mathsPrintJob(); return j ? { pages: j.pages.length, paper: j.paper, testSquare: j.testSquare.text, error: j.error || null } : null; },
   };
 
+// ===== mermaid =====
+// Provides: the surface's half of Mermaid (V1-PLAN §3, D2 and D3): mermaidPartNames (ink over a rendered diagram
+//   lands on the marks it was written from), drawMermaidFrom (the host act of Draw it: a text drawn as ink beside
+//   everything, selected and fitted, said in one sentence), the export pane's Mermaid row, mermaidImported (a
+//   dropped .mmd held, so Draw it is at hand), and what a test asks (mermaidLast).
+// Uses: core (MM.mermaidFor, MM.readMermaid, MM.drawMermaid), view (fitTo, view), render (say, flash, logKey),
+//   handwriting (isRead), images (downloadText, exportPanel, exportBtn), artifacts (codeRepOf).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== Ink over a rendered diagram =========================================
+  // The frame reports each node as a part named for its MERMAID id (`stroke_7`);
+  // which marks that node was written from is what the writer said of the board's
+  // own marks when it wrote this text (`ids`, and `marks` for a symbol drawn with
+  // several strokes). It is derived where it is asked — from the marks the tool
+  // wrote it from, when this page knows them, else from the board — and only when
+  // that reading says exactly this text: an edited text has no marks to name, and
+  // its parts keep their Mermaid ids. Runtime, never the log.
+  const mermaidMadeFrom = new Map(); // artifactId -> the marks it was made from, this sitting
+  let mermaidNamed = { key: null, names: null };
+
+  const boardMarksOf = (s) => s.contentIds.filter((id) => !s.artifacts.includes(id));
+  const isReadMark = (s) => (id) => { const n = s.nodes.get(id); return !!n && isRead(n); };
+
+  /** Mermaid id → the marks it stands for on this board, for one artifact's text; null when the text is no reading of the board's. */
+  function mermaidNamesFor(artifactId) {
+    const s = session.getState();
+    const key = logKey() + '|' + artifactId;
+    if (mermaidNamed.key === key) return mermaidNamed.names;
+    const n = s.nodes.get(artifactId);
+    const rep = n && codeRepOf(n);
+    let names = null;
+    if (rep && rep.data.kind === 'mermaid') {
+      const made = (mermaidMadeFrom.get(artifactId) || []).filter((id) => s.nodes.has(id) && !s.artifacts.includes(id));
+      for (const scope of [made, boardMarksOf(s)]) {
+        if (scope.length < 2) continue;
+        const said = MM.mermaidFor(s, scope, isReadMark(s));
+        if (said && said.said.text === rep.data.code) { names = { ids: said.said.ids, marks: said.said.marks }; break; }
+      }
+    }
+    mermaidNamed = { key: key, names: names };
+    return names;
+  }
+
+  /** The names ink over one node of a diagram addresses: its marks — a symbol's stroke, a figure's strokes — or, with no marks to say, the Mermaid id. */
+  function mermaidPartNames(artifactId, partId) {
+    const names = mermaidNamesFor(artifactId);
+    if (!names || !names.ids[partId]) return [partId];
+    const id = names.ids[partId];
+    return id.indexOf('figure:') === 0 ? (names.marks[partId] || [id]) : [id];
+  }
+
+  // ===== Draw it: a text drawn as ink ========================================
+  const MERMAID_THINGS = { sequence: ['participant', 'participants'], 'uml-class': ['class', 'classes'] };
+  const MERMAID_LINKS = { sequence: ['message', 'messages'] };
+  const mermaidCount = (n, [one, many]) => n + ' ' + (n === 1 ? one : many);
+  let mermaidDrawn = null;
+
+  /** Where a drawing stands so it lands beside everything on the board and off the hand's way: right of every mark, at the board's top. */
+  function mermaidOrigin(s, scale) {
+    const boxes = s.contentIds.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
+    if (!boxes.length) { const c = screenToWorld(innerWidth / 2, innerHeight / 2); return { x: c.x, y: c.y }; }
+    const b = union(boxes);
+    return { x: b.maxX + 80 * scale, y: b.minY };
+  }
+
+  /** What was drawn, in one sentence — and what was not: the lines a reader could not read, and what is drawn otherwise than written. */
+  function mermaidSaid(name, drawn) {
+    const notation = MM.notationById(drawn.notation);
+    const called = notation ? notation.name : drawn.notation;
+    const article = /^[A-Z]{2,}\b/.test(called) ? 'a ' + called : (/^[aeio]/i.test(called) ? 'an ' : 'a ') + called.toLowerCase();
+    const nodes = Object.keys(drawn.ids).length;
+    let out = drawn.bounds
+      ? 'drew ' + article + ' from ' + name + ': ' + mermaidCount(nodes, MERMAID_THINGS[drawn.notation] || ['node', 'nodes']) + ' and ' + mermaidCount(drawn.links.length, MERMAID_LINKS[drawn.notation] || ['link', 'links'])
+      : 'nothing was drawn from ' + name;
+    const parts = [];
+    if (drawn.refused.length) {
+      const lines = drawn.refused.slice(0, 3).map((r) => 'line ' + r.line + (r.text ? ' “' + r.text.trim().slice(0, 40) + '”' : '') + ' (' + r.reason + ')');
+      parts.push('not read: ' + lines.join(', ') + (drawn.refused.length > 3 ? ' and ' + (drawn.refused.length - 3) + ' more' : ''));
+    }
+    for (const note of drawn.notes) parts.push(note);
+    if (parts.length) out += ' — ' + parts.join('; ');
+    return out;
+  }
+
+  /**
+   * The host act of *Draw it* (tools/mermaid-draw.ts names it): the artifact's text drawn as ink the engine reads
+   * as the notation it was written in, at the zoom the hand works at, beside everything on the board — inside
+   * the tool's stamp, so it is one act and one undo takes it all away. The drawn marks are selected and the view
+   * fitted to them; what was left out or drawn otherwise is said, never thrown.
+   */
+  function drawMermaidFrom(artifactId) {
+    const s = session.getState();
+    const n = s.nodes.get(artifactId);
+    const rep = n && codeRepOf(n);
+    if (!rep || rep.data.kind !== 'mermaid') { flash('that is not a Mermaid text'); return null; }
+    const scale = 1 / view.zoom;
+    const origin = mermaidOrigin(s, scale);
+    // Hundreds of events, one paint: the board is drawn when the diagram is all there.
+    const drawn = holdPaint(() => MM.drawMermaid(session, rep.data.code, { at: Date.now(), scale: scale, origin: origin }));
+    const marks = Object.values(drawn.ids).concat(drawn.links.flatMap((l) => l.ids));
+    const name = (MM.wordOf(n) || 'the text').replace(/^.*\//, '');
+    if (drawn.bounds) {
+      // The text has done its part: its field closes, and what was drawn is what is held.
+      const sum = session.getState().summon;
+      if (sum) session.dismiss(sum.id, drawn.lastAt + 1);
+      session.select(marks, drawn.lastAt + 2);
+      fitTo(drawn.bounds);
+    }
+    const said = mermaidSaid(name, drawn);
+    mermaidDrawn = { notation: drawn.notation, ids: Object.assign({}, drawn.ids), links: drawn.links.map((l) => ({ index: l.index, from: l.from, to: l.to, ids: l.ids.slice() })), marks: marks, notes: drawn.notes.slice(), refused: drawn.refused.map((r) => Object.assign({}, r)), bounds: drawn.bounds, said: said };
+    say(said);
+    return drawn;
+  }
+
+  /** What the last Draw it drew and said, for tests. */
+  const mermaidLast = () => (mermaidDrawn ? Object.assign({}, mermaidDrawn) : null);
+
+  /** A dropped or pasted .mmd is held where it landed, so Draw it is in the field at once — when a reader reads it; else it stands as text and says so. */
+  function mermaidImported(artifactId, name) {
+    const n = session.getState().nodes.get(artifactId);
+    const rep = n && codeRepOf(n);
+    if (!rep) return;
+    const read = MM.readMermaid(rep.data.code);
+    if (read.notation) {
+      session.summonMarks([artifactId], Date.now());
+      say(name + ': ' + mermaidCount(read.nodes.length, MERMAID_THINGS[read.notation] || ['node', 'nodes']) + ' of Mermaid — Draw it puts it on the board as marks');
+    } else {
+      const why = read.refused.length ? read.refused[0].reason : 'it is not a diagram the canvas reads';
+      say(name + ' stands as text: the canvas cannot draw it yet — ' + why);
+    }
+  }
+
+  // ===== The export pane's Mermaid row =======================================
+  // Beside the board's three files, a fourth when what is held — or, holding
+  // nothing, the board — reads as a notation the canvas can write in Mermaid:
+  // the file it would write, named for the notation. The pane reads the board
+  // again each time it opens; a board that reads as none has no such row.
+  const exMermaid = document.getElementById('exMermaid');
+
+  /** What the pane would write: the held marks' Mermaid when they read as a diagram, else the whole board's. */
+  function mermaidToExport() {
+    const s = session.getState();
+    const board = boardMarksOf(s);
+    const held = new Set(s.summon ? s.summon.enclosedIds : s.selection);
+    const heldMarks = board.filter((id) => held.has(id));
+    for (const [scope, marks] of [['held', heldMarks], ['board', board]]) {
+      if (marks.length < 2) continue;
+      const said = MM.mermaidFor(s, marks, isReadMark(s));
+      if (said) return { scope: scope, said: said };
+    }
+    return null;
+  }
+
+  function refreshMermaidRow() {
+    const got = mermaidToExport();
+    exMermaid.hidden = !got;
+    if (!got) return;
+    const b = exMermaid.querySelector('button');
+    b.textContent = got.said.reading.notation + '.mmd';
+    b.title = (got.scope === 'held' ? 'The marks held' : 'The board') + ' as Mermaid text — ' + MM.describeNotation(got.said.reading);
+  }
+  exportBtn.addEventListener('click', refreshMermaidRow);
+  exportPanel.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('button[data-export="mermaid"]');
+    if (!b) return;
+    const got = mermaidToExport();
+    if (!got) { flash('nothing here reads as a diagram the canvas can write in Mermaid'); return; }
+    const file = got.said.reading.notation + '.mmd';
+    downloadText(file, got.said.said.text, 'text/plain');
+    flash(file + ' — ' + MM.describeNotation(got.said.reading));
+  });
+
 // ===== boot =====
 // Provides: the debug handle (window.__mm, what the e2e drives), subscription (the journal first, the paint,
 //   the packs pane and the pen's ports), restore, first render.
@@ -11802,6 +12158,13 @@
     }),
   };
 
+
+  // Mermaid (V1-PLAN D2, D3), for tests: the library a frame loads (a stand-in, or the CDN's again), what a frame said of itself, what Draw it drew.
+  Object.assign(window.__mm, {
+    mermaidFrom: mermaidFrom,
+    mermaidState: (id) => (mermaidStates.has(id) ? Object.assign({}, mermaidStates.get(id)) : null),
+    mermaidLast: mermaidLast,
+  });
 
   // The board this browser keeps hears every change FIRST, before the paint:
   // a release on a big board paints for seconds, and the record of the stroke

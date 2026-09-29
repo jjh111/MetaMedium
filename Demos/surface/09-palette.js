@@ -257,6 +257,8 @@
     'maths-show': (o) => mathsShow(o.data),
     'maths-print': () => mathsPrint(),
     duplicate: (o, scope) => duplicateMarks(scope.summon, o.data.ids),
+    // A Mermaid text drawn as ink, at this zoom and beside everything (25-mermaid.js).
+    'mermaid-draw': (o) => drawMermaidFrom(o.data.artifact),
     'behave-model': (o) => { const d = o.data; agents.forEach((a) => withWork('behave:' + a.id + ':' + d.nodeId, [d.nodeId], modelWords(a) + ' · reading the words', a.behave({ nodeId: d.nodeId, words: d.words, at: Date.now() })).then(() => render(session.getState()))); },
   };
   /** What the surface does around a tool's act: before it (the field rebuilt from what it leaves), and after (what to say). */
@@ -271,6 +273,8 @@
     clean: { before: () => { shownSummonId = null; }, after: (o, scope, t) => { if (t.detail.ids.length) flash('drew ' + t.detail.ids.length + ' clean' + (t.detail.summary ? ' — ' + t.detail.summary : '')); } },
     graph3d: { after: (o, scope, t) => say(!t.made ? 'could not hold that group' : t.detail.ok ? 'in 3D (tier 1): ' + t.detail.reasoning : 'could not stand it in 3D: ' + t.detail.error) },
     frames: { after: (o, scope, t) => { if (o.data.act !== 'frame' || !t.made) return; const st = session.getState(); flash('framed ' + t.detail.members + ' — ' + MM.describeFrame(MM.frameOfNode(st.nodes.get(t.made)), st.nodes)); } },
+    // The drawing said as Mermaid stands beside it: say so, remember which marks it was written from, and keep the field.
+    mermaid: { after: (o, scope, t) => { if (!t.made) { say(t.detail.error); return; } mermaidMadeFrom.set(t.made, scope.marks.slice()); flash('the drawing as Mermaid, beside it — ' + t.detail.reading + '; Draw it puts it back as marks'); refreshPalette(); } },
     label: { after: (o, scope, t) => { const d = t.detail; if (d.done.length || d.saying.length || d.refused.length) say(labelSentence(String(o.data.word).trim(), d.done, d.saying, d.refused)); } },
   };
 

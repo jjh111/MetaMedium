@@ -6,9 +6,9 @@
 // the whole vocabulary; it grows by adding a row with a test, never by a
 // special case elsewhere (BUILD-PLAN-v8 I6).
 
-export type Kind = 'html' | 'js' | 'json' | 'svg' | 'md' | 'png' | 'jpg' | 'text' | 'control' | 'run';
+export type Kind = 'html' | 'js' | 'json' | 'svg' | 'md' | 'png' | 'jpg' | 'text' | 'control' | 'run' | 'mermaid';
 
-export type Renderer = 'page' | 'source' | 'tree' | 'vector' | 'prose' | 'image' | 'text' | 'control' | 'run';
+export type Renderer = 'page' | 'source' | 'tree' | 'vector' | 'prose' | 'image' | 'text' | 'control' | 'run' | 'mermaid';
 export type Addressing = 'regions' | 'functions' | 'keys' | 'elements' | 'headings' | 'pixels' | 'runs' | 'value' | 'parts';
 
 export interface KindRow {
@@ -37,6 +37,12 @@ export const KINDS: readonly KindRow[] = [
   // scripts-only, opaque-origin frame with a clear background, and REPORTS
   // its parts — named things at named places — so ink over it lands on them.
   { kind: 'run', extensions: ['run.js'], mime: 'text/javascript', renderer: 'run', addressing: 'parts', textual: true },
+  // A diagram said as Mermaid text (V1-PLAN §3, D2): drawn by mermaid.js in the
+  // same scripts-only, opaque-origin frame a program runs in, which REPORTS each
+  // node as a part — named for the marks it was written from — so ink over the
+  // rendered diagram lands on them. The text always stands, drawn or not; and a
+  // text is data, never code: nothing here is played.
+  { kind: 'mermaid', extensions: ['mmd', 'mermaid'], mime: 'text/vnd.mermaid', renderer: 'mermaid', addressing: 'parts', textual: true },
 ];
 
 export function kindOf(path: string): KindRow | undefined {
