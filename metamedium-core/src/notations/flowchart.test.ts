@@ -364,8 +364,15 @@ describe('ports, through E3’s hook', () => {
     const q = s.addStroke(handShape(diamondCorners(300, 300, 180, 110), { seed: 54 }), 1000);
     const p = s.addStroke(handShape(boxCorners(80, 460, 120, 60), { seed: 55 }), 5000);
     // Drawn from the box up to where the pen felt the decision's left vertex.
-    const hit = nearestMagnet({ x: 214, y: 303 }, magnetSites(s.getState().nodes.get(q)!, s.getState().nodes), 14)!;
-    expect(hit.site).toMatchObject({ kind: 'port:flowchart', port: 'left' });
+    // Since S2 a flat diamond's ink offers its own four corners (the rung reads
+    // it unsure, and its bounds' corners lay in the air), and a mark's own site
+    // leads a tie with a notation's port at the same point — the flowchart's
+    // 'left' port stands on that very vertex all the same.
+    const sites = magnetSites(s.getState().nodes.get(q)!, s.getState().nodes);
+    const hit = nearestMagnet({ x: 214, y: 303 }, sites, 14)!;
+    expect(hit.site).toMatchObject({ kind: 'corner' });
+    const left = sites.find((x) => x.kind === 'port:flowchart' && x.port === 'left')!;
+    expect(Math.hypot(left.point.x - hit.site.point.x, left.point.y - hit.site.point.y)).toBeLessThan(1e-6);
     const f = s.addStroke(arrow({ x: 84, y: 426 }, hit.site.point, 56), 9000);
     s.bind({ strokeId: f, nodeId: q, site: { kind: hit.site.kind, index: hit.site.index }, end: 'end', at: 9001 });
     const flow = read(s).connectors.find((c) => c.id === f)!;
