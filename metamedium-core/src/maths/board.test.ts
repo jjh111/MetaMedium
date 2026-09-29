@@ -207,6 +207,32 @@ describe('what is typed after =', () => {
   });
 });
 
+// A number's figure stands beside it, so only the ink beside a number is read for figures: on a board of
+// two thousand marks with one number on it the dimensions and the solver walked every figure against every
+// other, two seconds a stroke (bench/board.mjs, measured at R4c's 2,000). What the maths says of a drawing
+// must not depend on what else is on the board — that is the property, and the cost follows from it.
+describe('a board with a lot on it', () => {
+  it('says exactly what the drawing alone says, and reads no figure a number is not beside', () => {
+    const alone = triangle();
+    const crowded = triangle();
+    // A wall of boxes and lines far to one side, and a small drawing of them near the triangle's label on the other.
+    for (let i = 0; i < 300; i++) crowded.s.addStroke(rectStroke(3000 + (i % 30) * 150, 2000 + Math.floor(i / 30) * 120, 90, 60), 100000 + i * 4000);
+    for (let i = 0; i < 60; i++) crowded.s.addStroke(lineStroke({ x: 3000 + i * 40, y: 1500 }, { x: 3000 + i * 40 + 30, y: 1560 }), 2000000 + i * 4000);
+    const a = boardMaths(alone.s.getState())!, b = boardMaths(crowded.s.getState())!;
+    expect(b.figures).toHaveLength(a.figures.length);
+    const said = (board: NonNullable<typeof a>) => mathsChips(board).map((c) => [c.key.replace(/figure:[^:]*/, 'figure'), c.kind, c.text, Math.round(c.at.x), Math.round(c.at.y)]);
+    expect(said(b)).toEqual(said(a));
+  });
+
+  it('reads the drawing a number is written beside, however dense it is around, and its ruled lines with it', () => {
+    const { s } = triangle();
+    // Clutter touching the triangle's own corner: a ruled figure's strokes are pulled in by what they meet.
+    for (let i = 0; i < 40; i++) s.addStroke(lineStroke({ x: 100 + i * 3, y: 400 + i }, { x: 130 + i * 3, y: 430 + i }), 60000 + i * 4000);
+    const board = boardMaths(s.getState())!;
+    expect(kind(mathsChips(board), 'side').map((c) => c.text)).toEqual(['25.30']);
+  });
+});
+
 // A triangle whose ends do not close is no figure, and says nothing.
 describe('an open drawing', () => {
   it('two lines and a number beside them are not a figure: no chip', () => {

@@ -32,7 +32,11 @@
 import type { Point } from '../types';
 import type { Session, SessionEvent, SessionState } from '../session/session';
 import { figuresOf } from '../diagram/figures';
-import type { BoardDimensions } from './dimension';
+import { boundsOf, getRep, transcriptOf } from '../session/nodes';
+import { MarkGrid, finiteBounds } from '../relate/grid';
+import { reachAround, withinReach } from '../relate/relations';
+import { boundingBoxDistance } from '../geometry';
+import type { BoardDimensions, BoardNumber } from './dimension';
 import { numbersOf } from './dimension';
 import { sheetLines } from './gather';
 import { checkWritten, readSheet } from './sheet';
@@ -42,6 +46,60 @@ import { solveBoard } from './solve';
 import type { BoardMaths, Conflict, FigureMaths, SolvedValue } from './solve';
 import { formatQuantity } from './quantity';
 import type { Quantity } from './quantity';
+
+// ===== Which ink a number can be about =====
+
+/** The most marks one drawing beside a number is walked to: a doodle that big is not a figure. */
+export const BESIDE_MAX = 600;
+/**
+ * A number can be about a mark within this many of the mark's own sizes of it: a label attaches to a
+ * side up to about three quarters of that side's length from its middle (`ATTACH_FLOOR` in dimension.ts),
+ * and no side is longer than the mark's own diagonal. Generous, since a mark too far only costs a look.
+ */
+const ATTACH_REACH = 2;
+
+const isWriting = (state: SessionState, id: string): boolean => {
+  const n = state.nodes.get(id);
+  return !!n && !!transcriptOf(n);
+};
+
+/**
+ * The ink beside the numbers: every mark a number can be about (within `ATTACH_REACH` of the mark's own
+ * size of it), and the drawings those marks hang together with, walked outwards by within-reach links —
+ * the links a ruled figure's strokes meet by. In the board's order, and no more than `BESIDE_MAX`.
+ */
+function drawingsBeside(state: SessionState, numbers: readonly BoardNumber[]): string[] {
+  const artifacts = new Set(state.artifacts);
+  const grid = new MarkGrid();
+  const order = new Map<string, number>();
+  state.contentIds.forEach((id, i) => {
+    if (artifacts.has(id)) return;
+    const n = state.nodes.get(id);
+    const b = n && !getRep(n, 'erased') ? boundsOf(n) : undefined;
+    if (!b || !finiteBounds(b)) return;
+    grid.set(id, b);
+    order.set(id, i);
+  });
+  const seen = new Set<string>();
+  const queue: string[] = [];
+  for (const id of order.keys()) {
+    const b = grid.boundsOf(id)!;
+    const size = Math.max(1, b.maxX - b.minX, b.maxY - b.minY);
+    for (const num of numbers) {
+      if (boundingBoxDistance(num.bounds, b) <= ATTACH_REACH * size) { seen.add(id); queue.push(id); break; }
+    }
+  }
+  for (let q = 0; q < queue.length && seen.size < BESIDE_MAX; q++) {
+    const b = grid.boundsOf(queue[q])!;
+    const r = reachAround(b);
+    for (const o of grid.query({ minX: b.minX - r, minY: b.minY - r, maxX: b.maxX + r, maxY: b.maxY + r })) {
+      if (seen.has(o) || !withinReach(b, grid.boundsOf(o)!)) continue;
+      seen.add(o);
+      queue.push(o);
+    }
+  }
+  return [...seen].sort((a, b) => order.get(a)! - order.get(b)!);
+}
 
 // ===== The board's maths, kept while its log stands =====
 
@@ -58,7 +116,20 @@ function emptyDimensions(): BoardDimensions {
  * for a board with no numbers and no page, however many marks it holds.
  */
 export function boardMaths(state: SessionState): BoardMaths | null {
-  if (numbersOf(state).length) return solveBoard(state, { figures: figuresOf(state) });
+  const numbers = numbersOf(state);
+  if (numbers.length) {
+    // Only the ink a number can be about is read for figures: the dimensions and the solver walk every
+    // figure against every other, and on a board of two thousand marks with one number on it that was two
+    // seconds a stroke. A figure a number is not written beside has nothing to say.
+    const ink = drawingsBeside(state, numbers);
+    const near = new Set(ink);
+    const keep = new Set(state.artifacts);
+    const narrowed = {
+      ...state,
+      contentIds: state.contentIds.filter((id) => near.has(id) || keep.has(id) || isWriting(state, id)),
+    };
+    return solveBoard(narrowed, { figures: figuresOf(narrowed) });
+  }
   // No number stands on a mark, so none is left out of the page.
   const sheet = readSheet(sheetLines(state, { except: [] }));
   if (!sheet.entries.some((e) => e.kind !== 'heading' && e.kind !== 'note')) return null;

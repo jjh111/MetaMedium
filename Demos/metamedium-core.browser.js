@@ -8265,12 +8265,229 @@ ${p.svg}</section>`),
     return { ...base, rows, cols, pages, assembly, html, reason };
   }
 
+  // src/relate/grid.ts
+  var MIN_LEVEL = -40;
+  function finiteBounds(b) {
+    return Number.isFinite(b.minX) && Number.isFinite(b.minY) && Number.isFinite(b.maxX) && Number.isFinite(b.maxY);
+  }
+  function levelOf(b) {
+    const size = Math.max(b.maxX - b.minX, b.maxY - b.minY);
+    if (!(size > 0)) return MIN_LEVEL;
+    let level = Math.max(MIN_LEVEL, Math.ceil(Math.log2(size)));
+    while (2 ** level < size) level++;
+    return level;
+  }
+  var MarkGrid = class {
+    constructor() {
+      /** level → cx → cy → the ids filed there. */
+      this.levels = /* @__PURE__ */ new Map();
+      /** How many marks each level holds, and how many cells, so a query skips empty levels. */
+      this.counts = /* @__PURE__ */ new Map();
+      this.filed = /* @__PURE__ */ new Map();
+    }
+    get size() {
+      return this.filed.size;
+    }
+    has(id) {
+      return this.filed.has(id);
+    }
+    /** The box a mark is filed under, as it was given. */
+    boundsOf(id) {
+      return this.filed.get(id)?.bounds;
+    }
+    ids() {
+      return this.filed.keys();
+    }
+    /** File a mark (or move it, when it is already filed). A box that is not finite is not filed. */
+    set(id, bounds) {
+      this.delete(id);
+      if (!finiteBounds(bounds)) return;
+      const level = levelOf(bounds);
+      const cell = 2 ** level;
+      const cx2 = Math.floor(bounds.minX / cell);
+      const cy2 = Math.floor(bounds.minY / cell);
+      let xs = this.levels.get(level);
+      if (!xs) this.levels.set(level, xs = /* @__PURE__ */ new Map());
+      let ys = xs.get(cx2);
+      if (!ys) xs.set(cx2, ys = /* @__PURE__ */ new Map());
+      let here2 = ys.get(cy2);
+      const count9 = this.counts.get(level) ?? { marks: 0, cells: 0 };
+      if (!here2) {
+        ys.set(cy2, here2 = /* @__PURE__ */ new Set());
+        count9.cells++;
+      }
+      here2.add(id);
+      count9.marks++;
+      this.counts.set(level, count9);
+      this.filed.set(id, { level, cx: cx2, cy: cy2, bounds: { minX: bounds.minX, minY: bounds.minY, maxX: bounds.maxX, maxY: bounds.maxY } });
+    }
+    delete(id) {
+      const f = this.filed.get(id);
+      if (!f) return false;
+      this.filed.delete(id);
+      const xs = this.levels.get(f.level);
+      const ys = xs.get(f.cx);
+      const here2 = ys.get(f.cy);
+      here2.delete(id);
+      const count9 = this.counts.get(f.level);
+      count9.marks--;
+      if (here2.size === 0) {
+        ys.delete(f.cy);
+        count9.cells--;
+        if (ys.size === 0) xs.delete(f.cx);
+      }
+      if (count9.marks === 0) {
+        this.counts.delete(f.level);
+        this.levels.delete(f.level);
+      }
+      return true;
+    }
+    clear() {
+      this.levels.clear();
+      this.counts.clear();
+      this.filed.clear();
+    }
+    /**
+     * Become a copy of `other`: the same marks filed the same way, sharing
+     * nothing either will change — a filed box is never changed in place, so
+     * those are shared. For a checkpoint, which keeps the index as it stood.
+     */
+    copyFrom(other) {
+      this.levels = /* @__PURE__ */ new Map();
+      for (const [level, xs] of other.levels) {
+        const xs2 = /* @__PURE__ */ new Map();
+        for (const [cx2, ys] of xs) {
+          const ys2 = /* @__PURE__ */ new Map();
+          for (const [cy2, here2] of ys) ys2.set(cy2, new Set(here2));
+          xs2.set(cx2, ys2);
+        }
+        this.levels.set(level, xs2);
+      }
+      this.counts = /* @__PURE__ */ new Map();
+      for (const [level, c] of other.counts) this.counts.set(level, { marks: c.marks, cells: c.cells });
+      this.filed = new Map(other.filed);
+    }
+    /** Every mark whose box meets `box` (edges touching count), in no particular order. */
+    query(box) {
+      const out = [];
+      this.visit(() => box, (id, b) => {
+        if (b.maxX >= box.minX && b.minX <= box.maxX && b.maxY >= box.minY && b.minY <= box.maxY) out.push(id);
+      });
+      return out;
+    }
+    /**
+     * Marks near a point, where how near depends on how big the mark is:
+     * `radiusFor(cell)` is the farthest a mark of at most `cell` across can be
+     * and still count. Every mark whose box comes within its level's radius of
+     * the point is returned — a superset, for the caller's exact test.
+     */
+    around(p, radiusFor) {
+      const out = [];
+      this.visit(
+        (cell) => {
+          const r = radiusFor(cell);
+          return { minX: p.x - r, minY: p.y - r, maxX: p.x + r, maxY: p.y + r };
+        },
+        (id, b, box) => {
+          if (b.maxX >= box.minX && b.minX <= box.maxX && b.maxY >= box.minY && b.minY <= box.maxY) out.push(id);
+        }
+      );
+      return out;
+    }
+    /** Walk the cells a box (per level) could reach, handing each filed mark to `fn`. */
+    visit(boxAt, fn) {
+      for (const [level, xs] of this.levels) {
+        const cell = 2 ** level;
+        const box = boxAt(cell);
+        if (!finiteBounds(box)) {
+          for (const ys of xs.values()) for (const here2 of ys.values()) for (const id of here2) fn(id, this.filed.get(id).bounds, box);
+          continue;
+        }
+        const x0 = Math.floor(box.minX / cell) - 1, x1 = Math.floor(box.maxX / cell);
+        const y0 = Math.floor(box.minY / cell) - 1, y1 = Math.floor(box.maxY / cell);
+        const span = (x1 - x0 + 1) * (y1 - y0 + 1);
+        const count9 = this.counts.get(level);
+        if (span > count9.cells) {
+          for (const [cx2, ys] of xs) {
+            if (cx2 < x0 || cx2 > x1) continue;
+            for (const [cy2, here2] of ys) {
+              if (cy2 < y0 || cy2 > y1) continue;
+              for (const id of here2) fn(id, this.filed.get(id).bounds, box);
+            }
+          }
+          continue;
+        }
+        for (let cx2 = x0; cx2 <= x1; cx2++) {
+          const ys = xs.get(cx2);
+          if (!ys) continue;
+          for (let cy2 = y0; cy2 <= y1; cy2++) {
+            const here2 = ys.get(cy2);
+            if (!here2) continue;
+            for (const id of here2) fn(id, this.filed.get(id).bounds, box);
+          }
+        }
+      }
+    }
+  };
+
   // src/maths/board.ts
+  var BESIDE_MAX = 600;
+  var ATTACH_REACH = 2;
+  var isWriting = (state, id) => {
+    const n2 = state.nodes.get(id);
+    return !!n2 && !!transcriptOf(n2);
+  };
+  function drawingsBeside(state, numbers) {
+    const artifacts = new Set(state.artifacts);
+    const grid = new MarkGrid();
+    const order2 = /* @__PURE__ */ new Map();
+    state.contentIds.forEach((id, i) => {
+      if (artifacts.has(id)) return;
+      const n2 = state.nodes.get(id);
+      const b = n2 && !getRep(n2, "erased") ? boundsOf(n2) : void 0;
+      if (!b || !finiteBounds(b)) return;
+      grid.set(id, b);
+      order2.set(id, i);
+    });
+    const seen = /* @__PURE__ */ new Set();
+    const queue = [];
+    for (const id of order2.keys()) {
+      const b = grid.boundsOf(id);
+      const size = Math.max(1, b.maxX - b.minX, b.maxY - b.minY);
+      for (const num2 of numbers) {
+        if (boundingBoxDistance(num2.bounds, b) <= ATTACH_REACH * size) {
+          seen.add(id);
+          queue.push(id);
+          break;
+        }
+      }
+    }
+    for (let q = 0; q < queue.length && seen.size < BESIDE_MAX; q++) {
+      const b = grid.boundsOf(queue[q]);
+      const r = reachAround(b);
+      for (const o of grid.query({ minX: b.minX - r, minY: b.minY - r, maxX: b.maxX + r, maxY: b.maxY + r })) {
+        if (seen.has(o) || !withinReach(b, grid.boundsOf(o))) continue;
+        seen.add(o);
+        queue.push(o);
+      }
+    }
+    return [...seen].sort((a, b) => order2.get(a) - order2.get(b));
+  }
   function emptyDimensions() {
     return { figures: [], numbers: [], attachments: [], labels: /* @__PURE__ */ new Map(), rightAngles: [], underlines: [], drawings: [], numberIds: /* @__PURE__ */ new Set() };
   }
   function boardMaths(state) {
-    if (numbersOf(state).length) return solveBoard(state, { figures: figuresOf(state) });
+    const numbers = numbersOf(state);
+    if (numbers.length) {
+      const ink = drawingsBeside(state, numbers);
+      const near = new Set(ink);
+      const keep = new Set(state.artifacts);
+      const narrowed = {
+        ...state,
+        contentIds: state.contentIds.filter((id) => near.has(id) || keep.has(id) || isWriting(state, id))
+      };
+      return solveBoard(narrowed, { figures: figuresOf(narrowed) });
+    }
     const sheet = readSheet(sheetLines(state, { except: [] }));
     if (!sheet.entries.some((e) => e.kind !== "heading" && e.kind !== "note")) return null;
     return { dimensions: emptyDimensions(), sheet, figures: [] };
@@ -9067,7 +9284,7 @@ ${p.svg}</section>`),
     return c ? c.ends.map((e) => ({ end: e.end, point: e.point, out: e.out })) : null;
   }
   var isRead = (node) => isWord(node) || !!transcriptOf(node);
-  function isWriting(node, nodes, ink, hull2) {
+  function isWriting2(node, nodes, ink, hull2) {
     if (isRead(node)) return true;
     return snapReading(node, nodes).shape === "text" && !compactFill(ink, hull2);
   }
@@ -9183,7 +9400,7 @@ ${p.svg}</section>`),
       const hull2 = hullOf2(ink);
       const d = hull2.length >= 3 && insideConvex2(e.point, hull2) ? 0 : hull2.length >= 2 ? distToRing2(e.point, hull2) : dist5(e.point, hull2[0]);
       if (d > reach) continue;
-      if (isWriting(o.node, nodes, o.ink, hull2)) {
+      if (isWriting2(o.node, nodes, o.ink, hull2)) {
         writing = true;
         continue;
       }
@@ -9291,7 +9508,7 @@ ${p.svg}</section>`),
     const raw = strokePointsOf(mark);
     if (!conn || !b || !raw || raw.length < 3) return null;
     const hull2 = hullOf2(raw);
-    if (hull2.length < 2 || isWriting(mark, nodes, raw, hull2)) return null;
+    if (hull2.length < 2 || isWriting2(mark, nodes, raw, hull2)) return null;
     const size = Math.max(b.maxX - b.minX, b.maxY - b.minY);
     const markScale = getRep(mark, "stroke")?.data?.scale ?? 1;
     if (size / markScale < HAND_RESOLUTION_PX) return null;
@@ -12521,171 +12738,6 @@ ${lines.join("\n")}
     );
   }
 
-  // src/relate/grid.ts
-  var MIN_LEVEL = -40;
-  function finiteBounds(b) {
-    return Number.isFinite(b.minX) && Number.isFinite(b.minY) && Number.isFinite(b.maxX) && Number.isFinite(b.maxY);
-  }
-  function levelOf(b) {
-    const size = Math.max(b.maxX - b.minX, b.maxY - b.minY);
-    if (!(size > 0)) return MIN_LEVEL;
-    let level = Math.max(MIN_LEVEL, Math.ceil(Math.log2(size)));
-    while (2 ** level < size) level++;
-    return level;
-  }
-  var MarkGrid = class {
-    constructor() {
-      /** level → cx → cy → the ids filed there. */
-      this.levels = /* @__PURE__ */ new Map();
-      /** How many marks each level holds, and how many cells, so a query skips empty levels. */
-      this.counts = /* @__PURE__ */ new Map();
-      this.filed = /* @__PURE__ */ new Map();
-    }
-    get size() {
-      return this.filed.size;
-    }
-    has(id) {
-      return this.filed.has(id);
-    }
-    /** The box a mark is filed under, as it was given. */
-    boundsOf(id) {
-      return this.filed.get(id)?.bounds;
-    }
-    ids() {
-      return this.filed.keys();
-    }
-    /** File a mark (or move it, when it is already filed). A box that is not finite is not filed. */
-    set(id, bounds) {
-      this.delete(id);
-      if (!finiteBounds(bounds)) return;
-      const level = levelOf(bounds);
-      const cell = 2 ** level;
-      const cx2 = Math.floor(bounds.minX / cell);
-      const cy2 = Math.floor(bounds.minY / cell);
-      let xs = this.levels.get(level);
-      if (!xs) this.levels.set(level, xs = /* @__PURE__ */ new Map());
-      let ys = xs.get(cx2);
-      if (!ys) xs.set(cx2, ys = /* @__PURE__ */ new Map());
-      let here2 = ys.get(cy2);
-      const count9 = this.counts.get(level) ?? { marks: 0, cells: 0 };
-      if (!here2) {
-        ys.set(cy2, here2 = /* @__PURE__ */ new Set());
-        count9.cells++;
-      }
-      here2.add(id);
-      count9.marks++;
-      this.counts.set(level, count9);
-      this.filed.set(id, { level, cx: cx2, cy: cy2, bounds: { minX: bounds.minX, minY: bounds.minY, maxX: bounds.maxX, maxY: bounds.maxY } });
-    }
-    delete(id) {
-      const f = this.filed.get(id);
-      if (!f) return false;
-      this.filed.delete(id);
-      const xs = this.levels.get(f.level);
-      const ys = xs.get(f.cx);
-      const here2 = ys.get(f.cy);
-      here2.delete(id);
-      const count9 = this.counts.get(f.level);
-      count9.marks--;
-      if (here2.size === 0) {
-        ys.delete(f.cy);
-        count9.cells--;
-        if (ys.size === 0) xs.delete(f.cx);
-      }
-      if (count9.marks === 0) {
-        this.counts.delete(f.level);
-        this.levels.delete(f.level);
-      }
-      return true;
-    }
-    clear() {
-      this.levels.clear();
-      this.counts.clear();
-      this.filed.clear();
-    }
-    /**
-     * Become a copy of `other`: the same marks filed the same way, sharing
-     * nothing either will change — a filed box is never changed in place, so
-     * those are shared. For a checkpoint, which keeps the index as it stood.
-     */
-    copyFrom(other) {
-      this.levels = /* @__PURE__ */ new Map();
-      for (const [level, xs] of other.levels) {
-        const xs2 = /* @__PURE__ */ new Map();
-        for (const [cx2, ys] of xs) {
-          const ys2 = /* @__PURE__ */ new Map();
-          for (const [cy2, here2] of ys) ys2.set(cy2, new Set(here2));
-          xs2.set(cx2, ys2);
-        }
-        this.levels.set(level, xs2);
-      }
-      this.counts = /* @__PURE__ */ new Map();
-      for (const [level, c] of other.counts) this.counts.set(level, { marks: c.marks, cells: c.cells });
-      this.filed = new Map(other.filed);
-    }
-    /** Every mark whose box meets `box` (edges touching count), in no particular order. */
-    query(box) {
-      const out = [];
-      this.visit(() => box, (id, b) => {
-        if (b.maxX >= box.minX && b.minX <= box.maxX && b.maxY >= box.minY && b.minY <= box.maxY) out.push(id);
-      });
-      return out;
-    }
-    /**
-     * Marks near a point, where how near depends on how big the mark is:
-     * `radiusFor(cell)` is the farthest a mark of at most `cell` across can be
-     * and still count. Every mark whose box comes within its level's radius of
-     * the point is returned — a superset, for the caller's exact test.
-     */
-    around(p, radiusFor) {
-      const out = [];
-      this.visit(
-        (cell) => {
-          const r = radiusFor(cell);
-          return { minX: p.x - r, minY: p.y - r, maxX: p.x + r, maxY: p.y + r };
-        },
-        (id, b, box) => {
-          if (b.maxX >= box.minX && b.minX <= box.maxX && b.maxY >= box.minY && b.minY <= box.maxY) out.push(id);
-        }
-      );
-      return out;
-    }
-    /** Walk the cells a box (per level) could reach, handing each filed mark to `fn`. */
-    visit(boxAt, fn) {
-      for (const [level, xs] of this.levels) {
-        const cell = 2 ** level;
-        const box = boxAt(cell);
-        if (!finiteBounds(box)) {
-          for (const ys of xs.values()) for (const here2 of ys.values()) for (const id of here2) fn(id, this.filed.get(id).bounds, box);
-          continue;
-        }
-        const x0 = Math.floor(box.minX / cell) - 1, x1 = Math.floor(box.maxX / cell);
-        const y0 = Math.floor(box.minY / cell) - 1, y1 = Math.floor(box.maxY / cell);
-        const span = (x1 - x0 + 1) * (y1 - y0 + 1);
-        const count9 = this.counts.get(level);
-        if (span > count9.cells) {
-          for (const [cx2, ys] of xs) {
-            if (cx2 < x0 || cx2 > x1) continue;
-            for (const [cy2, here2] of ys) {
-              if (cy2 < y0 || cy2 > y1) continue;
-              for (const id of here2) fn(id, this.filed.get(id).bounds, box);
-            }
-          }
-          continue;
-        }
-        for (let cx2 = x0; cx2 <= x1; cx2++) {
-          const ys = xs.get(cx2);
-          if (!ys) continue;
-          for (let cy2 = y0; cy2 <= y1; cy2++) {
-            const here2 = ys.get(cy2);
-            if (!here2) continue;
-            for (const id of here2) fn(id, this.filed.get(id).bounds, box);
-          }
-        }
-      }
-    }
-  };
-
   // src/diagram/roles.ts
   var ROLES = ["container", "node", "edge", "label", "annotation", "unclassified"];
   var CLOSED = /* @__PURE__ */ new Set(["rectangle", "circle", "triangle"]);
@@ -12693,7 +12745,7 @@ ${lines.join("\n")}
   var WRITING = /* @__PURE__ */ new Set(["text", "dot"]);
   var isClosed = (s, id) => CLOSED.has(s.shapes[id] ?? "");
   var isConnector = (s, id) => CONNECTOR.has(s.shapes[id] ?? "");
-  var isWriting2 = (s, id) => WRITING.has(s.shapes[id] ?? "");
+  var isWriting3 = (s, id) => WRITING.has(s.shapes[id] ?? "");
   var inScope = (s, id) => s.ids.includes(id);
   function contents(s, id) {
     return s.relations.filter((r) => r.kind === "contains" && r.from === id && inScope(s, r.to)).sort((a, b) => b.strength - a.strength);
@@ -12730,7 +12782,7 @@ ${lines.join("\n")}
         targets: held2.map((r) => r.to)
       };
     }
-    if (isWriting2(s, id)) {
+    if (isWriting3(s, id)) {
       const inside = enclosingMark(s, id);
       if (inside && isClosed(s, inside.to)) {
         return {
@@ -16324,7 +16376,7 @@ ${lines.join("\n")}
       reading--;
     }
   }
-  function isWriting3(node) {
+  function isWriting4(node) {
     if (isWord(node) || transcriptOf(node)) return true;
     return resemblances(node)[0]?.to === "type:text";
   }
@@ -16383,7 +16435,7 @@ ${lines.join("\n")}
         candidates.push(c);
         continue;
       }
-      if (isWriting3(m.node)) writing.add(m.id);
+      if (isWriting4(m.node)) writing.add(m.id);
       else if (fingerprintOf(m.node) && !fingerprintOf(m.node).isClosed) open.push(m.id);
     }
     const inFigure = /* @__PURE__ */ new Set();
@@ -17108,7 +17160,7 @@ ${lines.join("\n")}
     const side = (name, a, b) => ({ name: `${name} side`, along: [a, b], reasoning: `anywhere along the class\u2019s ${name} side` });
     return [side("top", tl, tr), side("right", tr, br), side("bottom", br, bl), side("left", bl, tl)];
   }
-  function isWriting4(node) {
+  function isWriting5(node) {
     if (isWord(node) || transcriptOf(node)) return true;
     return resemblances(node)[0]?.to === "type:text";
   }
@@ -17135,7 +17187,7 @@ ${lines.join("\n")}
   function mayBeLine(n2) {
     if (!getRep(n2, "stroke") || getRep(n2, "erased") || getRep(n2, "gesture") || n2.edges.some((e) => e.rel === "part-of")) return false;
     const fp = fingerprintOf(n2);
-    return !!fp && !fp.isClosed && !isWriting4(n2);
+    return !!fp && !fp.isClosed && !isWriting5(n2);
   }
   function umlClassPortsOf(node, nodes) {
     if (reading2 > 0) return null;
@@ -17284,7 +17336,7 @@ ${lines.join("\n")}
         if (!resemblances(m.node).some((e) => e.to === "type:rectangle")) continue;
         const b = boxOf(pts, false);
         if (b && b.score >= BOX_FLOOR) candidates.push({ id: m.id, box: [m.id], marks: [m.id], shape: b, scale: m.scale, frame: framesOf(b)[0], lines: [], fit: 1, lead: "" });
-      } else if (!isWriting4(m.node)) open.push(m);
+      } else if (!isWriting5(m.node)) open.push(m);
     }
     if (!candidates.length && open.length < 4) return null;
     const inFigure = /* @__PURE__ */ new Set();
@@ -17336,7 +17388,7 @@ ${lines.join("\n")}
       const fp = fingerprintOf(m.node);
       const closed = !!fp?.isClosed && !isWord(m.node);
       const spans = spanU > WRITING_SPAN * f.w || spanV > WRITING_SPAN * f.h;
-      const writes = isWriting4(m.node) || (closed ? sizeOfBounds(m.bounds) <= LETTER_SHARE * Math.min(f.w, f.h) : !spans || !fp || zigzagOf(strokePointsOf(m.node) ?? [], m.scale) > COMPARTMENT_CROSSINGS[0]);
+      const writes = isWriting5(m.node) || (closed ? sizeOfBounds(m.bounds) <= LETTER_SHARE * Math.min(f.w, f.h) : !spans || !fp || zigzagOf(strokePointsOf(m.node) ?? [], m.scale) > COMPARTMENT_CROSSINGS[0]);
       if (writes) inside.get(c).writing.push(m);
       else inside.get(c).foreign.push(m);
     }
@@ -17515,7 +17567,7 @@ ${lines.join("\n")}
     const taken = /* @__PURE__ */ new Set([...relations.flatMap((r) => r.ids), ...pointers, ...edgeMarks.keys(), ...usedWords, ...headOf2]);
     const outsideWriting = [...marks.values()].filter((m) => {
       if (insideOf2.has(m.id) || boxMarks.has(m.id) || lineIds.has(m.id) || inFigure.has(m.id) || taken.has(m.id)) return false;
-      if (isWriting4(m.node)) return true;
+      if (isWriting5(m.node)) return true;
       const fp = fingerprintOf(m.node);
       return !!fp && !fp.isClosed && isLetterLike(m.bounds, m.scale) && sizeOfBounds(m.bounds) <= LETTER_PX * m.scale;
     });
@@ -17558,7 +17610,7 @@ ${lines.join("\n")}
         labels.push({ ...base, of: best.r.id, where: "beside", confidence: MAX2 * (1 - 0.5 * (best.d / best.reach)), reason: `writing ${Math.round(best.d)} from the middle of ${best.r.id} \u2014 its label` });
         continue;
       }
-      if (isWriting4(m.node)) labels.push({ ...base, where: "alone", role: "annotation", confidence: MAX2 * 0.5, reason: "writing beside nothing in the diagram \u2014 a note" });
+      if (isWriting5(m.node)) labels.push({ ...base, where: "alone", role: "annotation", confidence: MAX2 * 0.5, reason: "writing beside nothing in the diagram \u2014 a note" });
     }
     const readingOrder = (ids) => [...ids].sort((p, q) => {
       const a = marks.get(p).bounds, b = marks.get(q).bounds;
@@ -18168,12 +18220,12 @@ ${lines.join("\n")}
   var offBox3 = (p, b) => Math.hypot(Math.max(0, b.minX - p.x, p.x - b.maxX), Math.max(0, b.minY - p.y, p.y - b.maxY));
   var offPlumb2 = (v) => Math.atan2(Math.abs(v.x), Math.abs(v.y)) * DEG8;
   var offLevel2 = (v) => Math.atan2(Math.abs(v.y), Math.abs(v.x)) * DEG8;
-  function isWriting5(node) {
+  function isWriting6(node) {
     if (isWord(node) || transcriptOf(node)) return true;
     return resemblances(node)[0]?.to === "type:text";
   }
   function writingLike(node, ink, scale) {
-    if (isWriting5(node)) return true;
+    if (isWriting6(node)) return true;
     if (!ink || fingerprintOf(node)?.isClosed) return false;
     return zigzagOf(ink, scale) >= WRITING_ZIGZAG;
   }
@@ -18450,7 +18502,7 @@ ${lines.join("\n")}
       return tops.some((t) => Math.abs(t.x - cx2) <= across2 + reach && t.y >= b.maxY - 0.5 * h2 - reach && t.y <= b.maxY + below + reach);
     };
     for (const s of loose) {
-      if (!closedOf(s) || isWriting5(s.node) || !reads(s.node, "rectangle")) continue;
+      if (!closedOf(s) || isWriting6(s.node) || !reads(s.node, "rectangle")) continue;
       const b = s.bounds, w2 = b.maxX - b.minX, h2 = b.maxY - b.minY;
       if (!overTop(b, LIFELINE_MIDDLE * w2, Math.max(LIFELINE_BELOW * h2, magnetRadius(s.size, s.scale)), s.scale)) continue;
       const box = boxOf2(s.ink, false);
