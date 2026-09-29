@@ -466,6 +466,73 @@ export async function runHand(browser, servers, { freshContext, screenshot }) {
       await letGo(page);
     });
 
+
+    // ---- A reload: a new sitting and the same person ----
+    let sittingBefore = null, idsBefore = [];
+    await record('H1.16', async () => {
+      await letGo(page);
+      const before = await page.evaluate(() => { const mm = window.__mm, s = mm.session.getState(); return { me: mm.folder().me, ids: s.contentIds.slice(), marks: s.contentIds.length }; });
+      sittingBefore = before.me; idsBefore = before.ids;
+      await page.reload({ waitUntil: 'load', timeout: 60000 });
+      await ready();
+      await inRoom();
+      await page.evaluate((x) => window.__mm.setView(1, -x, 0), WX);
+      const back = await waitFor(page, (n) => window.__mm.session.getState().contentIds.length >= n, before.marks, 10000);
+      await joinModel();
+      const now = await page.evaluate(() => { const mm = window.__mm, s = mm.session.getState(); return { me: mm.folder().me, ids: s.contentIds.slice(), marks: s.contentIds.length, colour: mm.colourOf(s.contentIds[0]) }; });
+      const look = await lookUntil((l) => idsBefore.filter((id) => !!markLine(l, id)).length >= 3);
+      const listed = idsBefore.filter((id) => !!markLine(look, id));
+      await stroke(page, rect(700, 660, 90, 60));
+      const fresh = (await page.evaluate(tabNow)).last;
+      check(`H1.16. §6 (synthetic strokes): the tab reloaded by its address — a new sitting (${sittingBefore} → ${now.me}), the same person; the board comes back from the room (${before.marks} → ${now.marks} marks), the hand's look lists his earlier marks under their old ids (${listed.length} of ${idsBefore.length}); his next mark is ${fresh}, an id no sitting has held`,
+        back && now.me !== sittingBefore && String(now.me).startsWith('john~') && now.marks >= before.marks && listed.length === idsBefore.length && !!fresh && !idsBefore.includes(fresh) && !String(fresh).includes(String(sittingBefore)),
+        { before, now, listed, fresh });
+    });
+
+    await record('H1.17', async () => {
+      // A mark drawn before the reload is still his to label: a reload is a new sitting and the same person.
+      const opened = await holdAtPoint(page, { x: 470, y: 250 });
+      await typeInField('label: gate');
+      const line1 = await fieldLine(page);
+      await page.keyboard.press('Enter');
+      await sleep(200);
+      const first = await page.evaluate((id) => { const mm = window.__mm; const l = mm.MM.labelOf(mm.session.getState().nodes.get(id)); return l ? l.text : null; }, boxB);
+      await letGo(page);
+      await stroke(page, rect(400, 150, 450, 200));
+      await stroke(page, tick(790, 300));
+      const held = await waitFor(page, (a) => { const s = window.__mm.session.getState().summon; return !!s && s.enclosedIds.includes(a[0]) && s.enclosedIds.includes(a[1]); }, [boxB, sun], 5000);
+      await typeInField('label: outlet');
+      const line2 = await fieldLine(page);
+      await page.keyboard.press('Enter');
+      await sleep(200);
+      const labels = await page.evaluate(([a, b]) => { const mm = window.__mm, s = mm.session.getState(); const t = (id) => { const l = mm.MM.labelOf(s.nodes.get(id)); return l ? l.text : null; }; return { box: t(a), sun: t(b) }; }, [boxB, sun]);
+      const look = await lookUntil((l) => /labelled “outlet”/.test(markLine(l, boxB) || ''));
+      const refused = textOf(await hand.call('canvas_label', { id: boxB, text: 'mine now' }));
+      check(`H1.17. §6 (synthetic strokes): after the reload, a mark drawn before it labels — "${line1}" before Enter, and it says ${first}; held with the hand's circle, "${line2}"; the hand's look: "${(markLine(look, boxB) || '').slice(0, 100)}", the circle still “${labels.sun}”; the hand's own label on his mark is refused (${refused.slice(-60)})`,
+        opened && /^↵ label it “gate” — on (yours|your \d+)/.test(line1) && first === 'gate' && held && /^↵ label it “outlet” — on (yours|your \d+), not the (mark|\d+ marks) claude made$/.test(line2) && labels.box === 'outlet' && labels.sun === 'sun'
+          && /labelled “outlet”/.test(markLine(look, boxB) || '') && /by john/.test(markLine(look, boxB) || '') && !/“mine now” on/.test(refused) && /john/.test(refused),
+        { line1, first, line2, labels, look: markLine(look, boxB), refused });
+      await letGo(page);
+    });
+
+    await record('H1.18', async () => {
+      // A7: after an undo and a reload, a sentence and a reading land on the marks they were about.
+      const say = textOf(await hand.call('canvas_say', { about: [boxB], text: 'still your box, after the reload' }));
+      const prop = textOf(await hand.call('canvas_propose', { ids: [word], label: 'window-frame', confidence: 0.6, reasoning: 'after the reload, on the word' }));
+      const landed = await waitFor(page, ([b, w]) => {
+        const mm = window.__mm, s = mm.session.getState();
+        return mm.answerCards().some((c) => c.about.length === 1 && c.about[0] === b && c.who === 'claude' && c.id !== undefined) && mm.MM.interpretationsOf(s.nodes.get(w), s.nodes).some((r) => r.label === 'window-frame');
+      }, [boxB, word], 6000);
+      const where = await page.evaluate(([b, w]) => {
+        const mm = window.__mm, s = mm.session.getState();
+        const withReading = s.contentIds.filter((id) => mm.MM.interpretationsOf(s.nodes.get(id), s.nodes).some((r) => r.label === 'window-frame'));
+        const sayCards = mm.answerCards().filter((c) => c.who === 'claude' && c.about.includes(b)).length;
+        return { withReading, sayCards, undone: !s.nodes.has('x') };
+      }, [boxB, word]);
+      check(`H1.18. A7 (synthetic strokes): after an undo and a reload the hand's sentence lands on his box alone and its reading on his word alone — the reading is on ${JSON.stringify(where.withReading)} (${where.withReading.length} mark)`,
+        /placed beside/.test(say) && /held on/.test(prop) && landed && where.withReading.length === 1 && where.withReading[0] === word, { say, prop, where });
+    });
+
     check(`H1.Z. nothing the scenario opened reached for :8020, where a relay on this machine listens by default — ${toJohnsRelay.length} request${toJohnsRelay.length === 1 ? '' : 's'} refused`, toJohnsRelay.length === 0, toJohnsRelay.slice(0, 5));
   } catch (err) {
     check(`the scenario itself fell over: ${String(err && err.message ? err.message : err).split('\n')[0]}`, false, { stack: String(err && err.stack) });
