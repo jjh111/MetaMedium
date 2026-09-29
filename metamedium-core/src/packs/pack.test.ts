@@ -372,6 +372,12 @@ describe('the pen: a pack naming a notation offers its ports while in use', () =
     expect(shippedPack('uml-class@1')!.definitions).toEqual([]);
     expect(shippedPack('sequence@1')!.notation).toBe('sequence');
     expect(shippedPack('sequence@1')!.definitions).toEqual([]);
+    expect(shippedPack('state@1')!.notation).toBe('state');
+    expect(shippedPack('state@1')!.definitions).toEqual([]);
+    expect(shippedPack('er@1')!.notation).toBe('er');
+    expect(shippedPack('er@1')!.definitions).toEqual([]);
+    expect(shippedPack('mindmap@1')!.notation).toBe('mindmap');
+    expect(shippedPack('mindmap@1')!.definitions).toEqual([]);
   });
 
   it('uml-class@1 in use puts each class’s four sides on the pen — a place along a side — and stopping takes them back (D4)', () => {
@@ -424,6 +430,69 @@ describe('the pen: a pack naming a notation offers its ports while in use', () =
     s.unuse('sequence@1', next());
     expect(registeredPorts()).toEqual([]);
     expect(sites(solid)).toEqual([]);
+    stop();
+  });
+  it('state@1 in use puts each state’s border on the pen — a place along it — and stopping takes it back (D5)', () => {
+    const s = createSession();
+    const stop = followPacks(s);
+    const box = s.addStroke(handRect(100, 100, 200, 90, { seed: 5 }), next(4000));
+    const sites = () => magnetSites(s.getState().nodes.get(box)!, s.getState().nodes).filter((x) => x.kind === 'along:state');
+    expect(sites()).toEqual([]);
+    s.use('state@1', next(4000));
+    expect(registeredPorts()).toEqual(['state']);
+    const along = sites();
+    expect(along.length).toBeGreaterThan(8);
+    // Somewhere along each of its four sides, and nowhere off its border.
+    expect(along.some((x) => Math.abs(x.point.y - 100) < 6)).toBe(true);
+    expect(along.some((x) => Math.abs(x.point.x - 300) < 6)).toBe(true);
+    expect(along.some((x) => Math.abs(x.point.y - 190) < 6)).toBe(true);
+    expect(along.some((x) => Math.abs(x.point.x - 100) < 6)).toBe(true);
+    expect(along.every((x) => x.point.x > 94 && x.point.x < 306 && x.point.y > 94 && x.point.y < 196)).toBe(true);
+    s.unuse('state@1', next());
+    expect(registeredPorts()).toEqual([]);
+    expect(sites()).toEqual([]);
+    stop();
+  });
+  it('er@1 in use puts each entity’s border on the pen — a place along it — and stopping takes it back (D6)', () => {
+    const s = createSession();
+    const stop = followPacks(s);
+    const box = s.addStroke(handRect(100, 100, 200, 90, { seed: 5 }), next(4000));
+    const sites = () => magnetSites(s.getState().nodes.get(box)!, s.getState().nodes).filter((x) => x.kind === 'along:er');
+    expect(sites()).toEqual([]);
+    s.use('er@1', next(4000));
+    expect(registeredPorts()).toEqual(['er']);
+    const along = sites();
+    expect(along.length).toBeGreaterThan(8);
+    // Somewhere along each of its four sides, and nowhere off its border.
+    expect(along.some((x) => Math.abs(x.point.y - 100) < 6)).toBe(true);
+    expect(along.some((x) => Math.abs(x.point.x - 300) < 6)).toBe(true);
+    expect(along.some((x) => Math.abs(x.point.y - 190) < 6)).toBe(true);
+    expect(along.some((x) => Math.abs(x.point.x - 100) < 6)).toBe(true);
+    expect(along.every((x) => x.point.x > 94 && x.point.x < 306 && x.point.y > 94 && x.point.y < 196)).toBe(true);
+    s.unuse('er@1', next());
+    expect(registeredPorts()).toEqual([]);
+    expect(sites()).toEqual([]);
+    stop();
+  });
+  it('mindmap@1 in use puts each node’s border on the pen — a place along it — and stopping takes it back (D6)', () => {
+    const s = createSession();
+    const stop = followPacks(s);
+    const box = s.addStroke(handRect(100, 100, 200, 90, { seed: 5 }), next(4000));
+    const sites = () => magnetSites(s.getState().nodes.get(box)!, s.getState().nodes).filter((x) => x.kind === 'along:mindmap');
+    expect(sites()).toEqual([]);
+    s.use('mindmap@1', next(4000));
+    expect(registeredPorts()).toEqual(['mindmap']);
+    const along = sites();
+    expect(along.length).toBeGreaterThan(8);
+    // Somewhere along each of its four sides, and nowhere off its border.
+    expect(along.some((x) => Math.abs(x.point.y - 100) < 6)).toBe(true);
+    expect(along.some((x) => Math.abs(x.point.x - 300) < 6)).toBe(true);
+    expect(along.some((x) => Math.abs(x.point.y - 190) < 6)).toBe(true);
+    expect(along.some((x) => Math.abs(x.point.x - 100) < 6)).toBe(true);
+    expect(along.every((x) => x.point.x > 94 && x.point.x < 306 && x.point.y > 94 && x.point.y < 196)).toBe(true);
+    s.unuse('mindmap@1', next());
+    expect(registeredPorts()).toEqual([]);
+    expect(sites()).toEqual([]);
     stop();
   });
 });

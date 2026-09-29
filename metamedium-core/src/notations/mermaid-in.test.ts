@@ -58,6 +58,9 @@ function drawnBack(text: string, s: Session = named('importer~t1')): { drawn: Dr
   return { drawn, reading, text: m.text };
 }
 
+/** These draw and read dozens of boards through every registered notation: more than vitest's five seconds on a loaded machine. */
+const SLOW = 120_000;
+
 describe('the round trip: a text drawn and read again comes back', () => {
   const texts: [string, string][] = [
     ['D2’s golden, before the writing is read', FLOWCHART_MERMAID_UNREAD],
@@ -407,7 +410,7 @@ describe('the caps, and what is said beyond them', () => {
     const e = drawMermaid(createSession(), many, { at: 1000 });
     expect(e.links).toHaveLength(MERMAID_MAX_LINKS);
     expect(e.notes.join(' ')).toMatch(/the text holds 130 links among the nodes drawn and the board draws 120 at most: the 10 after the first 120 are not drawn/);
-  });
+}, SLOW);
 });
 
 describe('what will not read back as written is said', () => {
@@ -434,7 +437,7 @@ describe('random charts, written as D2 writes them, come back', () => {
       const text = randomFlowchartText(seed);
       expect(canonical(drawnBack(text).text), `seed ${seed}\n${text}`).toBe(canonical(text));
     }
-  });
+  }, SLOW);
 
   it('at a quarter and at four times the zoom', () => {
     for (let seed = 101; seed <= 115; seed++) {

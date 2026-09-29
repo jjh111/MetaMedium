@@ -549,6 +549,40 @@ export {
   HELD_ARROW,
 } from './notations/sequence';
 export type { SequenceReading, SequenceParticipant, SequenceMessage, MessageKind } from './notations/sequence';
+// The state notation (V1-PLAN §3, D5's state half): a state is a round-cornered
+// box, the initial state a small dot scribbled solid, the final a ring with a
+// mark inside it, a transition an arrow between them — or a loop out of a state
+// and back, its barb measured — each end read past its head. What makes it a
+// state diagram rather than the flowchart's boxes and arrows is what a
+// flowchart has no symbol for: the reading's confidence is its structure
+// scaled by that evidence. Its content is STATE_TABLE, which the state@1 pack
+// names; its stateDiagram-v2 writer and reader are state-mermaid.ts,
+// registered with D2's writers and D3's readers.
+export {
+  STATE,
+  STATE_TABLE,
+  readState,
+  statePortsOf,
+  FILLED_PATH,
+  BLOB_ASPECT,
+  DOT_FILLED,
+  SMALL_BESIDE,
+  INNER_SHARE,
+  INNER_CENTRED,
+  LOOP_OUT,
+  LOOP_OUT_PX,
+  LOOP_STANDS_OUT,
+  BARB_SHARE,
+  BARB_PX,
+  ROUNDED_BY,
+  ROUND_ENOUGH,
+  ROUNDED_EXTENT,
+  ROUNDED_UPRIGHT,
+  EVIDENCE,
+  PLAIN_SHARE,
+  FOREIGN_PENALTY,
+} from './notations/state';
+export type { StateReading, StateSymbol, StateTransition } from './notations/state';
 export { stanceOf, cornersOf, tightBox } from './notations/shape';
 // Dashed lines (V1-PLAN §3, D5) — short straight strokes in a row read as one
 // line, derived like figures: each dash's ends in the row's corridor, each a
@@ -594,6 +628,14 @@ export { writeUmlClass, readClassDiagramText, CLASS_DIAGRAM_READER, memberLine }
 export { writeSequence, readSequenceText, SEQUENCE_READER, sequenceText, BLANK_WORDS } from './notations/sequence-mermaid';
 export type { SequenceDiagramRead, SequenceNodeRead, SequenceLinkRead, DrawnSequenceLink } from './notations/sequence-mermaid';
 export type { LayeredNode, LayeredLink, LayeredOptions, LayeredLayout, LayeredBack, LayeredDirection } from './notations/layered';
+// The state diagram in Mermaid, both ways (D5): `stateDiagram-v2` written from
+// a reading — states in reading order with their names, transitions by what
+// they join, the initial dot and the final ring both `[*]` — and read back and
+// drawn as ink the notation reads: rounded boxes, a dot scribbled solid, a ring
+// round a second, arrows bound at both ends, a loop out of a state and back.
+export { writeState, readStateText, STATE_READER, stateText, INITIAL_ID, FINAL_ID } from './notations/state-mermaid';
+export type { StateDiagramRead, StateNodeRead, StateLinkRead, DrawnStateLink } from './notations/state-mermaid';
+
 
 // Concepts — the meaning-mappings, as a library rather than as code paths.
 export { matchConcepts, BUILTIN_CONCEPTS } from './concepts/concept';
@@ -836,3 +878,68 @@ export type { SerializeOptions } from './participants/serialize';
 
 // Types
 export type * from './types';
+
+// The ER diagram (V1-PLAN §3, D6): an entity is a box with its name written in
+// it, a relationship a plain line between two of them, its verb beside the
+// middle and a multiplicity at each end — the writing that says how many, read
+// as one of four cardinalities. What makes it an ER diagram rather than the
+// flowchart's or the class diagram's boxes and lines is what they lack: lines
+// with no head, boxes with nothing in them but a name, a multiplicity at the
+// ends. Its content is ER_TABLE, which the er@1 pack names; its erDiagram
+// writer and reader are er-mermaid.ts, registered with D2's writers and D3's
+// readers.
+export {
+  ER,
+  ER_TABLE,
+  readEr,
+  erPortsOf,
+  cardinalityOf,
+  saysOf,
+  END_SHARE as ER_END_SHARE,
+  MULTIPLICITY_SHARE,
+  MIDDLE_SHARE,
+  LETTER_PX as ER_LETTER_PX,
+  EVIDENCE as ER_EVIDENCE,
+  PLAIN_SHARE as ER_PLAIN_SHARE,
+  CLASSLIKE_PENALTY,
+  HEADED_PENALTY,
+} from './notations/er';
+export type { ErReading, ErEntity, ErRelationship, ErEnd, ErWriting, Cardinality } from './notations/er';
+// The ER diagram in Mermaid, both ways (D6): `erDiagram` written from a reading
+// — entities in reading order with their names, relationships by what they
+// join with the crow's-foot token each end says — and read back and drawn as
+// ink the notation reads: boxes, plain lines bound at both ends, a dash beside
+// each end carrying its multiplicity, the verb on the line.
+export { writeEr, readErText, ER_READER, cardinalityOfToken } from './notations/er-mermaid';
+export type { ErDiagramRead, ErNodeRead, ErLinkRead, DrawnErLink } from './notations/er-mermaid';
+
+// The mind map (V1-PLAN §3, D6): a node is a circle or a box with its word
+// written in it, a branch a plain line between two of them, the root the most
+// central node of the tree. What makes it a mind map rather than an ER
+// diagram's boxes or a molecule's bubbles is a word in every node, a hub with
+// branches that go on past it, and lines with nothing beside them. Its content
+// is MINDMAP_TABLE, which the mindmap@1 pack names; its `mindmap` writer and
+// reader are mindmap-mermaid.ts, registered with D2's writers and D3's readers.
+export {
+  MINDMAP,
+  MINDMAP_TABLE,
+  readMindMap,
+  mindMapPortsOf,
+  clockwiseFromTop,
+  shapeTokens,
+  EVIDENCE as MINDMAP_EVIDENCE,
+  PLAIN_SHARE as MINDMAP_PLAIN_SHARE,
+  WRITTEN_PENALTY,
+  HEADED_PENALTY as MINDMAP_HEADED_PENALTY,
+  CLASSLIKE_PENALTY as MINDMAP_CLASSLIKE_PENALTY,
+  LOOP_PENALTY,
+  LETTER_PX as MINDMAP_LETTER_PX,
+} from './notations/mindmap';
+export type { MindMapReading, MindMapNode, MindMapBranch, MindMapWriting, MindMapShape } from './notations/mindmap';
+// The mind map in Mermaid, both ways (D6): `mindmap` written from a reading —
+// the tree as indentation, each node its id and its words in its shape's
+// brackets — and read back and drawn as ink the notation reads: the root at the
+// middle and the tree fanned round it, nodes with their words on their own ink,
+// plain branches bound at both ends.
+export { writeMindMap, readMindMapText, MINDMAP_READER } from './notations/mindmap-mermaid';
+export type { MindMapDiagramRead, MindMapNodeRead, MindMapLinkRead, DrawnMindMapLink } from './notations/mindmap-mermaid';

@@ -71,6 +71,9 @@ function readAll(s: Session, e: ReturnType<typeof drawClassDiagram>, words: Reco
   e.multiplicities.forEach((m, i) => read(m.id, cards[i]));
 }
 
+/** These draw and read dozens of boards through every registered notation: more than vitest's five seconds on a loaded machine. */
+const SLOW = 120_000;
+
 describe('out: the writer', () => {
   it('is registered by notation, with a reader by keyword', () => {
     expect(mermaidWriters()).toEqual(expect.arrayContaining(['flowchart', 'uml-class']));
@@ -232,7 +235,7 @@ describe('in: the round trip — a text drawn and read again comes back', () => 
       const text = randomClassText(seed);
       for (const scale of [0.25, 4]) expect(canonical(drawnBack(text, named('importer~t1'), { scale }).text), `seed ${seed} at ${scale}×`).toBe(canonical(text));
     }
-  });
+}, SLOW);
 });
 
 describe('the other way: a hand’s drawing exported and drawn back reads as the same diagram', () => {

@@ -251,7 +251,7 @@ suite and the gate green, `master` fast-forwarded and pushed.
 | **0b. A board that holds** (pulled forward by `PERF.md`, 27 Sep) | R3 no lost work · R4b the engine holds 2,000 marks · R4c the surface draws only what changed · R4d a room merges a line, not the board · R4e a brief carries what it is about | nothing is ever lost silently; a 2,000-mark board opens in under 1.5 s, answers a stroke in 16 ms at p95 and draws its reading within 100 ms; a room line costs under 16 ms; the budgets are tests |
 | **1. The backbone** — ✅ done on `w2`, 28 Sep | B1 tools · B2 context · B3 packs | a tool is one file; the field ranks by context with reasons; a pack is used by an event and benched |
 | **2. Editing** — ✅ done, 28 Sep | E1 handles · E2 bindings follow · E3 ports, heads and figures | a selected mark reshapes by its points; bound arrows follow; notations can declare ports |
-| **3. Diagrams** — core of D1–D4 and D5's sequence half built, 28 Sep; the surfaces next | D1 flowchart · S1 the shape rung holds a diamond, an L and a wide arc · W1 drawing never destroys what it connects · S2 an arrow read where its ink points · D2 Mermaid out · D3 Mermaid in · D4 UML class · D5 sequence and state · D6 ER and mind map · D7 routing · D8 the repair demo | A1–A3 pass in the gate |
+| **3. Diagrams** — core of D1–D4, D5 and D6 built, 28–29 Sep; the surfaces next | D1 flowchart · S1 the shape rung holds a diamond, an L and a wide arc · W1 drawing never destroys what it connects · S2 an arrow read where its ink points · D2 Mermaid out · D3 Mermaid in · D4 UML class · D5 sequence and state · D6 ER and mind map · D7 routing · D8 the repair demo | A1–A3 pass in the gate |
 | **4. Maths** ∥ after B1 | M1 quantities and expressions · M2 the sheet · M3 figures and dimensions · M4 solving · M5 maths on the board · M6 the garment pack · M7 true size and print | A4 passes in the gate |
 | **5. Seats** ∥ | J1 decide on the canvas · J2 extraction, a spike · J3 numerals, an experiment · J4 Claude Code is the canvas's seat (28 Sep) | the seat is measured on fixtures; the spike and the experiment say yes or not yet, with numbers; What is this? and Read the writing reach the Claude Code session and come back |
 | **6. Ready for use** | R1 boards · R2 the log format · R3 no lost work · R4 performance · R5 first run · R6 pencil and WebKit · R7 deploy and release · R8 one platform · R9 the shard alongside | A8–A10 pass; budgets met |
@@ -1880,6 +1880,182 @@ golden list of packs must add `sequence@1` (and `uml-class@1`) when the
 bundles are rebuilt; the bundles are not committed here. The state half can
 reuse the loop reading (a state's self-transition), `headsApart` and the
 held barb; its transitions are solid, so dashes are not needed there.
+*D5 status (the state half), 29 Sep 2026:* D5's state core built on
+`worktree-agent-a078449d3d735bcd9` (`6f0480c` red — the state board as a core
+test, 109 of 116 failing — then `2ce9367`, `037463b`, `c5334d0`, `37a9288`,
+`2cc2b81`); the field's and the panel's display, the `mermaid` kind's render
+of a `stateDiagram-v2` and *Draw it* are the surface's, still to come.
+`notations/state.ts`: a **state** is a round-cornered box — a closed stroke the
+rung reads as a rectangle, a stadium, or a circle not small beside the others,
+known also by how fully it fills its own tightest box (a hand's rounded box is
+between the flowchart's box and stadium measures and reads as either,
+unsurely) — its name the writing in it; a box holding a state is a composite's
+frame (a container). The **initial state** is a small dot scribbled solid and
+the **final** a ring with a mark inside it — read from the ink alone: the rung
+calls a scribbled dot an arc, writing, a rectangle or nothing (never a dot),
+so a mark is a spot by being compact and dense (its path runs 1.6–2.4 times its
+hull's perimeter, `FILLED_PATH`) and a ring holding one, a tap or a second ring
+a bullseye; a ring and its dot drawn within the word window are gathered into
+a word by the letter rules and are read from the word's letters; a hollow small
+ring is an initial or a final by which way its transition runs, less surely. A
+**transition** is an arrow between two of these, each end read past its head
+(a small mark heads.ts calls a circle head at an end is the dot or the ring it
+lands on, `landed`), a bind first; a **self-transition** is a loop out of a
+state and back — one open stroke both of whose ends land on one state,
+standing out `LOOP_OUT` of its size, its barb measured where it folds back out
+(heads.ts finds no head on it and the rung reads an arc, or nothing); a line
+with no head is no transition. **The trap, and the rule:** boxes and arrows
+are what a flowchart is, so the reading's confidence is its structure scaled by
+what a flowchart has no symbol for (`EVIDENCE`: a solid initial dot, a final
+ring, a loop, round corners), plain boxes and arrows are the flowchart's and
+read here as nothing, round corners alone are held under the floor, and a
+decision or a data symbol counts against it; the reading returns before the
+costly joining when none of that stands. A state offers its border as one
+closed continuous port (`along:state`), a dot its four cardinals (`port:state`).
+`notations/state-mermaid.ts`: the writer (`stateDiagram-v2`, `direction LR`
+when the transitions run across, `state "name" as id`, transitions by the
+states they join, the dot and the ring both `[*]`, D2's ids, escapes and
+placeholder; several initials or finals fold into one `[*]` and a transition
+into an initial or out of a final runs the other way in Mermaid, each said);
+the reader (a hand's forms; a composite's frame, a choice, a fork, a join, a
+note, concurrent regions and styles refused with their lines, a composite's
+contents read flat) drawn by D3's layered layout — rounded boxes, the dot as
+one solid spiral, the final as a ring round a second spiral, arrows bound at
+both ends (a box's own site, else a place along its border; arcs around a state
+in the way with closed-triangle heads), a loop out of a state's side bound at
+both ends — read back, what does not read as written is said. `state@1`
+(`packs/shipped/state.ts`) names the notation and restates none of
+`STATE_TABLE`; its affinities lift clean forms and lining up; its ports follow
+it on the pen. `graph-kit.ts` (the joining of symbols by connectors, the label
+pass, roles, a writer's words — flowchart.ts only exports what it reuses) and
+`box-routing.ts` (a copy of the class reader's sides, arcs and spread ends,
+shared with D6) are new. The bench (`state.bench.test.ts`, 36 hands of the
+board): read 36/36, first 36/36 (0.83–0.85); states 108/108, names 108/108,
+initial 36/36, final 36/36, arrows 180/180, loops 36/36, labels 216/216; the
+ring and its dot drawn quickly (gathered into a word) the same; **states with
+square corners read 36/36 above the floor with every symbol right but first
+only 12/36** — a flowchart reads a square box better than anything and says
+0.82–0.87 to the state diagram's 0.77–0.80; both are said. The flowchart
+bench, the class bench, the sequence board, a wireframe, the molecule and a
+line of writing: highest 0.12, none above the floor. The round trip
+(`state-mermaid.test.ts`): the goldens (`fixtures/state.mermaid.ts`, by hand)
+and six texts come back exactly, every hand of the board exported before and
+after its writing is read, 50 seeded random diagrams at 1× (40) and 0.25× and
+4× (10), twelve hands exported and drawn back read the same. packBench:
+`state@1` has no definitions; the corpus, now 3,930 drawings with the state
+boards, 0 false reads for every pack; basics@1 96/96 and test-molecule@1 48/48
+unchanged. Found, for their owners: **a loop whose ends cross its own state's
+outline three times is a scratch that erases the state** (`session/erase.ts`;
+the fixture stops the loop 5 px short, the reader's drawing is bound at both
+ends) — the same hazard D5's sequence half found for a self-message; **a bound
+end is carried onto its site (`follow`), so a connector's ink that ends off
+its site is drawn back distorted** — a loop's last wing tip, three pixels
+of ink, bent a whole loop (`session/follow.ts`; the drawing now ends its ink on
+the site); **the letter rules gather a ring and the dot drawn in it into a
+word** (`session/words.ts`; read through here, as the flowchart reads a
+gathered diamond); **the shape rung never calls a scribbled dot a dot** — an arc
+0.55, writing 0.5–0.8, a rectangle or nothing — so anything that must know a
+dot reads its ink; **a fourth registered notation is a few per cent on every
+test that draws and reads** (`mermaid-in.test.ts`'s caps and 60-chart cases sit
+at 3.7–4.3 s against vitest's 5 s here, and fail on master too under load).
+The surface's half must know: `notationsOf(state, scope)` gives a `StateReading`
+(each symbol's `symbol` — `state`, `initial`, `final` — `rounded`, `labels`;
+each transition's `self`, `from`, `to`, `labels`; `evidence`, `foreign`);
+`toMermaid` maps each Mermaid state id to its box (`ids`, `marks`) and
+`links[i]` to transition i — the initial and final have no id, they are `[*]`;
+`drawMermaid` inside `session.withTool`, as D3; a state's name and a
+transition's words are labels on their own ink; a bind at `along:state` or
+`port:state` is found again while the notation is known (always) and offered to
+the pen only while the pack is in use; and e2e 51's golden list of packs must
+add `state@1` when the bundles are rebuilt.
+*D6 status, 29 Sep 2026:* D6 built on `worktree-agent-a078449d3d735bcd9`, ER
+first and the mind map after it — `e17327a` red (the ER board as a core test,
+109 of 116 failing), `47dacc3` (the notation reads it and writes `erDiagram`),
+`f672fb2` (the round trip, the rules, the bench, `er@1`), `59c011e`; `f9fd80b`
+red (the mind-map board, 109 of 116 failing), `512eb42` (the notation, its
+writer, reader and drawing, `mindmap@1`), `f833f55` (the round trip, the rules,
+the bench); `0a91d10` (three older round-trip tests carry the timeout the heavy
+ones do), `fe222e7` (both bundles rebuilt — the state half's too), `2b675ca`
+(e2e 51's golden). The field's and the panel's display, the `mermaid` kind's
+render of an `erDiagram` or a `mindmap` and *Draw it* are the surface's, still to
+come. **ER** (`notations/er.ts`, `er-mermaid.ts`, `er@1`): an **entity** is a box
+with its name in it (a box with a line across it is a class's compartments, a
+box holding a box a frame), a **relationship** a plain line between two, no head,
+its **verb** the writing beside its middle and a **multiplicity** the short
+writing near each end — the pieces of one end read together — said as one of four
+cardinalities (`ER_TABLE`: exactly one, zero or one, zero or more, one or more;
+Mermaid's crow's-foot tokens); a crow's foot drawn as ink is not read, and neither
+are Chen's relationship diamonds (§3 named them) — the notation is the
+crow's-foot one. **The trap, and the rule:** boxes and lines are what a flowchart
+and a class diagram are, so the confidence is the structure scaled by what they
+lack (`EVIDENCE`: a multiplicity at the ends, a verb beside the middle), with a
+head or a compartment counting against it; a board of arrows returns before the
+costly joining. Mermaid: `erDiagram`, `direction LR`, `id["name"]`,
+`from ||--o{ to : "verb"`, entities in the reading order of the page as it was
+meant to stand (a hand's page leans — the centres are turned back by the lines'
+median lean) **by columns when it runs across, by rows when it runs down**; a
+relationship with no verb is `""` (Mermaid wants one), nothing said of how many is
+written as zero or more and said; the reader takes the word aliases for a
+cardinality and refuses attributes, a title and styles with their lines; the
+drawing puts a dash beside each end labelled with the words. The bench
+(`er.bench.test.ts`, 36 hands): read 36/36, first 36/36 (0.65–0.67); entities
+144/144, names, relationships 108/108, multiplicities 108/108, verbs 108/108, at
+three corner roundnesses; every other board (flowchart, class, sequence, state,
+wireframe, molecule, writing) highest 0.08, none above the floor. **Mind map**
+(`notations/mindmap.ts`, `mindmap-mermaid.ts`, `mindmap@1`): a **node** is a
+circle, an oval or a box with its word in it, a **branch** a plain line between
+two, the **root** the most central node of the tree (least total distance), each
+node's branches in the order a hand reads round it — clockwise from the top round
+the root, from the way it faces round any other. What makes it a mind map and not
+the ER diagram's boxes or the molecule's bubbles: a word in every node, a hub with
+three branches and branches that go on past it, and lines with nothing beside them
+(a multiplicity or a verb, a head, a compartment or a loop counts against it).
+Bare words on a branch are not read. Mermaid: `mindmap`, the tree as indentation,
+`id(("words"))` and `id["words"]`; the drawing fans the tree round the root in
+rings, a subtree a share of its parent's wedge by its leaves, so the order read
+back is the text's; a text rooted away from its centre reads back re-rooted, said.
+The bench (`mindmap.bench.test.ts`): read 36/36, first 36/36 (0.68–0.69); nodes
+252/252, words, shapes, depths, order 252/252, branches 216/216; others highest
+0.05, the molecule 0.24. The round trips: the goldens, six texts for ER and
+five for the mind map, and 30 + 6 seeded random diagrams each (1×, 0.25×, 4×)
+come back; nine hands each, exported and drawn back, read the same. packBench: `er@1` and `mindmap@1` have no
+definitions; the corpus, now 3,942 drawings, 0 false reads for every pack.
+**A golden changed by design:** the red commit's ER entity order (rows) was
+against its own comment (columns); a layered layout keeps a rank in a column, so
+the writer reads columns when it runs across and rows when it runs down, and the
+golden now says Customer, Order, Invoice, Line item. **And e2e 51's list of packs**
+(`Demos/session-engine.e2e.js`) is now state@1, er@1 and mindmap@1 after
+sequence@1, in its own commit (`2b675ca`), after the bundles'. Found, for their
+owners: **`notationsOf` swallows an exception a notation's reading throws** and
+the notation simply reads as none — a ruled box's figure id was looked up in a
+map keyed by its strokes and the ER reading of it was silently missing until a
+test read it directly (`notations/notation.ts`); **a word written across a line is a
+scratch that erases the line** (its zigzag crosses the line three times —
+`session/erase.ts` — so a test's compartment line goes below the word); **a line as small as a letter between two
+close shapes was written off as writing** (a branch 40 px long; fixed in both
+notations: a stroke whose ends land on two different symbols joins them,
+`joinsTwo`, `graph-kit.ts`); **three older tests sit at 4.4–7 s against vitest's
+5 s** with five notations registered (`mermaid-in.test.ts`'s caps and 60-chart
+cases, `uml-class-mermaid.test.ts`'s random diagrams) and timed out in the suite
+and passed alone — they carry `SLOW` now; **the packs pane says "the er diagram
+notation"** (`23-packs.js` lowers a notation's name — an acronym's case is
+lost, as the UML class diagram's already is). The surface's half must know:
+`notationsOf(state, scope)` gives an `ErReading` (each entity's `name`, each
+relationship's `sides.from` and `sides.to` — `entity`, `multiplicity`,
+`cardinality` — and `verb`) or a `MindMapReading` (each node's `symbol`
+`root` or `node`, `shape`, `depth`, `parent`, `children`, `name`; each branch's
+`tree`); `toMermaid` maps each Mermaid id to its shape's marks (`ids`, `marks`)
+and `links[i]` to relationship or branch i; `drawMermaid` inside
+`session.withTool`, as D3; the names and the verbs are labels on their own ink,
+and each end's multiplicity a labelled dash beside it; a bind at `along:er` or
+`along:mindmap` is found again while the notation is known (always) and offered
+to the pen only while the pack is in use. On this branch the surface reads no
+notation at all (`notationsOf` is asked by no fragment; `23-packs.js` only
+names a pack's notation): *Make it Mermaid* (`tools/mermaid.ts`, which CLAUDE.md
+on the director's branch describes and this branch does not have) reads the marks
+as the likeliest registered notation with a writer, so it should offer the three
+new ones with no surface change — unverified here; the field's *what this is* row and the panel's
+*becomes* row saying *an ER diagram 0.66* are the surface unit still to come.
 **D7 Routing** — orthogonal connectors between ports and *tidy the diagram*.
 **D8 The repair demo** — `CONTROL-POINTS-PLAN.md` P4; *needs John:* one
 photograph of a hand-drawn flowchart.

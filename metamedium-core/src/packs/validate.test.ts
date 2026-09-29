@@ -25,8 +25,8 @@ const GOOD = {
 describe('the shipped packs', () => {
   it('read whole: nothing refused, each under its own name, a test pack never listed', () => {
     expect(packRefusals()).toEqual([]);
-    expect(shippedPacks().map(packRef)).toEqual(['basics@1', 'flowchart@1', 'uml-class@1', 'sequence@1', 'test-molecule@1']);
-    expect(listedPacks().map(packRef)).toEqual(['basics@1', 'flowchart@1', 'uml-class@1', 'sequence@1']);
+    expect(shippedPacks().map(packRef)).toEqual(['basics@1', 'flowchart@1', 'uml-class@1', 'sequence@1', 'state@1', 'er@1', 'mindmap@1', 'test-molecule@1']);
+    expect(listedPacks().map(packRef)).toEqual(['basics@1', 'flowchart@1', 'uml-class@1', 'sequence@1', 'state@1', 'er@1', 'mindmap@1']);
     for (const p of shippedPacks()) {
       expect(shippedPack(packRef(p))).toBe(p);
       expect(Object.isFrozen(p)).toBe(true);
@@ -41,6 +41,9 @@ describe('the shipped packs', () => {
     expect(affinityOf(['flowchart@1'])).toEqual({ 'notation:flowchart': ['on:flow', 'on:clean'] });
     expect(affinityOf(['uml-class@1', 'flowchart@1'])).toEqual({ 'notation:uml-class': ['on:clean', 'tool:tidy'], 'notation:flowchart': ['on:flow', 'on:clean'] });
     expect(affinityOf(['sequence@1'])).toEqual({ 'notation:sequence': ['on:clean', 'tool:tidy'] });
+    expect(affinityOf(['state@1'])).toEqual({ 'notation:state': ['on:clean', 'tool:tidy'] });
+    expect(affinityOf(['er@1'])).toEqual({ 'notation:er': ['on:clean', 'tool:tidy'] });
+    expect(affinityOf(['mindmap@1'])).toEqual({ 'notation:mindmap': ['on:clean', 'tool:tidy'] });
     expect(affinityOf(['flowchart@1', 'test-molecule@1', 'flowchart@1', 'nope@1'])).toEqual({ 'notation:flowchart': ['on:flow', 'on:clean'], 'concept:row': ['key:snap'] });
   });
 
