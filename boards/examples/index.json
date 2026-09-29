@@ -1,0 +1,33 @@
+{
+  "starter": "molecule",
+  "examples": [
+    {
+      "id": "flowchart",
+      "name": "Flowchart",
+      "says": "boxes and arrows read as a flowchart, with the Mermaid it says beside them",
+      "file": "flowchart.jsonl",
+      "marks": 12
+    },
+    {
+      "id": "class-diagram",
+      "name": "Class diagram",
+      "says": "three classes, a composition and an association, read as a UML class diagram",
+      "file": "class-diagram.jsonl",
+      "marks": 17
+    },
+    {
+      "id": "molecule",
+      "name": "Molecule",
+      "says": "the Basics pack in use: two molecules and a bubble, read with nothing taught",
+      "file": "molecule.jsonl",
+      "marks": 11
+    },
+    {
+      "id": "pattern-page",
+      "name": "Pattern page",
+      "says": "a right triangle with 24 and 8 on its legs says its long side, and a page of steps checks itself",
+      "file": "pattern-page.jsonl",
+      "marks": 4
+    }
+  ]
+}

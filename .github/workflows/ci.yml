@@ -76,6 +76,12 @@ jobs:
       # Git runs there with a configuration of its own and a test identity.
       - name: The app's build and the release script, on their own
         run: node --test ../scripts/build-app.test.mjs ../scripts/release.test.mjs
+      # The example boards a first-time hand opens from the boards pane (V1-PLAN R5)
+      # are logs the engine makes, never drawn: what is committed under
+      # boards/examples must be what scripts/examples.mjs makes today — and the
+      # test replays each and asks the engine what it reads.
+      - name: The example boards, in sync and read as what they are
+        run: node ../scripts/examples.mjs --check && node --test ../scripts/examples.test.mjs
 
   shard:
     name: shard-3d — typecheck, test, build

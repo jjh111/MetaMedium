@@ -83,6 +83,15 @@ test('every example replays whole: no pack notice, no stale line, nothing erased
   }
 });
 
+test('an example opens with nothing held: no field, no selection, no loop waiting', () => {
+  for (const id of IDS) {
+    const { state } = open(id);
+    assert.equal(state.summon, null, `${id}: no field open`);
+    assert.deepEqual(state.selection, [], `${id}: nothing selected`);
+    assert.equal(state.pendingLassoId, null, `${id}: no loop waiting`);
+  }
+});
+
 test('the flowchart reads as a flowchart, and its Mermaid stands beside it as an artifact that says the same', () => {
   const { state, s } = open('flowchart');
   const [top] = MM.notationsOf(state).sort((x, y) => y.confidence - x.confidence);
@@ -129,6 +138,15 @@ test('the pattern page says its sizes: 25.30 beside the long side of a right tri
   const steps = chips.filter((c) => c.kind === 'step');
   assert.ok(steps.length >= 3 && steps.every((c) => c.text.startsWith('✓')), JSON.stringify(steps.map((c) => c.text)));
   assert.equal(chips.filter((c) => c.kind === 'conflict').length, 0, 'nothing on this page disagrees');
+});
+
+test('a note is not a measurement: no example but the pattern page has anything the maths says, and the page has nothing that disagrees or is not on its sheet', () => {
+  for (const id of IDS) {
+    const board = MM.boardMaths(open(id).state);
+    const chips = board ? MM.mathsChips(board) : [];
+    if (id === 'pattern-page') assert.ok(chips.length && chips.every((c) => !c.text.startsWith('?')), JSON.stringify(chips.map((c) => c.text)));
+    else assert.deepEqual(chips.map((c) => c.text), [], `${id}: no note reads as a step`);
+  }
 });
 
 test('the service worker keeps the examples for offline: the index and every file', () => {
