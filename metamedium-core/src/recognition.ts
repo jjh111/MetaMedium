@@ -107,14 +107,17 @@ function evenBowOf(fp: Fingerprint, points: Point[], scale: number): { evidence:
   return { evidence, bow };
 }
 
-function detectLine(fp: Fingerprint, points: Point[], scale = 1, even = evenBowOf(fp, points, scale), seen: HeadSeen | null = null): RecognitionResult | null {
+function detectLine(fp: Fingerprint, points: Point[], scale = 1, even = evenBowOf(fp, points, scale), head: HeadRead | null = null): RecognitionResult | null {
   if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
 
   const straight = ramp(fp.straightness, 0.55, 0.95);
   const corners = fit(fp.corners, 0, 3);
   // A line gives way exactly as far as an even bow is shown to be meant, and
-  // as far as a head that draws back on its shaft is (S2: a long arrow's head
-  // turns no corner, so nothing else took the line's confidence from it).
+  // as far as a head that draws back on its shaft is, where only the hand-scale
+  // read found it (S2: a long arrow's head turns no corner, so nothing else
+  // took the line's confidence from it; an arrow the corners read keeps its
+  // line beside it, as it always did).
+  const seen = head?.by === 'seen' ? head : null;
   const confidence = (straight * 0.7 + corners * 0.3) * (1 - even.evidence) * (1 - (seen?.fit ?? 0));
   const bows = even.bow && even.evidence >= 0.05 ? `, but it bows evenly like an arc of ${Math.round(even.bow.sweep)}°` : '';
   const headed = seen && seen.fit >= 0.05 ? `, but its ${seen.head} draws back like an arrow's head` : '';
@@ -248,16 +251,11 @@ function detectText(fp: Fingerprint, points: Point[], scale = 1): RecognitionRes
  * The one shape the diagram rung cannot do without — an edge with no arrow has
  * no direction, and a flow is then just a graph. Detected from the corner
  * positions along the path: a corner that turns hard inside the last (or
- * first) fifth of the stroke, with a straight shaft before it.
+ * first) fifth of the stroke, with a straight shaft before it — and, on a
+ * stroke long enough that the head is a sliver of it, the head at the hand's
+ * own scale (`readHead`).
  */
-function detectArrow(fp: Fingerprint, points: Point[], scale = 1, seen: HeadSeen | null = headSeenOf(fp, points, scale)): RecognitionResult | null {
-  if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
-  // Two ways to read a head, and the surer one stands: the corners the rung
-  // measured (fractions of the path, which is what a head on a shaft of a
-  // hand's length is), and the head at the hand's own scale, which a long shaft
-  // needs (S2, `headSeenOf`).
-  const viaCorners = headByCorners(fp, points, scale);
-  const best = seen && (!viaCorners || seen.fit > viaCorners.fit) ? seen : viaCorners;
+function detectArrow(fp: Fingerprint, points: Point[], scale = 1, best: HeadRead | null = readHead(fp, points, scale)): RecognitionResult | null {
   if (!best) return null;
 
   // Where the ink points, not where the head's first corner turned: a two-wing
@@ -279,8 +277,39 @@ function detectArrow(fp: Fingerprint, points: Point[], scale = 1, seen: HeadSeen
   );
 }
 
+/**
+ * A head read on a stroke, and by which reading: the rung's corners, or the
+ * head at the hand's own scale.
+ */
+type HeadRead = HeadSeen & { by: 'corners' | 'seen' };
+
+/**
+ * The corners' reading of a head stands wherever it can see the head: it takes
+ * at least this share of the path (one wing of a hand's head is about a sixth,
+ * two a third; the corner detector's own floor is a sixteenth). Below it the
+ * head is a sliver of a long stroke, and the surer of the two readings stands
+ * (S2: `headSeenOf`). An arrow the corners read well keeps their reading, to
+ * the digit, as every held log was read.
+ */
+export const HEAD_SHARE_SEEN = 0.1;
+
+/**
+ * Which way a stroke's head is read: the corners' where they see it, else the
+ * surer of them and the head at the hand's scale. Null for a stroke with none.
+ */
+function readHead(fp: Fingerprint, points: Point[], scale: number): HeadRead | null {
+  if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
+  const corners = headByCorners(fp, points, scale);
+  if (corners && (corners.share ?? 0) >= HEAD_SHARE_SEEN) return { ...corners, by: 'corners' };
+  const seen = headSeenOf(fp, points, scale);
+  if (seen && (!corners || seen.fit > corners.fit)) return { ...seen, by: 'seen' };
+  return corners ? { ...corners, by: 'corners' } : null;
+}
+
 /** A head read on a stroke: which end, its tip (a hint the ink's own tip is found from), how straight the shaft is, how hard the barb turns, how big it is against the shaft, and how well it fits an arrow. */
 interface HeadSeen {
+  /** The share of the path the head takes, where the corners measured it. */
+  share?: number;
   fit: number;
   head: 'end' | 'start';
   tip: Point;
@@ -338,6 +367,7 @@ function headByCorners(fp: Fingerprint, points: Point[], scale: number): HeadSee
     const barb = barbOf(path, tipIdx, head, tail, scale);
     return {
       fit: (shaftOk * 0.5 + barbOk * 0.35 + shortHead * 0.15) * shortBarb(barb, scale),
+      share: headLen,
       head,
       tip: path[tipIdx],
       straight,
@@ -476,16 +506,16 @@ export function analyzeStroke(points: Point[], scale = 1): StrokeAnalysis {
   }
 
   const even = evenBowOf(fingerprint, points, scale);
-  const seen = headSeenOf(fingerprint, points, scale);
+  const head = readHead(fingerprint, points, scale);
   const results = [
-    detectLine(fingerprint, points, scale, even, seen),
+    detectLine(fingerprint, points, scale, even, head),
     detectArc(fingerprint, points, scale, even),
     detectTriangle(fingerprint),
     detectRectangle(fingerprint),
     detectCircle(fingerprint, points, scale),
     detectDot(fingerprint, scale),
     detectText(fingerprint, points, scale),
-    detectArrow(fingerprint, points, scale, seen),
+    detectArrow(fingerprint, points, scale, head),
   ].filter((r): r is RecognitionResult => r !== null);
 
   // Ranked by measured confidence — no detector outranks another by fiat.
