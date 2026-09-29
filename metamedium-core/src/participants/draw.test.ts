@@ -51,6 +51,30 @@ describe('strokeFor → the shape rung reads it back', () => {
   it('line', () => expect(readAs(strokeFor({ shape: 'line', from: { x: 100, y: 100 }, to: { x: 400, y: 160 } })!)).toBe('line'));
   it('arrow', () => expect(readAs(strokeFor({ shape: 'arrow', from: { x: 100, y: 100 }, to: { x: 400, y: 100 } })!)).toBe('arrow'));
   it('a shape with no size is nothing', () => expect(strokeFor({ shape: 'rectangle', x: 0, y: 0, w: 0, h: 10 })).toBeNull());
+
+  it('an arrow reads back as an arrow at any length and any heading (D3: its barb capped at 40 past 1,200 px)', () => {
+    const lost: string[] = [];
+    for (const len of [60, 200, 600, 1200, 2500, 5000, 20000]) {
+      for (const deg of [0, 30, 90, 200]) {
+        const a = (deg * Math.PI) / 180;
+        const to = { x: 100 + len * Math.cos(a), y: 100 + len * Math.sin(a) };
+        const top = readAs(strokeFor({ shape: 'arrow', from: { x: 100, y: 100 }, to })!);
+        if (top !== 'arrow') lost.push(`${len} at ${deg}°: ${top}`);
+      }
+    }
+    expect(lost).toEqual([]);
+  });
+
+  it('an arrow’s barb is sized from its shaft, inside the limits a clean arrow keeps: a fortieth to a fifth', () => {
+    // clean.ts keeps a barb at most a fifth of the shaft and handles.ts at least
+    // a fortieth, so a barb outside them does not read back as an arrow.
+    for (const len of [60, 200, 1200, 5000, 20000]) {
+      const pts = strokeFor({ shape: 'arrow', from: { x: 0, y: 0 }, to: { x: len, y: 0 } })!;
+      const reach = Math.max(...pts.slice(-24).map((p) => Math.hypot(p.x - len, p.y)));
+      expect(reach, `${len}: barb ${reach.toFixed(1)}`).toBeGreaterThanOrEqual(len / 40 - 1e-9);
+      expect(reach, `${len}: barb ${reach.toFixed(1)}`).toBeLessThanOrEqual(len / 5 + 1e-9);
+    }
+  });
 });
 
 describe('agent.draw', () => {
