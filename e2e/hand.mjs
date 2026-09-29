@@ -30,8 +30,8 @@
 //          ghost's timing, is a skip); a box drawn below a held text is a box (the hand wrote the text)
 //   H1.7-18 QA-v10 §6, acceptance A7 — the hand's circle lands in its own colour with its card; a
 //          sentence lands on his box alone, under the id his tab gave it; a transcript lands on his
-//          word with no model asked; a proposed reading is held and attributed (H1.10b: whether the
-//          field's row shows it is a skip, known); one undo takes only his last mark and the next
+//          word with no model asked; a proposed reading is held and attributed (H1.10b: it joins the
+//          field's row with its author); one undo takes only his last mark and the next
 //          number is new; the hand's label lands on its own ink and is refused on his; his `label:`
 //          says who it is not on before Enter; a field left open stays open under the hand's line,
 //          `name: pair` makes the thing his; a loop that waits waits under the hand's stroke; a reload
@@ -387,15 +387,13 @@ export async function runHand(browser, servers, { freshContext, screenshot }) {
       const line = markLine(look, boxB);
       check(`H1.10. §6: canvas_propose a reading with a confidence — it is held on his box in the tab, attributed to the hand, never blessed ("${mine && mine.label} ${mine && mine.weight} · ${mine && mine.source}"), and the hand's own look says who read it — "${(line || '').slice(0, 90)}"`,
         /held on/.test(said) && landed && !!mine && mine.source === HAND && !mine.blessed && /gate 0\.70 · claude/.test(line || ''), { said, reads, line });
-      // Whether it stands in the field's "what this is" row is the surface's, and today it does not (a hand is a tier 0 voice, and 09-palette.js leaves tier 0 out).
+      // The field's "what this is" row: another hand's proposed reading stands there with its author, ranked with the rest (F1).
       const opened = await holdAtPoint(page, { x: 470, y: 250 });
       const items = await page.evaluate(() => { const f = window.__mm.fieldItems(); return f ? f.ranked.map((i) => i.label) : []; });
       await letGo(page);
-      const shown = items.some((l) => /gate/.test(l));
-      check(shown
-        ? 'H1.10b. §6: the hand\'s proposed reading joins the field\'s row on his box as "gate 0.70 · claude"'
-        : 'H1.10b. §6: the hand\'s proposed reading joins the field\'s row as "… · claude" — skipped (known: a hand is a tier 0 voice and conversionsFor in 09-palette.js leaves tier 0 out of "what this is", so the reading lands and shows nowhere; QA-v10 §6 row 4 says it joins the row)',
-        opened && (shown || items.length > 0), { opened, items });
+      const shown = items.find((l) => /gate/.test(l));
+      check(`H1.10b. §6: the hand's proposed reading joins the field's row on his box as "gate 0.70 · claude" ("${shown}")`,
+        opened && /^gate 0\.70 · claude$/.test(shown || ''), { opened, items });
     });
 
 

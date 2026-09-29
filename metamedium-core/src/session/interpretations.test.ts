@@ -11,6 +11,8 @@ import {
   disagreement,
   sourcesOf,
   hasMultipleSources,
+  isShapeRungReading,
+  isHeardReading,
 } from './interpretations';
 import { circleStroke } from '../test/strokes';
 
@@ -202,5 +204,34 @@ describe('provenance', () => {
     expect(spiral.sourceName).toBe('llm:qwen3');
     expect(spiral.source).not.toBe(TIER0_PARTICIPANT);
     expect(spiral.source).not.toBe(LOCAL_PARTICIPANT);
+  });
+});
+
+describe('whose reading it is — the engine\'s measurement, or another voice\'s (F1)', () => {
+  it('a hand is a tier 0 voice, and its proposal is heard, never the shape rung', () => {
+    const { s, id } = sessionWithACircle();
+    // The MCP hand joins as a tier 0 participant: a reading it proposes is tier 0 too.
+    const hand = s.join('human', 'claude', 1100);
+    s.propose({ participantId: hand, nodeId: id, at: 1200,
+      edges: [{ to: 'type:pump', rel: 'resembles', weight: 0.8, reasoning: 'a circle with a stem' }] });
+    const reads = interpretationsOf(s.getState().nodes.get(id)!, s.getState().nodes);
+    const pump = reads.find((r) => r.label === 'pump')!;
+    expect(pump.tier).toBe(0);
+    expect(isShapeRungReading(pump)).toBe(false);
+    expect(isHeardReading(pump)).toBe(true);
+    // What the engine measured is the rung's, and is never a heard reading.
+    const own = reads.filter((r) => r.sourceName === 'engine');
+    expect(own.length).toBeGreaterThan(0);
+    expect(own.every((r) => isShapeRungReading(r) && !isHeardReading(r))).toBe(true);
+  });
+
+  it('a model\'s reading is heard; a name, a label and a blessed reading are not readings to hear', () => {
+    const { s, id } = sessionWithACircle();
+    const agent = s.join('agent', 'llm:qwen3', 1100, 2);
+    s.propose({ participantId: agent, nodeId: id, at: 1200,
+      edges: [{ to: 'type:wheel', rel: 'resembles', weight: 0.6, reasoning: 'round with a hub' }] });
+    const reads = interpretationsOf(s.getState().nodes.get(id)!, s.getState().nodes);
+    expect(isHeardReading(reads.find((r) => r.label === 'wheel')!)).toBe(true);
+    expect(reads.filter(isHeardReading).map((r) => r.label)).toEqual(['wheel']);
   });
 });
