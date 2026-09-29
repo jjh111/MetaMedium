@@ -948,3 +948,20 @@ export type { MindMapReading, MindMapNode, MindMapBranch, MindMapWriting, MindMa
 // plain branches bound at both ends.
 export { writeMindMap, readMindMapText, MINDMAP_READER } from './notations/mindmap-mermaid';
 export type { MindMapDiagramRead, MindMapNodeRead, MindMapLinkRead, DrawnMindMapLink } from './notations/mindmap-mermaid';
+
+// The garment pattern piece (M6): a piece with its grain line, fold, notches, darts and seam
+// allowance, read from the geometry of ink. Its content is GARMENT_TABLE, which the garment@1
+// pack names; what it means in numbers — the cutting size against the sewing size, a fold's
+// half, what true size prints — is maths/garment.ts.
+export {
+  GARMENT,
+  GARMENT_TABLE,
+  readGarment,
+  simplify as garmentSimplify,
+  cornersOfRing as garmentCorners,
+  onEdge as garmentOnEdge,
+  EVIDENCE as GARMENT_EVIDENCE,
+  PLAIN_SHARE as GARMENT_PLAIN_SHARE,
+  PIECE_MIN_PX as GARMENT_PIECE_MIN_PX,
+} from './notations/garment';
+export type { GarmentReading, GarmentMark, GarmentSymbolName, OnEdge as GarmentOnEdge } from './notations/garment';

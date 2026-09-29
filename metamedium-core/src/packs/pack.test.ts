@@ -81,7 +81,7 @@ describe('the door: a board uses a pack by one event', () => {
 
   it('a name that is no pack’s, or one this build does not ship, is refused at the door and never written', () => {
     const s = createSession();
-    for (const [name, reason] of [['basics', 'malformed'], ['Basics@1', 'malformed'], ['', 'malformed'], ['basics@0', 'malformed'], ['basics@2', 'unknown'], ['garment@1', 'unknown']] as const) {
+    for (const [name, reason] of [['basics', 'malformed'], ['Basics@1', 'malformed'], ['', 'malformed'], ['basics@0', 'malformed'], ['basics@2', 'unknown'], ['garment@2', 'unknown']] as const) {
       const said = s.use(name, next());
       expect(said, name).toMatchObject({ pack: name, reason });
       expect(said!.detail.length).toBeGreaterThan(10);
