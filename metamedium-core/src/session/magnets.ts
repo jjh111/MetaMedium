@@ -10,7 +10,9 @@
 // carries or would be offered, exactly like measure.ts, so replay stays
 // deterministic and the log stays the only source. A mark with no confident
 // reading still offers its bounds' corners and centre, from its own ink:
-// an offer, never a lie about shape.
+// an offer, never a lie about shape — unless its ink is four-cornered
+// beyond doubt (a flat diamond, which the rung reads as a triangle or a
+// circle unsure), when its own four corners are the offer (S2).
 //
 // A notation that reads a mark as one of its symbols adds that symbol's ports
 // after the mark's own sites — points, and places along a segment or an
@@ -54,6 +56,7 @@ import type { MMNode } from './nodes';
 import { boundsOf, fingerprintOf, getRep, placed, strokePointsOf } from './nodes';
 import { type CleanShape, cleanOf, idealize, snapReading } from './clean';
 import { getBounds } from '../geometry';
+import { cornersOf, hullOf, roundFrom } from '../notations/shape';
 import { alongSiteOf, portSiteOf, portSites, reachOf } from './ports';
 
 export type MagnetKind =
@@ -118,7 +121,7 @@ const mid = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y)
  * ink is: a moved mark offers its sites where it stands, not where it was
  * drawn.
  */
-function formOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>): { shape: string; points: Point[]; held: CleanShape | null } | null {
+function formOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>): { shape: string; points: Point[]; held: CleanShape | null; corners?: Point[] } | null {
   const fp = fingerprintOf(node);
   const ink = strokePointsOf(node);
   if (!fp || !ink || ink.length < 2) return null;
@@ -127,7 +130,45 @@ function formOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>): { shape: stri
   const reading = snapReading(node, nodes);
   const ideal = reading.ok ? idealize(node, reading.shape)?.points : undefined;
   if (ideal && ideal.length >= 2 && reading.shape) return { shape: reading.shape, points: placed(node, ideal), held: null };
-  return { shape: 'ink', points: ink, held: null };
+  const corners = inkCornersOf(node, ink);
+  return { shape: 'ink', points: ink, held: null, ...(corners ? { corners } : {}) };
+}
+
+/**
+ * Four corners hold a diamond or a box and not a round end: the best four on
+ * the hull of a closed outline hold at least this much of it (a box or a
+ * diamond hand-drawn 0.83–0.92, a stadium 0.67–0.79, an oval 0.64, a pentagon
+ * or hexagon about 0.68 — `CORNERED` in notations/flowchart.ts, the same
+ * measure) and its best three hold no more than this (a triangle's hold 0.83
+ * and more, a quadrilateral's about half — `THREE_CORNERED`).
+ */
+export const INK_CORNERED = 0.8;
+export const INK_NOT_THREE = 0.74;
+/** …and each of the four turns between these, in degrees: a corner, not a point along a side. */
+export const INK_CORNER_TURN = [35, 145] as const;
+
+/**
+ * The four corners of a closed outline the rung read with no confidence — a
+ * diamond wider than it is tall, which it takes for a triangle or a circle —
+ * measured from its ink, clockwise from the topmost; null for anything the
+ * four corners do not hold (an oval, a pentagon, a flat triangle) and for
+ * anything open. The sites of such a mark are those corners, not the corners
+ * of its bounds, which lie in the air beside a diamond (V1-PLAN S2, D3).
+ */
+function inkCornersOf(node: MMNode, ink: readonly Point[]): Point[] | null {
+  if (!fingerprintOf(node)?.isClosed) return null;
+  const hull = hullOf(ink);
+  if (hull.length < 4) return null;
+  const { share, three, quad } = cornersOf(hull);
+  if (quad.length !== 4 || share < INK_CORNERED || three > INK_NOT_THREE) return null;
+  const v = roundFrom(quad, 'top');
+  for (let i = 0; i < 4; i++) {
+    const a = v[(i + 3) % 4], b = v[i], c = v[(i + 1) % 4];
+    const ux = a.x - b.x, uy = a.y - b.y, wx = c.x - b.x, wy = c.y - b.y;
+    const angle = (Math.acos(Math.max(-1, Math.min(1, (ux * wx + uy * wy) / ((Math.hypot(ux, uy) * Math.hypot(wx, wy)) || 1)))) * 180) / Math.PI;
+    if (angle < INK_CORNER_TURN[0] || angle > INK_CORNER_TURN[1]) return null;
+  }
+  return v;
 }
 
 /**
@@ -230,9 +271,15 @@ export function ownSitesOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>): Ma
       add('point', heldCentre ?? centre, 'the dot');
       break;
     default:
-      // Invariant 5: no confident reading, no pretended shape — the ink's own box.
-      boundsSites(add, b);
-      add('centre', centre, 'the centre of the mark’s bounds');
+      // Invariant 5: no confident reading, no pretended shape — the ink's own
+      // box, unless the ink's own four corners hold it (a flat diamond).
+      if (form.corners) {
+        form.corners.forEach((p) => add('corner', p, 'a corner of the mark’s outline — its four corners hold it'));
+        add('centre', mid(form.corners[0], form.corners[2]), 'the centre of the mark’s four corners');
+      } else {
+        boundsSites(add, b);
+        add('centre', centre, 'the centre of the mark’s bounds');
+      }
       break;
   }
   return out;
