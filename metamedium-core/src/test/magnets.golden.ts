@@ -59,8 +59,8 @@ export const MAGNETS_GOLDEN: GoldenData = {
     "kind": "tip",
     "index": 0,
     "point": {
-     "x": 578.9734676820511,
-     "y": 103.85096621412234
+     "x": 599.8973161952275,
+     "y": 119.71632338145645
     },
     "reasoning": "the arrow's tip — where it ends"
    },
@@ -70,8 +70,8 @@ export const MAGNETS_GOLDEN: GoldenData = {
     "kind": "middle",
     "index": 0,
     "point": {
-     "x": 439.25253678658936,
-     "y": 102.1665175677335
+     "x": 449.71446104317755,
+     "y": 110.09919615140055
     },
     "reasoning": "halfway along it"
    }
@@ -674,7 +674,20 @@ export const MAGNETS_GOLDEN: GoldenData = {
    },
    "distance": 5
   },
-  null,
+  {
+   "site": {
+    "nodeId": "stroke:2",
+    "shape": "arrow",
+    "kind": "tip",
+    "index": 0,
+    "point": {
+     "x": 599.8973161952275,
+     "y": 119.71632338145645
+    },
+    "reasoning": "the arrow's tip — where it ends"
+   },
+   "distance": 2.558432077348687
+  },
   {
    "site": {
     "nodeId": "stroke:3",
@@ -858,12 +871,12 @@ export const MAGNETS_GOLDEN: GoldenData = {
      "kind": "tip",
      "index": 0,
      "point": {
-      "x": 578.9734676820511,
-      "y": 103.85096621412234
+      "x": 599.8973161952275,
+      "y": 119.71632338145645
      },
      "reasoning": "the arrow's tip — where it ends"
     },
-    "distance": 23.71084328150014
+    "distance": 2.558432077348687
    }
   ],
   [
@@ -1039,12 +1052,12 @@ export const MAGNETS_GOLDEN: GoldenData = {
      "kind": "tip",
      "index": 0,
      "point": {
-      "x": 578.9734676820511,
-      "y": 103.85096621412234
+      "x": 599.8973161952275,
+      "y": 119.71632338145645
      },
      "reasoning": "the arrow's tip — where it ends"
     },
-    "distance": 23.71084328150014
+    "distance": 2.558432077348687
    }
   ],
   [],
