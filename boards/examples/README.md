@@ -14,8 +14,10 @@ at once, and the example itself is never written.
 | `pattern-page.jsonl` | a right triangle with 24 and 8 on its legs, whose long side the maths says, and a page of steps that check themselves (M5) |
 | `index.json` | what the pane lists — name, what it shows, file, marks — and the starter |
 
-Each file is a **log**, one event per line, as the app's *export* writes it and
-*from a file…* opens it.
+Each file is a **log**, one event per line under a version 1 header (R2,
+`metamedium-core/src/store/format.ts`), as the app's *export* writes it and
+*from a file…* opens it. The header names no `app`, so a release does not
+drift them.
 
 ## They are made, never drawn
 

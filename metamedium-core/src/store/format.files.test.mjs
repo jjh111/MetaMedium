@@ -92,7 +92,8 @@ describe('a surface from before the header reads a version 1 file', () => {
     const boards = logFilesUnder(join(ROOT, 'boards'));
     expect(boards.length).toBeGreaterThan(0);
     for (const f of boards) {
-      const text = readFileSync(f, 'utf8');
+      // the board as version 0 — bare events — whatever version the file on disk is
+      const text = decodeLog(readFileSync(f, 'utf8')).events.map((e) => JSON.stringify(e)).join('\n') + '\n';
       const v0 = old.decodeLog(text);
       const v1 = old.decodeLog(encodeLog(decodeLog(text).events, { app: '9.9.9' }));
       expect(v1.skipped, f).toBe(0);

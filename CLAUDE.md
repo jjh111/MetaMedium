@@ -325,7 +325,7 @@ any structural change.
 | `HELP.md` | **The help pane's page**, for a person using the canvas (PLAN-USER-SURFACE U1g): the loop, the field, handling marks, models and Claude, boards, rooms, your mark, undo, the shortcuts. The help tile reads it (`20-controls.js`), both service workers keep it for offline, and the gate's `app` scenario asks for it. Keep it true to the surface — it names controls and keys |
 | `VERSION`, `CHANGELOG.md` | **The version, one line** (`MAJOR.MINOR.PATCH`, an optional pre-release; `0.0.0` until the first release) — stamped into the page and both service workers' cache names by `scripts/build-app.mjs`, said at the head of the help pane. **The changelog**, newest first, one section a release, written only by `scripts/release.mjs` |
 | `scripts/` | **The app's build and the release** (V1-PLAN R7): `build-app.mjs` (stamps `VERSION`, makes `app/`; `--check` in CI) and `release.mjs` (`node scripts/release.mjs <version> [--dry-run] [--since <ref>]`: refuses a dirty tree and a version not greater than the last, writes the changelog's section by unit, bumps and stamps, builds the standalone file into `dist/release/`, commits, tags `v<version>` annotated — and never pushes). `build-app.test.mjs` and `release.test.mjs` are theirs (`node --test`, in CI's `core` job). **`examples.mjs`** (V1-PLAN R5) makes the example boards under `boards/examples/` from the engine — `--check` in CI, `examples.test.mjs` its Node test (*Several boards*, below) |
-| `boards/` | **Boards kept as logs.** A board worth keeping is its log, one event per line, as the app's export writes it and the boards pane opens (*from a file…*). `boards/story/` is the first (28 Sep 2026): dyna.ink explained in its own medium — the architecture, a stroke's life drawn in ink and read back by the engine as a sequence diagram, the plan's 59 units, the ten scenarios, the numbers, a treemap of the code, a flowchart and a class diagram read live beside the Mermaid the engine wrote, and the thirteen gaps building it found — with the scripts that drew it through an MCP hand run from the shell (its README says how, and how to make the next). **`boards/examples/`** (R5, 29 Sep 2026) is the app's own examples — a flowchart with its Mermaid beside it, a class diagram, a molecule from the Basics pack, a pattern page with a right triangle — each a log **made by `scripts/examples.mjs`**, never drawn, listed by `index.json` in the boards pane's *Examples* and opened as a new board of your own (its README) |
+| `boards/` | **Boards kept as logs.** A board worth keeping is its log, one event per line (a version 1 header first, R2 — `boards/story/board.jsonl` stays version 0 as it was kept), as the app's export writes it and the boards pane opens (*from a file…*). `boards/story/` is the first (28 Sep 2026): dyna.ink explained in its own medium — the architecture, a stroke's life drawn in ink and read back by the engine as a sequence diagram, the plan's 59 units, the ten scenarios, the numbers, a treemap of the code, a flowchart and a class diagram read live beside the Mermaid the engine wrote, and the thirteen gaps building it found — with the scripts that drew it through an MCP hand run from the shell (its README says how, and how to make the next). **`boards/examples/`** (R5, 29 Sep 2026) is the app's own examples — a flowchart with its Mermaid beside it, a class diagram, a molecule from the Basics pack, a pattern page with a right triangle — each a log **made by `scripts/examples.mjs`**, never drawn, listed by `index.json` in the boards pane's *Examples* and opened as a new board of your own (its README) |
 | `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal), and the social card. `Assets/ux-audit-2026-09-28/` holds the screenshots of the audit walked again (U2), which `UX-AUDIT-2026-09-28.md` cites. `make-card.mjs` regenerates that card from index.html's own hero — synthetic pointer input, so the picture shows the engine really reading a mark; `node Assets/make-card.mjs`. Change the picture and you must change the FILENAME and the four og:/twitter: tags in `index.html` and `404.html`, because scrapers cache by URL. **`Assets/whitepaper-figures/`** is the whitepaper's seven graphic plates: `build.py` holds their content and geometry and emits the static blocks `index.html` carries between `whitepaper-plate:KEY` markers (`--check` says they are in sync), `figures.css` and `figures.js` style and enhance them with no build, and `e2e/whitepaper-figures.mjs` audits the real page; its README is the workflow |
 | `archive/` | Retired versions and superseded plans, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) and PRDs v3.2/v4 |
@@ -2632,7 +2632,8 @@ at 400 files and saying so) and each becomes an artifact of its kind
 through an `import` event **in this participant's log**, laid out as
 cards; a second machine that pulls sees the same board and discovers
 nothing twice. Logs are one file per participant under
-`.metamedium/logs/`, one event per line, and the canvas is `mergeLogs` of
+`.metamedium/logs/`, one event per line — **a header line first, since R2
+(*The log format*, below)** — and the canvas is `mergeLogs` of
 them; **autosave** rewrites only this participant's file. A static site is opened read-only through
 `.metamedium/manifest.json` (`?folder=<base>`), so a published canvas can be
 drawn on and the ink stays the reader's. **The live budget**: the nearest
@@ -2848,6 +2849,50 @@ makes the annotated tag `v<version>` with the section as its message
 **It never pushes**; it prints the pushes, to the fetch URL — the push URL is
 a lock the week-1 automation left, on purpose. `--dry-run` prints all of it
 and writes nothing, exiting 1 where the real run would refuse.
+
+### The log format: a header, version 0 and 1 (V1-PLAN R2)
+
+> `metamedium-core/src/store/format.ts` (the one definition; `seam.ts`
+> re-exports `encodeLog` / `decodeLog`), `format.test.ts`,
+> `format.files.test.mjs`; the surface's `readLogText`, `logWrite` and
+> `logFileNote` in `Demos/surface/17-folder.js`; e2e N19–N19f.
+
+**A log kept as a file is versioned.** Version 1 begins with a header line,
+`{"type":"format","format":"metamedium-log","version":1,"app":"<VERSION>"}`
+(`app` when the writer knows it — the page's own version; the generated
+examples leave it out so their drift check holds across releases), then one
+event per line as ever; **version 0 is a log with no header** — every log kept
+before R2, and every one still under `boards/story/` and
+`shard-3d/fixtures/`. Every writer writes 1 (`encodeLog`; `appendToLogText`
+for an append: nothing yet gets the header, a version 1 file only the tail, a
+version 0 file is brought to 1 with its events as they were); every reader
+accepts 0 and 1 (`decodeLog` returns `version`, and the header is never among
+its events). **A version newer than this build reads is refused whole**
+(`LogFormatError`, before one event is returned): *“canvas.jsonl” is a version
+2 log, written by MetaMedium 0.9.0 — this build reads versions 0 and 1, so
+nothing of it was read; open it with a newer MetaMedium*. A header naming no
+usable version is refused the same way, never guessed at, and nothing appends
+to a file this build cannot read. The surface says the sentence where the file
+was met: in the boards pane for *from a file…* and the examples, in the status
+line for a folder — which is **not opened at all**, so nothing writes over it
+— and in the shard's panel. The journal a browser keeps a board in (R3) is
+records of events, not a file, and has no header; the file the board leaves as
+is one.
+
+**The trap, and how it is answered.** A surface from before R2 takes every
+line that parses for an event and its boards pane refuses a file whose lines
+have no string `type`; a header of some other shape would have broken it. So
+the header carries **`type: 'format'`**, a type the session has no case for
+and ignores: a version 1 file opens in a week-old surface, its header one
+event that does nothing (the board reads one event long). What that surface
+cannot do is refuse a version 2 — the reason the number is written now.
+`format.files.test.mjs` proves it against the committed Node bundle of the
+day before (`src/store/fixtures/core-before-r2.node.mjs.gz`, kept as a
+witness, never rebuilt): that bundle's `decodeLog`, `mergeLogs` and session
+load a version 1 file, and every board under `boards/` written as version 1,
+to the same board as version 0. The export says it in the status line (*log
+version 1 — an older MetaMedium opens it too*). A folder this hand wrote as
+version 0 opens as ever and its next save is version 1.
 
 ### Live logs: multiplayer as a transport (v9 S6)
 
