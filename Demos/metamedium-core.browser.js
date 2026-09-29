@@ -5915,12 +5915,12 @@ var MetaMediumCore = (() => {
   var UNIT_NAMES2 = { in: "inches", ft: "feet", cm: "centimetres", mm: "millimetres", m: "metres" };
   function scaleOf(labels, unit4) {
     const ratios = [];
-    const counted = /* @__PURE__ */ new Set();
+    const counted2 = /* @__PURE__ */ new Set();
     for (const { figure, label } of labels) {
       if (label.declared || !isLengthKey(label.key) || isRange(label.value) || label.value.dim !== (unit4 ? 1 : label.value.dim)) continue;
       if (label.number) {
-        if (counted.has(label.number)) continue;
-        counted.add(label.number);
+        if (counted2.has(label.number)) continue;
+        counted2.add(label.number);
       }
       const ink = inkMeasure(figure, label.key);
       if (!ink || ink <= 0) continue;
@@ -23230,8 +23230,47 @@ if (mm.THREE && mm.scene) {
     }
   };
 
+  // src/tools/mermaid-draw.ts
+  var THINGS = { sequence: ["participant", "participants"], "uml-class": ["class", "classes"] };
+  var LINKS = { sequence: ["message", "messages"] };
+  var counted = (n2, [one, many]) => `${n2} ${n2 === 1 ? one : many}`;
+  function withArticle(name) {
+    const acronym = /^[A-Z]{2,}\b/.test(name);
+    const said3 = acronym ? name : name.toLowerCase();
+    return `${!acronym && /^[aeio]/.test(said3) ? "an" : "a"} ${said3}`;
+  }
+  var MERMAID_DRAW = {
+    id: "mermaid-draw",
+    name: "drawing from Mermaid",
+    describe: () => "a Mermaid text, read as a flowchart, a class diagram or a sequence diagram, drawn as marks that read back as the same diagram; the text stays",
+    offers(scope) {
+      if (scope.marks.length !== 1) return [];
+      const id = scope.marks[0];
+      if (!scope.state.artifacts.includes(id)) return [];
+      const node = scope.state.nodes.get(id);
+      const rep = node && codeRepOf(node);
+      if (!rep || rep.data.kind !== "mermaid" || !rep.data.code) return [];
+      const read2 = readMermaid(rep.data.code);
+      if (!read2.notation) return [];
+      const name = notationById(read2.notation)?.name ?? read2.notation;
+      const what = `${counted(read2.nodes.length, THINGS[read2.notation] ?? ["node", "nodes"])} and ${counted(read2.links.length, LINKS[read2.notation] ?? ["link", "links"])} read as ${withArticle(name)}`;
+      return [{
+        key: "mermaid-draw",
+        label: "Draw it",
+        reason: `${what} \u2014 drawn as marks the canvas reads back as the same diagram; the text stays`,
+        base: 0.95,
+        tool: "mermaid-draw",
+        verbs: ["draw it", "ink it"],
+        data: { artifact: id, notation: read2.notation }
+      }];
+    },
+    take(offer) {
+      return { host: "mermaid-draw", detail: offer.data };
+    }
+  };
+
   // src/tools/builtin.ts
-  var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MERMAID];
+  var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MERMAID, MERMAID_DRAW];
   registerTool(CORRECT);
   registerTool(TEXT);
   registerTool(NAME2);
@@ -23250,6 +23289,7 @@ if (mm.THREE && mm.scene) {
   registerTool(KEEP);
   registerTool(STRUCTURE);
   registerTool(MERMAID);
+  registerTool(MERMAID_DRAW);
 
   // src/context/context.ts
   var CONTEXT_FADE = 2.5;
