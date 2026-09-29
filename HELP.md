@@ -45,6 +45,35 @@ A tap on empty ground lets go of whatever is held.
   model read them; then make them text, a name, or a label.
 - **Type text**: double-click empty ground.
 
+## Numbers and sums
+
+The canvas does the arithmetic itself — no model, ever. Write a number
+beside a side of a drawing (`24`, `8″`, `12 cm`; type it as text, or write it
+and have it read) and it is that side's length.
+
+- **A triangle with 24 and 8 on its legs** says the long side beside it:
+  *25.30*. The sizes show for a moment after you change something and while
+  you point at the drawing; the panel always says them, with the working
+  behind *details*. Hold the marks and choose **Show the sizes** to leave
+  them showing.
+- **A label that cannot hold** — a third number on the long side that the
+  legs disagree with — says so and stays: *labelled 24; legs of 24 and 8 make
+  it 25.30, 1.30 longer (5%)*. Draw a small square in a corner to say it is a
+  right angle.
+- **A page of steps** (`1. A ÷ 3 = 12 + 2 = 14`, with `A. Bust 36` above it)
+  shows each step's check at the end of its line — *✓ 14″*, or *✗ 14.67″ ·
+  written 12* — and says the other reading when it reads two ways. Change a
+  measurement and only the steps that depend on it change; **undo** puts them
+  back. **Check the steps** says how many agree.
+- **`=` in the field** is a sum: `= 24 ÷ 3` says *24 ÷ 3 = 8* before you press
+  Enter, and Enter puts it on the board as text beside the marks held. It reads
+  the names on your page too (`= A ÷ 3`).
+- **At true size**: with a unit written on the drawing (inches or
+  centimetres), **Print at true size** in the field — or the two files in
+  *controls › Board › export* — draws it at its real size from the numbers, and
+  prints it tiled onto pages at 100% with a test square on each. Measure the
+  square before you cut: a printer scales without saying so.
+
 ## Models
 
 A model adds reading handwriting, saying what a drawing is (*What is this?*),

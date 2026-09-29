@@ -303,13 +303,13 @@ any structural change.
 
 | Path | What it is |
 |---|---|
-| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, the UML class diagram, the sequence diagram and the dashed lines it reads, Mermaid out and in, and a layered layout), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*), **magnets, handles and bindings that follow** (`src/session/magnets.ts`, `handles.ts`, `follow.ts` with `affine.ts` and `manipulate.ts`; under *Magnets and bindings* and *Handles*) and the LLM transport. New recognition/engine work lands HERE |
+| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, the UML class diagram, the sequence diagram and the dashed lines it reads, Mermaid out and in, and a layered layout), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print, and what is said of it on the board — `board.ts`), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*), **magnets, handles and bindings that follow** (`src/session/magnets.ts`, `handles.ts`, `follow.ts` with `affine.ts` and `manipulate.ts`; under *Magnets and bindings* and *Handles*) and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages). Fully on the `brand/` system as of 3 Sept 2026 — its `:root` is `brand/tokens.css` under the names this page already used, so change a value THERE first |
 | `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/surface/` | **The reference surface's source**: `surface.css` and thirty script fragments (`00-core`, `00-ui` … `20-controls`, `21-minimap`, `22-boards`, `23-packs`, `24-seat`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Because they are one closure, the build and its `--check` refuse a name declared at the top of two fragments — the last would silently replace the first everywhere, which broke rendering once — reading the fragments as one strict block, so they must also compile as strict code (`Demos/build-surface.test.mjs`, in CI's `core` job). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. **`17-board.js` is the second** (V1-PLAN R3): the journal the board this browser keeps is written through, driven in Node by a store held in memory — `node --test Demos/surface/17-board.test.mjs`, in CI's `core` job too. **`17-boards.js` is the third** (R1): the list of boards — names, the trash, which board a page opens, whether the one on screen may be left — `node --test Demos/surface/17-boards.test.mjs`, also in CI. **`07-hand.js` is the fourth** (R6): the hand's rules — what a pen, a finger and a palm do, and the hand tile's face and cycle — `node --test Demos/surface/07-hand.test.mjs`, also in CI; `07-input.js` is its adapter. A fragment's `.test.mjs` is not concatenated into the build. `09-palette.js` is the adapter over core's tools (B1): it reads the readings, maps `MM.offersFor` to pills and performs what only the surface can, and builds no affordance by hand |
+| `Demos/surface/` | **The reference surface's source**: `surface.css` and thirty-one script fragments (`00-core`, `00-ui` … `20-controls`, `21-minimap`, `22-boards`, `23-packs`, `24-seat`, `25-maths`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Because they are one closure, the build and its `--check` refuse a name declared at the top of two fragments — the last would silently replace the first everywhere, which broke rendering once — reading the fragments as one strict block, so they must also compile as strict code (`Demos/build-surface.test.mjs`, in CI's `core` job). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. **`17-board.js` is the second** (V1-PLAN R3): the journal the board this browser keeps is written through, driven in Node by a store held in memory — `node --test Demos/surface/17-board.test.mjs`, in CI's `core` job too. **`17-boards.js` is the third** (R1): the list of boards — names, the trash, which board a page opens, whether the one on screen may be left — `node --test Demos/surface/17-boards.test.mjs`, also in CI. **`07-hand.js` is the fourth** (R6): the hand's rules — what a pen, a finger and a palm do, and the hand tile's face and cycle — `node --test Demos/surface/07-hand.test.mjs`, also in CI; `07-input.js` is its adapter. A fragment's `.test.mjs` is not concatenated into the build. `09-palette.js` is the adapter over core's tools (B1): it reads the readings, maps `MM.offersFor` to pills and performs what only the surface can, and builds no affordance by hand |
 | `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file (and exports the same build as `standalone(dir)`, which the release script attaches to a release). **`sw.js` is the service worker for both addresses** — this one and `/app/` — copied to `app/sw.js` by `scripts/build-app.mjs`, which stamps `VERSION` into it and into the page's `<meta name="metamedium-version">` (*One app address*, below). **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture and `mcp-smoke.mjs` as its stdio test; it is also the canvas's seat's answerer, and **`seat-watch.mjs`** is the silent reader that prints one line per brief parked there — what wakes a Claude Code session (*The canvas's seat*, below); `metamedium-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). **`relay.test.mjs`** is the relay's own test (`node --test Demos/relay.test.mjs`, in CI's `core` job): the catch-up as a pure function, and, over a real relay on a free port, the truncation line and three hands with one departed. `Demos/programs/` holds `run` programs written for the canvas (`metamedium-explained.run.js`: the loop told as a program, ending on a real measurement of the viewer's own stroke). Plus fish, composition diagrams, no-modes graph, etc. |
 | `app/` | **The app — v1's one address, `https://jjh111.github.io/MetaMedium/app/`** (V1-PLAN R7). Made, never edited: `index.html` is `Demos/session-engine.html` with each file it asks for asked for from `/app/` (`../Demos/…`), `sw.js` is `Demos/sw.js` byte for byte, `manifest.webmanifest` is the old address's starting and scoped at `./` — all three written by `node scripts/build-app.mjs` and drift-checked in CI (`--check`). Installable there, and it opens with no network after one visit. `Demos/session-engine.html` stays where it was and works as it always has |
 | `HELP.md` | **The help pane's page**, for a person using the canvas (PLAN-USER-SURFACE U1g): the loop, the field, handling marks, models and Claude, boards, rooms, your mark, undo, the shortcuts. The help tile reads it (`20-controls.js`), both service workers keep it for offline, and the gate's `app` scenario asks for it. Keep it true to the surface — it names controls and keys |
@@ -553,6 +553,43 @@ overlap and ⊕ marks both neighbours print, grid labels, a map, and **a
 measured test square (1 in, or 2 cm) on every page**, because a printer
 scales without saying so.
 
+**The maths on the board** (M5, 29 Sep 2026; `maths/board.ts`,
+`tools/maths.ts`, `Demos/surface/25-maths.js`; e2e 64–64g). Core decides what
+is said of the numbers and where, as data a surface only draws: `boardMaths`
+(`boardMathsOf` keeps it while the log stands), `mathsChips`, `mathsSaid` for
+the panel, `evaluateTyped` for `=`. **Beside their figure, never on an answer
+card** (the 15 Sep notes, §6): a derived side is a chip outside the figure
+where a label would stand (`25.30″` beside the long side, standing just clear
+of the line by the chip's own size — `from`/`away`), a label that cannot hold
+says the solver's own sentence right of the number it is about, a step's
+check stands at the right of its own line (*✓ 14″*, *✗ 14.67″ · written 12*,
+*✓ 48″ · or 46″* — plural, with the other reading said). **The ghost rule
+holds** (v10 F4): an answer shows for a moment after it changes
+(`MATHS_MS`), while the hand points at its marks or holds them, and while
+*Show the sizes* was asked (until what it says changes); **a problem stands
+at rest** — a label that cannot hold, a written result that is off, a step
+with no value — because colour is signal and a disagreement is worth a look.
+The panel says it always: plain lines (*legs of 24 and 8 make the long side
+25.30*), every value's formula and the drawing's scale behind **details**, and
+`measure` speaks the drawing's unit. **Change flows, the ink stays:** a
+measurement edited as text re-derives exactly the chips that depend on it
+(`diffSheets` is the oracle) and undo takes them back. On a page that flows
+(more than `TEXT_FITS_LINES` lines) a step's chip is placed from the frame's own
+document, on its line just past its words (`mathsLineBox`); a fitted text is
+evenly spaced, as `sheetLines` divides it. **Only the ink beside a number is
+read for figures** (`drawingsBeside`): the dimensions and the solver walk every
+figure against every other, and on PERF.md's 2,000-mark board with one number
+that was 2.1 s a stroke; a number's figure stands beside it (within
+`ATTACH_REACH` of the mark's own size, then the drawings it hangs with by
+within-reach links), which took it to 4–10 ms — and means what the maths says
+of a drawing never depends on what else is on the board. `=` in the field is a
+sum read against the page's own definitions (`= A ÷ 3`; `ctx.maths`, a thunk, so
+`09-field.js` still names nothing outside itself) with its result said before
+Enter, and Enter stands the words on the board as text beside the marks held —
+one act, one undo (`mathsWrite`). The export pane has a row of its own,
+*true-size.svg* and *print.html* (Letter, or A4 for a metric drawing), waiting
+with its reason until a figure has numbers and a unit.
+
 ### Clean forms: a confident reading, redrawn
 
 > `metamedium-core/src/session/clean.ts` — `snapReading`, `idealize`,
@@ -657,7 +694,7 @@ only readings the line says so and Enter names nothing. Typed, it reads a verb t
 selection has (`erase`, `dup`, `clean`, `line up`, `play`, `frame`, `read`,
 `what` …, by label or alias), a name the library knows (reused, no model
 asked), words the verb table reads at a definition, a prefix (`name:`,
-`label:`, `ask:`, `draw:`, `page:`, `run:`, `new:`, `what:`), or else the
+`label:`, `ask:`, `draw:`, `page:`, `run:`, `new:`, `what:`), a sum after `=` (*= 24 ÷ 3*, read by core against the page: the line says *24 ÷ 3 = 8* before Enter, and Enter puts it on the board as text — M5), or else the
 brief. Under
 the field, laid out as John sketched it (6 Sep): the **core** — four round
 buttons at the left, Name · Copy · Paste · Erase, always the same four in
@@ -695,10 +732,10 @@ What Enter will do is a pure function — `readFieldCommand(ctx)` — of a
 over a live artifact, the offers as labels and aliases, the joined models by
 name, what the library holds, the definition in the loop and what the verb table
 read in the words, whose ink is held — `marks`, how many of the held marks the
-person made and who made each of the rest — and a thunk for the drawing's genre)
+person made and who made each of the rest — a thunk for the drawing's genre and one for what a sum comes to)
 returning a **`FieldReading`** (`kind`, the `line` shown under the field,
 `quiet`, and a **named command** — `take` · `name` · `label` · `ask-what` ·
-`ask` · `draw` · `build` · `library` · `behave` · `need-model`). Beside it,
+`ask` · `draw` · `build` · `library` · `behave` · `need-model` · `maths`). Beside it,
 `typedWord(ctx)` is as pure: the word a typed text offers to name or label with,
 or null. `09-palette.js` is the adapter on both
 sides: `fieldContext` gathers, `runFieldCommand` performs, and `readField` keeps
@@ -809,8 +846,9 @@ said after the reason, and what makes it specific to these marks),
 `verbs`, `hidden` (typed, never a slot), `lead` (stands with the readings:
 *Fold “…” into the text*), and `data` for its take. `offersFor(scope, ctx)`
 asks every tool in **registry order** — `builtin.ts` registers the
-seventeen built-ins in the order the field always built its pills, which is
-the tie-break between equal offers — each key once; `completionsFor` is
+built-ins in the order the field always built its pills (the maths tool, M5,
+last: *Show the sizes*, *Check the steps*, *Print at true size*, host acts that
+write nothing), which is the tie-break between equal offers — each key once; `completionsFor` is
 what typed text completes to (*Name it*, *Label it*, words told to a
 definition), each `place`d rather than ranked. `rankOffers(items, uses)` is
 the palette's old `baseLikelihood` as a pure function — `baseOn(grounds)`,
@@ -1972,7 +2010,8 @@ the marks' own dots. The model pane's status stays in the pane. **A match chip
 is a button** (D8): a tap on it summons the group it stands beside —
 `session.summonMarks(ids, at)`, the same summon a loop and a mark reach,
 with `scopeSource: 'pointed'` — so the second molecule is one tap from being
-held. Export is a pane of three files (SVG, PNG, the log); help is
+held. Export is a pane of three files (SVG, PNG, the log) and a row for a
+figure at its real size (M5: the maths); help is
 **`HELP.md`**, one page for a person — draw, hold, choose; the four round
 buttons; what a model adds and how to ask one, Claude too; boards; rooms;
 your mark; undo; the shortcuts (PLAN-USER-SURFACE U1g) — read into a pane,
