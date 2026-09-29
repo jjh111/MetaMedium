@@ -2,6 +2,7 @@
 // Provides: the field's QUERY, pure — readFieldCommand (what Enter will do, as a named
 //   command record), and the two matchers it stands on (verbFor, libraryMatch), plus
 //   the prefix pattern (FIELD_PREFIXES), the sum (`= 24 ÷ 3`, read by readSum — DIRECTOR-PLAN-W2 M5)
+//   notationWords (a notation's reading in the person's words, N1),
 //   and typedWord (the word a typed text offers to name the selection with, or to label the
 //   person's own ink with — V1-PLAN L2e), and
 //   the words for another hand's marks a label will not go on (theirMarks, madeThese).
@@ -42,6 +43,8 @@
    * @property {string} [enter]     what Enter does when this item leads, said in the line
    *                                 instead of "take it as the name" (W2: writing is read)
    * @property {*} [asks]           truthy when taking it asks a model: the line carries the dot
+   * @property {string} [notation]  a reading of what the marks ARE as a diagram (a notation's id): a
+   *                                 reading, but never a name — the line does not offer it as one (N1)
    *
    * @typedef {Object} FieldContext  everything the reader is allowed to know
    * @property {string} text          what has been typed, untrimmed
@@ -113,6 +116,23 @@
   }
 
   /**
+   * Pure: a notation's reading, said in the person's words (V1-PLAN §3 Reading, N1). Core says a
+   * reading in one line (`describeNotation`: "a UML class diagram 0.49 — three classes, one
+   * composition"); the field shows its short name and number, the tooltip its sentence, and the
+   * panel *is* the two joined by a colon. A person says "a class diagram", never "UML".
+   * @param {string} described  `MM.describeNotation(reading)`
+   * @returns {{name:string, conf:string, label:string, said:string, is:string}}
+   */
+  function notationWords(described) {
+    const cut = String(described || '').indexOf(' — ');
+    const head = (cut < 0 ? String(described || '') : described.slice(0, cut)).replace(/^(an?) UML /, '$1 ');
+    const said = cut < 0 ? '' : described.slice(cut + 3);
+    const m = /^(.*\S)\s+(\d(?:\.\d+)?)$/.exec(head);
+    const name = m ? m[1] : head, conf = m ? m[2] : '';
+    return { name: name, conf: conf, label: conf ? name + ' ' + conf : name, said: said, is: said ? name + ': ' + said : name };
+  }
+
+  /**
    * Pure: every offer, visible or hidden, that the typed text names — by an alias or by
    * the start of its label.
    * @param {string} q
@@ -181,7 +201,10 @@
         if (act.asks) out.model = true;
         return out;
       }
-      if (items.some((i) => i.certain)) return { kind: 'empty', line: '↵ nothing yet — tap a reading to take it as the name', quiet: true, command: null };
+      // A notation's reading (a flowchart, a class diagram) is what the marks are, not a name to give them:
+      // with only such readings the line says a tap uses one, not that it names anything (N1).
+      if (items.some((i) => i.certain && !i.notation)) return { kind: 'empty', line: '↵ nothing yet — tap a reading to take it as the name', quiet: true, command: null };
+      if (items.some((i) => i.certain)) return { kind: 'empty', line: '↵ nothing yet — tap a reading to use it', quiet: true, command: null };
       return { kind: 'empty', line: '', quiet: true, command: null };
     }
 

@@ -462,6 +462,18 @@
     // Writing becomes what Enter does with it: read, then text, a name or a label (W2, U2's walk).
     const shapes0 = ids.map((id) => MM.topInterpretation(s.nodes.get(id))).filter(Boolean);
     if (shapes0.length && shapes0.every((x) => x === 'text')) return { here: 'writing' + (concept && concept.concept === 'writing' ? ' ' + concept.confidence.toFixed(2) : ''), next: 'read it · then text, a name or a label' };
+    // A drawing that reads as a diagram says which (V1-PLAN §3 Reading, N1): the first reading is what it is,
+    // any other above the floor is said beside it; what it becomes is Mermaid, or tidied, or a name.
+    const notated = notationsHeld(ids.filter((id) => s.contentIds.includes(id)));
+    if (notated.length) {
+      const words = notated.map((r) => notationWords(MM.describeNotation(r)));
+      const offered = (key) => paletteItems.some((i) => i.key === key);
+      return {
+        here: words[0].name,
+        is: words[0].is + (words.length > 1 ? ' · or ' + words.slice(1).map((x) => x.label).join(', ') : ''),
+        next: (offered('mermaid') ? 'Make it Mermaid · ' : '') + (offered('snap') ? 'draw them clean · ' : '') + 'a name',
+      };
+    }
     // Show it in 3D only when the field offers it: circles joined by lines (U1d).
     if (genre === 'graph' || genre === 'mixed') return { here: 'a structure, a graph' + (concept ? ' (' + concept.concept + ')' : ''), next: (paletteItems.some((i) => i.key === '3d') ? 'Show it in 3D · ' : '') + 'a brief builds the diagram, then a model writes the words' };
     if (genre === 'layout') return { here: 'a structure, a layout' + (concept ? ' (' + concept.concept + ')' : ''), next: 'a brief builds the page at once, then a model writes the words' };
@@ -496,7 +508,8 @@
     const mathsSays = mathsPanel(s, sum.enclosedIds);
     // Where this stands on the map of becoming, and the rung after it (SURFACE-v10-PLAN §4).
     const rung = becomesOf(s, sum, reading);
-    if (rung) top += '<div class="row"><span class="k">becomes</span><span class="v">' + esc(rung.here + ' → ' + rung.next) + '</span></div>';
+    if (rung && rung.is) top += '<div class="row"><span class="k">is</span><span class="v">' + esc(rung.is) + '</span></div><div class="row"><span class="k">becomes</span><span class="v">' + esc(rung.next) + '</span></div>';
+    else if (rung) top += '<div class="row"><span class="k">becomes</span><span class="v">' + esc(rung.here + ' → ' + rung.next) + '</span></div>';
     // What stands beside it, and what that put first (V1-PLAN §2.2). Said only
     // when something does: far from any context the panel is as it was.
     const beside = contextFor(sum.enclosedIds);

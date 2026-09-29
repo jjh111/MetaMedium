@@ -76,6 +76,8 @@
     },
     // What stands beside the open field's marks (V1-PLAN §2.2, B2), and the tops the contexts hold, for tests.
     paletteContext: () => (session.getState().summon ? paletteContext : null),
+    // How many times the held marks were read for notations (N1): once while the log stands, shared by the field and the panel.
+    notationReads: () => notationReadCount,
     steadyTops: () => [...steadyTops].map(([k, v]) => ({ context: k, key: v.key, at: v.at })),
     usesHere: () => JSON.parse(JSON.stringify(usesHere)),
     // The worker runtime, for tests: what is loaded, where each body is, what broke.
