@@ -16904,7 +16904,7 @@ function readGarment(state, scopeIds) {
   const nodes = state.nodes;
   const { scope, marks } = marksOf(state, scopeIds);
   if (scope.length < 3) return null;
-  const closed = [];
+  const shut = [];
   const open = [];
   const writing = /* @__PURE__ */ new Set();
   for (const m of marks) {
@@ -16918,12 +16918,18 @@ function readGarment(state, scopeIds) {
     const scale = scaleOf6(m.node);
     if (fp.isClosed) {
       const pts = strokePointsOf(m.node);
-      const outline = pts && pts.length >= 3 ? outlineOf2(pts) : null;
-      if (outline) closed.push({ id: m.id, node: m.node, outline, scale });
+      if (pts && pts.length >= 3) shut.push({ id: m.id, node: m.node, pts, scale });
       continue;
     }
     if (writingOf(m.node)) writing.add(m.id);
     else open.push({ id: m.id, node: m.node, scale });
+  }
+  const boxOf3 = (pts) => pts.reduce((b, p) => ({ minX: Math.min(b.minX, p.x), maxX: Math.max(b.maxX, p.x), minY: Math.min(b.minY, p.y), maxY: Math.max(b.maxY, p.y) }), { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
+  if (!shut.some((c) => sizeOf5(boxOf3(c.pts)) / c.scale >= PIECE_MIN_PX)) return null;
+  const closed = [];
+  for (const c of shut) {
+    const outline = outlineOf2(c.pts);
+    if (outline) closed.push({ id: c.id, node: c.node, outline, scale: c.scale });
   }
   const big = closed.filter((c) => sizeOf5(c.outline.bounds) / c.scale >= PIECE_MIN_PX);
   if (!big.length) return null;

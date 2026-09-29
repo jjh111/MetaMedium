@@ -421,7 +421,7 @@ export function readGarment(state: SessionState, scopeIds?: readonly string[]): 
   if (scope.length < 3) return null;
 
   // 1. What each mark could be: a closed outline, writing, or an open stroke.
-  const closed: { id: string; node: MMNode; outline: Outline; scale: number }[] = [];
+  const shut: { id: string; node: MMNode; pts: Point[]; scale: number }[] = [];
   const open: { id: string; node: MMNode; scale: number }[] = [];
   const writing = new Set<string>();
   for (const m of marks) {
@@ -435,14 +435,20 @@ export function readGarment(state: SessionState, scopeIds?: readonly string[]): 
     const scale = scaleOf(m.node);
     if (fp.isClosed) {
       const pts = strokePointsOf(m.node);
-      const outline = pts && pts.length >= 3 ? outlineOf(pts) : null;
-      if (outline) closed.push({ id: m.id, node: m.node, outline, scale });
+      if (pts && pts.length >= 3) shut.push({ id: m.id, node: m.node, pts, scale });
       continue;
     }
     if (writingOf(m.node)) writing.add(m.id);
     else open.push({ id: m.id, node: m.node, scale });
   }
-  // The cheap test before the costly ones: no outline of a piece's size, no piece.
+  // The cheap test before the costly ones: no outline of a piece's size, no piece — and nothing measured but the box.
+  const boxOf = (pts: readonly Point[]) => pts.reduce((b, p) => ({ minX: Math.min(b.minX, p.x), maxX: Math.max(b.maxX, p.x), minY: Math.min(b.minY, p.y), maxY: Math.max(b.maxY, p.y) }), { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
+  if (!shut.some((c) => sizeOf(boxOf(c.pts)) / c.scale >= PIECE_MIN_PX)) return null;
+  const closed: { id: string; node: MMNode; outline: Outline; scale: number }[] = [];
+  for (const c of shut) {
+    const outline = outlineOf(c.pts);
+    if (outline) closed.push({ id: c.id, node: c.node, outline, scale: c.scale });
+  }
   const big = closed.filter((c) => sizeOf(c.outline.bounds) / c.scale >= PIECE_MIN_PX);
   if (!big.length) return null;
 
