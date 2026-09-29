@@ -1625,8 +1625,15 @@ artifact and a new version keeping its kind, Draw it first with what the text
 reads as, five symbols and four flows read back as a flowchart with the new
 node's word inside its symbol, beside everything and selected and fitted, the
 sentence, one act and one undo, a style line refused with its line and the rest
-drawn, no offer for an unknown text or a text file, and the caps said. The whole
-gate: **GATE**. Found, for their owners: the first arrow of e2e 50's flowchart — a
+drawn, no offer for an unknown text or a text file, and the caps said. The whole gate:
+629 passed, 0 failed, 7 skipped in 603 s — canvas 370 and two skips (25d, 62d), keep 31,
+boards 20, app 14, pencil 16, models 19, seat 12, budgets 1 and its five measures
+skipped by name (load 5.0 on 4 cores), shard 123 + 11 + 12; core 1,727 in 108
+files (a first run under that load timed out two of the notations' heaviest,
+mermaid-in's caps and a seeded chart, at five seconds; alone and on the rerun all
+pass); typecheck clean in core and the shard; relay, field, build, board and
+release tests 117; surface and app in sync, both bundles equal a fresh build; the
+canvas MCP smoke passes; WebKit not run (unavailable here). Found, for their owners: the first arrow of e2e 50's flowchart — a
 20-unit wing on a 62-unit shaft — is written `---` by D2 (no head read), the
 other two `-->`; `62` and `63` draw a 14-unit wing so all three flows read, and
 record 50 is unchanged. Probably the barb's share of a short shaft
