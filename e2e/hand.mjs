@@ -23,9 +23,29 @@
 //
 // The records:
 //   H1.0   the hand and the tab meet in the room: each is heard by the other
-//   H1.1   the hand's arrival and a look ask no model: the model of the gate's own counts none,
-//          the working registry is empty
-//   H1.2   QA-v10 §4: the mark beside a box that it crosses nothing of opens nothing …
+//   H1.1   a model of the gate's own joins the tab; the hand's arrival and two looks ask it nothing
+//   H1.2-6 QA-v10 §4 — the mark beside a box that crosses nothing opens nothing; across it, the field
+//          opens on the box and stays his (the hand's look never says "selected" or "the field is open");
+//          one tap lets go and the next stroke draws; the snap tile counts the circle (H1.5b, the
+//          ghost's timing, is a skip); a box drawn below a held text is a box (the hand wrote the text)
+//   H1.7-18 QA-v10 §6, acceptance A7 — the hand's circle lands in its own colour with its card; a
+//          sentence lands on his box alone, under the id his tab gave it; a transcript lands on his
+//          word with no model asked; a proposed reading is held and attributed (H1.10b: whether the
+//          field's row shows it is a skip, known); one undo takes only his last mark and the next
+//          number is new; the hand's label lands on its own ink and is refused on his; his `label:`
+//          says who it is not on before Enter; a field left open stays open under the hand's line,
+//          `name: pair` makes the thing his; a loop that waits waits under the hand's stroke; a reload
+//          is a new sitting and the same person (the board back, old ids, a label on a mark drawn
+//          before it, the hand's own refused); after undo and reload a sentence and a reading land
+//          on the marks they were about
+//   H1.19  QA-v10 §5, the one deliberate act: What is this? asks the gate's model once, the working dot
+//          up while the call is out; the reading lands held and the hand's look says who read it
+//   H1.20-21 QA-v10 §7 — the minimap and a tap on it; three circles and two lines, Show it in 3D,
+//          the hand's look says one run artifact, playing
+//   H1.S1-4 the rows only John's own hand can walk: skips, by name
+//   H1.Y   the invariant: Tier 1 before a model — the model was asked once, by H1.19, and no brief,
+//          no seat, no real model
+//   H1.Z   nothing reached for :8020
 
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -600,6 +620,22 @@ export async function runHand(browser, servers, { freshContext, screenshot }) {
       const shortLook = await lookUntil((l) => !!three && !!markLine(l, three));
       check(`H1.21. §7 (synthetic strokes): three circles and two lines, circled, Show it in 3D — the hand's look: one artifact "${(markLine(shortLook, three) || '').slice(0, 100)}"`,
         held && took && made && !!three && /\brun\b/.test(markLine(shortLook, three) || '') && /playing|live/.test(markLine(shortLook, three) || ''), { held, took, made, three, line: markLine(shortLook, three), full: look.slice(0, 1500) });
+    });
+
+
+    // ---- The rows of QA-v10 that only John's own hand can walk ----
+    check('H1.S1. QA-v10 §1 — letters at any size, words, a line: hello and world written big in his own hand, a tall l with a flick apart, three bubbles and two lines quickly; the panel says a word of 5 strokes, no arrow above 0.3, five marks and not a word — skipped: needs John\'s hand (his x-height 31–40 px, ascenders 72–88 px)', true);
+    check('H1.S2. QA-v10 §2 — reading, and the transcript as text: circle hello world and take Read the writing, take “hello world” as text, Show the ink, double-click to edit — skipped: needs John\'s hand (the writing to be read; H1.9 is the hand transcribing a synthetic word, with no model asked)', true);
+    check('H1.S3. QA-v10 §3 — text folds back from ink: three passes across world in the text, write there above the gap, Fold “there” into the text, undo twice — skipped: needs John\'s hand (the scratch and the writing beside the gap)', true);
+    check('H1.S4. QA-v10 §5 row 2 — a brief that fails leaves nothing behind: type draw a svg of a flower at a circled shape to a small model, thirty seconds, Esc — skipped: needs a small model that fails on its own terms (the models scenario stops a failing model with a stub; QA-v1 walks this row by hand)', true);
+
+    // ---- The invariant: Tier 1 before a model ----
+    await record('H1.Y', async () => {
+      await letGo(page);
+      await sleep(500);
+      const now = await page.evaluate(() => { const mm = window.__mm, MM = mm.MM, s = mm.session.getState(); const seat = typeof mm.seat === 'function' ? mm.seat() : null; return { working: mm.working(), pending: MM.pendingBriefs(s).length, seated: !!(seat && seat.seated), agents: mm.agents.map((a) => a.config.model), lastCalls: mm.lastCalls().map((c) => c.line) }; });
+      check(`H1.Y. Tier 1 before a model: across the hand's arrival and its looking, drawing, saying, proposing, labelling, transcribing and writing, an undo, a reload and all of §4, §6 and §7, the gate's own model was asked ${asked()} time${asked() === 1 ? '' : 's'} — once, by the one deliberate act (What is this?, H1.19) — the working registry is empty, no brief was parked (${now.pending}), the hand did not take the seat (${now.seated}), and no request to a real model was attempted (${guards.modelAttempts.length})`,
+        asked() === deliberate && deliberate === 1 && now.working.length === 0 && now.pending === 0 && !now.seated && guards.modelAttempts.length === 0, { calls: model.calls, now, attempts: guards.modelAttempts });
     });
 
     check(`H1.Z. nothing the scenario opened reached for :8020, where a relay on this machine listens by default — ${toJohnsRelay.length} request${toJohnsRelay.length === 1 ? '' : 's'} refused`, toJohnsRelay.length === 0, toJohnsRelay.slice(0, 5));
