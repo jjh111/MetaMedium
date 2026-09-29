@@ -241,7 +241,21 @@
     }
     if (!changed.size) return null;
     const out = MM.followPreview(s.nodes, changed, boundByAt.index);
-    return out.size ? out : null;
+    if (!out.size) return null;
+    // A routed connector is drawn routed from where the drag takes what it is tied to (V1-PLAN D7): the
+    // function the replay runs, over the board as the drag leaves it.
+    let preview = null;
+    for (const [id, n] of out) {
+      if (!MM.routeRepOf(n)) continue;
+      if (!preview) {
+        preview = new Map(s.nodes);
+        for (const [cid, cn] of changed) preview.set(cid, cn);
+        for (const [fid, fn] of out) preview.set(fid, fn);
+      }
+      const near = (box) => s.contentIds.filter((cid) => { const cb = MM.boundsOf(preview.get(cid)); return !!cb && cb.minX <= box.maxX && box.minX <= cb.maxX && cb.minY <= box.maxY && box.minY <= cb.maxY; });
+      out.set(id, Object.assign({}, n, { reps: n.reps.filter((r) => r.modality !== 'route').concat([{ modality: 'route', data: MM.deriveRoute(n, preview, near), source: 'engine' }]) }));
+    }
+    return out;
   }
 
   function renderSelection(s) {

@@ -35,6 +35,8 @@
     beginWork: (key, ids, label) => beginWork(key, ids, label), endWork: (key) => endWork(key),
     // A hand's word on its own ink, for tests: where the last paint drew each label, and a mark's ink colour.
     labelsDrawn: () => labelsDrawn.map((l) => Object.assign({}, l)),
+    // The routed connectors (V1-PLAN D7), for tests: where the last paint drew each route — the polyline on the board, its head, the ink faint beneath.
+    routesDrawn: () => routesDrawn.map((r) => Object.assign({}, r)),
     // The one selected mark's own points (V1-PLAN E1), for tests: where the last paint drew each handle, in world units.
     handlesDrawn: () => handlesDrawn.map((h) => Object.assign({}, h)),
     // What followed the drag in progress (V1-PLAN E2), for tests: each connector the last paint drew following, and its ends where it drew them.

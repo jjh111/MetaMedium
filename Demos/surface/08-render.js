@@ -191,6 +191,10 @@
         const clean = MM.cleanPointsOf(n);
         const cb = clean && pointsBox(clean);
         if (cb) b = growBox(b, cb);
+        // A routed connector draws its route, which may run outside its ink's box (D7).
+        const rt = MM.routeRepOf(n);
+        const rb = rt && rt.points.length >= 2 && pointsBox(rt.points);
+        if (rb) b = growBox(b, rb);
       }
       if (depth < 12) {
         for (const e of n.edges) {
@@ -423,7 +427,24 @@
       const reshaping = reshapeShownFor(node.id);
       const shown = reshaping || node;
       const clean = MM.cleanPointsOf(shown);
-      if (paintOps) recordOp({ kind: 'ink', id: node.id, colour: style.color, width: round2(style.width), box: boxOfPoints(points), clean: clean ? boxOfPoints(clean) : null, moved: paintMoved || !!reshaping, gesture: !!style.gesture });
+      // A routed connector (V1-PLAN D7): the route in front, at right angles between its ports and its
+      // arrow's head at the tip, the hand's ink — and the clean form it held — faint beneath. The route is
+      // derived from where the sites stand, so it is drawn where they stand; nothing is covered.
+      const route = MM.routeRepOf(shown);
+      const routed = route && route.points.length >= 2 ? route : null;
+      if (paintOps) recordOp({ kind: 'ink', id: node.id, colour: style.color, width: round2(style.width), box: boxOfPoints(points), clean: routed ? boxOfPoints(routed.points) : clean ? boxOfPoints(clean) : null, moved: paintMoved || !!reshaping, gesture: !!style.gesture });
+      if (routed) {
+        for (const under of clean ? [points, clean] : [points]) {
+          path(under, false);
+          ctx.strokeStyle = C.inkFaint;
+          ctx.lineWidth = Math.max(1, style.width * 0.7);
+          ctx.stroke();
+        }
+        inkStroke(routed.points, false, style);
+        if (routed.head) inkStroke([routed.head.wings[0], routed.head.tip, routed.head.wings[1]], false, style);
+        routesDrawn.push({ id: node.id, points: routed.points.map((p) => ({ x: p.x, y: p.y })), head: routed.head ? { tip: Object.assign({}, routed.head.tip), wings: routed.head.wings.map((w) => Object.assign({}, w)) } : null, faint: true, avoided: routed.avoided });
+        return;
+      }
       if (clean) {
         // Snapped: the clean form in front, the hand's ink faint beneath it.
         // What was drawn is still there — that is the whole promise.
@@ -749,6 +770,7 @@
     const pv = dragPreview();
     // The connectors bound to what a drag moves, each drawn as it will stand when the hand lets go (V1-PLAN E2).
     followShown = pv ? dragFollowers() : null;
+    routesDrawn = [];
     // Which artifacts wear their brackets and name — for every artifact on the
     // board, in its order, drawn or not: a label rises above the name, and the
     // name is the same whether the artifact is on screen or not.
@@ -941,6 +963,7 @@
   // made at. Its chrome — who put it there — keeps quiet until the hand
   // points at the mark, like every other reading.
   const LABEL_PX = 13;
+  let routesDrawn = []; // this paint's routed connectors, in world units, for tests (V1-PLAN D7): { id, points, head, faint, avoided }
   let labelsDrawn = []; // this paint's labels, in world units, for tests: { id, text, x, y, w, size, px, colour, who, whoShown }
 
   /** A label's size in world units: LABEL_PX in the hand's space when its mark was made. */

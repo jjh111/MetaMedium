@@ -4460,6 +4460,7 @@ window.__scenario = async function(){
     if (tidy66) tidy66.click();
     await wait(80);
     const wrote66 = s66.getEvents().slice(n66);
+    const afterTidy66 = s66.getEvents().length;
     const routes66 = connectors66().map(routeOf66);
     step('66a. taking it is one act: the symbols of the rank lined up and a route for each of the three connectors, every event the tool\'s',
       gapBefore66 > 50 && Math.abs(centreY66('Stop') - centreY66('Go')) < 1 && routes66.length === 3 && routes66.every(Boolean) &&
@@ -4477,10 +4478,13 @@ window.__scenario = async function(){
       drawn66.map((d) => ({ id: d.id, faint: d.faint, n: d.points.length })));
     // A box dragged by the pointer: the routes tied to it follow, derived — one move event.
     const sumB66 = s66.getState().summon; if (sumB66) s66.dismiss(sumB66.id, Date.now());
-    s66.select(symbol66('Go').ids, Date.now()); await wait(30);
+    // Two boxes held move as one (a lone box shows its own points, and a press near one reshapes).
+    s66.select(symbol66('Go').ids.concat(symbol66('Stop').ids), Date.now()); await wait(30);
     const routesBefore66 = JSON.stringify(connectors66().map((id) => routeOf66(id).points));
     const goBox66 = MM.boundsOf(nodes66().get(symbol66('Go').ids[0]));
-    const from66 = mm.worldToScreen((goBox66.minX + goBox66.maxX) / 2, (goBox66.minY + goBox66.maxY) / 2);
+    const stopBox66 = MM.boundsOf(nodes66().get(symbol66('Stop').ids[0]));
+    // A press between the two, inside the held outline and away from its corners and knob.
+    const from66 = mm.worldToScreen((goBox66.maxX + stopBox66.minX) / 2, (goBox66.minY + goBox66.maxY) / 2);
     const c66 = document.getElementById('canvas');
     const pe66 = (type, x, y) => c66.dispatchEvent(new PointerEvent(type, { pointerId: 1, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1 }));
     const m66 = s66.getEvents().length;
@@ -4499,9 +4503,14 @@ window.__scenario = async function(){
       JSON.stringify(moved66) === '["move"]' && JSON.stringify(rerouted66.map((r) => r.points)) !== routesBefore66 && rerouted66.every((r) => orthogonal66(r.points)) && onSites66,
       { events: moved66, changed: JSON.stringify(rerouted66.map((r) => r.points)) !== routesBefore66, onSites: onSites66 });
     s66.undo();
-    step('66f. one undo springs the box and the routes back, and the next takes the whole tidy away — the symbols out of their rank again and no connector routed',
-      JSON.stringify(connectors66().map((id) => routeOf66(id).points)) === routesBefore66 && (s66.undo(), s66.getEvents().length === n66 && connectors66().every((id) => !routeOf66(id)) && Math.abs(centreY66('Stop') - centreY66('Go')) > 50),
-      { events: s66.getEvents().length, expected: n66 });
+    const back66 = JSON.stringify(connectors66().map((id) => routeOf66(id).points)) === routesBefore66;
+    // Closing the field and holding the two boxes were acts of their own; then ONE undo takes the whole tidy.
+    while (s66.getEvents().length > afterTidy66 && ['dismiss', 'select', 'deselect'].includes(s66.getEvents()[s66.getEvents().length - 1].type)) s66.undo();
+    const atTidy66 = s66.getEvents().length === afterTidy66;
+    s66.undo();
+    step('66f. one undo springs the box and the routes back, and one more takes the whole tidy away — the symbols out of their rank again and no connector routed',
+      back66 && atTidy66 && s66.getEvents().length === n66 && connectors66().every((id) => !routeOf66(id)) && Math.abs(centreY66('Stop') - centreY66('Go')) > 50,
+      { back: back66, atTidy: atTidy66, events: s66.getEvents().length, expected: n66 });
     mm.session.load([]);
   }
 
