@@ -107,20 +107,23 @@ function evenBowOf(fp: Fingerprint, points: Point[], scale: number): { evidence:
   return { evidence, bow };
 }
 
-function detectLine(fp: Fingerprint, points: Point[], scale = 1, even = evenBowOf(fp, points, scale)): RecognitionResult | null {
+function detectLine(fp: Fingerprint, points: Point[], scale = 1, even = evenBowOf(fp, points, scale), seen: HeadSeen | null = null): RecognitionResult | null {
   if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
 
   const straight = ramp(fp.straightness, 0.55, 0.95);
   const corners = fit(fp.corners, 0, 3);
-  // A line gives way exactly as far as an even bow is shown to be meant.
-  const confidence = (straight * 0.7 + corners * 0.3) * (1 - even.evidence);
+  // A line gives way exactly as far as an even bow is shown to be meant, and
+  // as far as a head that draws back on its shaft is (S2: a long arrow's head
+  // turns no corner, so nothing else took the line's confidence from it).
+  const confidence = (straight * 0.7 + corners * 0.3) * (1 - even.evidence) * (1 - (seen?.fit ?? 0));
   const bows = even.bow && even.evidence >= 0.05 ? `, but it bows evenly like an arc of ${Math.round(even.bow.sweep)}°` : '';
+  const headed = seen && seen.fit >= 0.05 ? `, but its ${seen.head} draws back like an arrow's head` : '';
 
   return result(
     'line',
     'Line',
     confidence,
-    `open, straightness ${fp.straightness.toFixed(2)}, ${fp.corners} corner(s)${bows}`
+    `open, straightness ${fp.straightness.toFixed(2)}, ${fp.corners} corner(s)${bows}${headed}`
   );
 }
 
@@ -247,69 +250,14 @@ function detectText(fp: Fingerprint, points: Point[], scale = 1): RecognitionRes
  * positions along the path: a corner that turns hard inside the last (or
  * first) fifth of the stroke, with a straight shaft before it.
  */
-function detectArrow(fp: Fingerprint, points: Point[], scale = 1): RecognitionResult | null {
+function detectArrow(fp: Fingerprint, points: Point[], scale = 1, seen: HeadSeen | null = headSeenOf(fp, points, scale)): RecognitionResult | null {
   if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
-  const corners = fp.cornerData ?? [];
-  if (corners.length === 0 || corners.length > 4) return null;
-
-  // The head lives inside this fraction of the path. Generous, because a
-  // two-wing head — out one wing, back to the tip, out the other — is three
-  // corners and legitimately a third of the stroke; a tighter window read every
-  // one of those as a bent line. What keeps a bent line out is the rule below:
-  // a corner in the MIDDLE of the stroke is not a head at either end.
-  const HEAD = 0.42;
-  const atEnd = corners.filter((c) => c.t >= 1 - HEAD);
-  const atStart = corners.filter((c) => c.t <= HEAD);
-  if (corners.some((c) => c.t > HEAD && c.t < 1 - HEAD)) return null;
-  // Both ends bent means a double-headed arrow or a zigzag; either way, not this.
-  if (atEnd.length > 0 && atStart.length > 0) return null;
-
-  const path = resampleByArcLength(points, 100);
-  const tryHead = (head: 'end' | 'start', cs: typeof corners) => {
-    if (cs.length === 0) return null;
-    const first = cs.reduce((a, c) => (head === 'end' ? Math.min(a, c.t) : Math.max(a, c.t)), head === 'end' ? 1 : 0);
-    const shaft = head === 'end' ? path.slice(0, Math.max(3, Math.round(first * 100))) : path.slice(Math.min(97, Math.round(first * 100)));
-    const straight = calculateStraightness(shaft);
-    const sharpest = Math.max(...cs.map((c) => c.angle));
-    const shaftOk = ramp(straight, 0.72, 0.95);
-    // A barb DRAWS BACK on the shaft: the wing turns past ninety degrees
-    // (a hand's wing leaves the tip at ~30° off the shaft, a 150° turn). The
-    // earlier ramp (55°–110°) took the hook a pen leaves at liftoff for a
-    // barb, and every tall l read as an arrow 0.6 (v10 F2).
-    const barbOk = ramp(sharpest, (95 * Math.PI) / 180, (140 * Math.PI) / 180);
-    // The head is short next to the shaft: a long tail after the corner is a
-    // bent line, not a barb. One wing is ~15% of the path, two wings ~35% —
-    // and under a sixteenth of it is a liftoff hook, not a wing anyone meant.
-    const headLen = head === 'end' ? 1 - first : first;
-    if (headLen < 0.06) return null;
-    const shortHead = 1 - ramp(headLen, 0.3, 0.45);
-    const tipIdx = Math.round(first * 99);
-    const tail = head === 'end' ? path[0] : path[99];
-    // A barb is SHORT AGAINST ITS SHAFT; an L is two arms (S1). The barb's
-    // reach from the tip over the shaft's length, which a second arm as long
-    // as a box's side never has. Its length, not its angle: an L's corner is
-    // square, but raising the angle a barb must turn to keep it out would
-    // lose the arrows real hands draw.
-    const barb = barbOf(path, tipIdx, head, tail, scale);
-    // Short against the shaft, or short in the hand's space: a barb is a
-    // flick of the pen, and on a short arrow the flick is most of the shaft.
-    const shortBarb = Math.max(
-      1 - ramp(barb.ratio, BARB_OF_SHAFT[0], BARB_OF_SHAFT[1]),
-      1 - ramp(barb.reach / scale, BARB_FLICK_PX[0], BARB_FLICK_PX[1])
-    );
-    return {
-      fit: (shaftOk * 0.5 + barbOk * 0.35 + shortHead * 0.15) * shortBarb,
-      head,
-      tip: path[tipIdx],
-      tail,
-      straight,
-      sharpest,
-      barb,
-    };
-  };
-  const best = [tryHead('end', atEnd), tryHead('start', atStart)]
-    .filter((x): x is NonNullable<typeof x> => !!x)
-    .sort((a, b) => b.fit - a.fit)[0];
+  // Two ways to read a head, and the surer one stands: the corners the rung
+  // measured (fractions of the path, which is what a head on a shaft of a
+  // hand's length is), and the head at the hand's own scale, which a long shaft
+  // needs (S2, `headSeenOf`).
+  const viaCorners = headByCorners(fp, points, scale);
+  const best = seen && (!viaCorners || seen.fit > viaCorners.fit) ? seen : viaCorners;
   if (!best) return null;
 
   // Where the ink points, not where the head's first corner turned: a two-wing
@@ -329,6 +277,156 @@ function detectArrow(fp: Fingerprint, points: Point[], scale = 1): RecognitionRe
       `the barb ${best.barb.ratio.toFixed(2)} of the shaft`,
     { head: best.head, tip, tail, barb: best.barb.reach }
   );
+}
+
+/** A head read on a stroke: which end, its tip (a hint the ink's own tip is found from), how straight the shaft is, how hard the barb turns, how big it is against the shaft, and how well it fits an arrow. */
+interface HeadSeen {
+  fit: number;
+  head: 'end' | 'start';
+  tip: Point;
+  straight: number;
+  sharpest: number;
+  barb: { reach: number; shaft: number; ratio: number };
+}
+
+/**
+ * A head from the rung's corners: a corner that turns hard inside the last (or
+ * first) fifth of the stroke, with a straight shaft before it.
+ */
+function headByCorners(fp: Fingerprint, points: Point[], scale: number): HeadSeen | null {
+  const corners = fp.cornerData ?? [];
+  if (corners.length === 0 || corners.length > 4) return null;
+
+  // The head lives inside this fraction of the path. Generous, because a
+  // two-wing head — out one wing, back to the tip, out the other — is three
+  // corners and legitimately a third of the stroke; a tighter window read every
+  // one of those as a bent line. What keeps a bent line out is the rule below:
+  // a corner in the MIDDLE of the stroke is not a head at either end.
+  const HEAD = 0.42;
+  const atEnd = corners.filter((c) => c.t >= 1 - HEAD);
+  const atStart = corners.filter((c) => c.t <= HEAD);
+  if (corners.some((c) => c.t > HEAD && c.t < 1 - HEAD)) return null;
+  // Both ends bent means a double-headed arrow or a zigzag; either way, not this.
+  if (atEnd.length > 0 && atStart.length > 0) return null;
+
+  const path = resampleByArcLength(points, 100);
+  const tryHead = (head: 'end' | 'start', cs: typeof corners): HeadSeen | null => {
+    if (cs.length === 0) return null;
+    const first = cs.reduce((a, c) => (head === 'end' ? Math.min(a, c.t) : Math.max(a, c.t)), head === 'end' ? 1 : 0);
+    const shaft = head === 'end' ? path.slice(0, Math.max(3, Math.round(first * 100))) : path.slice(Math.min(97, Math.round(first * 100)));
+    const straight = calculateStraightness(shaft);
+    const sharpest = Math.max(...cs.map((c) => c.angle));
+    const shaftOk = ramp(straight, 0.72, 0.95);
+    // A barb DRAWS BACK on the shaft: the wing turns past ninety degrees
+    // (a hand's wing leaves the tip at ~30° off the shaft, a 150° turn). The
+    // earlier ramp (55°–110°) took the hook a pen leaves at liftoff for a
+    // barb, and every tall l read as an arrow 0.6 (v10 F2).
+    const barbOk = ramp(sharpest, BARB_TURN[0], BARB_TURN[1]);
+    // The head is short next to the shaft: a long tail after the corner is a
+    // bent line, not a barb. One wing is ~15% of the path, two wings ~35% —
+    // and under a sixteenth of it is a liftoff hook, not a wing anyone meant.
+    const headLen = head === 'end' ? 1 - first : first;
+    if (headLen < 0.06) return null;
+    const shortHead = 1 - ramp(headLen, 0.3, 0.45);
+    const tipIdx = Math.round(first * 99);
+    const tail = head === 'end' ? path[0] : path[99];
+    // A barb is SHORT AGAINST ITS SHAFT; an L is two arms (S1). The barb's
+    // reach from the tip over the shaft's length, which a second arm as long
+    // as a box's side never has. Its length, not its angle: an L's corner is
+    // square, but raising the angle a barb must turn to keep it out would
+    // lose the arrows real hands draw.
+    const barb = barbOf(path, tipIdx, head, tail, scale);
+    return {
+      fit: (shaftOk * 0.5 + barbOk * 0.35 + shortHead * 0.15) * shortBarb(barb, scale),
+      head,
+      tip: path[tipIdx],
+      straight,
+      sharpest,
+      barb,
+    };
+  };
+  return [tryHead('end', atEnd), tryHead('start', atStart)]
+    .filter((x): x is HeadSeen => !!x)
+    .sort((a, b) => b.fit - a.fit)[0] ?? null;
+}
+
+/**
+ * Short against the shaft, or short in the hand's space: a barb is a flick of
+ * the pen, and on a short arrow the flick is most of the shaft.
+ */
+function shortBarb(barb: { reach: number; ratio: number }, scale: number): number {
+  return Math.max(
+    1 - ramp(barb.ratio, BARB_OF_SHAFT[0], BARB_OF_SHAFT[1]),
+    1 - ramp(barb.reach / scale, BARB_FLICK_PX[0], BARB_FLICK_PX[1])
+  );
+}
+
+/** A barb DRAWS BACK on the shaft: the turn at the tip, in radians, from nothing at the first to full credit at the second. */
+export const BARB_TURN = [(95 * Math.PI) / 180, (140 * Math.PI) / 180] as const;
+/**
+ * A barb is at least this many pixels on screen, or it is the hook a pen
+ * leaves lifting off (a tall l's is under ten). Only the head read at the
+ * hand's scale asks it: the corners' own rule is a share of the path.
+ */
+export const BARB_MIN_PX = 12;
+/** The hand-scale head is looked for in strokes at least this straight overall (a long arrow with a head is nearly as straight as its shaft). */
+const HEAD_SEEN_STRAIGHT = 0.5;
+/** …and no more than this many points are looked at: a long stroke is read at a coarser step, never a slower one. */
+const HEAD_SEEN_POINTS = 2000;
+
+/**
+ * A head at the hand's own scale — the one thing the corners cannot see. The
+ * corner detector measures its window in fractions of the path, so on a shaft
+ * of a thousand pixels a hand-sized head (a wing of thirty) is a sixtieth of
+ * the stroke and turns no corner it can find: a long sequence message, an
+ * arrow across a wide page, read as a line alone (D5). So the stroke is looked
+ * at as the hand drew it: at either end, the ink the pen first reached
+ * farthest along the shaft is the tip (`inkTipIndex`), and what follows it is
+ * a barb when it is at least a hand's flick long (`BARB_MIN_PX`), DRAWS BACK
+ * on the shaft (the turn at the tip, `BARB_TURN` — a hook that bends on ahead
+ * or aside does not), is short against the shaft, and the shaft before it is
+ * straight. A pen's liftoff hook and an L's second arm are neither; each has
+ * its own test in recognition.test.ts. Null when there is no such head.
+ */
+function headSeenOf(fp: Fingerprint, points: Point[], scale: number): HeadSeen | null {
+  if (fp.isClosed || fp.straightness < HEAD_SEEN_STRAIGHT || points.length < 4) return null;
+  let total = 0;
+  for (let i = 1; i < points.length; i++) total += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+  if (!(total > 0)) return null;
+  const step = Math.max(2 * scale, total / HEAD_SEEN_POINTS);
+  const dense = resampleByArcLength(points, Math.max(8, Math.round(total / step) + 1));
+  const near = HAND_RESOLUTION_PX * scale;
+  const seen = (head: 'end' | 'start'): HeadSeen | null => {
+    const pts = head === 'end' ? dense : dense.slice().reverse();
+    const tail = pts[0];
+    let farAt = 0, farD = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const d = Math.hypot(pts[i].x - tail.x, pts[i].y - tail.y);
+      if (d > farD) { farD = d; farAt = i; }
+    }
+    if (!(farD > 0)) return null;
+    const at = inkTipIndex(pts, 'end', tail, pts[farAt], near);
+    const tip = pts[at];
+    const shaftLen = Math.hypot(tip.x - tail.x, tip.y - tail.y);
+    if (!(shaftLen > 0)) return null;
+    const ux = (tip.x - tail.x) / shaftLen, uy = (tip.y - tail.y) / shaftLen;
+    let reach = 0, wing = tip, barbPath = 0;
+    for (let i = at + 1; i < pts.length; i++) {
+      barbPath += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+      const d = Math.hypot(pts[i].x - tip.x, pts[i].y - tip.y);
+      if (d > reach) { reach = d; wing = pts[i]; }
+    }
+    if (reach / scale < BARB_MIN_PX) return null;
+    // The turn at the tip: how far the wing leaves the way the shaft was going.
+    const back = ((tip.x - wing.x) * ux + (tip.y - wing.y) * uy) / reach;
+    const sharpest = Math.PI - Math.acos(Math.max(-1, Math.min(1, back)));
+    const straight = calculateStraightness(pts.slice(0, at + 1));
+    const barb = { reach, shaft: shaftLen, ratio: reach / shaftLen };
+    const shortHead = 1 - ramp(barbPath / total, 0.3, 0.45);
+    const fit = (ramp(straight, 0.72, 0.95) * 0.5 + ramp(sharpest, BARB_TURN[0], BARB_TURN[1]) * 0.35 + shortHead * 0.15) * shortBarb(barb, scale);
+    return fit > 0 ? { fit, head, tip, straight, sharpest, barb } : null;
+  };
+  return [seen('end'), seen('start')].filter((x): x is HeadSeen => !!x).sort((a, b) => b.fit - a.fit)[0] ?? null;
 }
 
 /**
@@ -378,15 +476,16 @@ export function analyzeStroke(points: Point[], scale = 1): StrokeAnalysis {
   }
 
   const even = evenBowOf(fingerprint, points, scale);
+  const seen = headSeenOf(fingerprint, points, scale);
   const results = [
-    detectLine(fingerprint, points, scale, even),
+    detectLine(fingerprint, points, scale, even, seen),
     detectArc(fingerprint, points, scale, even),
     detectTriangle(fingerprint),
     detectRectangle(fingerprint),
     detectCircle(fingerprint, points, scale),
     detectDot(fingerprint, scale),
     detectText(fingerprint, points, scale),
-    detectArrow(fingerprint, points, scale),
+    detectArrow(fingerprint, points, scale, seen),
   ].filter((r): r is RecognitionResult => r !== null);
 
   // Ranked by measured confidence — no detector outranks another by fiat.

@@ -331,6 +331,19 @@ describe('an arrow is read where its ink points (S2)', () => {
     expect(missed).toEqual([]);
   });
 
+  it('a long arrow drawn in any direction is an arrow: the head is read along the shaft, never along the page', () => {
+    for (const len of [700, 2000]) {
+      for (const deg of [0, 45, 90, 135, 180, 250, 315]) {
+        for (const seed of [1, 2]) {
+          const a = (deg * Math.PI) / 180;
+          const pts = handArrow({ x: 0, y: 0 }, { x: len * Math.cos(a), y: len * Math.sin(a) }, { wings: 2, headLen: 30, seed });
+          const results = analyzeStroke(pts).results;
+          expect(results[0]?.type, `${len} at ${deg}° seed ${seed}`).toBe('arrow');
+        }
+      }
+    }
+  });
+
   it('the same, zoomed out: the head is a hand’s on screen, the world is a screenful wider', () => {
     // scale 3: a 30px head on screen is 90 units, on a shaft of 3,600.
     for (const seed of [1, 2, 3]) {
