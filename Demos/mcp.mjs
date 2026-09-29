@@ -156,11 +156,22 @@ function codeRepOf(node) {
   for (let i = node.reps.length - 1; i >= 0; i--) if (node.reps[i].modality === 'code') return node.reps[i];
   return null;
 }
+// Who made a reading, said after it — never for the engine's own shape rung.
+// In this hand's own session its own proposals are the local participant's,
+// whose word is "local"; it is named by the name it goes by in the room.
+function readBy(x) {
+  // A name somebody gave (a blessing) is theirs and no reading of anyone's: it says nothing here, as it never did.
+  if (x.blessed) return x.tier ? ' · ' + x.sourceName : '';
+  const who = x.source === MM.LOCAL_PARTICIPANT ? label(ME) : x.sourceName;
+  return x.tier || (who && who !== 'engine') ? ' · ' + who : '';
+}
 function describeMark(node, s) {
   const b = MM.boundsOf(node);
   // Readings are what the engine and the models read; a label is its maker's
-  // word and is said on its own, never as one of them (L2b).
-  const reads = MM.interpretationsOf(node, s.nodes).filter((x) => x.basis !== 'label').slice(0, 3).map((x) => x.label + ' ' + x.weight.toFixed(2) + (x.tier ? ' · ' + x.sourceName : ''));
+  // word and is said on its own, never as one of them (L2b). Whoever read it
+  // is said unless it is the engine's own shape rung: another hand's proposal
+  // is a tier 0 voice too, and unsaid it reads as the engine's.
+  const reads = MM.interpretationsOf(node, s.nodes).filter((x) => x.basis !== 'label').slice(0, 3).map((x) => x.label + ' ' + x.weight.toFixed(2) + readBy(x));
   const name = MM.wordOf(node);
   const lab = MM.labelOf(node);
   const said = MM.transcriptOf(node);
