@@ -101,3 +101,13 @@ describe('the run kind', () => {
     expect(kindOf('x.run.js')?.renderer).toBe('run');
   });
 });
+
+describe('the mermaid kind (V1-PLAN D2)', () => {
+  it('is a row of the closed table: .mmd and .mermaid, rendered in the run sandbox, addressed by the parts it reports', () => {
+    expect(kindOf('flow.mmd')?.kind).toBe('mermaid');
+    expect(kindOf('a/b/Flow.MERMAID')?.kind).toBe('mermaid');
+    expect(rowOf('mermaid')).toMatchObject({ kind: 'mermaid', extensions: ['mmd', 'mermaid'], renderer: 'mermaid', addressing: 'parts', textual: true });
+    // Its parts are reported by the rendered diagram, never read from the source.
+    expect(addressablesOf('mermaid', 'flowchart TD\n a --> b\n')).toEqual([]);
+  });
+});
