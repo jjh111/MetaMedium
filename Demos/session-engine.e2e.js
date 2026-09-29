@@ -3868,6 +3868,137 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 64. Maths on the board (DIRECTOR-PLAN-W2 M5; V1-PLAN A4; MATHS-PLAN §4, §6) ----
+  // The right triangle John asked about, ruled in three lines with a small square in its corner:
+  // legs of 24 and 8 are written beside them as text, and the canvas says the long side — a chip
+  // beside it, for a moment, and always in the panel. A third 24 says what cannot hold, and stays.
+  // A page of steps shows each step's check; changing a measurement changes what depends on it;
+  // undo puts it back; the field reads `=`; the figure goes out at true size. Never on an answer card.
+  {
+    const mx = window.__mmMaths || { chipsDrawn: () => [], settle: () => {}, trueSizeSvg: () => null, printJob: () => null };
+    const chipsOf = (kind) => mx.chipsDrawn().filter((c) => !kind || c.kind === kind);
+    const fresh64 = () => { const s0 = mm.session.getState(); if (s0.summon) mm.session.dismiss(s0.summon.id, Date.now()); mm.session.load([]); mm.setView(1, 0, 0); };
+    const lastId64 = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
+    // The triangle: the right angle at the bottom left, the long leg along the bottom (480), the short leg up the left (160) — 24 : 8 — and the long side between their far ends.
+    const A64 = { x: 420, y: 420 }, B64 = { x: 900, y: 420 }, C64 = { x: 420, y: 260 };
+    const mid64 = { x: (B64.x + C64.x) / 2, y: (B64.y + C64.y) / 2 };
+    const drawTriangle = () => {
+      const ids = [];
+      for (const [p, q] of [[A64, B64], [C64, A64], [B64, C64]]) { t.stroke(t.line(p, q, 40)); ids.push(lastId64()); }
+      t.stroke(t.rect(A64.x + 2, A64.y - 17, 15, 15)); ids.push(lastId64());
+      return ids;
+    };
+    const label64 = (code, box) => mm.typeText({ x: box.x, y: box.y }, code, { w: box.w, h: box.h });
+    const legBox = { x: 620, y: 432, w: 60, h: 30 }, upBox = { x: 366, y: 322, w: 44, h: 30 }, longBox = { x: 660, y: 292, w: 44, h: 30 };
+    const dist64 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    const say64 = () => document.getElementById('status').textContent;
+
+    // A triangle with 24 and 8 on its legs: 25.3 on the long side.
+    fresh64();
+    const tri64 = drawTriangle();
+    const ink64 = tri64.slice(0, 3);
+    const nodes64 = mm.session.getState().nodes;
+    label64('24', legBox); label64('8', upBox);
+    await wait(80);
+    const sides64 = chipsOf('side');
+    const side64 = sides64[0];
+    step('64. a right triangle ruled in three lines with 24 and 8 written beside its legs says 25.30 beside its long side — a chip outside the figure, beside the middle of that side',
+      tri64.length === 4 && sides64.length === 1 && /25\.3/.test(side64.text) && dist64(side64, mid64) < 70 && dist64(side64, A64) > dist64(mid64, A64),
+      { tri: tri64.length, chips: mx.chipsDrawn().map((c) => ({ kind: c.kind, text: c.text, x: Math.round(c.x), y: Math.round(c.y) })), mid: mid64 });
+    step('64a. …and no answer card carries a number — derived values live beside their figure (the notes, §6)', mm.answerCards().length === 0, mm.answerCards().length);
+    sameAsWhole('the triangle and its chip — the maths');
+
+    // For a moment, and on hover: settled, the derived side is gone; pointed at, it is back.
+    mx.settle();
+    const settled64 = chipsOf('side').length;
+    mm.inspect(ink64[2]);
+    const hovered64 = chipsOf('side').length;
+    const panel64 = document.getElementById('inspector').textContent;
+    mm.inspect(null);
+    step('64a2. the derived side is shown for a moment and on hover, not forever — and the panel always says it, with the formula behind details',
+      settled64 === 0 && hovered64 === 1 && /25\.30/.test(panel64) && /√\(24² \+ 8²\)/.test(panel64),
+      { settled: settled64, hovered: hovered64, panel: panel64.slice(0, 260) });
+
+    // A third 24 on the long side: the conflict, in the solver's words — and it stands at rest.
+    label64('24', longBox);
+    await wait(80);
+    mx.settle();
+    const conflicts64 = chipsOf('conflict');
+    step('64b. a third 24 on the long side says what cannot hold — labelled 24; legs of 24 and 8 make it 25.30, 1.30 longer (5%) — and the chip stands after the moment is over',
+      conflicts64.length === 1 && conflicts64[0].text === 'labelled 24; legs of 24 and 8 make it 25.30, 1.30 longer (5%)' && conflicts64[0].standing === true && chipsOf('side').length === 0 && mm.answerCards().length === 0,
+      { conflicts: conflicts64.map((c) => c.text), sides: chipsOf('side').length });
+    sameAsWhole('the conflict chip standing — the maths');
+    // Undo takes the third 24 back, and the derived side with it comes back to what the legs make.
+    mm.session.undo(); await wait(60);
+    step('64b2. undo takes the third 24 back: no conflict, and the long side is 25.30 again beside its figure', chipsOf('conflict').length === 0 && chipsOf('side').length === 1 && /25\.3/.test(chipsOf('side')[0].text), mx.chipsDrawn().map((c) => c.kind + ' ' + c.text));
+
+    // The field: Show the sizes leads for these marks, says the answer, and leaves the sizes showing.
+    mm.session.summonMarks(mm.session.getState().contentIds.slice(), Date.now()); await wait(80);
+    const sizes64 = [...document.querySelectorAll('#summon .pill.item')].find((b) => /Show the sizes/.test(b.textContent));
+    const lead64 = t.readingLine();
+    if (sizes64) sizes64.click();
+    await wait(60);
+    mx.settle();
+    step('64c. the field offers Show the sizes for the marks held, and Enter would take it; taking it says the answer in the status line and leaves the sizes showing',
+      !!sizes64 && /Show the sizes/.test(lead64) && /25\.30/.test(say64()) && chipsOf('side').length === 1,
+      { offered: !!sizes64, line: lead64, status: say64(), chips: chipsOf('side').length });
+
+    // = is a sum: the line says the result before Enter; Enter puts the words on the board as text, one act.
+    t.typeIn('= 24 ÷ 3'); await wait(30);
+    const eqLine64 = t.readingLine();
+    const textsBefore64 = mm.session.getState().artifacts.length;
+    t.typeEnter('= 24 ÷ 3'); await wait(80);
+    const stNow64 = mm.session.getState();
+    const sum64 = stNow64.artifacts.map((id) => { const rep = codeRepOfNode(stNow64.nodes.get(id)); return rep && rep.data.kind === 'text' ? rep.data.code : null; }).filter((c) => c === '24 ÷ 3 = 8');
+    const evs64 = mm.session.getEvents().length;
+    mm.session.undo(); await wait(40);
+    step('64d. typing = 24 ÷ 3 in the field says 24 ÷ 3 = 8 before Enter, and Enter puts it on the board as text — one act, one undo',
+      eqLine64 === '↵ 24 ÷ 3 = 8 — put it on the board as text' && sum64.length === 1 && stNow64.artifacts.length === textsBefore64 + 1 && mm.session.getState().artifacts.length === textsBefore64 && mm.session.getEvents().length < evs64,
+      { line: eqLine64, made: sum64, artifacts: [textsBefore64, stNow64.artifacts.length, mm.session.getState().artifacts.length] });
+    { const s0 = mm.session.getState(); if (s0.summon) mm.session.dismiss(s0.summon.id, Date.now()); }
+
+    // A page: each step shows its check, beside its own line.
+    fresh64();
+    const APRON64 = ['A. Bust 36', 'B. Top to waist 20', 'C. Top to bottom 46', 'Add seam allowance', '1. A ÷ 3 = 12 + 2 = 14', '2. ① ÷ 2 = 14 ÷ 2 = 7', '3. B 20 + 2 = 22', '4. C 48', '5. A 38"', '6. (C × 2) − B 72"'];
+    const page64 = mm.typeText({ x: 420, y: 140 }, APRON64.join('\n'), { w: 360, h: 300 });
+    await wait(100);
+    const stepTexts64 = () => Object.fromEntries(chipsOf('step').map((c) => [c.key, c.text]));
+    const first64 = stepTexts64();
+    const ys64 = chipsOf('step').map((c) => c.y);
+    step('64e. the sample page’s steps each show their check beside their own line: 14″, 7″ and 22″ agree, 4 and 5 and 6 agree with their allowance and say the other reading',
+      Object.keys(first64).length === 6 && first64['step:1'] === '✓ 14″' && first64['step:2'] === '✓ 7″' && first64['step:3'] === '✓ 22″' && first64['step:4'] === '✓ 48″ · or 46″'
+        && first64['step:6'] === '✓ 72″ · or 74″' && ys64.every((y, i) => !i || y > ys64[i - 1]) && chipsOf('step').every((c) => c.x >= 780),
+      { steps: first64, ys: ys64 });
+    sameAsWhole('the page’s step chips — the maths');
+    // Changing A changes what depends on it: 1, 2 and 5 — and nothing else.
+    const page38 = APRON64.map((l) => (l === 'A. Bust 36' ? 'A. Bust 38' : l)).join('\n');
+    mm.editText(page64, page38); await wait(80);
+    const second64 = stepTexts64();
+    const changed64 = Object.keys(second64).filter((k) => second64[k] !== first64[k]).sort();
+    step('64f. changing A from 36 to 38 changes exactly steps 1, 2 and 5 — the others stand — and a step now off says what it computes and what was written',
+      JSON.stringify(changed64) === JSON.stringify(['step:1', 'step:2', 'step:5']) && /^✗ 14\.67″ · written /.test(second64['step:1']),
+      { changed: changed64, now: second64 });
+    mm.session.undo(); await wait(80);
+    step('64f2. undo puts every chip back as it was', JSON.stringify(stepTexts64()) === JSON.stringify(first64), stepTexts64());
+
+    // Export at true size: an SVG whose root is in paper units, and a print tiled onto pages.
+    fresh64();
+    drawTriangle();
+    label64('24″', legBox); label64('8″', upBox);
+    await wait(80);
+    const svg64 = mx.trueSizeSvg();
+    const job64 = mx.printJob();
+    const row64 = document.querySelector('#exportPanel [data-mathsout="svg"]');
+    step('64g. the export pane has a row for the figure at true size: an SVG whose root width and height are in paper inches, and a print tiled onto pages with a test square on each',
+      !!svg64 && /^<svg[^>]* width="[\d.]+in" height="[\d.]+in"/.test(svg64) && !!job64 && job64.pages > 0 && /1 in/.test(job64.testSquare) && !!row64 && !row64.disabled,
+      { root: svg64 && svg64.slice(0, 120), pages: job64 && job64.pages, square: job64 && job64.testSquare, row: !!row64 });
+    // A board with nothing to draw says so in the row rather than downloading an empty file.
+    fresh64(); await wait(40);
+    const emptyRow64 = document.querySelector('#exportPanel [data-mathsout="svg"]');
+    step('64g2. with no labelled figure the row is there and says why it waits', !!emptyRow64 && emptyRow64.disabled && /label/i.test(emptyRow64.title) && mx.trueSizeSvg() === null, emptyRow64 && emptyRow64.title);
+    fresh64();
+  }
+
   return R;
 };
 
