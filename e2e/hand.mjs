@@ -371,6 +371,101 @@ export async function runHand(browser, servers, { freshContext, screenshot }) {
         opened && (shown || items.length > 0), { opened, items });
     });
 
+
+    let boxC = null;
+    await record('H1.11', async () => {
+      await stroke(page, rect(700, 520, 90, 60));
+      boxC = (await page.evaluate(tabNow)).last;
+      await lookUntil((l) => !!markLine(l, boxC));
+      const before = await page.evaluate(tabNow);
+      await page.click('#undoBtn');
+      const undone = await waitFor(page, (id) => !window.__mm.session.getState().nodes.has(id) || window.__mm.session.getState().nodes.get(id).reps.some((r) => r.modality === 'erased'), boxC, 5000);
+      const look = await lookUntil((l) => !markLine(l, boxC));
+      await stroke(page, circle(900, 540, 35));
+      const next = (await page.evaluate(tabNow)).last;
+      const num = (id) => Number(String(id).split(':').pop());
+      check(`H1.11. §6 (synthetic strokes): one undo in the tab takes only his last mark (${boxC}) — the hand's look no longer lists it and still lists the circle, his box and his word; his next mark is ${next}, a new number and never the undone one's`,
+        undone && !markLine(look, boxC) && !!markLine(look, sun) && !!markLine(look, boxB) && !!markLine(look, word) && !!next && next !== boxC && num(next) > num(boxC) && before.marks === (await page.evaluate(tabNow)).marks,
+        { boxC, next, look: look.split('\n').slice(0, 8) });
+    });
+
+    await record('H1.12', async () => {
+      const own = textOf(await hand.call('canvas_label', { id: sun, text: 'sun' }));
+      const drawn = await waitFor(page, (id) => window.__mm.labelsDrawn().some((l) => l.id === id && l.text === 'sun'), sun, 5000);
+      const hers = await page.evaluate((id) => { const mm = window.__mm; const l = mm.labelsDrawn().find((x) => x.id === id); return { label: l, ink: mm.colourOf(id) }; }, sun);
+      const refused = textOf(await hand.call('canvas_label', { id: boxB, text: 'not mine' }));
+      await sleep(300);
+      const onBox = await page.evaluate((id) => { const mm = window.__mm; const n = mm.session.getState().nodes.get(id); const l = mm.MM.labelOf(n); return l ? l.text : null; }, boxB);
+      check(`H1.12. §6: the hand labels its own circle “sun” — it is drawn in the tab in the hand's colour (${hers.label && hers.label.colour} against ink ${hers.ink}); the same call on his box is refused, the reply naming whose ink it is ("${refused.slice(-70)}"), and nothing lands on the box (${onBox})`,
+        /“sun” on/.test(own) && drawn && !!hers.label && hers.label.colour === hers.ink && /john/.test(refused) && !/“not mine” on/.test(refused) && onBox === null, { own, refused, hers, onBox });
+    });
+
+    const fieldLine = (page) => page.evaluate(() => { const r = document.querySelector('#summon .reading'); return r ? r.textContent.trim() : ''; });
+    const typeInField = async (text) => { await page.fill('#summon input.filter', text); await sleep(80); };
+    await record('H1.13', async () => {
+      await stroke(page, rect(400, 150, 450, 200));
+      await stroke(page, tick(790, 300));
+      const held = await waitFor(page, (a) => { const s = window.__mm.session.getState().summon; return !!s && s.enclosedIds.includes(a[0]) && s.enclosedIds.includes(a[1]); }, [boxB, sun], 5000);
+      await typeInField('label: inlet');
+      const line = await fieldLine(page);
+      await page.keyboard.press('Enter');
+      await sleep(200);
+      const labels = await page.evaluate(([a, b]) => { const mm = window.__mm, s = mm.session.getState(); const t = (id) => { const l = mm.MM.labelOf(s.nodes.get(id)); return l ? l.text : null; }; return { box: t(a), sun: t(b) }; }, [boxB, sun]);
+      const look = await lookUntil((l) => /labelled “inlet”/.test(markLine(l, boxB) || ''));
+      check(`H1.13. §6 (synthetic strokes): his box and the hand's circle held, \`label: inlet\` — the line says "${line}" before Enter, and Enter puts inlet on his box alone (box ${labels.box}, circle ${labels.sun}); the hand's look: "${(markLine(look, boxB) || '').slice(0, 90)}"`,
+        held && line === '↵ label it “inlet” — on yours, not the mark claude made' && labels.box === 'inlet' && labels.sun === 'sun' && /labelled “inlet”/.test(markLine(look, boxB) || '') && /labelled “sun”/.test(markLine(look, sun) || ''),
+        { held, line, labels, look: markLine(look, boxB) });
+      await letGo(page);
+    });
+
+    let pair = null;
+    await record('H1.14', async () => {
+      await stroke(page, rect(1000, 150, 80, 60));
+      const p1 = (await page.evaluate(tabNow)).last;
+      await stroke(page, rect(1110, 150, 80, 60));
+      const p2 = (await page.evaluate(tabNow)).last;
+      await stroke(page, rect(960, 110, 270, 150));
+      await stroke(page, tick(1160, 225));
+      const held = await waitFor(page, (a) => { const s = window.__mm.session.getState().summon; return !!s && a.every((id) => s.enclosedIds.includes(id)); }, [p1, p2], 5000);
+      const drew = textOf(await hand.call('canvas_draw', { shapes: [{ shape: 'line', from: { x: WX + 1000, y: 320 }, to: { x: WX + 1200, y: 320 } }] }));
+      const line = (drew.match(/^(\S+) → /) || [])[1] || null;
+      await waitFor(page, (id) => !!window.__mm.session.getState().nodes.get(id), line, 5000);
+      await sleep(250);
+      const still = await page.evaluate(tabNow);
+      await typeInField('name: pair');
+      await page.keyboard.press('Enter');
+      await sleep(250);
+      const made = await page.evaluate(([a, b, l]) => {
+        const mm = window.__mm, MM = mm.MM, s = mm.session.getState();
+        const art = s.artifacts.map((id) => s.nodes.get(id)).find((n) => MM.wordOf(n) === 'pair');
+        return art ? { id: art.id, parts: art.edges.filter((e) => e.rel === 'has-part').map((e) => e.to), theLine: l } : null;
+      }, [p1, p2, line]);
+      pair = made && made.id;
+      const look = await lookUntil((l) => !!pair && !!markLine(l, pair));
+      check(`H1.14. §6 (synthetic strokes): two of his marks held and the field left open — the hand's line lands (${line}) and the field stays open on his two (${still.summon && still.summon.length}); \`name: pair\` and Enter make the thing, holding his two marks and nothing of the hand's; the hand's look: "${(markLine(look, pair) || '').slice(0, 80)}", its count line "${countLine(look)}"`,
+        held && !!line && still.summon && still.summon.length === 2 && !!made && made.parts.includes(p1) && made.parts.includes(p2) && !made.parts.includes(line)
+          && /“pair”/.test(markLine(look, pair) || '') && /by john/.test(markLine(look, pair) || '') && !/the field is open/.test(look),
+        { held, still, made, count: countLine(look) });
+      await letGo(page);
+    });
+
+    await record('H1.15', async () => {
+      await letGo(page);
+      await stroke(page, rect(430, 170, 220, 160));
+      const loopWaits = await page.evaluate(() => !!window.__mm.session.getState().pendingLassoId);
+      const drew = textOf(await hand.call('canvas_draw', { shapes: [{ shape: 'line', from: { x: WX + 660, y: 340 }, to: { x: WX + 700, y: 340 } }] }));
+      const hers = (drew.match(/^(\S+) → /) || [])[1] || null;
+      await waitFor(page, (id) => !!window.__mm.session.getState().nodes.get(id), hers, 5000);
+      await sleep(200);
+      const still = await page.evaluate(() => !!window.__mm.session.getState().pendingLassoId);
+      await stroke(page, tick(575, 270));
+      const held = await waitFor(page, () => !!window.__mm.session.getState().summon, null, 5000);
+      const now = await page.evaluate(tabNow);
+      check(`H1.15. §6 (synthetic strokes): he draws a loop round a mark and, before his check, the hand's stroke lands (${hers}) — his loop still waits (${loopWaits} → ${still}) and his check takes his loop up: the field opens on his mark (${JSON.stringify(now.summon)}) and not on the hand's line`,
+        loopWaits && still && held && !!now.summon && now.summon.includes(boxB) && !now.summon.includes(hers), { loopWaits, still, now, hers });
+      await letGo(page);
+    });
+
     check(`H1.Z. nothing the scenario opened reached for :8020, where a relay on this machine listens by default — ${toJohnsRelay.length} request${toJohnsRelay.length === 1 ? '' : 's'} refused`, toJohnsRelay.length === 0, toJohnsRelay.slice(0, 5));
   } catch (err) {
     check(`the scenario itself fell over: ${String(err && err.message ? err.message : err).split('\n')[0]}`, false, { stack: String(err && err.stack) });
