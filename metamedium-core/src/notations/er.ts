@@ -49,8 +49,7 @@ import { MAX_TIER0_CONFIDENCE } from '../recognition';
 import type { Notation, NotationConnector, NotationLabel, NotationReading, NotationSymbol } from './notation';
 import type { Candidate } from './flowchart';
 import { figureCandidate, mayBeSide, strokeCandidate } from './flowchart';
-import { outside } from './shape';
-import { centreOf, countWord, joinSymbols, labelWriting, marksOf, mean, ownWords, rolesOf, symbolOf, writingOf } from './graph-kit';
+import { centreOf, countWord, joinSymbols, labelWriting, lineAcross, marksOf, mean, ownWords, rolesOf, symbolOf, writingOf } from './graph-kit';
 import { insideOf, isBox, portsFor, stateShape } from './state';
 
 // ===== The table — the ER diagram's content =====
@@ -130,9 +129,6 @@ export const MULTIPLICITY_SHARE = 0.3;
 export const MIDDLE_SHARE = 0.34;
 /** A mark this small in the hand's space (screen pixels, longest side) is writing, however the shape rung read it. */
 export const LETTER_PX = 40;
-/** A line lies across a box, as a class's compartment line does, when this share of its ink stands within this share of the box's size of it — a line that crosses the box or bows round it does not. */
-export const INSIDE_SHARE = 0.85;
-export const INSIDE_SLACK = 0.05;
 /** A per-mark reading below this offers no ports: the pen should not feel a guess. */
 export const PORTS_FLOOR = 0.4;
 
@@ -297,17 +293,7 @@ export function readEr(state: SessionState, scopeIds?: readonly string[]): ErRea
   for (const a of boxes) for (const b of boxes) if (a !== b && insideOf(a, b)) containers.add(a);
   const candidates = boxes.filter((c) => !containers.has(c));
   const lines = open.filter((id) => !inFigure.has(id) && resemblances(nodes.get(id)!)[0]?.to !== 'type:arrow');
-  const compartmented = (c: Candidate) =>
-    lines.some((id) => {
-      const pts = strokePointsOf(nodes.get(id)!);
-      if (!pts || pts.length < 2) return false;
-      const b = boundsOf(nodes.get(id)!)!;
-      // A line across a box lies wholly inside it; one that crosses it, or bows round it, does not.
-      const slack = INSIDE_SLACK * c.outline.size;
-      const within = pts.filter((p) => outside(p, c.outline.hull) <= slack).length / pts.length;
-      const short = Math.min(c.outline.bounds.maxX - c.outline.bounds.minX, c.outline.bounds.maxY - c.outline.bounds.minY);
-      return within >= INSIDE_SHARE && sizeOf(b) >= 0.5 * short;
-    });
+  const compartmented = (c: Candidate) => lines.some((id) => lineAcross(c, strokePointsOf(nodes.get(id)!) ?? []));
   const classLike = candidates.filter(compartmented);
   const entities = candidates.filter((c) => !classLike.includes(c));
   if (entities.length < 2) return null;

@@ -6,10 +6,12 @@
 // says them: a node is its shape's stroke (`stroke_1`), its words in the
 // shape's own delimiters — `((…))` for a circle, `[…]` for a box — every label
 // quoted. The tree is what the indentation says: the centre first, then each
-// node's branches nested one level in, taken clockwise from the top round the
-// node they leave — Food (up and right), Travel (down and right), Sleep (left)
-// — so a hand's map and the text agree on which branch comes first. Writing
-// nobody has read is written "(unread writing)".
+// node's branches nested one level in, in the order a hand reads round the
+// node they leave — clockwise from the top round the centre: Food (up and
+// right), Travel (down and right), Sleep (left); round any other node
+// clockwise from the way it faces, away from its parent: Pizza (up) before
+// Ramen (down) — so a hand's map and the text agree on which branch comes
+// first. Writing nobody has read is written "(unread writing)".
 
 /** The board before anybody has read the writing. */
 export const MINDMAP_MERMAID_UNREAD = `mindmap

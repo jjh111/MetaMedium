@@ -902,3 +902,34 @@ export type { ErReading, ErEntity, ErRelationship, ErEnd, ErWriting, Cardinality
 // each end carrying its multiplicity, the verb on the line.
 export { writeEr, readErText, ER_READER, cardinalityOfToken } from './notations/er-mermaid';
 export type { ErDiagramRead, ErNodeRead, ErLinkRead, DrawnErLink } from './notations/er-mermaid';
+
+// The mind map (V1-PLAN §3, D6): a node is a circle or a box with its word
+// written in it, a branch a plain line between two of them, the root the most
+// central node of the tree. What makes it a mind map rather than an ER
+// diagram's boxes or a molecule's bubbles is a word in every node, a hub with
+// branches that go on past it, and lines with nothing beside them. Its content
+// is MINDMAP_TABLE, which the mindmap@1 pack names; its `mindmap` writer and
+// reader are mindmap-mermaid.ts, registered with D2's writers and D3's readers.
+export {
+  MINDMAP,
+  MINDMAP_TABLE,
+  readMindMap,
+  mindMapPortsOf,
+  clockwiseFromTop,
+  shapeTokens,
+  EVIDENCE as MINDMAP_EVIDENCE,
+  PLAIN_SHARE as MINDMAP_PLAIN_SHARE,
+  WRITTEN_PENALTY,
+  HEADED_PENALTY as MINDMAP_HEADED_PENALTY,
+  CLASSLIKE_PENALTY as MINDMAP_CLASSLIKE_PENALTY,
+  LOOP_PENALTY,
+  LETTER_PX as MINDMAP_LETTER_PX,
+} from './notations/mindmap';
+export type { MindMapReading, MindMapNode, MindMapBranch, MindMapWriting, MindMapShape } from './notations/mindmap';
+// The mind map in Mermaid, both ways (D6): `mindmap` written from a reading —
+// the tree as indentation, each node its id and its words in its shape's
+// brackets — and read back and drawn as ink the notation reads: the root at the
+// middle and the tree fanned round it, nodes with their words on their own ink,
+// plain branches bound at both ends.
+export { writeMindMap, readMindMapText, MINDMAP_READER } from './notations/mindmap-mermaid';
+export type { MindMapDiagramRead, MindMapNodeRead, MindMapLinkRead, DrawnMindMapLink } from './notations/mindmap-mermaid';

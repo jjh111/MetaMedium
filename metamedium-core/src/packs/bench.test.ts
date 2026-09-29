@@ -4,7 +4,7 @@
 // recognition corpus's single marks (every shape every way a hand draws it,
 // boxes turned, arcs of every sweep), the flowchart bench's thirty-six
 // flowcharts, its wireframes and lines of writing, the class-diagram bench's
-// boards (D4), the sequence board every way it is drawn (D5), the state board (D5's state half), the ER board (D6), a row of boxes and a hub.
+// boards (D4), the sequence board every way it is drawn (D5), the state board (D5's state half), the ER board and the mind-map board (D6), a row of boxes and a hub.
 // A canonical molecule in the corpus says what it is, and must be read as one.
 //
 // A false read is a match above the floor on a drawing that is neither
@@ -21,6 +21,7 @@ import { CLASS_VARIANTS, drawClassDiagram, drawClassPair } from '../notations/fi
 import { SEQUENCE_VARIANTS, drawSequence } from '../notations/fixtures/sequence';
 import { STATE_VARIANTS, drawState } from '../notations/fixtures/state';
 import { ER_VARIANTS, drawEr } from '../notations/fixtures/er';
+import { MINDMAP_VARIANTS, drawMindMap } from '../notations/fixtures/mindmap';
 import { benchCorpus, packBench, type BenchDrawing, type PackBenchResult } from './bench';
 import { shippedPacks } from './registry';
 import { packRef } from './pack';
@@ -47,6 +48,8 @@ function corpus(): BenchDrawing[] {
   STATE_VARIANTS.filter((_, i) => i % 4 === 0).forEach((v) => out.push({ label: `A4 seed ${v.seed} dot ${v.dot} final ${v.final}`, strokes: strokesOf((s) => drawState(s, v)) }));
   // The ER bench's board (D6): entities with names, plain lines, a multiplicity at each end, a verb beside each.
   ER_VARIANTS.filter((_, i) => i % 6 === 0).forEach((v) => out.push({ label: `A5 seed ${v.seed} jitter ${v.jitter} tilt ${v.tilt}`, strokes: strokesOf((s) => drawEr(s, v)) }));
+  // The mind-map bench's board (D6): a centre, three branches, two with leaves, a word in every node.
+  MINDMAP_VARIANTS.filter((_, i) => i % 6 === 0).forEach((v) => out.push({ label: `A6 seed ${v.seed} jitter ${v.jitter} tilt ${v.tilt}`, strokes: strokesOf((s) => drawMindMap(s, v)) }));
   for (const seed of [1, 2, 3, 4, 5, 6]) {
     out.push({ label: `wireframe ${seed}`, strokes: strokesOf((s) => drawWireframe(s, seed)) });
     out.push({ label: `writing ${seed}`, strokes: strokesOf((s) => drawWriting(s, seed)) });

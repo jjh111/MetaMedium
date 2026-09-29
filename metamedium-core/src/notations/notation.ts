@@ -44,6 +44,7 @@ import { UML_CLASS } from './uml-class';
 import { SEQUENCE } from './sequence';
 import { STATE } from './state';
 import { ER } from './er';
+import { MINDMAP } from './mindmap';
 
 /** A symbol a notation knows, and which of the six roles it plays. */
 export interface NotationSymbolDef {
@@ -312,3 +313,4 @@ registerNotation(UML_CLASS);
 registerNotation(SEQUENCE);
 registerNotation(STATE);
 registerNotation(ER);
+registerNotation(MINDMAP);

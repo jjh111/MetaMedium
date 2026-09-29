@@ -353,6 +353,31 @@ export function notesFor(
   return notes;
 }
 
+/**
+ * Whether a line lies across a box, as a class's compartment line does: this
+ * share of its ink stands within this share of the box's size of the box's
+ * outline, and it is at least half as long as the box's short side. A line
+ * that crosses the box, or bows round it, does not.
+ */
+export const INSIDE_SHARE = 0.85;
+export const INSIDE_SLACK = 0.05;
+export function lineAcross(c: Candidate, ink: readonly Point[]): boolean {
+  if (ink.length < 2) return false;
+  const slack = INSIDE_SLACK * c.outline.size;
+  const within = ink.filter((p) => outside(p, c.outline.hull) <= slack).length / ink.length;
+  const b = boundsOfPoints(ink);
+  const short = Math.min(c.outline.bounds.maxX - c.outline.bounds.minX, c.outline.bounds.maxY - c.outline.bounds.minY);
+  return within >= INSIDE_SHARE && Math.max(b.maxX - b.minX, b.maxY - b.minY) >= 0.5 * short;
+}
+
+/** What a piece of writing says for a writer: its read words, then the placeholder once for any piece not read — unless the surface reads it with its line (`readWith`). Null when there is none. */
+export function saidWriting(w: { text?: string; unread: readonly string[] } | undefined, opts: MermaidOptions): { text: string | null; unread: string[] } {
+  if (!w) return { text: null, unread: [] };
+  const missing = w.unread.filter((id) => !opts.readWith?.(id));
+  const parts = [...(w.text ? [w.text] : []), ...(missing.length ? [UNREAD_WRITING] : [])];
+  return { text: parts.length ? parts.join(' ') : null, unread: missing };
+}
+
 /** Symbol-shaped things a notation builds from candidates. */
 export function symbolOf(c: Candidate, symbol: string, role: Role, confidence: number, reason: string, ports: NotationSymbol['ports'], words: string | undefined, readings?: NotationSymbol['readings']): NotationSymbol {
   return {

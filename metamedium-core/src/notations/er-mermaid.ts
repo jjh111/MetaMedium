@@ -54,9 +54,9 @@ import { MERMAID_MAX_LINKS, MERMAID_MAX_NODES, MERMAID_TEXT_PX, arcThrough, regi
 import { layoutLayered } from './layered';
 import type { Standing } from './box-routing';
 import { outward, routeBoxes, SIDES } from './box-routing';
-import type { Cardinality, ErReading, ErWriting } from './er';
+import type { Cardinality, ErReading } from './er';
 import { ER_TABLE, cardinalityOf, erPortsOf, readEr } from './er';
-import { countWord, someWords } from './graph-kit';
+import { countWord, saidWriting, someWords } from './graph-kit';
 import { clamp, pointAtShare, besideContent, scaled, shareAt, spanOf, unit } from './state-mermaid';
 import type { Span } from './state-mermaid';
 
@@ -79,14 +79,6 @@ function leanOf(lines: readonly (readonly [Point, Point])[]): number {
   if (!angles.length) return 0;
   const m = angles[Math.floor(angles.length / 2)];
   return Math.abs(m) <= MAX_LEAN ? m : 0;
-}
-
-/** The words of a piece of writing, or null when there is none: its read words, then the placeholder for any piece not read (once), unless the surface reads it with its line. */
-function said(w: ErWriting | undefined, opts: MermaidOptions): { text: string | null; unread: string[] } {
-  if (!w) return { text: null, unread: [] };
-  const missing = w.unread.filter((id) => !opts.readWith?.(id));
-  const parts = [...(w.text ? [w.text] : []), ...(missing.length ? [UNREAD_WRITING] : [])];
-  return { text: parts.length ? parts.join(' ') : null, unread: missing };
 }
 
 /**
@@ -140,7 +132,7 @@ export function writeEr(reading: NotationReading, opts: MermaidOptions = {}): Me
   const blank: string[] = [];
   for (const s of ordered) {
     const m = idOf.get(s.id)!;
-    const w = said(s.name, opts);
+    const w = saidWriting(s.name, opts);
     if (w.unread.length) {
       unread.push({ where: `the name of ${m}`, ids: w.unread });
       w.unread.forEach((id) => unreadIds.add(id));
@@ -160,7 +152,7 @@ export function writeEr(reading: NotationReading, opts: MermaidOptions = {}): Me
     const a = idOf.get(k.from)!, b = idOf.get(k.to)!;
     const tokens = (['from', 'to'] as const).map((at) => {
       const side = k.sides[at];
-      const w = said(side.multiplicity, opts);
+      const w = saidWriting(side.multiplicity, opts);
       if (w.unread.length) {
         unread.push({ where: `the multiplicity at ${at === 'from' ? a : b} on ${a} — ${b}`, ids: w.unread });
         w.unread.forEach((id) => unreadIds.add(id));
@@ -173,7 +165,7 @@ export function writeEr(reading: NotationReading, opts: MermaidOptions = {}): Me
       }
       return T.cardinalities[card][at === 'from' ? 'left' : 'right'];
     });
-    const v = said(k.verb, opts);
+    const v = saidWriting(k.verb, opts);
     if (v.unread.length) {
       unread.push({ where: `the verb of ${a} — ${b}`, ids: v.unread });
       v.unread.forEach((id) => unreadIds.add(id));

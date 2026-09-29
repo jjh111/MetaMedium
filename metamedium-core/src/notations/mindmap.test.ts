@@ -93,7 +93,7 @@ describe('A6 — a mind map: a centre, three branches, two with leaves, a word i
         const got = nodeFor(r, want.box[0])!;
         expect(got.parent, `${name}'s parent`).toBe(want.parent ? idOf[want.parent] : undefined);
       }
-      // Branches out of a node, clockwise from the top: Food, Travel, Sleep round Trip; Pizza above Ramen.
+      // Branches out of a node, clockwise from the top round the centre and from the way it faces round any other: Food, Travel, Sleep round Trip; Pizza before Ramen.
       const kids = (name: string) => (ns.find((x) => x.id === idOf[name])!.children);
       expect(kids('Trip')).toEqual([idOf.Food, idOf.Travel, idOf.Sleep]);
       expect(kids('Food')).toEqual([idOf.Pizza, idOf.Ramen]);
