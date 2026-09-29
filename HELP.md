@@ -16,6 +16,11 @@ The canvas reads every mark as you draw it. Nothing asks a model until you do.
 
 A tap on empty ground lets go of whatever is held.
 
+New here? On an empty board the panel offers **start from an example**: a
+board of your own opens with a molecule already drawn — hold it and see what
+the canvas reads it as. **More examples** opens the boards pane, where a
+flowchart, a class diagram and a pattern page wait too.
+
 ## The field
 
 - **The four round buttons**, always in the same place: **Name** (make the
@@ -92,7 +97,7 @@ asked only when you ask — never while you draw.
   in this room** first when Claude is here, a model on this machine (Ollama or
   LM Studio, found by itself, one suggested per job), or a hosted one by its
   key. A key stays on this device, and only if you tick *remember*.
-- **Claude**: *controls › live › with Claude* joins the room Claude Code is in
+- **Claude**: *controls › Helpers › live › with Claude* joins the room Claude Code is in
   and makes Claude the one who reads for you.
 - Ask with no model here and the ask is **kept**: the field says what it needs,
   and it runs when one joins.
@@ -103,10 +108,23 @@ asked only when you ask — never while you draw.
 
 **controls › Board › boards**: a new board, one from a file, rename,
 duplicate, delete. Delete puts a board in the trash; *restore* brings it back
-whole. **reset** is a fresh board — the old one goes to the trash. Every
+whole. **reset** is a fresh board — the old one goes to the trash. Under
+*examples*, a flowchart (with its Mermaid beside it), a class diagram, a
+molecule and a pattern page: opening one makes a new board of your own from
+it — the example itself never changes, so draw on it freely. Every
 board is kept in this browser as you draw; **export** writes it out as SVG, PNG
 or its log — and, when what you hold or the board reads as a diagram, as Mermaid
 text — and **folder** makes a folder on your computer the canvas.
+
+## Packs
+
+**controls › Helpers › packs** lists premade drawings a board can use.
+*Basics* knows a bubble (a circle on its own) and a molecule (three bubbles
+joined by two bonds): use it and the field names what you draw — *molecule
+0.92 · Basics* — with nothing taught by you. *Flowchart*, *UML class diagram*
+and *Sequence diagram* name the diagrams the canvas reads and make what goes
+with them likelier first. A board keeps the packs it uses; *stop using* puts
+one back, and **undo** takes either back.
 
 ## Live rooms
 
