@@ -139,7 +139,7 @@ const FINAL = { cx: 940, cy: 150, r: 20 };
 const PIVOT = { x: 520, y: 240 };
 
 /** Draw the state board on a session. Returns what it should read as. */
-export function drawState(s: Session, v: StateVariant, t0 = 1000): StateExpected {
+export function drawState(s: Session, v: StateVariant, t0 = 1000, o: { quick?: boolean; round?: number } = {}): StateExpected {
   let t = t0;
   const c = Math.cos((v.tilt * Math.PI) / 180), sn = Math.sin((v.tilt * Math.PI) / 180);
   const turn = (p: Point): Point => ({ x: PIVOT.x + (p.x - PIVOT.x) * c - (p.y - PIVOT.y) * sn, y: PIVOT.y + (p.x - PIVOT.x) * sn + (p.y - PIVOT.y) * c });
@@ -153,19 +153,21 @@ export function drawState(s: Session, v: StateVariant, t0 = 1000): StateExpected
   // 1. The states, first on every hand: rounded boxes.
   const box = (name: keyof typeof BOX, k: number) => {
     const b = BOX[name];
-    return draw(handShape(boxCorners(b.cx, b.cy, b.w, b.h), { seed: seed(k), jitter: j, startAt: start(k), round: 0.3 }));
+    return draw(handShape(boxCorners(b.cx, b.cy, b.w, b.h), { seed: seed(k), jitter: j, startAt: start(k), round: o.round ?? 0.3 }));
   };
   const idle = box('Idle', 1), running = box('Running', 2), paused = box('Paused', 3);
 
   // 2. The initial dot and the final state.
   const initial = [draw(filledDot(DOT.cx, DOT.cy, DOT.r, { style: v.dot, seed: seed(4), jitter: 0.6 }))];
   const final = [draw(handCircle(FINAL.cx, FINAL.cy, FINAL.r, { seed: seed(5), jitter: Math.min(j, 2) }))];
+  // What is inside the ring: drawn seconds after it, or — `quick` — right after it, when the letter rules gather the two into a word.
+  const gap = o.quick ? 300 : 4000;
   final.push(
     v.final === 'filled'
-      ? draw(filledDot(FINAL.cx, FINAL.cy, 9, { style: v.seed % 2 ? 'spiral' : 'zigzag', seed: seed(6), jitter: 0.5 }))
+      ? draw(filledDot(FINAL.cx, FINAL.cy, 9, { style: v.seed % 2 ? 'spiral' : 'zigzag', seed: seed(6), jitter: 0.5 }), gap)
       : v.final === 'tap'
-        ? draw(handDot(FINAL.cx, FINAL.cy, 5, { seed: seed(6) }))
-        : draw(handCircle(FINAL.cx, FINAL.cy, 10, { seed: seed(6), jitter: 1 }))
+        ? draw(handDot(FINAL.cx, FINAL.cy, 5, { seed: seed(6) }), gap)
+        : draw(handCircle(FINAL.cx, FINAL.cy, 10, { seed: seed(6), jitter: 1 }), gap)
   );
 
   // 3. The transitions.

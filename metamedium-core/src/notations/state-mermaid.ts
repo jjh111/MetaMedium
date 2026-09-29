@@ -51,7 +51,7 @@
 
 import type { Bounds, Point } from '../types';
 import type { Session } from '../session/session';
-import { getRep } from '../session/nodes';
+import { boundsOf, getRep } from '../session/nodes';
 import { magnetSites } from '../session/magnets';
 import { alongIndex } from '../session/ports';
 import { strokeFor } from '../session/synthesize';
@@ -378,7 +378,10 @@ export function readStateText(text: string): StateDiagramRead {
   const finals = nodes.filter((n) => n.symbol === 'final').length;
   if (nodes.some((n) => n.symbol === 'initial') && nodes.filter((n) => n.symbol === 'initial').length > 1) said.push('every [*] a transition leaves is one start');
   if (finals > 1) said.push('every [*] a transition arrives at is one end');
-  return { keyword, notation: keyword ? T.notation : null, direction, nodes, links, notes: said, refused: refused.sort((x, y) => x.line - y.line) };
+  // The initial dot first and the final ring last, the states between in the order the text names them: the layered layout keeps the
+  // text's order as the reading order, and the writer writes the initial first and the final last as the drawing stands them.
+  const ordered = [...nodes.filter((n) => n.symbol === 'initial'), ...nodes.filter((n) => n.symbol === 'state'), ...nodes.filter((n) => n.symbol === 'final')];
+  return { keyword, notation: keyword ? T.notation : null, direction, nodes: ordered, links, notes: said, refused: refused.sort((x, y) => x.line - y.line) };
 }
 
 // ===== In: drawing a read state diagram =====
@@ -644,6 +647,15 @@ function drawStateRead(session: Session, read: MermaidRead, opts: DrawMermaidOpt
   /** Where an end is bound: a site the mark offers at the place wanted, else a place along the state's border, else nowhere. */
   const endAt = (id: string, want: Point, port: string): { end: DrawnEnd; bound: boolean } => {
     const nodeId = ids[id];
+    // A dot scribbled solid offers no site of its own but its bounds' corners: its four cardinals are the notation's ports (statePortsOf).
+    if (symbolOf.get(id) === 'initial') {
+      const b = boundsOf(st().nodes.get(nodeId)!);
+      const k = ({ top: 0, right: 1, bottom: 2, left: 3 } as Record<string, number>)[port] ?? 0;
+      if (b) {
+        const at = [{ x: (b.minX + b.maxX) / 2, y: b.minY }, { x: b.maxX, y: (b.minY + b.maxY) / 2 }, { x: (b.minX + b.maxX) / 2, y: b.maxY }, { x: b.minX, y: (b.minY + b.maxY) / 2 }][k];
+        return { end: { nodeId, site: { kind: `port:${T.notation}`, index: k }, of: 'notation', port, point: at }, bound: true };
+      }
+    }
     const site = near(id, want, 0.3 * U);
     if (site) return { end: { nodeId, site: { kind: site.kind, index: site.index }, of: 'mark', port, point: site.point }, bound: true };
     const span = symbolOf.get(id) === 'state' ? spanOfNode(id) : null;
@@ -675,7 +687,7 @@ function drawStateRead(session: Session, read: MermaidRead, opts: DrawMermaidOpt
       const S = a.end.point, E = z.end.point;
       const out = (p: Point): Point => ({ x: p.x + n.x * h, y: p.y + n.y * h });
       const wing = (s: number): Point => ({ x: E.x + n.x * bb * Math.cos(Math.PI / 6) + tangent.x * s * bb * Math.sin(Math.PI / 6), y: E.y + n.y * bb * Math.cos(Math.PI / 6) + tangent.y * s * bb * Math.sin(Math.PI / 6) });
-      const id = session.addStroke(inkAlong([S, out(S), out(E), E, wing(-1), E, wing(1)], step), next(), pid, scale, { content: true });
+      const id = session.addStroke(inkAlong([S, out(S), out(E), E, wing(-1), E, wing(1), E], step), next(), pid, scale, { content: true });
       for (const [end, e] of [['start', a], ['end', z]] as const) if (e.bound) session.bind({ strokeId: id, nodeId: e.end.nodeId, site: e.end.site, end, at: next(), participantId: pid });
       if (!a.bound || !z.bound) unbound.push(`${l.from} --> ${l.to}`);
       if (label) session.label({ nodeId: id, text: label, participantId: pid, at: next() });
@@ -728,7 +740,7 @@ function drawStateRead(session: Session, read: MermaidRead, opts: DrawMermaidOpt
     notes.push(`the transition ${l.from} --> ${l.to} closes a cycle (${bk.cycle.join(' → ')}), and runs back against the direction`);
   }
   if (!layout.kept && links.some((l) => !l.self)) notes.push(`every transition runs within a rank, so read back the drawing will say ${r.direction === 'LR' ? 'down (the default)' : 'across (LR)'}`);
-  if (nodes.some((x) => x.symbol === 'final')) notes.push('the final [*] is drawn as a ring round a scribbled dot, read back as a final state');
+  if (nodes.some((x) => x.symbol === 'final')) notes.push('the final [*] is drawn as a ring round a scribbled dot, which reads as a final state');
   if (placeholder.length) notes.push(`“${UNREAD_WRITING}” is what D2 writes for writing nobody has read: it is put on the ink as the words, since the words are not known — ${someWords(placeholder)}`);
 
   const lb = layout.bounds;

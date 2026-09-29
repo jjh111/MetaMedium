@@ -53,7 +53,7 @@
 import type { Point } from '../types';
 import type { SessionState } from '../session/session';
 import type { MMNode } from '../session/nodes';
-import { fingerprintOf, getRep, isWord, resemblances, strokePointsOf, transcriptOf } from '../session/nodes';
+import { fingerprintOf, getRep, isWord, lettersOf, resemblances, strokePointsOf, transcriptOf } from '../session/nodes';
 import type { NotationPort, NotationPorts } from '../session/ports';
 import { activeBindingsOf } from '../session/magnets';
 import { cleanOf, cleanPointsOf } from '../session/clean';
@@ -124,6 +124,8 @@ export const ROUNDED_BY = [0.8, 0.92] as const;
 export const ROUNDED_EXTENT = [0.82, 0.9] as const;
 /** …and stands square to the page within this many degrees, as a box does (flowchart.ts's UPRIGHT is its own). */
 export const ROUNDED_UPRIGHT = [12, 33] as const;
+/** With no dot, ring or loop, states mostly round-cornered are still read — under the floor, held — as a state diagram in waiting; plain boxes are the flowchart's and not read. */
+export const ROUND_ENOUGH = 0.5;
 /** A per-mark reading below this offers no ports: the pen should not feel a guess. */
 export const PORTS_FLOOR = 0.4;
 
@@ -134,9 +136,9 @@ export const PORTS_FLOOR = 0.4;
  * confidence of any one mark: how much more a state diagram this makes the
  * drawing than the boxes and arrows every diagram is made of.
  */
-export const EVIDENCE = { initial: 0.5, final: 0.5, loop: 0.35, rounded: 0.25 } as const;
+export const EVIDENCE = { initial: 0.6, final: 0.6, loop: 0.45, rounded: 0.25 } as const;
 /** With no evidence at all a board of boxes and arrows is this share as sure a state diagram as its structure makes it; evidence carries the rest. */
-export const PLAIN_SHARE = 0.3;
+export const PLAIN_SHARE = 0.25;
 /** A board with a flowchart's own symbols in it — a decision, a data symbol — is this much less a state diagram, at most, for a board of them alone. */
 export const FOREIGN_PENALTY = 0.75;
 
@@ -210,6 +212,42 @@ function compactCandidate(node: MMNode): Candidate | null {
   const o = outlineOf(m.pts);
   if (!o) return null;
   return { id: node.id, ids: [node.id], marks: [node.id], outline: o, scale: scaleOf(node), shapes: [{ symbol: 'round', score: compact, why: `a small mark, ${o.aspect.toFixed(1)}:1` }], lead: '', fit: 1 };
+}
+
+/**
+ * A ring and the mark inside it, drawn quickly, are small strokes in quick
+ * succession, one inside the other — which the letter rules (session/words.ts)
+ * gather into a word, as they do the halves of a diamond. The word's letters
+ * are read here as the bullseye they are: the largest a ring, another within
+ * it — or null. The candidate stands for the word, its strokes the letters.
+ */
+function bullseyeWord(word: MMNode, nodes: ReadonlyMap<string, MMNode>): Candidate | null {
+  const letters = lettersOf(word).filter((id) => nodes.has(id) && !getRep(nodes.get(id)!, 'erased'));
+  if (letters.length < 2 || letters.length > 3) return null;
+  const parts = letters.map((id) => {
+    const pts = strokePointsOf(nodes.get(id)!);
+    return { id, o: pts && pts.length >= 3 ? outlineOf(pts) : null };
+  });
+  if (parts.some((x) => !x.o)) return null;
+  const ring = [...parts].sort((a, b) => b.o!.size - a.o!.size)[0];
+  if (ring.o!.aspect > BLOB_ASPECT[0] || ring.o!.extent < 0.7) return null;
+  const cr = centreOf(ring.o!.bounds);
+  const inside = parts.filter((x) => x !== ring).every((x) => {
+    const share = x.o!.size / ring.o!.size;
+    const cx = centreOf(x.o!.bounds);
+    return share >= INNER_SHARE[0] && share <= INNER_SHARE[1] && outside(cx, ring.o!.hull) === 0 && Math.hypot(cx.x - cr.x, cx.y - cr.y) <= INNER_CENTRED * ring.o!.size;
+  });
+  if (!inside) return null;
+  return {
+    id: word.id,
+    ids: letters,
+    marks: [word.id, ...letters],
+    outline: ring.o!,
+    scale: scaleOf(nodes.get(ring.id)!),
+    shapes: [{ symbol: 'round', score: 1, why: 'a ring with a mark inside it' }],
+    lead: 'a ring with a mark inside it, which the letter rules gathered into a word',
+    fit: 1,
+  };
 }
 
 /**
@@ -362,15 +400,32 @@ let reading = 0;
 /**
  * What the state notation reads one mark as, on its own, and the ports its
  * symbol offers — the notation's side of E3's hook. A lone closed stroke
- * read as a box offers its border; anything else — a dot, a ring, a
- * transition, writing — offers nothing of its own (a circle's own sites are
- * the mark's). Re-entry answers nothing, so the hook never calls itself.
+ * read as a box offers its border, a spot filled solid (an initial dot in
+ * waiting, which the mark's own sites serve with its bounds' corners) its four
+ * cardinals; anything else — a ring, a transition, writing — offers nothing of
+ * its own (a circle's own sites are the mark's). Re-entry answers nothing, so
+ * the hook never calls itself.
  */
 export function statePortsOf(node: MMNode, nodes: ReadonlyMap<string, MMNode>): { symbol: string; ports: NotationPort[] } | null {
   if (reading > 0) return null;
   reading++;
   try {
     if (getRep(node, 'erased') || getRep(node, 'gesture') || isWord(node) || transcriptOf(node)) return null;
+    // A spot filled solid — an initial dot in waiting — takes a transition at its four cardinals.
+    const spot = blobCandidate(node);
+    if (spot && spot.shapes[0].score >= 0.5) {
+      const b = spot.outline.bounds;
+      const mid = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
+      return {
+        symbol: 'initial',
+        ports: [
+          { name: 'top', at: { x: mid.x, y: b.minY }, reasoning: 'the dot’s top' },
+          { name: 'right', at: { x: b.maxX, y: mid.y }, reasoning: 'the dot’s right' },
+          { name: 'bottom', at: { x: mid.x, y: b.maxY }, reasoning: 'the dot’s bottom' },
+          { name: 'left', at: { x: b.minX, y: mid.y }, reasoning: 'the dot’s left' },
+        ],
+      };
+    }
     const fp = fingerprintOf(node);
     if (!fp?.isClosed) return null;
     const c = strokeCandidate(node);
@@ -400,8 +455,15 @@ export function readState(state: SessionState, scopeIds?: readonly string[]): St
   const compacts = new Map<string, Candidate>();
   const writing = new Set<string>();
   const open: string[] = [];
+  const wordFinals: Candidate[] = [];
   for (const m of marks) {
-    if (isWord(m.node) || transcriptOf(m.node)) {
+    if (isWord(m.node)) {
+      const b = bullseyeWord(m.node, nodes);
+      if (b) wordFinals.push(b);
+      else writing.add(m.id);
+      continue;
+    }
+    if (transcriptOf(m.node)) {
       writing.add(m.id);
       continue;
     }
@@ -456,12 +518,12 @@ export function readState(state: SessionState, scopeIds?: readonly string[]): St
     taken.add(inner);
     finals.push({ c: ring, inner });
   }
-  const finalCandidates: Candidate[] = finals.map(({ c, inner }) => ({
+  const finalCandidates: Candidate[] = wordFinals.concat(finals.map(({ c, inner }) => ({
     ...c,
     ids: [c.id, inner.id],
     marks: [c.id, inner.id],
     lead: `a ring with ${rings.includes(inner) ? 'a second ring' : 'a mark'} inside it`,
-  }));
+  })));
   const lone = [...spots, ...rings].filter((c) => !taken.has(c));
   const hollow = lone.filter((c) => rings.includes(c) && smallness(c) >= 0.5);
   const dots = lone.filter((c) => spots.includes(c));
@@ -484,7 +546,8 @@ export function readState(state: SessionState, scopeIds?: readonly string[]): St
     const l = loopOf(nodes.get(id)!, states, nodes);
     if (l && (l.barbs.start || l.barbs.end)) loops.push(l);
   }
-  if (!pending.length && !finalCandidates.length && !loops.length) return null;
+  const roundish = mean(states.map((c) => (isBox(c) ? 1 - ramp(c.outline.four, ROUNDED_BY[0], ROUNDED_BY[1]) : 0)));
+  if (!pending.length && !finalCandidates.length && !loops.length && roundish < ROUND_ENOUGH) return null;
 
   // 6. Transitions: arrows between what stands; then the loops.
   const symbols = [...states, ...finalCandidates, ...pending];
@@ -574,7 +637,7 @@ export function readState(state: SessionState, scopeIds?: readonly string[]): St
 
   // 8. Labels: writing inside a state names it; beside a transition it is the event.
   const owned = new Set<string>();
-  for (const s of out) for (const id of s.ids) owned.add(id);
+  for (const s of out) for (const id of [...s.ids, ...symbolOfMarkIds(symbolOfMark, s.id)]) owned.add(id);
   for (const c of pending) if (!isPlaced.has(c)) for (const id of c.ids) if (writingOf(nodes.get(id)!)) writing.add(id);
   const labels = labelWriting(nodes, {
     marks,
