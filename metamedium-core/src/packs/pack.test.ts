@@ -378,6 +378,7 @@ describe('the pen: a pack naming a notation offers its ports while in use', () =
     expect(shippedPack('er@1')!.definitions).toEqual([]);
     expect(shippedPack('mindmap@1')!.notation).toBe('mindmap');
     expect(shippedPack('mindmap@1')!.definitions).toEqual([]);
+    expect(shippedPack('garment@1')!.notation).toBe('garment');
   });
 
   it('uml-class@1 in use puts each class’s four sides on the pen — a place along a side — and stopping takes them back (D4)', () => {
@@ -493,6 +494,17 @@ describe('the pen: a pack naming a notation offers its ports while in use', () =
     s.unuse('mindmap@1', next());
     expect(registeredPorts()).toEqual([]);
     expect(sites()).toEqual([]);
+    stop();
+  });
+
+  it('garment@1 in use puts nothing on the pen — a piece’s marks are not places a line is tied — and says so, and stopping changes nothing (M6)', () => {
+    const s = createSession();
+    const stop = followPacks(s);
+    s.use('garment@1', next(4000));
+    expect(s.getState().packs).toEqual(['garment@1']);
+    expect(registeredPorts()).toEqual([]);
+    s.unuse('garment@1', next());
+    expect(s.getState().packs).toEqual([]);
     stop();
   });
 });
