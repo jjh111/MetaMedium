@@ -21,8 +21,9 @@ import { WHAT } from './what';
 import { DUPLICATE } from './duplicate';
 import { KEEP } from './keep';
 import { STRUCTURE } from './structure';
+import { MERMAID } from './mermaid';
 
-export const BUILTIN_TOOLS = [CORRECT, TEXT, NAME, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES, TEXT_EDIT, VERBS, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE] as const;
+export const BUILTIN_TOOLS = [CORRECT, TEXT, NAME, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES, TEXT_EDIT, VERBS, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MERMAID] as const;
 
 registerTool(CORRECT);
 registerTool(TEXT);
@@ -41,3 +42,4 @@ registerTool(WHAT);
 registerTool(DUPLICATE);
 registerTool(KEEP);
 registerTool(STRUCTURE);
+registerTool(MERMAID);

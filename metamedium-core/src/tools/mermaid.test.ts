@@ -9,13 +9,15 @@ import { createSession, DEFAULT_SESSION_CONFIG, type Session } from '../session/
 import { boundsOf, LOCAL_PARTICIPANT } from '../session/nodes';
 import { rectStroke } from '../test/strokes';
 import { drawFlowchart, FLOWCHART_VARIANTS } from '../notations/fixtures/flowchart';
+import { drawClassDiagram, CLASS_VARIANTS } from '../notations/fixtures/uml-class';
+import { drawSequence, SEQUENCE_VARIANTS } from '../notations/fixtures/sequence';
 import { FLOWCHART_MERMAID_UNREAD, FLOWCHART_MERMAID_READ, FLOWCHART_WORDS } from '../notations/fixtures/flowchart.mermaid';
 import { offersFor, toolScope, takeOffer, getTool, registeredTools } from './registry';
 import { rankOffers } from './rank';
 import { BUILTIN_TOOLS } from './builtin';
 import { MERMAID } from './mermaid';
 
-const named = () => createSession({ ...DEFAULT_SESSION_CONFIG, logName: 'john' });
+const named = () => createSession(DEFAULT_SESSION_CONFIG);
 const hold = (s: Session, ids: string[], at = 900_000) => { s.summonMarks(ids, at); };
 const mermaidOf = (s: Session) => rankOffers(offersFor(toolScope(s))).find((o) => o.key === 'mermaid');
 
@@ -80,6 +82,22 @@ describe('the Mermaid tool', () => {
     hold(s, s.getState().contentIds.slice(), 960_000);
     takeOffer(mermaidOf(s)!, toolScope(s), s, 1_000_000);
     expect(artifactsOf(s)[0].code.code).toBe(FLOWCHART_MERMAID_READ);
+  });
+
+  it('a class diagram and a sequence diagram are offered too, in their own Mermaid', () => {
+    const c = named();
+    drawClassDiagram(c, CLASS_VARIANTS[0]);
+    hold(c, c.getState().contentIds.slice());
+    expect(mermaidOf(c)!.reason).toMatch(/UML class diagram/);
+    takeOffer(mermaidOf(c)!, toolScope(c), c, 1_000_000);
+    expect(artifactsOf(c)[0].code).toMatchObject({ kind: 'mermaid', path: 'uml-class.mmd' });
+    expect(artifactsOf(c)[0].code.code).toMatch(/^classDiagram\n/);
+    const q = named();
+    drawSequence(q, SEQUENCE_VARIANTS[0]);
+    hold(q, q.getState().contentIds.slice());
+    expect(mermaidOf(q)!.reason).toMatch(/sequence diagram/);
+    takeOffer(mermaidOf(q)!, toolScope(q), q, 1_000_000);
+    expect(artifactsOf(q)[0].code.code).toMatch(/^sequenceDiagram\n/);
   });
 
   it('is not offered twice for a text already standing on the board', () => {
