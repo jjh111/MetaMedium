@@ -299,6 +299,19 @@ describe('a routed connector', () => {
     expect(s.getEvents().length).toBe(n);
   });
 
+  it('a route whose end is let go stands no more — and stands again when the end is tied again', () => {
+    const s = chart('flowchart TD\n A[One] --> B[Two]');
+    const [id] = connectorsOf(s);
+    s.route({ ids: [id], at: at(1) });
+    const was = JSON.stringify(routeRepOf(nodeOf(s, id))!.points);
+    const tie = bindingsOf(nodeOf(s, id)).map((b) => ({ ...b }));
+    for (const b of tie) s.unbind({ strokeId: id, end: b.end as 'start' | 'end', at: at(2) });
+    // Routed still, as the log says, with nothing to route between: the ink is drawn.
+    expect(routeRepOf(nodeOf(s, id))!.points).toEqual([]);
+    for (const b of tie) s.bind({ strokeId: id, nodeId: b.nodeId, site: b.site, end: b.end as 'start' | 'end', at: at(3) });
+    expect(JSON.stringify(routeRepOf(nodeOf(s, id))!.points)).toBe(was);
+  });
+
   it('state is a pure function of the log: replayed whole, or from a checkpoint, every route is the same', () => {
     const s = chart(CHART, named(4));
     const ids = connectorsOf(s);

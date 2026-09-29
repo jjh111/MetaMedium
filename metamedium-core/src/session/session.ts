@@ -2848,8 +2848,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     stroke.edges = stroke.edges.filter((e) => !(e.rel === 'bound-to' && e.end === ev.end));
     stroke.reps = stroke.reps.filter((r) => !(r.modality === 'bound' && (r.data as { end?: string }).end === ev.end));
     if (!stroke.edges.some((e) => e.rel === 'bound-to' && e.to === was)) noFollowerOf(was, stroke.id);
-    // A routed connector with an end let go has nothing to route between (D7).
-    reroute([ev.strokeId]);
+    // A routed connector with an end let go has nothing to route between (D7) — found here, not by
+    // way of what is tied to what, since it may have let go of its last tie.
+    if (routeRepOf(stroke)) putRoute(stroke);
   }
 
   // ===== Bindings follow (V1-PLAN E2; follow.ts) =====

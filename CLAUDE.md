@@ -46,7 +46,10 @@ a page*, below; e2e 64); and a drawing that reads as a diagram is offered
 *Make it Mermaid*, the Mermaid stands beside it as an artifact drawn in the
 board's ink, the export pane writes the file, and *Draw it* puts a Mermaid
 text back on the board as marks that read as the same diagram (*Mermaid on
-the surface*, below; e2e 62–63). **And the hand is in the gate** (H1, `node e2e/run.mjs hand`, *The MCP hand*, below): QA-v10's machine rows walked headless with
+the surface*, below; e2e 62–63). **D7, routing** (*Routing*, below; e2e 66): a diagram's connectors are drawn at
+right angles between their ports, round what stands between, by a `route`
+event whose polyline is derived from where the sites stand — and *Tidy the
+diagram* lines up the ranks and routes every tied connector in one act. **And the hand is in the gate** (H1, `node e2e/run.mjs hand`, *The MCP hand*, below): QA-v10's machine rows walked headless with
 `Demos/mcp.mjs` in a room of its own, and `QA-v1.md` is the hand checklist for A1–A10. What is next is state, ER and mind map,
 first run, a review of use, and v1.0.0 (`V1-PLAN.md`
 §8–§9, every unit with its dated status line).
@@ -309,7 +312,7 @@ any structural change.
 
 | Path | What it is |
 |---|---|
-| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, the UML class diagram, the sequence diagram and the dashed lines it reads, Mermaid out and in, and a layered layout), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print, and what is said of it on the board — `board.ts`), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*), **magnets, handles and bindings that follow** (`src/session/magnets.ts`, `handles.ts`, `follow.ts` with `affine.ts` and `manipulate.ts`; under *Magnets and bindings* and *Handles*) and the LLM transport. New recognition/engine work lands HERE |
+| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, the UML class diagram, the sequence diagram and the dashed lines it reads, Mermaid out and in, and a layered layout), **routing** (`src/diagram/route.ts`: orthogonal routes between bound ports, derived, and the tidy plan; `src/tools/route.ts`; under *Routing*), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print, and what is said of it on the board — `board.ts`), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*), **magnets, handles and bindings that follow** (`src/session/magnets.ts`, `handles.ts`, `follow.ts` with `affine.ts` and `manipulate.ts`; under *Magnets and bindings* and *Handles*) and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages). Fully on the `brand/` system as of 3 Sept 2026 — its `:root` is `brand/tokens.css` under the names this page already used, so change a value THERE first |
 | `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
@@ -865,10 +868,10 @@ said after the reason, and what makes it specific to these marks),
 `verbs`, `hidden` (typed, never a slot), `lead` (stands with the readings:
 *Fold “…” into the text*), and `data` for its take. `offersFor(scope, ctx)`
 asks every tool in **registry order** — `builtin.ts` registers the
-twenty built-ins in the order the field always built its pills (the maths
+twenty-one built-ins in the order the field always built its pills (the maths
 tool, M5 — *Show the sizes*, *Check the steps*, *Print at true size*, host
-acts that write nothing — then *Mermaid* and *drawing from Mermaid*, appended
-at the end, so the order and e2e 49's golden stand), which is
+acts that write nothing — then *Mermaid*, *drawing from Mermaid* and *routing*
+(D7), appended at the end, so the order and e2e 49's golden stand), which is
 the tie-break between equal offers — each key once; `completionsFor` is
 what typed text completes to (*Name it*, *Label it*, words told to a
 definition), each `place`d rather than ranked. `rankOffers(items, uses)` is
@@ -1226,6 +1229,80 @@ port is found by the notation the ENGINE knows (`knowPorts`, every
 registered notation's; `portSiteOf`, `boundSiteOf`), whether or not the page
 offers its ports to the pen — the pen's offer is the page's, the log's claim
 is the board's, and state stays a pure function of the log.
+
+### Routing: connectors at right angles between their ports (V1-PLAN §3, D7)
+
+> `metamedium-core/src/diagram/route.ts` (`routeBetween`, `outwardOf`,
+> `deriveRoute`, `tidyPlanOf`), `route.test.ts`; the `route` event and
+> `applyRoute` / `reroute` in `session/session.ts`; `tools/route.ts`;
+> `Demos/surface/08-render.js`, `05-selection.js`; e2e 66.
+
+A diagram's connectors are drawn by a hand, and a hand draws a diagonal.
+**A `route` event** (`session.route({ ids, mode? })`; `mode: 'raw'` takes it
+off, as `snap` has its `raw`) marks connectors that have both ends tied as
+routed — a **`'route'` rep** on each — and **the polyline is derived, never
+logged and never carried**: it is a pure function of the sites the ends are
+bound to where they stand now (`boundSiteOf`) and of the boxes standing in
+the way, found again in the apply path at the follow's own triggers
+(`followFrom` → `reroute`: a move, scale, turn, tidy, reshape, snap or bind
+of a mark it is tied to, an `unbind`, a stroke drawn, an erase), and only
+when a change can reach it — the connector or its targets changed, a mark it
+was routed among changed (`seen`), or one stands in the window it was read in
+(`routeAffectedBy`). The follow of a connector is a similarity of the WHOLE
+connector, and a route is not a similarity of anything, so it is never
+stretched from one place to the next: a box moved is one `move` event, the
+ink follows as it always did (E2), the route is found again from the ports,
+and undo of the move springs it back. The room oracle runs it (`route` among
+its acts, `src/test/room.ts`), and the polyline agrees with a replay from zero
+and from a checkpoint after every merge.
+
+**What reads a connector still reads its ink.** The `'route'` rep is a form
+drawn in front, as a snapped form is, and `boundsOf`, `standingPointsOf`, the
+sites, the wires (`connects`, `points-to`), the heads and the notation's
+reading are of the ink the follow carries onto the sites — so a routed
+flowchart reads as the same flowchart and says the same Mermaid (both tested).
+Not, as a clean rep would be, where the connector "stands": a route stands
+over TWO other marks, and reading it as the connector's own would change what
+the drawing reads as. While an end is tied to nothing there is nothing to
+route between: the rep stays (the log says routed), holds no points, the ink
+is drawn, and the route stands again when the end is tied.
+
+**The route** (`routeBetween`, pure and deterministic). Each end leaves along
+its port's outward normal (`outwardOf`: a box's edge middle straight out; a
+corner along one of the two sides it belongs to, the one that faces the other
+end; a decision's vertex outward — the site read against the box of the mark
+it belongs to; a site in the middle of a mark, which has no outward, toward the
+other end), by a stub of the hand's own size (`STUB_PX`, `STUB_SHARE`); then a
+search over the lines the marks in the way leave open (their edges a stub off,
+the stubs' ends), with the fewest turns first and the shortest next, never
+more than `ROUTE_MAX_TURNS`. The marks in the way are the closed marks in a
+window round the two ports that are big enough to go round (`MIN_OBSTACLE_PX`:
+a letter is not one), not a mark that holds or sits inside a symbol the
+connector joins, at most `MAX_BLOCKS` of them, nearest first. **It never fails
+to draw one, and it says when it could not go round**: shorter stubs are
+tried, then the two symbols alone, then a direct elbow, and a route through
+marks says `avoided: false`, the marks in `blocked` and *could not avoid …*
+in its reasoning. An arrow's head is kept at the tip along the last segment
+(`head`: the barb as drawn, never more than a share of the segment). A
+separate head drawn apart — Mermaid in's arcs — is bound to nothing and
+stays where it was (a known gap).
+
+**Tidy the diagram** (`tools/route.ts`, `tidyPlanOf`): the tool offers, at
+tier 1 and for a notation reading with connectors tied at both ends — never a
+row of boxes, a molecule, a flowchart with its arrows loose, or a sequence
+diagram, whose messages are level by definition — *Tidy the diagram*, *Route
+the connectors* and, once any is routed, *Show the connectors as drawn*. Tidy
+is tidy's alignment plus routing **in one act**: the symbols are ranked by the
+longest way from where the flows begin (a flow round to a symbol already on the
+way is a loop and left out), each rank of two or more standing within reach
+of each other is lined up as a row (flows down) or a column (flows across) by
+`session.tidy`, the writing standing on a symbol carried with it by a `move`,
+then every tied connector routed. A symbol drawn in several strokes is left
+where it stands (tidy places whole marks). The surface draws the route in
+front with the hand's ink — and the clean form it held — faint beneath
+(`08-render.js`, `mm.routesDrawn()`), files the mark by the box its route runs
+in, and draws a routed connector routed from where a drag is taking what it
+is tied to (`dragFollowers`): the preview is the act.
 
 ### Handles: the one selected mark's own points (V1-PLAN E1)
 

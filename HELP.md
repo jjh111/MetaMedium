@@ -44,6 +44,14 @@ flowchart, a class diagram and a pattern page wait too.
   tile says *offer*, *auto* or *off*.
 - **Tie a line to a mark**: end a line or an arrow on a mark's edge, corner or
   centre — the pen feels it — and it follows when the mark moves.
+- **Tidy a diagram**: when lines and arrows are tied to the marks of a flowchart
+  or a class diagram, hold the drawing and choose **Tidy the diagram**: the
+  marks in a row line up, and every tied line runs at right angles between the
+  marks it joins, round what stands between. Your own lines stay faint
+  underneath, and a box you move afterwards carries them — the lines are drawn
+  again from where the box now stands. **Route the connectors** does only the
+  lines, and **Show the connectors as drawn** puts yours back. One undo takes a
+  tidy away.
 - **Erase**: scratch back and forth across a mark three times, or hold it and
   tap **Erase**. Twice only says *one more pass erases it*.
 - **Write**: write words in your hand. Hold them and press Enter to have a
