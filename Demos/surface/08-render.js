@@ -324,7 +324,7 @@
     // is its maker's word, not what the rung measured (L2b); a name is above.
     let cap = Infinity;
     for (const r of MM.interpretationsOf(node, s.nodes)) {
-      if (r.tier !== 0 || r.basis !== 'resemblance') continue;
+      if (!MM.isShapeRungReading(r)) continue;
       const g = { on: 'shape', confidence: r.weight };
       cap = Math.min(cap, MM.baseOn(g));
       items.push({ key: 'shape:' + r.label, label: r.label, base: cap, grounds: g });

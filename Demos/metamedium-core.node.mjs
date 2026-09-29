@@ -1460,6 +1460,14 @@ function interpretationsOf(node, nodes) {
     return b.weight - a.weight;
   });
 }
+function isShapeRungReading(r) {
+  return r.tier === 0 && r.basis === "resemblance" && (!r.source || r.source === ENGINE_PARTICIPANT);
+}
+function isHeardReading(r) {
+  if (r.blessed) return false;
+  if (r.tier > 0) return true;
+  return r.basis === "resemblance" && !!r.source && r.source !== ENGINE_PARTICIPANT && r.source !== LOCAL_PARTICIPANT;
+}
 function byTier(interpretations) {
   const groups = /* @__PURE__ */ new Map();
   for (const i of interpretations) {
@@ -25522,6 +25530,7 @@ export {
   isFlat,
   isFrame,
   isGesture,
+  isHeardReading,
   isLassoLike,
   isLetterLike,
   isOpenRouter,
@@ -25529,6 +25538,7 @@ export {
   isParticipant,
   isRange,
   isSeatTraffic,
+  isShapeRungReading,
   isSpecific,
   isStrokeClosed,
   isTestPack,

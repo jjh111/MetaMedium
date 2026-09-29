@@ -3545,7 +3545,7 @@
     // is its maker's word, not what the rung measured (L2b); a name is above.
     let cap = Infinity;
     for (const r of MM.interpretationsOf(node, s.nodes)) {
-      if (r.tier !== 0 || r.basis !== 'resemblance') continue;
+      if (!MM.isShapeRungReading(r)) continue;
       const g = { on: 'shape', confidence: r.weight };
       cap = Math.min(cap, MM.baseOn(g));
       items.push({ key: 'shape:' + r.label, label: r.label, base: cap, grounds: g });
@@ -5181,7 +5181,7 @@
         }));
       }
     }
-    // What a model read this group as — held, attributed, and an offer to name it.
+    // What another voice read this group as — a model, or a hand such as Claude's (a tier 0 voice too, so it is told by its author, not its tier: F1) — held, attributed, and an offer to name it.
     {
       const seen = new Set();
       const heard = [];
@@ -5189,7 +5189,7 @@
         const n = s.nodes.get(id);
         if (!n) continue;
         for (const r of MM.interpretationsOf(n, s.nodes)) {
-          if (r.tier === 0 || r.blessed) continue;
+          if (!MM.isHeardReading(r)) continue;
           const key = r.label.toLowerCase();
           if (seen.has(key)) continue;
           seen.add(key);
@@ -5260,7 +5260,7 @@
     let least = null;
     for (const id of ids) {
       const n = s.nodes.get(id);
-      const r = n && MM.interpretationsOf(n, s.nodes).find((x) => x.tier === 0 && x.label === 'text');
+      const r = n && MM.interpretationsOf(n, s.nodes).find((x) => MM.isShapeRungReading(x) && x.label === 'text');
       if (!r) return 0;
       least = least === null ? r.weight : Math.min(least, r.weight);
     }
@@ -6513,7 +6513,7 @@
       const rung = readRungs(s);
       const role = rung.roles.get(id);
       // What the shape rung measured: never a label, which is its maker's word (L2b).
-      const shapeRead = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0 && r.basis !== 'label')[0];
+      const shapeRead = MM.interpretationsOf(node, s.nodes).filter(MM.isShapeRungReading)[0];
       const rows = [];
       const fpx = MM.fingerprintOf(node);
       if (fpx) {
@@ -6703,7 +6703,7 @@
       out += row('becomes', !rep ? 'another drawing like it is offered as one · a brief builds on it · its tank plays' : kind === 'mermaid' ? 'Draw it puts it on the board as marks · edit the text for a new version' : 'draw over it to change a part · a brief is a new version');
       return out;
     }
-    const shapeRead = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0 && r.basis !== 'label')[0];
+    const shapeRead = MM.interpretationsOf(node, s.nodes).filter(MM.isShapeRungReading)[0];
     const writing = o.isWordNode || (!!shapeRead && shapeRead.label === 'text');
     const said = MM.transcriptsOf(node)[0];
     let is = writing ? (said ? 'writing that says “' + said.text + '”' : 'writing, not read yet')

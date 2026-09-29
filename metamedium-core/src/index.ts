@@ -635,6 +635,8 @@ export {
   disagreement,
   sourcesOf,
   hasMultipleSources,
+  isShapeRungReading,
+  isHeardReading,
 } from './session/interpretations';
 export type { Interpretation, InterpretationGroup, Disagreement } from './session/interpretations';
 

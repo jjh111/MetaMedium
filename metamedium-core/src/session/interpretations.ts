@@ -15,7 +15,7 @@
 
 import type { MMNode, Capability } from './nodes';
 import { resemblances, wordOf, labelOf, isParticipant } from './nodes';
-import { TIER0_PARTICIPANT, LOCAL_PARTICIPANT } from './nodes';
+import { TIER0_PARTICIPANT, ENGINE_PARTICIPANT, LOCAL_PARTICIPANT } from './nodes';
 
 /** One reading of a node, with everything needed to show who said it and why. */
 export interface Interpretation {
@@ -135,6 +135,30 @@ export function interpretationsOf(
     if (a.blessed !== b.blessed) return a.blessed ? -1 : 1;
     return b.weight - a.weight;
   });
+}
+
+/**
+ * Is this what the shape rung measured? Tier 0 is a capability, not an
+ * author: an MCP hand joins at tier 0 too, so its proposed reading is tier 0
+ * and is nobody's measurement. The rung's own readings are the engine's — an
+ * unattributed resemblance, or one the engine itself made — and a surface
+ * asking "what did the rung say?" asks this, never `tier === 0`.
+ */
+export function isShapeRungReading(r: Interpretation): boolean {
+  return r.tier === 0 && r.basis === 'resemblance' && (!r.source || r.source === ENGINE_PARTICIPANT);
+}
+
+/**
+ * Is this another voice's reading of the mark — a model's, or a hand's such
+ * as the MCP hand's `canvas_propose` — held and attributed, for a field to
+ * show beside the rung's, ranked with them and never in their place (F1)?
+ * Not a name (a bless) and not a label (its maker's word): those are said
+ * elsewhere. A person's own reading of their own mark is not another's.
+ */
+export function isHeardReading(r: Interpretation): boolean {
+  if (r.blessed) return false;
+  if (r.tier > 0) return true;
+  return r.basis === 'resemblance' && !!r.source && r.source !== ENGINE_PARTICIPANT && r.source !== LOCAL_PARTICIPANT;
 }
 
 /** The same readings grouped by capability tier, ascending (0 first). */

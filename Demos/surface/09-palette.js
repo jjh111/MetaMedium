@@ -146,7 +146,7 @@
         }));
       }
     }
-    // What a model read this group as — held, attributed, and an offer to name it.
+    // What another voice read this group as — a model, or a hand such as Claude's (a tier 0 voice too, so it is told by its author, not its tier: F1) — held, attributed, and an offer to name it.
     {
       const seen = new Set();
       const heard = [];
@@ -154,7 +154,7 @@
         const n = s.nodes.get(id);
         if (!n) continue;
         for (const r of MM.interpretationsOf(n, s.nodes)) {
-          if (r.tier === 0 || r.blessed) continue;
+          if (!MM.isHeardReading(r)) continue;
           const key = r.label.toLowerCase();
           if (seen.has(key)) continue;
           seen.add(key);
@@ -225,7 +225,7 @@
     let least = null;
     for (const id of ids) {
       const n = s.nodes.get(id);
-      const r = n && MM.interpretationsOf(n, s.nodes).find((x) => x.tier === 0 && x.label === 'text');
+      const r = n && MM.interpretationsOf(n, s.nodes).find((x) => MM.isShapeRungReading(x) && x.label === 'text');
       if (!r) return 0;
       least = least === null ? r.weight : Math.min(least, r.weight);
     }

@@ -410,6 +410,7 @@ var MetaMediumCore = (() => {
     isFlat: () => isFlat,
     isFrame: () => isFrame,
     isGesture: () => isGesture,
+    isHeardReading: () => isHeardReading,
     isLassoLike: () => isLassoLike,
     isLetterLike: () => isLetterLike,
     isOpenRouter: () => isOpenRouter,
@@ -417,6 +418,7 @@ var MetaMediumCore = (() => {
     isParticipant: () => isParticipant,
     isRange: () => isRange,
     isSeatTraffic: () => isSeatTraffic,
+    isShapeRungReading: () => isShapeRungReading,
     isSpecific: () => isSpecific,
     isStrokeClosed: () => isStrokeClosed,
     isTestPack: () => isTestPack,
@@ -2127,6 +2129,14 @@ var MetaMediumCore = (() => {
       if (a.blessed !== b.blessed) return a.blessed ? -1 : 1;
       return b.weight - a.weight;
     });
+  }
+  function isShapeRungReading(r) {
+    return r.tier === 0 && r.basis === "resemblance" && (!r.source || r.source === ENGINE_PARTICIPANT);
+  }
+  function isHeardReading(r) {
+    if (r.blessed) return false;
+    if (r.tier > 0) return true;
+    return r.basis === "resemblance" && !!r.source && r.source !== ENGINE_PARTICIPANT && r.source !== LOCAL_PARTICIPANT;
   }
   function byTier(interpretations) {
     const groups = /* @__PURE__ */ new Map();

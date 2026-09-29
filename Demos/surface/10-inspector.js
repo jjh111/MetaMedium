@@ -223,7 +223,7 @@
       const rung = readRungs(s);
       const role = rung.roles.get(id);
       // What the shape rung measured: never a label, which is its maker's word (L2b).
-      const shapeRead = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0 && r.basis !== 'label')[0];
+      const shapeRead = MM.interpretationsOf(node, s.nodes).filter(MM.isShapeRungReading)[0];
       const rows = [];
       const fpx = MM.fingerprintOf(node);
       if (fpx) {
@@ -413,7 +413,7 @@
       out += row('becomes', !rep ? 'another drawing like it is offered as one · a brief builds on it · its tank plays' : kind === 'mermaid' ? 'Draw it puts it on the board as marks · edit the text for a new version' : 'draw over it to change a part · a brief is a new version');
       return out;
     }
-    const shapeRead = MM.interpretationsOf(node, s.nodes).filter((r) => r.tier === 0 && r.basis !== 'label')[0];
+    const shapeRead = MM.interpretationsOf(node, s.nodes).filter(MM.isShapeRungReading)[0];
     const writing = o.isWordNode || (!!shapeRead && shapeRead.label === 'text');
     const said = MM.transcriptsOf(node)[0];
     let is = writing ? (said ? 'writing that says “' + said.text + '”' : 'writing, not read yet')
