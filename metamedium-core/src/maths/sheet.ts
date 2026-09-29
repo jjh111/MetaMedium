@@ -34,7 +34,16 @@ import { evaluateChain, normName, parseChain, parseLine } from './expr';
 import type { CheckStatus, LengthUnit, Quantity } from './quantity';
 import { arithmetic, compareQuantities, formatQuantity, isBare, isRange, parseQuantity, unitSuffix } from './quantity';
 
-export type SheetLineInput = string | { text: string; at?: Point; bounds?: Bounds; ids?: readonly string[] };
+export type SheetLineInput =
+  | string
+  | {
+      text: string;
+      at?: Point;
+      bounds?: Bounds;
+      ids?: readonly string[];
+      /** Typed as a sum (`= Waist ÷ 2`): read as maths whatever its words, so what it lacks is said. */
+      maths?: boolean;
+    };
 
 export interface SheetOptions {
   /** The unit a bare measurement takes. Unset: the unit the page writes most. Null: none — numbers stay bare. */
@@ -163,6 +172,7 @@ interface Source {
   at?: Point;
   bounds?: Bounds;
   ids?: string[];
+  maths?: boolean;
 }
 
 interface Draft {
@@ -263,6 +273,74 @@ function classify(src: Source, line: number): Draft {
   return { ...d, note: unreadable() };
 }
 
+// ===== Prose is not maths (F2) =====
+//
+// The grammar reads a colon as `=` and a dash as a minus, and any run of words as a name, so an ordinary note —
+// `Draw a box: then an arrow - and it reads` — parses as a check whose operands are words, and stood a `?` at
+// rest, a problem, on a page that was only writing. A line counts as maths only when it looks like it:
+//
+//   - no operator has two words for its operands — words joined by a dash or a colon are a sentence;
+//   - a line with no label (a letter or a step's number) says nothing of itself, so it needs an operator and
+//     every name in it defined on the page: the line is maths because of what it is made of;
+//   - a labelled line is the person's own word that this is a step, so a name the page lacks is a problem worth
+//     saying (`1. Waist ÷ 4`), as long as it has an operator, or is only names the page defines (`4. C 48`);
+//   - a line typed as a sum (`maths: true`) is read whatever it says.
+//
+// A line that fails is a note, said in words, and stays out of the steps, the checks and every chip.
+
+/** The names a page defines: each definition's letter and name, and a lettered formula's letter. */
+function definedNames(drafts: readonly Draft[]): Set<string> {
+  const out = new Set<string>();
+  for (const d of drafts) {
+    if (d.kind === 'definition') {
+      for (const k of [d.letter, d.name]) if (k) out.add(normName(k));
+    } else if (d.kind === 'step' && d.letter) out.add(normName(d.letter));
+  }
+  return out;
+}
+
+function proseToNotes(drafts: Draft[]): void {
+  const known = definedNames(drafts);
+  const wordsOnly = (e: Expr, op: { n: number; prose: boolean }): boolean => {
+    switch (e.k) {
+      case 'name': return !known.has(normName(e.name));
+      case 'op': {
+        op.n++;
+        const a = wordsOnly(e.a, op), b = wordsOnly(e.b, op);
+        if (a && b) op.prose = true;
+        return a && b;
+      }
+      case 'neg': case 'carry': return wordsOnly(e.a, op);
+      default: return false;
+    }
+  };
+  for (const d of drafts) {
+    if (d.src.maths || !d.chain) continue;
+    if (d.kind !== 'check' && d.kind !== 'step') continue;
+    const op = { n: 0, prose: false };
+    for (const g of d.chain.segments) {
+      const e = g.readings[0]?.expr;
+      if (e) wordsOnly(e, op);
+    }
+    const unknown = mentions(d.chain).names.filter((n) => !known.has(normName(n))).length;
+    // An `=` joining two segments that are each only words.
+    const segs = d.chain.segments;
+    segs.forEach((g, i) => {
+      if (i === 0 || (g.join !== '=' && g.join !== '≈')) return;
+      op.n++;
+      const a = g.readings[0]?.expr, b = segs[i - 1].readings[0]?.expr;
+      if (a && b && wordsOnly(a, { n: 0, prose: false }) && wordsOnly(b, { n: 0, prose: false })) op.prose = true;
+    });
+    const labelled = !!d.parse.label;
+    const maths = !op.prose && (labelled ? op.n > 0 || unknown === 0 : op.n > 0 && unknown === 0);
+    if (maths) continue;
+    d.kind = 'note';
+    d.note = `${d.parse.body} is words, not maths — no operator between numbers or names the page defines`;
+    d.key = undefined;
+    d.chain = undefined;
+  }
+}
+
 function hasNames(chain: ExprChain): boolean {
   const walk = (e: Expr): boolean => (e.k === 'name' || e.k === 'ref' ? true : e.k === 'op' ? walk(e.a) || walk(e.b) : e.k === 'neg' || e.k === 'carry' ? walk(e.a) : false);
   return chain.segments.some((g) => g.readings.some((r) => walk(r.expr)));
@@ -338,9 +416,10 @@ function cyclesOf(keys: string[], deps: Map<string, Set<string>>): Map<string, s
 
 export function readSheet(input: readonly SheetLineInput[], options: SheetOptions = {}): Sheet {
   const sources: Source[] = input.map((x) =>
-    typeof x === 'string' ? { text: x } : { text: x.text, ...(x.at ? { at: x.at } : {}), ...(x.bounds ? { bounds: x.bounds } : {}), ...(x.ids ? { ids: [...x.ids] } : {}) }
+    typeof x === 'string' ? { text: x } : { text: x.text, ...(x.at ? { at: x.at } : {}), ...(x.bounds ? { bounds: x.bounds } : {}), ...(x.ids ? { ids: [...x.ids] } : {}), ...(x.maths ? { maths: true } : {}) }
   );
   const drafts = sources.map((src, line) => classify(src, line));
+  proseToNotes(drafts);
   const { unit, reason: unitReason } =
     options.unit !== undefined
       ? { unit: options.unit, reason: options.unit ? `${UNIT_NAMES[options.unit]}, as given` : 'no unit, as given' }

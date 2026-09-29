@@ -427,7 +427,8 @@ export function evaluateTyped(text: string, board: BoardMaths | null): TypedMath
   const body = text.replace(/^\s*=\s*/, '').trim();
   if (!body) return { ok: false, reason: 'type a sum, like = 24 ÷ 3' };
   const page = board ? board.sheet.entries.map((e) => e.text) : [];
-  const sheet = readSheet([...page, body]);
+  // Typed after `=`, it is a sum whatever its words: what the page lacks is said, not taken for prose.
+  const sheet = readSheet([...page, { text: body, maths: true }]);
   const e = sheet.entries[sheet.entries.length - 1];
   if (!e) return { ok: false, reason: 'type a sum, like = 24 ÷ 3' };
   if (e.kind !== 'check') {

@@ -2501,9 +2501,10 @@ bytes, `--check` names a file that no longer is what the script makes (CI's
 reads (the flowchart as a flowchart, the class diagram as a UML class diagram,
 the molecule matched by `basics@1`, the pattern page saying 25.30″ and a check on
 each step). Each opens with nothing held (the summon dismissed and the marks let
-go) and carries a note in the person's words with no digit, colon or dash — a
-number near a drawing is a measurement to the maths and a colon or a dash can read
-as a step, and a note must be neither (found making the first two).
+go) and carries a note in the person's words with no digit — a number near a
+drawing is a measurement to the maths, and a note must not be one. (It also carried
+no colon or dash, which read as a step; F2 made prose say nothing, so those are
+free now — found making the first two.)
 **The boards pane lists them** under *examples*, from `index.json` (`exampleRows`,
 in `17-boards.js`: read, not trusted — a row with no name, a repeated id or a file
 that is not one of the folder's own `name.jsonl` is left out, nothing throws), and

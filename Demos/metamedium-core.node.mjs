@@ -3527,6 +3527,59 @@ function classify(src, line) {
   if (parse.shape === "formula") return { ...d, kind: "check", chain: parse.chain };
   return { ...d, note: unreadable() };
 }
+function definedNames(drafts) {
+  const out = /* @__PURE__ */ new Set();
+  for (const d of drafts) {
+    if (d.kind === "definition") {
+      for (const k of [d.letter, d.name]) if (k) out.add(normName(k));
+    } else if (d.kind === "step" && d.letter) out.add(normName(d.letter));
+  }
+  return out;
+}
+function proseToNotes(drafts) {
+  const known2 = definedNames(drafts);
+  const wordsOnly = (e, op) => {
+    switch (e.k) {
+      case "name":
+        return !known2.has(normName(e.name));
+      case "op": {
+        op.n++;
+        const a = wordsOnly(e.a, op), b = wordsOnly(e.b, op);
+        if (a && b) op.prose = true;
+        return a && b;
+      }
+      case "neg":
+      case "carry":
+        return wordsOnly(e.a, op);
+      default:
+        return false;
+    }
+  };
+  for (const d of drafts) {
+    if (d.src.maths || !d.chain) continue;
+    if (d.kind !== "check" && d.kind !== "step") continue;
+    const op = { n: 0, prose: false };
+    for (const g of d.chain.segments) {
+      const e = g.readings[0]?.expr;
+      if (e) wordsOnly(e, op);
+    }
+    const unknown = mentions(d.chain).names.filter((n2) => !known2.has(normName(n2))).length;
+    const segs = d.chain.segments;
+    segs.forEach((g, i) => {
+      if (i === 0 || g.join !== "=" && g.join !== "\u2248") return;
+      op.n++;
+      const a = g.readings[0]?.expr, b = segs[i - 1].readings[0]?.expr;
+      if (a && b && wordsOnly(a, { n: 0, prose: false }) && wordsOnly(b, { n: 0, prose: false })) op.prose = true;
+    });
+    const labelled = !!d.parse.label;
+    const maths = !op.prose && (labelled ? op.n > 0 || unknown === 0 : op.n > 0 && unknown === 0);
+    if (maths) continue;
+    d.kind = "note";
+    d.note = `${d.parse.body} is words, not maths \u2014 no operator between numbers or names the page defines`;
+    d.key = void 0;
+    d.chain = void 0;
+  }
+}
 function hasNames2(chain) {
   const walk = (e) => e.k === "name" || e.k === "ref" ? true : e.k === "op" ? walk(e.a) || walk(e.b) : e.k === "neg" || e.k === "carry" ? walk(e.a) : false;
   return chain.segments.some((g) => g.readings.some((r) => walk(r.expr)));
@@ -3593,9 +3646,10 @@ function cyclesOf(keys, deps) {
 }
 function readSheet(input, options = {}) {
   const sources = input.map(
-    (x) => typeof x === "string" ? { text: x } : { text: x.text, ...x.at ? { at: x.at } : {}, ...x.bounds ? { bounds: x.bounds } : {}, ...x.ids ? { ids: [...x.ids] } : {} }
+    (x) => typeof x === "string" ? { text: x } : { text: x.text, ...x.at ? { at: x.at } : {}, ...x.bounds ? { bounds: x.bounds } : {}, ...x.ids ? { ids: [...x.ids] } : {}, ...x.maths ? { maths: true } : {} }
   );
   const drafts = sources.map((src, line) => classify(src, line));
+  proseToNotes(drafts);
   const { unit: unit4, reason: unitReason } = options.unit !== void 0 ? { unit: options.unit, reason: options.unit ? `${UNIT_NAMES[options.unit]}, as given` : "no unit, as given" } : inferUnit(drafts.map((d) => d.parse));
   const withUnit = (q) => isBare(q) && unit4 ? { ...q, unit: unit4, dim: 1 } : q;
   const nameIndex = /* @__PURE__ */ new Map();
@@ -8172,7 +8226,7 @@ function evaluateTyped(text, board) {
   const body = text.replace(/^\s*=\s*/, "").trim();
   if (!body) return { ok: false, reason: "type a sum, like = 24 \xF7 3" };
   const page = board ? board.sheet.entries.map((e2) => e2.text) : [];
-  const sheet = readSheet([...page, body]);
+  const sheet = readSheet([...page, { text: body, maths: true }]);
   const e = sheet.entries[sheet.entries.length - 1];
   if (!e) return { ok: false, reason: "type a sum, like = 24 \xF7 3" };
   if (e.kind !== "check") {

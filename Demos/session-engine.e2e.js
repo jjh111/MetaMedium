@@ -4418,6 +4418,18 @@ window.__scenario = async function(){
     const emptyRow64 = document.querySelector('#exportPanel [data-mathsout="svg"]');
     step('64g2. with no labelled figure the row is there and says why it waits', !!emptyRow64 && emptyRow64.disabled && /label/i.test(emptyRow64.title) && mx.trueSizeSvg() === null, emptyRow64 && emptyRow64.title);
     fresh64();
+
+    // Prose is not maths (F2): a colon reads as `=` and a dash as a minus, and used to stand a `?` at rest on a note.
+    const PROSE64 = ['Draw a box: then an arrow - and it reads', 'Note: keep it short', '1. Draw a box', '2. Hold it - then choose what it becomes', 'Wait 5 min then go', 'Sew the seams first.', 'Press them open.', 'Total: many', 'color: red'];
+    const prose64 = mm.typeText({ x: 420, y: 140 }, PROSE64.join('\n'), { w: 360, h: 300 });
+    await wait(600);
+    step('64h. a page of notes with colons and dashes says nothing at rest — no chip, no standing ?', !!prose64 && chipsOf().length === 0, chipsOf().map((c) => c.kind + ' ' + c.text));
+    // …and beside the sample page it says nothing of its own, and the page's six checks stand as they were.
+    mm.typeText({ x: 900, y: 140 }, APRON64.join('\n'), { w: 360, h: 300 });
+    await wait(600);
+    const both64 = chipsOf('step');
+    step('64h2. beside the sample page the notes still say nothing: the page keeps its six checks and there is no seventh', both64.length === 6 && both64.every((c) => !c.text.startsWith('?')), both64.map((c) => c.text));
+    fresh64();
   }
 
   return R;

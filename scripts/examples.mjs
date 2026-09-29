@@ -22,7 +22,8 @@
 //   index.json           what the boards pane lists: name, what it shows, file, marks; the starter
 //
 // Every note on a board says what to do with it in the person's words and carries no digit: a
-// number written near a drawing is a measurement to the maths, and a note is not one.
+// number written near a drawing is a measurement to the maths, and a note is not one. (A colon or a
+// dash is no longer a worry: a line of words is not read as maths, F2, and says nothing.)
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';

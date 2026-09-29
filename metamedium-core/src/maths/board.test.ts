@@ -208,7 +208,7 @@ describe('what is typed after =', () => {
     expect(evaluateTyped('= ', null)).toMatchObject({ ok: false });
     const r = evaluateTyped('= hello', null);
     expect(r.ok).toBe(false);
-    expect(evaluateTyped('= Waist ÷ 2', null)).toMatchObject({ ok: false, reason: expect.stringMatching(/Waist/) });
+    expect(evaluateTyped('= Waist ÷ 2', null)).toMatchObject({ ok: false, reason: 'Waist is not on this sheet' });
   });
 });
 

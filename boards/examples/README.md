@@ -37,6 +37,6 @@ To add one: write its function in `scripts/examples.mjs`, list it in `EXAMPLES`,
 name its file in `Demos/sw.js`' `EXTRA` (so it opens offline — the test checks),
 run the script and `node scripts/build-app.mjs`.
 
-Notes on a board are written without digits or colons: a number written near a
-drawing is a measurement to the maths, and a line that reads as a step is
-checked — a note must not be either.
+Notes on a board are written without digits: a number written near a drawing is
+a measurement to the maths, and a note must not be one. A colon or a dash is
+fine — a line of words is not read as a step, and says nothing.
