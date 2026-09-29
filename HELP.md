@@ -44,6 +44,14 @@ A tap on empty ground lets go of whatever is held.
 - **Write**: write words in your hand. Hold them and press Enter to have a
   model read them; then make them text, a name, or a label.
 - **Type text**: double-click empty ground.
+- **Say a diagram as text**: hold a drawing that reads as a flowchart, a class
+  diagram or a sequence diagram and choose **Make it Mermaid**. A Mermaid text
+  stands beside it, drawn as a diagram in your ink (the text shows when the
+  diagram cannot be drawn), and ink over a node of it lands on the mark it came
+  from. Double-click the text, or hold it and choose **Edit the text**, to change
+  it. Hold it and choose **Draw it** to put it on the board as marks the canvas
+  reads back as the same diagram — one undo takes them away. A Mermaid file
+  dropped or pasted onto the board is held for you, ready to draw.
 
 ## Models
 
@@ -68,7 +76,8 @@ asked only when you ask — never while you draw.
 duplicate, delete. Delete puts a board in the trash; *restore* brings it back
 whole. **reset** is a fresh board — the old one goes to the trash. Every
 board is kept in this browser as you draw; **export** writes it out as SVG, PNG
-or its log, and **folder** makes a folder on your computer the canvas.
+or its log — and, when what you hold or the board reads as a diagram, as Mermaid
+text — and **folder** makes a folder on your computer the canvas.
 
 ## Live rooms
 

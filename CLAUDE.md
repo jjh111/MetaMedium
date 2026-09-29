@@ -39,11 +39,14 @@ arrows follow what they are bound to, derived from the bindings, never logged
 the sequence diagram with the dashed lines it reads (D5's first half), each a
 notation with its pack, its bench and its Mermaid out (D2) and in (D3,
 with a layered layout); and W1 keeps a diagram's own strokes from erasing or
-being swallowed. What is next is each diagram and the maths **on the
-surface** — the field saying *a flowchart 0.73*, a Mermaid artifact, *Draw
-it* from Mermaid, maths offers — then S2, state and ER, first run, a review
-of use, and v1.0.0 (`V1-PLAN.md` §8–§9, every unit with its dated status
-line).
+being swallowed. **29 Sep 2026: D2's and D3's surfaces** — a drawing that
+reads as a diagram is offered *Make it Mermaid*, the Mermaid stands beside it
+as an artifact drawn in the board's ink, the export pane writes the file, and
+*Draw it* puts a Mermaid text back on the board as marks that read as the same
+diagram (*Mermaid on the surface*, below; e2e 62–63). What is next is the
+maths **on the surface** — maths offers — then S2, state and ER, first run, a
+review of use, and v1.0.0 (`V1-PLAN.md` §8–§9, every unit with its dated
+status line).
 
 **28 Sep 2026, J5 (phase 5, seats): a hosted model is asked, and says why
 when it cannot be.** John joined GLM Flash from OpenRouter and the canvas
@@ -309,7 +312,7 @@ any structural change.
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/surface/` | **The reference surface's source**: `surface.css` and thirty script fragments (`00-core`, `00-ui` … `20-controls`, `21-minimap`, `22-boards`, `23-packs`, `24-seat`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Because they are one closure, the build and its `--check` refuse a name declared at the top of two fragments — the last would silently replace the first everywhere, which broke rendering once — reading the fragments as one strict block, so they must also compile as strict code (`Demos/build-surface.test.mjs`, in CI's `core` job). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. **`17-board.js` is the second** (V1-PLAN R3): the journal the board this browser keeps is written through, driven in Node by a store held in memory — `node --test Demos/surface/17-board.test.mjs`, in CI's `core` job too. **`17-boards.js` is the third** (R1): the list of boards — names, the trash, which board a page opens, whether the one on screen may be left — `node --test Demos/surface/17-boards.test.mjs`, also in CI. **`07-hand.js` is the fourth** (R6): the hand's rules — what a pen, a finger and a palm do, and the hand tile's face and cycle — `node --test Demos/surface/07-hand.test.mjs`, also in CI; `07-input.js` is its adapter. A fragment's `.test.mjs` is not concatenated into the build. `09-palette.js` is the adapter over core's tools (B1): it reads the readings, maps `MM.offersFor` to pills and performs what only the surface can, and builds no affordance by hand |
+| `Demos/surface/` | **The reference surface's source**: `surface.css` and thirty-one script fragments (`00-core`, `00-ui` … `20-controls`, `21-minimap`, `22-boards`, `23-packs`, `24-seat`, `25-mermaid`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Because they are one closure, the build and its `--check` refuse a name declared at the top of two fragments — the last would silently replace the first everywhere, which broke rendering once — reading the fragments as one strict block, so they must also compile as strict code (`Demos/build-surface.test.mjs`, in CI's `core` job). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. **`17-board.js` is the second** (V1-PLAN R3): the journal the board this browser keeps is written through, driven in Node by a store held in memory — `node --test Demos/surface/17-board.test.mjs`, in CI's `core` job too. **`17-boards.js` is the third** (R1): the list of boards — names, the trash, which board a page opens, whether the one on screen may be left — `node --test Demos/surface/17-boards.test.mjs`, also in CI. **`07-hand.js` is the fourth** (R6): the hand's rules — what a pen, a finger and a palm do, and the hand tile's face and cycle — `node --test Demos/surface/07-hand.test.mjs`, also in CI; `07-input.js` is its adapter. A fragment's `.test.mjs` is not concatenated into the build. `09-palette.js` is the adapter over core's tools (B1): it reads the readings, maps `MM.offersFor` to pills and performs what only the surface can, and builds no affordance by hand |
 | `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file (and exports the same build as `standalone(dir)`, which the release script attaches to a release). **`sw.js` is the service worker for both addresses** — this one and `/app/` — copied to `app/sw.js` by `scripts/build-app.mjs`, which stamps `VERSION` into it and into the page's `<meta name="metamedium-version">` (*One app address*, below). **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture and `mcp-smoke.mjs` as its stdio test; it is also the canvas's seat's answerer, and **`seat-watch.mjs`** is the silent reader that prints one line per brief parked there — what wakes a Claude Code session (*The canvas's seat*, below); `metamedium-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). **`relay.test.mjs`** is the relay's own test (`node --test Demos/relay.test.mjs`, in CI's `core` job): the catch-up as a pure function, and, over a real relay on a free port, the truncation line and three hands with one departed. `Demos/programs/` holds `run` programs written for the canvas (`metamedium-explained.run.js`: the loop told as a program, ending on a real measurement of the viewer's own stroke). Plus fish, composition diagrams, no-modes graph, etc. |
 | `app/` | **The app — v1's one address, `https://jjh111.github.io/MetaMedium/app/`** (V1-PLAN R7). Made, never edited: `index.html` is `Demos/session-engine.html` with each file it asks for asked for from `/app/` (`../Demos/…`), `sw.js` is `Demos/sw.js` byte for byte, `manifest.webmanifest` is the old address's starting and scoped at `./` — all three written by `node scripts/build-app.mjs` and drift-checked in CI (`--check`). Installable there, and it opens with no network after one visit. `Demos/session-engine.html` stays where it was and works as it always has |
 | `HELP.md` | **The help pane's page**, for a person using the canvas (PLAN-USER-SURFACE U1g): the loop, the field, handling marks, models and Claude, boards, rooms, your mark, undo, the shortcuts. The help tile reads it (`20-controls.js`), both service workers keep it for offline, and the gate's `app` scenario asks for it. Keep it true to the surface — it names controls and keys |
@@ -809,7 +812,9 @@ said after the reason, and what makes it specific to these marks),
 `verbs`, `hidden` (typed, never a slot), `lead` (stands with the readings:
 *Fold “…” into the text*), and `data` for its take. `offersFor(scope, ctx)`
 asks every tool in **registry order** — `builtin.ts` registers the
-seventeen built-ins in the order the field always built its pills, which is
+nineteen built-ins in the order the field always built its pills (the last two,
+*Mermaid* and *drawing from Mermaid*, appended at the end, so the order and
+e2e 49's golden stand), which is
 the tie-break between equal offers — each key once; `completionsFor` is
 what typed text completes to (*Name it*, *Label it*, words told to a
 definition), each `place`d rather than ranked. `rankOffers(items, uses)` is
@@ -1548,7 +1553,7 @@ notes. Nodes come in the drawing's reading order and links by the nodes they
 join — never the log's order — so the same drawing says the same text in any
 merge order; `fixtures/flowchart.mermaid.ts` holds the golden every hand of
 D1's bench must export. `ids`/`marks`/`links` map the text back to the marks
-for the surface that renders it (the `mermaid` kind, still to come).
+for the surface that renders it (the `mermaid` kind, *Mermaid on the surface*, below).
 
 **Mermaid in** (V1-PLAN §3, D3; `notations/mermaid-in.ts`,
 `notations/layered.ts`). `drawMermaid(session, text, { at, scale?,
@@ -1578,6 +1583,51 @@ reads any mark small, touching and on a connector's line as its head, so a
 way that brings one past those gates is read first on a scratch session and
 taken only if every end reads as drawn. Only strokes, binds and labels enter
 the log; for one undo, wrap the call in `session.withTool` (L2j).
+
+**Mermaid on the surface** (V1-PLAN §3, D2 and D3's surfaces, 29 Sep 2026;
+`kinds/kinds.ts`, `tools/mermaid.ts`, `tools/mermaid-draw.ts`,
+`Demos/surface/13-kinds.js`, `25-mermaid.js`; e2e 62–63, with
+`e2e/fixtures/mermaid-standin.js`). **A `mermaid` kind** (`.mmd`, `.mermaid`;
+renderer `mermaid`, addressing `parts`, like `run`) holds a text. **The
+exporter is a tool**: `mermaidFor(state, ids, isRead)` (one home — the tool, the
+export pane and the frame's part names ask it) reads the marks as the likeliest
+notation above `NOTATION_FLOOR` with a writer, and *Make it Mermaid* is offered
+for two or more held marks that read as one and are no artifact's, unless an
+artifact already holds that very text; taking it `import`s a `mermaid` artifact
+(named `<notation>.mmd`) beside the drawing — right of it, the drawing's size
+between a card and a wall — holding `toMermaid`'s text, in one act. The frame
+(`mermaidDocument` in `13-kinds.js`) is the run sandbox's twin — scripts, opaque
+origin, clear ground — and loads mermaid.js the way three.js is loaded, from a
+pinned CDN beside the text (`MERMAID_CDNS`: cdnjs, then jsdelivr; 11.4.0),
+`securityLevel: 'strict'`, nothing played. **The text always stands**: shown at
+once, kept when the library cannot load (`unavailable`) or cannot read it
+(`refused`, said in the status line with the library's first line) with a note in
+the frame, and hidden only behind a diagram that was drawn — whose fills and
+strokes are the board's ink, whatever theme mermaid drew in. Each node is
+reported as a part named for its Mermaid id (a flowchart's and a class's by the id
+mermaid gives its group, a participant by the name on its box and lifeline), and
+ink over a part lands on the marks the text was written from — `mermaidPartNames`,
+derived where asked from the marks the tool wrote it from this sitting, else from
+the board, and only when that reading says exactly this text; an edited text keeps
+its Mermaid ids. What a frame says of itself is runtime (`mermaidStates`); a test
+points the frames at a stand-in library (`mm.mermaidFrom`) and the gate skips its
+real-library record by name when the CDN cannot be reached. **The export pane**
+gains a row of its own, written from the held marks or the board, named for the
+notation, hidden for a board that reads as none. **Draw it** is the second tool's
+offer, first on one `mermaid` artifact held alone whose text `readMermaid` reads
+(not for an unknown diagram, an empty text or a text file); taking it names the
+host act, and `drawMermaidFrom` calls `drawMermaid` inside the tool's stamp at the
+hand's zoom (`scale` 1/zoom), its `origin` right of every mark on the board, with
+the paint held until the diagram is all written (`holdPaint` in `08-render.js`: a
+45-node diagram took seven seconds of per-event paints and takes half a second),
+closes the field, selects what was drawn and fits the view to it, and says in one
+sentence what was drawn and what was not — each line a reader could not read, each
+note, the caps of 60 nodes and 120 links. A `.mmd` dropped or pasted is held where
+it lands (`mermaidImported`), so *Draw it* is in the field at once; a text no
+reader reads says it stands as text. **Edit the text** (the `text-edit` tool, the
+editor of `19-text.js`, a double-click) works on a mermaid artifact and a new
+version keeps its kind, so the round trip is by hand: draw, *Make it Mermaid*,
+edit, *Draw it*, one undo to take the drawing away.
 
 **The UML class diagram** (V1-PLAN §3, D4; `notations/uml-class.ts`,
 `notations/uml-class-mermaid.ts`, the `uml-class@1` pack). A class is a box
@@ -2897,7 +2947,11 @@ never disagree.
 **It is not a bless and not a file** (§D): no `word` rep, no artifact, no
 library entry, no card in the grid, never a name the matcher learns.
 
-**On the board it is a caption.** The word is drawn beside its mark — above
+**On the board it is a caption** — inside the mark when the mark is a closed
+form the words fit in (D3, words inside symbols, 29 Sep 2026; `labelInside` in
+`08-render.js`: centred, the whole box the words fill inside the clean form the
+mark holds or its own closed ink, so a diamond and a circle take fewer words
+than a box), else beside it. Beside: the word is drawn above
 the top edge, above an artifact's name when that shows — in the ink's own
 colour (the maker's, from the same tokens in either theme), at a size in the
 board's units: the caption rule of `13-kinds.js`, so it scales with the
