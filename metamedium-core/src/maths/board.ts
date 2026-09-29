@@ -97,6 +97,14 @@ export interface MathsChip {
   /** Where it stands, in canvas units: its centre, or its left end when `align` says so. */
   at: Point;
   align: 'centre' | 'left';
+  /**
+   * A chip beside a side stands off a point on the figure (`from`) in a direction
+   * (`away`, a unit vector): `at` is where that puts a small chip, and a surface that
+   * knows the chip's own size stands it just clear of the line it speaks of — a wide
+   * sentence beside a short side would otherwise lie across it.
+   */
+  from?: Point;
+  away?: Point;
   /** The marks it is about — the figure's, the numbers written on it, the page's text: pointing at any of them brings it up. */
   ids: string[];
   /** A problem, not an answer: it stays when the moment is over. */
@@ -118,34 +126,35 @@ export function marksOfFigure(fm: FigureMaths): string[] {
   return [...new Set([...fm.figure.ids, ...fm.labels.flatMap((l) => l.ids)])];
 }
 
-/** The unit vector from a figure's inside to a point on its edge — outward. A line has no inside: up. */
-function outwardFrom(fm: FigureMaths, at: Point): Point {
-  const f = fm.figure;
-  const c = f.centre && f.kind === 'circle' ? f.centre : f.closed && f.vertices.length ? { x: f.vertices.reduce((a, p) => a + p.x, 0) / f.vertices.length, y: f.vertices.reduce((a, p) => a + p.y, 0) / f.vertices.length } : null;
-  if (c) {
-    const d = Math.hypot(at.x - c.x, at.y - c.y);
-    if (d > 1e-6) return { x: (at.x - c.x) / d, y: (at.y - c.y) / d };
-  }
-  // A line, or the middle of a figure's own centre: off its length, on the upper side of the screen.
-  const s = f.sides[0];
-  if (s) {
-    const dx = s.to.x - s.from.x, dy = s.to.y - s.from.y, l = Math.hypot(dx, dy) || 1;
-    const n = { x: dy / l, y: -dx / l };
-    return n.y > 0 || (n.y === 0 && n.x > 0) ? { x: -n.x, y: -n.y } : n;
-  }
-  return { x: 0, y: -1 };
-}
-
-/** Where a key stands on a figure: the middle of its side, or of the part of a side. */
-function placeOf(fm: FigureMaths, key: string): Point | null {
+/** Where a key stands on a figure: the middle of its side (or of the part of a side), and which way that side runs. */
+function placeOf(fm: FigureMaths, key: string): { at: Point; dir: Point } | null {
   const [base, part] = key.split('.');
   const side = fm.figure.sides.find((s) => s.key === base);
   if (!side) return null;
-  if (part) {
-    const p = side.parts?.find((x) => x.key === key);
-    return p ? mid(p.from, p.to) : null;
+  const seg = part ? side.parts?.find((x) => x.key === key) : side;
+  if (!seg) return null;
+  const dx = seg.to.x - seg.from.x, dy = seg.to.y - seg.from.y, l = Math.hypot(dx, dy);
+  return { at: mid(seg.from, seg.to), dir: l > 1e-9 ? { x: dx / l, y: dy / l } : { x: 1, y: 0 } };
+}
+
+/**
+ * The unit vector that stands off a side, away from what the figure encloses: the side's own
+ * normal on the far side from the figure's middle — not the direction from the middle to the
+ * side's middle, which on a long low triangle points along the figure and off its side. A line
+ * has no inside: it stands on the upper side of the screen.
+ */
+function outwardFrom(fm: FigureMaths, place: { at: Point; dir: Point }): Point {
+  const f = fm.figure;
+  let n = { x: place.dir.y, y: -place.dir.x };
+  const inside = f.kind === 'circle' && f.centre ? f.centre : f.kind === 'arc' && f.vertices[2] ? f.vertices[2] : f.closed && f.vertices.length ? { x: f.vertices.reduce((a, p) => a + p.x, 0) / f.vertices.length, y: f.vertices.reduce((a, p) => a + p.y, 0) / f.vertices.length } : null;
+  if (inside) {
+    const d = (place.at.x - inside.x) * n.x + (place.at.y - inside.y) * n.y;
+    if (d < 0) n = { x: -n.x, y: -n.y };
+    // A side through the middle (a circle's radius): either way is off it; keep the upper.
+    else if (d === 0 && (n.y > 0 || (n.y === 0 && n.x > 0))) n = { x: -n.x, y: -n.y };
+    return n;
   }
-  return mid(side.from, side.to);
+  return n.y > 0 || (n.y === 0 && n.x > 0) ? { x: -n.x, y: -n.y } : n;
 }
 
 /** The measures that belong to no side, said one under another below their figure. */
@@ -176,7 +185,7 @@ function figureChips(board: BoardMaths): MathsChip[] {
           const n = outwardFrom(fm, there);
           out.push({
             key: `side:${fm.figure.id}:${v.key}`, kind: 'side', text: v.text, ids,
-            at: { x: there.x + n.x * CHIP_OFFSET, y: there.y + n.y * CHIP_OFFSET }, align: 'centre',
+            at: { x: there.at.x + n.x * CHIP_OFFSET, y: there.at.y + n.y * CHIP_OFFSET }, align: 'centre', from: there.at, away: n,
             standing: false, reason: derivedReason(v),
           });
         } else if (SAID_BELOW.has(v.key)) {
@@ -188,7 +197,7 @@ function figureChips(board: BoardMaths): MathsChip[] {
           });
         }
       }
-      for (const c of top.conflicts) out.push(conflictChip(fm, c, ids));
+      for (const c of top.conflicts) out.push(conflictChip(board, fm, c, ids));
     }
     // A drawing's scale, once, when more than one label says it: how the labels agree with the ink.
     const drawing = fm.drawing;
@@ -215,13 +224,27 @@ function figureChips(board: BoardMaths): MathsChip[] {
   return out;
 }
 
-/** A label that cannot hold, inside its figure beside the side it is on: the solver's own sentence. */
-function conflictChip(fm: FigureMaths, c: Conflict, ids: string[]): MathsChip {
-  const there = placeOf(fm, c.key) ?? { x: (fm.figure.vertices[0]?.x ?? 0), y: (fm.figure.vertices[0]?.y ?? 0) };
+/**
+ * A label that cannot hold: the solver's own sentence, right of the number it is about — where the
+ * hand looks — else inside its figure beside the side it is on.
+ */
+function conflictChip(board: BoardMaths, fm: FigureMaths, c: Conflict, ids: string[]): MathsChip {
+  const all = [...new Set([...ids, ...c.ids])];
+  const num = board.dimensions.numbers.find((n) => n.ids.some((id) => c.ids.includes(id)));
+  const key = `conflict:${fm.figure.id}:${c.key}`;
+  if (num) {
+    return {
+      key, kind: 'conflict', text: c.reason, ids: all,
+      at: { x: num.bounds.maxX + STEP_GAP, y: (num.bounds.minY + num.bounds.maxY) / 2 }, align: 'left', standing: true, reason: c.reason,
+    };
+  }
+  const v0 = fm.figure.vertices[0] ?? { x: 0, y: 0 };
+  const there = placeOf(fm, c.key) ?? { at: v0, dir: { x: 1, y: 0 } };
   const n = outwardFrom(fm, there);
   return {
-    key: `conflict:${fm.figure.id}:${c.key}`, kind: 'conflict', text: c.reason, ids: [...new Set([...ids, ...c.ids])],
-    at: { x: there.x - n.x * CHIP_OFFSET, y: there.y - n.y * CHIP_OFFSET }, align: 'centre', standing: true, reason: c.reason,
+    key, kind: 'conflict', text: c.reason, ids: all,
+    at: { x: there.at.x - n.x * CHIP_OFFSET, y: there.at.y - n.y * CHIP_OFFSET }, align: 'centre', from: there.at, away: { x: -n.x, y: -n.y },
+    standing: true, reason: c.reason,
   };
 }
 
@@ -298,7 +321,8 @@ export function mathsSaid(board: BoardMaths, ids: readonly string[]): MathsSaid 
     for (const r of rest) rows.push({ k: 'or', v: r.sentence, ...(r.conflicts.length ? { why: r.conflicts.map((c) => c.reason).join('; ') } : {}) });
     for (const v of fm.solution.ink) rows.push({ k: v.label, v: `${v.text} (the ink’s)`, why: v.reason });
     for (const n of fm.solution.notes) rows.push({ k: 'note', v: n });
-    if (fm.drawing?.scale && fm.drawing.scale.labels > 1) lines.push(fm.drawing.scale.reason);
+    // How the labels agree with the ink is working, not an answer: behind details.
+    if (fm.drawing?.scale && fm.drawing.scale.labels > 1) rows.push({ k: 'scale', v: fm.drawing.scale.reason });
   }
   const page = board.sheet.entries.filter((e) => (e.kind === 'step' || e.kind === 'check') && (e.ids ?? []).some((id) => held.has(id)));
   if (page.length) {

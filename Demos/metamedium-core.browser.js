@@ -33,6 +33,7 @@ var MetaMediumCore = (() => {
     BUILTIN_CONCEPTS: () => BUILTIN_CONCEPTS,
     BUILTIN_TOOLS: () => BUILTIN_TOOLS,
     BUILTIN_TYPES: () => BUILTIN_TYPES,
+    CHIP_OFFSET: () => CHIP_OFFSET,
     CLASS_DIAGRAM_READER: () => CLASS_DIAGRAM_READER,
     COMMAND_MARK_SAMPLES: () => COMMAND_MARK_SAMPLES,
     COMPARTMENT_CROSSINGS: () => COMPARTMENT_CROSSINGS,
@@ -193,6 +194,7 @@ var MetaMediumCore = (() => {
     SPECIFIC_GROUNDS: () => SPECIFIC_GROUNDS,
     STEADY_MARGIN: () => STEADY_MARGIN,
     STEADY_MS: () => STEADY_MS,
+    STEP_GAP: () => STEP_GAP,
     STRAIGHT_RUN: () => STRAIGHT_RUN,
     STRAIGHT_TURN: () => STRAIGHT_TURN,
     SYMMETRIC_LINKS: () => SYMMETRIC_LINKS,
@@ -243,6 +245,8 @@ var MetaMediumCore = (() => {
     binarize: () => binarize,
     bindingsOf: () => bindingsOf,
     blessedBehaviourOf: () => blessedBehaviourOf,
+    boardMaths: () => boardMaths,
+    boardMathsOf: () => boardMathsOf,
     boundByIndex: () => boundByIndex,
     boundRepsOf: () => boundRepsOf,
     boundSiteOf: () => boundSiteOf,
@@ -350,6 +354,7 @@ var MetaMediumCore = (() => {
     endOfHandle: () => endOfHandle,
     evaluateChain: () => evaluateChain,
     evaluateExpr: () => evaluateExpr,
+    evaluateTyped: () => evaluateTyped,
     explanationOf: () => explanationOf,
     exportFrame: () => exportFrame,
     figureOfMark: () => figureOfMark,
@@ -454,6 +459,8 @@ var MetaMediumCore = (() => {
     matchDefinition: () => matchDefinition,
     matchPrimitiveFromLibrary: () => matchPrimitiveFromLibrary,
     matchesCommandMark: () => matchesCommandMark,
+    mathsChips: () => mathsChips,
+    mathsSaid: () => mathsSaid,
     maxTokensFor: () => maxTokensFor,
     mayCross: () => mayCross,
     measure: () => measure,
@@ -2227,12 +2234,12 @@ var MetaMediumCore = (() => {
     const cy2 = (a2 * (c.x - b.x) + b2 * (a.x - c.x) + c2 * (b.x - a.x)) / d;
     return { cx: cx2, cy: cy2, r: Math.hypot(a.x - cx2, a.y - cy2) };
   }
-  function arcThrough(a, mid8, c) {
-    const cc = circumcircle(a, mid8, c);
+  function arcThrough(a, mid9, c) {
+    const cc = circumcircle(a, mid9, c);
     if (!cc) return null;
     const a0 = Math.atan2(a.y - cc.cy, a.x - cc.cx);
     const a1 = Math.atan2(c.y - cc.cy, c.x - cc.cx);
-    const am = Math.atan2(mid8.y - cc.cy, mid8.x - cc.cx);
+    const am = Math.atan2(mid9.y - cc.cy, mid9.x - cc.cx);
     const norm2 = (x) => (x % TAU + TAU) % TAU;
     const viaCcw = norm2(am - a0) < norm2(a1 - a0);
     const sweep = viaCcw ? norm2(a1 - a0) : -norm2(a0 - a1);
@@ -2359,15 +2366,15 @@ var MetaMediumCore = (() => {
       }
       case "arc": {
         const a = fp.start, c = fp.end;
-        let mid8 = raw[Math.floor(raw.length / 2)], best = -1;
+        let mid9 = raw[Math.floor(raw.length / 2)], best = -1;
         for (const p of raw) {
           const d = Math.abs(sideOf(a, c, p));
           if (d > best) {
             best = d;
-            mid8 = p;
+            mid9 = p;
           }
         }
-        const arc = arcThrough(a, mid8, c);
+        const arc = arcThrough(a, mid9, c);
         if (!arc) return { shape: "line", closed: false, points: [a, c], reasoning: "too flat to bow; drawn straight" };
         return { shape, closed: false, points: arc.points, reasoning: `a circular arc of radius ${Math.round(arc.r)} through its ends and its bulge` };
       }
@@ -8258,6 +8265,277 @@ ${p.svg}</section>`),
     return { ...base, rows, cols, pages, assembly, html, reason };
   }
 
+  // src/maths/board.ts
+  function emptyDimensions() {
+    return { figures: [], numbers: [], attachments: [], labels: /* @__PURE__ */ new Map(), rightAngles: [], underlines: [], drawings: [], numberIds: /* @__PURE__ */ new Set() };
+  }
+  function boardMaths(state) {
+    if (numbersOf(state).length) return solveBoard(state, { figures: figuresOf(state) });
+    const sheet = readSheet(sheetLines(state, { except: [] }));
+    if (!sheet.entries.some((e) => e.kind !== "heading" && e.kind !== "note")) return null;
+    return { dimensions: emptyDimensions(), sheet, figures: [] };
+  }
+  var memo = null;
+  function boardMathsOf(session) {
+    const events = session.getEvents();
+    const last = events.length ? events[events.length - 1] : void 0;
+    if (memo && memo.events === events && memo.length === events.length && memo.last === last) return memo.board;
+    const board = boardMaths(session.getState());
+    memo = { events, length: events.length, last, board };
+    return board;
+  }
+  var CHIP_OFFSET = 28;
+  var STEP_GAP = 14;
+  var fmt3 = (q) => q ? formatQuantity(q) : "no value";
+  var mid6 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  function marksOfFigure(fm) {
+    return [.../* @__PURE__ */ new Set([...fm.figure.ids, ...fm.labels.flatMap((l) => l.ids)])];
+  }
+  function placeOf(fm, key2) {
+    const [base, part] = key2.split(".");
+    const side = fm.figure.sides.find((s) => s.key === base);
+    if (!side) return null;
+    const seg2 = part ? side.parts?.find((x) => x.key === key2) : side;
+    if (!seg2) return null;
+    const dx = seg2.to.x - seg2.from.x, dy = seg2.to.y - seg2.from.y, l = Math.hypot(dx, dy);
+    return { at: mid6(seg2.from, seg2.to), dir: l > 1e-9 ? { x: dx / l, y: dy / l } : { x: 1, y: 0 } };
+  }
+  function outwardFrom(fm, place2) {
+    const f = fm.figure;
+    let n2 = { x: place2.dir.y, y: -place2.dir.x };
+    const inside = f.kind === "circle" && f.centre ? f.centre : f.kind === "arc" && f.vertices[2] ? f.vertices[2] : f.closed && f.vertices.length ? { x: f.vertices.reduce((a, p) => a + p.x, 0) / f.vertices.length, y: f.vertices.reduce((a, p) => a + p.y, 0) / f.vertices.length } : null;
+    if (inside) {
+      const d = (place2.at.x - inside.x) * n2.x + (place2.at.y - inside.y) * n2.y;
+      if (d < 0) n2 = { x: -n2.x, y: -n2.y };
+      else if (d === 0 && (n2.y > 0 || n2.y === 0 && n2.x > 0)) n2 = { x: -n2.x, y: -n2.y };
+      return n2;
+    }
+    return n2.y > 0 || n2.y === 0 && n2.x > 0 ? { x: -n2.x, y: -n2.y } : n2;
+  }
+  var SAID_BELOW = /* @__PURE__ */ new Set(["diagonal", "circumference", "arc"]);
+  var derivedReason = (v) => v.reason;
+  function figureChips(board) {
+    const out = [];
+    const scaled3 = /* @__PURE__ */ new Set();
+    for (const fm of board.figures) {
+      const top = fm.solution.readings[0];
+      const ids = marksOfFigure(fm);
+      const bounds = fm.figure.outline.length ? fm.figure.outline : fm.figure.vertices;
+      const box = {
+        minX: Math.min(...bounds.map((p) => p.x)),
+        maxX: Math.max(...bounds.map((p) => p.x)),
+        minY: Math.min(...bounds.map((p) => p.y)),
+        maxY: Math.max(...bounds.map((p) => p.y))
+      };
+      let below = 0;
+      if (top) {
+        const contested = new Set(top.conflicts.map((c) => c.key));
+        for (const v of top.values) {
+          if (v.from !== "derived" || contested.has(v.key)) continue;
+          const there = placeOf(fm, v.key);
+          if (there) {
+            const n2 = outwardFrom(fm, there);
+            out.push({
+              key: `side:${fm.figure.id}:${v.key}`,
+              kind: "side",
+              text: v.text,
+              ids,
+              at: { x: there.at.x + n2.x * CHIP_OFFSET, y: there.at.y + n2.y * CHIP_OFFSET },
+              align: "centre",
+              from: there.at,
+              away: n2,
+              standing: false,
+              reason: derivedReason(v)
+            });
+          } else if (SAID_BELOW.has(v.key)) {
+            below++;
+            out.push({
+              key: `measure:${fm.figure.id}:${v.key}`,
+              kind: "measure",
+              text: `${v.label} ${v.text}`,
+              ids,
+              at: { x: (box.minX + box.maxX) / 2, y: box.maxY + CHIP_OFFSET * below },
+              align: "centre",
+              standing: false,
+              reason: derivedReason(v)
+            });
+          }
+        }
+        for (const c of top.conflicts) out.push(conflictChip(board, fm, c, ids));
+      }
+      const drawing = fm.drawing;
+      if (drawing?.scale && drawing.scale.labels > 1 && !scaled3.has(drawing.id)) {
+        scaled3.add(drawing.id);
+        out.push({
+          key: `scale:${drawing.id}`,
+          kind: "scale",
+          text: drawing.scale.reason,
+          ids: drawing.ids.length ? drawing.ids : ids,
+          at: { x: box.minX, y: box.minY - CHIP_OFFSET },
+          align: "left",
+          standing: false,
+          reason: drawing.scale.reason
+        });
+      }
+      for (const l of fm.labels) {
+        if (l.step === void 0 || l.declared) continue;
+        const check2 = checkWritten(board.sheet, String(l.step), l.value);
+        if (!check2 || check2.status !== "off") continue;
+        const num2 = board.dimensions.numbers.find((n2) => n2.id === l.number);
+        if (!num2) continue;
+        out.push({
+          key: `label:${fm.figure.id}:${l.number ?? l.text}`,
+          kind: "step",
+          text: `\u2717 ${check2.reason}`,
+          ids: [.../* @__PURE__ */ new Set([...l.ids, ...fm.figure.ids])],
+          at: { x: num2.bounds.maxX + STEP_GAP, y: (num2.bounds.minY + num2.bounds.maxY) / 2 },
+          align: "left",
+          standing: true,
+          reason: check2.reason
+        });
+      }
+    }
+    return out;
+  }
+  function conflictChip(board, fm, c, ids) {
+    const all = [.../* @__PURE__ */ new Set([...ids, ...c.ids])];
+    const num2 = board.dimensions.numbers.find((n3) => n3.ids.some((id) => c.ids.includes(id)));
+    const key2 = `conflict:${fm.figure.id}:${c.key}`;
+    if (num2) {
+      return {
+        key: key2,
+        kind: "conflict",
+        text: c.reason,
+        ids: all,
+        at: { x: num2.bounds.maxX + STEP_GAP, y: (num2.bounds.minY + num2.bounds.maxY) / 2 },
+        align: "left",
+        standing: true,
+        reason: c.reason
+      };
+    }
+    const v0 = fm.figure.vertices[0] ?? { x: 0, y: 0 };
+    const there = placeOf(fm, c.key) ?? { at: v0, dir: { x: 1, y: 0 } };
+    const n2 = outwardFrom(fm, there);
+    return {
+      key: key2,
+      kind: "conflict",
+      text: c.reason,
+      ids: all,
+      at: { x: there.at.x - n2.x * CHIP_OFFSET, y: there.at.y - n2.y * CHIP_OFFSET },
+      align: "centre",
+      from: there.at,
+      away: { x: -n2.x, y: -n2.y },
+      standing: true,
+      reason: c.reason
+    };
+  }
+  function stepSaid(readings2) {
+    const top = readings2[0];
+    if (!top) return null;
+    if (!top.value) {
+      const why = [...top.notes, ...top.unknowns.map((u) => `${u} is not on this sheet`)].filter((x, i, xs) => xs.indexOf(x) === i);
+      return { text: `? ${why[0] ?? "no value"}`, standing: true };
+    }
+    const v = fmt3(top.value);
+    const off = top.checks.find((c) => c.status === "off");
+    if (off) return { text: `\u2717 ${v} \xB7 written ${fmt3(off.written)}`, standing: true };
+    const agrees = top.checks.length > 0 && top.checks.every((c) => c.status !== "unknown");
+    const others = readings2.slice(1).map((r) => r.value ? fmt3(r.value) : "").filter((x, i, xs) => x && x !== v && xs.indexOf(x) === i);
+    return { text: `${agrees ? "\u2713" : "="} ${v}${others.length ? ` \xB7 or ${others.slice(0, 2).join(", ")}` : ""}`, standing: false };
+  }
+  function stepChips(sheet) {
+    const out = [];
+    for (const e of sheet.entries) {
+      if (e.kind !== "step" && e.kind !== "check" || e.kind === "step" && e.conflict || !e.bounds) continue;
+      const said3 = stepSaid(e.readings);
+      if (!said3) continue;
+      out.push({
+        key: e.kind === "step" ? `step:${e.key}` : `check:${e.line}`,
+        kind: "step",
+        text: said3.text,
+        ids: [...e.ids ?? []],
+        at: { x: e.bounds.maxX + STEP_GAP, y: (e.bounds.minY + e.bounds.maxY) / 2 },
+        align: "left",
+        standing: said3.standing,
+        reason: stepReason2(e)
+      });
+    }
+    return out;
+  }
+  function stepReason2(e) {
+    const top = e.readings[0];
+    if (!top) return e.reason;
+    const rest = e.readings.slice(1).map((r) => `or ${fmt3(r.value)}${r.label ? ` ${r.label}` : " from the measurements"}${r.checks.some((c) => c.status === "off") ? ` \u2717 written ${fmt3(r.checks.find((c) => c.status === "off").written)}` : ""}`);
+    return [`${e.text} \u2014 ${e.reason}`, ...rest].join("; ");
+  }
+  function mathsChips(board) {
+    return [...figureChips(board), ...stepChips(board.sheet)];
+  }
+  function mathsSaid(board, ids) {
+    const held2 = new Set(ids);
+    const lines = [];
+    const rows = [];
+    for (const fm of board.figures) {
+      if (!marksOfFigure(fm).some((id) => held2.has(id))) continue;
+      const [top, ...rest] = fm.solution.readings;
+      if (!top) continue;
+      const derived = top.values.filter((v) => v.from === "derived");
+      if (!derived.length && !top.conflicts.length) continue;
+      lines.push(top.sentence);
+      for (const c of top.conflicts) lines.push(c.reason);
+      for (const v of derived) rows.push({ k: v.label, v: v.text, why: v.reason });
+      for (const r of rest) rows.push({ k: "or", v: r.sentence, ...r.conflicts.length ? { why: r.conflicts.map((c) => c.reason).join("; ") } : {} });
+      for (const v of fm.solution.ink) rows.push({ k: v.label, v: `${v.text} (the ink\u2019s)`, why: v.reason });
+      for (const n2 of fm.solution.notes) rows.push({ k: "note", v: n2 });
+      if (fm.drawing?.scale && fm.drawing.scale.labels > 1) rows.push({ k: "scale", v: fm.drawing.scale.reason });
+    }
+    const page = board.sheet.entries.filter((e) => (e.kind === "step" || e.kind === "check") && (e.ids ?? []).some((id) => held2.has(id)));
+    if (page.length) {
+      const steps = page.filter((e) => e.kind === "step" && !e.conflict);
+      const off = steps.filter((e) => e.readings[0]?.checks.some((c) => c.status === "off") || !e.readings[0]?.value);
+      if (steps.length) lines.push(`${steps.length} step${steps.length === 1 ? "" : "s"} \u2014 ${off.length ? `${steps.length - off.length} agree, ${off.length} ${off.length === 1 ? "does" : "do"} not (${off.map((e) => e.key).join(", ")})` : steps.length === 1 ? "it agrees" : "every one agrees"}`);
+      for (const e of page) {
+        if (e.kind !== "step" && e.kind !== "check") continue;
+        if (e.kind === "step" && e.conflict) {
+          rows.push({ k: e.text, v: e.conflict });
+          continue;
+        }
+        const said3 = stepSaid(e.readings);
+        if (said3) rows.push({ k: e.kind === "step" ? e.n !== null ? `${e.n}.` : `${e.letter}.` : "check", v: said3.text, why: stepReason2(e) });
+      }
+    }
+    return lines.length || rows.length ? { lines, rows } : null;
+  }
+  function evaluateTyped(text, board) {
+    const body = text.replace(/^\s*=\s*/, "").trim();
+    if (!body) return { ok: false, reason: "type a sum, like = 24 \xF7 3" };
+    const page = board ? board.sheet.entries.map((e2) => e2.text) : [];
+    const sheet = readSheet([...page, body]);
+    const e = sheet.entries[sheet.entries.length - 1];
+    if (!e) return { ok: false, reason: "type a sum, like = 24 \xF7 3" };
+    if (e.kind !== "check") {
+      if (e.kind === "value") return { ok: false, reason: `${body} is only a number \u2014 type a sum, like = 24 \xF7 3` };
+      if (e.kind === "definition") return { ok: false, reason: `${body} says what ${e.key} is \u2014 type a sum, like = ${e.key} \xF7 3` };
+      return { ok: false, reason: `cannot read \u201C${body}\u201D as a sum` };
+    }
+    const top = e.readings[0];
+    if (!top || !top.value) {
+      const why = top ? [...top.notes, ...top.unknowns.map((u) => `${u} is not on this sheet`)].filter((x, i, xs) => xs.indexOf(x) === i) : [];
+      return { ok: false, reason: why[0] ?? `cannot read \u201C${body}\u201D as a sum` };
+    }
+    const off = top.checks.find((c) => c.status === "off");
+    if (off) return { ok: false, reason: `${top.formula} is ${fmt3(top.value)}, not ${fmt3(off.written)}` };
+    const result2 = fmt3(top.value);
+    const second = e.readings[1];
+    return {
+      ok: true,
+      body,
+      result: result2,
+      words: body.includes("=") ? body : `${top.formula} = ${result2}`,
+      ...second && second.value ? { also: `${second.formula} = ${fmt3(second.value)}` } : {}
+    };
+  }
+
   // src/session/handles.ts
   var MIN_EXTENT_PX = 2;
   var HANDLES = {
@@ -8340,7 +8618,7 @@ ${p.svg}</section>`),
   var sub5 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
   var add2 = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
   var mul2 = (a, k) => ({ x: a.x * k, y: a.y * k });
-  var mid6 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  var mid7 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
   var cross4 = (a, b) => a.x * b.y - a.y * b.x;
   var len = (a) => Math.hypot(a.x, a.y);
   var dist4 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -8389,14 +8667,14 @@ ${p.svg}</section>`),
           const e = sub5(p[i], p[(i + 3) % 4]);
           const cr = cross4(s, e);
           if (Math.abs(cr) < 1e-12) return null;
-          const v = cross4(s, sub5(t, mid6(p[i], p[(i + 1) % 4]))) / cr;
+          const v = cross4(s, sub5(t, mid7(p[i], p[(i + 1) % 4]))) / cr;
           const k = atLeast(1 + v, len(e), floor) - 1;
           q = p.slice();
           q[i] = add2(p[i], mul2(e, k));
           q[(i + 1) % 4] = add2(p[(i + 1) % 4], mul2(e, k));
           how = `its side ${i} moved, the side across it held`;
         } else {
-          q = moved2(sub5(t, mid6(p[0], p[2])));
+          q = moved2(sub5(t, mid7(p[0], p[2])));
           how = "moved whole by its centre";
         }
         const top = sub5(q[1], q[0]), side = sub5(q[3], q[0]);
@@ -8432,7 +8710,7 @@ ${p.svg}</section>`),
         if (p.length < 2) return null;
         let a = p[0], z = p[p.length - 1];
         if (kind === "middle") {
-          const by = sub5(t, mid6(a, z));
+          const by = sub5(t, mid7(a, z));
           return made([add2(a, by), add2(z, by)], `moved whole by its middle, ${r02(dist4(a, z))} long`);
         }
         if (kind === "tail") a = t;
@@ -8443,7 +8721,7 @@ ${p.svg}</section>`),
       case "arrow": {
         if (p.length < 2) return null;
         let tail = p[0], tip = p[1];
-        if (kind === "middle") return made(moved2(sub5(t, mid6(tail, tip))), `moved whole by its middle, ${r02(dist4(tail, tip))} long`);
+        if (kind === "middle") return made(moved2(sub5(t, mid7(tail, tip))), `moved whole by its middle, ${r02(dist4(tail, tip))} long`);
         const was = p.length >= 3 ? dist4(p[2], p[1]) : 0;
         if (kind === "tail") tail = t;
         else tip = t;
@@ -8470,7 +8748,7 @@ ${p.svg}</section>`),
         if (kind === "bulge") {
           const ch2 = dist4(a, z);
           if (ch2 < 1e-9) return null;
-          const m = mid6(a, z);
+          const m = mid7(a, z);
           const n2 = { x: -(z.y - a.y) / ch2, y: (z.x - a.x) / ch2 };
           let s = (t.x - m.x) * n2.x + (t.y - m.y) * n2.y;
           const least = Math.max(floor, ch2 * 0.01);
@@ -10109,9 +10387,9 @@ ${p.svg}</section>`),
   function lowerBound(list5, e) {
     let lo = 0, hi = list5.length;
     while (lo < hi) {
-      const mid8 = lo + hi >> 1;
-      if (order(list5[mid8], e) < 0) lo = mid8 + 1;
-      else hi = mid8;
+      const mid9 = lo + hi >> 1;
+      if (order(list5[mid9], e) < 0) lo = mid9 + 1;
+      else hi = mid9;
     }
     return lo;
   }
@@ -19276,7 +19554,7 @@ ${lines.join("\n")}
   var MERMAID_MAX_LINKS = 120;
   var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   var add3 = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
-  var mid7 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  var mid8 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
   function inkAround(corners, step2) {
     const ring2 = [...corners, corners[0]];
     const out = [{ x: ring2[0].x, y: ring2[0].y }];
@@ -19307,7 +19585,7 @@ ${lines.join("\n")}
         const lean = h2 * Math.tan(DATA_LEAN_DEG * Math.PI / 180);
         const tl = { x: -body / 2 + lean / 2, y: -h2 / 2 }, tr = { x: body / 2 + lean / 2, y: -h2 / 2 };
         const br = { x: body / 2 - lean / 2, y: h2 / 2 }, bl = { x: -body / 2 - lean / 2, y: h2 / 2 };
-        return { symbol, w: body + lean, h: h2, ink: () => inkAround([tl, tr, br, bl], INK_STEP), ports: { top: mid7(tl, tr), right: mid7(tr, br), bottom: mid7(br, bl), left: mid7(bl, tl) } };
+        return { symbol, w: body + lean, h: h2, ink: () => inkAround([tl, tr, br, bl], INK_STEP), ports: { top: mid8(tl, tr), right: mid8(tr, br), bottom: mid8(br, bl), left: mid8(bl, tl) } };
       }
       case "terminator": {
         const w2 = clamp(tw + BOX_H * U, CORE_MIN * U, CORE_MAX * U);
@@ -19402,7 +19680,7 @@ ${lines.join("\n")}
     const th = sweep * Math.PI / 180;
     const R = c / (2 * Math.sin(th / 2));
     const d = R * Math.cos(th / 2);
-    const M = mid7(P, Q);
+    const M = mid8(P, Q);
     const C = { x: M.x - out.x * d, y: M.y - out.y * d };
     const a0 = Math.atan2(P.y - C.y, P.x - C.x);
     const a1 = Math.atan2(Q.y - C.y, Q.x - C.x);
@@ -23166,8 +23444,81 @@ if (mm.THREE && mm.scene) {
     }
   };
 
+  // src/tools/maths.ts
+  var GROUNDS = { on: "written", confidence: 0.9, why: "the numbers you wrote here" };
+  function saysSomething(fm) {
+    const top = fm.solution.readings[0];
+    return !!top && (top.conflicts.length > 0 || top.values.some((v) => v.from === "derived"));
+  }
+  var MATHS = {
+    id: "maths",
+    name: "maths",
+    describe: () => "a drawing with numbers written on it is solved figure by figure with no model \u2014 the sides they fix, with their formula, and what cannot hold; a page of steps is checked; a figure in a unit goes out at true size",
+    offers(scope) {
+      const board = boardMathsOf(scope.session);
+      if (!board) return [];
+      const marks = new Set(scope.marks);
+      if (!marks.size) return [];
+      const out = [];
+      const held2 = board.figures.filter((fm) => marksOfFigure(fm).some((id) => marks.has(id)));
+      const saying = held2.filter(saysSomething);
+      if (saying.length) {
+        const said3 = saying.flatMap((fm) => {
+          const top = fm.solution.readings[0];
+          return [top.sentence, ...top.conflicts.map((c) => c.reason)];
+        });
+        out.push({
+          key: "maths:sizes",
+          label: "Show the sizes",
+          reason: said3.join(" \u2014 "),
+          base: baseOn(GROUNDS),
+          tool: "maths",
+          grounds: GROUNDS,
+          verbs: ["sizes", "show the sizes", "solve", "solve it", "maths"],
+          data: { act: "sizes", ids: [...new Set(saying.flatMap(marksOfFigure))], say: said3[0] }
+        });
+      }
+      const steps = board.sheet.entries.filter((e) => e.kind === "step" && !e.conflict && (e.ids ?? []).some((id) => marks.has(id)));
+      if (steps.length) {
+        const off = steps.filter((e) => e.kind === "step" && (!e.readings[0]?.value || e.readings[0].checks.some((c) => c.status === "off")));
+        const reason = `${steps.length} step${steps.length === 1 ? "" : "s"} \u2014 ${off.length ? `${steps.length - off.length} agree, ${off.length} ${off.length === 1 ? "does" : "do"} not (${off.map((e) => e.kind === "step" ? e.key : "").join(", ")})` : steps.length === 1 ? "it agrees" : "every one agrees"}`;
+        out.push({
+          key: "maths:steps",
+          label: "Check the steps",
+          reason,
+          base: baseOn(GROUNDS),
+          tool: "maths",
+          grounds: { ...GROUNDS, why: "the steps you wrote here" },
+          verbs: ["steps", "check", "check the steps", "maths"],
+          data: { act: "steps", ids: [...new Set(steps.flatMap((e) => e.ids ?? []))], say: reason }
+        });
+      }
+      const inUnit = held2.filter((fm) => fm.drawing?.unit && fm.solution.readings.length);
+      if (inUnit.length) {
+        const ts = trueSize(board);
+        if (ts.figures.some((f) => inUnit.some((fm) => fm.figure.ids.some((id) => f.ids.includes(id))))) {
+          out.push({
+            key: "maths:print",
+            label: "Print at true size",
+            reason: "the drawing at its real size, tiled onto pages at 100% with a test square on each \u2014 a printer scales without saying so",
+            base: 0.4,
+            tool: "maths",
+            verbs: ["print", "print at true size", "true size", "full size"],
+            data: { act: "print" }
+          });
+        }
+      }
+      return out;
+    },
+    take(offer) {
+      const { act } = offer.data;
+      if (act === "print") return { host: "maths-print" };
+      return { host: "maths-show", detail: offer.data };
+    }
+  };
+
   // src/tools/builtin.ts
-  var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE];
+  var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS];
   registerTool(CORRECT);
   registerTool(TEXT);
   registerTool(NAME2);
@@ -23185,6 +23536,7 @@ if (mm.THREE && mm.scene) {
   registerTool(DUPLICATE);
   registerTool(KEEP);
   registerTool(STRUCTURE);
+  registerTool(MATHS);
 
   // src/context/context.ts
   var CONTEXT_FADE = 2.5;
