@@ -3868,6 +3868,290 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
+  // ---- 62. Mermaid out: a drawing said as text, standing beside it (V1-PLAN §3, D2's surface) ----
+  // A hand-drawn flowchart — three processes and a decision joined by arrows, the drawing of 50 — held:
+  // the field offers Make it Mermaid; taking it stands a mermaid artifact beside the drawing holding the
+  // text the notation says (the golden below, written by hand from the drawing: nodes in reading order,
+  // no writing so every symbol blank, flows grouped by the node each leaves). The frame draws it with a
+  // library it loads and reports each node as a part named for its Mermaid id, so ink over the diagram
+  // lands on the mark it was written from. The library is a CDN's: 62c runs the plumbing with a stand-in
+  // served by the gate (no network), 62d the real one when it loads and is SKIPPED BY NAME when it cannot,
+  // 62e the text standing when it does not, and the export pane writes the file (62g).
+  {
+    mm.session.load([]); mm.setView(1, 0, 0); mm.resetUses(); mm.mermaidFrom(null);
+    const ids62 = [];
+    const last62 = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
+    const keep62 = () => ids62.push(last62());
+    const diamond62 = (cx, cy, w, h) => {
+      const v = [{ x: cx, y: cy - h / 2 }, { x: cx + w / 2, y: cy }, { x: cx, y: cy + h / 2 }, { x: cx - w / 2, y: cy }];
+      const mid = { x: (v[0].x + v[1].x) / 2, y: (v[0].y + v[1].y) / 2 };
+      const path = [mid, v[1], v[2], v[3], v[0], mid];
+      let p = [];
+      for (let i = 0; i < path.length - 1; i++) p = p.concat(t.line(path[i], path[i + 1], 26).slice(i ? 1 : 0));
+      return p;
+    };
+    const arrowDown62 = (x, y0, y1) => t.line({ x: x, y: y0 }, { x: x, y: y1 }, 40).concat(t.line({ x: x, y: y1 }, { x: x - 14, y: y1 - 20 }, 16).slice(1));
+    t.stroke(t.rect(200, 100, 160, 70)); keep62();
+    t.stroke(arrowDown62(280, 174, 236)); keep62();
+    t.stroke(t.rect(200, 240, 160, 70)); keep62();
+    t.stroke(arrowDown62(280, 314, 382)); keep62();
+    t.stroke(diamond62(280, 440, 180, 110)); keep62();
+    t.stroke(arrowDown62(280, 499, 566)); keep62();
+    t.stroke(t.rect(200, 570, 160, 70)); keep62();
+    const sid62 = (id) => id.replace(/[^A-Za-z0-9]+/g, '_');
+    const [P1, f1, P2, f2, Q, f3, P3] = ids62;
+    const golden62 = ['flowchart TD',
+      '    ' + sid62(P1) + '[" "]', '    ' + sid62(P2) + '[" "]', '    ' + sid62(Q) + '{" "}', '    ' + sid62(P3) + '[" "]',
+      '    ' + sid62(P1) + ' --> ' + sid62(P2), '    ' + sid62(P2) + ' --> ' + sid62(Q), '    ' + sid62(Q) + ' --> ' + sid62(P3)].join('\n') + '\n';
+    const holdDrawing62 = async () => {
+      const sum = mm.session.getState().summon; if (sum) mm.session.dismiss(sum.id, Date.now());
+      mm.session.summonMarks(ids62.slice(), Date.now()); await wait(80);
+    };
+    const pill62 = (key) => document.querySelector('#summon .pill.item[data-key="' + key + '"]');
+    const artifacts62 = () => { const st = mm.session.getState(); return st.artifacts.filter((id) => { const r = codeRepOfNode(st.nodes.get(id)); return r && r.data.kind === 'mermaid'; }); };
+    await holdDrawing62();
+    const offer62 = pill62('mermaid');
+    step('62. a hand-drawn flowchart held is offered Make it Mermaid, and the offer says what the marks read as',
+      !!offer62 && /Make it Mermaid/.test(offer62.textContent) && /flowchart/.test(offer62.title) && !offer62.querySelector('.dot'),
+      { label: offer62 && offer62.textContent, title: offer62 && offer62.title });
+    const events62 = mm.session.getEvents().length;
+    if (offer62) offer62.click();
+    await wait(80);
+    const st62 = mm.session.getState();
+    const a62 = artifacts62();
+    const rep62 = a62.length ? codeRepOfNode(st62.nodes.get(a62[0])) : null;
+    const core62 = MM.toMermaid(MM.notationsOf(st62, ids62)[0]);
+    step('62a. taking it stands a mermaid artifact holding exactly the text the notation says — the hand-written golden, and core’s own',
+      a62.length === 1 && !!rep62 && rep62.data.kind === 'mermaid' && rep62.data.code === golden62 && !!core62 && core62.text === golden62 && /\.mmd$/.test(rep62.data.path || ''),
+      { artifacts: a62.length, kind: rep62 && rep62.data.kind, path: rep62 && rep62.data.path, code: rep62 && rep62.data.code, golden: golden62 });
+    const fr62 = a62.length ? MM.frameOf(st62.nodes.get(a62[0])) : null;
+    const drawnRight62 = Math.max(...ids62.map((id) => MM.boundsOf(st62.nodes.get(id)).maxX));
+    const said62 = document.getElementById('status').textContent;
+    step('62b. it stands beside the drawing, never over it, the drawing is untouched, and the status line says so — and one undo takes it all away',
+      !!fr62 && fr62.x >= drawnRight62 && /Mermaid/.test(said62) && ids62.every((id) => st62.contentIds.includes(id)) && (mm.session.undo(), mm.session.getState().artifacts.length === 0 && mm.session.getEvents().length === events62),
+      { frame: fr62, drawnRight: drawnRight62, said: said62, after: mm.session.getState().artifacts.length });
+
+    // The frame's library, first a stand-in the gate serves: the plumbing with no network.
+    const standIn62 = location.origin + '/e2e/fixtures/mermaid-standin.js';
+    const settled62 = async (id, ms) => { for (let i = 0; i < (ms || 60); i++) { const s = mm.mermaidState(id); if (s) return s; await new Promise((r) => setTimeout(r, 250)); } return mm.mermaidState(id); };
+    mm.mermaidFrom([standIn62]);
+    await holdDrawing62();
+    if (pill62('mermaid')) pill62('mermaid').click();
+    await wait(60);
+    const aid62 = artifacts62()[0];
+    const state62c = aid62 ? await settled62(aid62, 40) : null;
+    const parts62 = aid62 ? mm.reportedRegions(aid62) : [];
+    const want62 = [P1, P2, Q, P3].map(sid62);
+    step('62c. the frame loads the library it is told, renders the text and reports each node as a part named for its Mermaid id — four nodes, each with a size; the text is hidden behind the diagram',
+      !!state62c && state62c.state === 'rendered' && JSON.stringify(parts62.map((p) => p.id).sort()) === JSON.stringify(want62.slice().sort()) && parts62.every((p) => p.w > 0 && p.h > 0) && state62c.shown === 'diagram',
+      { state: state62c, parts: parts62.map((p) => p.id), want: want62 });
+    const stC = mm.session.getState();
+    const frC = aid62 && MM.frameOf(stC.nodes.get(aid62));
+    const partOf62 = (mid) => parts62.find((p) => p.id === mid);
+    const over62 = (mid) => { const p = partOf62(mid); return p ? mm.regionsUnderInk(aid62, { minX: frC.x + p.x + p.w * 0.3, maxX: frC.x + p.x + p.w * 0.7, minY: frC.y + p.y + p.h * 0.3, maxY: frC.y + p.y + p.h * 0.7 }) : []; };
+    const onP2 = over62(sid62(P2)), onQ = over62(sid62(Q));
+    step('62c2. ink over a node of the rendered diagram lands on the mark it was written from — the second process, then the decision — and on nothing else',
+      JSON.stringify(onP2) === JSON.stringify([P2]) && JSON.stringify(onQ) === JSON.stringify([Q]),
+      { onP2, onQ, P2, Q });
+
+    // The real library, from its CDN — when it loads. Otherwise skipped, by name, and the text stands.
+    mm.mermaidFrom(null);
+    const state62d = aid62 ? await settled62(aid62, 100) : null;
+    const partsD = aid62 ? mm.reportedRegions(aid62) : [];
+    if (state62d && state62d.state === 'rendered') {
+      const frD = MM.frameOf(mm.session.getState().nodes.get(aid62));
+      const pQ = partsD.find((p) => p.id === sid62(Q));
+      const landed = pQ ? mm.regionsUnderInk(aid62, { minX: frD.x + pQ.x + pQ.w * 0.4, maxX: frD.x + pQ.x + pQ.w * 0.6, minY: frD.y + pQ.y + pQ.h * 0.4, maxY: frD.y + pQ.y + pQ.h * 0.6 }) : [];
+      step('62d. the real diagram library draws the text — each of the four nodes a part named for its Mermaid id, and ink over the decision lands on the decision’s mark',
+        JSON.stringify(partsD.map((p) => p.id).sort()) === JSON.stringify(want62.slice().sort()) && partsD.every((p) => p.w > 0 && p.h > 0) && JSON.stringify(landed) === JSON.stringify([Q]),
+        { parts: partsD, landed });
+    } else {
+      const fD = mm.frames.get(aid62);
+      step('62d. skipped — the diagram library did not load here (' + ((state62d && state62d.why) || 'no answer in time') + '), so the real render is not asserted; the text stands in the frame',
+        !!state62d && state62d.shown === 'text' && !!fD && fD.iframe.srcdoc.indexOf('flowchart TD') >= 0,
+        { state: state62d });
+    }
+
+    // The library gone: the text always stands, and the frame says the diagram could not be drawn.
+    mm.mermaidFrom([location.origin + '/e2e/fixtures/no-such-library.js']);
+    const state62e = aid62 ? await settled62(aid62, 40) : null;
+    const fE = aid62 && mm.frames.get(aid62);
+    step('62e. with no library to draw it the text stands — the frame says so, shows the source, and reports no parts; the artifact is not broken',
+      !!state62e && state62e.state === 'unavailable' && state62e.shown === 'text' && !!fE && fE.iframe.srcdoc.indexOf('flowchart TD') >= 0 && !fE.wrap.classList.contains('broken') && mm.reportedRegions(aid62).length === 0,
+      { state: state62e, broken: fE && fE.wrap.classList.contains('broken') });
+
+    // A text the library cannot read is said with its line, and stands as text.
+    mm.mermaidFrom([standIn62]);
+    const notes62 = mm.importText('notes.mmd', 'this is not a diagram', { x: 900, y: 100 }, 300);
+    const state62f = await settled62(notes62, 40);
+    step('62f. a text the library cannot read is refused with what it said, shown as text, and the artifact stands',
+      !!state62f && state62f.state === 'refused' && /Parse error on line 1/.test(state62f.why || '') && state62f.shown === 'text' && mm.session.getState().artifacts.includes(notes62),
+      { state: state62f });
+    mm.session.erase(notes62, Date.now());
+
+    // The export pane: a row of its own when the board (or the held marks) reads as a notation with a writer.
+    const exportBtn62 = document.getElementById('exportBtn');
+    exportBtn62.click(); await wait(40);
+    const row62 = document.getElementById('exMermaid');
+    const btn62 = row62 && row62.querySelector('button[data-export="mermaid"]');
+    const rowShown62 = !!row62 && !row62.hidden && !!btn62;
+    const grabbed62 = [];
+    const nativeClick62 = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () { if (this.download) { grabbed62.push({ name: this.download, href: this.href }); return; } return nativeClick62.call(this); };
+    if (btn62) btn62.click();
+    await wait(60);
+    HTMLAnchorElement.prototype.click = nativeClick62;
+    let file62 = '';
+    try { if (grabbed62[0]) file62 = await (await fetch(grabbed62[0].href)).text(); } catch (err) { file62 = 'error: ' + err; }
+    step('62g. the export pane has a Mermaid row when the board reads as a diagram — it writes the .mmd file, its text the golden — and the row is not there for a board that reads as none',
+      rowShown62 && grabbed62.length === 1 && /\.mmd$/.test(grabbed62[0].name) && file62 === golden62,
+      { shown: rowShown62, grabbed: grabbed62.map((g) => g.name), file: file62 });
+    const sumG = mm.session.getState().summon; if (sumG) mm.session.dismiss(sumG.id, Date.now());
+    mm.session.load([]);
+    for (const [x, y] of [[200, 200], [360, 204], [520, 200]]) t.stroke(t.rect(x, y, 120, 80));
+    exportBtn62.click(); await wait(40); // the pane reads the board again when it opens
+    const rowNone62 = document.getElementById('exMermaid');
+    const noneHidden62 = !!rowNone62 && rowNone62.hidden;
+    if (!document.getElementById('exportPanel').hidden) exportBtn62.click();
+    step('62g2. a row of boxes reads as no diagram: the export pane has no Mermaid row', noneHidden62, { hidden: noneHidden62 });
+    mm.mermaidFrom(null);
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
+  // ---- 63. Mermaid in: the text edited, drawn back as ink the engine reads (V1-PLAN §3, D3's surface) ----
+  // The flowchart exported to Mermaid; its text edited in the canvas's editor — a new node, "Done", joined
+  // to the last process; the artifact held: the field leads with Draw it. Taking it draws the diagram as
+  // ink the engine reads exactly as a hand's — five symbols and four flows, the new one saying Done — in
+  // one act, beside everything on the board, selected and fitted; the drawing's notes and the lines it did
+  // not read are said in the status line, never thrown; the caps are said; one undo takes it all away.
+  {
+    mm.session.load([]); mm.setView(1, 0, 0); mm.resetUses();
+    mm.mermaidFrom([location.origin + '/e2e/fixtures/mermaid-standin.js']);
+    const ids63 = [];
+    const last63 = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
+    const keep63 = () => ids63.push(last63());
+    const diamond63 = (cx, cy, w, h) => {
+      const v = [{ x: cx, y: cy - h / 2 }, { x: cx + w / 2, y: cy }, { x: cx, y: cy + h / 2 }, { x: cx - w / 2, y: cy }];
+      const mid = { x: (v[0].x + v[1].x) / 2, y: (v[0].y + v[1].y) / 2 };
+      const path = [mid, v[1], v[2], v[3], v[0], mid];
+      let p = [];
+      for (let i = 0; i < path.length - 1; i++) p = p.concat(t.line(path[i], path[i + 1], 26).slice(i ? 1 : 0));
+      return p;
+    };
+    const arrowDown63 = (x, y0, y1) => t.line({ x: x, y: y0 }, { x: x, y: y1 }, 40).concat(t.line({ x: x, y: y1 }, { x: x - 14, y: y1 - 20 }, 16).slice(1));
+    t.stroke(t.rect(200, 100, 160, 70)); keep63();
+    t.stroke(arrowDown63(280, 174, 236)); keep63();
+    t.stroke(t.rect(200, 240, 160, 70)); keep63();
+    t.stroke(arrowDown63(280, 314, 382)); keep63();
+    t.stroke(diamond63(280, 440, 180, 110)); keep63();
+    t.stroke(arrowDown63(280, 499, 566)); keep63();
+    t.stroke(t.rect(200, 570, 160, 70)); keep63();
+    const sid63 = (id) => id.replace(/[^A-Za-z0-9]+/g, '_');
+    const pill63 = (key) => document.querySelector('#summon .pill.item[data-key="' + key + '"]');
+    const dismiss63 = () => { const sum = mm.session.getState().summon; if (sum) mm.session.dismiss(sum.id, Date.now()); };
+    const mermaids63 = () => { const st = mm.session.getState(); return st.artifacts.filter((id) => { const r = codeRepOfNode(st.nodes.get(id)); return r && r.data.kind === 'mermaid'; }); };
+    mm.session.summonMarks(ids63.slice(), Date.now()); await wait(80);
+    if (pill63('mermaid')) pill63('mermaid').click();
+    await wait(60);
+    const aid63 = mermaids63()[0];
+    dismiss63();
+    const before63 = codeRepOfNode(mm.session.getState().nodes.get(aid63)).data.code;
+    // Edit its text in the canvas's own editor: a new node, joined to the last process.
+    const opened63 = mm.beginTextEdit(aid63);
+    const editor63 = document.getElementById('textEditor');
+    const shown63 = !editor63.hidden && editor63.value === before63;
+    editor63.value = before63 + '    ' + sid63(ids63[6]) + ' --> done63["Done"]\n';
+    mm.commitTextEdit(); await wait(40);
+    const rep63 = codeRepOfNode(mm.session.getState().nodes.get(aid63));
+    const versions63 = mm.session.getState().nodes.get(aid63).reps.filter((r) => r.modality === 'code').length;
+    step('63. a mermaid artifact opens in the text editor and a new version keeps its kind — the text with a new node, every version held',
+      opened63 === true && shown63 && rep63.data.kind === 'mermaid' && /done63\["Done"\]/.test(rep63.data.code) && versions63 === 2,
+      { opened: opened63, shown: shown63, kind: rep63.data.kind, versions: versions63 });
+
+    // Held, it is offered Draw it, first.
+    mm.session.summonMarks([aid63], Date.now()); await wait(80);
+    const affords63 = [...document.querySelectorAll('#summon .row.afford .pill.item')];
+    const draw63 = pill63('mermaid-draw');
+    step('63a. the edited text held is offered Draw it, first among what it affords, and the offer says what the text reads as',
+      !!draw63 && affords63[0] === draw63 && /Draw it/.test(draw63.textContent) && /5 nodes and 4 links read as a flowchart/.test(draw63.title),
+      { first: affords63[0] && affords63[0].textContent, title: draw63 && draw63.title });
+    const contentBefore63 = mm.session.getState().contentIds.slice();
+    const eventsBefore63 = mm.session.getEvents().length;
+    const boundsBefore63 = MM.getBounds(contentBefore63.flatMap((id) => { const b = MM.boundsOf(mm.session.getState().nodes.get(id)); return b ? [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }] : []; }));
+    if (draw63) draw63.click();
+    await wait(400);
+    const st63 = mm.session.getState();
+    const drawn63 = mm.mermaidLast();
+    const marks63 = drawn63 ? drawn63.marks : [];
+    const reading63 = marks63.length ? MM.notationsOf(st63, marks63)[0] : null;
+    const words63 = reading63 ? reading63.symbols.map((s) => s.text).filter(Boolean) : [];
+    step('63b. Draw it draws the text as ink the engine reads as a flowchart — five symbols and four flows, the new one saying Done',
+      !!drawn63 && drawn63.notation === 'flowchart' && !!reading63 && reading63.notation === 'flowchart' && reading63.symbols.length === 5 && reading63.connectors.length === 4 && words63.includes('Done'),
+      { notation: drawn63 && drawn63.notation, read: reading63 && MM.describeNotation(reading63), words: words63 });
+    const drawnBox63 = MM.getBounds(marks63.flatMap((id) => { const b = MM.boundsOf(st63.nodes.get(id)); return b ? [{ x: b.minX, y: b.minY }, { x: b.maxX, y: b.maxY }] : []; }));
+    const onScreen63 = mm.worldToScreen(drawnBox63.minX, drawnBox63.minY), onScreenEnd63 = mm.worldToScreen(drawnBox63.maxX, drawnBox63.maxY);
+    const artFrame63 = MM.frameOf(st63.nodes.get(aid63));
+    step('63c. it is drawn beside everything on the board — right of the drawing and of the artifact — selected, and the view fitted to it',
+      drawnBox63.minX >= Math.max(boundsBefore63.maxX, artFrame63.x + artFrame63.w) && marks63.every((id) => st63.selection.includes(id)) && onScreen63.x >= 0 && onScreen63.y >= 0 && onScreenEnd63.x <= innerWidth && onScreenEnd63.y <= innerHeight,
+      { drawn: drawnBox63, before: boundsBefore63, selected: st63.selection.length, marks: marks63.length, screen: [onScreen63, onScreenEnd63] });
+    const said63 = document.getElementById('status').textContent;
+    step('63d. the status line says what was drawn in one sentence, and the text it was drawn from stands unchanged',
+      /flowchart/.test(said63) && /5/.test(said63) && codeRepOfNode(st63.nodes.get(aid63)).data.code === rep63.data.code,
+      { said: said63 });
+    const acts63 = new Set(mm.session.getEvents().slice(eventsBefore63).map((e) => e.act));
+    mm.session.undo();
+    const after63 = mm.session.getState();
+    const codeAfter63 = (codeRepOfNode(after63.nodes.get(aid63)) || { data: {} }).data.code;
+    step('63e. one undo takes the whole drawing away — every mark, bind and label — and leaves the artifact with its edited text',
+      acts63.size === 1 && after63.contentIds.length === contentBefore63.length && after63.contentIds.every((id, i) => id === contentBefore63[i]) && mm.session.getEvents().length === eventsBefore63 && codeAfter63 === rep63.data.code,
+      { acts: [...acts63], content: after63.contentIds.length, was: contentBefore63.length });
+    dismiss63();
+
+    // What cannot be drawn is said, never thrown: a style line is refused with its line; a text no reader knows has no Draw it.
+    const styled63 = mm.importText('styled.mmd', 'flowchart TD\n    a["One"] --> b["Two"]\n    style a fill:#f9f\n', { x: 1000, y: 100 }, 320);
+    dismiss63();
+    mm.session.summonMarks([styled63], Date.now()); await wait(80);
+    const styledPill63 = pill63('mermaid-draw');
+    if (styledPill63) styledPill63.click();
+    await wait(300);
+    const styledSaid63 = document.getElementById('status').textContent;
+    const styledLast63 = mm.mermaidLast();
+    step('63f. a line the reader cannot read is said with its number and its words in the status line, and the rest is drawn — never thrown',
+      !!styledLast63 && styledLast63.refused.length === 1 && /line 3/.test(styledSaid63) && /style a fill/.test(styledSaid63) && styledLast63.marks.length > 0,
+      { said: styledSaid63, refused: styledLast63 && styledLast63.refused });
+    mm.session.undo();
+    dismiss63();
+    const junk63 = mm.importText('junk.mmd', 'this is not a diagram', { x: 1000, y: 400 }, 320);
+    const plain63 = mm.importText('plain.txt', 'flowchart TD\n a --> b\n', { x: 1000, y: 700 }, 320);
+    mm.session.summonMarks([junk63], Date.now()); await wait(60);
+    const junkOffered63 = !!pill63('mermaid-draw');
+    dismiss63();
+    mm.session.summonMarks([plain63], Date.now()); await wait(60);
+    const plainOffered63 = !!pill63('mermaid-draw');
+    dismiss63();
+    step('63g. Draw it is offered only when a reader reads the text — not for a text no diagram keyword opens, and not for a text file',
+      !junkOffered63 && !plainOffered63, { junk: junkOffered63, plain: plainOffered63 });
+
+    // The caps: sixty nodes and a hundred and twenty links at most, the rest said.
+    const chain63 = ['flowchart TD'];
+    for (let i = 1; i <= 64; i++) chain63.push('    n' + i + '["' + i + '"]' + (i > 1 ? '' : ''));
+    for (let i = 1; i < 64; i++) chain63.push('    n' + i + ' --> n' + (i + 1));
+    const big63 = mm.importText('big.mmd', chain63.join('\n') + '\n', { x: 2000, y: 100 }, 320);
+    dismiss63();
+    mm.session.summonMarks([big63], Date.now()); await wait(80);
+    const bigPill63 = pill63('mermaid-draw');
+    if (bigPill63) bigPill63.click();
+    await wait(1500);
+    const bigSaid63 = document.getElementById('status').textContent;
+    const bigLast63 = mm.mermaidLast();
+    step('63h. sixty nodes are drawn and the four after them are said, in the status line',
+      !!bigLast63 && Object.keys(bigLast63.ids).length === 60 && /64 nodes/.test(bigSaid63) && /60 at most/.test(bigSaid63),
+      { drawn: bigLast63 && Object.keys(bigLast63.ids).length, said: bigSaid63 });
+    mm.session.undo();
+    mm.mermaidFrom(null);
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
   return R;
 };
 
