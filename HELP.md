@@ -100,6 +100,17 @@ and have it read) and it is that side's length.
   *controls › Board › export* — draws it at its real size from the numbers, and
   prints it tiled onto pages at 100% with a test square on each. Measure the
   square before you cut: a printer scales without saying so.
+- **A pattern piece**: outline the piece, then mark it as a drafter does — a line
+  with an arrowhead at each end inside it is its **grain line**; the same line
+  along an edge says that edge is **cut on the fold**; a short tick across the
+  outline is a **notch**; a narrow wedge standing on an edge is a **dart**; a
+  second outline the same distance off all round is the **seam allowance**, the
+  cutting line. Hold it and the field says *a garment pattern piece*. With sizes
+  written on it (`18″` beside a side) and an allowance on your page (`Add ½″
+  seam allowance`) a chip beside it says what it is cut at and sewn at, and
+  **Print at true size** prints the cutting line dashed, the grain line, the
+  notches and the dart; a piece on the fold is printed as drawn — half — and
+  says it is cut on the fold and how wide it opens.
 
 ## Models
 
@@ -135,10 +146,10 @@ text — and **folder** makes a folder on your computer the canvas.
 **controls › Helpers › packs** lists premade drawings a board can use.
 *Basics* knows a bubble (a circle on its own) and a molecule (three bubbles
 joined by two bonds): use it and the field names what you draw — *molecule
-0.92 · Basics* — with nothing taught by you. *Flowchart*, *UML class diagram*
-and *Sequence diagram* name the diagrams the canvas reads and make what goes
-with them likelier first. A board keeps the packs it uses; *stop using* puts
-one back, and **undo** takes either back.
+0.92 · Basics* — with nothing taught by you. *Flowchart*, *UML class diagram*, *Sequence diagram* and *Garment pattern* name
+the diagrams and pattern pieces the canvas reads and make what goes with them
+likelier first. A board keeps the packs it uses; *stop using* puts one back, and
+**undo** takes either back.
 
 ## Live rooms
 

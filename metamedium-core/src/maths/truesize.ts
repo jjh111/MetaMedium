@@ -41,6 +41,8 @@ import type { BoardMaths, Conflict, FigureMaths, Solution, SolveReading, SolvedF
 import type { LengthUnit, Quantity } from './quantity';
 import { formatNumber, formatQuantity, isRange, quantity, unitSuffix } from './quantity';
 import { FONT_FAMILY, esc, expandBounds, fmt, systemOf, textWidth, unionBounds, unitFactor, wrap } from './svg';
+import type { GarmentDrawn } from './garment';
+import { garmentDecor, garmentOwned, pieceOfFigure } from './garment';
 
 // ===== What it returns =====
 
@@ -88,6 +90,8 @@ export interface TrueSizeFigure {
   /** The labels that cannot hold in the reading drawn. */
   conflicts: Conflict[];
   notes: string[];
+  /** A pattern piece's marks as drawn (M6): its cutting line dashed, its grain line, notches, darts and fold, in the document's coordinates. */
+  garment?: { marks: GarmentDrawn[]; notes: string[] };
 }
 
 export interface TrueSizeOmission {
@@ -306,6 +310,9 @@ interface Mark {
   points: Point[];
   closed?: boolean;
   dashed?: boolean;
+  /** A pattern piece's mark (M6): what it is, and `head` for the chevron at a line's end. */
+  garment?: GarmentDrawn['kind'];
+  part?: 'head';
 }
 
 interface Text {
@@ -691,7 +698,8 @@ function textEl(w: Writer, t: Text, attrs = ''): string {
 
 function markEl(w: Writer, k: Mark): string {
   const dash = k.dashed ? ` stroke-dasharray="${w.n(w.F.labelGap / 2)} ${w.n(w.F.labelGap / 2)}"` : '';
-  return `<path d="${pathOf(w, k.points, !!k.closed)}" stroke-width="${w.n(w.F.thin)}"${dash}/>`;
+  const tag = k.garment ? ` data-garment="${k.garment}"${k.part ? ` data-part="${k.part}"` : ''}` : '';
+  return `<path${tag} d="${pathOf(w, k.points, !!k.closed)}" stroke-width="${w.n(w.F.thin)}"${dash}/>`;
 }
 
 function outlineEl(w: Writer, o: Outline): string {
@@ -721,7 +729,11 @@ function styleOf(w: Writer, stroke = w.F.stroke): string {
  * give the same bytes, and nothing is written anywhere.
  */
 export function trueSize(solved: SolvedFigures, options: TrueSizeOptions = {}): TrueSize {
+  // A pattern piece's own marks (M6) — its other outline, its grain line, its notches and darts — are drawn on it, never left out as figures with no numbers.
+  const board = 'dimensions' in solved ? solved : null;
+  const owned = board ? garmentOwned(board) : new Set<string>();
   const entries = entriesOf(solved)
+    .filter((e) => !(board && e.figure.ids.every((id) => owned.has(id)) && !pieceOfFigure(board, e.figure.id)))
     .map((e) => ({ e, b: inkBounds(e.figure) }))
     .sort((p, q) => p.b.minX - q.b.minX || p.b.minY - q.b.minY || (p.e.figure.id < q.e.figure.id ? -1 : p.e.figure.id > q.e.figure.id ? 1 : 0))
     .map((x) => x.e);
@@ -783,6 +795,16 @@ export function trueSize(solved: SolvedFigures, options: TrueSizeOptions = {}): 
       : e.figure.kind === 'arc' ? arcShape(c)
       : lineShape(c);
     const name = nameOf.get(e.figure.id)!;
+    // What a pattern piece is marked with, laid on it where the ink's marks stand (M6).
+    const piece = board ? pieceOfFigure(board, e.figure.id) : undefined;
+    const decor = piece && (e.figure.kind === 'triangle' || e.figure.kind === 'rectangle') ? garmentDecor(piece, shape.vertices, { factor: c.f, head: F.corner * 0.9, tick: F.corner * 1.2, gap: F.labelGap }) : null;
+    if (decor) {
+      for (const m of decor.marks) {
+        shape.marks.push({ points: m.points, ...(m.closed ? { closed: true } : {}), ...(m.dashed ? { dashed: true } : {}), garment: m.kind });
+        for (const h of m.heads ?? []) shape.marks.push({ points: h, garment: m.kind, part: 'head' });
+      }
+      for (const t of decor.texts) shape.texts.push({ text: t.text, at: t.at, angle: t.angle, size: F.note, anchor: 'middle', key: t.key });
+    }
     const drawnBox = unionBounds([
       expandBounds(pointBox(outlinePoints(shape.outline)), F.stroke / 2),
       ...shape.marks.map((k) => expandBounds(pointBox(k.points), F.thin / 2)),
@@ -809,7 +831,8 @@ export function trueSize(solved: SolvedFigures, options: TrueSizeOptions = {}): 
       notes.push(m ? `the ${name}: drawn as if the corner at ${m[1]} is right — the ink measures it ${m[2]}°, a reading, not a fact` : `the ${name}: drawn on a reading — ${a}`);
     }
     if (figUnit !== U) notes.push(`the ${name}: labelled in ${UNIT_WORDS[figUnit]}, drawn in ${UNIT_WORDS[U]}`);
-    return { e, shape, box, name, notes, precision, figUnit, reading };
+    if (decor) for (const x of decor.notes) notes.push(`the ${name}: ${x}`);
+    return { e, shape, box, name, notes, precision, figUnit, reading, decor };
   });
 
   // The title: what, at what, and what was not as simple as that.
@@ -822,6 +845,7 @@ export function trueSize(solved: SolvedFigures, options: TrueSizeOptions = {}): 
     else if (n > 1) clauses.push(`${who}drawn from the first of ${n} readings`);
     const assumed = b.reading.assumes?.[0] && /^the corner at ([A-Z])/.exec(b.reading.assumes[0]);
     if (assumed) clauses.push(`${who}drawn as if the corner at ${assumed[1]} is right`);
+    if (b.decor?.title) clauses.push(`${who}${b.decor.title}`);
   }
   const leftOut = omitted.filter((o) => o.labelled);
   const unlabelled = omitted.filter((o) => !o.labelled);
@@ -930,6 +954,7 @@ export function trueSize(solved: SolvedFigures, options: TrueSizeOptions = {}): 
     readings: p.e.solution.readings.length,
     conflicts: p.e.solution.conflicts,
     notes: p.notes,
+    ...(p.decor ? { garment: { marks: p.shape.marks.filter((k) => k.garment && k.part !== 'head').map((k) => ({ kind: k.garment!, points: k.points, ...(k.closed ? { closed: true } : {}), ...(k.dashed ? { dashed: true } : {}) })), notes: p.decor.notes } } : {}),
   }));
 
   return { svg, unit: U, width, height, title, notes, figures, omitted, print: { markup: piecesMarkup, region } };

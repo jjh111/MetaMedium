@@ -45,6 +45,7 @@ import { SEQUENCE } from './sequence';
 import { STATE } from './state';
 import { ER } from './er';
 import { MINDMAP } from './mindmap';
+import { GARMENT } from './garment';
 
 /** A symbol a notation knows, and which of the six roles it plays. */
 export interface NotationSymbolDef {
@@ -314,3 +315,4 @@ registerNotation(SEQUENCE);
 registerNotation(STATE);
 registerNotation(ER);
 registerNotation(MINDMAP);
+registerNotation(GARMENT);

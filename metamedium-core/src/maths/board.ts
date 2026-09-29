@@ -43,8 +43,9 @@ import { checkWritten, readSheet } from './sheet';
 import type { CheckEntry, Sheet, StepEntry } from './sheet';
 import type { ChainReading } from './expr';
 import { solveBoard } from './solve';
+import { garmentMaths, garmentNotFigures, garmentOf } from './garment';
 import type { BoardMaths, Conflict, FigureMaths, SolvedValue } from './solve';
-import { formatQuantity } from './quantity';
+import { formatNumber, formatQuantity, unitSuffix } from './quantity';
 import type { Quantity } from './quantity';
 
 // ===== Which ink a number can be about =====
@@ -128,7 +129,14 @@ export function boardMaths(state: SessionState): BoardMaths | null {
       ...state,
       contentIds: state.contentIds.filter((id) => near.has(id) || keep.has(id) || isWriting(state, id)),
     };
-    return solveBoard(narrowed, { figures: figuresOf(narrowed) });
+    // A pattern piece among the figures says what its cutting line, fold and marks come to (M6); its notches,
+    // darts and fold are no figures of their own to solve, or a tick across an edge would divide it into parts.
+    const piece = garmentOf(narrowed);
+    const apart = piece ? garmentNotFigures(piece) : null;
+    const solving = apart ? { ...narrowed, contentIds: narrowed.contentIds.filter((id) => !apart.has(id)) } : narrowed;
+    const solved = solveBoard(solving, { figures: figuresOf(solving) });
+    const garment = piece ? garmentMaths(narrowed, solved, piece) : [];
+    return garment.length ? { ...solved, garment } : solved;
   }
   // No number stands on a mark, so none is left out of the page.
   const sheet = readSheet(sheetLines(state, { except: [] }));
@@ -156,7 +164,7 @@ export function boardMathsOf(session: Pick<Session, 'getState' | 'getEvents'>): 
 
 // ===== Chips =====
 
-export type MathsChipKind = 'side' | 'measure' | 'conflict' | 'step' | 'scale';
+export type MathsChipKind = 'side' | 'measure' | 'conflict' | 'step' | 'scale' | 'garment';
 
 /** One thing said beside a figure or a page: a surface draws it and decides when. */
 export interface MathsChip {
@@ -357,9 +365,29 @@ function stepReason(e: StepEntry | CheckEntry): string {
   return [`${e.text} — ${e.reason}`, ...rest].join('; ');
 }
 
+/**
+ * What a pattern piece comes to, said once beside it, below it: the cutting size
+ * against the sewing size (`cut 19 × 27″ · sewn 18 × 26″`), and that it is cut on
+ * the fold. The marks' own numbers — notches, darts, the grain — are the panel's.
+ */
+function garmentChips(board: BoardMaths): MathsChip[] {
+  const out: MathsChip[] = [];
+  for (const g of board.garment ?? []) {
+    const cx = (g.bounds.minX + g.bounds.maxX) / 2;
+    let row = 0;
+    const unit = g.unit ? unitSuffix(g.unit, 1) : '';
+    const n = (v: number) => formatNumber(v, 2);
+    const say = (key: string, text: string, reason: string) =>
+      out.push({ key: `garment:${g.id}:${key}`, kind: 'garment', text, ids: g.ids.slice(), at: { x: cx, y: g.bounds.maxY + CHIP_OFFSET * ++row }, align: 'centre', standing: false, reason });
+    if (g.seam?.cut && g.seam.sewn) say('seam', `cut ${n(g.seam.cut.width)} × ${n(g.seam.cut.height)}${unit} · sewn ${n(g.seam.sewn.width)} × ${n(g.seam.sewn.height)}${unit}`, g.lines.join(' — '));
+    if (g.fold?.opened !== undefined) say('fold', `cut on the fold · ${n(g.fold.opened)}${unit} across opened`, g.fold.reason);
+  }
+  return out;
+}
+
 /** Everything said beside the figures and the page, in the figures' order and then the page's. */
 export function mathsChips(board: BoardMaths): MathsChip[] {
-  return [...figureChips(board), ...stepChips(board.sheet)];
+  return [...figureChips(board), ...garmentChips(board), ...stepChips(board.sheet)];
 }
 
 // ===== The panel's words =====
@@ -394,6 +422,12 @@ export function mathsSaid(board: BoardMaths, ids: readonly string[]): MathsSaid 
     for (const n of fm.solution.notes) rows.push({ k: 'note', v: n });
     // How the labels agree with the ink is working, not an answer: behind details.
     if (fm.drawing?.scale && fm.drawing.scale.labels > 1) rows.push({ k: 'scale', v: fm.drawing.scale.reason });
+  }
+  // A pattern piece: its cutting size against its sewing size, and what each mark comes to.
+  for (const g of board.garment ?? []) {
+    if (!g.ids.some((id) => held.has(id))) continue;
+    lines.push(...g.lines);
+    rows.push(...g.rows);
   }
   const page = board.sheet.entries.filter((e) => (e.kind === 'step' || e.kind === 'check') && (e.ids ?? []).some((id) => held.has(id)));
   if (page.length) {

@@ -51,7 +51,7 @@ the surface*, below; e2e 62–63). **D7, routing** (*Routing*, below; e2e 66): a
 right angles between their ports, round what stands between, by a `route`
 event whose polyline is derived from where the sites stand — and *Tidy the
 diagram* lines up the ranks and routes every tied connector in one act. **And the hand is in the gate** (H1, `node e2e/run.mjs hand`, *The MCP hand*, below): QA-v10's machine rows walked headless with
-`Demos/mcp.mjs` in a room of its own, and `QA-v1.md` is the hand checklist for A1–A10. **And the state diagram, the ER diagram and the mind map** (D5's second half, D6) read, each with its pack and its Mermaid out and in; **and every notation reads on the surface** (N1: the field's *what this is* row and the panel's *is* / *becomes* say *a flowchart 0.92*, *a class diagram*, *an ER diagram* …, e2e 67); **and a first run** (R5): example boards in the boards pane and *start from an example* on an empty board. What is next is a review
+`Demos/mcp.mjs` in a room of its own, and `QA-v1.md` is the hand checklist for A1–A10. **And the state diagram, the ER diagram and the mind map** (D5's second half, D6) read, each with its pack and its Mermaid out and in; **and every notation reads on the surface** (N1: the field's *what this is* row and the panel's *is* / *becomes* say *a flowchart 0.92*, *a class diagram*, *an ER diagram* …, e2e 67); **and a first run** (R5): example boards in the boards pane and *start from an example* on an empty board. **And the garment pattern piece** (M6, 29 Sep 2026; *The garment pattern piece*, below; e2e 68): a piece drawn with its grain line, notches, dart and seam allowance or fold reads as *a garment pattern piece*, says what it is cut at and sewn at beside itself, and prints those marks at true size. What is next is a review
 of use, and v1.0.0 (`V1-PLAN.md`
 §8–§9, every unit with its dated status line).
 
@@ -180,7 +180,7 @@ circle them, cross with a command mark *you taught the system*, prompt them into
 a living page that renders in the canvas with your ink still outlining its
 divs — then draw on that page and the ink addresses the regions underneath it.
 Scratch anything out to erase. `Demos/session-engine.html` is the surface;
-`Demos/session-engine.e2e.js` drives 415 records through the real UI (413 checks and two honest skips, 25d and 62d, on 29 Sep after S2, M5, D2–D7, N1 and R5; headless with the shard's three scenarios via `node e2e/run.mjs`, which CI runs): page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room (and ids that hold in it: an undo sent, one sitting per page load, a doubled name and a truncated room said), a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), the explanation plane's layout, one Enter one act and what `fitAll` fits, labels (a hand's and a person's, on their own ink only), who made what, gestures per hand in a room, a person the same across a reload, and what a paint reads (R4c: at eighteen points the board painted both ways and every mark's role compared with the whole-board read; the reading under a mark, a neighbour's panel, a chip and a card following the log the moment it changes, undo, a move and another hand's line included; a pointer move that paints no board, a wheel that paints once a frame), and the field's offers (B1: e2e 49, the golden record of what the field offers three scopes — a row of boxes, a molecule, a line of writing — captured before tools; a tool registered in one line, offered at once), the steady top beside a flowchart (B2: e2e 50), and library packs (B3: e2e 51 — basics@1 used from the packs pane, the canonical molecule named with nothing taught and its pack said, stopped, undone, the golden unchanged on boards with no pack, a pack the build lacks said, the flowchart's ports on the pen), and handles (E1: e2e 52 — a box selected alone shows its nine points and its corner dragged reshapes the clean form while the ink stays; the magnets follow, one undo, the zone rule on both sides of a corner, the knob and the move zone on a reshaped box, none on writing), and bindings that follow (E2: e2e 53 — two arrows tied to a box follow it when the pointer drags it and still read as pointing at it, one move event; one undo; drawn following before the hand lets go; an arrow's tip handle dragged onto another box's corner binds there, the old claim let go, in one act, and one undo takes it back), and the user surface (`PLAN-USER-SURFACE.md`: a tap off the field with a wobble leaves no dot, e2e 54; writing is read, not named, 55; the panel in the user's words with the inspector behind *details*, 56; the status line in words, 57; the field by the hand, off the minimap and the held marks, whole, 58; Enter does the likely act, 59; the control centre grouped, 60; help and your mark, 61). A run takes about 50 s headless; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
+`Demos/session-engine.e2e.js` drives 415 records through the real UI (413 checks and two honest skips, 25d and 62d, on 29 Sep after S2, M5, D2–D7, N1 and R5; headless with the shard's three scenarios via `node e2e/run.mjs`, which CI runs): page, flowchart, handwriting (read only when asked; a line read as one), the model drawing, the user-side loop, selection and the field, corrections, the worker, the tank, words into verbs and acting out, frames and the drawn slider, the folder, pictures, text, the moment, a live room (and ids that hold in it: an undo sent, one sitting per page load, a doubled name and a truncated room said), a playing frame that takes the pointer, hold by long-press, the graph in 3D, and the foundations (letters at any size, a mark that crosses, readings that stay, the minimap), the explanation plane's layout, one Enter one act and what `fitAll` fits, labels (a hand's and a person's, on their own ink only), who made what, gestures per hand in a room, a person the same across a reload, and what a paint reads (R4c: at eighteen points the board painted both ways and every mark's role compared with the whole-board read; the reading under a mark, a neighbour's panel, a chip and a card following the log the moment it changes, undo, a move and another hand's line included; a pointer move that paints no board, a wheel that paints once a frame), and the field's offers (B1: e2e 49, the golden record of what the field offers three scopes — a row of boxes, a molecule, a line of writing — captured before tools; a tool registered in one line, offered at once), the steady top beside a flowchart (B2: e2e 50), and library packs (B3: e2e 51 — basics@1 used from the packs pane, the canonical molecule named with nothing taught and its pack said, stopped, undone, the golden unchanged on boards with no pack, a pack the build lacks said, the flowchart's ports on the pen), and handles (E1: e2e 52 — a box selected alone shows its nine points and its corner dragged reshapes the clean form while the ink stays; the magnets follow, one undo, the zone rule on both sides of a corner, the knob and the move zone on a reshaped box, none on writing), and bindings that follow (E2: e2e 53 — two arrows tied to a box follow it when the pointer drags it and still read as pointing at it, one move event; one undo; drawn following before the hand lets go; an arrow's tip handle dragged onto another box's corner binds there, the old claim let go, in one act, and one undo takes it back), and the garment pattern piece (M6: e2e 68 — a piece drawn with the pointer read in the field, cut and sewn beside it, its marks at true size, a fold cut on the fold), and the user surface (`PLAN-USER-SURFACE.md`: a tap off the field with a wobble leaves no dot, e2e 54; writing is read, not named, 55; the panel in the user's words with the inspector behind *details*, 56; the status line in words, 57; the field by the hand, off the minimap and the held marks, whole, 58; Enter does the likely act, 59; the control centre grouped, 60; help and your mark, 61). A run takes about 50 s headless; run it **in its own tab on its own origin** (`http://127.0.0.1:8010/…?fresh=1&nosw=1` — `__setup` refuses any other URL: it replaces `fetch` with a stub, joins a stub model named `e2e-stub`, and wipes the origin's saved board), start it with `__setup(); __scenario().then(r => window.__R = r)` and read `__R` when it lands.
 v7 Stage E (handwriting) shipped 1 Sep 2026: a word written beside a shape is read by a
 model that can see and offered as that shape's name. Whitepaper v5.1 stays parked until the
 conversation benchmark passes end to end.
@@ -313,7 +313,7 @@ any structural change.
 
 | Path | What it is |
 |---|---|
-| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, the UML class diagram, the sequence diagram and the dashed lines it reads, the state diagram, the ER diagram, the mind map, Mermaid out and in, and a layered layout), **routing** (`src/diagram/route.ts`: orthogonal routes between bound ports, derived, and the tidy plan; `src/tools/route.ts`; under *Routing*), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print, and what is said of it on the board — `board.ts`), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*), **magnets, handles and bindings that follow** (`src/session/magnets.ts`, `handles.ts`, `follow.ts` with `affine.ts` and `manipulate.ts`; under *Magnets and bindings* and *Handles*) and the LLM transport. New recognition/engine work lands HERE |
+| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, the UML class diagram, the sequence diagram and the dashed lines it reads, the state diagram, the ER diagram, the mind map, the garment pattern piece, Mermaid out and in, and a layered layout), **routing** (`src/diagram/route.ts`: orthogonal routes between bound ports, derived, and the tidy plan; `src/tools/route.ts`; under *Routing*), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print, what is said of it on the board — `board.ts` — and what a pattern piece's marks come to, `garment.ts`), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*), **magnets, handles and bindings that follow** (`src/session/magnets.ts`, `handles.ts`, `follow.ts` with `affine.ts` and `manipulate.ts`; under *Magnets and bindings* and *Handles*) and the LLM transport. New recognition/engine work lands HERE |
 | `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages). Fully on the `brand/` system as of 3 Sept 2026 — its `:root` is `brand/tokens.css` under the names this page already used, so change a value THERE first |
 | `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
@@ -1050,8 +1050,10 @@ notation, restating none of `UML_CLASS_TABLE`; its affinities),
 `SEQUENCE_TABLE`; its affinities), **`state@1`** (names the state notation,
 restating none of `STATE_TABLE`; its affinities), **`er@1`** (names the ER
 notation, restating none of `ER_TABLE`; its affinities), **`mindmap@1`** (names
-the mind-map notation, restating none of `MINDMAP_TABLE`; its affinities) and
-**`test-molecule@1`** (tests only — a `test-` pack is never listed).
+the mind-map notation, restating none of `MINDMAP_TABLE`; its affinities),
+**`garment@1`** (names the pattern-piece notation, restating none of
+`GARMENT_TABLE`; no definitions, no ports; its affinities lift clean forms and
+the maths) and **`test-molecule@1`** (tests only — a `test-` pack is never listed).
 
 **A board uses a pack by an event**: `use { pack: 'basics@1' }` and `unuse`,
 through `session.use` / `unuse`; `SessionState.packs` in the order used. They
@@ -1994,6 +1996,74 @@ re-rooted, said. The bench (`mindmap.bench.test.ts`, 36 hands of the board): rea
 branches 216/216, the order round every node 252/252, at three corner roundnesses;
 the flowchart, class, sequence, state and ER boards, a wireframe and a line of
 writing: highest 0.05, the molecule 0.24, none above the floor.
+
+### The garment pattern piece (V1-PLAN M6)
+
+> `metamedium-core/src/notations/garment.ts` (the reading, `GARMENT_TABLE`),
+> `maths/garment.ts` (what the marks come to, what true size prints),
+> `packs/shipped/garment.ts`, `fixtures/garment.ts`, `garment.test.ts`,
+> `garment.bench.test.ts`, `maths/garment.test.ts`; e2e 68.
+
+A pattern piece is a **piece** (any closed outline of some size, at its sewing
+line) with the marks a drafter puts on it, read from the geometry — never a
+pack definition, because **each of the six is a relation to the outline** (inside
+it, along it, across it, standing on it, off it the same distance all round) and
+two need a head kind or an orientation: a signature is a bag of shapes and the
+links between them, and a box with an arrow in it, a piece with a grain line, is
+one signature (`garment@1` has no definitions; the trap, under *Library packs*).
+A **grain line** is a straight line with a head at each end inside the piece and
+a good part of its length — heads read past the line's own ink, as a chevron drawn
+at each end (`headsOf`) or a hook at each end of one stroke (`hooksOf`, on the
+stroke's own points: the shape rung and `headsOf` see only the far end of the
+second). A **fold** is the same line standing along an edge, parallel and close:
+that edge is cut on the fold. A **notch** is a short tick across the outline (or
+ending on it), square to it, or a small wedge on it — as small as a letter, and
+told from one by where it stands. A **dart** is a narrow wedge from an edge, its
+point inside: a closed triangle or a V of one stroke, its two ends on the outline.
+A **seam allowance** is a second outline standing off the piece the same distance
+all round, *measured* (`SEAM_OFF`, `SEAM_EVEN`), so a card in a panel — offset
+unevenly — is no allowance; the piece is the inner outline, the finished size, and
+the outer one the cutting line. The reading is plural and derived like every
+notation (nothing enters the log), and **its confidence is its evidence**
+(`EVIDENCE`): a grain line settles it alone, a fold half as surely, and two
+notches, a dart or a seam allowance alone are held under the floor, so a box with
+an arrow in it, a card in a panel and a row of ticks read as no pattern piece
+(`garment.bench.test.ts`: its own board, 24 hands, read 144/144 at 1×, 0.6× and
+1.8× elsewhere on the page; the recognition corpus, the flowchart bench and the
+class, sequence, state, ER and mind-map boards, wireframes, molecules, writing, a
+row and a hub read none above the floor). It surfaces in the field's *what this
+is* row and the panel as *a garment pattern piece 0.83 — one piece: one grain line,
+two notches, one dart, a seam allowance* (N1 reads every registered notation) and
+puts nothing on the pen.
+
+**What the maths does with it** (`maths/garment.ts`; `boardMaths(state).garment`,
+`mathsChips`, `mathsSaid`, `trueSize`). *The numbers rule the outline they are
+written on* (MATHS-PLAN rule 2): a number in the piece is its sewing size and the
+cutting line stands the allowance out from it; a number written outside the cutting
+line is the cutting size, the piece sewn smaller, and the other reading said (rule
+3: *or, if 18 × 26″ is the finished size, cut at 19 × 27″*). **The allowance is the
+page's** when it says one — the sheet's `Add ½″ seam allowance` — else the ink's own
+offset at the drawing's scale, said to be the ink's (*as the ink draws it*); where
+both stand the page rules and the ink's is said beside it. A chip below the piece
+says *cut 19 × 27″ · sewn 18 × 26″*, shown for a moment and while the hand points
+(the ghost rule, M5), the panel always saying it in plain lines. **A fold halves the
+piece**: cut on the fold, opened it is twice as wide across it (*36″ across, 18″ as
+drawn*). What each mark comes to is measured on the piece's true sides by an affine
+map of the ink's corners onto the solved ones, never in pixels: the grain along the
+26″ sides, each notch how far in from its nearer corner, each dart how wide and how
+long. **True size prints them** (`garmentDecor`, drawn by `truesize.ts`): the other
+outline dashed exactly the allowance out (or in), the grain line at its length with
+a head at each end, the notches and darts where the ink's stand, the fold edge marked
+and *cut on the fold, opened 36″ across* said in the title and the notes — in the SVG
+and in what a print covers — and a piece's own marks are never listed as figures it
+could not draw. Rectangles and triangles: the figures the solver can fix and true size
+can draw; a bodice of curved edges says its marks and no sizes.
+**A notch is no line that divides an edge**: `withParts` divides a side wherever
+another mark ends on it, so a tick across an edge made a 26″ written beside the
+middle of that side the length of a part between two notches, and the side was fixed
+by nothing — found drawing the piece with the pointer for e2e 68. `garmentNotFigures`
+leaves a notch, a dart, a fold and a grain line's drawn-apart heads out of what the
+solver is handed.
 
 ### Spatial Graph — retired
 
