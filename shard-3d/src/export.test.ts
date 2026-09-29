@@ -73,8 +73,19 @@ describe('the format is the canvas’s', () => {
     const log = boardWithMassing();
     const text = encodeBoard(log.session.getEvents());
     const lines = text.split('\n').filter((l) => l.trim());
-    expect(lines.length).toBe(log.session.getEvents().length);
+    // A version 1 log (V1-PLAN R2): the header line, then one event a line.
+    expect(JSON.parse(lines[0])).toMatchObject({ format: 'metamedium-log', version: 1 });
+    expect(lines.length).toBe(log.session.getEvents().length + 1);
     for (const line of lines) expect(() => JSON.parse(line)).not.toThrow();
+  });
+
+  it('a log with no header — version 0, every board exported before R2 — still opens; a newer version is refused in a sentence', () => {
+    const log = boardWithMassing();
+    const events = log.session.getEvents();
+    const bare = events.map((e) => JSON.stringify(e)).join('\n') + '\n';
+    expect(decodeBoard(bare).events).toEqual(events);
+    const future = JSON.stringify({ type: 'format', format: 'metamedium-log', version: 2 }) + '\n' + bare;
+    expect(() => decodeBoard(future, 'castle.mm.log')).toThrow(/castle\.mm\.log.*version 2.*versions 0 and 1/s);
   });
 
   it('a broken line is skipped and COUNTED, never fatal', () => {
@@ -130,8 +141,9 @@ describe('a board round-trips through export → open', () => {
     const log = createLog();
     log.sees(blindSpace);
     const text = encodeBoard(log.session.getEvents());
-    expect(text).toBe('');
-    expect(decodeBoard(text)).toEqual({ events: [], skipped: 0 });
+    // Only the header (R2): a file, and no events.
+    expect(text.split('\n').filter((l) => l.trim())).toHaveLength(1);
+    expect(decodeBoard(text)).toMatchObject({ events: [], skipped: 0, version: 1 });
   });
 });
 
