@@ -300,7 +300,9 @@ export function notationsOf(state: SessionState, scopeIds?: readonly string[]): 
 export function describeNotation(r: NotationReading): string {
   const acronym = /^[A-Z]{2,}\b/.test(r.name);
   const name = acronym ? r.name : r.name.toLowerCase();
-  return `${!acronym && /^[aeio]/.test(name) ? 'an' : 'a'} ${name} ${r.confidence.toFixed(2)} — ${r.summary}`;
+  // An acronym takes the article of the way it is said: “an ER diagram”, “a UML class diagram”.
+  const vowel = acronym ? /^[AEFHILMNORSX]/.test(name) : /^[aeio]/.test(name);
+  return `${vowel ? 'an' : 'a'} ${name} ${r.confidence.toFixed(2)} — ${r.summary}`;
 }
 
 // The notations shipped with the engine read from the start. Reading is

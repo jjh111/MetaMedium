@@ -19,6 +19,7 @@ import { FLOWCHART_PACK } from './shipped/flowchart';
 import { UML_CLASS_PACK } from './shipped/uml-class';
 import { SEQUENCE_PACK } from './shipped/sequence';
 import { STATE_PACK } from './shipped/state';
+import { ER_PACK } from './shipped/er';
 import { TEST_MOLECULE } from './shipped/test-molecule';
 
 /** Where a board's packs come from: a name to its content, or undefined for a name this build does not have. */
@@ -47,6 +48,7 @@ ship(FLOWCHART_PACK);
 ship(UML_CLASS_PACK);
 ship(SEQUENCE_PACK);
 ship(STATE_PACK);
+ship(ER_PACK);
 ship(TEST_MOLECULE);
 
 /** The content a pack's name stands for in this build, or undefined. */

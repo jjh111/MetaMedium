@@ -5,11 +5,12 @@
 // the board must export. The ids are the marks' own, said in Mermaid as D2
 // says them: an entity is its box's stroke (`stroke_1`), its name an alias.
 // The relationships run across the page, so it says `direction LR`. Entities
-// come in reading order — the drawing's rows, each left to right: Customer,
-// Order and Line item, then Invoice beneath — of the page as it was meant to
-// stand (a hand's page leans a little); then the relationships by the
-// entities they join, the first standing to the left of the second or above
-// it, each end's cardinality as the words at that end say it.
+// come in reading order — the drawing's columns, left to right, each top to
+// bottom: Customer, then Order above Invoice, then Line item — of the page as
+// it was meant to stand (a hand's page leans a little); then the relationships
+// by the entities they join, in the places those stand in, the first standing
+// to the left of the second or above it, each end's cardinality as the words at
+// that end say it.
 //
 // A cardinality is Mermaid's own crow's-foot token: `||` exactly one, `|o` /
 // `o|` zero or one, `}o` / `o{` zero or more, `}|` / `|{` one or more, the
@@ -23,11 +24,11 @@ export const ER_MERMAID_UNREAD = `erDiagram
     direction LR
     stroke_1["(unread writing)"]
     stroke_2["(unread writing)"]
-    stroke_3["(unread writing)"]
     stroke_4["(unread writing)"]
+    stroke_3["(unread writing)"]
     stroke_1 }o--o{ stroke_2 : "(unread writing)"
-    stroke_2 }o--o{ stroke_3 : "(unread writing)"
     stroke_2 }o--o{ stroke_4 : "(unread writing)"
+    stroke_2 }o--o{ stroke_3 : "(unread writing)"
 `;
 
 /** The board once a model that can see has read every piece of writing in it (ER_WORDS). */
@@ -35,9 +36,9 @@ export const ER_MERMAID_READ = `erDiagram
     direction LR
     stroke_1["Customer"]
     stroke_2["Order"]
-    stroke_3["Line item"]
     stroke_4["Invoice"]
+    stroke_3["Line item"]
     stroke_1 ||--o{ stroke_2 : "places"
-    stroke_2 ||--|{ stroke_3 : "contains"
     stroke_2 ||--o| stroke_4 : "bills"
+    stroke_2 ||--|{ stroke_3 : "contains"
 `;

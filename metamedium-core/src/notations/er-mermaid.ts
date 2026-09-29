@@ -65,7 +65,8 @@ const T = ER_TABLE;
 // ===== Out: the text =====
 
 const centreOf = (b: Bounds): Point => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
-const hasColon = /[:]/;
+/** Mermaid's preprocessing strips the last character of a line matching these, so a line that does has its colons written as entities too. */
+const PREPROCESSED = /style|classDef/;
 
 /** How far a page leans, in radians: the median angle of the lines that run across it, read left to right; none when none does, or when it is past what a hand leans. */
 const MAX_LEAN = (15 * Math.PI) / 180;
@@ -118,7 +119,7 @@ export function writeEr(reading: NotationReading, opts: MermaidOptions = {}): Me
         ? { value: 'LR', reason: `the relationships run across — between what they join, ${Math.round(acrossSum)} across against ${Math.round(down)} down; ${moving.length - downward} of ${moving.length} more across than down` }
         : { value: 'TD', reason: `the relationships run down — between what they join, ${Math.round(down)} down against ${Math.round(acrossSum)} across; ${downward} of ${moving.length} more down than across` };
   const across = direction.value === 'LR';
-  // Entities in reading order — rows down the page, each left to right — of the page as it was meant to stand: a hand's page leans, and
+  // Entities in reading order — columns left to right, each top to bottom, when the relationships run across; rows down the page, each left to right, when they run down — of the page as it was meant to stand: a hand's page leans, and
   // over a page's width a few degrees is a box's height, so the entities' centres are turned back by the median lean of the lines
   // that run across before they are put in rows.
   const lean = leanOf(moving.map((k) => [centreOf(byId.get(k.from)!.bounds), centreOf(byId.get(k.to)!.bounds)] as const));
@@ -127,7 +128,7 @@ export function writeEr(reading: NotationReading, opts: MermaidOptions = {}): Me
     const p = { x: c.x * Math.cos(-lean) - c.y * Math.sin(-lean), y: c.x * Math.sin(-lean) + c.y * Math.cos(-lean) };
     return [s.id, { minX: p.x - w / 2, maxX: p.x + w / 2, minY: p.y - h / 2, maxY: p.y + h / 2 }] as const;
   }));
-  const ordered = inReadingOrder(entities, (s) => upright.get(s.id), (s) => s.id);
+  const ordered = inReadingOrder(entities, (s) => upright.get(s.id), (s) => s.id, across);
   const place = new Map(ordered.map((s, i) => [s.id, i]));
 
   const lines: string[] = [T.mermaid.header];
@@ -145,7 +146,7 @@ export function writeEr(reading: NotationReading, opts: MermaidOptions = {}): Me
       w.unread.forEach((id) => unreadIds.add(id));
     }
     if (w.text === null) blank.push(m);
-    lines.push(`    ${m}[${mermaidString(w.text ?? ' ', { colons: hasColon.test(w.text ?? '') })}]`);
+    lines.push(`    ${m}[${mermaidString(w.text ?? ' ', { colons: PREPROCESSED.test(m + (w.text ?? '')) })}]`);
     ids[m] = s.id;
     marks[m] = [...new Set(s.ids.length ? s.ids : [s.id])].sort(naturalCompare);
   }
@@ -178,7 +179,7 @@ export function writeEr(reading: NotationReading, opts: MermaidOptions = {}): Me
       v.unread.forEach((id) => unreadIds.add(id));
     }
     if (v.text === null) verbless.push(`${a} — ${b}`);
-    const verb = v.text === null ? '""' : mermaidString(v.text, { colons: hasColon.test(v.text) });
+    const verb = v.text === null ? '""' : mermaidString(v.text, { colons: PREPROCESSED.test(a + b + v.text) });
     lines.push(`    ${a} ${tokens[0]}${T.connectors.relationship.mermaid.line}${tokens[1]} ${b} :${' '}${verb}`);
     links.push({ index: links.length, id: k.id, ids: [k.id, ...[...new Set(k.ids)].filter((x) => x !== k.id).sort(naturalCompare)], from: a, to: b });
   }
@@ -230,7 +231,7 @@ export interface ErNodeRead extends MermaidNodeRead {
 export interface ErLinkRead extends MermaidLinkRead {
   /** How many at each end, as the text says. */
   cardinality: { from: Cardinality; to: Cardinality };
-  /** `--` (identifying) or `..` (non-identifying, drawn as a plain line all the same). */
+  /** `--` or `to` (identifying), or `..` or `optionally to` (non-identifying, drawn as a plain line all the same). */
   identifying: boolean;
 }
 
@@ -344,7 +345,7 @@ export function readErText(text: string): ErDiagramRead {
       const cardTo = RIGHT_TOKENS.find(([k]) => k.toLowerCase() === rt.toLowerCase())![1];
       const a = node(nameOf(left), n), b = node(nameOf(right), n);
       const label = rawWords !== undefined ? wordOf(rawWords) : '';
-      const identifying = line === '--';
+      const identifying = line === '--' || line.toLowerCase() === 'to';
       if (!identifying) notes.add('a non-identifying relationship (“..”, “to”) is drawn as a plain line: the board has no dashed relationship');
       links.push({ index: links.length, line: n, from: a.id, to: b.id, head: 'none', written: `${lt}${line}${rt}`, ...(label ? { label } : {}), cardinality: { from: cardFrom, to: cardTo }, identifying });
       continue;
@@ -384,6 +385,8 @@ const LINE = 1.4;
 const ENTITY_MIN = 8;
 const ENTITY_MAX = 20;
 const ENTITY_H = 3.4;
+/** Along a side, each end of a line and the dash beside it takes this much, in text sizes. */
+const END_ROOM = 2.2;
 /** The gap between ranks and between neighbours, in text sizes: room for a dash at each end of a line. */
 const RANK_GAP = 8;
 const NODE_GAP = 5;
@@ -446,10 +449,13 @@ function drawErRead(session: Session, read: MermaidRead, opts: DrawMermaidOption
 
   // Sizes, in the hand's space: an entity as wide as its name.
   const words = (s: string) => Math.max(...s.split('\n').map((x) => [...x].length), 0);
+  // Room along a side for every line that may leave it, and its dash: each end takes END_ROOM text sizes of the side it shares.
+  const degree = new Map(nodes.map((x) => [x.id, links.filter((l) => l.from === x.id || l.to === x.id).length]));
   const size = new Map(
     nodes.map((x) => {
       const lines = Math.max(1, x.text.split('\n').length);
-      return [x.id, { w: clamp(words(x.text) * CHAR + 3, ENTITY_MIN, ENTITY_MAX) * U, h: Math.max(ENTITY_H, lines * LINE + 2) * U }] as const;
+      const room = (degree.get(x.id)! + 1) * END_ROOM;
+      return [x.id, { w: Math.max(clamp(words(x.text) * CHAR + 3, ENTITY_MIN, ENTITY_MAX), room) * U, h: Math.max(ENTITY_H, lines * LINE + 2, room) * U }] as const;
     })
   );
   const layout = layoutLayered(
@@ -565,18 +571,18 @@ function drawErRead(session: Session, read: MermaidRead, opts: DrawMermaidOption
     const h = DASH * U;
     const place = (n: Point) => {
       const halfAlong = Math.abs(u.y) * (h / 2), halfAcross = Math.abs(n.y) * (h / 2);
-      return add(hand(d.at), add(scaled(u, 0.3 * U + halfAlong), scaled(n, DASH_OFF * U + halfAcross)));
+      return add(d.at, add(scaled(u, 0.3 * U + halfAlong), scaled(n, DASH_OFF * U + halfAcross)));
     };
     const perp = { x: -u.y, y: u.x };
     const options = [perp, { x: -perp.x, y: -perp.y }]
       .map((n) => ({ n, c: place(n) }))
-      .filter((x) => (x.c.x - hand(d.at).x) * o.x + (x.c.y - hand(d.at).y) * o.y > 0.3 * U);
+      .filter((x) => (x.c.x - d.at.x) * o.x + (x.c.y - d.at.y) * o.y > 0.3 * U);
     const pick = (options.length ? options : [{ n: perp, c: place(perp) }])
-      .map((x) => ({ ...x, room: offLines(world(x.c), d.at) }))
+      .map((x) => ({ ...x, room: offLines(x.c, d.at) }))
       // The most room from the other lines; on a tie, above a line that runs across, right of one that runs down.
       .sort((p, q) => q.room - p.room || (Math.abs(u.x) > Math.abs(u.y) ? p.n.y - q.n.y : q.n.x - p.n.x))[0];
     const c = pick.c;
-    const mark = session.addStroke(strokeFor({ shape: 'line', from: { x: c.x, y: c.y - h / 2 }, to: { x: c.x, y: c.y + h / 2 } })!.map(world), next(), pid, scale, { content: true });
+    const mark = session.addStroke(strokeFor({ shape: 'line', from: hand({ x: c.x, y: c.y - h / 2 }), to: hand({ x: c.x, y: c.y + h / 2 }) })!.map(world), next(), pid, scale, { content: true });
     session.label({ nodeId: mark, text: d.said, participantId: pid, at: next() });
     drawnMarks.push(mark);
   }

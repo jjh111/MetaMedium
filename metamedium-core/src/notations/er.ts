@@ -40,7 +40,7 @@
 import type { Bounds } from '../types';
 import type { SessionState } from '../session/session';
 import type { MMNode } from '../session/nodes';
-import { boundsOf, fingerprintOf, getRep, isWord, labelOf, resemblances, transcriptOf } from '../session/nodes';
+import { boundsOf, fingerprintOf, getRep, isWord, labelOf, resemblances, strokePointsOf, transcriptOf } from '../session/nodes';
 import type { NotationPort, NotationPorts } from '../session/ports';
 import { isLetterLike } from '../session/words';
 import { figuresAmong } from '../diagram/figures';
@@ -50,7 +50,7 @@ import type { Notation, NotationConnector, NotationLabel, NotationReading, Notat
 import type { Candidate } from './flowchart';
 import { figureCandidate, mayBeSide, strokeCandidate } from './flowchart';
 import { outside } from './shape';
-import { centreOf, countWord, joinSymbols, labelWriting, marksOf, mean, rolesOf, symbolOf, writingOf } from './graph-kit';
+import { centreOf, countWord, joinSymbols, labelWriting, marksOf, mean, ownWords, rolesOf, symbolOf, writingOf } from './graph-kit';
 import { insideOf, isBox, portsFor, stateShape } from './state';
 
 // ===== The table — the ER diagram's content =====
@@ -130,7 +130,10 @@ export const MULTIPLICITY_SHARE = 0.3;
 export const MIDDLE_SHARE = 0.34;
 /** A mark this small in the hand's space (screen pixels, longest side) is writing, however the shape rung read it. */
 export const LETTER_PX = 40;
-/** A line stroke the shape rung reads as an arrow is a flow; ER lines carry no head. */
+/** A line lies across a box, as a class's compartment line does, when this share of its ink stands within this share of the box's size of it — a line that crosses the box or bows round it does not. */
+export const INSIDE_SHARE = 0.85;
+export const INSIDE_SLACK = 0.05;
+/** A per-mark reading below this offers no ports: the pen should not feel a guess. */
 export const PORTS_FLOOR = 0.4;
 
 /**
@@ -296,10 +299,14 @@ export function readEr(state: SessionState, scopeIds?: readonly string[]): ErRea
   const lines = open.filter((id) => !inFigure.has(id) && resemblances(nodes.get(id)!)[0]?.to !== 'type:arrow');
   const compartmented = (c: Candidate) =>
     lines.some((id) => {
-      const b = boundsOf(nodes.get(id)!);
-      if (!b) return false;
-      const mid = centreOf(b);
-      return outside(mid, c.outline.hull) === 0 && sizeOf(b) >= 0.5 * Math.min(c.outline.bounds.maxX - c.outline.bounds.minX, c.outline.bounds.maxY - c.outline.bounds.minY);
+      const pts = strokePointsOf(nodes.get(id)!);
+      if (!pts || pts.length < 2) return false;
+      const b = boundsOf(nodes.get(id)!)!;
+      // A line across a box lies wholly inside it; one that crosses it, or bows round it, does not.
+      const slack = INSIDE_SLACK * c.outline.size;
+      const within = pts.filter((p) => outside(p, c.outline.hull) <= slack).length / pts.length;
+      const short = Math.min(c.outline.bounds.maxX - c.outline.bounds.minX, c.outline.bounds.maxY - c.outline.bounds.minY);
+      return within >= INSIDE_SHARE && sizeOf(b) >= 0.5 * short;
     });
   const classLike = candidates.filter(compartmented);
   const entities = candidates.filter((c) => !classLike.includes(c));
@@ -340,10 +347,10 @@ export function readEr(state: SessionState, scopeIds?: readonly string[]): ErRea
     const b = stateShape(c);
     const confidence = MAX * b.score * c.fit;
     const reason = `${c.lead ? `${c.lead}: ` : ''}${b.why}`;
-    return { ...symbolOf(c, 'entity', ER_TABLE.symbols.entity.role as Role, confidence, reason, portsFor(c, nodes), undefined), symbol: 'entity', name: { ids: [], unread: [] } } as ErEntity;
+    return { ...symbolOf(c, 'entity', ER_TABLE.symbols.entity.role as Role, confidence, reason, portsFor(c, nodes), ownWords(nodes, [c.id, ...c.ids])), symbol: 'entity', name: { ids: [], unread: [] } } as ErEntity;
   });
   const owned = new Set<string>();
-  for (const s of out) for (const id of [...s.ids, ...symbolOfMark.get(s.id)!.marks]) owned.add(id);
+  for (const s of out) for (const id of [...s.ids, ...byId.get(s.id)!.marks]) owned.add(id);
   const labels = labelWriting(nodes, {
     marks,
     writing,
@@ -355,10 +362,10 @@ export function readEr(state: SessionState, scopeIds?: readonly string[]): ErRea
 
   const reliedOn = new Map(relationships.map((r) => [r.id, r]));
   const labelById = new Map(labels.map((l) => [l.id, l]));
-  const isMultiplicity = new Set<string>();
-  const kept: NotationLabel[] = [];
+  // Writing beside a relationship: near an end and short, or read words that count, is a candidate multiplicity; the pieces of one end
+  // are read together — “0” “..” “1” — and are a multiplicity if none has been read, or together they say one of the four.
+  const groups = new Map<string, { r: ErRelationship; at: 'from' | 'to'; ids: string[] }>();
   for (const l of labels) {
-    kept.push(l);
     if (l.where !== 'beside' || !l.of || !l.bounds) continue;
     const r = reliedOn.get(l.of);
     if (!r) continue;
@@ -366,17 +373,25 @@ export function readEr(state: SessionState, scopeIds?: readonly string[]): ErRea
     const len = Math.max(1e-6, Math.hypot(Q.x - P.x, Q.y - P.y));
     const mid = centreOf(l.bounds);
     const t = ((mid.x - P.x) * (Q.x - P.x) + (mid.y - P.y) * (Q.y - P.y)) / (len * len);
-    const says = cardinalityOf(l.text);
     const middle = t > 0.5 - MIDDLE_SHARE / 2 && t < 0.5 + MIDDLE_SHARE / 2;
     const atEnd = t <= END_SHARE || t >= 1 - END_SHARE;
     const shortEnough = sizeOf(l.bounds) <= MULTIPLICITY_SHARE * len;
+    const counts = l.text !== undefined && cardinalityOf(l.text) !== null;
+    if (middle || !((atEnd && shortEnough) || counts)) continue;
     const at: 'from' | 'to' = t < 0.5 ? 'from' : 'to';
-    const isMult = l.text !== undefined ? says !== null && !middle : atEnd && shortEnough;
-    if (!isMult) continue;
-    isMultiplicity.add(l.id);
-    (r.sides[at].multiplicity ??= { ids: [], unread: [] }).ids.push(l.id);
-    l.reason = `${l.reason} — near its end at ${r.sides[at].entity}: a multiplicity`;
+    const g = groups.get(`${r.id}:${at}`) ?? { r, at, ids: [] };
+    g.ids.push(l.id);
+    groups.set(`${r.id}:${at}`, g);
   }
+  const isMultiplicity = new Set<string>();
+  for (const g of groups.values()) {
+    const read = g.ids.map((id) => labelById.get(id)!.text).filter((x): x is string => x !== undefined);
+    if (read.length && cardinalityOf(read.join('')) === null) continue;
+    g.ids.forEach((id) => isMultiplicity.add(id));
+    (g.r.sides[g.at].multiplicity ??= { ids: [], unread: [] }).ids.push(...g.ids);
+    for (const id of g.ids) labelById.get(id)!.reason += ` — near its end at ${g.r.sides[g.at].entity}: a multiplicity`;
+  }
+  const kept: NotationLabel[] = [...labels];
   // A multiplicity is not the verb; its pieces in reading order, its words read together.
   const inReading = (ids: string[]) =>
     [...ids].sort((p, q) => {
@@ -399,8 +414,7 @@ export function readEr(state: SessionState, scopeIds?: readonly string[]): ErRea
   }
   for (const s of out) {
     const inside = labels.filter((l) => l.of === s.id && l.where === 'inside').map((l) => l.id);
-    const own = (getRep(nodes.get(s.id)!, 'label')?.data as { text?: string } | undefined)?.text ?? undefined;
-    s.name = writingOf2(nodes, inside, ' ', own ?? s.text);
+    s.name = writingOf2(nodes, inside, ' ', s.text);
   }
 
   // 5. Roles: what every mark in the scope plays — one of the six.
@@ -408,7 +422,7 @@ export function readEr(state: SessionState, scopeIds?: readonly string[]): ErRea
   const { roles, weight, unplaced } = rolesOf(
     scope,
     (put) => {
-      for (const s of out) for (const id of [...s.ids, ...symbolOfMark.get(s.id)!.marks]) put(id, s.role, 1);
+      for (const s of out) for (const id of [...s.ids, ...byId.get(s.id)!.marks]) put(id, s.role, 1);
       for (const k of relationships) for (const id of k.ids) put(id, k.role, 1);
       for (const l of kept) put(l.id, l.role, l.where === 'alone' ? 0.5 : 1);
       for (const id of pointers) put(id, 'annotation', 0.5);
