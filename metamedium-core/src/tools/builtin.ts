@@ -24,8 +24,9 @@ import { STRUCTURE } from './structure';
 import { MATHS } from './maths';
 import { MERMAID } from './mermaid';
 import { MERMAID_DRAW } from './mermaid-draw';
+import { ROUTE } from './route';
 
-export const BUILTIN_TOOLS = [CORRECT, TEXT, NAME, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES, TEXT_EDIT, VERBS, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW] as const;
+export const BUILTIN_TOOLS = [CORRECT, TEXT, NAME, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES, TEXT_EDIT, VERBS, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE] as const;
 
 registerTool(CORRECT);
 registerTool(TEXT);
@@ -47,3 +48,4 @@ registerTool(STRUCTURE);
 registerTool(MATHS);
 registerTool(MERMAID);
 registerTool(MERMAID_DRAW);
+registerTool(ROUTE);
