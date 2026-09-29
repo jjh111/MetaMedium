@@ -168,6 +168,26 @@ describe('what makes it an ER diagram and not a flowchart or a class diagram', (
   });
 });
 
+describe('short lines', () => {
+  it('a relationship as short as a letter between two close boxes is a relationship, not writing — it is known by what it joins', () => {
+    const s = createSession(), t = { at: 1000 };
+    box(s, t, 200, 200, 100, 60, 1);
+    box(s, t, 342, 200, 100, 60, 2);
+    // Each end within reach of a box, the whole about 40 px long.
+    const l = line(s, t, [252, 200], [290, 200]);
+    words(s, t, 271, 170, 40);
+    const r = readEr(s.getState());
+    expect(r).not.toBeNull();
+    expect(r!.connectors.map((k) => k.id)).toEqual([l]);
+    // A letter-sized stroke that joins nothing is still writing.
+    const g = createSession(), u = { at: 1000 };
+    box(g, u, 200, 200, 100, 60, 1);
+    box(g, u, 700, 200, 100, 60, 2);
+    line(g, u, [420, 190], [455, 190]);
+    expect(readEr(g.getState())).toBeNull();
+  });
+});
+
 describe('the writing at the ends and beside the middle', () => {
   it('a multiplicity is the short writing near an end, the verb the writing beside the middle; a line of read words near an end that says none of the four is a verb', () => {
     const s = createSession(), t = { at: 1000 };
