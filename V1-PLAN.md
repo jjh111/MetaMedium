@@ -1473,6 +1473,43 @@ short of the ink (E2), a long arrow's small head lost while *line* leads
 to the box beside it (D4), a flat diamond's sites at its box's corners
 (D3). *Status, 28 Sep 2026:* briefed; stopped while surveying, before any
 commit. The five findings stand.
+*Status, 29 Sep 2026: built, all five, in core* — each red first, alone, then
+its fix: `1926890`/`e661cdf` (the rung's arrow tip is the stroke's own point
+the pen first reached farthest along the shaft: `inkTipIndex` /
+`arrowTipIndex` in `geometry.ts`, the one home, which `diagram/heads.ts` and
+`session/erase.ts` now ask instead of each working it out; the tail was
+already the stroke's own end), `555be74`/`05c2a2f` (a head that is a sliver of
+a long stroke is read at the hand's own scale — `readHead`, `headSeenOf`:
+the corners' reading stands where the head takes `HEAD_SHARE_SEEN` of the
+path, else the surer of the two, and the line gives way exactly as far only
+where the hand-scale read found the head; every arrow the corners read keeps
+their reading to the digit; a liftoff hook and an L stay lines), `57567a2`/
+`12cf569` (`strokeFor`'s barb is a thirtieth of the shaft past 1,200, inside
+the fortieth to a fifth a clean arrow keeps), `fb27088`/`b77d1f3` (a closed
+mark that reads as no head takes no fill: the class's box at a long
+relation's end no longer takes the diamond hatched against it),
+`f194b77`/`fad9847` (a closed outline the rung read unsure whose best four
+corners hold it offers those four as its sites, `INK_CORNERED`; an oval, a
+pentagon, a hexagon, a flat triangle and writing keep their bounds). Two
+goldens changed by design, each in its own commit: `6fd5d55` (the magnets
+golden: the board's arrow's tip site is (599.90, 119.72), was (578.97,
+103.85), its middle with it, a nearest-site query that answered null now
+answers the tip) and `8127ee9` (`flowchart.test.ts`: the nearest site at a
+flat decision's left vertex is now its own corner, the port `left` on the
+same point; a mark's own site leads a tie, as D3's Mermaid in relies on).
+`follow.test.ts`'s precondition (the rung's tip stands short of the ink) was
+the finding itself and now says the tip is the ink's. Core 1,724 in 106 files
+(13 new); shard 606; every bench as it was (recognition 1,674 at 99.9%,
+clean: zero wrong snaps, command mark, flowchart, class, sequence, packs);
+`bench/equivalence.mjs` against `ef460f5`: no shape reading, weight or reason
+of any held log differs, only where an arrow's tip stands (its rep, sites,
+maths, the wires and briefs that follow from it); one stroke now costs 0.245
+ms against 0.228; gate `canvas` 350 passed, 1 skipped, `pencil` 16 (e2e 49's
+golden unchanged). *Found, for other owners:* `notations/uml-class.ts`'s
+`headApart` and `mermaid-in.ts`'s scaling of long arrows are workarounds for
+what this fixed and may go; `notations/sequence.ts`'s `heldBarb` (`HELD_ARROW`)
+now holds only what the corners and the hand-scale read both leave below a
+line.
 **D2 Mermaid out** — the exporter tool,
 the `mermaid` kind in `kinds/kinds.ts` and its renderer in the `run`
 sandbox, the export pane. *Red first:* the fixture's Mermaid equals a golden

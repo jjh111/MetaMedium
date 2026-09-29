@@ -620,7 +620,7 @@ pattern and live in `src/recognition.ts`:
 | `detectRectangle` | closed, very generous aspect (a header bar is a rectangle) | extent near a full box, four corners, mean turn near 90° |
 | `detectDot` | — | size *on screen* (`fp.size / scale`) |
 | `detectText` | open, at least a few turns | many corners, sparse box, curvy, wide. Writing *without reading it*: enough to make a mark a `label` |
-| `detectArrow` | open, 1–4 corners, none in the middle | a straight shaft, a sharp barb inside one end, a short head — gated by the barb being **short against its shaft** (or a flick in the hand's space), so an L is two arms, not an arrow. Returns `meta: { head, tip, tail, barb }` |
+| `detectArrow` | open, 1–4 corners, none in the middle | a straight shaft, a sharp barb inside one end, a short head — gated by the barb being **short against its shaft** (or a flick in the hand's space), so an L is two arms, not an arrow; a head that is a sliver of a long stroke is read at the hand's own scale (`readHead`, `headSeenOf`), and the tip is the ink the pen first reached farthest along the shaft (`inkTipIndex`, geometry.ts). Returns `meta: { head, tip, tail, barb }` |
 
 ### Main Analysis Function
 
@@ -635,15 +635,16 @@ export function analyzeStroke(points: Point[], scale = 1): StrokeAnalysis {
   }
 
   const even = evenBowOf(fingerprint, points, scale); // read once, for the line and the arc
+  const head = readHead(fingerprint, points, scale); // read once, for the line and the arrow
   const results = [
-    detectLine(fingerprint, points, scale, even),
+    detectLine(fingerprint, points, scale, even, head),
     detectArc(fingerprint, points, scale, even),
     detectTriangle(fingerprint),
     detectRectangle(fingerprint),
     detectCircle(fingerprint, points, scale),
     detectDot(fingerprint, scale),
     detectText(fingerprint, points, scale),
-    detectArrow(fingerprint, points, scale),
+    detectArrow(fingerprint, points, scale, head),
   ].filter((r): r is RecognitionResult => r !== null);
 
   // Ranked by measured confidence — no detector outranks another by fiat.

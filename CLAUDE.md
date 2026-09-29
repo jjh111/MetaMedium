@@ -41,7 +41,8 @@ notation with its pack, its bench and its Mermaid out (D2) and in (D3,
 with a layered layout); and W1 keeps a diagram's own strokes from erasing or
 being swallowed. What is next is each diagram and the maths **on the
 surface** — the field saying *a flowchart 0.73*, a Mermaid artifact, *Draw
-it* from Mermaid, maths offers — then S2, state and ER, first run, a review
+it* from Mermaid, maths offers — then state and ER (S2, an arrow read where
+its ink points, is done, 29 Sep), first run, a review
 of use, and v1.0.0 (`V1-PLAN.md` §8–§9, every unit with its dated status
 line).
 
@@ -427,7 +428,20 @@ reach from the tip over the shaft's length, or a flick in the hand's space
 whatever the shaft: an L is two arms, and each L of a box drawn in two
 strokes used to be *arrow 0.59*. Its length, never its angle, is the
 discriminator — S1, `BARB_OF_SHAFT`, `BARB_FLICK_PX` — and the reading says
-it: *the barb 0.13 of the shaft*),
+it: *the barb 0.13 of the shaft*. **Where its ink points** (S2): the tip
+the rung keeps is the stroke's own point the pen first reached farthest
+along the shaft, coming from the tail (`inkTipIndex` / `arrowTipIndex` in
+`geometry.ts`, the one home — `diagram/heads.ts` and `session/erase.ts` find
+that same point again), not the corner where the head first turned, which
+sat a wing's length short. And **a head that is a sliver of a long stroke**
+is read at the hand's own scale (`readHead`, `headSeenOf`): the corner
+detector's window is a fraction of the path, so a hand-sized head on a
+shaft of a thousand pixels turned no corner and the stroke was a line
+alone. There the barb is a flick of at least `BARB_MIN_PX` that turns past
+`BARB_TURN` on a straight shaft — a liftoff hook, which bends on ahead or
+aside, and an L are neither — and the line gives way exactly as far. An
+arrow the corners see (its head at least `HEAD_SHARE_SEEN` of the path)
+keeps their reading to the digit),
 `text` (writing, *without reading it*: open, turns many times, low and wide,
 mostly-empty box — enough to make a mark a `label`), and `dot`. **Below the
 hand's resolution (`HAND_RESOLUTION_PX`) only `dot` is offered**: a 5px blob has
@@ -1036,8 +1050,13 @@ for the journal through a reload.
 corners, edge-middles and centre, a circle's centre and cardinals, a
 triangle's corners and centroid, an arrow's tip and tail — arithmetic on
 the clean form a mark carries or would be offered, so replay is
-deterministic; unread ink offers its bounds, never a pretended shape.
-Radii are about the hand (`magnetRadius(sizePx, scale)`). While a
+deterministic; unread ink offers its bounds, never a pretended shape — save
+a closed outline whose best four corners hold it (`INK_CORNERED`,
+`INK_NOT_THREE`, the flowchart's own measure), which a flat diamond is and
+the rung reads unsure: its four corners are then the sites, clockwise from
+the top (S2; an oval, a pentagon, a flat triangle and writing keep their
+bounds), and a mark's own site leads a tie with a notation's port at the same
+point. Radii are about the hand (`magnetRadius(sizePx, scale)`). While a
 connector is drawn its end shows the nearest site in reach as a ghost
 ring; releasing inside lands the endpoint on the site and logs `bind`.
 **A magnet is an offer, not a trap**: the hand can push through it, and
@@ -1069,7 +1088,8 @@ of a line, an arrow or an arc — the arrow's own barb, a small triangle, diamon
 or circle touching the end on its axis, a separate chevron, a fill — hollow or
 filled, filled measured as ink coverage of the head's own inside, so a fast
 hatch and a head three times the size read alike; writing at an end is a
-label, not a head. `figuresOf` reads ruled strokes whose ends meet — tied by a
+label, not a head; a closed mark that reads as no head — the class's own box
+at the end of a long relation — is nobody's head and takes no fill (S2). `figuresOf` reads ruled strokes whose ends meet — tied by a
 magnet, or touching within the magnet radius — as one figure: a triangle, a
 quadrilateral (a diamond, said as one turned about 45°; a rectangle when its
 corners read right), a polygon. Each side keeps the marks it was drawn with,
@@ -1101,8 +1121,8 @@ cannot say *turn about this end and stretch*. **The correction** (`followed`)
 reads each ACTIVE bound end — `activeBindingsOf`, so an erased target moves
 nothing — where it stands (`connectorEnds`: a held clean form's ends, else
 the ink's, an arrow's tip being the ink the pen first reached farthest along
-its shaft, `inkEndsOf` in `diagram/heads.ts`; the rung's own tip can sit a
-wing's length short) and where its site stands now (`boundSiteOf`), and
+its shaft, `inkEndsOf` in `diagram/heads.ts`; the rung's tip is that same
+ink since S2) and where its site stands now (`boundSiteOf`), and
 composes onto the map it held the similarity that carries one onto the
 other: **one bound end** pivots and stretches the connector about its free
 end; **two** are carried by the one similarity that takes both; sites that
@@ -3029,7 +3049,10 @@ command mark or a scratch, because those are commitments and no tier commits —
 the first real run had a model's arrow cross a box three times and erase it.
 The rule is about what was declared, not who drew it; an agent driving
 `addStroke` without the flag can still gesture (v6 same-class citizenship).
-The vocabulary is closed on purpose:
+`strokeFor` sizes an arrow's barb from its shaft (S2): about 40 units to a
+shaft of 1,200, then a thirtieth of it — inside the fortieth to a fifth a
+clean arrow keeps — so a long arrow is not a sliver of a head. The vocabulary
+is closed on purpose:
 a model that can only draw what the canvas can read makes marks the human can
 argue with on the same terms as their own. `parseShapes` drops anything outside
 it and caps the count (`MAX_DRAWN`). The brief it draws from is the same one
