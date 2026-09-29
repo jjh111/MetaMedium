@@ -237,3 +237,51 @@ describe('what a sheet never does: throw, guess, or settle', () => {
     expect(fmt(step(bare, '1').value)).toBe('6');
   });
 });
+
+// F2 — prose on the board is not maths. A colon is an `=` and a dash a minus to the grammar, so an
+// ordinary note used to read as a step or a check with words for operands, and each stood a `?` at
+// rest (a "problem"). A line counts as maths only when it looks like it: an operator whose operands
+// are numbers, references or names the page defines — never two words with a dash between them.
+describe('prose is not maths', () => {
+  const PROSE = [
+    'Draw a box: then an arrow - and it reads',
+    'Note: keep it short',
+    'Step one: draw',
+    'Total: many',
+    'color: red',
+    'Draw 3 boxes - then join them',
+    'Wait 5 min then go',
+    'Hold a molecule and the field says what it reads as.',
+    'Hold the lone bubble and it says bubble - draw more',
+    '1. Draw a box',
+    '2. Hold it - then choose what it becomes',
+    '3. Draw 3 boxes - then join them',
+  ];
+  const says = (e: SheetEntry) => e.kind === 'step' || e.kind === 'check';
+
+  it('says nothing: no step, no check, on any line of it', () => {
+    for (const line of PROSE) {
+      const e = readSheet([line]).entries[0];
+      expect(says(e), `${line} → ${e.kind}: ${e.reason}`).toBe(false);
+    }
+  });
+
+  it('says nothing beside a page that has maths on it, and leaves the page alone', () => {
+    const page = readSheet([...APRON_LINES, ...PROSE]);
+    const plain = readSheet(APRON_LINES);
+    expect(page.entries.slice(0, APRON_LINES.length).map((e) => [e.kind, e.reason])).toEqual(plain.entries.map((e) => [e.kind, e.reason]));
+    expect(page.entries.slice(APRON_LINES.length).filter(says)).toEqual([]);
+    expect(page.unit).toBe(plain.unit);
+  });
+
+  it('a name the page defines still makes a line maths, and so does a sum of numbers', () => {
+    expect(readSheet(['A. Bust 36', 'Bust ÷ 3']).entries[1].kind).toBe('check');
+    expect(readSheet(['24 - 8 = 16']).entries[0].kind).toBe('check');
+    expect(readSheet(['1. Waist ÷ 4']).entries[0].kind).toBe('step');
+  });
+
+  it('a line typed as a sum is read as one, whatever its words', () => {
+    const e = readSheet([{ text: 'Waist ÷ 2', maths: true }]).entries[0];
+    expect(e.kind).toBe('check');
+  });
+});

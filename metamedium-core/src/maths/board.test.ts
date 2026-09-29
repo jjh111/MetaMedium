@@ -175,6 +175,11 @@ describe('a page: each step carries its check', () => {
     const { s } = pageBoard(['Sew the seams first.', 'Press them open.']);
     expect(chipsOf(s)).toEqual([]);
   });
+
+  it('a note with a colon or a dash in it is prose, not a step: no chip, no problem standing at rest (F2)', () => {
+    const { s } = pageBoard(['Draw a box: then an arrow - and it reads', 'Note: keep it short', '1. Draw a box', '2. Hold it - then choose what it becomes']);
+    expect(chipsOf(s)).toEqual([]);
+  });
 });
 
 describe('what is typed after =', () => {
