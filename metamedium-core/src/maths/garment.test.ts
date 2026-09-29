@@ -15,11 +15,11 @@
 // own strokes out of its list of what it could not draw.
 
 import { describe, it, expect } from 'vitest';
-import type { Bounds } from '../types';
+import type { Bounds, Point } from '../types';
 import { createSession } from '../session/session';
 import type { Session } from '../session/session';
 import { drawGarment, GARMENT_VARIANTS } from '../notations/fixtures/garment';
-import { rectStroke } from '../test/strokes';
+import { lineStroke, rectStroke } from '../test/strokes';
 import { boardMaths, mathsChips, mathsSaid } from './board';
 import { trueSize } from './truesize';
 
@@ -114,6 +114,31 @@ describe('the seam allowance: cutting size against sewing size', () => {
     expect(g.darts[0].depth).toBeLessThan(9);
     expect(said(g.lines)).toMatch(/2 notches/);
     expect(said(g.lines)).toMatch(/a dart 2\.\d+″ wide and 8\.\d+″ long/);
+  });
+});
+
+describe('a notch is no line that divides an edge', () => {
+  it('a number written beside the middle of a side with a notch either side of it is the side’s, not the part between the notches', () => {
+    // Drawn with a ruler, as the browser test draws it: a tick that ends exactly on the edge cuts it.
+    const s = createSession();
+    let at = 1000;
+    const draw = (pts: Point[]) => s.addStroke(pts, (at += 4000));
+    const run = (...ps: Point[]) => ps.slice(1).reduce<Point[]>((acc, p, i) => acc.concat(lineStroke(ps[i], p, 10).slice(i ? 1 : 0)), []);
+    draw(rectStroke(392, 152, 416, 576, 30));
+    const piece = draw(rectStroke(420, 180, 360, 520, 30));
+    draw(lineStroke({ x: 600, y: 250 }, { x: 600, y: 630 }, 40));
+    draw(run({ x: 589, y: 269 }, { x: 600, y: 250 }, { x: 611, y: 269 }));
+    draw(run({ x: 589, y: 611 }, { x: 600, y: 630 }, { x: 611, y: 611 }));
+    // Notches at 350 and 520 on a left side that runs 180 to 700: the part between them is centred on 435, the whole side on 440.
+    for (const y of [350, 520]) draw(lineStroke({ x: 408, y }, { x: 434, y }, 12));
+    text(s, '18″', { minX: 590, maxX: 630, minY: 154, maxY: 176 }, 40000);
+    text(s, '26″', { minX: 394, maxX: 418, minY: 420, maxY: 440 }, 41000);
+    text(s, 'Add ½″ seam allowance', { minX: 900, maxX: 1300, minY: 100, maxY: 130 }, 42000);
+    const g = boardMaths(s.getState())!.garment![0];
+    expect(g.id).toBe(piece);
+    expect(g.figure).toMatchObject({ id: piece, on: 'sewing' });
+    expect(g.seam!.sewn).toMatchObject({ width: 18, height: 26 });
+    expect(said(g.lines)).toContain('cut at 19 × 27″, sewn at 18 × 26″');
   });
 });
 
