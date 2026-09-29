@@ -306,6 +306,60 @@ describe('an arrow is read where its ink points (S2)', () => {
     expect(off).toEqual([]);
   });
 
+  it('a long arrow with a hand-sized head is an arrow at any length, and the line gives way (D5)', () => {
+    // D5: a sequence message across a wide page — a long shaft, a barb a sliver
+    // of the stroke — read line 0.83, arrow 0.60, or line alone, because the
+    // corner detector measures in fractions of the path.
+    const missed: string[] = [];
+    for (const len of [200, 400, 800, 1200, 2000, 3000]) {
+      for (const wings of [1, 2] as const) {
+        for (const headLen of [20, 28, 40]) {
+          for (const headAt of ['end', 'start'] as const) {
+            for (const seed of [1, 2, 3]) {
+              const to = { x: len, y: len * 0.06 }, from = { x: 0, y: 0 };
+              const pts = handArrow(headAt === 'end' ? from : to, headAt === 'end' ? to : from, { wings, headLen, seed, headAt });
+              const results = analyzeStroke(pts).results;
+              const arrow = results.find((r) => r.type === 'arrow'), line = results.find((r) => r.type === 'line');
+              if (results[0]?.type !== 'arrow' || (line && line.confidence >= arrow!.confidence)) {
+                missed.push(`${len} w${wings} h${headLen} ${headAt} s${seed}: ${results.slice(0, 3).map((r) => `${r.type} ${r.confidence.toFixed(2)}`).join(', ')}`);
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(missed).toEqual([]);
+  });
+
+  it('the same, zoomed out: the head is a hand’s on screen, the world is a screenful wider', () => {
+    // scale 3: a 30px head on screen is 90 units, on a shaft of 3,600.
+    for (const seed of [1, 2, 3]) {
+      const pts = handArrow({ x: 0, y: 0 }, { x: 3600, y: 200 }, { wings: 2, headLen: 90, seed, jitter: 7 });
+      const results = analyzeStroke(pts, 3).results;
+      expect(results[0]?.type, `seed ${seed}`).toBe('arrow');
+    }
+  });
+
+  it('a long line’s liftoff hook, which turns aside and does not draw back on it, is still a line', () => {
+    // The hook a pen leaves lifting off, bending on ahead or to the side, on a
+    // shaft of any length: it never draws back along the shaft.
+    for (const len of [200, 600, 1500, 3000]) {
+      for (const seed of [1, 2, 3, 4]) {
+        for (const sideways of [0, 1, -1]) {
+          const shaft = handLine({ x: 0, y: 0 }, { x: len, y: len * 0.05 }, { seed, jitter: 1.5 });
+          const end = shaft[shaft.length - 1];
+          const hook = Array.from({ length: 8 }, (_, i) => {
+            const a = ((i + 1) / 8) * Math.PI * 0.55;
+            return { x: end.x + 9 * Math.sin(a), y: end.y + sideways * 9 * (1 - Math.cos(a)) };
+          });
+          const results = analyzeStroke(shaft.concat(hook)).results;
+          expect(results[0]?.type, `${len} seed ${seed} side ${sideways}`).toBe('line');
+          if (sideways === 0) expect(results.map((r) => r.type), `${len} seed ${seed}`).not.toContain('arrow');
+        }
+      }
+    }
+  });
+
   it('the tip is one of the stroke’s own points', () => {
     const pts = handArrow({ x: 0, y: 0 }, { x: 400, y: 40 }, { wings: 2, headLen: 40, seed: 2 });
     const meta = analyzeStroke(pts).results.find((r) => r.type === 'arrow')?.meta as { tip: Point };
