@@ -73,7 +73,8 @@ async function startCountingModel() {
     req.on('end', () => {
       calls.push({ at: Date.now(), method: req.method, path: req.url, bytes: body.length });
       const reply = JSON.stringify([{ label: 'the model of the gate', confidence: 0.61, reasoning: 'it answers every question the same way' }]);
-      res.writeHead(200, { ...cors, 'content-type': 'application/json' }).end(JSON.stringify({ id: 'x', object: 'chat.completion', model: 'e2e-hand-stub', choices: [{ index: 0, message: { role: 'assistant', content: reply }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }));
+      // A moment, so the page's working dot can be seen while the call is out.
+      setTimeout(() => res.writeHead(200, { ...cors, 'content-type': 'application/json' }).end(JSON.stringify({ id: 'x', object: 'chat.completion', model: 'e2e-hand-stub', choices: [{ index: 0, message: { role: 'assistant', content: reply }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } })), 600);
     });
   });
   await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
@@ -176,6 +177,12 @@ async function holdAtPoint(page, pt) {
   await page.mouse.up();
   await sleep(80);
   return opened;
+}
+async function takePill(page, label) {
+  const pill = page.locator('#summon .pill.item', { hasText: label });
+  if (await pill.count() !== 1) return false;
+  await pill.click({ timeout: 5000 });
+  return true;
 }
 /** The hand's line about one mark, out of a canvas_look. */
 const markLine = (look, id) => String(look).split('\n').find((l) => l.startsWith(id + ' ') || l.startsWith(id + ' ·')) || null;
@@ -444,7 +451,8 @@ export async function runHand(browser, servers, { freshContext, screenshot }) {
       const look = await lookUntil((l) => !!pair && !!markLine(l, pair));
       check(`H1.14. §6 (synthetic strokes): two of his marks held and the field left open — the hand's line lands (${line}) and the field stays open on his two (${still.summon && still.summon.length}); \`name: pair\` and Enter make the thing, holding his two marks and nothing of the hand's; the hand's look: "${(markLine(look, pair) || '').slice(0, 80)}", its count line "${countLine(look)}"`,
         held && !!line && still.summon && still.summon.length === 2 && !!made && made.parts.includes(p1) && made.parts.includes(p2) && !made.parts.includes(line)
-          && /“pair”/.test(markLine(look, pair) || '') && /by john/.test(markLine(look, pair) || '') && !/the field is open/.test(look),
+          && /“pair”/.test(markLine(look, pair) || '') && /by john/.test(markLine(look, pair) || '') && !/the field is open/.test(look)
+          && !/ · claude/.test(markLine(look, pair) || '') /* a name he gave is never said to be the hand's reading */,
         { held, still, made, count: countLine(look) });
       await letGo(page);
     });
@@ -531,6 +539,67 @@ export async function runHand(browser, servers, { freshContext, screenshot }) {
       }, [boxB, word]);
       check(`H1.18. A7 (synthetic strokes): after an undo and a reload the hand's sentence lands on his box alone and its reading on his word alone — the reading is on ${JSON.stringify(where.withReading)} (${where.withReading.length} mark)`,
         /placed beside/.test(say) && /held on/.test(prop) && landed && where.withReading.length === 1 && where.withReading[0] === word, { say, prop, where });
+    });
+
+
+    // ---- §5. The one deliberate ask: What is this? — a model is asked when a person asks, and once ----
+    await record('H1.19', async () => {
+      await letGo(page);
+      const idle = await page.evaluate(tabNow);
+      const callsBefore = asked();
+      const opened = await holdAtPoint(page, { x: 470, y: 250 });
+      const took = opened && await takePill(page, 'What is this?');
+      const working = await waitFor(page, () => window.__mm.working().length > 0, null, 3000);
+      const during = await page.evaluate(tabNow);
+      const read = await waitFor(page, () => { const mm = window.__mm, s = mm.session.getState(); return s.contentIds.some((id) => mm.MM.interpretationsOf(s.nodes.get(id), s.nodes).some((r) => /the.model.of.the.gate/.test(r.label))); }, null, 8000);
+      if (took) deliberate++;
+      const on = await page.evaluate(() => { const mm = window.__mm, s = mm.session.getState(); return s.contentIds.filter((id) => mm.MM.interpretationsOf(s.nodes.get(id), s.nodes).some((r) => /the.model.of.the.gate/.test(r.label))); });
+      await sleep(300);
+      const after = await page.evaluate(tabNow);
+      const look = await lookUntil((l) => on.length > 0 && /the.model.of.the.gate 0\.61 · /.test(markLine(l, on[0]) || ''));
+      check(`H1.19. §5, the deliberate act: What is this? on his box asks the gate's model — ${callsBefore} → ${asked()} calls (one), the working dot up while it was out (${JSON.stringify(during.working)}) and gone after (${JSON.stringify(after.working)}); the reading lands on ${on.length} mark, held, and the hand's look attributes it — "${(markLine(look, on[0]) || '').slice(0, 120)}"`,
+        idle.working.length === 0 && callsBefore === 0 && opened && took && working && during.working.length >= 1 && read && asked() === 1 && after.working.length === 0 && on.length === 1 && /the.model.of.the.gate 0\.61 · /.test(markLine(look, on[0]) || ''),
+        { idle, opened, took, during, after, on, calls: model.calls, line: markLine(look, on[0]) });
+      await letGo(page);
+    });
+
+    // ---- §7. The minimap and the frame ----
+    await record('H1.20', async () => {
+      await letGo(page);
+      // Zoom in far on his box, then pan away from the board: the map still shows the board and the viewport.
+      await page.evaluate((x) => window.__mm.setView(4, -4 * (x + 3700), -4 * 230), WX);
+      await page.evaluate(() => window.__mm.setView(4, 2000, 0));
+      await sleep(200);
+      const map = await page.evaluate(() => { const m = window.__mm.minimap(), el = document.getElementById('minimap'); const r = el.getBoundingClientRect(); return m ? { scale: m.scale, ox: m.ox, oy: m.oy, hidden: el.hidden, rect: { l: r.left, t: r.top, w: r.width, h: r.height } } : null; });
+      const target = { x: WX + 545, y: 250 }; // the middle of his box, in the world
+      const at = map && { x: map.rect.l + (map.ox + target.x * map.scale) * (map.rect.w / 176), y: map.rect.t + (map.oy + target.y * map.scale) * (map.rect.h / 108) };
+      if (at) await page.mouse.click(at.x, at.y);
+      await sleep(250);
+      const centre = await page.evaluate(() => { const v = window.__mm.view; return { x: (innerWidth / 2 - v.panX) / v.zoom, y: (innerHeight / 2 - v.panY) / v.zoom, zoom: v.zoom }; });
+      check(`H1.20. §7: zoomed in far and panned away, the minimap shows the board with the viewport on it (${map ? 'shown' : 'hidden'}); a tap on it goes there — the centre of the screen is now at ${Math.round(centre.x)},${Math.round(centre.y)} of ${target.x},${target.y}`,
+        !!map && !map.hidden && !!at && Math.abs(centre.x - target.x) < 12 && Math.abs(centre.y - target.y) < 12 && centre.zoom === 4, { map, at, centre });
+      await page.evaluate((x) => window.__mm.setView(1, -x, 0), WX);
+    });
+
+    let three = null;
+    await record('H1.21', async () => {
+      await page.evaluate(() => window.__mm.setView(1, -6000, 0));
+      const cs = [{ x: 520, y: 230 }, { x: 720, y: 230 }, { x: 620, y: 400 }];
+      for (const c of cs) await stroke(page, circle(c.x, c.y, 38));
+      const ids3 = (await page.evaluate(() => { const s = window.__mm.session.getState(); return s.contentIds.slice(-3); }));
+      await stroke(page, seg({ x: 558, y: 230 }, { x: 682, y: 230 }, 30));
+      await stroke(page, seg({ x: 540, y: 264 }, { x: 600, y: 366 }, 30));
+      await stroke(page, rect(440, 160, 380, 300));
+      await stroke(page, tick(760, 415));
+      const held = await waitFor(page, () => !!window.__mm.session.getState().summon, null, 5000);
+      const took = held && await takePill(page, 'Show it in 3D');
+      const made = await waitFor(page, () => window.__mm.session.getState().live.length > 0, null, 8000);
+      three = await page.evaluate(() => { const s = window.__mm.session.getState(); return s.live.slice(-1)[0] || null; });
+      const look = await lookUntil((l) => !!three && !!markLine(l, three), 8000, { detail: 'full' });
+      const line = markLine(look, three);
+      const shortLook = await lookUntil((l) => !!three && !!markLine(l, three));
+      check(`H1.21. §7 (synthetic strokes): three circles and two lines, circled, Show it in 3D — the hand's look: one artifact "${(markLine(shortLook, three) || '').slice(0, 100)}"`,
+        held && took && made && !!three && /\brun\b/.test(markLine(shortLook, three) || '') && /playing|live/.test(markLine(shortLook, three) || ''), { held, took, made, three, line: markLine(shortLook, three), full: look.slice(0, 1500) });
     });
 
     check(`H1.Z. nothing the scenario opened reached for :8020, where a relay on this machine listens by default — ${toJohnsRelay.length} request${toJohnsRelay.length === 1 ? '' : 's'} refused`, toJohnsRelay.length === 0, toJohnsRelay.slice(0, 5));
