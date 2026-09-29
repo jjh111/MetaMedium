@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { createSession } from './session';
 import { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet } from './magnets';
-import { circleStroke, rectStroke, lineStroke, triangleStroke, arcStroke, handArrow, handText } from '../test/strokes';
+import { circleStroke, rectStroke, lineStroke, triangleStroke, arcStroke, handArrow, handText, handBox } from '../test/strokes';
+import type { Point } from '../types';
+import { diamondCorners, handShape } from '../notations/fixtures/hand';
 
 const built = (pts: { x: number; y: number }[]) => {
   const s = createSession();
@@ -68,6 +70,56 @@ describe('magnets — the places a mark offers attachment', () => {
     expect(sites.every((s) => s.shape === 'ink')).toBe(true);
     expect(kinds(sites)).toContain('corner');
     expect(kinds(sites)).toContain('centre');
+  });
+
+  it('a flat diamond offers its vertices, not the corners of its bounds (D3)', () => {
+    // A diamond wider than it is tall reads as a triangle or a circle unsure, so
+    // it has no clean form to take sites from, and offered the corners of its
+    // bounds — four places in the air beside the mark. Its ink is four-cornered
+    // all the same: those four corners are measured, not pretended.
+    const bad: string[] = [];
+    for (const [w, h] of [[180, 110], [160, 100], [200, 90], [140, 80], [120, 60], [100, 100]]) {
+      for (const seed of [1, 2, 3, 4, 5, 6]) {
+        const { sites } = built(handShape(diamondCorners(400, 300, w, h), { seed, jitter: 2 }));
+        const corners = sites.filter((s) => s.kind === 'corner');
+        const vertices = [{ x: 400, y: 300 - h / 2 }, { x: 400 + w / 2, y: 300 }, { x: 400, y: 300 + h / 2 }, { x: 400 - w / 2, y: 300 }];
+        const missing = vertices.filter((v) => !corners.some((c) => near(c.point, v, 12)));
+        if (corners.length !== 4 || missing.length) bad.push(`${w}×${h} seed ${seed}: ${corners.map((c) => `(${Math.round(c.point.x)}, ${Math.round(c.point.y)})`).join(' ')}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('a box turned about 45° with unequal sides offers its own corners too', () => {
+    for (const [w, h] of [[160, 100], [200, 90], [120, 60]]) {
+      const { sites } = built(handBox(400, 300, w, h, 45, { seed: 3, jitter: 1 }));
+      const centre = sites.find((s) => s.kind === 'centre')!;
+      const corners = sites.filter((s) => s.kind === 'corner');
+      expect(corners).toHaveLength(4);
+      // Every corner is a place on the box: the same distance from its centre as the box's own half-diagonal.
+      const half = Math.hypot(w, h) / 2;
+      for (const c of corners) expect(Math.abs(Math.hypot(c.point.x - centre.point.x, c.point.y - centre.point.y) - half)).toBeLessThan(10);
+    }
+  });
+
+  it('an oval, a pentagon, a hexagon and a flat triangle drawn unsure keep their bounds, never four pretended corners', () => {
+    // Four corners hold a diamond or a box, and not these: an oval's hold 0.64
+    // of it, a pentagon's and a hexagon's about 0.68, a flat triangle's four
+    // are its three and one along a side.
+    const ring = (n: number, rx: number, ry: number, from = 0) =>
+      Array.from({ length: n }, (_, i) => ({ x: 400 + rx * Math.cos(from + (i / n) * 2 * Math.PI), y: 300 + ry * Math.sin(from + (i / n) * 2 * Math.PI) }));
+    const drawn: Record<string, Point[]> = {
+      oval: handShape(ring(48, 100, 40), { seed: 1, jitter: 2 }),
+      pentagon: handShape(ring(5, 80, 80, -Math.PI / 2), { seed: 2, jitter: 2 }),
+      hexagon: handShape(ring(6, 90, 60), { seed: 1, jitter: 2 }),
+      'flat triangle': handShape([{ x: 300, y: 340 }, { x: 500, y: 340 }, { x: 400, y: 290 }], { seed: 1, jitter: 2 }),
+    };
+    for (const [name, pts] of Object.entries(drawn)) {
+      const { sites } = built(pts);
+      const corners = sites.filter((s) => s.kind === 'corner');
+      expect(corners.length, name).toBeGreaterThan(0);
+      expect(corners.every((s) => /bounds/.test(s.reasoning)), name).toBe(true);
+    }
   });
 
   it('nearestMagnet takes the closest site inside the radius and refuses outside it', () => {
