@@ -16,6 +16,7 @@
 // same one, is not offered again.
 
 import { boundsOf, transcriptOf } from '../session/nodes';
+import type { SessionState } from '../session/session';
 import { NOTATION_FLOOR, describeNotation, notationsOf } from '../notations/notation';
 import type { NotationReading } from '../notations/notation';
 import { toMermaid } from '../notations/mermaid';
@@ -29,16 +30,24 @@ const MIN_W = 320, MIN_H = 240, MAX_W = 900, MAX_H = 900;
 /** How far beside the drawing it stands, as a share of the drawing's width, never under a card's gap. */
 const GAP_SHARE = 0.12, MIN_GAP = 48;
 
-/** The reading a scope's Mermaid is written from, with its text: the likeliest notation the canvas can write. */
-function mermaidOf(scope: ToolScope) {
-  const words = (id: string) => scope.host.isRead(id) && !transcriptOf(scope.state.nodes.get(id)!);
-  for (const reading of notationsOf(scope.state, scope.marks)) {
+/**
+ * The Mermaid some marks are written as, with the reading it is written from:
+ * the likeliest notation the canvas can write, above the notations' floor, or
+ * null. The export pane asks it of the whole board as the tool asks it of the
+ * marks held — one home for what reads as a diagram worth saying. `isRead` is
+ * the host's: writing read with its line says nothing of its own.
+ */
+export function mermaidFor(state: SessionState, ids: readonly string[], isRead: (id: string) => boolean = () => false) {
+  const words = (id: string) => isRead(id) && !transcriptOf(state.nodes.get(id)!);
+  for (const reading of notationsOf(state, ids)) {
     if (reading.confidence < NOTATION_FLOOR) continue;
     const said = toMermaid(reading, { readWith: words });
     if (said) return { reading, said };
   }
   return null;
 }
+
+const mermaidOf = (scope: ToolScope) => mermaidFor(scope.state, scope.marks, scope.host.isRead);
 
 /** Whether an artifact on the board already holds exactly this text. */
 function standing(scope: ToolScope, text: string): boolean {

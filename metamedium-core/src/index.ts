@@ -686,6 +686,7 @@ export { shapesSummary } from './tools/clean';
 export { isWritingMark, definitionOf, definitionsIn, artifactsIn, writingLine } from './tools/board';
 export type { WritingLine } from './tools/board';
 export { bestWiring, frameTemplatesFor } from './tools/frames';
+export { mermaidFor } from './tools/mermaid';
 
 // Context (V1-PLAN §2.2, B2) — what stands beside the hand: the notations and
 // concepts read over what a scope sits beside, weighted by nearness relative to

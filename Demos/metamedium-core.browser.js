@@ -460,6 +460,7 @@ var MetaMediumCore = (() => {
     memberKind: () => memberKind,
     memberLine: () => memberLine,
     mergeLogs: () => mergeLogs,
+    mermaidFor: () => mermaidFor,
     mermaidIds: () => mermaidIds,
     mermaidReaders: () => mermaidReaders,
     mermaidString: () => mermaidString,
@@ -23179,15 +23180,16 @@ if (mm.THREE && mm.scene) {
   var MAX_H = 900;
   var GAP_SHARE = 0.12;
   var MIN_GAP = 48;
-  function mermaidOf(scope) {
-    const words = (id) => scope.host.isRead(id) && !transcriptOf(scope.state.nodes.get(id));
-    for (const reading4 of notationsOf(scope.state, scope.marks)) {
+  function mermaidFor(state, ids, isRead2 = () => false) {
+    const words = (id) => isRead2(id) && !transcriptOf(state.nodes.get(id));
+    for (const reading4 of notationsOf(state, ids)) {
       if (reading4.confidence < NOTATION_FLOOR) continue;
       const said3 = toMermaid(reading4, { readWith: words });
       if (said3) return { reading: reading4, said: said3 };
     }
     return null;
   }
+  var mermaidOf = (scope) => mermaidFor(scope.state, scope.marks, scope.host.isRead);
   function standing(scope, text) {
     const s = scope.state;
     return s.artifacts.some((id) => {

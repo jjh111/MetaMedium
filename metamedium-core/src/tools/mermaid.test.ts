@@ -15,7 +15,7 @@ import { FLOWCHART_MERMAID_UNREAD, FLOWCHART_MERMAID_READ, FLOWCHART_WORDS } fro
 import { offersFor, toolScope, takeOffer, getTool, registeredTools } from './registry';
 import { rankOffers } from './rank';
 import { BUILTIN_TOOLS } from './builtin';
-import { MERMAID } from './mermaid';
+import { MERMAID, mermaidFor } from './mermaid';
 
 const named = () => createSession(DEFAULT_SESSION_CONFIG);
 const hold = (s: Session, ids: string[], at = 900_000) => { s.summonMarks(ids, at); };
@@ -98,6 +98,19 @@ describe('the Mermaid tool', () => {
     expect(mermaidOf(q)!.reason).toMatch(/sequence diagram/);
     takeOffer(mermaidOf(q)!, toolScope(q), q, 1_000_000);
     expect(artifactsOf(q)[0].code.code).toMatch(/^sequenceDiagram\n/);
+  });
+
+  it('mermaidFor says the same text for the whole board as the tool does for the marks held — the export pane’s and the offer’s one home', () => {
+    const { s } = flowchart();
+    const ids = s.getState().contentIds.slice();
+    const said = mermaidFor(s.getState(), ids)!;
+    expect(said.said.text).toBe(FLOWCHART_MERMAID_UNREAD);
+    expect(said.reading.notation).toBe('flowchart');
+    // A board that reads as no diagram says nothing.
+    const t = named();
+    const row = [0, 1, 2].map((i) => t.addStroke(rectStroke(200 + i * 160, 200, 120, 80), 1000 + i * 100));
+    expect(mermaidFor(t.getState(), row)).toBeNull();
+    expect(mermaidFor(t.getState(), [])).toBeNull();
   });
 
   it('is not offered twice for a text already standing on the board', () => {
