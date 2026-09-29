@@ -1953,6 +1953,24 @@ are computed by the canvas, never a model. (4) A text that is parked (past the
 live budget) has no frame to measure, so its step chips stand at core's even
 division of the frame.
 
+*F2, 29 Sep 2026 (branch `unit/fixes-1`; red `437f625`, fix `f03f0fd`):* **prose on the
+board is no longer read as maths** — the finding above (2) and R5's. The grammar
+reads a colon as `=`, a dash as a minus and words as a name, so *Draw a box: then
+an arrow - and it reads* was a check and *1. Draw a box* a step, each standing a
+`?` at rest. `proseToNotes` in `sheet.ts` is the smallest rule: an operator never
+joins two words the page does not define; a line with no label needs an operator
+and only names the page defines; a labelled one may name what the page lacks
+(*1. Waist ÷ 4* still says *Waist is not on this sheet*); a line typed after `=`
+is read whatever it says (`maths: true`, so `evaluateTyped` still says what is
+missing). What fails is a `note`. Every existing sheet, apron, tunic and board test
+passes unchanged; new: `sheet.test.ts` 4, `board.test.ts` 1, e2e 64h and 64h2
+(canvas 394 passed, 2 skipped). R5's caution on colons and dashes in the examples'
+notes is lifted (their logs are unchanged); the one on digits stays, since a number
+beside a drawing is a dimension. **Found:** the examples' guard was a comment, a
+README line and CLAUDE.md, not a test — the test that holds is *a note is not a
+measurement* (`examples.test.mjs`), which passes with prose; `dimension.ts` and
+`solve.ts` still read numbers in a note beside a figure by design.
+
 ### Phase 5 — seats
 J1–J3 as `DIRECTOR-PLAN-W2.md` §3, with §6's addition.
 
@@ -2464,6 +2482,20 @@ out, so it lands and shows nowhere (`QA-v10` §6 row 4 says it joins as
 it shows; (3) `QA-v10` §4's *1 selected* predates per-hand gestures — the
 hand's look never says *selected* or *the field is open* about John's field
 (H1.3). Not run: WebKit (unavailable here); the scenario is Chromium's.
+*F1, 29 Sep 2026 (branch `unit/fixes-1`; red `40ebe28`, fix `d51d474`):* **the H1.10b
+skip is a pass** — a reading another hand proposes joins the field's *what this is*
+row as *gate 0.70 · claude*. Tier 0 is a capability, not an author: the hand joins
+at tier 0, and `conversionsFor` left tier 0 out because tier 0 is the shape rung's.
+`interpretations.ts` now says who: `isShapeRungReading` (the engine's own
+measurement) and `isHeardReading` (another voice's, held and attributed; a name and
+a label are not readings to hear). The field's row, `readingsOfMark` (the reading
+under a mark) and the panel's shape row (`10-inspector.js`, twice) ask them instead
+of `tier === 0`, so a hand's proposal is also never taken for what the rung
+measured. `canvas_look` already agreed (H1.10) and is unchanged; e2e 49's golden is
+unchanged. Tests: `interpretations.test.ts` 2, `hand` 25 passed, 5 skipped (was 24
+and 6). **Found:** a hand's reading has no chip on the board after the field closes
+(`08-render.js` draws chips for tier 2 only) — a model's stays, the hand's shows
+only in the field and the panel.
 **V1** — the review of use: John and the drafter on real work, on John's
 machine; the faults written up as `NOTES-V1-REVIEW.md`. **V2** — its fixes,
 each with its regression. **V3** — the whitepaper's v1 figures (week 1's
