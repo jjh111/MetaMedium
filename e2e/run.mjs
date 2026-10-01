@@ -486,8 +486,10 @@ async function runBudgets(browser, servers, engineName) {
           const calibration = await page.evaluate(calibrateInPage);
           const why = tooLoaded(calibration);
           const st = opened.out.state;
-          check(`I2. the board of pictures opens whole: ${st.artifacts} artifacts and ${st.content - st.artifacts} traced strokes`,
-            st.artifacts === 5 && st.content >= made.marks, { state: st, expected: { artifacts: 5, strokes: made.marks } });
+          // Every traced stroke is a mark of its own on the board (small ones gather into words on the content plane, so count the ink).
+          const ink = await page.evaluate(() => { let n = 0; for (const node of window.__mm.session.getState().nodes.values()) if (node.reps.some((r) => r.modality === 'stroke')) n++; return n; });
+          check(`I2. the board of pictures opens whole: ${st.artifacts} artifacts and ${ink} traced strokes`,
+            st.artifacts === 5 && ink === made.marks, { state: st, ink, expected: { artifacts: 5, strokes: made.marks } });
           const max = OPEN_MS_PER_MARK * made.marks;
           measured.picturesOpenMs = +opened.out.drawnMs.toFixed(0);
           if (why) check(`${label} — skipped: ${why}`, true, { why, drawnMs: opened.out.drawnMs, calibrationMs: +calibration.toFixed(1) });
