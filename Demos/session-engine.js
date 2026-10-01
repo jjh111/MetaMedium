@@ -10706,6 +10706,418 @@
     return out;
   }
 
+// ===== find (the kept index, and the boards' pictures) =====
+// Provides: what Find keeps beside the journals (PLAN-IPAD-NOTES I6) — for every board this browser keeps, what it
+//   SAYS (the labels, names, typed text, figures' words, Mermaid, picture names, read writing: core's
+//   searchEntriesOf) and a small picture of it, in IndexedDB `mm-find` (its own store, version 1: `index` and
+//   `thumbs`, each keyed by board), both under one key — the board's own record of its change (core's searchKeyOf:
+//   when it changed, its events, its characters, the format's version). findLoad, findChanged (the journal's hook:
+//   the board on screen is indexed a moment after the last change, off the pointer path), findLeaving (a board
+//   left is indexed and drawn from the live state, in the task that leaves it), findSyncSoon / findSync (every
+//   board whose kept index is missing or stale — the board's records read, replayed in a scratch session, never
+//   the one on screen), findDrop (a board emptied from the trash), findIdle, findBoards (what a query is asked
+//   of), findThumbCurrent (the picture of the board on screen, for the pane), findState (for tests).
+// Uses: core (MM.searchEntriesOf, searchKeyOf, stalePlan, thumbFit, createSession, cleanPointsOf, strokePointsOf,
+//   boundsOf, pictureOf, getRep), the session (the board on screen), the boards adapter (boards, board, boardDB,
+//   idbBackend, openPlan, statsOf, onBoardHere, boardEntryName, boardsListed), boards list (boardShelves),
+//   assets (assetGet, pictures — the decoded pictures the paint holds), the find pane (renderFind).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the closure's; no imports, no exports.
+//
+// DERIVED, NEVER IN A LOG. Nothing here writes an event: the index and the pictures are what the boards say and
+// look like, found again when a board changes, and lost harmlessly (the next sync reads the boards again). A
+// board a hand only looked at is never written, and neither is its index until a sync finds it missing.
+//
+// OFF THE POINTER PATH. A change only restarts a timer (`FIND_DEBOUNCE_MS`); what it fires is read from the state
+// the session already holds, when the hand is not on the glass. Another board is read from its own records and
+// replayed in a scratch session one at a time, with a pause between, and never while the pointer is down.
+
+  const FIND_DB = 'mm-find';
+  const FIND_DEBOUNCE_MS = 1200;
+  const FIND_PAUSE_MS = 40;
+  /** The picture a board has in the list: its size on the canvas (it is shown at a third of it, for the screens that are twice as dense). */
+  const THUMB_W = 240, THUMB_H = 160, THUMB_PAD = 12, THUMB_JPEG = 0.72;
+  /** Most marks drawn in one picture, and most pictures decoded for it. */
+  const THUMB_MARKS = 6000, THUMB_PICTURES = 12;
+
+  const finder = {
+    how: 'none',          // 'indexeddb' | 'memory' (this browser would not keep it: found again each visit)
+    loading: null,
+    loaded: false,        // what was kept has been read: until then nothing is made, or it would be made again
+    index: new Map(),     // board id → { board, key, entries }
+    thumbs: new Map(),    // board id → { board, key, src }
+    builds: 0,            // indexes made since this page opened (for tests: a kept index is not built again)
+    timer: 0,
+    syncing: null,
+    syncSoon: 0,
+    progress: null,       // { done, total } while boards are being read
+    down: false,          // the pointer is on the glass
+    dbPromise: null,
+  };
+
+  addEventListener('pointerdown', () => { finder.down = true; }, { capture: true, passive: true });
+  addEventListener('pointerup', () => { finder.down = false; }, { capture: true, passive: true });
+  addEventListener('pointercancel', () => { finder.down = false; }, { capture: true, passive: true });
+
+  // ----- the store ---------------------------------------------------------------------------------
+  function findDB() {
+    if (!finder.dbPromise) {
+      finder.dbPromise = new Promise((resolve, reject) => {
+        let req;
+        try { req = indexedDB.open(FIND_DB, 1); } catch (err) { reject(err); return; }
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains('index')) db.createObjectStore('index', { keyPath: 'board' });
+          if (!db.objectStoreNames.contains('thumbs')) db.createObjectStore('thumbs', { keyPath: 'board' });
+        };
+        req.onsuccess = () => {
+          const db = req.result;
+          db.onversionchange = () => { db.close(); finder.dbPromise = null; };
+          db.onclose = () => { finder.dbPromise = null; };
+          resolve(db);
+        };
+        req.onerror = () => reject(req.error || new DOMException('the browser would not open its storage', 'UnknownError'));
+        req.onblocked = () => reject(new DOMException('blocked', 'InvalidStateError'));
+      });
+      finder.dbPromise.catch(() => { finder.dbPromise = null; });
+    }
+    return finder.dbPromise;
+  }
+  /** A transaction over the kept index and pictures; `fn(tx)` issues the requests. Resolves once committed. */
+  function findTx(mode, fn) {
+    return findDB().then((db) => new Promise((resolve, reject) => {
+      let tx, out;
+      try { tx = db.transaction(['index', 'thumbs'], mode); out = fn(tx); } catch (err) { try { if (tx) tx.abort(); } catch (e) { /* nothing */ } reject(err); return; }
+      tx.oncomplete = () => resolve(out);
+      tx.onabort = () => reject(tx.error || new DOMException('the browser abandoned the write', 'AbortError'));
+    }));
+  }
+  /** Written, and never waited on: what is kept here is found again if it is lost. */
+  function findWrite(store, rec) { findTx('readwrite', (tx) => { tx.objectStore(store).put(rec); }).catch(() => { finder.how = finder.how === 'indexeddb' ? 'memory' : finder.how; }); }
+
+  /** What was kept, read once into memory: a query is asked of memory. */
+  function findLoad() {
+    if (finder.loading) return finder.loading;
+    finder.loading = (async () => {
+      try {
+        const got = await findTx('readonly', (tx) => {
+          const out = { index: [], thumbs: [] };
+          tx.objectStore('index').getAll().onsuccess = (e) => { out.index = e.target.result || []; };
+          tx.objectStore('thumbs').getAll().onsuccess = (e) => { out.thumbs = e.target.result || []; };
+          return out;
+        });
+        // What this page has made since it opened is newer than what was kept.
+        for (const r of got.index) if (r && typeof r.board === 'string' && Array.isArray(r.entries) && !finder.index.has(r.board)) finder.index.set(r.board, r);
+        for (const r of got.thumbs) if (r && typeof r.board === 'string' && typeof r.src === 'string' && !finder.thumbs.has(r.board)) finder.thumbs.set(r.board, r);
+        finder.how = 'indexeddb';
+      } catch (err) { finder.how = 'memory'; }
+      finder.loaded = true;
+      findNotify();
+    })();
+    return finder.loading;
+  }
+  function findNotify() {
+    if (typeof renderFind === 'function') renderFind();
+    if (typeof renderBoardsPane === 'function') renderBoardsPane();
+  }
+
+  // ----- keys, and what is wanted -----------------------------------------------------------------------
+  const findKeyOf = (id) => MM.searchKeyOf(boards.stats.get(id));
+  /** The board's use, for a tie and for the order boards are read in: the latest of when it was opened and changed. */
+  function findRecency(e) {
+    const st = boards.stats.get(e.id);
+    return Math.max(e.opened || 0, (st && st.changed) || 0, e.created || 0);
+  }
+  /** The boards this browser keeps and has not thrown away, most recent first. */
+  function findWanted() {
+    return boardShelves([...boards.entries.values()]).boards.sort((a, b) => findRecency(b) - findRecency(a));
+  }
+  /** What a query is asked of: every board on the list, the name always, and what it says when that is known. */
+  function findBoards() {
+    return findWanted().map((e) => {
+      const idx = finder.index.get(e.id);
+      return { id: e.id, name: boardEntryName(e.id), recency: findRecency(e), entries: idx ? idx.entries : [] };
+    });
+  }
+  /** Whether the board on screen is one this page may index: its own, read, not being loaded, and not another tab's. */
+  function findCurrentOk(leaving) {
+    return onBoardHere() && board.ready && !board.restoring && board.lock !== 'taken' && (leaving || !boards.switching);
+  }
+
+  // ----- the board on screen --------------------------------------------------------------------------------
+  /** The board on screen, indexed as it stands now — when its kept index is not for what it holds. */
+  function findIndexCurrent(leaving) {
+    if (!findCurrentOk(leaving)) return false;
+    if (!finder.loaded && !leaving) { findLoad(); return false; }
+    const id = board.id, key = findKeyOf(id);
+    if (!key) return false;
+    const held = finder.index.get(id);
+    if (held && held.key === key) return false;
+    const rec = { board: id, key, entries: MM.searchEntriesOf(session.getState()) };
+    finder.index.set(id, rec);
+    finder.builds++;
+    findWrite('index', rec);
+    findNotify();
+    return true;
+  }
+  /** A change was journaled (17-folder.js): the board on screen is indexed a moment after the last one. */
+  function findChanged(id) {
+    if (id !== board.id) return;
+    if (finder.timer) clearTimeout(finder.timer);
+    finder.timer = setTimeout(findRun, FIND_DEBOUNCE_MS);
+  }
+  /** The debounced run: only while the hand is not on the glass, and when the browser has a moment. */
+  function findRun() {
+    finder.timer = 0;
+    if (finder.down) { finder.timer = setTimeout(findRun, 400); return; }
+    const go = () => { try { findIndexCurrent(); findThumbCurrent(false); } catch (err) { /* the index is a convenience */ } };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(go, { timeout: 2000 }); else go();
+  }
+
+  // ----- the picture of a board ------------------------------------------------------------------------------------
+  /**
+   * A board drawn small, from its state: the pictures first (as the paint draws them, under the ink), a faint plate
+   * where anything else stands, then the ink — its clean form where it holds one — in its maker's colour. `pic(asset)`
+   * is a decoded bitmap or nothing (a plate then). The same marks, forms and colours the canvas draws, in a picture
+   * of its own: the board on screen is never repainted for it. Returns a JPEG as a data URL, or null.
+   */
+  function findPaintThumb(st, pic) {
+    const cv = document.createElement('canvas');
+    cv.width = THUMB_W; cv.height = THUMB_H;
+    const g = cv.getContext('2d');
+    if (!g) return null;
+    const cs = getComputedStyle(document.documentElement);
+    const tok = (n, d) => cs.getPropertyValue(n).trim() || d;
+    g.fillStyle = tok('--ground', '#f8f6f1');
+    g.fillRect(0, 0, THUMB_W, THUMB_H);
+    const ink = tok('--ink', '#222'), agent = tok('--agent', '#68a'), goldRGB = tok('--gold-rgb', '201,168,76');
+    const gone = (n) => n.reps.some((r) => r.modality === 'erased');
+    const items = [];
+    let box = null;
+    const grow = (b) => { if (!b || !MM.finiteBounds(b)) return; box = box ? { minX: Math.min(box.minX, b.minX), minY: Math.min(box.minY, b.minY), maxX: Math.max(box.maxX, b.maxX), maxY: Math.max(box.maxY, b.maxY) } : { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY }; };
+    const artifacts = new Set(st.artifacts);
+    const inkOf = (n) => {
+      const pts = MM.cleanPointsOf(n) || MM.strokePointsOf(n);
+      if (!pts || pts.length < 2) return;
+      const b = MM.getBounds(pts);
+      grow(b);
+      const made = n.edges.find((e) => e.rel === 'made-by');
+      items.push({ k: 'ink', pts, colour: !made || made.to === MM.LOCAL_PARTICIPANT ? ink : agent });
+    };
+    let pictures = 0;
+    for (const id of st.contentIds) {
+      const n = st.nodes.get(id);
+      if (!n || gone(n)) continue;
+      if (artifacts.has(id)) {
+        const b = MM.boundsOf(n);
+        if (!b) continue;
+        grow(b);
+        const p = MM.pictureOf(n);
+        const code = MM.getRep(n, 'code');
+        const kind = code && code.data && code.data.kind;
+        items.push({ k: p ? 'pic' : 'plate', b, asset: p && p.asset, text: kind === 'text' || kind === 'md' });
+        if (!p && kind !== 'text' && kind !== 'md') for (const e of n.edges) { if (e.rel !== 'has-part') continue; const m = st.nodes.get(e.to); if (m && !gone(m)) inkOf(m); }
+        if (p) pictures++;
+      } else inkOf(n);
+      if (items.length > THUMB_MARKS * 2) break;
+    }
+    const fit = MM.thumbFit(box, THUMB_W, THUMB_H, THUMB_PAD);
+    g.setTransform(fit.scale, 0, 0, fit.scale, fit.x, fit.y);
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    const px = 1 / fit.scale;
+    let decoded = 0;
+    for (const it of items) {
+      if (it.k !== 'pic') continue;
+      const bmp = it.asset && decoded < THUMB_PICTURES ? pic(it.asset) : null;
+      if (bmp) { decoded++; try { g.drawImage(bmp, it.b.minX, it.b.minY, it.b.maxX - it.b.minX, it.b.maxY - it.b.minY); continue; } catch (err) { /* a plate, then */ } }
+      g.fillStyle = 'rgba(' + goldRGB + ',0.14)';
+      g.fillRect(it.b.minX, it.b.minY, it.b.maxX - it.b.minX, it.b.maxY - it.b.minY);
+    }
+    for (const it of items) {
+      if (it.k !== 'plate') continue;
+      g.fillStyle = 'rgba(' + goldRGB + ',0.07)';
+      g.fillRect(it.b.minX, it.b.minY, it.b.maxX - it.b.minX, it.b.maxY - it.b.minY);
+      g.strokeStyle = 'rgba(' + goldRGB + ',0.45)'; g.lineWidth = 1.2 * px;
+      g.strokeRect(it.b.minX, it.b.minY, it.b.maxX - it.b.minX, it.b.maxY - it.b.minY);
+      if (it.text) {
+        // A few lines where words stand: what a text looks like at a glance.
+        g.strokeStyle = 'rgba(' + goldRGB + ',0.5)';
+        const w = it.b.maxX - it.b.minX, h = it.b.maxY - it.b.minY, rows = Math.max(1, Math.min(6, Math.floor((h * fit.scale - 6) / 5)));
+        for (let r = 0; r < rows; r++) { const y = it.b.minY + ((r + 1) * h) / (rows + 1); g.beginPath(); g.moveTo(it.b.minX + w * 0.08, y); g.lineTo(it.b.minX + w * (r === rows - 1 ? 0.5 : 0.92), y); g.stroke(); }
+      }
+    }
+    const inks = items.filter((it) => it.k === 'ink');
+    const stride = inks.length > THUMB_MARKS ? Math.ceil(inks.length / THUMB_MARKS) : 1;
+    g.lineWidth = Math.max(1.3 * px, 0.6);
+    const tol2 = px * px * 0.64;
+    for (let i = 0; i < inks.length; i += stride) {
+      const it = inks[i], pts = it.pts;
+      g.strokeStyle = it.colour;
+      g.beginPath();
+      let lx = pts[0].x, ly = pts[0].y;
+      g.moveTo(lx, ly);
+      for (let j = 1; j < pts.length; j++) {
+        const p = pts[j];
+        if (j < pts.length - 1) { const dx = p.x - lx, dy = p.y - ly; if (dx * dx + dy * dy < tol2) continue; }
+        g.lineTo(p.x, p.y); lx = p.x; ly = p.y;
+      }
+      g.stroke();
+    }
+    try { return cv.toDataURL('image/jpeg', THUMB_JPEG); } catch (err) { return null; }
+  }
+  /** The board on screen drawn small now — from the pictures the canvas already holds decoded. Kept under the key of what it holds. */
+  function findThumbCurrent(force, leaving) {
+    if (!findCurrentOk(leaving)) return false;
+    if (!finder.loaded && !leaving) return false;
+    const id = board.id, key = findKeyOf(id);
+    if (!key) return false;
+    const held = finder.thumbs.get(id);
+    if (held && (held.key === key || !force)) return false;
+    const src = findPaintThumb(session.getState(), (a) => { const e = pictures.get(a); return e && e.bmp ? e.bmp : null; });
+    if (!src) return false;
+    const rec = { board: id, key, src };
+    finder.thumbs.set(id, rec);
+    findWrite('thumbs', rec);
+    findNotify();
+    return true;
+  }
+  /** The board is being left (17-folder.js's switchBoard, before it goes): what it says and how it looks, from the live state — it will not be there in a moment. */
+  function findLeaving() {
+    try {
+      findIndexCurrent(true);
+      findThumbCurrent(true, true);
+    } catch (err) { /* a board is left whatever Find makes of it */ }
+  }
+
+  // ----- every other board ------------------------------------------------------------------------------------------
+  const findPause = (ms) => new Promise((r) => setTimeout(r, ms));
+  /** The decoded pictures a thumbnail needs, for a board replayed in a scratch session: read from the asset store, small. */
+  async function findPictures(st) {
+    const out = new Map();
+    for (const id of st.artifacts) {
+      if (out.size >= THUMB_PICTURES) break;
+      const n = st.nodes.get(id), p = n && MM.pictureOf(n);
+      if (!p || !p.asset || out.has(p.asset)) continue;
+      try {
+        const rec = await assetGet(p.asset);
+        if (!rec) continue;
+        const blob = new Blob([rec.bytes], { type: rec.mime || 'image/jpeg' });
+        const w = rec.w || p.w, h = rec.h || p.h;
+        let bmp = null;
+        if (w && h) { const k = Math.min(1, 320 / Math.max(w, h)); try { bmp = await createImageBitmap(blob, { resizeWidth: Math.max(1, Math.round(w * k)), resizeHeight: Math.max(1, Math.round(h * k)), resizeQuality: 'low' }); } catch (err) { bmp = null; } }
+        if (!bmp) bmp = await createImageBitmap(blob);
+        out.set(p.asset, bmp);
+      } catch (err) { /* a plate, then */ }
+    }
+    return out;
+  }
+  /** One board, other than the one on screen: its records read, replayed in a scratch session, what it says kept and its picture drawn. */
+  async function findBuildOther(id) {
+    const db = await boardDB();
+    const key0 = findKeyOf(id);
+    const got = await idbBackend(db, id).read();
+    const plan = openPlan({ meta: got.meta, records: got.records, legacy: null, owner: true, fallback: false, now: Date.now() });
+    let key = key0;
+    if (!key) {
+      // A board R3 kept and no one has opened since says nothing of what it holds: said from its records, as opening it would.
+      let chars = 0, last = 0;
+      for (const r of got.records) chars += (r.text || '').length;
+      for (const ev of plan.events) if (ev && typeof ev.at === 'number' && ev.at > last) last = ev.at;
+      boards.stats.set(id, statsOf(plan.events, chars, last || (got.meta && got.meta.created) || 0));
+      key = findKeyOf(id);
+    }
+    const scratch = MM.createSession();
+    scratch.load(plan.events);
+    const st = scratch.getState();
+    const entries = MM.searchEntriesOf(st);
+    const pics = await findPictures(st);
+    let src = null;
+    try { src = findPaintThumb(st, (a) => pics.get(a) || null); } finally { for (const b of pics.values()) { try { b.close(); } catch (err) { /* gone */ } } }
+    const rec = { board: id, key, entries };
+    finder.index.set(id, rec);
+    finder.builds++;
+    findWrite('index', rec);
+    if (src) { const t = { board: id, key, src }; finder.thumbs.set(id, t); findWrite('thumbs', t); }
+  }
+
+  /**
+   * Every board whose kept index is missing or stale, read and indexed, the most recent first, one at a time with a
+   * pause between, and each a quiet moment: nothing while the pointer is down. The board on screen is indexed from
+   * its live state. A board no longer wanted (emptied from the trash) is let go. One sync runs at a time.
+   */
+  function findSync() {
+    if (finder.syncing) return finder.syncing;
+    finder.syncing = (async () => {
+      try {
+        await findLoad();
+        for (let i = 0; i < 300 && !(boards.ready && board.ready); i++) await findPause(100);
+        if (boards.how !== 'indexeddb') return;
+        if (boardsListed) await boardsListed.catch(() => {});
+        const wanted = findWanted();
+        const held = {};
+        for (const id of new Set([...finder.index.keys(), ...finder.thumbs.keys()])) {
+          const idx = finder.index.get(id), th = finder.thumbs.get(id);
+          // The board on screen is drawn on leaving and when its pane opens; every other is drawn with what it says.
+          const isCur = onBoardHere() && id === board.id;
+          held[id] = idx && th && (th.key === idx.key || isCur) ? idx.key : '~';
+        }
+        const plan = MM.stalePlan(wanted.map((e) => ({ id: e.id, key: findKeyOf(e.id) })), held);
+        for (const id of plan.drop) { finder.index.delete(id); finder.thumbs.delete(id); }
+        if (plan.drop.length) findTx('readwrite', (tx) => { for (const id of plan.drop) { tx.objectStore('index').delete(id); tx.objectStore('thumbs').delete(id); } }).catch(() => {});
+        // A board that has no key yet (nothing said of what it holds) is built too: its key is made from its records.
+        const build = [...new Set(plan.build.concat(wanted.filter((e) => !findKeyOf(e.id)).map((e) => e.id)))];
+        let done = 0;
+        for (const id of build) {
+          finder.progress = { done, total: build.length };
+          findNotify();
+          while (finder.down) await findPause(200);
+          try {
+            if (onBoardHere() && id === board.id) { findIndexCurrent(); findThumbCurrent(false); }
+            else if (boards.entries.has(id)) await findBuildOther(id);
+          } catch (err) { /* a board that cannot be read is found by its name only */ }
+          done++;
+          await findPause(FIND_PAUSE_MS);
+        }
+      } finally {
+        finder.progress = null;
+        finder.syncing = null;
+        findNotify();
+      }
+    })();
+    return finder.syncing;
+  }
+  /** Soon, and once: the list changed, or the page has just opened. */
+  function findSyncSoon(ms) {
+    if (finder.syncSoon) clearTimeout(finder.syncSoon);
+    finder.syncSoon = setTimeout(() => { finder.syncSoon = 0; findSync(); }, ms === undefined ? 900 : ms);
+  }
+  /** Boards emptied from the trash: what was kept for them goes. */
+  function findDrop(ids) {
+    for (const id of ids) { finder.index.delete(id); finder.thumbs.delete(id); }
+    if (ids.length) findTx('readwrite', (tx) => { for (const id of ids) { tx.objectStore('index').delete(id); tx.objectStore('thumbs').delete(id); } }).catch(() => {});
+  }
+  /** Everything pending done now (for tests, and for a query asked a moment after a change): the debounce run, and a sync. */
+  async function findIdle() {
+    if (finder.timer) { clearTimeout(finder.timer); finder.timer = 0; }
+    if (finder.syncSoon) { clearTimeout(finder.syncSoon); finder.syncSoon = 0; }
+    await findLoad();
+    findIndexCurrent();
+    await findSync();
+    findIndexCurrent();
+    return true;
+  }
+  /** For tests: what is kept, by board — its key and how much it holds — and how many indexes this page has made. */
+  function findState() {
+    return {
+      how: finder.how, builds: finder.builds, syncing: !!finder.syncing, progress: finder.progress ? Object.assign({}, finder.progress) : null,
+      index: Object.fromEntries([...finder.index].map(([k, v]) => [k, { key: v.key, entries: v.entries.length }])),
+      thumbs: Object.fromEntries([...finder.thumbs].map(([k, v]) => [k, { key: v.key, bytes: v.src.length }])),
+    };
+  }
+
+  // The page has opened: after the board has, read what was kept and bring it up to date — once, when the page is quiet.
+  setTimeout(() => { findLoad().then(() => findSyncSoon(1500)); }, 2500);
+
 // ===== folder =====
 // Provides: the folder as the canvas — openFolder/openStatic/openStore (discovery into artifacts,
 //   per-participant logs merged), autosave (to the folder), the live budget (liveSet), the grid and
@@ -11226,6 +11638,7 @@
         if (board.id === id) board.meta = meta;
         boards.stats.set(id, stats);
         if (typeof renderBoardsPane === 'function') renderBoardsPane(true);
+        findChanged(id); // Find (I6): the board on screen is indexed a moment after its last change
         return p;
       },
     }, {
@@ -11560,6 +11973,7 @@
   /** The list changed here: this page's faces, the pane, and every other tab of this browser. */
   function boardsChanged() {
     syncBoardFaces();
+    findSyncSoon(); // Find (I6): a board made, copied, restored or let go is read once things are quiet
     try { if (boards.channel) boards.channel.postMessage({ type: 'boards', at: Date.now() }); } catch (err) { /* nothing */ }
   }
   try {
@@ -11911,6 +12325,7 @@
       const v = await readyToLeave(o.force);
       if (v) { if (prep.lock.release) prep.lock.release(); return refuse(v); }
       // From here to the load, nothing is awaited: no stroke can land in between.
+      findLeaving(); // Find (I6): what the board says and how it looks, from the live state, before it is gone
       leaveBoard();
       applyBoard(prep, { mode: 'restore', early: false });
       afterBoardOpened(id, { boot: false, address: true });
@@ -12013,6 +12428,7 @@
           }
         });
         for (const g of got) { boards.entries.delete(g.id); boards.stats.delete(g.id); prefs.del(BOARD_VIEW_KEY + g.id); }
+        findDrop(got.map((g) => g.id)); // Find (I6): what was kept for them goes
       }
     } finally { for (const g of got) g.release(); }
     boardsChanged();
@@ -13818,7 +14234,8 @@
 //   starter, one tap; *more examples* opens this pane).
 //   renderBoardsPane (the adapter calls it when the list changes), and at its foot how much room this browser
 //   holds and has left and whether it may clear it (PLAN-IPAD-NOTES I3: loadRoom, roomChanged).
-// Uses: ui (pane, chip), controls (tiles.boards, togglePanel/closePanel), boards list (boardRows,
+// Uses: the kept index and pictures (17-find.js: finder, findLoad, findThumbCurrent, findSyncSoon — a board's picture in its row),
+//   ui (pane, chip), controls (tiles.boards, togglePanel/closePanel), boards list (boardRows,
 //   sizeWords, storageWords, isKept), folder (the boards adapter: boards, board, onBoardHere, switchBoard, newBoard,
 //   renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash, emptyTrash, boardFromFile,
 //   rereadBoards, boardEntryName, exportLogNow, readLogText), input (flash, say), the
@@ -13846,6 +14263,8 @@
       togglePanel(boardsPanel, tiles.boards);
       if (boardsPanel.hasAttribute('hidden')) return;
       bd.renaming = null; bd.confirm = null; bd.said = null;
+      // What was kept of each board's look, and the board on screen drawn as it stands (Find, I6).
+      findLoad().then(() => { findThumbCurrent(true); findSyncSoon(300); renderBoardsPane(); });
       paintBoardsPane();
       // Another tab may have changed the list, and what its boards hold, since this page read it.
       rereadBoards();
@@ -13914,6 +14333,14 @@
     const row = bdEl('div', 'bdItem' + (r.here ? ' here' : ''));
     row.dataset.id = r.id;
     if (r.here) row.dataset.here = '';
+    // A small picture of the board (Find, PLAN-IPAD-NOTES I6): made when it was left, kept beside the index.
+    const th = finder.thumbs.get(r.id);
+    if (th) {
+      const img = bdEl('img', 'bdThumb');
+      img.src = th.src; img.alt = ''; img.width = 64; img.height = 43; img.decoding = 'async';
+      row.classList.add('hasThumb');
+      row.appendChild(img);
+    }
     let name;
     if (bd.renaming === r.id) {
       name = bdEl('input', 'bdNameInput');
@@ -15024,6 +15451,259 @@
     flash(file + ' — ' + MM.describeNotation(got.said.reading));
   });
 
+// ===== find (the pane) =====
+// Provides: the search field under the bar (PLAN-IPAD-NOTES I6) — one tap on *find*, or `/`, or ⌘K / Ctrl K (⌘F
+//   too: the board has no page text for the browser's own find to look through) — a word typed is looked for on
+//   EVERY board this browser keeps, as it is typed, and the boards that say it are listed, each hit as the words in
+//   context (*“Pricing” — label on a box · Board “Q4 notes”*); a tap on one opens that board in place (the switch
+//   the boards pane does) and takes the view to what was found, which is ringed for a moment. renderFind (the kept
+//   index landed, or a board changed), openFind / closeFind, findOpenHit, findShow, findFlashState (for tests).
+// Uses: ui (pane, esc), controls (openPane, closePanel, tiles), core (MM.searchBoards, describeHit, boundsOf,
+//   getRep), the session, view (fitTo, view, worldToScreen), the boards adapter (board, boards, onBoardHere,
+//   switchBoard), the kept index (finder, findBoards, findSync, findIdle, findIndexCurrent), the boards pane
+//   (rereadBoards), input (say, flash).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the closure's; no imports, no exports.
+//
+// SEARCHING IS READING. Nothing here writes an event: a tap opens a board and moves the view, as a tap on the
+// boards pane's row does, and the ring that says where is drawn on a layer of its own over the canvas, never in
+// the paint and never in the log. The query is asked of memory (17-find.js keeps what every board says), so it
+// answers as it is typed; what is not yet indexed is read in the background and the list fills as it lands.
+
+  const findBtn = document.getElementById('findBtn');
+  const findPanel = document.getElementById('findPanel');
+  const findInput = document.getElementById('findInput');
+  const findStatusEl = document.getElementById('findStatus');
+  const findList = findPanel ? findPanel.querySelector('.fdList') : null;
+  /** What the pane holds between paints: the hit the keys are on, the boards shown whole. */
+  const fd = { sel: 0, whole: new Set(), query: '' };
+  /** A board shows this many hits until a tap on *more*. */
+  const FIND_HITS = 5;
+  /** The ring round what was found: how long it stays, and the least a find is shown at (a label is small; the view should not be a blob). */
+  const FIND_FLASH_MS = 2600, FIND_MIN_W = 320, FIND_MIN_H = 220, FIND_AIR = 1.6;
+
+  if (findPanel) ui.pane(findPanel, 'find', () => closeFind());
+  const findOpen = () => !!findPanel && !findPanel.hasAttribute('hidden');
+  function openFind() {
+    if (!findPanel || EMBED) return;
+    if (!findOpen()) openPane(findPanel, findBtn);
+    findInput.focus();
+    findInput.select();
+    // What may have changed since: another tab's boards, this board's last stroke, boards never read.
+    findIndexCurrent();
+    rereadBoards().then(() => { findSync(); renderFind(); });
+    renderFind();
+  }
+  function closeFind() {
+    if (!findPanel) return;
+    closePanel(findPanel, findBtn);
+    if (document.activeElement === findInput) findInput.blur();
+  }
+  if (findBtn) findBtn.onclick = () => { if (findOpen()) closeFind(); else openFind(); };
+
+  // ----- the list -------------------------------------------------------------------------------------------------
+  function fdEl(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = text;
+    return e;
+  }
+  /** The words of a hit with what matched marked, the way a person typing sees it. */
+  function fdWords(h) {
+    const out = fdEl('span', 'fdText');
+    let at = 0;
+    const text = h.text;
+    out.appendChild(document.createTextNode('“'));
+    for (const sp of h.spans || []) {
+      if (sp[0] < at || sp[1] > text.length) continue;
+      if (sp[0] > at) out.appendChild(document.createTextNode(text.slice(at, sp[0])));
+      out.appendChild(fdEl('mark', '', text.slice(sp[0], sp[1])));
+      at = sp[1];
+    }
+    if (at < text.length) out.appendChild(document.createTextNode(text.slice(at)));
+    out.appendChild(document.createTextNode('”'));
+    return out;
+  }
+  function fdHitEl(h) {
+    const b = fdEl('button', 'fdHit');
+    b.type = 'button';
+    b.dataset.board = h.board;
+    if (h.id) b.dataset.id = h.id;
+    b.dataset.kind = h.kind;
+    b.title = MM.describeHit(h);
+    if (h.kind === 'board') { b.appendChild(fdEl('span', 'fdText', 'open this board')); b.appendChild(fdEl('span', 'fdWhat', ' — its name says it')); }
+    else { b.appendChild(fdWords(h)); b.appendChild(fdEl('span', 'fdWhat', ' — ' + h.what)); }
+    return b;
+  }
+
+  /** The list for what is typed: grouped by board, a board by its best hit, the words in context. */
+  function renderFind() {
+    if (!findPanel || !findList || !findOpen()) return;
+    const q = findInput.value;
+    fd.query = q;
+    const kept = findBoards();
+    const frag = document.createDocumentFragment();
+    const hits = [];
+    if (!/[\p{L}\p{N}]/u.test(q)) {
+      findStatusEl.textContent = kept.length
+        ? 'a word is looked for on every board you keep here — labels, names, typed text, figures, Mermaid, and what was read from writing'
+        : 'there is no board here to look through yet';
+    } else {
+      const groups = MM.searchBoards(kept, q, { hitsPerBoard: 60 });
+      for (const g of groups) {
+        const box = fdEl('div', 'fdGroup');
+        box.dataset.board = g.board;
+        const here = onBoardHere() && board.id === g.board;
+        const head = fdEl('div', 'fdHead');
+        head.appendChild(fdEl('span', 'fdBoardName', g.name));
+        if (here) head.appendChild(ui.chip('here', { cls: 'bdHere', why: 'the board on screen' }));
+        box.appendChild(head);
+        const shown = fd.whole.has(g.board) ? g.hits : g.hits.slice(0, FIND_HITS);
+        for (const h of shown) { const el = fdHitEl(h); hits.push(el); box.appendChild(el); }
+        const rest = g.hits.length - shown.length + g.more;
+        if (rest > 0) {
+          const m = fdEl('button', 'fdMore', rest + ' more on this board');
+          m.type = 'button';
+          m.dataset.whole = g.board;
+          box.appendChild(m);
+        }
+        frag.appendChild(box);
+      }
+      const reading = finder.progress ? ' · reading the boards… ' + finder.progress.done + ' of ' + finder.progress.total : '';
+      const n = kept.length;
+      findStatusEl.textContent = groups.length
+        ? groups.length + ' board' + (groups.length === 1 ? '' : 's') + ' of ' + n + ' say it' + reading
+        : 'nothing on ' + (n === 1 ? 'the board' : n + ' boards') + ' says “' + q.trim() + '”' + reading;
+    }
+    findList.replaceChildren(frag);
+    fd.sel = Math.min(fd.sel, Math.max(0, hits.length - 1));
+    fdMark(hits);
+  }
+  /** The hit the keys are on. */
+  function fdMark(hits) {
+    (hits || [...findList.querySelectorAll('.fdHit')]).forEach((h, i) => h.classList.toggle('on', i === fd.sel));
+  }
+
+  if (findInput) {
+    findInput.addEventListener('input', () => { fd.sel = 0; fd.whole.clear(); renderFind(); });
+    findInput.addEventListener('keydown', (e) => {
+      // Keys stay in the field: ⌘Z in a word is not an undo on the board.
+      e.stopPropagation();
+      const hits = [...findList.querySelectorAll('.fdHit')];
+      if (e.key === 'Escape') { e.preventDefault(); closeFind(); }
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (hits.length) { fd.sel = (fd.sel + (e.key === 'ArrowDown' ? 1 : hits.length - 1)) % hits.length; fdMark(hits); hits[fd.sel].scrollIntoView({ block: 'nearest' }); }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const h = hits[fd.sel] || hits[0];
+        if (h) h.click();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K' || e.key === 'f' || e.key === 'F')) { e.preventDefault(); findInput.select(); }
+    });
+  }
+  if (findList) {
+    findList.addEventListener('click', (e) => {
+      const more = e.target.closest && e.target.closest('button.fdMore');
+      if (more) { fd.whole.add(more.dataset.whole); renderFind(); return; }
+      const b = e.target.closest && e.target.closest('button.fdHit');
+      if (b) findOpenHit({ board: b.dataset.board, id: b.dataset.id || null });
+    });
+  }
+
+  // The keys: `/` where nothing is being typed, ⌘K and Ctrl K anywhere, ⌘F and Ctrl F too.
+  addEventListener('keydown', (e) => {
+    if (EMBED || e.altKey || e.defaultPrevented) return;
+    const t = e.target;
+    const typing = !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+    const k = (e.key || '').toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && (k === 'k' || k === 'f')) { e.preventDefault(); openFind(); }
+    else if (e.key === '/' && !e.ctrlKey && !e.metaKey && !typing) { e.preventDefault(); openFind(); }
+  });
+
+  // ----- taking a hit ------------------------------------------------------------------------------------------------
+  /**
+   * Open the board a hit stands on — in place, through the switch the boards pane makes — and show where. A
+   * hit's place is read again from the mark itself when the board is open (a mark moved since it was indexed is
+   * found where it is); a mark that is gone leaves the board as it opens. Writes nothing.
+   */
+  async function findOpenHit(hit) {
+    closeFind();
+    const here = onBoardHere() && board.id === hit.board;
+    if (!here) {
+      const ok = await switchBoard(hit.board, { said: (v) => say(v.words) });
+      if (!ok) return false;
+    }
+    if (!(onBoardHere() && board.id === hit.board)) return true;
+    return findShow(hit);
+  }
+  /** The view on what was found, and a ring round it for a moment. False when there is nowhere to go (a board's own name). */
+  function findShow(hit) {
+    const st = session.getState();
+    let b = null;
+    if (hit.id) {
+      const n = st.nodes.get(hit.id);
+      if (n && !n.reps.some((r) => r.modality === 'erased')) b = MM.boundsOf(n);
+    }
+    if (!b || !MM.finiteBounds(b)) {
+      // Indexed where it stood; the mark itself is the better word, and this is the hit's own.
+      const held = finder.index.get(hit.board);
+      const e = held && held.entries.find((x) => x.id === hit.id && x.box);
+      b = e ? e.box : null;
+    }
+    if (!b || !MM.finiteBounds(b)) return false;
+    const w = Math.max(b.maxX - b.minX, FIND_MIN_W), h = Math.max(b.maxY - b.minY, FIND_MIN_H);
+    const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
+    fitTo({ minX: cx - (w * FIND_AIR) / 2, minY: cy - (h * FIND_AIR) / 2, maxX: cx + (w * FIND_AIR) / 2, maxY: cy + (h * FIND_AIR) / 2 });
+    findRing(b);
+    return true;
+  }
+
+  // The ring: a layer of its own over the canvas, pointer-transparent, drawn from the view each frame so it
+  // follows a pan, and gone after FIND_FLASH_MS or at the next touch.
+  let ring = null;
+  function findRing(b) {
+    if (!ring) {
+      const cv = document.createElement('canvas');
+      cv.id = 'findRing';
+      cv.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(cv);
+      ring = { cv, g: cv.getContext('2d'), box: null, at: 0, raf: 0 };
+    }
+    ring.box = { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY };
+    ring.at = performance.now();
+    ring.cv.hidden = false;
+    if (!ring.raf) ring.raf = requestAnimationFrame(ringTick);
+  }
+  function ringStop() {
+    if (!ring) return;
+    if (ring.raf) cancelAnimationFrame(ring.raf);
+    ring.raf = 0; ring.box = null; ring.cv.hidden = true;
+  }
+  function ringTick(now) {
+    if (!ring || !ring.box) return;
+    ring.raf = 0;
+    const t = now - ring.at;
+    const dpr = window.devicePixelRatio || 1;
+    const cv = ring.cv;
+    if (cv.width !== Math.round(innerWidth * dpr) || cv.height !== Math.round(innerHeight * dpr)) { cv.width = Math.round(innerWidth * dpr); cv.height = Math.round(innerHeight * dpr); }
+    const g = ring.g;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, innerWidth, innerHeight);
+    if (t >= FIND_FLASH_MS) { ringStop(); return; }
+    const a = worldToScreen(ring.box.minX, ring.box.minY), z = worldToScreen(ring.box.maxX, ring.box.maxY);
+    const pad = 10 + 4 * Math.sin(t / 160);
+    const alpha = Math.min(1, (FIND_FLASH_MS - t) / 700);
+    g.lineWidth = 2.5;
+    g.strokeStyle = 'rgba(' + (C ? C.goldRGB : '201,168,76') + ',' + (0.95 * alpha).toFixed(3) + ')';
+    g.beginPath();
+    if (g.roundRect) g.roundRect(a.x - pad, a.y - pad, z.x - a.x + pad * 2, z.y - a.y + pad * 2, 10); else g.rect(a.x - pad, a.y - pad, z.x - a.x + pad * 2, z.y - a.y + pad * 2);
+    g.stroke();
+    ring.raf = requestAnimationFrame(ringTick);
+  }
+  addEventListener('pointerdown', (e) => { if (ring && ring.box && !(findPanel && findPanel.contains(e.target))) ringStop(); }, { capture: true, passive: true });
+  /** For tests: whether the ring is up and the box it rings. */
+  function findFlashState() { return { active: !!(ring && ring.box), box: ring && ring.box ? Object.assign({}, ring.box) : null }; }
+
 // ===== boot =====
 // Provides: the debug handle (window.__mm, what the e2e drives), subscription (the journal first, the paint,
 //   the packs pane and the pen's ports), restore, first render.
@@ -15047,6 +15727,8 @@
     lastCalls: () => agents.map((a) => ({ id: agentKey(a), model: a.config.model, line: callLine(lastCall.get(agentKey(a))) })),
     // Device preferences and the chrome, for tests: the theme, the hand, auto-read, the field's reader, the clip.
     themeMode: () => themeMode, setThemeMode: setThemeMode, hand: () => hand, setHand: setHand,
+    // Find (PLAN-IPAD-NOTES I6), for tests: what is kept for each board, everything pending done, the ring round what was found.
+    findState: findState, findIdle: findIdle, findFlashState: findFlashState, finderThumbs: () => [...finder.thumbs.keys()],
     // Pen, finger and palm (V1-PLAN R6), for tests: what draws, the magnet a hovering pen feels, and the hands down.
     draws: () => draws, setDraws: setDraws, palmMs: PALM_MS,
     penHover: () => (penHover ? { kind: penHover.site.kind, index: penHover.site.index, nodeId: penHover.site.nodeId, point: { x: penHover.site.point.x, y: penHover.site.point.y } } : null),

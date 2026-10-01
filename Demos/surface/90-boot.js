@@ -21,6 +21,8 @@
     lastCalls: () => agents.map((a) => ({ id: agentKey(a), model: a.config.model, line: callLine(lastCall.get(agentKey(a))) })),
     // Device preferences and the chrome, for tests: the theme, the hand, auto-read, the field's reader, the clip.
     themeMode: () => themeMode, setThemeMode: setThemeMode, hand: () => hand, setHand: setHand,
+    // Find (PLAN-IPAD-NOTES I6), for tests: what is kept for each board, everything pending done, the ring round what was found.
+    findState: findState, findIdle: findIdle, findFlashState: findFlashState, finderThumbs: () => [...finder.thumbs.keys()],
     // Pen, finger and palm (V1-PLAN R6), for tests: what draws, the magnet a hovering pen feels, and the hands down.
     draws: () => draws, setDraws: setDraws, palmMs: PALM_MS,
     penHover: () => (penHover ? { kind: penHover.site.kind, index: penHover.site.index, nodeId: penHover.site.nodeId, point: { x: penHover.site.point.x, y: penHover.site.point.y } } : null),

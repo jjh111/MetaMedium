@@ -518,6 +518,7 @@
         if (board.id === id) board.meta = meta;
         boards.stats.set(id, stats);
         if (typeof renderBoardsPane === 'function') renderBoardsPane(true);
+        findChanged(id); // Find (I6): the board on screen is indexed a moment after its last change
         return p;
       },
     }, {
@@ -852,6 +853,7 @@
   /** The list changed here: this page's faces, the pane, and every other tab of this browser. */
   function boardsChanged() {
     syncBoardFaces();
+    findSyncSoon(); // Find (I6): a board made, copied, restored or let go is read once things are quiet
     try { if (boards.channel) boards.channel.postMessage({ type: 'boards', at: Date.now() }); } catch (err) { /* nothing */ }
   }
   try {
@@ -1203,6 +1205,7 @@
       const v = await readyToLeave(o.force);
       if (v) { if (prep.lock.release) prep.lock.release(); return refuse(v); }
       // From here to the load, nothing is awaited: no stroke can land in between.
+      findLeaving(); // Find (I6): what the board says and how it looks, from the live state, before it is gone
       leaveBoard();
       applyBoard(prep, { mode: 'restore', early: false });
       afterBoardOpened(id, { boot: false, address: true });
@@ -1305,6 +1308,7 @@
           }
         });
         for (const g of got) { boards.entries.delete(g.id); boards.stats.delete(g.id); prefs.del(BOARD_VIEW_KEY + g.id); }
+        findDrop(got.map((g) => g.id)); // Find (I6): what was kept for them goes
       }
     } finally { for (const g of got) g.release(); }
     boardsChanged();

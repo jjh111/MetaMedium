@@ -216,6 +216,14 @@ derived, rebuilt when missing): labels, names, typed text, SVG text, Mermaid,
 transcripts. Lexical first; a hit opens the board at the region. Thumbnails in
 the boards list, made when a board is left.
 
+*Status, 1 Oct 2026: I6 built on `unit/i6-search` (`V1-PLAN.md` §9, *The iPad*, has the unit's line).* The index
+is core's (`metamedium-core/src/search/`: words folded and cut, what a board says, a query ranked across boards, which
+boards to read again — 17 tests) and the surface keeps it in its own IndexedDB, `mm-find`, beside the journals
+(`17-find.js`; the pane is `26-find.js`): *find* in the bar, `/`, ⌘K; a hit opens its board in place at the mark,
+ringed; thumbnails in the boards rows, made when a board is left and for any board that has none. e2e boards N23–N23i.
+**Open:** a hit inside a region waits for I5 (`registerSearchSource` is the hook); a vector joins at
+`searchBoards(…, { semantic })` (I9); the MCP hand does not search yet (`canvas_find` is `mcp.mjs`'s owner's).
+
 **I7 — seats per job.** The models pane becomes seats: *reader*, *writer*,
 *decider*, *semantic* (and *parser* when it has a job), each with its own
 provider, model and key, remembered per seat. `readers()` asks the reader seat

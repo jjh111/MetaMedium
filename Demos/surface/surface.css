@@ -241,6 +241,27 @@ html, body {
 #boardsPanel .bdConfirmRow button { flex: 1; }
 #boardsPanel .bdEmpty { margin-top: 7px; width: 100%; }
 #boardsPanel #boardsStatus:not(:empty) { margin: 9px 0 0; }
+/* A board's picture in its row (Find, I6): at the left, the name and the rest beside it. */
+#boardsPanel .bdItem.hasThumb { display: grid; grid-template-columns: 64px minmax(0, 1fr); column-gap: 9px; align-items: start; }
+#boardsPanel .bdItem.hasThumb > .bdThumb { grid-row: 1 / span 3; width: 64px; height: 43px; border-radius: 4px; border: 1px solid var(--edge); object-fit: cover; background: var(--well); }
+#boardsPanel .bdItem.hasThumb > :not(.bdThumb) { grid-column: 2; }
+
+/* Find: one field under the bar; the boards that say the word, each hit as the words in context. */
+#findBtn { min-width: 42px; }
+#findPanel { width: min(360px, calc(100vw - 24px)); box-sizing: border-box; max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+#findPanel #findInput { margin-top: 0; font-size: 13px; padding: 8px 9px; }
+#findPanel #findStatus { margin: 7px 0 0; }
+#findPanel .fdGroup { margin-top: 10px; border-top: 1px solid var(--edge); padding-top: 6px; }
+#findPanel .fdHead { display: flex; align-items: center; gap: 6px; font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--dim); margin-bottom: 3px; }
+#findPanel .fdBoardName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#findPanel button.fdHit, #findPanel button.fdMore { display: block; width: 100%; text-align: left; border: 1px solid transparent; border-radius: 6px; padding: 6px 7px; font: 12px/1.4 var(--ui); color: var(--ink); background: none; }
+#findPanel button.fdHit + button.fdHit { margin-top: 1px; }
+#findPanel button.fdHit:hover, #findPanel button.fdHit.on { border-color: var(--gold); background: rgba(var(--gold-rgb), 0.08); color: var(--ink); }
+#findPanel .fdText mark { background: rgba(var(--gold-rgb), 0.28); color: inherit; border-radius: 2px; padding: 0 1px; }
+#findPanel .fdWhat { color: var(--dim); font-size: 10.5px; }
+#findPanel button.fdMore { color: var(--dim); font-size: 10.5px; padding: 3px 7px; }
+#findRing { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 4; }
+#findRing[hidden] { display: none; }
 
 /* The library packs pane (V1-PLAN §2.3, B3): what this build ships, what the board uses, and use / stop using. */
 #packsPanel { width: min(320px, calc(100vw - 24px)); box-sizing: border-box; max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
@@ -512,7 +533,7 @@ body.panelHidden #inspector { display: none; }
 /* ==========================================================================
    Embed: the surface as a figure inside a page.
    ========================================================================== */
-body.embed .markChip, body.embed #ccBtn, body.embed #undoBtn { display: none; }
+body.embed .markChip, body.embed #ccBtn, body.embed #undoBtn, body.embed #findBtn { display: none; }
 body.embed #inspector { width: 250px; font-size: 10.5px; }
 body.embed.summoning #inspector { display: none; }
 

@@ -990,3 +990,24 @@ export {
   PIECE_MIN_PX as GARMENT_PIECE_MIN_PX,
 } from './notations/garment';
 export type { GarmentReading, GarmentMark, GarmentSymbolName, OnEdge as GarmentOnEdge } from './notations/garment';
+
+// Find (I6, PLAN-IPAD-NOTES): words across every board — folded and cut into words, what a board says
+// extracted from its state with the place it stands, a query ranked across boards (a hook for the meaning
+// seat to join), which boards to index again, and a thumbnail's fit. Derived; never in a log.
+export {
+  tokenize as searchTokenize,
+  normalise as searchNormalise,
+  searchEntriesOf,
+  registerSearchSource,
+  unregisterSearchSource,
+  searchBoards,
+  describeHit,
+  excerptOf,
+  searchKeyOf,
+  stalePlan,
+  thumbFit,
+  SEARCH_VERSION,
+  SEMANTIC_FLOOR,
+  MAX_ENTRIES as SEARCH_MAX_ENTRIES,
+} from './search';
+export type { SearchEntry, SearchKind, SearchSource, SearchBoard, SearchHit, SearchGroup, SearchOptions } from './search';

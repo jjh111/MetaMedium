@@ -32,6 +32,7 @@
     <div class="markChip" id="markChip" title="Your mark: circle some marks, then draw it across them to see what they can become. The built-in mark is a check ✓ — click to teach your own by drawing it five times.">
       <canvas id="markGlyph" width="34" height="22"></canvas><span id="markName">check</span>
     </div>
+    <button id="findBtn" aria-pressed="false" title="Find a word on any board (/ or ⌘K): labels, names, typed text, figures, Mermaid, and what was read from writing">find</button>
     <button id="undoBtn" title="Undo (⌘Z)">undo</button>
     <button id="ccBtn" aria-pressed="false" title="Controls" aria-label="Controls"><i></i><i></i><i></i><i></i></button>
   </div>
@@ -140,6 +141,11 @@
   <div class="bdList"></div>
   <div id="boardsStatus" class="hint" aria-live="polite"></div>
   <input id="boardsFile" type="file" accept=".zip,.jsonl,.ndjson,.json,.txt,application/zip,application/x-zip-compressed,application/json" hidden>
+</div>
+<div id="findPanel" hidden>
+  <input id="findInput" type="text" placeholder="find a word on any board" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-label="find a word on any board">
+  <div id="findStatus" class="hint" aria-live="polite"></div>
+  <div class="fdList"></div>
 </div>
 <div id="packsPanel" hidden>
   <p class="hint">A board says which packs it uses. Using one is an event in its log — undo takes it back — and what it ships is matched here as if you had taught it.</p>

@@ -8,7 +8,8 @@
 //   starter, one tap; *more examples* opens this pane).
 //   renderBoardsPane (the adapter calls it when the list changes), and at its foot how much room this browser
 //   holds and has left and whether it may clear it (PLAN-IPAD-NOTES I3: loadRoom, roomChanged).
-// Uses: ui (pane, chip), controls (tiles.boards, togglePanel/closePanel), boards list (boardRows,
+// Uses: the kept index and pictures (17-find.js: finder, findLoad, findThumbCurrent, findSyncSoon — a board's picture in its row),
+//   ui (pane, chip), controls (tiles.boards, togglePanel/closePanel), boards list (boardRows,
 //   sizeWords, storageWords, isKept), folder (the boards adapter: boards, board, onBoardHere, switchBoard, newBoard,
 //   renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash, emptyTrash, boardFromFile,
 //   rereadBoards, boardEntryName, exportLogNow, readLogText), input (flash, say), the
@@ -36,6 +37,8 @@
       togglePanel(boardsPanel, tiles.boards);
       if (boardsPanel.hasAttribute('hidden')) return;
       bd.renaming = null; bd.confirm = null; bd.said = null;
+      // What was kept of each board's look, and the board on screen drawn as it stands (Find, I6).
+      findLoad().then(() => { findThumbCurrent(true); findSyncSoon(300); renderBoardsPane(); });
       paintBoardsPane();
       // Another tab may have changed the list, and what its boards hold, since this page read it.
       rereadBoards();
@@ -104,6 +107,14 @@
     const row = bdEl('div', 'bdItem' + (r.here ? ' here' : ''));
     row.dataset.id = r.id;
     if (r.here) row.dataset.here = '';
+    // A small picture of the board (Find, PLAN-IPAD-NOTES I6): made when it was left, kept beside the index.
+    const th = finder.thumbs.get(r.id);
+    if (th) {
+      const img = bdEl('img', 'bdThumb');
+      img.src = th.src; img.alt = ''; img.width = 64; img.height = 43; img.decoding = 'async';
+      row.classList.add('hasThumb');
+      row.appendChild(img);
+    }
     let name;
     if (bd.renaming === r.id) {
       name = bdEl('input', 'bdNameInput');
