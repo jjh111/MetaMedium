@@ -998,15 +998,35 @@ window.__scenario = async function(){
     const wob = (x, y) => [x + Math.sin(y * 0.3) * 0.8, y + Math.cos(x * 0.2) * 0.8];
     const box = (x, y, w, h) => { g.beginPath(); g.moveTo(...wob(x, y)); g.lineTo(...wob(x + w, y)); g.lineTo(...wob(x + w, y + h)); g.lineTo(...wob(x, y + h)); g.closePath(); g.stroke(); };
     box(20, 20, 260, 40); box(20, 80, 120, 100); box(160, 80, 120, 100);
-    const bitmap = g.getImageData(0, 0, W0, H0);
+    // Recorded again 1 Oct 2026 by design (PLAN-IPAD-NOTES I1): a picture is no longer traced the moment it comes
+    // in — it is kept as a picture, drawn on the board, and *Trace into ink* is an offer on it. So the sketch is
+    // brought in as a file, held, and the offer taken; the ink that comes of it is what this record always read.
+    const sketchFile = await new Promise((resolve) => off.toBlob((b) => resolve(new File([b], 'sketch.png', { type: 'image/png' })), 'image/png'));
     const before = mm.session.getState().contentIds.length;
-    const res = mm.importBitmap(bitmap, 'sketch.png', { x: 9200, y: 2000 }, { size: 600, url: off.toDataURL('image/png') });
+    // The grid's one cell: the picture stands at (9200, 2000), 600 by 400 — where the traced ink always stood.
+    const pic = await mm.importPictures([sketchFile], { view: { minX: 9165, minY: 1965, maxX: 10165, maxY: 2665 } });
+    const picId = pic.ids[0];
+    const stPic = mm.session.getState();
+    const inkOnImport = stPic.contentIds.length - before - 1;   // marks besides the picture itself
+    mm.session.summonMarks([picId], Date.now()); await wait(90);
+    const tracePill = document.querySelector('#summon .pill[data-key="trace"]');
+    if (tracePill) tracePill.click();
+    for (let i = 0; i < 80 && mm.session.getState().contentIds.length === before + 1; i++) await wait(100);
+    await wait(60);
     const stP = mm.session.getState();
     const traced = stP.contentIds.slice(before).filter(id => MM.strokePointsOf(stP.nodes.get(id)));
     const reads = traced.map(id => MM.topInterpretation(stP.nodes.get(id)));
-    step('24. a picture of three boxes is traced into three rectangles of ink, and the picture is kept beside them', res.strokes === 3 && reads.filter(r => r === 'rectangle').length === 3 && !!res.imageId && stP.artifacts.includes(res.imageId), { reads, reasoning: res.reasoning });
-    // Declared content: the traced boxes never read as a loop or a mark.
-    step('24a. traced ink is declared content — nothing waits as a loop', stP.pendingLassoId === null && !stP.summon);
+    step('24. a picture of three boxes is kept as a picture, not traced on the way in; the offer Trace into ink makes three rectangles of ink over it, and the picture stays',
+      inkOnImport === 0 && !!tracePill && traced.length === 3 && reads.filter(r => r === 'rectangle').length === 3 && !!picId && stP.artifacts.includes(picId), { inkOnImport, reads, offer: !!tracePill });
+    // The field the picture was held in is the hand's to close; the traced ink is declared content — nothing waits as a loop.
+    { const sm24 = mm.session.getState().summon; if (sm24) mm.session.dismiss(sm24.id, Date.now()); await wait(30); }
+    const stP2 = mm.session.getState();
+    step('24a. traced ink is declared content — nothing waits as a loop', stP2.pendingLassoId === null && !stP2.summon);
+    // A loop round the ink on a picture takes the picture too (it stands inside the loop): the page is made of the ink alone, so the picture is moved aside first.
+    mm.session.select([picId], Date.now());
+    mm.session.move({ ids: [picId], dx: 0, dy: 1400, at: Date.now() });
+    mm.session.deselect(Date.now() + 1);
+    await wait(40);
     // Circle the traced ink and prompt it into a page: the page renders inside its own ink.
     const cP = mm.worldToScreen(9500, 2200);
     t.stroke(t.circle(cP.x, cP.y, 340));
@@ -1017,7 +1037,7 @@ window.__scenario = async function(){
     const stQ = mm.session.getState();
     const pageId = stQ.live.find(id => { const r = codeRepOfNode(stQ.nodes.get(id)); return r && r.data.kind === 'html' && stQ.nodes.get(id).edges.some(e => e.rel === 'has-part' && traced.includes(e.to)); });
     const regions = pageId ? MM.regionsOf(stQ.nodes.get(pageId), stQ.nodes) : [];
-    step('24b. the traced ink prompts into a living page inside its own ink: three regions, one per box', !!pageId && regions.length === 3, { pageId, regions: regions.length, live: stQ.live.length, mp: document.getElementById('mpStatus').textContent, summon: !!stQ.summon, enclosed: stQ.summon && stQ.summon.enclosedIds.length, hadMake: !!makeP, hadInput: !!inputP, lastSys: (window.__calls.slice(-1)[0] || {}).system, traced: traced.length, participants: stQ.participants, agentId: mm.agents.map(a => a.id), artifacts: stQ.artifacts.slice(-2) });
+    step('24b. the traced ink prompts into a living page inside its own ink: three regions, one per box', !!pageId && regions.length === 3, { pageId, regions: regions.length, members: pageId ? stQ.nodes.get(pageId).edges.filter(e => e.rel === 'has-part').map(e => { const n = stQ.nodes.get(e.to); const b = MM.boundsOf(n); return [e.to, MM.topInterpretation(n), b && [Math.round(b.minX), Math.round(b.minY), Math.round(b.maxX), Math.round(b.maxY)]]; }) : null, live: stQ.live.length, mp: document.getElementById('mpStatus').textContent, summon: !!stQ.summon, enclosed: stQ.summon && stQ.summon.enclosedIds.length, hadMake: !!makeP, hadInput: !!inputP, lastSys: (window.__calls.slice(-1)[0] || {}).system, traced: traced.length, participants: stQ.participants, agentId: mm.agents.map(a => a.id), artifacts: stQ.artifacts.slice(-2) });
     // SVG in, and the board out.
     const svgId = mm.importText('figure.svg', '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60"><rect x="5" y="5" width="40" height="50"/><circle cx="75" cy="30" r="20"/></svg>', { x: 9200, y: 2700 });
     const svgNode = svgId && mm.session.getState().nodes.get(svgId);
