@@ -6,7 +6,7 @@
 // the whole vocabulary; it grows by adding a row with a test, never by a
 // special case elsewhere (BUILD-PLAN-v8 I6).
 
-export type Kind = 'html' | 'js' | 'json' | 'svg' | 'md' | 'png' | 'jpg' | 'text' | 'control' | 'run' | 'mermaid';
+export type Kind = 'html' | 'js' | 'json' | 'svg' | 'md' | 'png' | 'jpg' | 'webp' | 'text' | 'control' | 'run' | 'mermaid';
 
 export type Renderer = 'page' | 'source' | 'tree' | 'vector' | 'prose' | 'image' | 'text' | 'control' | 'run' | 'mermaid';
 export type Addressing = 'regions' | 'functions' | 'keys' | 'elements' | 'headings' | 'pixels' | 'runs' | 'value' | 'parts';
@@ -31,6 +31,7 @@ export const KINDS: readonly KindRow[] = [
   { kind: 'md', extensions: ['md', 'markdown'], mime: 'text/markdown', renderer: 'prose', addressing: 'headings', textual: true },
   { kind: 'png', extensions: ['png'], mime: 'image/png', renderer: 'image', addressing: 'pixels', textual: false },
   { kind: 'jpg', extensions: ['jpg', 'jpeg'], mime: 'image/jpeg', renderer: 'image', addressing: 'pixels', textual: false },
+  { kind: 'webp', extensions: ['webp'], mime: 'image/webp', renderer: 'image', addressing: 'pixels', textual: false },
   { kind: 'text', extensions: ['txt'], mime: 'text/plain', renderer: 'text', addressing: 'runs', textual: true },
   { kind: 'control', extensions: [], mime: 'application/json', renderer: 'control', addressing: 'value', textual: true },
   // A program that renders itself (a three.js scene, a 2D drawing) in a

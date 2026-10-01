@@ -366,6 +366,8 @@ export type { Sample, FitResult } from './behave/fit';
 
 // Kinds of code — the closed table — and what ink lands on, per kind.
 export { KINDS, kindOf, rowOf } from './kinds/kinds';
+export { isPictureKind, isAssetRef, pictureOf, ASSET_REF } from './kinds/picture';
+export type { Picture } from './kinds/picture';
 export type { Kind, KindRow, Renderer, Addressing } from './kinds/kinds';
 export { addressablesOf, functionsOf, keysOf, headingsOf, elementsOf, runsOf, matchBrace } from './kinds/address';
 
