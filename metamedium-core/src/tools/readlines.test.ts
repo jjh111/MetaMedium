@@ -76,6 +76,16 @@ describe('Read the board', () => {
     expect(takeOffer(o, toolScope(s, { host: SEES }), s, 99_000_000).host).toBe('read-board');
     expect(offers(s, { ...SEES, writing: () => ({ lines: 0, unread: 0 }) }).some((x) => x.key === 'read-board')).toBe(false);
   });
+
+  it('is not offered when every line on the board is already held — reading the board would be reading these (e2e 49\'s golden: a line held alone on its board)', () => {
+    const s = createSession();
+    hold(s, [word(s, 100, 100)]);
+    expect(offers(s, { ...SEES, writing: () => ({ lines: 1, unread: 1 }) }).some((x) => x.key === 'read-board')).toBe(false);
+    const s2 = createSession();
+    hold(s2, [word(s2, 100, 100), word(s2, 100, 260, 220, 2)]);
+    expect(offers(s2, { ...SEES, writing: () => ({ lines: 2, unread: 2 }) }).some((x) => x.key === 'read-board')).toBe(false);
+    expect(offers(s2, { ...SEES, writing: () => ({ lines: 3, unread: 3 }) }).some((x) => x.key === 'read-board')).toBe(true);
+  });
 });
 
 describe('Read the picture', () => {

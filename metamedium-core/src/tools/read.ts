@@ -48,9 +48,11 @@ export const READ: Tool = {
       }];
     }
     const out: Offer[] = [];
-    // The whole board's writing, typed: only where the host says there is some.
+    const lines = writingLinesIn(s, scope.summon.enclosedIds);
+    // The whole board's writing, typed: only where the host says there is some beyond the lines held — with
+    // every line on the board held, reading the board is reading these (and e2e 49's golden stands).
     const board = scope.host.writing ? scope.host.writing() : null;
-    if (board && board.lines > 0) {
+    if (board && board.lines > lines.length) {
       out.push({
         key: 'read-board',
         label: 'Read the board',
@@ -64,7 +66,6 @@ export const READ: Tool = {
       });
     }
     // Several lines held: ONE batch reads them all (the lines already read are left, unless asked again).
-    const lines = writingLinesIn(s, scope.summon.enclosedIds);
     if (lines.length >= 2) {
       const ids = lines.flatMap((l) => l.ids);
       const unreadLines = lines.filter((l) => !lineIsRead(l, scope.host.isRead));

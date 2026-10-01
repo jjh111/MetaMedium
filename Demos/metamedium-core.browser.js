@@ -28246,8 +28246,9 @@ Reply with ONLY a JSON object, no prose, no code fences:
         }];
       }
       const out = [];
+      const lines = writingLinesIn(s, scope.summon.enclosedIds);
       const board2 = scope.host.writing ? scope.host.writing() : null;
-      if (board2 && board2.lines > 0) {
+      if (board2 && board2.lines > lines.length) {
         out.push({
           key: "read-board",
           label: "Read the board",
@@ -28260,7 +28261,6 @@ Reply with ONLY a JSON object, no prose, no code fences:
           data: { scope: "board", force: board2.unread === 0 }
         });
       }
-      const lines = writingLinesIn(s, scope.summon.enclosedIds);
       if (lines.length >= 2) {
         const ids = lines.flatMap((l) => l.ids);
         const unreadLines = lines.filter((l) => !lineIsRead(l, scope.host.isRead));
