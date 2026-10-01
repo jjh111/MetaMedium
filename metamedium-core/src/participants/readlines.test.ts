@@ -5,10 +5,11 @@
 // against an injected transport, so no model is asked.
 
 import { describe, it, expect } from 'vitest';
-import { createSession, type Session } from '../session/session';
+import { createSession, DEFAULT_SESSION_CONFIG, type Session } from '../session/session';
 import { handText, circleStroke } from '../test/strokes';
 import { PRESETS, type ChatMessage } from '../llm/provider';
 import { createAgentParticipant } from './agent';
+import { createSeatParticipant, pendingBriefs } from './seat';
 import { transcriptsOf, strokePointsOf } from '../session/nodes';
 import READ_LINES from '../llm/fixtures/read-lines.json';
 import {
@@ -21,8 +22,8 @@ const seeing = { ...PRESETS.ollama, model: 'qwen3.5:9b', vision: true } as const
 const blind = { ...PRESETS.ollama, model: 'qwen3:8b' } as const;
 
 /** A page of notes: line 1 is two words, line 2 one, line 3 one; a circle among them; strokes spaced far apart in time. */
-function page() {
-  const s = createSession();
+function page(config?: Parameters<typeof createSession>[0]) {
+  const s = createSession(config);
   let at = 10_000;
   const w = (x: number, y: number, width: number, height: number, seed: number) => s.addStroke(handText(x, y, width, height, { seed }), (at += 10_000), undefined, 1);
   const a1 = w(100, 100, 160, 40, 1);
@@ -262,5 +263,25 @@ describe('agent.readPicture: a photographed page, its text as lines', () => {
     const none = await readerWith(s, seeing, () => '{"lines":[]}').agent.readPicture({ nodeId: id, image: PNG, at: 2000 });
     expect(none.ok).toBe(false);
     expect(none.error).toMatch(/no text/);
+  });
+});
+
+describe('through the seat: Claude Code reads the sheet', () => {
+  it('ONE brief names every mark on the sheet, carries the numbered contract and the lines said in words, and one reply from the hand holds each line', async () => {
+    const p = page({ ...DEFAULT_SESSION_CONFIG, logName: 'john~j1' });
+    const seat = createSeatParticipant(p.s, 20_000, { baseUrl: 'http://127.0.0.1:8020' });
+    const asking = seat.readLines({ lines: [{ nodeId: p.a1, ids: [p.a1, p.a2] }, { nodeId: p.b, ids: [p.b] }, { nodeId: p.c, ids: [p.c] }], image: PNG, at: 30_000 });
+    const briefs = pendingBriefs(p.s.getState());
+    expect(briefs).toHaveLength(1);
+    expect(briefs[0]).toMatchObject({ ask: 'read', asked: 'read the writing', about: [p.a1, p.a2, p.b, p.c] });
+    expect(briefs[0].contract).toMatch(/numbered lines/i);
+    expect(briefs[0].brief).toMatch(/3 numbered lines/);
+    expect(JSON.stringify(p.s.getEvents())).not.toContain('base64');
+    // The hand that answers: another sitting, an explanation whose question is the brief's own id.
+    const hand = p.s.join('human', 'claude~c1', Date.now());
+    p.s.answer({ participantId: hand, question: briefs[0].key, text: reply(READ_LINES.lines.slice(0, 3).map((l, i) => ({ line: i + 1, ...l }))), aboutIds: briefs[0].about, at: Date.now() });
+    const res = await asking;
+    expect(res.lines.map((l) => l.ok)).toEqual([true, true, true]);
+    expect(transcriptsOf(p.s.getState().nodes.get(p.b)!).map((t) => t.text)).toEqual(['pricing']);
   });
 });

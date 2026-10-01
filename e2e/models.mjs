@@ -69,6 +69,7 @@
 //   M25  a line the reply leaves out fails by itself, and says why, in the status line and for the line; the others hold
 //   M26  lines already read are skipped (one line asked); Read these again, typed, asks for all of them — in calls of
 //        at most a sheet's lines
+//   M26b "read the board", typed with one word held, reads every line of the board: a sheet of eight and a sheet of one
 //   M27  Esc in the middle of a batch stops the rest: the second call is never made, and nothing lands
 //   M28  Read the picture: the picture, downscaled, goes to the reader alone; its text lands as a text artifact BESIDE it,
 //        held as the reader's, named for its source, editable; the picture stays as it was
@@ -1103,6 +1104,23 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       check(`M26. with 6 lines held and one unread, Read these asks for ONE line (${got.map((c) => c.lines).join(',')}) and it lands (${second}); typed, "read these again" asks for all 6 lines — ${calls.map((c) => c.lines).join(' + ')} lines in ${calls.length} call(s)`,
         took && got.length === 1 && got[0].lines === 1 && second === 'hello world' && again.length >= 1 && calls.reduce((n, c) => n + c.lines, 0) === 6 && calls.every((c) => c.lines <= 8),
         { took, got, second, line, calls });
+      await letGo(p6);
+    });
+
+    await record('M26b', async () => {
+      // Read the board: typed at one word held, it reads every line of the board — nine here, in a sheet of eight and a sheet of one.
+      await holdIds(p6, [A[1][0]]);
+      const input = p6.locator('#summon input.filter');
+      await input.fill('read the board');
+      await sleep(150);
+      const b = chats().length;
+      await input.press('Enter');
+      const got = await stubbed(chats, b, 1, 8000);
+      await sleep(900);
+      const calls = chats(b);
+      check(`M26b. "read the board" typed with one word held reads the board's every line — ${calls.map((c) => c.lines).join(' + ')} lines in ${calls.length} calls, to the reader alone`,
+        got.length >= 1 && calls.length === 2 && calls[0].lines === 8 && calls[1].lines === 1 && calls.every((c) => c.model === 'z-ai/glm-4.5v' && c.job === 'read-lines'),
+        { calls });
       await letGo(p6);
     });
 
