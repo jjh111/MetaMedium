@@ -37,8 +37,22 @@
 //   M11  a reload: the remembered pick rejoins, sees again, and answers
 //   M12  the key is nowhere it was not asked to be: not the log, the board's journal,
 //        a cache, the DOM or the address — only where "remember" put it
+//
+// Seats per job (V1-PLAN I7, PLAN-IPAD-NOTES §3), in a context of its own (a clean device):
+//   M13  one key, entered once, serves the writer, the reader and the decider: three joins, the key typed
+//        for the first only, every call the stub saw carried it; each seat says its model and its last call
+//   M14  Read the writing asks the reader seat alone; What is this? the writer alone; a model joined with
+//        no seat is asked by neither once seats are chosen; the decider is never asked by either
+//   M15  Which is it? is offered when two definitions tie and a decider is seated — and only then; taking
+//        it asks the decider once, and its answer stands beside the engine's, attributed, at 0.99 and over;
+//        an answer under the floor is said and holds nothing
+//   M16  a reload keeps the seats (the key from this device, because "remember" put it there)
+//   M17  the key is nowhere it was not asked to be, across every seat — only under mm-model-keys
+//   M18  a device where the key was not remembered: the seats come back, no key in any store; the key
+//        entered once again serves every seat that waits for it
+//   M19  an old remembered pick and key become the writer seat (and the reader, for a model that sees)
 
-import { startModelStub, STUB_KEY, REASONING_ONLY } from './servers.mjs';
+import { startModelStub, STUB_KEY, REASONING_ONLY, JEV } from './servers.mjs';
 import { isModelRequest } from './guards.mjs';
 import { sleep, waitReady } from './keep.mjs';
 
@@ -170,8 +184,9 @@ async function closeModels(page) {
 }
 
 /** Join a custom OpenAI-compatible endpoint through the pane, as a hand would; the pane's sentence when it settles. */
-async function joinCustom(page, base, model, key, remember) {
+async function joinCustom(page, base, model, key, remember, seat) {
   await openModels(page);
+  await page.selectOption('#mpFor', seat || 'any');
   await page.selectOption('#mpProvider', 'custom');
   await page.fill('#mpEndpoint', base);
   await page.fill('#mpModel', model);
@@ -184,6 +199,32 @@ async function joinCustom(page, base, model, key, remember) {
     return t !== was && !/^asking /.test(t) && t !== '';
   }, before, { timeout: 12000 }).catch(() => {});
   return paneStatus(page);
+}
+
+/** The seats as the page holds them (V1-PLAN I7): what each is held by, the providers a key is held for — never a key. */
+const seatsOf = (page) => page.evaluate(() => window.__mm.seats());
+
+/** A seat's row in the pane: who holds it, in words, and what its last call came to. */
+const seatRow = (page, seat) => page.evaluate((k) => {
+  const r = document.querySelector('.seatRow[data-seat="' + k + '"]');
+  if (!r) return null;
+  const t = (sel) => ((r.querySelector(sel) || {}).textContent || '').trim();
+  return { who: t('.seatWho'), call: t('.seatCall'), fallback: t('.seatFallback'), tryable: !!r.querySelector('[data-seat-try]'), picks: [...r.querySelectorAll('.seatPick option')].map((o) => o.textContent.trim()) };
+}, seat);
+
+/** Press a seat's try it and wait for its row to say what the call came to. */
+async function trySeat(page, seat) {
+  await page.locator('.seatRow[data-seat="' + seat + '"] [data-seat-try]').click({ timeout: 5000 });
+  await page.waitForFunction((k) => /^(ok|failed)\b/.test((((document.querySelector('.seatRow[data-seat="' + k + '"] .seatCall') || {}).textContent) || '').trim()), seat, { timeout: 12000 }).catch(() => {});
+  return seatRow(page, seat);
+}
+
+/** Three molecules' worth of the same drawing at a point: its ink's ids (the last five marks). */
+function drawMolecule(o) {
+  const d = window.__draw, mm = window.__mm, x = o.x, y = o.y;
+  d.stroke(d.circle(x, y, 40)); d.stroke(d.circle(x + 200, y, 40)); d.stroke(d.circle(x + 100, y + 160, 40));
+  d.stroke(d.line({ x: x + 40, y: y }, { x: x + 160, y: y }, 30)); d.stroke(d.line({ x: x + 28, y: y + 28 }, { x: x + 72, y: y + 132 }, 30));
+  return mm.session.getState().contentIds.slice(-5);
 }
 
 /** A joined model's row in the pane, by its name in words. */
@@ -298,6 +339,7 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
   const host = stub.origin.replace(/^https?:\/\//, '');
   const chats = (since = 0) => stub.calls().filter((c) => c.path === '/v1/chat/completions').slice(since);
   let board = null;
+  const guardsAll = [guards];
   try {
     // ---- M0. The gate's guard, unchanged ----
     await record('M0', async () => {
@@ -517,6 +559,252 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
           JSON.stringify(lsHolding) === '["mm-model-key"]' && e.localStorage['mm-model-key'] === JSON.stringify(STUB_KEY) && !!pick && !('apiKey' in pick) && pick.model === 'z-ai/glm-5.3-flash',
         { lsHolding, pick, idbStores: e.idbStores, cacheEntries: e.cacheEntries });
     });
+
+    // =====================================================================================================
+    // Seats per job (V1-PLAN I7). A clean device: its own context, so nothing above has kept a key here.
+    // =====================================================================================================
+    const guards2 = await freshContext(browser, { origins: [servers.staticOrigin, stub.origin], label: 'models-seats' });
+    guardsAll.push(guards2);
+    await guards2.context.addInitScript(localStandIn);
+    const p2 = await guards2.context.newPage();
+    await p2.goto(url, { waitUntil: 'load', timeout: 60000 });
+    await waitReady(p2);
+    await p2.evaluate(installDraw);
+    const KEYS_AT = (base) => base.replace(/\/+$/, '').toLowerCase();
+
+    // ---- M13. One key, three seats ----
+    await record('M13', async () => {
+      const base = stub.baseUrl;
+      const before = chats().length;
+      const w = await joinCustom(p2, base, 'z-ai/glm-5.3-flash', STUB_KEY, true, 'writer');
+      const r = await joinCustom(p2, base, 'z-ai/glm-4.5v', '', false, 'reader');
+      const d = await joinCustom(p2, base, JEV, '', false, 'decider');
+      const a = await joinCustom(p2, base, 'openai/gpt-4o-mini', '', false, 'any');
+      const seats = await seatsOf(p2);
+      const keyField = await p2.inputValue('#mpKey');
+      const rows = { reader: await seatRow(p2, 'reader'), writer: await seatRow(p2, 'writer'), decider: await seatRow(p2, 'decider'), semantic: await seatRow(p2, 'semantic') };
+      check(`M13. four joins, the key typed once — for the writer ("${w.slice(0, 70)}") — and the reader, the decider and a model with no seat joined with the key field empty ("${r.slice(0, 60)}")`,
+        /^GLM 5\.3 Flash joined/.test(w) && /^GLM 4\.5V joined/.test(r) && /Jev/.test(d) && /joined/.test(d) && /^GPT-4o-mini joined/i.test(a) && keyField === '' &&
+          seats.writer && seats.writer.model === 'z-ai/glm-5.3-flash' && seats.reader && seats.reader.model === 'z-ai/glm-4.5v' && seats.decider && seats.decider.model === JEV &&
+          seats.any.length === 1 && seats.any[0].model === 'openai/gpt-4o-mini' && seats.keys.length === 1 && seats.keys[0] === KEYS_AT(base) && chats().length === before,
+        { w, r, d, a, seats, keyField });
+      check(`M13b. each seat says who holds it — ${['reader', 'writer', 'decider'].map((k) => k + ': ' + (rows[k] && rows[k].who)).join(' / ')} — and the semantic seat says it is on this device and coming`,
+        !!rows.reader && /GLM 4\.5V/.test(rows.reader.who) && /sees/.test(rows.reader.who) && /GLM 5\.3 Flash/.test(rows.writer.who) && /Jev/.test(rows.decider.who) && /hosted/.test(rows.decider.who) &&
+          !!rows.semantic && /on this device/.test(rows.semantic.who + rows.semantic.fallback) && /coming/.test(rows.semantic.who + rows.semantic.fallback) && !rows.semantic.tryable,
+        rows);
+      const seen = [];
+      for (const k of ['writer', 'reader', 'decider']) seen.push(await trySeat(p2, k));
+      const asked = chats(before);
+      check(`M13c. try it on each seat reaches its own model with the one key — ${asked.map((c) => c.model + ' (' + c.key + ')').join(', ')} — and each row keeps what the call came to`,
+        asked.length === 3 && asked.every((c) => c.key === 'the stub\'s') && new Set(asked.map((c) => c.model)).size === 3 && seen.every((x) => x && /^ok · \d+(\.\d)? s · /.test(x.call)),
+        { asked, seen });
+    });
+
+    // ---- M14. Routing: the reader reads, the writer writes ----
+    let seatBoard = null;
+    await record('M14', async () => {
+      seatBoard = await p2.evaluate(drawBoard, MOLECULE_AT);
+      await sleep(200);
+      const calls = chats().length;
+      const wordAt = await p2.evaluate((id) => { const b = window.__mm.MM.boundsOf(window.__mm.session.getState().nodes.get(id)); return window.__mm.worldToScreen((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2); }, seatBoard.word);
+      const held = await holdAt(p2, wordAt.x, wordAt.y);
+      const took = held && (await takePill(p2, /^writing( \d\.\d\d)?$/) || await takePill(p2, 'Read the writing'));
+      const read = await until(p2, (id) => { const n = window.__mm.session.getState().nodes.get(id); const t = n && window.__mm.MM.transcriptOf(n); return t ? t.text || t : null; }, seatBoard.word, 8000);
+      await sleep(250);
+      const readCalls = chats(calls);
+      check(`M14. Read the writing asks the reader seat alone — ${readCalls.map((c) => c.model + ' ' + c.job).join(', ')} — one image, though GPT-4o-mini and the writer see too; the word holds “${read}”`,
+        held && took && readCalls.length === 1 && readCalls[0].model === 'z-ai/glm-4.5v' && readCalls[0].job === 'read' && readCalls[0].image === true && read === 'hello',
+        { held, took, readCalls, read });
+      await letGo(p2);
+      const before = chats().length;
+      const held2 = await holdAt(p2, MOLECULE_AT.x, MOLECULE_AT.y);
+      const took2 = held2 && await takePill(p2, 'What is this?');
+      const whatCalls = await stubbed(chats, before, 1);
+      await sleep(400);
+      const after = chats(before);
+      check(`M14b. What is this? asks the writer seat alone — ${after.map((c) => c.model + ' ' + c.job).join(', ')} — and the model with no seat, the reader and the decider are not asked`,
+        held2 && took2 && whatCalls.length >= 1 && after.length === 1 && after[0].model === 'z-ai/glm-5.3-flash' && after[0].job === 'what',
+        { held2, took2, after });
+      const decides = chats().filter((c) => c.job === 'decide');
+      const mini = chats().filter((c) => c.model === 'openai/gpt-4o-mini');
+      check('M14c. neither act asked the decider, and the model with no seat was never asked at all (the seats narrow who is asked; asking nothing is the default)',
+        decides.length === 0 && mini.length === 0, { decides: decides.length, mini: mini.length });
+      await letGo(p2);
+    });
+
+    // ---- M15. The decider, on a tie ----
+    await record('M15', async () => {
+      await p2.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
+      await sleep(150);
+      const A = { x: 420, y: 130 }, B = { x: 860, y: 130 }, C = { x: 420, y: 500 };
+      const nameThrough = async (at, text) => {
+        const ok = await holdAt(p2, at.x, at.y);
+        if (!ok) return false;
+        await p2.fill('#summon input.filter', text);
+        await p2.press('#summon input.filter', 'Enter');
+        await sleep(200);
+        await letGo(p2);
+        return true;
+      };
+      await p2.evaluate(drawMolecule, A);
+      const nA = await nameThrough(A, 'molecule');
+      await p2.evaluate(drawMolecule, B);
+      const nB = await nameThrough(B, 'compound');
+      const third = await p2.evaluate(drawMolecule, C);
+      await sleep(200);
+      const arts = await p2.evaluate(() => window.__mm.session.getState().artifacts.length);
+      const before = chats().length;
+      const held = await holdAt(p2, C.x, C.y);
+      const offered = held ? await p2.evaluate(() => [...document.querySelectorAll('#summon .pill.item')].map((x) => x.textContent.trim())) : [];
+      const has = offered.some((t) => /Which is it\?/.test(t));
+      check(`M15. two definitions named from the same drawing, and a third drawing held: both match — and Which is it? is offered (${offered.length} pills), the decider's name on its reason`,
+        nA && nB && arts === 2 && held && has && chats(before).length === 0,
+        { nA, nB, arts, held, offered });
+      const took = has && await takePill(p2, 'Which is it?');
+      const calls = await stubbed(chats, before, 1);
+      await until(p2, (ids) => { const mm = window.__mm, s = mm.session.getState(); return ids.some((id) => { const n = s.nodes.get(id); return n && mm.MM.interpretationsOf(n, s.nodes).some((r) => r.tier === 1.5); }) ? true : null; }, third, 8000);
+      await sleep(250);
+      const decisions = stub.decisions();
+      const rows = await p2.evaluate((ids) => {
+        const mm = window.__mm, s = mm.session.getState();
+        return ids.flatMap((id) => { const n = s.nodes.get(id); return n ? mm.MM.interpretationsOf(n, s.nodes).filter((r) => r.tier === 1.5).map((r) => ({ label: r.label, weight: +r.weight.toFixed(3), source: r.sourceName })) : []; });
+      }, third);
+      const chips = await p2.evaluate(() => (window.__mm.chips() || []).map((c) => c.text));
+      const pills = await p2.evaluate(() => [...document.querySelectorAll('#summon .pill.item')].map((x) => x.textContent.trim()));
+      const lead = decisions.length ? decisions[decisions.length - 1].lead : null;
+      check(`M15b. taking it asks the decider once — ${calls.map((c) => c.model + ' ' + c.job).join(', ')} — and its answer stands as one more reading beside the engine's: ${JSON.stringify(rows)}, and the field says it: ${pills.filter((t) => /jev|Jev/.test(t)).join(' | ')}`,
+        took && calls.length === 1 && calls[0].model === JEV && calls[0].job === 'decide' && calls[0].key === 'the stub\'s' && !!lead && rows.length >= 1 && rows.every((r) => r.weight >= 0.99 && r.label === lead) &&
+          pills.some((t) => new RegExp('^' + lead + ' 0\\.99\\d? · Jev').test(t)) && pills.some((t) => /^molecule 1\.00|^compound 1\.00|^(molecule|compound) 0\.\d\d$/.test(t)),
+        { took, calls, decisions, rows, pills, chips });
+      await letGo(p2);
+      // Not a tie: one definition named, a drawing that matches only it — nothing to decide.
+      await p2.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
+      await sleep(120);
+      await p2.evaluate(drawMolecule, A);
+      await nameThrough(A, 'molecule');
+      await p2.evaluate(drawMolecule, C);
+      await sleep(150);
+      const held2 = await holdAt(p2, C.x, C.y);
+      const offered2 = held2 ? await p2.evaluate(() => [...document.querySelectorAll('#summon .pill.item')].map((x) => x.textContent.trim())) : [];
+      check('M15c. with one definition and a drawing like it there is nothing to tie, and the field does not offer to ask the decider',
+        held2 && !offered2.some((t) => /Which is it\?/.test(t)) && offered2.some((t) => /^molecule/.test(t)), { held2, offered2 });
+      await letGo(p2);
+      // Under the floor: the decider leads at 0.97 — said, and nothing held.
+      stub.decideAt(0.97);
+      await p2.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
+      await sleep(120);
+      await p2.evaluate(drawMolecule, A); await nameThrough(A, 'molecule');
+      await p2.evaluate(drawMolecule, B); await nameThrough(B, 'compound');
+      const third2 = await p2.evaluate(drawMolecule, C);
+      await sleep(150);
+      const before2 = chats().length;
+      const held3 = await holdAt(p2, C.x, C.y);
+      const took3 = held3 && await takePill(p2, 'Which is it?');
+      await stubbed(chats, before2, 1);
+      await sleep(500);
+      const said = await statusLine(p2);
+      const rows2 = await p2.evaluate((ids) => {
+        const mm = window.__mm, s = mm.session.getState();
+        return ids.flatMap((id) => { const n = s.nodes.get(id); return n ? mm.MM.interpretationsOf(n, s.nodes).filter((r) => r.tier === 1.5).map((r) => r.label) : []; });
+      }, third2);
+      check(`M15d. an answer under the floor is said — "${said.slice(0, 150)}" — and holds nothing: the engine's ranking stands`,
+        held3 && took3 && chats(before2).length === 1 && rows2.length === 0 && /Jev/.test(said) && /0\.97/.test(said) && /engine/.test(said), { held3, took3, said, rows2 });
+      stub.decideAt(0.995);
+      await letGo(p2);
+    });
+
+    // ---- M16. A reload keeps the seats ----
+    await record('M16', async () => {
+      const lists = stub.calls().filter((c) => c.path === '/v1/models').length;
+      await p2.reload({ waitUntil: 'load' });
+      await waitReady(p2);
+      await openModels(p2);
+      const seats = await until(p2, () => { const s = window.__mm.seats(); return s.reader && s.writer && s.decider && s.any.length === 1 ? s : null; }, null, 10000);
+      const agents = await p2.evaluate(() => window.__mm.agents.map((a) => ({ model: a.config.model, vision: !!a.config.vision, keyed: !!a.config.apiKey })));
+      const before = chats().length;
+      const tried = [];
+      for (const k of ['writer', 'reader', 'decider']) tried.push(await trySeat(p2, k));
+      const asked = chats(before);
+      check(`M16. after a reload the seats are as they were — reader ${seats && seats.reader && seats.reader.model}, writer ${seats && seats.writer && seats.writer.model}, decider ${seats && seats.decider && seats.decider.model} — each asked again what it can do, keyed from this device, and each try answers`,
+        !!seats && seats.reader.model === 'z-ai/glm-4.5v' && seats.writer.model === 'z-ai/glm-5.3-flash' && seats.decider.model === JEV && agents.length === 3 && agents.every((a) => a.keyed) &&
+          agents.find((a) => a.model === 'z-ai/glm-4.5v').vision && stub.calls().filter((c) => c.path === '/v1/models').length > lists &&
+          asked.length === 3 && asked.every((c) => c.key === 'the stub\'s') && tried.every((x) => x && /^ok · /.test(x.call)),
+        { seats, agents, asked, tried });
+    });
+
+    // ---- M17. The key, across every seat ----
+    await record('M17', async () => {
+      const e = await everywhere(p2);
+      const has = (text) => typeof text === 'string' && text.includes(STUB_KEY);
+      const lsHolding = Object.entries(e.localStorage).filter(([, v]) => has(v)).map(([k]) => k);
+      const keys = JSON.parse(e.localStorage['mm-model-keys'] || 'null');
+      const seatsStored = JSON.parse(e.localStorage['mm-seats'] || 'null');
+      check(`M17. across the reader, the writer and the decider the key is nowhere it was not asked to be — not the log (${e.log.length} characters), the journal (${e.idbStores} stores), a cache (${e.cacheEntries}), the DOM, the address, nor any seat's kept pick; in storage only under ${lsHolding.join(', ') || 'nothing'}, once, for the one provider`,
+        !has(e.log) && !has(e.idb) && !has(e.caches) && !has(e.dom) && !has(e.address) && e.idbStores > 0 && JSON.stringify(lsHolding) === '["mm-model-keys"]' &&
+          !!keys && Object.keys(keys).length === 1 && keys[KEYS_AT(stub.baseUrl)] === STUB_KEY && !!seatsStored && !JSON.stringify(seatsStored).includes('apiKey') &&
+          !!seatsStored.reader && !!seatsStored.writer && !!seatsStored.decider,
+        { lsHolding, keys: keys && Object.keys(keys), seatsStored });
+    });
+
+    // ---- M18. A device that did not remember the key ----
+    const guards3 = await freshContext(browser, { origins: [servers.staticOrigin, stub.origin], label: 'models-seats-forgetful' });
+    guardsAll.push(guards3);
+    await guards3.context.addInitScript(localStandIn);
+    const p3 = await guards3.context.newPage();
+    await record('M18', async () => {
+      await p3.goto(url, { waitUntil: 'load', timeout: 60000 });
+      await waitReady(p3);
+      const base = stub.baseUrl;
+      await joinCustom(p3, base, 'z-ai/glm-5.3-flash', STUB_KEY, false, 'writer');
+      await joinCustom(p3, base, 'z-ai/glm-4.5v', '', false, 'reader');
+      await joinCustom(p3, base, JEV, '', false, 'decider');
+      await p3.reload({ waitUntil: 'load' });
+      await waitReady(p3);
+      await openModels(p3);
+      const seats = await until(p3, () => { const s = window.__mm.seats(); return s.reader && s.writer && s.decider ? s : null; }, null, 10000);
+      const e = await everywhere(p3);
+      const has = (text) => typeof text === 'string' && text.includes(STUB_KEY);
+      const lsHolding = Object.entries(e.localStorage).filter(([, v]) => has(v)).map(([k]) => k);
+      const tried = await trySeat(p3, 'writer');
+      check(`M18. where "remember" was not ticked the seats come back (${seats ? ['reader', 'writer', 'decider'].map((k) => seats[k] && seats[k].model).join(', ') : 'none'}) and no key is in any store (${lsHolding.join(', ') || 'none'}; the log, journal, caches, DOM and address clean); a seat tried says why it cannot — "${tried && tried.call}"`,
+        !!seats && !has(e.log) && !has(e.idb) && !has(e.caches) && !has(e.dom) && !has(e.address) && lsHolding.length === 0 && !!tried && /^failed · \d+(\.\d)? s · HTTP 401/.test(tried.call),
+        { seats, lsHolding, tried });
+      // The key entered once more — on the writer — serves every seat that waits for one.
+      await joinCustom(p3, base, 'z-ai/glm-5.3-flash', STUB_KEY, false, 'writer');
+      const before = chats().length;
+      const after = [await trySeat(p3, 'writer'), await trySeat(p3, 'reader'), await trySeat(p3, 'decider')];
+      const asked = chats(before);
+      check(`M18b. the key typed once, for one seat, serves the reader and the decider that waited for it — ${asked.map((c) => c.model + ' ' + c.key).join(', ')}`,
+        asked.length === 3 && asked.every((c) => c.key === 'the stub\'s') && after.every((x) => x && /^ok · /.test(x.call)), { asked, after });
+    });
+
+    // ---- M19. An old pick and key become the writer seat ----
+    const guards4 = await freshContext(browser, { origins: [servers.staticOrigin, stub.origin], label: 'models-seats-migrated' });
+    guardsAll.push(guards4);
+    await guards4.context.addInitScript(localStandIn);
+    await guards4.context.addInitScript(([base, key]) => {
+      try {
+        if (localStorage.getItem('__seeded')) return;
+        localStorage.setItem('__seeded', '1');
+        localStorage.setItem('mm-model-pick', JSON.stringify({ provider: 'custom', baseUrl: base, model: 'z-ai/glm-5.3-flash', kind: 'openai-compatible', vision: true, title: 'Z.AI: GLM 5.3 Flash' }));
+        localStorage.setItem('mm-model-key', JSON.stringify(key));
+      } catch (e) { /* none */ }
+    }, [stub.baseUrl, STUB_KEY]);
+    const p4 = await guards4.context.newPage();
+    await record('M19', async () => {
+      await p4.goto(url, { waitUntil: 'load', timeout: 60000 });
+      await waitReady(p4);
+      await openModels(p4);
+      const seats = await until(p4, () => { const s = window.__mm.seats(); return s.writer && s.reader ? s : null; }, null, 10000);
+      const ls = await p4.evaluate(() => { const o = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); o[k] = localStorage.getItem(k); } return o; });
+      const before = chats().length;
+      const tried = seats ? await trySeat(p4, 'writer') : null;
+      const asked = chats(before);
+      check(`M19. an old remembered pick and key become the writer seat, and the reader because it sees — ${seats ? seats.writer.model + ' / ' + seats.reader.model : 'none'} — the key kept for its provider, the old entries let go, and the seat answers with it`,
+        !!seats && seats.writer.model === 'z-ai/glm-5.3-flash' && seats.reader.model === 'z-ai/glm-5.3-flash' && !('mm-model-pick' in ls) && !('mm-model-key' in ls) &&
+          JSON.parse(ls['mm-model-keys'] || '{}')[KEYS_AT(stub.baseUrl)] === STUB_KEY && !!tried && /^ok · /.test(tried.call) && asked.length === 1 && asked[0].key === 'the stub\'s',
+        { seats, keys: Object.keys(ls), tried, asked });
+    });
   } catch (err) {
     check(`the scenario threw: ${String(err && err.message ? err.message : err).split('\n')[0]}`, false, { stack: String(err && err.stack) });
     await screenshot(page, 'models');
@@ -524,5 +812,5 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
     await stub.stop();
   }
   if (steps.some((s) => !s.ok)) await screenshot(page, 'models');
-  return { steps, guards: [guards], measured: { stubCalls: stub.calls().length } };
+  return { steps, guards: guardsAll, measured: { stubCalls: stub.calls().length } };
 }

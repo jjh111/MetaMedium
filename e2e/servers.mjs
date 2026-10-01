@@ -165,6 +165,13 @@ export const STUB_KEY = 'e2e-stub-key-not-a-real-key';
 /** The stub's own model, beside OpenRouter's: every reply is reasoning that ran out of budget, and no answer. */
 export const REASONING_ONLY = 'e2e/reasoning-only';
 
+/**
+ * The decision model's id as John was told it is listed on OpenRouter (V1-PLAN I7) — UNVERIFIED; the stub lists
+ * it as a model of its own, text only, so a join validates against a list that holds it. Nothing here says what
+ * the real one answers.
+ */
+export const JEV = 'typesafe/jev-1.13';
+
 /** What a stub reply says, by the job its system prompt names. */
 const ANSWERS = {
   // The recorded GLM reply's own content: what reading "hello" came back as.
@@ -172,6 +179,8 @@ const ANSWERS = {
   // A reading with a slug for a label, so the board is seen to say it in words (J5, the walkthrough's item 3).
   what: JSON.stringify([{ label: 'state-transformation', confidence: 0.82, reasoning: 'three circles joined by two lines: states, and the changes between them' }]),
   try: 'ok',
+  // The decision seat's call: answered by the stub itself, from the questions it was sent (`decideReply`).
+  decide: null,
   other: 'ok',
 };
 
@@ -180,7 +189,31 @@ function jobOf(system) {
   if (/reading handwriting/.test(system)) return 'read';
   if (/offer INTERPRETATIONS/.test(system)) return 'what';
   if (/connection check/i.test(system)) return 'try';
+  if (/decision seat/i.test(system)) return 'decide';
   return 'other';
+}
+
+/**
+ * What the stub's decision model says to the questions it is sent (the user message's JSON, as
+ * `llm/decide-openrouter.ts` writes it): for each, the LAST option that is not *none of these* leads —
+ * at `p` (0.995 when sure, 0.97 when not) — and the rest share what is left, in the shape of
+ * `fixtures/decide-replies.json`. Returns the reply's content and what was decided, for the test to read.
+ */
+function decideReply(userContent, p) {
+  let questions = [];
+  try { questions = JSON.parse(userContent).questions || []; } catch { /* unreadable: no answers */ }
+  const decided = [];
+  const answers = questions.map((q) => {
+    const ids = (q.options || []).map((o) => o.id);
+    const named = ids.filter((id) => id !== 'no-match');
+    const lead = (named.length ? named : ids)[(named.length ? named : ids).length - 1];
+    const rest = ids.filter((id) => id !== lead);
+    const probabilities = {};
+    for (const id of ids) probabilities[id] = id === lead ? p : (1 - p) / Math.max(1, rest.length);
+    decided.push({ id: q.id, lead, p });
+    return { id: q.id, probabilities };
+  });
+  return { content: JSON.stringify({ answers }), decided };
 }
 
 function readBody(req) {
@@ -223,10 +256,20 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
     per_request_limits: null,
     supported_parameters: ['include_reasoning', 'max_tokens', 'reasoning'],
   };
-  const models = { data: [...LIST.data, own] };
+  const jev = {
+    ...own,
+    id: JEV,
+    canonical_slug: JEV,
+    name: 'E2E: Jev (a stand-in)',
+    description: "The stub's own stand-in for a decision model: answers the decision seat's JSON.",
+    supported_parameters: ['max_tokens', 'reasoning'],
+  };
+  const models = { data: [...LIST.data, own, jev] };
   const byId = new Map(models.data.map((m) => [m.id, m]));
   const sees = (id) => ((byId.get(id) || {}).architecture || {}).input_modalities?.includes('image');
   const calls = [];
+  const decisions = [];
+  let decideP = 0.995;
   const cors = {
     'access-control-allow-origin': '*',
     'access-control-allow-headers': 'authorization, content-type, http-referer, x-title',
@@ -259,6 +302,18 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
       if (keyWas !== 'the stub\'s') { send(401, REPLIES['error-401'].body); return; }
       if (!byId.has(body.model)) { send(404, { error: { message: `No endpoints found for ${body.model}.`, code: 404 } }); return; }
       if (image && !sees(body.model)) { send(404, { error: { message: 'No endpoints found that support image input', code: 404 } }); return; }
+      if (call.job === 'decide') {
+        const user = messages.filter((m) => m.role === 'user').map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n');
+        const d = decideReply(user, decideP);
+        decisions.push(...d.decided);
+        const r = JSON.parse(JSON.stringify(REPLIES['openrouter-glm'].body));
+        r.model = body.model;
+        r.choices[0].message.content = d.content;
+        delete r.choices[0].message.reasoning;
+        delete r.choices[0].message.reasoning_details;
+        send(200, r);
+        return;
+      }
       if (body.model === REASONING_ONLY) {
         const r = JSON.parse(JSON.stringify(REPLIES['reasoning-only'].body));
         r.model = body.model;
@@ -286,6 +341,10 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
     key,
     /** Every request so far, oldest first. */
     calls: () => calls.map((c) => ({ ...c })),
+    /** What the stub's decision model decided so far, oldest first: the question, the option that led, and how surely. */
+    decisions: () => decisions.map((d) => ({ ...d })),
+    /** How surely the stub's decision model leads from now on: 0.995 (sure, the default) or 0.97 (under the floor). */
+    decideAt: (p) => { decideP = p; },
     stop: () => new Promise((ok) => { server.closeAllConnections?.(); server.close(ok); }),
   };
 }

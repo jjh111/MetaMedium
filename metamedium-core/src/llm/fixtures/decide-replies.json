@@ -1,0 +1,24 @@
+{
+  "_about": "The shapes a decision model's reply takes through an OpenAI-compatible chat completion asked for the typed JSON the decision seat reads (participants/decide.ts, llm/decide-openrouter.ts). These are the SHAPES the seat must read, written by hand — NOT recorded from any decision model: what typesafe/jev-* returns on OpenRouter is unverified (PLAN-IPAD-NOTES §3). The envelope is OpenRouter's, as in replies.json; `content` is what the seat is asked to write. Read by the core tests and by the e2e stub (e2e/servers.mjs), never by the page.",
+  "sure": {
+    "content": "{\"answers\":[{\"id\":\"q1\",\"probabilities\":{\"molecule\":0.995,\"compound\":0.003,\"no-match\":0.002}}]}"
+  },
+  "split": {
+    "content": "{\"answers\":[{\"id\":\"q1\",\"probabilities\":{\"molecule\":0.52,\"compound\":0.44,\"no-match\":0.04}}]}"
+  },
+  "fenced": {
+    "content": "```json\n{\"answers\":[{\"id\":\"q1\",\"probabilities\":{\"molecule\":0.97,\"compound\":0.02,\"no-match\":0.01}}]}\n```"
+  },
+  "unknown-option": {
+    "content": "{\"answers\":[{\"id\":\"q1\",\"probabilities\":{\"molecule\":0.5,\"a salad\":0.5}}]}"
+  },
+  "not-a-distribution": {
+    "content": "{\"answers\":[{\"id\":\"q1\",\"probabilities\":{\"molecule\":-0.2,\"compound\":1.2,\"no-match\":0}}]}"
+  },
+  "prose": {
+    "content": "I think it is a molecule, probably."
+  },
+  "mixed": {
+    "content": "{\"answers\":[{\"id\":\"q1\",\"probabilities\":{\"bubble\":0.9,\"wheel\":0.05,\"no-match\":0.05}},{\"id\":\"q2\",\"probabilities\":{\"low\":0.1,\"mid\":0.2,\"high\":0.7}},{\"id\":\"q3\",\"probabilities\":{\"yes\":0.93,\"no\":0.07}},{\"id\":\"ghost\",\"probabilities\":{\"yes\":1}}]}"
+  }
+}
