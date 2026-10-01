@@ -5,7 +5,8 @@
 //   pictureSrc), tracing a held picture into ink (traceFrom); exportBoardSVG/exportBoardPNG/exportLog,
 //   downloadText/downloadBlob.
 // Uses: core, view (viewportWorld), folder (folder, boards, boardDB, journalFold, isKept, session), render, 17-assets.js
-//   (the rules: what a picture is kept as, where a pick stands, which assets are unused, what the decoded cost).
+//   (the rules: what a picture is kept as, where a pick stands, which assets are unused, what the decoded cost),
+//   and, in a live room, roomAssetFetch / folder.roomAssets (17-folder.js: the bytes of a picture another hand imported).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.

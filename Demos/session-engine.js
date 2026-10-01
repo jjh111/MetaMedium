@@ -9830,7 +9830,9 @@
 // Provides: the folder as the canvas — openFolder/openStatic/openStore (discovery into artifacts,
 //   per-participant logs merged), autosave (to the folder), the live budget (liveSet), the grid and
 //   focus views (setViewMode, focusOn), imageUrlFor, folderStatus; a live room (openLive: logs
-//   arriving live over a BroadcastChannel or a relay, merged as they land); and the boards this
+//   arriving live over a BroadcastChannel or a relay, merged as they land, and — over a relay — the bytes of
+//   the pictures they name: put on it before a line names them, fetched by hash when one is missing,
+//   roomAssetFetch; PLAN-IPAD-NOTES A1); and the boards this
 //   browser keeps when there is no folder (V1-PLAN R3, R1) — the adapter over 17-board.js's journal
 //   and 17-boards.js's list: IndexedDB (openBoard, persistBoard, flushBoard, forgetLocalLog; the list:
 //   switchBoard, newBoard, renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash,
@@ -11558,7 +11560,8 @@
 //   pictureSrc), tracing a held picture into ink (traceFrom); exportBoardSVG/exportBoardPNG/exportLog,
 //   downloadText/downloadBlob.
 // Uses: core, view (viewportWorld), folder (folder, boards, boardDB, journalFold, isKept, session), render, 17-assets.js
-//   (the rules: what a picture is kept as, where a pick stands, which assets are unused, what the decoded cost).
+//   (the rules: what a picture is kept as, where a pick stands, which assets are unused, what the decoded cost),
+//   and, in a live room, roomAssetFetch / folder.roomAssets (17-folder.js: the bytes of a picture another hand imported).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
