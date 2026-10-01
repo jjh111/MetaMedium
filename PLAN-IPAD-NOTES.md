@@ -18,6 +18,20 @@ summaries; each is marked (unverified) where it matters, and §6 lists what must
 be checked on the real iPad before a unit leans on it.** The product is becoming
 dyna.ink; nothing here renames anything.
 
+**John's direction, 1 October (later the same day).** One OpenRouter key is
+already in use and serves every hosted seat — GLM 5.3 Flash, Jev, and fast
+vision models for reading — but **lowest latency and local first** wherever a
+job allows: the models are a *temporal hierarchy* (the engine's tiers 0 and 1
+answer at once, a small local model in milliseconds, a fast hosted one in about
+a second, a higher one in seconds) and an *ecosystem* — every seat and tool sees
+the canvas state the way the engine describes it. He owns **dyna.ink** and
+related domains and has used **Cloudflare Pages and Workers**: the site moves
+there beside GitHub Pages (which keeps every old address), with a room relay as
+a Worker, so the iPad and an agent can share a board over https. **The
+foundational flow comes first, and it must work from both sides** — the person
+on the iPad, and an adjacent agent through MCP or with a key. Questions are kept
+for the end of each cycle, not asked on the way.
+
 ---
 
 ## 1. The answer: not yet
