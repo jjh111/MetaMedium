@@ -91,6 +91,35 @@ export function calibrateInPage() {
   return xs[2];
 }
 
+/**
+ * Runs in the page: the GPU the page draws with, as WebGL names it (the
+ * unmasked renderer where the browser gives it), or null.
+ */
+export function rendererInPage() {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl');
+    if (!gl) return null;
+    const info = gl.getExtension('WEBGL_debug_renderer_info');
+    return String(info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
+  } catch (err) { return null; }
+}
+
+/**
+ * Why a page drawing with this renderer cannot measure the surface's budgets,
+ * or null. They were set on a machine whose GPU rasterised the canvas
+ * (PERF.md); a renderer that is software — SwiftShader, llvmpipe — paints a
+ * zoomed-out board several times slower while the calibration, which is
+ * arithmetic, reads as that machine's (a container measured 53 ms against 41,
+ * inside the slack, and a pan at fit-all of four frames). Its numbers say
+ * nothing about the budgets either way.
+ */
+export function softwareRaster(renderer) {
+  if (typeof renderer !== 'string') return null;
+  return /swiftshader|llvmpipe|softpipe|software/i.test(renderer)
+    ? `the page draws with a software renderer (${renderer.replace(/\s+/g, ' ').slice(0, 80)}), not the GPU the budgets were set on`
+    : null;
+}
+
 /** Why this machine cannot measure the budgets now, or null when it can. */
 export function tooLoaded(calibrationMs) {
   const cores = os.cpus().length || 1;

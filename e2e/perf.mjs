@@ -50,7 +50,7 @@ import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import { startStatic } from './servers.mjs';
 import { isModelRequest } from './guards.mjs';
-import { probe, tools, serveBoard, openBoard as openFolder, interact as work, judge, fmt, calibrateInPage, tooLoaded, CALIBRATION_MS } from './budgets.mjs';
+import { probe, tools, serveBoard, openBoard as openFolder, interact as work, judge, fmt, calibrateInPage, tooLoaded, rendererInPage, softwareRaster, CALIBRATION_MS } from './budgets.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -220,7 +220,8 @@ async function main() {
             // The budgets (budgets.mjs; PERF.md), judged on every board — they are
             // the 2,000-mark board's, and the others are read against them.
             res.calibrationMs = await page.evaluate(calibrateInPage);
-            res.loaded = tooLoaded(res.calibrationMs);
+            res.renderer = await page.evaluate(rendererInPage);
+            res.loaded = tooLoaded(res.calibrationMs) || softwareRaster(res.renderer);
             res.budgets = judge({ open: res.open.folder || out, draw: i.draw, panWork: i.panWork, panFit: i.panFit });
             say(`  budgets (${size === 2000 ? 'the 2,000-mark board\'s own' : 'read against the 2,000-mark board\'s'}; calibration ${res.calibrationMs.toFixed(0)} ms against ${CALIBRATION_MS}${res.loaded ? ' — ' + res.loaded : ''}):`);
             for (const b of res.budgets) say(`    ${b.ok ? 'within' : 'OVER  '}  ${b.label}: ${fmt(b.value)} (budget ${b.said ? b.said + ', ' : ''}${fmt(b.max)})`);

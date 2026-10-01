@@ -132,7 +132,10 @@ memory as a published folder) and does two things.
   whole board, each a step with its number against its budget. A machine
   too loaded to measure (a one-minute load past three quarters of the cores)
   or slower than the one the budgets were set on (a fixed calibration run in
-  the page, 1.4× its time there) says so in each step's name and skips it:
+  the page, 1.4× its time there), or one whose page draws with a software
+  renderer (SwiftShader, llvmpipe — WebGL names it; a container's paint is
+  several times slower while its calibration reads as that machine's), says
+  so in each step's name and skips it:
   never a silent pass, never a failure that is the machine's.
 
 The same measuring is `perf.mjs`'s, beside the gate, for any board size and

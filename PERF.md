@@ -607,7 +607,9 @@ table) and `e2e/perf.mjs` for the 5,000 board. The gate records each budget as a
 skips them by name when the machine is too loaded to measure (a one-minute load
 past three quarters of the cores) or runs its calibration 1.4× slower than the
 machine they were set on (`budgets.mjs`, 41 ms here) — once, at load 9.1, it
-did. A frame budget is met when the interval is that many 60 Hz frames within a
+did — or draws with a software renderer (`softwareRaster`: a cloud container's
+SwiftShader read its calibration at 53 ms, inside the slack, and panned the
+whole 2,000-mark board at four frames; 1 Oct 2026). A frame budget is met when the interval is that many 60 Hz frames within a
 millisecond: `requestAnimationFrame` stamps frames on the vsync, and one reads
 16.6–16.8 ms.
 

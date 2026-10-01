@@ -34,7 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { startStatic, startVite } from './servers.mjs';
 import { isModelRequest, allowedError, ALLOWED_PAGE_ERRORS } from './guards.mjs';
 import { runKeep, runBig } from './keep.mjs';
-import { boardOf, serveBoard, openBoard, interact, equivalence, judge, fmt, calibrateInPage, tooLoaded, CALIBRATION_MS } from './budgets.mjs';
+import { boardOf, serveBoard, openBoard, interact, equivalence, judge, fmt, calibrateInPage, tooLoaded, rendererInPage, softwareRaster, CALIBRATION_MS } from './budgets.mjs';
 import { runBoards } from './boards.mjs';
 import { runApp } from './app.mjs';
 import { runPencil } from './pencil.mjs';
@@ -443,7 +443,8 @@ async function runBudgets(browser, servers, engineName) {
       } else {
         const calibration = await page.evaluate(calibrateInPage);
         measured.calibrationMs = +calibration.toFixed(1);
-        const why = tooLoaded(calibration);
+        measured.renderer = await page.evaluate(rendererInPage);
+        const why = tooLoaded(calibration) || softwareRaster(measured.renderer);
         if (why) skipAll(why);
         else {
           const r = await interact(page, { summarize, strokes: 5, size: 2000 });
