@@ -310,6 +310,11 @@ export { followMapOf, placementOf } from './session/nodes';
 // does to each mark a manipulation moves, and what a preview of a drag asks.
 export { manipulableOf, manipulatedReps, manipulationMap, markFrameOf } from './session/manipulate';
 export type { Manipulation } from './session/manipulate';
+export {
+  REGION_HOLDS, regionRepOf, regionMembers, regionCarries, regionsOfBoard, describeRegion, regionSaid, holdsSaid,
+  shareInside, standingBoxOf, thingKindOf,
+} from './session/board-regions';
+export type { RegionRep, RegionBoard, RegionDescription } from './session/board-regions';
 export type { Affine } from './session/affine';
 
 // Words from letters — printed letters gathered into one held mark (words.ts).

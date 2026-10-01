@@ -52,6 +52,7 @@ import {
   standingPointsOf,
   standsClosed,
   followMapOf,
+  regionRepOf,
   LOCAL_PARTICIPANT,
   TIER0_PARTICIPANT,
   type Locality,
@@ -83,6 +84,7 @@ import { reshapePreview, reshapedClean } from './handles';
 import { connectorEnds, followed, followThrough, releasedBy, reshapeDecision } from './follow';
 import { deriveRoute, routable, routeAffectedBy, routeRepOf } from '../diagram/route';
 import { type Manipulation, manipulableOf, manipulatedReps, markFrameOf } from './manipulate';
+import { regionCarries } from './board-regions';
 
 /** A move, scale or turn event as the manipulation it writes. */
 function manipulationOf(ev: Extract<SessionEvent, { type: 'move' | 'scale' | 'rotate' }>): Manipulation {
@@ -188,6 +190,12 @@ export interface SessionState {
    * lasso, a cluster, or a signature.
    */
   explanations: string[];
+  /**
+   * The regions on the board (PLAN-IPAD-NOTES I5), in the order they were made: named rectangles that
+   * hold what stands inside them. Not content and not ink — a node of their own, which a selection may
+   * name and a move carries what it holds with (`board-regions.ts`). An erased region is not listed.
+   */
+  regions: string[];
   /**
    * The mark this hand taught, or null while the built-in check stands. Each
    * hand's own: a mark another hand taught judges only that hand's strokes.
@@ -336,6 +344,14 @@ type SessionEventUnion =
    */
   | { type: 'label'; nodeId: string; text: string; participantId?: string; at: number }
   | { type: 'teach'; mark: CommandMark | null; at: number }
+  /**
+   * A region (PLAN-IPAD-NOTES I5): a named rectangle, at `bounds`, holding whatever stands inside it.
+   * What it holds is derived, never written (`board-regions.ts`); `from` is the rectangle the hand drew
+   * that the region was taken from — kept as ink, never counted as held, carried when the region moves.
+   */
+  | { type: 'region'; name: string; bounds: Bounds; from?: string; at: number; participantId?: string }
+  /** A region renamed. Any hand may rename a region; a node that is no region is untouched. */
+  | { type: 'rename'; nodeId: string; name: string; at: number; participantId?: string }
   /**
    * The board uses a library pack (V1-PLAN §2.3, B3): its definitions are
    * matched here from this event on, attributed to the pack; its notation's
@@ -664,6 +680,13 @@ export interface Session {
   teachCommandMark(mark: CommandMark | null, at: number): void;
   /** Bring a file, or a traced picture, onto the canvas. Returns the artifact's id, or the first stroke's. */
   import(args: { kind: Kind; path: string; name?: string; bounds: Bounds; code?: string; strokes?: Point[][]; asset?: string; mime?: string; w?: number; h?: number; at: number; participantId?: string }): string | null;
+  /**
+   * Make a region at `bounds` (PLAN-IPAD-NOTES I5) — one event. `from` names the drawn rectangle it is taken
+   * from. Returns the region's id, or null (and writes nothing) for no name or a box with no extent.
+   */
+  region(args: { name: string; bounds: Bounds; from?: string; at: number; participantId?: string }): string | null;
+  /** Rename a region — one event. Returns its id, or null (and writes nothing) for a node that is no live region or no name. */
+  renameRegion(args: { nodeId: string; name: string; at: number; participantId?: string }): string | null;
   /** Wire artifacts into a frame, by reference. Returns the frame's id. */
   frame(args: { ids: string[]; name: string; connections: Connection[]; at: number; participantId?: string }): string | null;
   /** Give a definition a behaviour. A human's is blessed by the act; a model's or the fit's is held until a human gives it. */
@@ -942,6 +965,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let clusterCandidates: ClusterCandidate[] = [];
   let participants: string[] = [];
   let explanations: string[] = [];
+  let regions: string[] = [];
   let live: string[] = [];
   let clocks: Record<string, Clock> = {};
   // The library packs this board uses (B3): their names in the order the log
@@ -1039,7 +1063,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
   interface Snapshot {
     nodes: Map<string, MMNode>; contentIds: string[]; artifacts: string[];
-    clusterCandidates: ClusterCandidate[]; participants: string[]; explanations: string[];
+    clusterCandidates: ClusterCandidate[]; participants: string[]; explanations: string[]; regions: string[];
     live: string[]; gestures: Map<string, Gestures>; markHands: Map<string, string>;
     lastAt: number; counter: number; clocks: Record<string, Clock>;
     packs: string[]; library: string[]; packNotices: PackNotice[];
@@ -1107,7 +1131,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return {
       nodes: copied, contentIds: contentIds.slice(), artifacts: artifacts.slice(),
       clusterCandidates: clusterCandidates.slice(), participants: participants.slice(),
-      explanations: explanations.slice(), live: live.slice(), gestures: structuredClone(gestures),
+      explanations: explanations.slice(), regions: regions.slice(), live: live.slice(), gestures: structuredClone(gestures),
       markHands: new Map(markHands), lastAt, counter, clocks: { ...clocks },
       packs: packs.slice(), library: library.slice(), packNotices: packNotices.slice(),
       derived: copyDerived({
@@ -1121,7 +1145,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     for (const [id, n] of s.nodes) nodes.set(id, nodeCopy(n));
     contentIds = s.contentIds.slice(); artifacts = s.artifacts.slice();
     clusterCandidates = s.clusterCandidates.slice(); participants = s.participants.slice();
-    explanations = s.explanations.slice(); live = s.live.slice(); gestures = structuredClone(s.gestures);
+    explanations = s.explanations.slice(); regions = (s.regions ?? []).slice(); live = s.live.slice(); gestures = structuredClone(s.gestures);
     markHands = new Map(s.markHands);
     lastAt = s.lastAt; counter = s.counter; clocks = { ...(s.clocks ?? {}) };
     packs = s.packs.slice(); library = s.library.slice(); packNotices = s.packNotices.slice();
@@ -1277,6 +1301,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     clusterCandidates = [];
     participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
     explanations = [];
+    regions = [];
     live = [];
     clocks = {};
     packs = [];
@@ -2465,6 +2490,16 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     if (!node || node.id.startsWith('type:') || isLibraryNode(node.id)) return;
     if (getRep(node, 'erased')) return;
 
+    // A region is no ink: it leaves the list and every hand's selection, and what it held stays
+    // where it stands, held by nothing (PLAN-IPAD-NOTES I5). Undo brings it back.
+    const ri = regions.indexOf(node.id);
+    if (ri >= 0) {
+      node.reps.push({ modality: 'erased', data: { at }, source: 'user' });
+      regions.splice(ri, 1);
+      for (const g of gestures.values()) g.selection = g.selection.filter((id) => id !== node.id);
+      return;
+    }
+
     // Ink is never destroyed: the node stays in the graph, marked erased.
     node.reps.push({ modality: 'erased', data: { at }, source: 'user' });
     removeFromContent(node.id);
@@ -2594,6 +2629,45 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const pid = ev.participantId ?? LOCAL_PARTICIPANT;
     if (!samePerson(authorOf(node), pid)) return null;
     node.reps.push({ modality: 'label', data: { text: ev.text, at: ev.at }, source: pid });
+    return node.id;
+  }
+
+  /**
+   * A region (PLAN-IPAD-NOTES I5): a node of its own with its box and its name, in no plane but its
+   * own list — not content, so it joins no cluster, no signature, no lasso and no scratch. A box with no
+   * extent, or no name, makes none. `from` is kept only for a live stroke of this board.
+   */
+  function applyRegion(ev: Extract<SessionEvent, { type: 'region' }>): string | null {
+    const name = typeof ev.name === 'string' ? ev.name.trim() : '';
+    const b = ev.bounds;
+    if (!name || !b || ![b.minX, b.minY, b.maxX, b.maxY].every((v) => typeof v === 'number' && Number.isFinite(v)) || b.maxX - b.minX <= 0 || b.maxY - b.minY <= 0) return null;
+    const pid = ev.participantId ?? LOCAL_PARTICIPANT;
+    if (!participants.includes(pid)) return null;
+    const frame = typeof ev.from === 'string' ? nodes.get(ev.from) : undefined;
+    const from = frame && getRep(frame, 'stroke') && !getRep(frame, 'erased') ? frame.id : undefined;
+    const node: MMNode = {
+      id: nextId('region'),
+      reps: [
+        { modality: 'region', data: { name, ...(from ? { from } : {}), at: ev.at }, source: pid },
+        { modality: 'bounds', data: { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY }, source: pid },
+      ],
+      edges: [{ to: pid, rel: 'made-by' }],
+      capability: 0,
+      createdAt: ev.at,
+    };
+    nodes.set(node.id, node);
+    markHands.set(node.id, handOf(ev));
+    regions.push(node.id);
+    return node.id;
+  }
+
+  /** A region's name replaced by a newer rep; the rectangle it was taken from is kept. A node that is no live region is left alone. */
+  function applyRename(ev: Extract<SessionEvent, { type: 'rename' }>): string | null {
+    const node = nodes.get(ev.nodeId);
+    const name = typeof ev.name === 'string' ? ev.name.trim() : '';
+    const rep = node && !getRep(node, 'erased') ? regionRepOf(node) : null;
+    if (!node || !rep || !name) return null;
+    node.reps = [...node.reps, { modality: 'region', data: { name, ...(rep.from ? { from: rep.from } : {}), at: ev.at }, source: ev.participantId ?? LOCAL_PARTICIPANT }];
     return node.id;
   }
 
@@ -3409,7 +3483,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
   /** A hand selects outright: its own selection, never another's (L2h). */
   function applySelect(ev: Extract<SessionEvent, { type: 'select' }>) {
-    gesturesOf(handOf(ev)).selection = ev.ids.filter((id) => inContent.has(id));
+    gesturesOf(handOf(ev)).selection = ev.ids.filter((id) => inContent.has(id) || regions.includes(id));
   }
 
   /**
@@ -3421,7 +3495,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   function applyManipulation(ev: Extract<SessionEvent, { type: 'move' | 'scale' | 'rotate' }>) {
     const moved: string[] = [];
     const m = manipulationOf(ev);
-    for (const n of manipulableOf(nodes, ev.ids)) {
+    for (const n of manipulableOf(nodes, manipulatedIds(ev))) {
       const reps = manipulatedReps(n, m);
       if (!reps) continue;
       n.reps = reps;
@@ -3431,6 +3505,17 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     }
     followFrom(moved);
     recomputeClusterCandidates();
+  }
+
+  /**
+   * The ids a manipulation acts on (PLAN-IPAD-NOTES I5): a region carries what it holds, as it stands
+   * when the event is applied — derived, never written. A turn carries no region (a rotated rectangle is
+   * not a rectangle): the marks named turn, and a region named is left where it is.
+   */
+  function manipulatedIds(ev: Extract<SessionEvent, { type: 'move' | 'scale' | 'rotate' }>): readonly string[] {
+    if (!regions.length || !ev.ids.some((id) => regions.includes(id))) return ev.ids;
+    if (ev.type === 'rotate') return ev.ids.filter((id) => !regions.includes(id));
+    return regionCarries({ nodes, contentIds, regions }, ev.ids);
   }
 
   /** A moved letter moves its word's bounds with it. */
@@ -3955,6 +4040,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         return applyAnswer(ev);
       case 'label':
         return applyLabel(ev);
+      case 'region':
+        return applyRegion(ev);
+      case 'rename':
+        return applyRename(ev);
       case 'teach':
         applyTeach(ev);
         return null;
@@ -4234,7 +4323,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
 
   /** A move, a scale or a turn, and the bound ends it walks off their sites let go first (`releasedBy`) — one act. */
   function manipulate(ev: Extract<SessionEvent, { type: 'move' | 'scale' | 'rotate' }>) {
-    const releases = boundBy.size ? releasedBy(nodes, ev.ids, manipulationOf(ev)) : [];
+    const releases = boundBy.size ? releasedBy(nodes, manipulatedIds(ev), manipulationOf(ev)) : [];
     if (!releases.length) {
       dispatch(ev);
       return;
@@ -4260,6 +4349,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       artifacts: [...artifacts],
       participants: [...participants],
       explanations: [...explanations],
+      regions: [...regions],
       commandMark: reader.commandMark,
       markMiss: reader.markMiss,
       staleResult,
@@ -4312,6 +4402,16 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     correct: (args) => void dispatch({ type: 'correct', ...args }),
     clock: (args) => void dispatch({ type: 'clock', ...args }),
     behave: (args) => void dispatch({ type: 'behave', ...args }),
+    region: (args) => {
+      const b = args.bounds;
+      if (!args.name?.trim() || !b || b.maxX - b.minX <= 0 || b.maxY - b.minY <= 0 || ![b.minX, b.minY, b.maxX, b.maxY].every(Number.isFinite)) return null;
+      return dispatch({ type: 'region', ...args });
+    },
+    renameRegion: (args) => {
+      const n = nodes.get(args.nodeId);
+      if (!n || getRep(n, 'erased') || !regionRepOf(n) || !args.name?.trim()) return null;
+      return dispatch({ type: 'rename', ...args });
+    },
     frame: (args) => dispatch({ type: 'frame', ...args }),
     import: (args) => dispatch({ type: 'import', ...args }),
     matchesOf: (ids) => matchesFor(ids),

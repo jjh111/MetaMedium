@@ -566,3 +566,19 @@ export function isFrame(node: MMNode): boolean {
 export function frameOfNode(node: MMNode): { members: string[]; connections: { from: { id: string; port: string }; to: { id: string; port: string }; reasoning?: string }[] } | undefined {
   return getRep(node, 'frame')?.data as { members: string[]; connections: { from: { id: string; port: string }; to: { id: string; port: string }; reasoning?: string }[] } | undefined;
 }
+
+/**
+ * A region's own rep (PLAN-IPAD-NOTES I5): its name, the drawn rectangle it was taken from, when. The
+ * newest `region` rep is the name (a rename pushes another); its box is the node's `bounds`, moved as
+ * any mark is. Null for a node that is no region.
+ */
+export interface RegionRep { name: string; from?: string; at: number }
+export function regionRepOf(node: MMNode): RegionRep | null {
+  for (let i = node.reps.length - 1; i >= 0; i--) {
+    const r = node.reps[i];
+    if (r.modality !== 'region') continue;
+    const d = r.data as Partial<RegionRep> | null;
+    return d && typeof d.name === 'string' ? { name: d.name, ...(typeof d.from === 'string' ? { from: d.from } : {}), at: typeof d.at === 'number' ? d.at : 0 } : null;
+  }
+  return null;
+}
