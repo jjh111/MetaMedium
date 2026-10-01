@@ -61,6 +61,17 @@
 //   M22  a board only looked at is never written: switching through boards and back leaves a board with
 //        no event, and not one join is added to a board that was not asked on
 //   M23  Reset and an example opened are loads in place too: the model answers on each
+//   M24  (V1-PLAN / PLAN-IPAD-NOTES I8, read my notes) Read these with no model that sees is kept — no pane, no call;
+//        the reader joins and it runs: ONE call, to the reader alone, one image, the sheet of three lines, and
+//        each line's reading lands where it was written (a line of two words one word on each)
+//   M24b the batch is shown while it runs, on the marks, and said when it lands; drawing the lines asked nothing
+//   M24c the reader's row says what the call cost: the lines, the payload in KB, the seconds a line; the payload is small
+//   M25  a line the reply leaves out fails by itself, and says why, in the status line and for the line; the others hold
+//   M26  lines already read are skipped (one line asked); Read these again, typed, asks for all of them — in calls of
+//        at most a sheet's lines
+//   M27  Esc in the middle of a batch stops the rest: the second call is never made, and nothing lands
+//   M28  Read the picture: the picture, downscaled, goes to the reader alone; its text lands as a text artifact BESIDE it,
+//        held as the reader's, named for its source, editable; the picture stays as it was
 
 import { startModelStub, STUB_KEY, REASONING_ONLY, JEV } from './servers.mjs';
 import { isModelRequest } from './guards.mjs';
@@ -113,6 +124,40 @@ function localStandIn() {
     return Promise.reject(new TypeError('Failed to fetch'));
   };
 }
+
+
+/** One cursive word as points: low, wide, open, turning many times — what the shape rung reads as `text`. */
+function wordPoints(x, y, w, h, humps) {
+  const p = []; const n = humps * 14;
+  for (let i = 0; i <= n; i++) { const t = i / n; const a = t * humps * Math.PI; p.push({ x: x + w * t, y: y + h / 2 - (h / 2) * Math.abs(Math.sin(a)) * (0.7 + 0.3 * Math.cos(a * 0.37)) }); }
+  return p;
+}
+
+/**
+ * Write a page of notes straight into the log — each word one stroke, seconds apart so no two are ever gathered as
+ * letters — and return its marks' ids by line. `lines`: one array of [x, y, w, h, humps] words a line.
+ */
+function writePage(arg) {
+  const mm = window.__mm, s = mm.session;
+  const word = (x, y, w, h, humps) => { const pts = []; const n = humps * 14; for (let i = 0; i <= n; i++) { const t = i / n; const a = t * humps * Math.PI; pts.push({ x: x + w * t, y: y + h / 2 - (h / 2) * Math.abs(Math.sin(a)) * (0.7 + 0.3 * Math.cos(a * 0.37)) }); } return pts; };
+  let t = arg.t0;
+  return arg.lines.map((line) => line.map(([x, y, w, h, humps]) => {
+    t += 12000;
+    s.addStroke(word(x, y, w, h, humps), t, undefined, 1);
+    const st = s.getState();
+    return st.contentIds[st.contentIds.length - 1];
+  }));
+}
+
+/** Hold marks the way a tap on a chip does, and wait for the field's pills. */
+async function holdIds(page, ids) {
+  await page.evaluate((list) => window.__mm.session.summonMarks(list, Date.now()), ids);
+  await page.waitForSelector('#summon .pill.item', { timeout: 6000 });
+  await sleep(120);
+}
+
+/** The first transcript a mark holds, or null. */
+const saidOn = (page, id) => page.evaluate((nid) => { const mm = window.__mm, n = mm.session.getState().nodes.get(nid); const t = n && mm.MM.transcriptsOf(n)[0]; return t ? t.text : null; }, id);
 
 /** The page's hand, as the canvas harness has it: strokes dispatched at the canvas. */
 function installDraw() {
@@ -933,6 +978,182 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       check(`M23. Reset (a fresh board, ${fresh ? 'opened' : 'not opened'}) and an example opened (${example ? 'opened' : 'not opened'}) are loads in place: the model answers on each — What is this? on the fresh board (${r.calls.length} call, ${joins} join), a question on the example (${asked.ok ? 'answered' : asked.error}, ${chats().length - before} call, ${joinsEx} join in its log)`,
         !!fresh && r.held && r.took && r.calls.length === 1 && r.got && joins === 1 && !!example && asked.ok && chats().length - before === 1 && joinsEx === 1,
         { fresh, r, joins, example, asked, joinsEx });
+    });
+
+    // =====================================================================================================
+    // Read my notes (PLAN-IPAD-NOTES I8). A clean device, no model at first.
+    // =====================================================================================================
+    const guards6 = await freshContext(browser, { origins: [servers.staticOrigin, stub.origin], label: 'models-notes' });
+    guardsAll.push(guards6);
+    await guards6.context.addInitScript(localStandIn);
+    const p6 = await guards6.context.newPage();
+    await p6.goto(url, { waitUntil: 'load', timeout: 60000 });
+    await waitReady(p6);
+    await p6.evaluate(installDraw);
+    const FIX = JSON.parse((await import('node:fs')).readFileSync(new URL('../metamedium-core/src/llm/fixtures/read-lines.json', import.meta.url), 'utf8'));
+    const PAGE_A = { t0: 100000, lines: [[[560, 140, 200, 44, 7], [800, 140, 170, 44, 6]], [[560, 260, 260, 48, 8]], [[560, 380, 180, 44, 5]]] };
+    let A = null;
+    const readerJoined = () => p6.evaluate(() => window.__mm.agents.length);
+    const lastReader = () => p6.evaluate(() => (window.__mm.lastCalls().find((c) => /glm-4\.5v/.test(c.model)) || {}).line || '');
+
+    await record('M24', async () => {
+      const before = chats().length;
+      A = await p6.evaluate(writePage, PAGE_A);
+      await sleep(200);
+      const drawn = chats().length - before;
+      await holdIds(p6, A.flat());
+      const took = await takePill(p6, 'Read these');
+      await sleep(300);
+      const said = await statusLine(p6);
+      const kept = await p6.evaluate(() => { const k = window.__mm.keptAsk && window.__mm.keptAsk(); return k ? { needs: k.needs, what: k.what } : null; });
+      const pane = await paneOpen(p6);
+      const calls0 = chats().length - before;
+      const joined = await joinCustom(p6, stub.baseUrl, 'z-ai/glm-4.5v', STUB_KEY, false, 'reader');
+      const got = await stubbed(chats, before, 1, 10000);
+      const texts = await until(p6, (ids) => { const mm = window.__mm, s = mm.session.getState(); const one = (id) => { const n = s.nodes.get(id), t = n && mm.MM.transcriptsOf(n)[0]; return t ? t.text : null; }; const out = ids.map(one); return out.every((x) => x) ? out : null; }, [A[0][0], A[0][1], A[1][0], A[2][0]], 10000);
+      check(`M24. Read these with no model that sees is kept — "${said.slice(0, 90)}" — no pane, no call (${calls0}); drawing the lines asked nothing (${drawn} calls); the reader joins (${joined.slice(0, 40)}) and it runs: ONE call, to it alone, one image, a sheet of 3 lines — each line's reading lands where it was written: ${JSON.stringify(texts)}`,
+        drawn === 0 && took && /needs a model that can see/.test(said) && /kept/.test(said) && !!kept && kept.needs === 'sees' && !pane && calls0 === 0 &&
+          got.length === 1 && got[0].model === 'z-ai/glm-4.5v' && got[0].job === 'read-lines' && got[0].image === true && got[0].lines === 3 &&
+          !!texts && texts[0] === 'hello' && texts[1] === 'world' && texts[2] === 'pricing' && texts[3] === 'buy oat milk today',
+        { drawn, took, said, kept, pane, calls0, got, texts });
+      await letGo(p6);
+    });
+
+    await record('M24b', async () => {
+      stub.readDelay(900);
+      const B = await p6.evaluate(writePage, { t0: 400000, lines: [[[560, 480, 200, 44, 7]], [[560, 560, 220, 44, 6]], [[560, 640, 160, 44, 5]]] });
+      await holdIds(p6, B.flat());
+      const before = chats().length;
+      const took = await takePill(p6, 'Read these');
+      await sleep(350);
+      const mid = await p6.evaluate(() => ({ working: window.__mm.working().length, status: (document.getElementById('status').textContent || '').trim() }));
+      const got = await stubbed(chats, before, 1, 8000);
+      const landed = await until(p6, (ids) => { const mm = window.__mm, s = mm.session.getState(); return ids.every((id) => { const n = s.nodes.get(id); return n && mm.MM.transcriptsOf(n).length; }) ? true : null; }, B.flat(), 10000);
+      await sleep(150);
+      const after = await p6.evaluate(() => ({ working: window.__mm.working().length, status: (document.getElementById('status').textContent || '').trim() }));
+      stub.readDelay(0);
+      check(`M24b. while the batch runs it is shown on the marks (${mid.working} working) and said — "${mid.status}" — and when it lands, said again: "${after.status}"; one call (${got.length})`,
+        took && mid.working >= 1 && /reading 3 lines/.test(mid.status) && !!landed && after.working === 0 && /read 3 lines/.test(after.status) && got.length === 1,
+        { took, mid, after, got });
+      check('M24b2. its marks hold the lines B1 B2 B3 at the fixture’s words, in the reader’s name',
+        !!landed && (await saidOn(p6, B[0][0])) === 'hello world', { first: await saidOn(p6, B[0][0]) });
+      await letGo(p6);
+    });
+
+    await record('M24c', async () => {
+      const row = await lastReader();
+      const stats = await p6.evaluate(() => window.__mm.lastReads());
+      const last = stats[stats.length - 1] || {};
+      check(`M24c. the reader's row says what the call cost — "${row}" — and its payload is small: ${last.lines} lines, ${last.bytes} bytes, ${last.ms} ms (${last.perLine} ms a line)`,
+        /^ok · \d+(\.\d)? s · read 3 lines · \d+(\.\d)? KB · \d+(\.\d)? s a line$/.test(row) && last.lines === 3 && last.bytes > 200 && last.bytes < 120000 && last.perLine > 0,
+        { row, last });
+    });
+
+    await record('M25', async () => {
+      stub.readSkip(2);
+      const C = await p6.evaluate(writePage, { t0: 700000, lines: [[[960, 140, 200, 44, 7]], [[960, 220, 220, 44, 6]], [[960, 300, 160, 44, 5]]] });
+      await holdIds(p6, C.flat());
+      const before = chats().length;
+      const took = await takePill(p6, 'Read these');
+      await stubbed(chats, before, 1, 8000);
+      await until(p6, (id) => { const mm = window.__mm, n = mm.session.getState().nodes.get(id); return n && mm.MM.transcriptsOf(n).length ? true : null; }, C[2][0], 8000);
+      await sleep(250);
+      const said = await statusLine(p6);
+      const per = await p6.evaluate(() => window.__mm.lastReads().slice(-1)[0].lines_said);
+      const have = [await saidOn(p6, C[0][0]), await saidOn(p6, C[1][0]), await saidOn(p6, C[2][0])];
+      stub.readSkip(0);
+      check(`M25. a line the reply left out fails by itself and says why — "${said.slice(0, 140)}" — and the others are held: ${JSON.stringify(have)}`,
+        took && have[0] === 'hello world' && have[1] === null && have[2] !== null && /read 2 of 3 lines/.test(said) && /line 2/.test(said) && /no reading came back/.test(said) &&
+          Array.isArray(per) && per.length === 3 && per[1].ok === false && /no reading came back/.test(per[1].error),
+        { took, said, per, have });
+      globalThis.__C = C;
+      await letGo(p6);
+    });
+
+    await record('M26', async () => {
+      const C = globalThis.__C;
+      const every = A.concat(C).flat();
+      await holdIds(p6, every.concat([]));
+      const before = chats().length;
+      const took = await takePill(p6, 'Read these');
+      const got = await stubbed(chats, before, 1, 8000);
+      await sleep(300);
+      const second = await saidOn(p6, C[1][0]);
+      await letGo(p6);
+      // Every line read now: typed, "read these again" asks for all of them — a sheet's lines a call.
+      await holdIds(p6, every);
+      const input = p6.locator('#summon input.filter');
+      await input.fill('read these again');
+      await sleep(150);
+      const line = await p6.evaluate(() => (document.querySelector('#summon .readingLine, #summon .reading') || {}).textContent || '');
+      const b2 = chats().length;
+      await input.press('Enter');
+      const again = await stubbed(chats, b2, 1, 8000);
+      await sleep(900);
+      const calls = chats(b2);
+      check(`M26. with 6 lines held and one unread, Read these asks for ONE line (${got.map((c) => c.lines).join(',')}) and it lands (${second}); typed, "read these again" asks for all 6 lines — ${calls.map((c) => c.lines).join(' + ')} lines in ${calls.length} call(s)`,
+        took && got.length === 1 && got[0].lines === 1 && second === 'hello world' && again.length >= 1 && calls.reduce((n, c) => n + c.lines, 0) === 6 && calls.every((c) => c.lines <= 8),
+        { took, got, second, line, calls });
+      await letGo(p6);
+    });
+
+    await record('M27', async () => {
+      await newBoardVia(p6);
+      await sleep(200);
+      const rows = [];
+      for (let i = 0; i < 10; i++) rows.push([[560, 100 + i * 62, 200, 40, 6]]);
+      const D = await p6.evaluate(writePage, { t0: 1000000, lines: rows });
+      await holdIds(p6, D.flat());
+      stub.readDelay(1200);
+      const before = chats().length;
+      const took = await takePill(p6, 'Read these');
+      await stubbed(chats, before, 1, 8000);
+      await sleep(150);
+      await letGo(p6);
+      await p6.keyboard.press('Escape');
+      await sleep(2200);
+      const calls = chats(before);
+      const landed = (await Promise.all(D.flat().map((id) => saidOn(p6, id)))).filter(Boolean).length;
+      const said = await statusLine(p6);
+      const idle = await p6.evaluate(() => window.__mm.working().length);
+      stub.readDelay(0);
+      check(`M27. 10 lines are two calls; Esc in the middle of the first stops it and the rest — ${calls.length} call made, ${landed} readings landed, nothing working (${idle}) — and the status says so: "${said.slice(0, 100)}"`,
+        took && calls.length === 1 && calls[0].lines === 8 && landed === 0 && idle === 0 && /stopped/.test(said),
+        { took, calls, landed, said, idle });
+    });
+
+    await record('M28', async () => {
+      await newBoardVia(p6);
+      await sleep(200);
+      await p6.evaluate(async () => {
+        const c = document.createElement('canvas'); c.width = 3000; c.height = 2000;
+        const g = c.getContext('2d'); g.fillStyle = '#f4f1ea'; g.fillRect(0, 0, 3000, 2000); g.fillStyle = '#222';
+        for (let i = 0; i < 12; i++) g.fillRect(200, 200 + i * 130, 1200 + (i % 3) * 400, 14);
+        const file = new File([await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.8))], 'notes-page.jpg', { type: 'image/jpeg' });
+        await window.__mm.importPictures([file], { view: { minX: 480, minY: 140, maxX: 1380, maxY: 740 } });
+        await window.__mm.boardIdle();
+      });
+      const pic = await p6.evaluate(() => { const mm = window.__mm, st = mm.session.getState(); const id = st.artifacts.find((a) => mm.MM.pictureOf(st.nodes.get(a))); const b = mm.MM.boundsOf(st.nodes.get(id)); return { id, box: b, asset: mm.MM.pictureOf(st.nodes.get(id)).asset }; });
+      await holdIds(p6, [pic.id]);
+      const before = chats().length;
+      const took = await takePill(p6, 'Read the picture');
+      const got = await stubbed(chats, before, 1, 10000);
+      const text = await until(p6, (pid) => {
+        const mm = window.__mm, st = mm.session.getState();
+        const codeOf = (n) => n.reps.filter((r) => r.modality === 'code').pop();
+        const id = st.artifacts.find((a) => { const n = st.nodes.get(a); const c = n && codeOf(n); return c && c.data.kind === 'text'; });
+        if (!id) return null;
+        const n = st.nodes.get(id), c = codeOf(n), b = mm.MM.boundsOf(n);
+        return { id, code: c.data.code, box: b, name: (mm.MM.wordOf(n) || ''), by: (n.edges.find((e) => e.rel === 'made-by') || {}).to, agent: mm.agents[0].id, codeBy: c.source };
+      }, pic.id, 10000);
+      const after = await p6.evaluate((id) => { const mm = window.__mm, b = mm.MM.boundsOf(mm.session.getState().nodes.get(id)); return b; }, pic.id);
+      const stats = await p6.evaluate(() => window.__mm.lastReads().slice(-1)[0]);
+      check(`M28. Read the picture: one call to the reader alone with one image, downscaled to ${stats && stats.w}×${stats && stats.h} (${stats && stats.bytes} bytes); its text lands as a text artifact beside the picture — right of it, ${text && Math.round(text.box.minX)} ≥ ${Math.round(pic.box.maxX)} — held as the reader's, named "${text && text.name}", the picture untouched`,
+        took && got.length === 1 && got[0].job === 'read-picture' && got[0].model === 'z-ai/glm-4.5v' && got[0].image === true &&
+          !!stats && Math.max(stats.w, stats.h) <= 1568 && stats.bytes < 700000 &&
+          !!text && text.code === FIX.picture.join('\n') && text.box.minX >= pic.box.maxX && text.by === text.agent && text.codeBy === text.agent && /notes-page/.test(text.name) &&
+          JSON.stringify(after) === JSON.stringify(pic.box),
+        { took, got, text, stats, pic, after });
     });
   } catch (err) {
     check(`the scenario threw: ${String(err && err.message ? err.message : err).split('\n')[0]}`, false, { stack: String(err && err.stack) });

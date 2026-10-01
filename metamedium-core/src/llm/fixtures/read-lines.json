@@ -1,0 +1,16 @@
+{
+  "_about": "What the stub's reader says (V1-PLAN / PLAN-IPAD-NOTES I8): `lines` are the texts it gives to the numbered lines of a sheet, in order — line 1 first — each with the confidence it states; `picture` is what it says of a photographed page, one text per line. Invented for the tests: no real call was made to write this file, and the words are nobody's handwriting. Read by the core tests and by the e2e stub (e2e/servers.mjs) alike.",
+  "lines": [
+    { "text": "hello world", "confidence": 0.93 },
+    { "text": "pricing", "confidence": 0.88 },
+    { "text": "buy oat milk today", "confidence": 0.81 },
+    { "text": "call the printer", "confidence": 0.9 },
+    { "text": "draft the launch note", "confidence": 0.86 },
+    { "text": "monday", "confidence": 0.95 },
+    { "text": "tidy the studio", "confidence": 0.84 },
+    { "text": "send the invoice", "confidence": 0.89 },
+    { "text": "book the train", "confidence": 0.87 },
+    { "text": "water the plants", "confidence": 0.91 }
+  ],
+  "picture": ["Monday", "buy oat milk", "call the printer", "draft the launch note"]
+}
