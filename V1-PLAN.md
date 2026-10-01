@@ -2875,6 +2875,41 @@ unchanged. Tests: `interpretations.test.ts` 2, `hand` 25 passed, 5 skipped (was 
 and 6). **Found:** a hand's reading has no chip on the board after the field closes
 (`08-render.js` draws chips for tier 2 only) — a model's stays, the hand's shows
 only in the field and the panel.
+**The iPad (PLAN-IPAD-NOTES.md, 1 Oct 2026).** *I1, a picture is kept and drawn — status, 1 Oct 2026
+(branch `unit/i1-pictures`; red `d32146f`, core `1255145`, surface `0bed21f`, record 24 by design
+`362c1dd`, `c03d1cc`, `6fcc216`):* **a picture's bytes are an asset, the event names it, and the board
+draws it under the ink.** The asset store is `mm-assets` (IndexedDB, keyed by the SHA-256 of the bytes kept,
+`17-assets.js` pure and Node-tested — 13 — and `18-images.js` the adapter); the bytes are committed before the
+`import` event exists, so a killed tab leaves no event naming bytes that were not kept (`keep` P1–P6, a kill
+right after and during an import: 38 records, was 31). The event is `import { kind: jpg | png | webp, asset,
+mime, w, h, name, path, bounds }` with no code and no bytes (core: `kinds/picture.ts`, `session.ts`; a version
+1 log's picture replays as it did, drawing its name). A pick is decoded in a Worker (main thread where the
+browser has no OffscreenCanvas), EXIF-turned, held to a long side of 2,560 and kept as JPEG, WebP where
+clearly smaller, PNG with transparency, one file at a time, laid out in a grid in the view and clear of what is
+already on the board, the line saying *3 of 10 pictures*. A picture is painted on the canvas first, under every
+stroke, culled with the rest of the paint, its decoded bitmap cached by asset (a thumbnail while small, whole
+once large, closed past a budget or when idle). It moves, scales and turns as itself (`manipulableOf`: a picture
+has no ink), survives a reload, a duplicate (the same assets, nothing copied) and the trash, and the assets no
+board uses are collected when the trash is emptied (`collectAssets`). **Tracing is an offer**, *Trace into ink*
+(`tools/trace.ts`, the twenty-second built-in), one undo; a photo is no longer thousands of strokes on arrival.
+Inputs: the import tile opens *photos* (multiple, no capture), *camera* (capture) and *other files*; a paste
+is taken anywhere unless it is meant for a text field. `canvas_look` says *a picture holiday.jpg 2560×1920*
+and that the hand has no pixels. Tests: core `import.test.ts` +8 and `trace.test.ts` 3 (2,479 in core); the
+four tests that pinned the tools' tail moved one place for the new tool; `17-assets.test.mjs` 13; canvas 439
+passed (was 425 − 2 skips: record 24 recorded again by design, **24–24b** now bring the sketch in as a picture
+and take the offer; **69–69k0** added: laid out, drawn (canvas pixels compared), kept once, EXIF and 2,560,
+off screen not drawn, read again from the store, a copy, the trash, collection, a drag, press-and-hold,
+the offer); `boards` 34 (N20–N20c: a real reload, a duplicate, the trash emptied); `keep` 38; `mcp-smoke`
+one check more. **Found for other owners:** (1) a loop drawn round ink on a picture takes the picture too — it
+is content inside the loop — so circling a traced sketch to make a page swept the picture into the page (24b moves
+it aside); whether a loop should skip a picture it only contains is core's and John's call. (2) A member-less
+artifact (a picture, and every imported file card) could not be moved or scaled before this — `manipulableOf`
+took strokes only; pictures are fixed, other imported cards still are not. (3) A folder's own pictures are
+still imported without an asset (they draw their name; `discover`), and a picture in a folder is also written to
+`imports/` as before. (4) `board.svg`, `board.png` and the log do not carry pictures yet (I4). (5) Unverified
+on a real iPad: `createImageBitmap`'s `imageOrientation: 'from-image'` and the resize options, WebP encoding in
+a worker, OffscreenCanvas in a Worker, IndexedDB durability — all have fallbacks; WebKit was not run here.
+(6) `boards` N19d failed once in three full runs and passed in four alone (its list order); not touched.
 **V1** — the review of use: John and the drafter on real work, on John's
 machine; the faults written up as `NOTES-V1-REVIEW.md`. **V2** — its fixes,
 each with its regression. **V3** — the whitepaper's v1 figures (week 1's

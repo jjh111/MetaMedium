@@ -1621,6 +1621,19 @@ window.__scenario = async function(){
         withLone === base69 + 4 && keptWhileTrashed && after.length === base69 + 3 && after.every((a) => listed69.some((l) => l.hash === a.hash)),
         { withLone, keptWhileTrashed, after: after.length });
     }
+    // A picture is held the way any mark is: press and hold on it (no loop, no mark), and the field offers what a picture affords.
+    {
+      mm.session.load([]); mm.setView(1, 0, 0); await wait(60);
+      const solo = await fileOf69('solo.png', 400, 300, solid69(RED));
+      const out = await mm.importPictures([solo], { view: { minX: 500, minY: 200, maxX: 1500, maxY: 800 } });
+      const id = out.ids[0], c0 = centre69(id), p0 = mm.worldToScreen(c0.x, c0.y);
+      const ev = (type, buttons) => cv69.dispatchEvent(new PointerEvent(type, { pointerId: 7, isPrimary: true, bubbles: true, clientX: p0.x, clientY: p0.y, button: 0, buttons }));
+      ev('pointerdown', 1); await wait(700); ev('pointerup', 0); await wait(90);
+      const sm = mm.session.getState().summon;
+      step('69k0. press and hold on a picture holds it — no loop, no mark — and the field offers Trace into ink', !!sm && sm.enclosedIds.length === 1 && sm.enclosedIds[0] === id && !!document.querySelector('#summon .pill[data-key="trace"]'), { held: sm && sm.enclosedIds, trace: !!document.querySelector('#summon .pill[data-key="trace"]') });
+      if (sm) mm.session.dismiss(sm.id, Date.now());
+      mm.session.load([]); await wait(40);
+    }
     // Tracing is an offer, not an import.
     {
       mm.session.load([]); mm.setView(1, 0, 0); await wait(60);
