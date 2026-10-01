@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '03-seats.js'), 'utf8');
 const S = new Function(
-  src + '\n  return { SEATS, SEAT_WORDS, resolveReaders, resolveWriters, fallbackWords, keyId, keysToKeep, migrateStored, orderChoices, seatsOfPick, pickOf };'
+  src + '\n  return { SEATS, SEAT_WORDS, resolveReaders, resolveWriters, fallbackWords, keyId, keysToKeep, migrateStored, orderChoices, seatsOfPick, pickOf, SEMANTIC_SOURCE, SEMANTIC_MAX_BYTES, semanticSourceOf, semanticNameOf, semanticWords, semanticFailed };'
 )();
 
 const m = (id, o = {}) => ({ id, vision: false, seats: [], size: Infinity, claude: false, local: false, ...o });
@@ -148,4 +148,53 @@ test('a pick keeps what the provider said and never a key', () => {
 test('what a join was for is not what is kept of the model', () => {
   const p = S.pickOf({ kind: 'openai-compatible', baseUrl: 'u', model: 'm' }, { provider: 'custom', seat: 'writer', endpoint: undefined });
   assert.deepEqual(p, { provider: 'custom', baseUrl: 'u', model: 'm', kind: 'openai-compatible', vision: false });
+});
+
+// ---- the semantic seat (I9): on this device, a model's address, no key ----
+test('the semantic seat says in words what it does with nobody in it — and no longer that it is coming', () => {
+  assert.doesNotMatch(S.fallbackWords('semantic'), /coming/);
+  assert.match(S.fallbackWords('semantic'), /words typed/);
+  assert.match(S.SEAT_WORDS.semantic.job, /notes like this/);
+});
+
+test('a model is a folder’s address: https, or on this machine — never a key, never another scheme', () => {
+  const d = S.semanticSourceOf('');
+  assert.equal(d.ok, true);
+  assert.equal(d.base, S.SEMANTIC_SOURCE);
+  assert.ok(S.SEMANTIC_SOURCE.startsWith('https://') && S.SEMANTIC_SOURCE.endsWith('/'));
+  assert.equal(S.semanticSourceOf('  https://example.org/m/potion  ').base, 'https://example.org/m/potion/');
+  assert.equal(S.semanticSourceOf('http://127.0.0.1:8123/model').base, 'http://127.0.0.1:8123/model/');
+  assert.equal(S.semanticSourceOf('http://localhost:9/m/').ok, true);
+  for (const bad of ['http://example.org/m', 'ftp://x/y', 'file:///etc/passwd', 'javascript:alert(1)', 'not a url', 'https://user:pw@example.org/m', 'https://example.org/m?token=abc']) {
+    const r = S.semanticSourceOf(bad);
+    assert.equal(r.ok, false, bad);
+    assert.ok(r.why.length > 20, bad);
+  }
+});
+
+test('a model is named for its folder: the last two parts before resolve/main', () => {
+  assert.equal(S.semanticNameOf('https://huggingface.co/minishlab/potion-base-8M/resolve/main/'), 'potion-base-8M');
+  assert.equal(S.semanticNameOf('http://127.0.0.1:8123/model/'), 'model');
+  assert.equal(S.semanticNameOf('https://example.org/'), 'example.org');
+});
+
+test('the seat row says who holds it, where it runs and what it costs — or what is wrong, in words', () => {
+  assert.equal(S.semanticWords(null).who, 'nothing chosen');
+  const held = S.semanticWords({ name: 'potion-base-8M', dimension: 256, words: 29528, bytes: 30 * 1048576 });
+  assert.match(held.who, /potion-base-8M/);
+  assert.match(held.who, /on this device/);
+  assert.match(held.who, /256/);
+  assert.match(held.who, /30 MB/);
+  assert.match(held.who, /no key/);
+  assert.ok(S.SEMANTIC_MAX_BYTES >= 32 * 1048576 && S.SEMANTIC_MAX_BYTES <= 64 * 1048576);
+});
+
+test('a load that fails says why in the person’s words: the host refused, the file is too big, the bytes are not a model', () => {
+  assert.match(S.semanticFailed({ status: 403, what: 'model.safetensors' }), /403/);
+  assert.match(S.semanticFailed({ status: 403, what: 'model.safetensors' }), /model\.safetensors/);
+  assert.match(S.semanticFailed({ status: 404 }), /no such|not found|404/);
+  assert.match(S.semanticFailed({ network: true, what: 'tokenizer.json' }), /reach|network|offline/);
+  assert.match(S.semanticFailed({ bytes: 200 * 1048576 }), /too big|more than/);
+  assert.match(S.semanticFailed({ reason: 'the weights end before the table does' }), /the weights end before/);
+  assert.match(S.semanticFailed({}), /could not/);
 });
