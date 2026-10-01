@@ -25,6 +25,7 @@ import type { Behaviour, Term, Verb } from '../behave/verbs';
 import { VERBS, TARGETED } from '../behave/verbs';
 import { parseBehaviour, describeBehaviour } from '../behave/words';
 import { boundsOf } from '../session/nodes';
+import { READ_LINES_PROMPT, READ_PICTURE_PROMPT, linesBrief, parseLineReadings, parsePictureLines } from './readlines';
 // The tools the canvas ships with, registered on import, so `here()` names them wherever a model is asked.
 import '../tools/builtin';
 import { registeredTools } from '../tools/registry';
@@ -593,6 +594,27 @@ export interface AgentParticipant {
     hold?: boolean;
   }): Promise<ReadResult>;
   /**
+   * Read several lines of handwriting in ONE call (PLAN-IPAD-NOTES I8): `image` is the sheet the surface drew from
+   * `sheetOf` — the lines' own ink, numbered, one height — and the reply is read line by line (`parseLineReadings`).
+   * Each line that came back is held as attributed transcript reps — a line of several marks whose reading has
+   * as many words gets a word on each mark, any other line is held whole on its first mark — and each line says
+   * for itself why it was not (no reading came back for it; its mark was erased while the model thought). Needs
+   * a model that can see; never throws.
+   */
+  readLines(args: {
+    /** A line a mark at a time: the mark the line is held on when it is held whole, and every mark it holds, left to right. */
+    lines: { nodeId: string; ids: string[] }[];
+    /** The sheet as a data URL. */
+    image: string;
+    at: number;
+    signal?: AbortSignal;
+  }): Promise<ReadLinesResult>;
+  /**
+   * Read a photographed page (PLAN-IPAD-NOTES I8): its text as lines. Holds nothing — the surface puts the
+   * text beside the picture as an artifact of its own. Needs a model that can see; never throws.
+   */
+  readPicture(args: { nodeId: string; image: string; at: number; signal?: AbortSignal }): Promise<ReadPictureResult>;
+  /**
    * Ask the model to add marks to the drawing. What it says it would draw, in
    * the shape rung's vocabulary, is drawn through `addStroke` attributed to
    * this participant — read, offered and erasable like any human mark.
@@ -702,6 +724,35 @@ export interface ReadResult {
   ok: boolean;
   /** Every transcript offered, best first. */
   transcripts: TranscriptReading[];
+  error?: string;
+  raw?: string;
+}
+
+/** What one line of a batch came to: read and held, or why not — each line says for itself. */
+export interface ReadLineResult {
+  ok: boolean;
+  /** What the reader said of the line, best first (also when held on the marks). */
+  transcripts: TranscriptReading[];
+  error?: string;
+  /** How it was held: a word on each mark of the line (`each`), or the line whole on its first mark (`first`, the rest read with it). */
+  how?: 'each' | 'first';
+}
+
+export interface ReadLinesResult {
+  /** At least one line was read and held. */
+  ok: boolean;
+  /** One result per line asked, in the order asked. */
+  lines: ReadLineResult[];
+  error?: string;
+  raw?: string;
+}
+
+export interface ReadPictureResult {
+  ok: boolean;
+  /** The text of the page, one text a line. */
+  lines: string[];
+  /** The lines joined by newlines. */
+  text: string;
   error?: string;
   raw?: string;
 }
@@ -1063,6 +1114,67 @@ export function createAgentParticipant(
     return { ok: true, transcripts, raw: result.text };
   }
 
+  async function readLines(args: { lines: { nodeId: string; ids: string[] }[]; image: string; at: number; signal?: AbortSignal }): Promise<ReadLinesResult> {
+    seat(args.at);
+    const n = args.lines.length;
+    const fail = (error: string, raw?: string): ReadLinesResult => ({ ok: false, lines: args.lines.map(() => ({ ok: false, transcripts: [], error })), error, ...(raw ? { raw } : {}) });
+    if (!config.vision) return fail(`${name} cannot see images`);
+    if (!n) return fail('no lines to read');
+    if (!/^data:image\//.test(args.image)) return fail('image must be a data URL');
+    const generation = session.getState().generation;
+
+    const result = await send(
+      config,
+      [
+        { role: 'system', content: READ_LINES_PROMPT },
+        { role: 'user', content: [{ type: 'image', dataUrl: args.image }, { type: 'text', text: linesBrief(args.lines) }] },
+      ],
+      { signal: args.signal }
+    );
+    if (!result.ok) return fail(result.error);
+
+    const per = parseLineReadings(result.text, n);
+    if (per.every((l) => l.length === 0)) return fail('no readable line in reply', result.text);
+
+    const lines = args.lines.map((line, i): ReadLineResult => {
+      const readings = per[i];
+      if (!readings.length) return { ok: false, transcripts: [], error: `no reading came back for line ${i + 1}` };
+      const top = readings[0];
+      const words = top.text.trim().split(/\s+/);
+      const each = line.ids.length > 1 && words.length === line.ids.length;
+      const targets = each
+        ? line.ids.map((nid, j) => ({ nid, reps: [{ modality: 'transcript', data: { text: words[j], line: top.text }, confidence: top.confidence }] }))
+        : [{ nid: line.nodeId, reps: readings.map((t) => ({ modality: 'transcript', data: { text: t.text }, confidence: t.confidence })) }];
+      for (const t of targets) {
+        session.propose({ participantId: id, nodeId: t.nid, edges: [], reps: t.reps, at: args.at, expect: { generation } });
+        const stale = session.getState().staleResult;
+        if (stale) return { ok: false, transcripts: readings, error: stale.detail };
+      }
+      return { ok: true, transcripts: readings, how: each ? 'each' : 'first' };
+    });
+    return { ok: lines.some((l) => l.ok), lines, raw: result.text };
+  }
+
+  async function readPicture(args: { nodeId: string; image: string; at: number; signal?: AbortSignal }): Promise<ReadPictureResult> {
+    seat(args.at);
+    const none = (error: string, raw?: string): ReadPictureResult => ({ ok: false, lines: [], text: '', error, ...(raw ? { raw } : {}) });
+    if (!config.vision) return none(`${name} cannot see images`);
+    if (!session.getState().nodes.get(args.nodeId)) return none('no such node');
+    if (!/^data:image\//.test(args.image)) return none('image must be a data URL');
+    const result = await send(
+      config,
+      [
+        { role: 'system', content: READ_PICTURE_PROMPT },
+        { role: 'user', content: [{ type: 'image', dataUrl: args.image }, { type: 'text', text: 'What does this page say?' }] },
+      ],
+      { signal: args.signal }
+    );
+    if (!result.ok) return none(result.error);
+    const lines = parsePictureLines(result.text);
+    if (!lines.length) return none('no text in the reply', result.text);
+    return { ok: true, lines, text: lines.join('\n'), raw: result.text };
+  }
+
   async function draw(args: { prompt: string; nodeIds?: string[]; at: number; signal?: AbortSignal }): Promise<DrawResult> {
     seat(args.at);
     const prompt = args.prompt.trim();
@@ -1185,5 +1297,5 @@ export function createAgentParticipant(
     return { ok: true, behaviour, via: 'model', unread: reply.unread, raw: result.text };
   }
 
-  return { get id() { return id; }, seat, name, config, interpret, ask, generate, read, draw, behave, program };
+  return { get id() { return id; }, seat, name, config, interpret, ask, generate, read, readLines, readPicture, draw, behave, program };
 }

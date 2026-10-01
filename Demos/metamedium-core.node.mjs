@@ -8209,6 +8209,51 @@ function runOfPeers(scope, axis) {
     reasoning: `${scope.ids.length} comparable marks sitting ${axis === "x" ? "side by side" : "one under another"} (overlap ${band.toFixed(2)}, similarity ${peers.toFixed(2)}) \u2014 ` + (aligned > 0.6 ? "already well lined up" : aligned > 0.25 ? "roughly lined up" : "not lined up yet")
   };
 }
+function writingBands2(words) {
+  const sorted = words.slice().sort((a, b) => a.bounds.minX - b.bounds.minX);
+  const heights = sorted.map((m) => Math.max(1, m.bounds.maxY - m.bounds.minY));
+  const meanH = heights.reduce((a, b) => a + b, 0) / heights.length;
+  const bands2 = [];
+  for (const m of sorted) {
+    const bd = bands2.find((x) => x.some((o) => bandOverlap2(o, m) >= 0.35));
+    if (bd) bd.push(m);
+    else bands2.push([m]);
+  }
+  return { bands: bands2, meanH };
+}
+function bandOverlap2(a, b) {
+  const overlap = Math.min(a.bounds.maxY, b.bounds.maxY) - Math.max(a.bounds.minY, b.bounds.minY);
+  const shorter = Math.max(1, Math.min(a.bounds.maxY - a.bounds.minY, b.bounds.maxY - b.bounds.minY));
+  return overlap / shorter;
+}
+function walkLine(band, meanH) {
+  const line = [band[0]];
+  let bandFit = 1, spacing = 1;
+  for (let i = 1; i < band.length; i++) {
+    const a = line[line.length - 1], b = band[i];
+    const gap = b.bounds.minX - a.bounds.maxX;
+    if (gap > meanH * 2.5) break;
+    bandFit = Math.min(bandFit, Math.min(1, bandOverlap2(a, b)));
+    spacing = Math.min(spacing, 1 - Math.max(0, gap) / (meanH * 2.5));
+    line.push(band[i]);
+  }
+  return { line, band: bandFit, spacing };
+}
+function writingLines(words) {
+  if (!words.length) return [];
+  const { bands: bands2, meanH } = writingBands2(words);
+  const lines = [];
+  for (const b of bands2) {
+    let rest = b;
+    while (rest.length) {
+      const { line } = walkLine(rest, meanH);
+      lines.push(line);
+      rest = rest.slice(line.length);
+    }
+  }
+  const mid11 = (l) => l.reduce((n2, m) => n2 + (m.bounds.minY + m.bounds.maxY) / 2, 0) / l.length;
+  return lines.sort((a, b) => mid11(a) - mid11(b) || a[0].bounds.minX - b[0].bounds.minX);
+}
 var BUILTIN_CONCEPTS = [
   {
     // The first drawn control (ARCHITECTURE-v8 §15): a line with a dot on it
@@ -8342,31 +8387,9 @@ var BUILTIN_CONCEPTS = [
     match(scope) {
       const words = scope.ids.filter((id) => scope.shapes[id] === "text").map((id) => scope.marks.find((m) => m.id === id)).filter((m) => !!m);
       if (words.length < 2) return null;
-      const sorted = words.slice().sort((a, b) => a.bounds.minX - b.bounds.minX);
-      const heights = sorted.map((m) => Math.max(1, m.bounds.maxY - m.bounds.minY));
-      const meanH = heights.reduce((a, b) => a + b, 0) / heights.length;
-      const bandOverlap2 = (a, b) => {
-        const overlap = Math.min(a.bounds.maxY, b.bounds.maxY) - Math.max(a.bounds.minY, b.bounds.minY);
-        const shorter = Math.max(1, Math.min(a.bounds.maxY - a.bounds.minY, b.bounds.maxY - b.bounds.minY));
-        return overlap / shorter;
-      };
-      const bands2 = [];
-      for (const m of sorted) {
-        const bd = bands2.find((x) => x.some((o) => bandOverlap2(o, m) >= 0.35));
-        if (bd) bd.push(m);
-        else bands2.push([m]);
-      }
+      const { bands: bands2, meanH } = writingBands2(words);
       const best = bands2.slice().sort((a, b) => b.length - a.length)[0];
-      const line = [best[0]];
-      let band = 1, spacing = 1;
-      for (let i = 1; i < best.length; i++) {
-        const a = line[line.length - 1], b = best[i];
-        const gap = b.bounds.minX - a.bounds.maxX;
-        if (gap > meanH * 2.5) break;
-        band = Math.min(band, Math.min(1, bandOverlap2(a, b)));
-        spacing = Math.min(spacing, 1 - Math.max(0, gap) / (meanH * 2.5));
-        line.push(b);
-      }
+      const { line, band, spacing } = walkLine(best, meanH);
       if (line.length < 2) return null;
       const confidence = Math.min(0.9, 0.5 + 0.2 * band + 0.1 * spacing + 0.05 * (line.length - 2));
       return {
@@ -26138,6 +26161,7 @@ function unionOf(boxes) {
   if (!boxes.length) return null;
   return boxes.reduce((a, b) => ({ minX: Math.min(a.minX, b.minX), maxX: Math.max(a.maxX, b.maxX), minY: Math.min(a.minY, b.minY), maxY: Math.max(a.maxY, b.maxY) }));
 }
+var isErased = (node) => !node || !!getRep(node, "erased");
 
 // src/tools/text.ts
 var TEXT = {
@@ -26789,15 +26813,239 @@ var CLOCKS = {
   }
 };
 
+// src/participants/readlines.ts
+var LINES_PER_CALL = 8;
+var LINE_PX = 72;
+var ROW_PAD_PX = 12;
+var NUMBER_PX = 56;
+var SHEET_MAX_PX = 1568;
+var SHEET_MIN_PX = 360;
+var SHEET_LINE_WIDTH = 3;
+function runsOf2(nodes, node) {
+  const pts = (n2) => n2 ? strokePointsOf(n2) : void 0;
+  const runs = isWord(node) ? lettersOf(node).map((id) => pts(nodes.get(id))) : [pts(node)];
+  return runs.filter((p) => !!p && p.length > 1);
+}
+function writingLinesIn(state, ids) {
+  const marks = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const id of ids) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const node = state.nodes.get(id);
+    if (!node || isErased(node)) continue;
+    if (!(isWord(node) || isWritingMark(node, state.nodes))) continue;
+    const bounds = boundsOf(node);
+    if (!bounds || !runsOf2(state.nodes, node).length) continue;
+    marks.push({ id, bounds });
+  }
+  return writingLines(marks).map((line) => {
+    const runs = line.flatMap((m) => runsOf2(state.nodes, state.nodes.get(m.id)));
+    const all = runs.flat();
+    return {
+      ids: line.map((m) => m.id),
+      runs,
+      box: {
+        minX: Math.min(...all.map((p) => p.x)),
+        minY: Math.min(...all.map((p) => p.y)),
+        maxX: Math.max(...all.map((p) => p.x)),
+        maxY: Math.max(...all.map((p) => p.y))
+      }
+    };
+  });
+}
+function lineIsRead(line, isRead2) {
+  return line.ids.length > 0 && line.ids.every(isRead2);
+}
+function batchesOf(items, per = LINES_PER_CALL) {
+  const out = [];
+  const n2 = Math.max(1, Math.floor(per));
+  for (let i = 0; i < items.length; i += n2) out.push(items.slice(i, i + n2));
+  return out;
+}
+var round1 = (v) => Math.round(v * 10) / 10;
+function sheetOf(lines) {
+  const rowHeight = LINE_PX + ROW_PAD_PX * 2;
+  const inkMax = SHEET_MAX_PX - NUMBER_PX - ROW_PAD_PX * 2;
+  const rows = lines.map((l, i) => {
+    const w2 = Math.max(1, l.box.maxX - l.box.minX);
+    const h2 = Math.max(l.box.maxY - l.box.minY, w2 / 40, 1);
+    const k = Math.min(LINE_PX / h2, inkMax / w2);
+    const inkW = w2 * k, inkH = h2 * k;
+    const x0 = NUMBER_PX + ROW_PAD_PX, y0 = i * rowHeight + ROW_PAD_PX + (LINE_PX - inkH) / 2;
+    return {
+      n: i + 1,
+      y: i * rowHeight,
+      k,
+      strokes: l.runs.map((run2) => run2.map((p) => ({ x: round1(x0 + (p.x - l.box.minX) * k), y: round1(y0 + (p.y - l.box.minY) * k) }))),
+      label: { x: ROW_PAD_PX, y: i * rowHeight + rowHeight / 2 },
+      w: inkW
+    };
+  });
+  const widest = rows.reduce((m, r) => Math.max(m, r.w), 0);
+  return {
+    width: Math.min(SHEET_MAX_PX, Math.max(SHEET_MIN_PX, Math.ceil(NUMBER_PX + ROW_PAD_PX * 2 + widest))),
+    height: rowHeight * rows.length,
+    rowHeight,
+    lineWidth: SHEET_LINE_WIDTH,
+    rows
+  };
+}
+function linesBrief(lines) {
+  const n2 = lines.length;
+  return `The image is a sheet of ${n2} numbered line${n2 === 1 ? "" : "s"} of handwriting, 1 to ${n2}, top to bottom; each line's number is printed at its left. Transcribe every line.`;
+}
+var READ_LINES_PROMPT = `You are reading handwriting from a shared drawing canvas. The image is a sheet of numbered lines of handwriting, dark ink on a white ground, each line drawn from the human's own strokes at one size; its number is printed at its left, in the margin.
+
+Transcribe every line, in the human's casing and punctuation. Read each line on its own: do not describe the image, do not guess at meaning, do not add words that are not there, and do not merge or split lines. If a line is ambiguous you may give a second object for the same line with a lower confidence.
+
+Reply with ONLY a JSON array, no prose, no code fences, one object a line:
+[{"line":1,"text":"what line 1 says","confidence":0.0-1.0},{"line":2,"text":"what line 2 says","confidence":0.0-1.0}]
+A line you cannot read at all: {"line":3,"text":"","confidence":0}`;
+var READ_PICTURE_PROMPT = `You are reading a photograph or a scan of a page from a shared drawing canvas \u2014 handwriting, print, or both.
+
+Transcribe its text, top to bottom, one text for each line of the page, in the human's casing and punctuation. Leave out anything that is a drawing rather than writing, do not describe the image, do not guess at meaning and do not add words that are not there.
+
+Reply with ONLY a JSON object, no prose, no code fences:
+{"lines":["the first line","the second line"]}`;
+var clamp01 = (v) => {
+  const n2 = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n2) ? Math.max(0, Math.min(1, n2)) : 0.5;
+};
+var unfence = (text) => text.replace(/```(?:json)?/gi, "").trim();
+function jsonIn(text) {
+  for (const [open, close] of [["[", "]"], ["{", "}"]]) {
+    const a = text.indexOf(open), b = text.lastIndexOf(close);
+    if (a === -1 || b < a) continue;
+    try {
+      return JSON.parse(text.slice(a, b + 1));
+    } catch {
+    }
+  }
+  return void 0;
+}
+function parseLineReadings(text, count9) {
+  const out = Array.from({ length: Math.max(0, count9) }, () => []);
+  if (!text || count9 < 1) return out;
+  const clean = unfence(text);
+  const put = (line, t, confidence) => {
+    if (!Number.isInteger(line) || line < 1 || line > count9) return;
+    const said3 = typeof t === "string" ? t.trim() : "";
+    if (said3) out[line - 1].push({ text: said3, confidence: clamp01(confidence) });
+  };
+  const parsed = jsonIn(clean);
+  let items = null;
+  if (Array.isArray(parsed)) items = parsed;
+  else if (parsed && typeof parsed === "object" && Array.isArray(parsed.lines)) items = parsed.lines;
+  if (items) {
+    items.forEach((item, i) => {
+      if (typeof item === "string") {
+        put(i + 1, item, 0.5);
+        return;
+      }
+      if (!item || typeof item !== "object") return;
+      const rec = item;
+      const said3 = typeof rec.text === "string" ? rec.text : typeof rec.label === "string" ? rec.label : "";
+      const given = typeof rec.line === "number" ? rec.line : typeof rec.line === "string" && /^\d+$/.test(rec.line.trim()) ? Number(rec.line) : i + 1;
+      put(given, said3, rec.confidence);
+    });
+  } else {
+    let any = false;
+    for (const raw of clean.split(/\r?\n/)) {
+      const m = /^\s*(\d+)\s*[.):\-]\s*(.+?)\s*$/.exec(raw);
+      if (m) {
+        put(Number(m[1]), m[2].replace(/^["'“]+|["'”]+$/g, ""), 0.5);
+        any = true;
+      }
+    }
+    if (!any && count9 === 1) {
+      const bare = clean.replace(/^["'\s]+|["'\s]+$/g, "");
+      if (bare && bare.length <= 200 && !/\n/.test(bare) && !/^the image|^i (can|cannot|can't)/i.test(bare)) put(1, bare, 0.5);
+    }
+  }
+  return out.map((l) => l.sort((a, b) => b.confidence - a.confidence));
+}
+function parsePictureLines(text) {
+  if (!text) return [];
+  const clean = unfence(text);
+  const parsed = jsonIn(clean);
+  const take = (list5) => list5.map((x) => typeof x === "string" ? x : x && typeof x === "object" && typeof x.text === "string" ? x.text : "").map((x) => x.trim()).filter(Boolean);
+  if (Array.isArray(parsed)) return take(parsed);
+  if (parsed && typeof parsed === "object" && Array.isArray(parsed.lines)) return take(parsed.lines);
+  if (/[[{]/.test(clean)) return [];
+  return clean.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 400);
+}
+
 // src/tools/read.ts
 var READ = {
   id: "read",
   name: "reading the writing",
-  describe: () => "writing, or any ink, handed as one image to a model that can see, and what it says held on the marks",
+  describe: () => "writing, or any ink, handed as one image to a model that can see, and what it says held on the marks; many lines in one batch; a picture\u2019s text set down beside it",
   asks: "model",
   offers(scope) {
     const s = scope.state;
     const sees = scope.host.models.some((m) => m.sees);
+    const needs = sees ? "" : " \u2014 needs a model that can see";
+    if (scope.marks.length === 1 && s.artifacts.includes(scope.marks[0])) {
+      const node = s.nodes.get(scope.marks[0]);
+      const pic = node && pictureOf(node);
+      if (!pic || !pic.asset) return [];
+      return [{
+        key: "read-picture",
+        label: "Read the picture",
+        reason: "the picture, sent to a model that can see, and the text on it set down beside it as a text of its own \u2014 the picture stays" + needs,
+        base: 0.55,
+        tool: "read",
+        asks: "model",
+        verbs: ["read the picture", "read picture", "transcribe", "ocr"],
+        data: { artifact: scope.marks[0], asset: pic.asset, name: pic.name }
+      }];
+    }
+    const out = [];
+    const board = scope.host.writing ? scope.host.writing() : null;
+    if (board && board.lines > 0) {
+      out.push({
+        key: "read-board",
+        label: "Read the board",
+        reason: "every line of writing on the board \u2014 " + board.lines + " line" + (board.lines === 1 ? "" : "s") + (board.unread < board.lines ? ", " + board.unread + " not read yet" : "") + " \u2014 each drawn from its own strokes, in a batch" + needs,
+        base: 0,
+        tool: "read",
+        asks: "model",
+        hidden: true,
+        verbs: ["read the board", "read board", "read all", "read everything"],
+        data: { scope: "board", force: board.unread === 0 }
+      });
+    }
+    const lines = writingLinesIn(s, scope.summon.enclosedIds);
+    if (lines.length >= 2) {
+      const ids = lines.flatMap((l) => l.ids);
+      const unreadLines = lines.filter((l) => !lineIsRead(l, scope.host.isRead));
+      if (unreadLines.length) {
+        out.unshift({
+          key: "read-lines",
+          label: "Read these",
+          reason: lines.length + " lines of writing" + (unreadLines.length < lines.length ? ", " + unreadLines.length + " not read yet" : "") + ", each drawn from its own strokes and read in one batch" + needs,
+          base: 0.52,
+          tool: "read",
+          asks: "model",
+          verbs: ["read", "read these", "read the writing"],
+          data: { ids, force: false }
+        });
+      } else {
+        out.unshift({
+          key: "read-lines",
+          label: "Read these again",
+          reason: "all " + lines.length + " lines are read \u2014 ask the reader again, each drawn from its own strokes" + needs,
+          base: 0,
+          tool: "read",
+          asks: "model",
+          hidden: true,
+          verbs: ["read again", "read these again", "reread"],
+          data: { ids, force: true }
+        });
+      }
+      return out;
+    }
     const unread = scope.summon.enclosedIds.filter((id) => {
       const n2 = s.nodes.get(id);
       return !!n2 && isWritingMark(n2, s.nodes) && !scope.host.isRead(id);
@@ -26817,7 +27065,7 @@ var READ = {
         verbs: ["read"],
         data: { line, single }
       };
-      return [offer];
+      return [...out, offer];
     }
     const ink = scope.marks.filter((id) => {
       const n2 = s.nodes.get(id);
@@ -26826,8 +27074,8 @@ var READ = {
     if (!ink.some((id) => {
       const n2 = s.nodes.get(id);
       return isWord(n2) || !snapReading(n2, s.nodes).ok;
-    })) return [];
-    return [{
+    })) return out;
+    return [...out, {
       key: "read-any",
       label: "Read as writing",
       reason: "the ink as one image, to a model that can see \u2014 for writing the shape rung did not spot" + (sees ? "" : " \u2014 needs a model that can see"),
@@ -26838,7 +27086,7 @@ var READ = {
       data: { line: ink, single: [] }
     }];
   },
-  take: () => ({ host: "read" })
+  take: (offer) => offer.key === "read-lines" || offer.key === "read-board" || offer.key === "read-picture" ? { host: offer.key, detail: offer.data } : { host: "read" }
 };
 
 // src/tools/what.ts
@@ -28104,11 +28352,11 @@ function parseTranscripts(text) {
     const rec = item;
     const t = typeof rec.text === "string" ? rec.text : typeof rec.label === "string" ? rec.label : "";
     if (!t.trim()) continue;
-    out.push({ text: t.trim(), confidence: clamp01(rec.confidence) });
+    out.push({ text: t.trim(), confidence: clamp012(rec.confidence) });
   }
   return out.sort((a, b) => b.confidence - a.confidence);
 }
-function clamp01(v) {
+function clamp012(v) {
   const n2 = typeof v === "number" ? v : Number(v);
   if (!Number.isFinite(n2)) return 0.5;
   return Math.max(0, Math.min(1, n2));
@@ -28134,7 +28382,7 @@ function parseReadings(text) {
     if (!label) continue;
     readings2.push({
       label,
-      confidence: clamp01(rec.confidence),
+      confidence: clamp012(rec.confidence),
       reasoning: typeof rec.reasoning === "string" ? rec.reasoning.trim() : ""
     });
   }
@@ -28572,6 +28820,60 @@ ${brief}`, ids: planned.ids, build: planned.build };
     }
     return { ok: true, transcripts, raw: result2.text };
   }
+  async function readLines(args) {
+    seat(args.at);
+    const n2 = args.lines.length;
+    const fail = (error, raw) => ({ ok: false, lines: args.lines.map(() => ({ ok: false, transcripts: [], error })), error, ...raw ? { raw } : {} });
+    if (!config.vision) return fail(`${name} cannot see images`);
+    if (!n2) return fail("no lines to read");
+    if (!/^data:image\//.test(args.image)) return fail("image must be a data URL");
+    const generation = session.getState().generation;
+    const result2 = await send(
+      config,
+      [
+        { role: "system", content: READ_LINES_PROMPT },
+        { role: "user", content: [{ type: "image", dataUrl: args.image }, { type: "text", text: linesBrief(args.lines) }] }
+      ],
+      { signal: args.signal }
+    );
+    if (!result2.ok) return fail(result2.error);
+    const per = parseLineReadings(result2.text, n2);
+    if (per.every((l) => l.length === 0)) return fail("no readable line in reply", result2.text);
+    const lines = args.lines.map((line, i) => {
+      const readings2 = per[i];
+      if (!readings2.length) return { ok: false, transcripts: [], error: `no reading came back for line ${i + 1}` };
+      const top = readings2[0];
+      const words = top.text.trim().split(/\s+/);
+      const each = line.ids.length > 1 && words.length === line.ids.length;
+      const targets = each ? line.ids.map((nid, j) => ({ nid, reps: [{ modality: "transcript", data: { text: words[j], line: top.text }, confidence: top.confidence }] })) : [{ nid: line.nodeId, reps: readings2.map((t) => ({ modality: "transcript", data: { text: t.text }, confidence: t.confidence })) }];
+      for (const t of targets) {
+        session.propose({ participantId: id, nodeId: t.nid, edges: [], reps: t.reps, at: args.at, expect: { generation } });
+        const stale = session.getState().staleResult;
+        if (stale) return { ok: false, transcripts: readings2, error: stale.detail };
+      }
+      return { ok: true, transcripts: readings2, how: each ? "each" : "first" };
+    });
+    return { ok: lines.some((l) => l.ok), lines, raw: result2.text };
+  }
+  async function readPicture(args) {
+    seat(args.at);
+    const none2 = (error, raw) => ({ ok: false, lines: [], text: "", error, ...raw ? { raw } : {} });
+    if (!config.vision) return none2(`${name} cannot see images`);
+    if (!session.getState().nodes.get(args.nodeId)) return none2("no such node");
+    if (!/^data:image\//.test(args.image)) return none2("image must be a data URL");
+    const result2 = await send(
+      config,
+      [
+        { role: "system", content: READ_PICTURE_PROMPT },
+        { role: "user", content: [{ type: "image", dataUrl: args.image }, { type: "text", text: "What does this page say?" }] }
+      ],
+      { signal: args.signal }
+    );
+    if (!result2.ok) return none2(result2.error);
+    const lines = parsePictureLines(result2.text);
+    if (!lines.length) return none2("no text in the reply", result2.text);
+    return { ok: true, lines, text: lines.join("\n"), raw: result2.text };
+  }
   async function draw(args) {
     seat(args.at);
     const prompt2 = args.prompt.trim();
@@ -28694,7 +28996,7 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
   }
   return { get id() {
     return id;
-  }, seat, name, config, interpret, ask, generate, read: read2, draw, behave, program };
+  }, seat, name, config, interpret, ask, generate, read: read2, readLines, readPicture, draw, behave, program };
 }
 
 // src/participants/bridge.ts
@@ -29036,6 +29338,8 @@ function createSeatParticipant(session, at = 0, options = {}) {
     ask: (question, nodeIds, t, signal) => via({ ask: "ask", about: alive(nodeIds), words: question }, () => agent.ask(question, nodeIds, t, signal)),
     // A line read as one image names every mark in the picture (`about`); one mark names itself.
     read: (args) => via({ ask: "read", about: alive(args.about && args.about.length ? args.about : [args.nodeId]) }, () => agent.read(args)),
+    // A batch of lines read as one sheet names every mark on it, so the hand that answers draws the page's ink.
+    readLines: (args) => via({ ask: "read", about: alive(args.lines.flatMap((l) => l.ids)) }, () => agent.readLines(args)),
     generate: (args) => via({ ask: "build", about: alive([args.artifactId]), words: args.prompt }, () => agent.generate(args)),
     program: (args) => via({ ask: "program", about: alive([args.artifactId]), words: args.prompt }, () => agent.program(args)),
     draw: (args) => via({ ask: "draw", about: alive(args.nodeIds && args.nodeIds.length ? args.nodeIds : everything()), words: args.prompt }, () => agent.draw(args)),
@@ -30073,6 +30377,8 @@ export {
   LIFELINE_OF_BOX,
   LIFELINE_PLUMB,
   LIFELINE_PX,
+  LINES_PER_CALL,
+  LINE_PX,
   LOCAL_PARTICIPANT,
   LOCAL_TIMEOUT_MS,
   LOG_DIR,
@@ -30144,6 +30450,8 @@ export {
   PRESETS,
   RANK_BAND,
   RANK_SPREAD,
+  READ_LINES_PROMPT,
+  READ_PICTURE_PROMPT,
   RECENT_EVENTS_MAX,
   RECENT_MS,
   RECENT_SAME_TOOL,
@@ -30165,6 +30473,7 @@ export {
   SEQUENCE_READER,
   SEQUENCE_TABLE,
   SETTLED_CONFIDENCE,
+  SHEET_MAX_PX,
   SITS_EXACTLY,
   SKIP_DIRS,
   SLIVER,
@@ -30230,6 +30539,7 @@ export {
   attachedNumberIds,
   authorOf,
   baseOn,
+  batchesOf,
   behaviourSource,
   behavioursOf,
   benchCorpus,
@@ -30450,6 +30760,8 @@ export {
   liftOf,
   liftTargets,
   likelihoodOf,
+  lineIsRead,
+  linesBrief,
   listModels,
   listedPacks,
   localityOf,
@@ -30527,8 +30839,10 @@ export {
   parseGraph,
   parseLayout,
   parseLine,
+  parseLineReadings,
   parseModelList,
   parsePackRef,
+  parsePictureLines,
   parseProgram,
   parseQuantity,
   parseReadings,
@@ -30625,6 +30939,7 @@ export {
   shapesSummary,
   sheetEntry,
   sheetLines,
+  sheetOf,
   sheetValue,
   shippedPack,
   shippedPacks,
@@ -30703,5 +31018,7 @@ export {
   writeState,
   writeUmlClass,
   writingLine,
+  writingLines,
+  writingLinesIn,
   zigzagOf
 };

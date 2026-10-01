@@ -651,7 +651,7 @@ export type { StateDiagramRead, StateNodeRead, StateLinkRead, DrawnStateLink } f
 
 
 // Concepts — the meaning-mappings, as a library rather than as code paths.
-export { matchConcepts, BUILTIN_CONCEPTS } from './concepts/concept';
+export { matchConcepts, BUILTIN_CONCEPTS, writingLines } from './concepts/concept';
 export type { Concept, ConceptMatch, ConceptScope, Conversion } from './concepts/concept';
 
 // Parsing — the drawing read as a LAYOUT, and the page built from that reading.
@@ -820,7 +820,9 @@ export type { BenchDrawing, BenchCorpus, BenchMiss, BenchRead, PackBenchOptions,
 // Agent participants — a model joins through the same channel a human uses.
 export { HERE, createAgentParticipant, parseReadings, parseCode, parseFill, parseTranscripts, parseBehaviourReply, parseProgram, readingsToEdges, MAX_READINGS } from './participants/agent';
 export type { BehaveResult, ProgramResult } from './participants/agent';
-export type { AgentParticipant, AgentReading, InterpretResult, AskResult, GenerateResult, ReadResult, TranscriptReading, DrawResult, RegionFill } from './participants/agent';
+export type { AgentParticipant, AgentReading, InterpretResult, AskResult, GenerateResult, ReadResult, ReadLineResult, ReadLinesResult, ReadPictureResult, TranscriptReading, DrawResult, RegionFill } from './participants/agent';
+export { writingLinesIn, lineIsRead, batchesOf, sheetOf, linesBrief, parseLineReadings, parsePictureLines, LINES_PER_CALL, LINE_PX, SHEET_MAX_PX, READ_LINES_PROMPT, READ_PICTURE_PROMPT } from './participants/readlines';
+export type { ReadLine, LinesSheet, LinesSheetRow } from './participants/readlines';
 export { seatOn, heldParticipant } from './participants/seated';
 export type { Seating } from './participants/seated';
 export { describeSession, describeSignature, describeRegions, describeAddressed, describeReading } from './participants/serialize';

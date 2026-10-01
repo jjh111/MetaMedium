@@ -175,7 +175,7 @@ describe('agent.readLines: one call, one picture, every line held where it was w
     expect(system).toMatch(/"line"/);
     const user = sent[0].find((m) => m.role === 'user')!.content as { type: string; dataUrl?: string; text?: string }[];
     expect(user.filter((x) => x.type === 'image')).toHaveLength(1);
-    expect(user.find((x) => x.type === 'text')!.text).toMatch(/3 lines/);
+    expect(user.find((x) => x.type === 'text')!.text).toMatch(/\b3\b.*lines/);
   });
 
   it('holds each line’s reading, attributed: a line of two words as one word on each mark, any other line on its first mark', async () => {
@@ -242,7 +242,9 @@ describe('agent.readPicture: a photographed page, its text as lines', () => {
   it('sends the picture once and returns its lines, holding nothing on the board', async () => {
     const s = createSession();
     const id = s.import({ kind: 'jpg', path: 'imports/page.jpg', name: 'page.jpg', bounds: { minX: 0, minY: 0, maxX: 400, maxY: 300 }, asset: 'sha256:' + 'ab'.repeat(32), mime: 'image/jpeg', w: 1568, h: 1176, at: 1000 })!;
-    const before = s.getEvents().length;
+    // The model's own seat (a join) is the one thing asking writes; it holds nothing of what it read.
+    const written = () => s.getEvents().filter((e) => e.type !== 'join').length;
+    const before = written();
     const { agent, sent } = readerWith(s, seeing, () => JSON.stringify({ lines: READ_LINES.picture }));
     const res = await agent.readPicture({ nodeId: id, image: PNG, at: 2000 });
     expect(res.ok).toBe(true);
@@ -250,7 +252,7 @@ describe('agent.readPicture: a photographed page, its text as lines', () => {
     expect(res.text).toBe(READ_LINES.picture.join('\n'));
     expect(sent).toHaveLength(1);
     expect((sent[0].find((m) => m.role === 'user')!.content as { type: string }[]).filter((x) => x.type === 'image')).toHaveLength(1);
-    expect(s.getEvents().length).toBe(before);
+    expect(written()).toBe(before);
   });
   it('says why when it cannot: no sight, no image, nothing in the reply', async () => {
     const s = createSession();
