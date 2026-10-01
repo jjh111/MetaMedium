@@ -11,11 +11,12 @@
 //   logWrite, logFileNote; a folder whose log is of a newer version is refused before it is opened),
 //   the view per board, browser
 //   storage where there is no IndexedDB, the one import of browser storage's old copy, the lock one
-//   tab holds per board, and what the status line says when a save fails (boardWarning, keepBoardIn).
+//   tab holds per board, what the status line says when a save fails (boardWarning, keepBoardIn), and the one
+//   ask that the browser keep the device's storage (askPersist; PLAN-IPAD-NOTES I3).
 // Uses: core, board (createJournal, openPlan, troubleOf, troubleWords, journalEvents, journalFold,
 //   journalText), boards (the list's pure half), view (fitAll, afterViewChange, clampZoom), teach
 //   (savedMark, restoreMark), artifacts, render, input (say, flash), images (downloadText), controls
-//   (syncTiles), the boards pane (renderBoardsPane), the seat (seatRoomOpened: who is heard in a room).
+//   (syncTiles), the boards pane (renderBoardsPane, roomChanged), the seat (seatRoomOpened: who is heard in a room).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -1360,6 +1361,25 @@
     if (board.restoring) return; // the log being loaded is what the store holds
     if (folder.store) { if (board.journal.state !== 'off') leaveBoard(); return; }
     board.journal.sync(session.getEvents());
+    if (!persistAsked.done) askPersist();
+  }
+  // Kept on the iPad (PLAN-IPAD-NOTES I3). Safari clears a site's storage after seven days without a visit
+  // unless it is installed or the browser agreed to keep it, so once a board holds something the page asks
+  // `navigator.storage.persist()` — once per device (the preference is written before the answer, whatever it
+  // is: the browser decides, and asking again is nagging), never for what is not the device's own board
+  // (`persistPlan`, 17-boards.js: ?fresh=1, a replay, an embed, a room, a folder). The pane's foot says what it
+  // answered (22-boards.js).
+  const persistAsked = { done: false };
+  function askPersist() {
+    let asked = false;
+    try { asked = !!localStorage.getItem(PERSIST_KEY); } catch (err) { asked = true; } // no way to remember it: not to be asked on every stroke
+    const st = typeof navigator !== 'undefined' ? navigator.storage : null;
+    const plan = persistPlan({ supported: !!st && typeof st.persist === 'function', asked: asked, holds: session.getEvents().length > 0, mode: board.mode });
+    if (plan.why === 'empty') return; // asked when there is something to keep
+    persistAsked.done = true;
+    if (!plan.ask) return;
+    try { localStorage.setItem(PERSIST_KEY, String(Date.now())); } catch (err) { /* private mode */ }
+    Promise.resolve().then(() => st.persist()).then(() => { if (typeof roomChanged === 'function') roomChanged(); }, () => { /* the browser said nothing: the pane says so */ });
   }
   /** On the way out — the tab hidden, the page going — anything not yet written goes now, and where the hand left the board. */
   function flushBoard() {

@@ -6,9 +6,10 @@
 //   and the examples (V1-PLAN R5): a few boards made by the engine, each opened as a NEW board of
 //   your own, a copy — the example is never written — and the empty board's panel start (the
 //   starter, one tap; *more examples* opens this pane).
-//   renderBoardsPane (the adapter calls it when the list changes).
+//   renderBoardsPane (the adapter calls it when the list changes), and at its foot how much room this browser
+//   holds and has left and whether it may clear it (PLAN-IPAD-NOTES I3: loadRoom, roomChanged).
 // Uses: ui (pane, chip), controls (tiles.boards, togglePanel/closePanel), boards list (boardRows,
-//   sizeWords, isKept), folder (the boards adapter: boards, board, onBoardHere, switchBoard, newBoard,
+//   sizeWords, storageWords, isKept), folder (the boards adapter: boards, board, onBoardHere, switchBoard, newBoard,
 //   renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash, emptyTrash, boardFromFile,
 //   rereadBoards, boardEntryName, exportLogNow, readLogText), input (flash, say), the
 //   inspector's element (the panel's start), boards list (exampleUrl, exampleRows, exampleName, starterOf).
@@ -39,7 +40,39 @@
       // Another tab may have changed the list, and what its boards hold, since this page read it.
       rereadBoards();
       loadExamples();
+      loadRoom();
     };
+  }
+
+  // ----- The browser's room (PLAN-IPAD-NOTES I3) -------------------------------------------------------
+  // `navigator.storage.estimate()` and `.persisted()`, read when the pane opens and again when the browser has
+  // answered the ask (17-folder.js's askPersist), said at the foot by storageWords (17-boards.js). A browser
+  // with neither says that, and nothing is guessed.
+  const room = { state: 'idle', usage: undefined, quota: undefined, persisted: null };
+  function loadRoom() {
+    const st = typeof navigator !== 'undefined' ? navigator.storage : null;
+    const ask = (f) => { try { return st && typeof st[f] === 'function' ? Promise.resolve(st[f]()).catch(() => undefined) : Promise.resolve(undefined); } catch (err) { return Promise.resolve(undefined); } };
+    room.state = 'loading';
+    return Promise.all([ask('estimate'), ask('persisted')]).then((got) => {
+      const est = got[0] || {};
+      room.usage = typeof est.usage === 'number' ? est.usage : undefined;
+      room.quota = typeof est.quota === 'number' ? est.quota : undefined;
+      room.persisted = typeof got[1] === 'boolean' ? got[1] : null;
+      room.state = 'ready';
+      renderBoardsPane();
+    });
+  }
+  /** The browser answered the ask, or the boards changed under it: read the room again if the pane is showing it. */
+  function roomChanged() {
+    if (boardsPanel && !boardsPanel.hasAttribute('hidden')) loadRoom();
+    else room.state = 'idle';
+  }
+  /** Installed to the Home Screen: iOS's own flag, else the display mode — the one place the page can tell. */
+  function runsInstalled() {
+    try { return navigator.standalone === true || (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches); } catch (err) { return false; }
+  }
+  function roomEl() {
+    return bdEl('p', 'bdStorage hint', room.state === 'ready' ? storageWords({ usage: room.usage, quota: room.quota, persisted: room.persisted, installed: runsInstalled() }) : 'reading how much room this browser keeps…');
   }
 
   /** The list changed (a record landed, another tab spoke): the pane again, if it stands — never under a name being typed. */
@@ -155,6 +188,7 @@
       // With nothing it could take yet (a board open elsewhere), asking again is the next move.
       if (rows.trash.length && (!c || !c.gone.length)) tr.appendChild(bdButton('Empty the trash…', 'bdEmpty', { emptyTrash: '' }, 'says what it will delete, and asks again'));
     }
+    frag.appendChild(roomEl());
     bdList.replaceChildren(frag);
     paintBoardsSaid();
   }
