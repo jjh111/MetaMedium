@@ -41,6 +41,26 @@ describe('the header', () => {
     expect(logHeader({ app: '1.2.3' })).toMatchObject({ format: LOG_FORMAT, version: 1, app: '1.2.3' });
   });
 
+  it('says how many pictures sit beside it when it is told (a board bundle), and nothing when it is not — a reader that does not know the field is unchanged (I4)', () => {
+    const evs = someEvents();
+    const h = JSON.parse(encodeLog(evs, { app: '0.4.0', assets: 3 }).split('\n')[0]);
+    expect(h).toMatchObject({ type: 'format', format: LOG_FORMAT, version: 1, app: '0.4.0', assets: 3 });
+    expect('assets' in JSON.parse(encodeLog(evs).split('\n')[0])).toBe(false);
+    expect('assets' in JSON.parse(encodeLog(evs, { assets: 0 }).split('\n')[0])).toBe(false);
+    // Read back: the count is the header's, the version is still 1, the events are the events.
+    const d = decodeLog(encodeLog(evs, { assets: 3 }));
+    expect(d).toMatchObject({ version: 1, assets: 3, skipped: 0 });
+    expect(d.events).toEqual(evs);
+    expect('assets' in decodeLog(encodeLog(evs))).toBe(false);
+    // Nonsense in the field is no count: read, not trusted.
+    for (const v of ['"many"', '-2', '1.5', 'null']) {
+      const text = `{"type":"format","format":"${LOG_FORMAT}","version":1,"assets":${v}}\n` + bare(evs);
+      expect('assets' in decodeLog(text), v).toBe(false);
+    }
+    // A header with the field is a version 1 file to every reader of 1: appending keeps it.
+    expect(appendToLogText(encodeLog(evs, { assets: 3 }), evs.slice(0, 1)).split('\n')[0]).toContain('"assets":3');
+  });
+
   it('an empty log is still a file with a header; a tail is bare events, so appends concatenate', () => {
     expect(decodeLog(encodeLog([]))).toMatchObject({ events: [], skipped: 0, version: 1 });
     const evs = someEvents();
