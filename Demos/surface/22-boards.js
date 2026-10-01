@@ -156,7 +156,7 @@
     const many = boards.how === 'indexeddb';
     const head = bdJoin(bdEl('div', 'bdHead'), [
       bdButton('New board', 'bdNew', { boardNew: '' }, 'a new, empty board — the one on screen stays as it is'),
-      bdButton('from a file…', 'bdFrom', { boardFile: '' }, 'a board from a log file — one event per line, as export writes it'),
+      bdButton('from a file…', 'bdFrom', { boardFile: '' }, 'a board from a .zip made by export with its pictures, or from a log file — one event per line'),
     ]);
     if (!many) head.querySelectorAll('button').forEach((b) => { b.disabled = true; });
     frag.appendChild(head);
@@ -376,8 +376,9 @@
       const f = bdFile.files && bdFile.files[0];
       if (!f) return;
       paneSay(null);
-      const made = await boardFromFile(f, { said: (v) => paneSay(v) }).catch((err) => { paneSay('could not read “' + f.name + '” — ' + ((err && err.message) || err)); return false; });
+      const notes = [];
+      const made = await boardFromFile(f, { said: (v) => paneSay(v), note: (n) => { notes.push(n); paneSay(n); } }).catch((err) => { paneSay('could not read “' + f.name + '” — ' + ((err && err.message) || err)); return false; });
       bdFile.value = '';
-      if (made) { closePanel(boardsPanel, tiles.boards); flash('“' + made.name + '” — ' + sizeWords(boards.stats.get(made.id)) + ', from ' + f.name); }
+      if (made) { closePanel(boardsPanel, tiles.boards); flash('“' + made.name + '” — ' + sizeWords(boards.stats.get(made.id)) + ', from ' + f.name + (notes.length ? ' · ' + notes.join(' · ') : '')); }
     });
   }

@@ -1737,7 +1737,7 @@ window.__scenario = async function(){
       { btn: !!dlBtn, name: dl && dl.name, size: dl && dl.blob.size, status: (document.getElementById('status').textContent || '').slice(0, 120) });
 
     // The SVG.
-    const sv = mm.exportSvg();
+    const sv = await mm.exportSvg();
     const doc70 = new DOMParser().parseFromString(sv.text, 'image/svg+xml');
     const imgs70 = [...doc70.querySelectorAll('image')];
     const hrefOf = (e) => e.getAttribute('xlink:href') || e.getAttribute('href') || '';
@@ -1794,7 +1794,7 @@ window.__scenario = async function(){
     {
       const held = redPic ? picIds70.find((id) => { const c1 = centre70(id); return Math.abs(c1.x - redPic.x) < 1 && Math.abs(c1.y - redPic.y) < 1; }) : null;
       mm.session.select([held], Date.now()); await wait(60);
-      const hs = mm.exportSvg(), hp = await mm.exportPng();
+      const hs = await mm.exportSvg(), hp = await mm.exportPng();
       const hb = await bitmapOf70(hp.blob);
       const hc = centre70(held);
       step('70c3. with one picture held, board.svg holds that picture alone (one image, no ink, no figure) and board.png is of its place — red there — and each says it is of what is held',

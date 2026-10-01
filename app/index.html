@@ -124,9 +124,13 @@
 </div>
 <div id="exportPanel" hidden>
   <div class="exRow">
-    <button data-export="svg" title="Every mark as a path, the clean form where one is held">board.svg</button>
-    <button data-export="png" title="The canvas as pixels, as it is on screen">board.png</button>
-    <button data-export="log" title="The whole board as a log: a header line, then one event per line">canvas.jsonl</button>
+    <button data-export="bundle" title="The whole board and its pictures in one .zip — boards ▸ from a file… opens it whole, pictures and all">board + pictures</button>
+  </div>
+  <div class="exRow">
+    <button data-export="svg" title="The held marks, or the board: ink as paths, pictures, SVG figures and writing drawn in under it">board.svg</button>
+    <button data-export="png" title="The held marks, or the whole board, drawn as a picture with its pictures and figures — not the screen as it is">board.png</button>
+    <button data-export="pdf" title="The held marks, or the whole board, on one page of Letter or A4">board.pdf</button>
+    <button data-export="log" title="The whole board as a log: a header line, then one event per line — its pictures are not in it">canvas.jsonl</button>
   </div>
   <div class="exRow" id="exMermaid" hidden>
     <button data-export="mermaid" title="The board as Mermaid text">flowchart.mmd</button>
@@ -136,7 +140,7 @@
 <div id="boardsPanel" hidden>
   <div class="bdList"></div>
   <div id="boardsStatus" class="hint" aria-live="polite"></div>
-  <input id="boardsFile" type="file" accept=".jsonl,.ndjson,.json,.txt,application/json" hidden>
+  <input id="boardsFile" type="file" accept=".zip,.jsonl,.ndjson,.json,.txt,application/zip,application/x-zip-compressed,application/json" hidden>
 </div>
 <div id="packsPanel" hidden>
   <p class="hint">A board says which packs it uses. Using one is an event in its log — undo takes it back — and what it ships is matched here as if you had taught it.</p>

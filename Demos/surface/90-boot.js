@@ -133,6 +133,12 @@
     pickSaid: () => pickSaid.slice(), traceFrom: traceFrom,
   });
 
+  // The board out and back whole (PLAN-IPAD-NOTES I4), for tests: each export as the pane makes it, the last file handed to the browser, a bundle read, a file opened as a board, pictures dropped from the store.
+  Object.assign(window.__mm, {
+    exportBundle: exportBundle, exportSvg: exportSvg, exportPng: exportPng, exportPdf: exportPdf, lastDownload: () => lastDownload, bundleProbe: bundleProbe,
+    boardFromFile: boardFromFile, dropAssets: assetDrop,
+  });
+
   // Mermaid (V1-PLAN D2, D3), for tests: the library a frame loads (a stand-in, or the CDN's again), what a frame said of itself, what Draw it drew.
   Object.assign(window.__mm, {
     mermaidFrom: mermaidFrom,

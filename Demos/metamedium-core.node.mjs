@@ -18980,6 +18980,7 @@ var LOG_VERSION = 1;
 function logHeader(opts = {}) {
   const h2 = { type: "format", format: LOG_FORMAT, version: LOG_VERSION };
   if (opts.app) h2.app = opts.app;
+  if (typeof opts.assets === "number" && Number.isInteger(opts.assets) && opts.assets > 0) h2.assets = opts.assets;
   return h2;
 }
 var LogFormatError = class extends Error {
@@ -19009,6 +19010,7 @@ function decodeLog(text, opts = {}) {
   let skipped = 0;
   let version2 = 0;
   let app;
+  let assets;
   let seen = false;
   for (const line of text.split("\n")) {
     const l = line.trim();
@@ -19029,12 +19031,16 @@ function decodeLog(text, opts = {}) {
         version2 = n2;
         app = theirApp;
         seen = true;
+        if (typeof v.assets === "number" && Number.isInteger(v.assets) && v.assets > 0) assets = v.assets;
       }
       continue;
     }
     events.push(v);
   }
-  return app === void 0 ? { events, skipped, version: version2 } : { events, skipped, version: version2, app };
+  const out = { events, skipped, version: version2 };
+  if (app !== void 0) out.app = app;
+  if (assets !== void 0) out.assets = assets;
+  return out;
 }
 function appendToLogText(existing, events, opts = {}) {
   if (!existing.trim()) return encodeLog(events, opts);

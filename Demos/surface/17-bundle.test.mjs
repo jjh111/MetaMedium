@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 
 const NAMES = [
   'crc32', 'isZipBytes', 'zipWrite', 'zipRead', 'assetEntryName', 'bundleName', 'bundleBuild', 'bundleRead',
-  'base64Of', 'svgDataUrl', 'boardSvg', 'pngPlan', 'paperOf', 'pdfPlan', 'pdfWrite',
+  'base64Of', 'svgDataUrl', 'pictureDataUrl', 'boardFrame', 'boardSvg', 'pngPlan', 'paperOf', 'pdfPlan', 'pdfWrite',
   'BUNDLE_LOG', 'PNG_MAX_SIDE', 'PNG_MAX_PIXELS',
 ];
 const file = join(dirname(fileURLToPath(import.meta.url)), '17-bundle.js');
@@ -289,6 +289,12 @@ test('the board as an SVG carries its pictures as <image> at their bounds, a fig
   assert.ok(!/<script|<circle|"quoted" </.test(svg));
   // The ink keeps its names, as it always did.
   assert.match(svg, /<path data-node="stroke:1" data-reads="circle" d="M0 0 L10 10"/);
+});
+
+test('the frame of a board is its marks and a margin of twenty, in whole units — the one place the svg, the png and the pdf agree on where the board is', () => {
+  assert.deepEqual(B.boardFrame(box(0, 0, 520, 400)), { x: -20, y: -20, w: 560, h: 440 });
+  assert.deepEqual(B.boardFrame(box(10.4, 20.6, 110.2, 90.2)), { x: -10, y: 1, w: 140, h: 110 });
+  assert.equal(B.pictureDataUrl('image/png', new Uint8Array([1, 2, 3])), 'data:image/png;base64,AQID');
 });
 
 test('with no pictures asked for the file leaves them out and keeps the rest (what a PNG draws over the pictures it draws itself)', () => {

@@ -253,6 +253,12 @@
   function svgEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function svgNum(v) { return String(+Number(v).toFixed(2)); }
 
+  /** The frame a board's picture is made in: the content's bounds and a margin, in whole world units — the SVG's viewBox, the PNG's ground, the PDF's picture. */
+  function boardFrame(box) {
+    const pad = 20;
+    const v = [box.minX - pad, box.minY - pad, box.maxX - box.minX + pad * 2, box.maxY - box.minY + pad * 2].map((n) => Math.round(n));
+    return { x: v[0], y: v[1], w: Math.max(1, v[2]), h: Math.max(1, v[3]) };
+  }
   /**
    * The board as an SVG: `layers` in board order — `{ kind: 'picture', id, name, box, turn?, href }` (`href` a
    * data URL, or null for a picture this device does not hold, which stands as its name in a dashed plate),
@@ -266,8 +272,8 @@
   function boardSvg(layers, box, o) {
     const opt = o || {};
     if (!layers.length || !box) return '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>';
-    const pad = 20;
-    const vb = [box.minX - pad, box.minY - pad, box.maxX - box.minX + pad * 2, box.maxY - box.minY + pad * 2].map((v) => Math.round(v));
+    const fr = boardFrame(box);
+    const vb = [fr.x, fr.y, fr.w, fr.h];
     const ink = opt.ink || BOARD_INK;
     let out = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="' + vb[2] + '" height="' + vb[3] + '" viewBox="' + vb.join(' ') + '">\n';
     if (opt.ground) out += '  <rect x="' + vb[0] + '" y="' + vb[1] + '" width="' + vb[2] + '" height="' + vb[3] + '" fill="' + svgEsc(opt.ground) + '"/>\n';
