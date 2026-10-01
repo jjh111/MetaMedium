@@ -229,6 +229,71 @@ function runOfPeers(scope: ConceptScope, axis: 'x' | 'y') {
   };
 }
 
+// ===== Lines of writing =====
+//
+// Words and cursive marks gather by nearness into a line (SURFACE-v10-PLAN D3), and the one home of how is
+// here: the `writing` concept reads the fullest line of a scope, and reading a page of notes (I8,
+// `participants/readlines.ts`) reads every line of it — the same bands, the same gap.
+
+/** A mark's word-band: the marks of a scope that share a vertical extent, left to right, and the mean height of the words. */
+export function writingBands(words: Mark[]): { bands: Mark[][]; meanH: number } {
+  const sorted = words.slice().sort((a, b) => a.bounds.minX - b.bounds.minX);
+  const heights = sorted.map((m) => Math.max(1, m.bounds.maxY - m.bounds.minY));
+  const meanH = heights.reduce((a, b) => a + b, 0) / heights.length;
+  // Bands first: a word joins the band of a word it shares a vertical extent with.
+  const bands: Mark[][] = [];
+  for (const m of sorted) {
+    const bd = bands.find((x) => x.some((o) => bandOverlap(o, m) >= 0.35));
+    if (bd) bd.push(m); else bands.push([m]);
+  }
+  return { bands, meanH };
+}
+
+function bandOverlap(a: Mark, b: Mark): number {
+  const overlap = Math.min(a.bounds.maxY, b.bounds.maxY) - Math.max(a.bounds.minY, b.bounds.minY);
+  const shorter = Math.max(1, Math.min(a.bounds.maxY - a.bounds.minY, b.bounds.maxY - b.bounds.minY));
+  return overlap / shorter;
+}
+
+/**
+ * A band walked left to right: each word must sit within a couple of x-heights of the one before it — the gap a
+ * hand leaves between words, never the gap that starts a column. The line is the words up to the first gap
+ * that is too wide; `band` and `spacing` are how well it holds together (1 is perfectly).
+ */
+function walkLine(band: Mark[], meanH: number): { line: Mark[]; band: number; spacing: number } {
+  const line = [band[0]];
+  let bandFit = 1, spacing = 1;
+  for (let i = 1; i < band.length; i++) {
+    const a = line[line.length - 1], b = band[i];
+    const gap = b.bounds.minX - a.bounds.maxX;
+    if (gap > meanH * 2.5) break;
+    bandFit = Math.min(bandFit, Math.min(1, bandOverlap(a, b)));
+    spacing = Math.min(spacing, 1 - Math.max(0, gap) / (meanH * 2.5));
+    line.push(band[i]);
+  }
+  return { line, band: bandFit, spacing };
+}
+
+/**
+ * Every line of writing among some marks, in reading order: top to bottom, each line's words left to right. A
+ * band is cut into lines wherever a gap is wider than a hand leaves between words, and a word alone is a
+ * line of one. The marks are the caller's to choose (writing, never boxes): this reads only where they stand.
+ */
+export function writingLines(words: Mark[]): Mark[][] {
+  if (!words.length) return [];
+  const { bands, meanH } = writingBands(words);
+  const lines: Mark[][] = [];
+  for (const b of bands) {
+    let rest = b;
+    while (rest.length) {
+      const { line } = walkLine(rest, meanH);
+      lines.push(line);
+      rest = rest.slice(line.length);
+    }
+  }
+  const mid = (l: Mark[]) => l.reduce((n, m) => n + (m.bounds.minY + m.bounds.maxY) / 2, 0) / l.length;
+  return lines.sort((a, b) => mid(a) - mid(b) || a[0].bounds.minX - b[0].bounds.minX);
+}
 
 // ===== The library =====
 
@@ -358,34 +423,9 @@ export const BUILTIN_CONCEPTS: Concept[] = [
         .map((id) => scope.marks.find((m) => m.id === id))
         .filter((m): m is Mark => !!m);
       if (words.length < 2) return null;
-      const sorted = words.slice().sort((a, b) => a.bounds.minX - b.bounds.minX);
-      const heights = sorted.map((m) => Math.max(1, m.bounds.maxY - m.bounds.minY));
-      const meanH = heights.reduce((a, b) => a + b, 0) / heights.length;
-      // Bands first: a word joins the band of a word it shares a vertical
-      // extent with. The fullest band is the line; walked left to right, each
-      // word must sit within a couple of x-heights of the one before it — the
-      // gap a hand leaves between words, never the gap that starts a column.
-      const bandOverlap = (a: Mark, b: Mark) => {
-        const overlap = Math.min(a.bounds.maxY, b.bounds.maxY) - Math.max(a.bounds.minY, b.bounds.minY);
-        const shorter = Math.max(1, Math.min(a.bounds.maxY - a.bounds.minY, b.bounds.maxY - b.bounds.minY));
-        return overlap / shorter;
-      };
-      const bands: Mark[][] = [];
-      for (const m of sorted) {
-        const bd = bands.find((x) => x.some((o) => bandOverlap(o, m) >= 0.35));
-        if (bd) bd.push(m); else bands.push([m]);
-      }
+      const { bands, meanH } = writingBands(words);
       const best = bands.slice().sort((a, b) => b.length - a.length)[0];
-      const line = [best[0]];
-      let band = 1, spacing = 1;
-      for (let i = 1; i < best.length; i++) {
-        const a = line[line.length - 1], b = best[i];
-        const gap = b.bounds.minX - a.bounds.maxX;
-        if (gap > meanH * 2.5) break;
-        band = Math.min(band, Math.min(1, bandOverlap(a, b)));
-        spacing = Math.min(spacing, 1 - Math.max(0, gap) / (meanH * 2.5));
-        line.push(b);
-      }
+      const { line, band, spacing } = walkLine(best, meanH);
       if (line.length < 2) return null;
       const confidence = Math.min(0.9, 0.5 + 0.2 * band + 0.1 * spacing + 0.05 * (line.length - 2));
       return {

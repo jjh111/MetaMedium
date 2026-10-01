@@ -505,6 +505,8 @@ export function createSeatParticipant(session: Session, at: number = 0, options:
     // A line read as one image names every mark in the picture (`about`); one mark names itself.
     read: (args: Parameters<AgentParticipant['read']>[0] & { about?: string[] }) =>
       via({ ask: 'read', about: alive(args.about && args.about.length ? args.about : [args.nodeId]) }, () => agent.read(args)),
+    // A batch of lines read as one sheet names every mark on it, so the hand that answers draws the page's ink.
+    readLines: (args) => via({ ask: 'read', about: alive(args.lines.flatMap((l) => l.ids)) }, () => agent.readLines(args)),
     generate: (args) => via({ ask: 'build', about: alive([args.artifactId]), words: args.prompt }, () => agent.generate(args)),
     program: (args) => via({ ask: 'program', about: alive([args.artifactId]), words: args.prompt }, () => agent.program(args)),
     draw: (args) => via({ ask: 'draw', about: alive(args.nodeIds && args.nodeIds.length ? args.nodeIds : everything()), words: args.prompt }, () => agent.draw(args)),

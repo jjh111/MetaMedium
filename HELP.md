@@ -61,6 +61,19 @@ flowchart, a class diagram and a pattern page wait too.
   tap **Erase**. Twice only says *one more pass erases it*.
 - **Write**: write words in your hand. Hold them and press Enter to have a
   model read them; then make them text, a name, or a label.
+- **Read my notes**: circle several lines of handwriting and double-tap inside
+  the loop (or draw your check across it), then press Enter or choose **Read these** —
+  every line is drawn cleanly from your own strokes onto one numbered sheet and
+  sent to your reader in one go, a sheet of up to eight lines at a time. The
+  status line says how far it is (*reading lines 1–8 of 12*), the marks show a
+  dot where the reader is working, and **Esc stops the rest**. Each line's words
+  land beside your ink, never over it, and the panel says what each line said —
+  or why one was not read. Lines already read are left alone; type **read these
+  again** to read them again, or **read the board** (with anything held) to read
+  every line on the board. Hold a **picture** of a page and choose **Read the
+  picture**: its text stands beside it as a text of its own, which you can edit.
+  (Claude Code at the desk reads your handwriting this way, but cannot yet see a
+  picture — choose a model that can.)
 - **Bring in pictures**: **controls › Board › import** has *photos* (pick
   several at once from your library or your files — SVGs too), *camera* (one
   shot of a page or a whiteboard) and *other files*. You can also drop pictures

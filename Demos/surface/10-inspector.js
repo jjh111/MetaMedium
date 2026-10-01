@@ -528,6 +528,8 @@
           '<div class="why">' + esc('because ' + lead.because.join('; ')) + '</div>';
       }
     }
+    // What each line of handwriting said, when several are held (I8): the reader's words per line, or why a line was not read.
+    top += linesPanel(sum.enclosedIds);
     if (mathsSays) top += mathsSays.top;
     if (reading.roles && reading.roles.length) {
       html += '<div class="sep"></div><div class="eyebrow">roles</div>';

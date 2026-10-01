@@ -250,6 +250,16 @@ spike beside it: TrOCR in the browser on the real iPad, measured — speed,
 memory, and its reading of John's hand against the reader seat's — before it
 becomes a fallback.
 
+*Status, 1 Oct 2026: I8 built on `unit/i8-read` (`V1-PLAN.md` §9, *The iPad*, has the unit's line).*
+*Read these*: every line of the marks held, each drawn from its own strokes on ONE numbered sheet at one
+line height (a single image with numbered lines, not an image a line — a small vision model reads one
+picture better than several), asked of the reader seat in batches of eight lines, progress on the marks,
+Esc stops, lines read skipped unless asked again, each line held where it was written or failing by itself
+with its reason; *Read the board* typed; *Read the picture* puts a held picture's text beside it as the
+reader's own text artifact. The batch's cost is in the reader's row (lines, KB, seconds a line). The TrOCR
+spike is `?spike=trocr` and **unrun** (the container cannot reach the CDN). Open: which vision model is the
+reader default on OpenRouter; Claude Code's seat cannot read a picture until the room carries pixels (A1).
+
 **I9 — notes like this.** Model2Vec embeddings of each region's words (typed,
 labelled, read), derived and cached, never in the log; *notes like this* in the
 field and in search. Lazy, under 32 MB.

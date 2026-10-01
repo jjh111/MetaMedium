@@ -3005,6 +3005,32 @@ the code (core was red first). (2) A rectangle round a flowchart's box with a th
 three things and is offered *Make it a region* (ranked low); `REGION_MIN_HELD` is the knob. (3) A region cannot be
 resized without scaling what it holds. (4) `fitAll` fits the content, not the regions; a board of only an empty region
 fits to nothing.
+*I8, read my notes — status, 1 Oct 2026 (branch `unit/i8-read`; red `26c8953`, core `60c5e8f`, surface `44848bb`, seat and the board `HEAD`):*
+**every line of the marks held is read in one batch, and a picture's text lands beside it.** Core:
+`concepts/concept.ts` exports `writingLines` (the `writing` concept's own bands and gap, the concept reading
+the fullest line and a page of notes every line, top to bottom); `participants/readlines.ts` is the pure part —
+`writingLinesIn`, `sheetOf` (one numbered sheet, one line height, one stroke width, pressure ignored, capped at
+`SHEET_MAX_PX`), `batchesOf` (`LINES_PER_CALL`), the contracts and `parseLineReadings` / `parsePictureLines`;
+`agent.readLines` and `agent.readPicture` (the seat wraps the first: one brief naming every mark); the read tool
+gains *Read these*, *Read the board* (typed; `ToolHost.writing`) and *Read the picture* — no new tool, so the
+describe and trace goldens stand. Surface: `06-handwriting.js` `readLines` / `readBatches` (a sheet's lines a
+call, one call after another, dots and label per call, Esc, lines read skipped, kept for a reader that sees),
+`readPictureFrom` (1,568 px JPEG, a text artifact beside the picture in the reader's name), `linesPanel`
+(10-inspector, one line), `readScopeHooks` for I5's regions; `lastReads()` keeps each call's lines, bytes and
+ms. **Chose one image with numbered lines over one image a line** (a small vision model reads one picture
+better than several; one round trip; the number is the reply's key). **Latency:** a sheet of 3 lines is about
+12 KB and the reader's row says *read 3 lines · 12 KB · 0.0 s a line* against the stub — a real model's number is
+John's to read. The TrOCR spike is `Demos/spike-trocr.html` behind `?spike=trocr`, **unrun here** (the CDN
+answers 403). Tests: core `readlines.test.ts` 24, `tools/readlines.test.ts` 7 (2,539 in core before the seat
+case); e2e `models` 47 (was 19; M24–M28 plus M26b: kept and run on join, shown and said, the cost in the row, a
+line the reply left out, skipped and again, the board, Esc mid-batch, the picture). **Found for other owners:**
+(1) Claude Code's seat cannot read a picture — the log carries no pixels, so `canvas_pending` draws nothing for
+it; A1's asset relay is the way, and until then `pictureReaders` leaves the seat out. (2) `mcp.mjs`'s `read`
+reply check validates a batch reply with the single-mark parser (it accepts any array with `text`, so it passes,
+but says nothing of a missing line) — A1's file. (3) `describeTools`' *twenty-one built-ins* wording in
+CLAUDE.md predates I1's and is not recounted here. (4) The W2 rule makes held unread writing ONE reading,
+*writing*; a hand sees *Read these* only in the field's tooltip and the status line, not as a pill, unless
+non-writing marks are held with it.
 **V1** — the review of use: John and the drafter on real work, on John's
 machine; the faults written up as `NOTES-V1-REVIEW.md`. **V2** — its fixes,
 each with its regression. **V3** — the whitepaper's v1 figures (week 1's

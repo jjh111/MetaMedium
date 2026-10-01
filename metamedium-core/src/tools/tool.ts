@@ -53,6 +53,12 @@ export interface ToolHost {
   decider?: { name: string } | null;
   /** Whether a mark's writing has been read — a transcript held, or read with its line (runtime). */
   isRead(id: string): boolean;
+  /**
+   * The lines of handwriting on the whole board and how many of them nobody has read (PLAN-IPAD-NOTES I8), kept
+   * by the host while the log stands — so *Read the board* is offered only where there is writing to read. A
+   * host that does not say has no such offer.
+   */
+  writing?(): { lines: number; unread: number };
   /** Whether a text made from writing is flipped over to show its ink (runtime). */
   isFlipped(id: string): boolean;
   /** How the host says a participant: `you` for this hand. */
