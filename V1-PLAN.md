@@ -2897,6 +2897,8 @@ per board is marks · KB of the journal only — I1's pictures live in `mm-asset
 adding to it; HELP.md's *Import a photo / Take a photo* wording is I1's inputs, to be matched
 to their final labels.
 
+*I6, find and thumbnails — status, 1 Oct 2026 (branch `unit/i6-search`; red `5557e83` and `d5d9a5e`, core `fb2db0a`, surface `a3f8059`):* a word is looked for on every board this browser keeps. Core `src/search/` (17 tests: words folded and cut, what a board says, a query ranked across boards with a `semantic` hook for I9, `registerSearchSource` for regions, `stalePlan`, `thumbFit`); the surface keeps the index and a 240×160 picture of each board in IndexedDB `mm-find` (`17-find.js`: the board on screen indexed a moment after its last change, a board left drawn from the live state, every other stale board replayed in a scratch session); `26-find.js` is the pane (find in the bar, `/`, ⌘K, ⌘F; hits grouped by board with the words in context; a tap opens the board in place at the hit, ringed, writing nothing); `22-boards.js` shows the pictures. e2e boards N23–N23i (boards 51 records, was 40); gate on Chromium: canvas 439+2, keep 38, boards 51, app 18, pencil 18, models 38, seat 12, hand 25+5 — budgets, shard, demo, demo2 not re-run after the last change (machine shared). *For other owners:* regions (I5) register a search source; I9 passes `semantic`; `mcp.mjs` can call `MM.searchBoards` (a `canvas_find` is its owner's).
+
 ### Phase 7 — review and release
 **H1** — week 1's U7 (the `hand` gate scenario) plus `QA-v1.md`, a hand
 checklist for A1–A10 with the MCP hand in the room checking each step.

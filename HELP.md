@@ -169,6 +169,18 @@ board is kept in this browser as you draw — its pictures too; **export** write
 or its log — and, when what you hold or the board reads as a diagram, as Mermaid
 text — and **folder** makes a folder on your computer the canvas.
 
+## Find
+
+**find** in the bar — or **/** , or **⌘K** / **Ctrl+K** — looks for a word on **every
+board you keep here**, as you type: the labels on your marks, the names of what you
+made, typed text, the words in a figure, Mermaid text, picture names, and what was
+read from your writing. A board is listed with what it says, each hit as the words
+in context (*“Pricing” — label on a box*); the first few words you type are enough
+(*pric* finds *Pricing*). A tap on one opens that board and takes you to the place,
+ringed for a moment — looking never changes a board. **↑ ↓** choose and **Enter**
+opens. It works with no network, and a board in the trash is not searched. In the
+**boards** pane each board shows a small picture of itself, made when you leave it.
+
 ## Packs
 
 **controls › Helpers › packs** lists premade drawings a board can use.
@@ -234,6 +246,7 @@ board and is kept with it.
 - **↑ ↓ ← →** — choose a pill in the field
 - **+ / −** — zoom in / out
 - **⌘0 / Ctrl+0** — fit everything on screen
+- **/ , ⌘K / Ctrl+K** — find a word on any board
 - **Space + drag, or scroll** — pan
 - **pinch, or ⌘ / Ctrl + scroll** — zoom
 
