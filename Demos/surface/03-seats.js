@@ -125,6 +125,7 @@
   function pickOf(config, extra) {
     const out = { baseUrl: config.baseUrl, model: config.model, kind: config.kind, vision: !!config.vision };
     if (config.title) out.title = config.title;
-    if (extra) for (const k of Object.keys(extra)) if (extra[k] !== undefined && k !== 'apiKey') out[k] = extra[k];
+    // `seat` is what a join was for, not what is kept of the model; a key is never kept.
+    if (extra) for (const k of Object.keys(extra)) if (extra[k] !== undefined && k !== 'apiKey' && k !== 'seat') out[k] = extra[k];
     return out;
   }

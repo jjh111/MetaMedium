@@ -177,6 +177,7 @@
   let keptAsk = null; // { what, needs: 'model'|'sees', need, sentence, ids, summonId, generation, run(ids) }
   /** What a tool's ask needs that no joined model gives — "needs a model that can see" — or null. */
   function needFor(tool) {
+    if (tool === 'which') return null; // offered only with a decider seated: it is the one asked
     if (tool === 'read') return readers().length ? null : 'needs a model that can see';
     return writers().length ? null : 'needs a model';
   }
@@ -511,7 +512,9 @@
     // What it can do is the provider's to say (J5): its list, read once a page; the id's guess only when the list cannot be read.
     (seat === 'decider' ? joinDecider(config, meta) : joinHosted(config, meta)).then((agent) => {
       if (!agent) return;
+      // A key typed is kept as the hand asked; one already held is kept now if *remember* is ticked this time.
       if (typed) commitKey(config.baseUrl, mpRememberKey.checked);
+      else if (key && mpRememberKey.checked && !rememberedKeys.has(keyId(config.baseUrl))) commitKey(config.baseUrl, true);
       mpKey.value = '';
       // The seat was for this join; the next starts as any job again, so a seat is never taken by a model joined for another reason.
       const f = document.getElementById('mpFor'); if (f) { f.value = 'any'; syncProviderFields(); }

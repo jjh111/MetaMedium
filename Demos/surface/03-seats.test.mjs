@@ -144,3 +144,8 @@ test('a pick keeps what the provider said and never a key', () => {
   assert.deepEqual(p, { provider: 'openRouter', baseUrl: 'u', model: 'm', kind: 'openai-compatible', vision: true, title: 'T' });
   assert.ok(!JSON.stringify(p).includes('SECRET'));
 });
+
+test('what a join was for is not what is kept of the model', () => {
+  const p = S.pickOf({ kind: 'openai-compatible', baseUrl: 'u', model: 'm' }, { provider: 'custom', seat: 'writer', endpoint: undefined });
+  assert.deepEqual(p, { provider: 'custom', baseUrl: 'u', model: 'm', kind: 'openai-compatible', vision: false });
+});

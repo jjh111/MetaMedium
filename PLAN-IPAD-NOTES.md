@@ -201,6 +201,14 @@ engine's top two definitions are within a margin — the answer one more held,
 attributed row, taken only at 0.99 and never evicting the engine's. The models
 scenario drives each seat against the stub.
 
+*Status, 1 Oct 2026: built on `unit/i7-seats` (`V1-PLAN.md` §9, Phase 5, has the
+unit's line).* Four seats in the pane (reader, writer, decider, *semantic* as a
+row that says it is coming — *parser* has no job yet); one key a provider, typed
+once; a seat chosen narrows who is asked and one left alone changes nothing;
+the decider is `llm/decide-openrouter.ts` over a chat completion with *Which is
+it?* as its first job, asked only by that tap. Open: the exact ids John wants
+per seat, and whether `typesafe/jev-1.13` is what OpenRouter lists.
+
 **I8 — read my notes.** *Read this region* / *Read the board*: every line of
 handwriting rendered from its own strokes and sent to the reader seat in a
 batch, with progress on the marks and Esc to stop; transcripts held, searchable
