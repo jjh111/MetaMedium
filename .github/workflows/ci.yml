@@ -61,6 +61,9 @@ jobs:
       # above. Like the field's test, it finds what it imports relative to itself.
       - name: The relay, on its own
         run: node --test ../Demos/relay.test.mjs
+      # The PNG the MCP hand reads and draws under the ink (PLAN-IPAD-NOTES A1): every filter, colour type and depth.
+      - name: The PNG reader under the ink
+        run: node --test ../Demos/ink-png.test.mjs
       # The same kind of fragment (V1-PLAN R3): the journal the board this
       # browser keeps is written through, driven by a store held in memory.
       - name: The board's journal, on its own
