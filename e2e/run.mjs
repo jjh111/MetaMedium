@@ -34,7 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { startStatic, startVite } from './servers.mjs';
 import { isModelRequest, allowedError, ALLOWED_PAGE_ERRORS } from './guards.mjs';
 import { runKeep, runBig } from './keep.mjs';
-import { boardOf, serveBoard, openBoard, interact, equivalence, judge, fmt, calibrateInPage, tooLoaded, rendererInPage, softwareRaster, CALIBRATION_MS } from './budgets.mjs';
+import { boardOf, serveBoard, openBoard, interact, equivalence, judge, fmt, calibrateInPage, tooLoaded, rendererInPage, softwareRaster, CALIBRATION_MS, countCanvasCalls, pictureFacts, PAINT_STROKE_CALLS_MAX } from './budgets.mjs';
 import { runBoards } from './boards.mjs';
 import { runApp } from './app.mjs';
 import { runPencil } from './pencil.mjs';
@@ -496,6 +496,42 @@ async function runBudgets(browser, servers, engineName) {
           if (why) check(`${label} — skipped: ${why}`, true, { why, drawnMs: opened.out.drawnMs, calibrationMs: +calibration.toFixed(1) });
           else check(`${label}: ${fmt(opened.out.drawnMs)} ${opened.out.drawnMs <= max ? '≤' : '>'} ${fmt(max)} (${OPEN_MS_PER_MARK} ms a mark)`, opened.out.drawnMs <= max,
             { drawnMs: opened.out.drawnMs, max, longestTaskMs: opened.out.longestTaskMs, marks: made.marks, calibrationMs: +calibration.toFixed(1) });
+        }
+        page = null;
+        await guards.context.close();
+      }
+    }
+    // 4. P1 (V1-PLAN; PERF.md "After P1"): a board of pictures traced into ink is painted as a few paths, not one a
+    //    stroke. A fact about what a paint hands the canvas, never a time — so it runs on any machine, a loaded one
+    //    and a software renderer too, where the pan's own frame is skipped by name above. Before it a paint of
+    //    this board made two `stroke()` calls a mark and a pan frame in this container's Chromium took 117 ms.
+    {
+      const { importedBoard } = await import('../metamedium-core/bench/board.mjs');
+      const label = 'P1. a board of 2 pictures of 1,000 traced strokes beside a figure';
+      if (engineName !== 'chromium') check(`${label} — skipped: the paint's calls are counted in Chromium`, true, { why: 'counted in Chromium' });
+      else {
+        const made = importedBoard(core, { pictures: 2, strokesEach: 1000, svgs: 1 });
+        const board = { marks: made.marks, events: made.events.length, json: JSON.stringify(made.events), jsonl: core.encodeLog(made.events) };
+        const guards = await freshContext(browser, { origins: [servers.staticOrigin], label: 'budgets-p1' });
+        guardsList.push(guards);
+        await serveBoard(guards.context, servers.staticOrigin, board);
+        await guards.context.addInitScript(countCanvasCalls);
+        const opened = await openBoard(guards.context, servers.staticOrigin, { capMs: 5 * 60000 });
+        page = opened.page;
+        if (!page) check(`${label}: the board did not open`, false, opened.out);
+        else {
+          const f = await page.evaluate(pictureFacts);
+          measured.pictureFacts = f;
+          check(`${label}: the board holds its ${made.marks} traced strokes`, f.strokes === made.marks, { strokes: f.strokes, expected: made.marks });
+          for (const [where, c] of [['zoomed out to the whole board', f.fit], ['after a pan', f.fitPanned], ['at zoom 1', f.work]]) {
+            check(`P1. a paint of it ${where} makes ${c.stroke} stroke() calls, at most ${PAINT_STROKE_CALLS_MAX} and not one a stroke (the same ink stroked a mark at a time makes ${f.unbatchedCalls ? f.unbatchedCalls.stroke : '—'})`,
+              c.stroke <= PAINT_STROKE_CALLS_MAX && c.stroke > 0, { calls: c, strokes: f.strokes, unbatched: f.unbatchedCalls });
+          }
+          check(`P1. the ink is never covered: every pixel of the ink's own colour a mark-by-mark paint puts down is ink in the batched one (${f.pixels ? f.pixels.single : '—'} pixels; ${f.pixels ? f.pixels.lost : '—'} lost, the batched paint has ${f.pixels ? f.pixels.batched : '—'})`,
+            !!f.pixels && f.pixels.lost === 0 && f.pixels.single > 1000 && f.pixels.batched >= f.pixels.single, { hook: f.hook, pixels: f.pixels });
+          // What is drawn is what the whole-board read would draw (R4c's check), on this board too.
+          const pc = await page.evaluate(() => { window.__mm.fitAll(); const id = window.__mm.session.getState().contentIds[0]; window.__mm.inspect(id); const r = window.__mm.paintCheck(); window.__mm.inspect(null); return { ok: r.ok, diffs: r.diffs.slice(0, 3), ink: r.ink, minimap: r.minimap }; });
+          check(`P1. a hand's paint of the board of pictures draws what the whole-board read draws (${pc.ink.drawn} ink ops of ${pc.ink.of}, the minimap ${pc.minimap.drawn} of ${pc.minimap.of})`, pc.ok && pc.minimap.drawn === pc.minimap.of, pc);
         }
         page = null;
         await guards.context.close();

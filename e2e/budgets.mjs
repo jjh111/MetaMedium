@@ -266,6 +266,78 @@ export function tools() {
   return true;
 }
 
+/**
+ * Runs before the page's own scripts (V1-PLAN P1): counts what a paint hands the canvas — a board
+ * of five thousand traced strokes used to hand it ten thousand `stroke()` calls, and the browser's
+ * rasterising of them, not the paint's JavaScript, was the frame. Read with
+ * `window.__canvasCalls.reset()` / `.take()`.
+ */
+export function countCanvasCalls() {
+  const proto = CanvasRenderingContext2D.prototype;
+  const counts = { stroke: 0, fill: 0, beginPath: 0, drawImage: 0 };
+  for (const k of Object.keys(counts)) {
+    const real = proto[k];
+    proto[k] = function (...args) { counts[k]++; return real.apply(this, args); };
+  }
+  window.__canvasCalls = { counts, reset() { for (const k of Object.keys(counts)) counts[k] = 0; }, take() { return Object.assign({}, counts); } };
+}
+
+/**
+ * P1's structural budget: ink of one colour and width is stroked as a few paths, not one a mark, so a
+ * paint of a board of traced pictures hands the canvas a handful of `stroke()` calls whatever the
+ * board's size. A fact about what the paint does, not a time: it holds on any machine. (After P1 a
+ * paint of 2,000 or 5,000 traced strokes makes two, with the pictures and the figure's plate; the
+ * allowance is for the chrome a paint may add, and it is nothing like the thousands before.)
+ */
+export const PAINT_STROKE_CALLS_MAX = 16;
+
+/**
+ * Runs in the page, on a board of traced pictures with `countCanvasCalls` installed: the `stroke()` calls
+ * one paint makes zoomed out to the whole board and at zoom 1, after a pan, and what the ink looks
+ * like batched against drawn mark by mark — every pixel of the ink's own colour that the mark-by-mark
+ * paint puts down is ink in the batched one too (ink is never covered; a batch lays every halo
+ * before every ink, so what a later mark's halo dimmed is not dimmed).
+ */
+export async function pictureFacts() {
+  const mm = window.__mm, canvas = document.getElementById('canvas');
+  const raf = () => new Promise((r) => requestAnimationFrame(r));
+  const paint = () => { const v = mm.view; window.__canvasCalls.reset(); mm.setView(v.zoom, v.panX, v.panY); return window.__canvasCalls.take(); };
+  const out = { strokes: 0, hook: typeof mm.setInkBatching === 'function' };
+  for (const node of mm.session.getState().nodes.values()) if (node.reps.some((r) => r.modality === 'stroke')) out.strokes++;
+  mm.fitAll(); await raf(); await raf();
+  out.fit = paint();
+  mm.setView(mm.view.zoom, mm.view.panX - 37, mm.view.panY - 11); await raf();
+  out.fitPanned = paint();
+  const s = mm.session.getState(), MM = mm.MM;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const id of s.contentIds) { const b = MM.boundsOf(s.nodes.get(id)); if (b) { minX = Math.min(minX, b.minX); minY = Math.min(minY, b.minY); maxX = Math.max(maxX, b.maxX); maxY = Math.max(maxY, b.maxY); } }
+  mm.setView(1, 720 - (minX + maxX) / 2, 450 - (minY + maxY) / 2); await raf();
+  out.work = paint();
+  if (!out.hook) return out;
+  // Pixels: the ink's own colour, mark by mark and batched, at the view that stands.
+  const inkMark = s.contentIds.find((id) => MM.strokePointsOf(s.nodes.get(id)));
+  const probe = document.createElement('canvas').getContext('2d');
+  probe.fillStyle = mm.inkDrawn(inkMark); probe.fillRect(0, 0, 1, 1);
+  const want = Array.from(probe.getImageData(0, 0, 1, 1).data);
+  const inkPixels = () => {
+    const d = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    const set = new Uint8Array(canvas.width * canvas.height);
+    let n = 0;
+    for (let i = 0, p = 0; i < d.length; i += 4, p++) if (d[i] === want[0] && d[i + 1] === want[1] && d[i + 2] === want[2] && d[i + 3] === 255) { set[p] = 1; n++; }
+    return { set, n };
+  };
+  mm.fitAll(); await raf(); await raf();
+  mm.setInkBatching(false); mm.setView(mm.view.zoom, mm.view.panX, mm.view.panY);
+  const single = inkPixels();
+  out.unbatchedCalls = (() => { const v = mm.view; window.__canvasCalls.reset(); mm.setView(v.zoom, v.panX, v.panY); return window.__canvasCalls.take(); })();
+  mm.setInkBatching(true); mm.setView(mm.view.zoom, mm.view.panX, mm.view.panY);
+  const batched = inkPixels();
+  let lost = 0;
+  for (let i = 0; i < single.set.length; i++) if (single.set[i] && !batched.set[i]) lost++;
+  out.pixels = { single: single.n, batched: batched.n, lost };
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // In Node: a board served, opened, and worked.
 // ---------------------------------------------------------------------------
