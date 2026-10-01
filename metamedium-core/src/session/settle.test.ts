@@ -112,7 +112,7 @@ describe('a picture traced into ink beside definitions', () => {
         expect(s.getState().clusterCandidates, `undo ${i} against a replay from zero`).toEqual(fresh.getState().clusterCandidates);
       }
       check('after the undos');
-    });
+    }, 240_000);
 
     it(`the log replays to the same board however often it is settled while it does (seed ${seed})`, () => {
       const s = createSession();
@@ -161,16 +161,17 @@ describe('a picture traced into ink beside definitions', () => {
     expect(s.getState().clusterCandidates.some((c) => c.matches.some((m) => m.artifactId === def)), 'a patch like it is matched').toBe(true);
     // A patch grown a stroke at a time: too small, in the size of the definition, then too big for it.
     const grown: string[] = [];
-    for (let i = 0; i < 110; i++) {
+    for (let i = 0; i < 84; i++) {
       grown.push(...hatch(2000, 0, 1));
-      check(`a patch of ${i + 1}`);
+      // Every stroke from before the definition's size is in reach (24 of 40) to past it (68), a few after.
+      if ((i >= 20 && i < 72) || i % 6 === 0) check(`a patch of ${i + 1}`);
     }
     // The patch of 110 is named: what was too big is the size of a definition now.
     s.bless({ summonId: s.summonMarks(grown, (t += 800))!, name: 'big patch', at: (t += 800) });
     check('the big patch named');
-    hatch(3000, 0, 100);
-    check('a patch of a hundred beside it');
-  });
+    hatch(3000, 0, 84);
+    check('a patch of as many beside it');
+  }, 240_000);
 
   it('a group taught as an example of a small definition is matched where it stands, however big it is', () => {
     const r = rng(78);

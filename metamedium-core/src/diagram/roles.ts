@@ -58,28 +58,74 @@ const WRITING = new Set(['text', 'dot']);
 const isClosed = (s: RoleScope, id: string) => CLOSED.has(s.shapes[id] ?? '');
 const isConnector = (s: RoleScope, id: string) => CONNECTOR.has(s.shapes[id] ?? '');
 const isWriting = (s: RoleScope, id: string) => WRITING.has(s.shapes[id] ?? '');
-const inScope = (s: RoleScope, id: string) => s.ids.includes(id);
+/**
+ * What the table asks of a scope, found once for it (V1-PLAN I2): which ids are
+ * in it, and each mark's relations out and in, in the order `relations` lists
+ * them, and the connectors whose ends are each mark. The rows used to filter
+ * the whole list of relations, and test membership in the list of ids, for
+ * every mark — O(n²) in the scope, seconds for the thousand strokes of a
+ * picture traced into ink. The answers are the same lists, in the same order.
+ */
+interface ScopeIndex {
+  ids: Set<string>;
+  out: Map<string, Relation[]>;
+  inn: Map<string, Relation[]>;
+  /** Every mark that is an end of any wire. */
+  ended: Set<string>;
+  /** For each mark, the connectors with an end on it, in `wires`' order. */
+  wiredTo: Map<string, string[]>;
+}
+
+const indexes = new WeakMap<RoleScope, ScopeIndex>();
+
+function indexOf(s: RoleScope): ScopeIndex {
+  let x = indexes.get(s);
+  if (x) return x;
+  x = { ids: new Set(s.ids), out: new Map(), inn: new Map(), ended: new Set(), wiredTo: new Map() };
+  for (const r of s.relations) {
+    const o = x.out.get(r.from);
+    if (o) o.push(r);
+    else x.out.set(r.from, [r]);
+    const i = x.inn.get(r.to);
+    if (i) i.push(r);
+    else x.inn.set(r.to, [r]);
+  }
+  for (const [w, v] of Object.entries(s.wires)) {
+    for (const e of v.ends) {
+      x.ended.add(e);
+      const list = x.wiredTo.get(e);
+      if (!list) x.wiredTo.set(e, [w]);
+      else if (list[list.length - 1] !== w) list.push(w);
+    }
+  }
+  indexes.set(s, x);
+  return x;
+}
+
+const inScope = (s: RoleScope, id: string) => indexOf(s).ids.has(id);
+
+/** What `kind` relations leave `id`, to marks in the scope, strongest first. */
+function strongest(s: RoleScope, id: string, kind: Relation['kind']): Relation[] {
+  const x = indexOf(s);
+  return (x.out.get(id) ?? [])
+    .filter((r) => r.kind === kind && x.ids.has(r.to))
+    .sort((a, b) => b.strength - a.strength);
+}
 
 /** Marks this one wholly encloses, strongest first. */
 function contents(s: RoleScope, id: string): Relation[] {
-  return s.relations
-    .filter((r) => r.kind === 'contains' && r.from === id && inScope(s, r.to))
-    .sort((a, b) => b.strength - a.strength);
+  return strongest(s, id, 'contains');
 }
 
 /** The smallest mark that wholly encloses this one. */
 function enclosingMark(s: RoleScope, id: string): Relation | undefined {
   // `inside` is emitted for every ancestor; the strongest is the tightest fit.
-  return s.relations
-    .filter((r) => r.kind === 'inside' && r.from === id && inScope(s, r.to))
-    .sort((a, b) => b.strength - a.strength)[0];
+  return strongest(s, id, 'inside')[0];
 }
 
 /** The nearest mark, by the `near` relation, when there is one. */
 function nearestMark(s: RoleScope, id: string): Relation | undefined {
-  return s.relations
-    .filter((r) => r.kind === 'near' && r.from === id && inScope(s, r.to))
-    .sort((a, b) => b.strength - a.strength)[0];
+  return strongest(s, id, 'near')[0];
 }
 
 /**
@@ -90,14 +136,11 @@ function nearestMark(s: RoleScope, id: string): Relation | undefined {
 const ENGAGING = new Set<Relation['kind']>(['near', 'touching', 'crossing', 'contains', 'inside']);
 
 function relatesToAnything(s: RoleScope, id: string): boolean {
-  if (
-    s.relations.some(
-      (r) => ENGAGING.has(r.kind) && ((r.from === id && inScope(s, r.to)) || (r.to === id && inScope(s, r.from)))
-    )
-  )
-    return true;
-  if (s.wires[id]?.ends.some((e) => inScope(s, e))) return true;
-  return Object.values(s.wires).some((w) => w.ends.includes(id));
+  const x = indexOf(s);
+  if ((x.out.get(id) ?? []).some((r) => ENGAGING.has(r.kind) && x.ids.has(r.to))) return true;
+  if ((x.inn.get(id) ?? []).some((r) => ENGAGING.has(r.kind) && x.ids.has(r.from))) return true;
+  if (s.wires[id]?.ends.some((e) => x.ids.has(e))) return true;
+  return x.ended.has(id);
 }
 
 /**
@@ -180,7 +223,7 @@ function place(s: RoleScope, id: string): RoleReading {
 
   // 7. closed → node. A dot that something connects to is a node too — a
   //    terminus, a state, a bullet with a line to it.
-  const wiredTo = Object.entries(s.wires).filter(([w, v]) => w !== id && v.ends.includes(id)).map(([w]) => w);
+  const wiredTo = (indexOf(s).wiredTo.get(id) ?? []).filter((w) => w !== id);
   if (isClosed(s, id) || (shape === 'dot' && wiredTo.length > 0)) {
     return {
       id, role: 'node', rule: 7,

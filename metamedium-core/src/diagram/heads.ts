@@ -41,6 +41,7 @@ import type { MMNode } from '../session/nodes';
 import { boundsOf, fingerprintOf, getRep, isWord, placed, strokePointsOf, transcriptOf } from '../session/nodes';
 import { snapReading } from '../session/clean';
 import { magnetRadius } from '../session/magnets';
+import { MarkGrid } from '../relate/grid';
 import { arrowTipIndex, calculateStraightness } from '../geometry';
 import { HAND_RESOLUTION_PX, MAX_TIER0_CONFIDENCE } from '../recognition';
 
@@ -501,6 +502,51 @@ function fillsIn(hull: readonly Point[], cands: readonly { id: string; ink: Poin
   return cands.filter((m) => m.ink.length > 0 && m.ink.filter((p) => insideConvex(p, bigger)).length >= 0.8 * m.ink.length);
 }
 
+/**
+ * The content plane filed for the length of one reading (V1-PLAN I2): every
+ * connector's end asks which marks lie within a head's length of it, and asked
+ * of the whole plane that is the plane's size for each of the ends of a
+ * thousand strokes — seconds for one picture traced into ink. A reading that
+ * asks it many times files the plane once (`withBoardIndex`), asks the index
+ * for the marks near an end, and puts them back in the plane's order; the test
+ * each is put to is the one it was always put to, so only what is not asked
+ * about changes.
+ */
+interface BoardIndex {
+  contentIds: readonly string[];
+  grid: MarkGrid;
+  /** Each content mark's place in the plane. */
+  place: Map<string, number>;
+  /** Marks whose box has no finite edge: filed nowhere, asked about always. */
+  loose: string[];
+}
+
+let board: BoardIndex | null = null;
+/** Below this many marks walking the plane is cheaper than filing it. */
+const INDEXED_FROM = 64;
+
+/** Run `fn` with the content plane of `state` filed, when it is big enough to pay. */
+export function withBoardIndex<T>(state: SessionState, fn: () => T): T {
+  if (board || state.contentIds.length < INDEXED_FROM) return fn();
+  const grid = new MarkGrid();
+  const place = new Map<string, number>();
+  const loose: string[] = [];
+  state.contentIds.forEach((id, i) => {
+    place.set(id, i);
+    const node = state.nodes.get(id);
+    const b = node && boundsOf(node);
+    if (!b) return;
+    grid.set(id, b);
+    if (!grid.has(id)) loose.push(id);
+  });
+  board = { contentIds: state.contentIds, grid, place, loose };
+  try {
+    return fn();
+  } finally {
+    board = null;
+  }
+}
+
 function readEnd(conn: Connector, e: EndGeom, state: SessionState): ConnectorEnd {
   const nodes = state.nodes;
   const heads: HeadReading[] = [];
@@ -510,7 +556,15 @@ function readEnd(conn: Connector, e: EndGeom, state: SessionState): ConnectorEnd
   // Every other mark that could be ink at this end: whatever lies within a head's length of it.
   const within = HEAD_MAX_SHARE * conn.length + magnetRadius(HEAD_MAX_SHARE * conn.length, conn.scale);
   const others: { id: string; node: MMNode; ink: Point[] }[] = [];
-  for (const id of state.contentIds) {
+  let candidates: readonly string[] = state.contentIds;
+  if (board && board.contentIds === state.contentIds) {
+    const ix = board;
+    candidates = ix.grid
+      .query({ minX: e.point.x - within, minY: e.point.y - within, maxX: e.point.x + within, maxY: e.point.y + within })
+      .concat(ix.loose)
+      .sort((p, q) => ix.place.get(p)! - ix.place.get(q)!);
+  }
+  for (const id of candidates) {
     if (id === conn.id || artifacts.has(id)) continue;
     const node = nodes.get(id);
     if (!node || getRep(node, 'erased') || getRep(node, 'gesture')) continue;
@@ -686,7 +740,7 @@ function compactFill(ink: readonly Point[], hull: readonly Point[]): boolean {
  */
 export function headsOf(state: SessionState, id: string): ConnectorHeads | null {
   const node = state.nodes.get(id);
-  if (!node || !state.contentIds.includes(id)) return null;
+  if (!node || !(board && board.contentIds === state.contentIds ? board.place.has(id) : state.contentIds.includes(id))) return null;
   const conn = connectorOf(node, state.nodes);
   if (!conn) return null;
   return { id, shape: conn.shape, start: readEnd(conn, conn.ends[0], state), end: readEnd(conn, conn.ends[1], state) };
@@ -732,13 +786,16 @@ export function headApartAt(connector: MMNode, mark: MMNode, nodes: ReadonlyMap<
 
 /** Every connector on the board, and what sits at its ends. */
 export function connectorHeads(state: SessionState): ConnectorHeads[] {
-  const out: ConnectorHeads[] = [];
-  for (const id of state.contentIds) {
-    if (state.artifacts.includes(id)) continue;
-    const h = headsOf(state, id);
-    if (h) out.push(h);
-  }
-  return out;
+  return withBoardIndex(state, () => {
+    const out: ConnectorHeads[] = [];
+    const artifacts = new Set(state.artifacts);
+    for (const id of state.contentIds) {
+      if (artifacts.has(id)) continue;
+      const h = headsOf(state, id);
+      if (h) out.push(h);
+    }
+    return out;
+  });
 }
 
 /** A connector's ends in a line, for a status line, a panel or a brief. */
