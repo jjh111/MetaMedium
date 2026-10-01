@@ -175,7 +175,7 @@
         html += '<div class="row"><span class="k">addresses</span><span class="v">' +
           esc(parts.map((r) => r.id).join(' ') || 'nothing yet') + '</span></div>';
       }
-      if (kind !== 'png' && kind !== 'jpg' && kind !== 'control') {
+      if (!MM.isPictureKind(kind) && kind !== 'control') {
         html += '<div class="acts">' + (kind === 'text' ? '<button class="mini" data-act="edit-text" data-id="' + esc(id) + '">edit the words</button>' : '') +
           '<button class="mini" data-act="export-code" data-id="' + esc(id) + '">save as .' + esc(kind === 'text' ? 'txt' : kind) + '</button></div>';
       }
@@ -408,7 +408,7 @@
       const name = MM.wordOf(node);
       const rep = codeRepOf(node);
       const kind = rep ? (rep.data.kind || 'html') : null;
-      const what = !rep ? 'a thing you named' : kind === 'html' ? 'a page' : kind === 'run' ? 'a program' : kind === 'text' ? 'text' : kind === 'mermaid' ? 'a diagram written in Mermaid' : kind === 'png' || kind === 'jpg' ? 'a picture' : 'a ' + kind + ' file';
+      const what = !rep ? 'a thing you named' : kind === 'html' ? 'a page' : kind === 'run' ? 'a program' : kind === 'text' ? 'text' : kind === 'mermaid' ? 'a diagram written in Mermaid' : MM.isPictureKind(kind) ? 'a picture' : 'a ' + kind + ' file';
       out += row('is', (name ? '“' + name + '”, ' : '') + what + (members ? ' made of ' + members + ' mark' + (members === 1 ? '' : 's') : '') + (o.author !== MM.LOCAL_PARTICIPANT ? ', by ' + o.authorName : ''));
       out += row('becomes', !rep ? 'another drawing like it is offered as one · a brief builds on it · its tank plays' : kind === 'mermaid' ? 'Draw it puts it on the board as marks · edit the text for a new version' : 'draw over it to change a part · a brief is a new version');
       return out;
@@ -450,7 +450,7 @@
       const rep = a && codeRepOf(a);
       if (rep) {
         const kind = rep.data.kind || 'html';
-        const what = kind === 'run' ? (rep.data.code && rep.data.code.startsWith(MM.GRAPH3D_MARK) ? 'a 3D thing' : 'a program') : kind === 'html' ? 'a page' : kind === 'text' ? 'text' : kind === 'mermaid' ? 'a diagram written in Mermaid' : kind === 'png' || kind === 'jpg' ? 'a picture' : 'a ' + kind + ' file';
+        const what = kind === 'run' ? (rep.data.code && rep.data.code.startsWith(MM.GRAPH3D_MARK) ? 'a 3D thing' : 'a program') : kind === 'html' ? 'a page' : kind === 'text' ? 'text' : kind === 'mermaid' ? 'a diagram written in Mermaid' : MM.isPictureKind(kind) ? 'a picture' : 'a ' + kind + ' file';
         return { here: 'an artifact, ' + what, next: kind === 'mermaid' ? (paletteItems.some((i) => i.key === 'mermaid-draw') ? 'Draw it puts it on the board as marks · ' : '') + 'edit the text for a new version · ink over a node addresses its marks' : 'ink over it addresses its parts · a brief is a new version · wire it in a frame' };
       }
       return { here: 'a definition' + (MM.wordOf(a) ? ' “' + MM.wordOf(a) + '”' : ''), next: 'another like it is matched · a brief builds on it · its tank plays' };

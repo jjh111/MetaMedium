@@ -299,6 +299,8 @@
     duplicate: (o, scope) => duplicateMarks(scope.summon, o.data.ids),
     // A Mermaid text drawn as ink, at this zoom and beside everything (25-mermaid.js).
     'mermaid-draw': (o) => drawMermaidFrom(o.data.artifact),
+    // A held picture traced into ink over itself (18-images.js): its pixels are read again from the asset store, so it lands a moment after the tap.
+    trace: (o) => { traceFrom(o.data.artifact, o.data.asset); },
     'behave-model': (o) => { const d = o.data; writers().forEach((a) => withWork('behave:' + a.id + ':' + d.nodeId, [d.nodeId], modelWords(a) + ' · reading the words', a.behave({ nodeId: d.nodeId, words: d.words, at: Date.now() })).then(() => render(session.getState()))); },
   };
   /** What the surface does around a tool's act: before it (the field rebuilt from what it leaves), and after (what to say). */

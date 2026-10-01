@@ -809,6 +809,108 @@ export async function storageTest(browser, servers, ctx) {
   return [guards, other];
 }
 
+/**
+ * Pictures are kept with the board (PLAN-IPAD-NOTES I1), driven from outside through the boards pane. Two pictures
+ * are imported; a REAL reload brings them back drawn, from the asset store; a duplicate shares the assets rather
+ * than copying bytes; the original is trashed and the trash emptied — the copy still draws them; the copy is
+ * trashed and emptied and the assets nothing uses any more are collected.
+ */
+export async function picturesTest(browser, servers, ctx) {
+  const { freshContext, steps } = ctx;
+  const check = (name, ok, detail) => steps.push({ name, ok: !!ok, detail });
+  const url = `${servers.staticOrigin}/Demos/session-engine.html?nosw=1`;
+  const guards = await freshContext(browser, { origins: [servers.staticOrigin], label: 'boards-pictures' });
+  const page = await guards.context.newPage();
+  const COLOURS = [[200, 40, 40], [40, 160, 60]];
+  // What the canvas shows where each picture stands, once every picture has been read and drawn.
+  const look = () => page.evaluate(async () => {
+    const mm = window.__mm, MM = mm.MM;
+    mm.setView(1, 0, 0);
+    const frames = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await frames();
+    for (let i = 0; i < 100 && mm.pictureState().loading; i++) await new Promise((r) => setTimeout(r, 50));
+    await frames();
+    const st = mm.session.getState();
+    const cv = document.getElementById('canvas'), dpr = window.devicePixelRatio || 1;
+    return st.artifacts.filter((id) => MM.pictureOf(st.nodes.get(id))).map((id) => {
+      const b = MM.boundsOf(st.nodes.get(id)), p = mm.worldToScreen((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
+      const d = cv.getContext('2d').getImageData(Math.round(p.x * dpr) - 2, Math.round(p.y * dpr) - 2, 5, 5).data;
+      let r = 0, g = 0, bl = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; bl += d[i + 2]; }
+      const n = d.length / 4; return [Math.round(r / n), Math.round(g / n), Math.round(bl / n)];
+    });
+  });
+  const close = (got, want) => got.length === want.length && want.every((w, i) => got[i] && got[i].every((v, k) => Math.abs(v - w[k]) <= 26));
+  const assets = () => page.evaluate(async () => (await window.__mm.assets()).length);
+  try {
+    await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+    await waitReady(page);
+    await page.evaluate(() => window.__mm.setAssetGrace(0));
+    await page.evaluate(async (colours) => {
+      const files = [];
+      for (const [i, rgb] of colours.entries()) {
+        const c = document.createElement('canvas'); c.width = 500; c.height = 400;
+        const g = c.getContext('2d'); g.fillStyle = 'rgb(' + rgb.join(',') + ')'; g.fillRect(0, 0, 500, 400);
+        files.push(new File([await new Promise((r) => c.toBlob(r, 'image/png'))], 'photo-' + i + '.png', { type: 'image/png' }));
+      }
+      await window.__mm.importPictures(files, { view: { minX: 480, minY: 140, maxX: 1380, maxY: 740 } });
+      await window.__mm.boardIdle();
+    }, COLOURS);
+    const first = await look();
+    // ---- N21. a real reload ----------------------------------------------------------------
+    await page.reload({ waitUntil: 'load' });
+    await waitReady(page);
+    await page.evaluate(() => window.__mm.setAssetGrace(0));
+    const reloaded = await look();
+    const n = await assets();
+    check('N21. two pictures imported, then a reload of the page: the board comes back with both, drawn in their own colours from the asset store — nothing of them was held by the page — and the store holds two assets',
+      close(first, COLOURS) && close(reloaded, COLOURS) && n === 2, { first, reloaded, assets: n });
+
+    // ---- N21b. a copy shares the assets; the original trashed and the trash emptied leaves them -------
+    const home = (await boardsNow(page)).current;
+    await openBoardsPane(page);
+    const before = (await boardsNow(page)).list.map((e) => e.id);
+    await page.click(`#boardsPanel button[data-dup="${home}"]`);
+    await until(page, (b4) => window.__mm.boards().list.some((e) => e.kind === 'board' && !b4.includes(e.id)) && !window.__mm.boards().busy, before);
+    const copy = (await boardsNow(page)).list.find((e) => e.kind === 'board' && !before.includes(e.id));
+    const copyId = copy && copy.id;
+    const afterDup = await assets();
+    await switchTo(page, copyId);
+    const copyLook = await look();
+    await openBoardsPane(page);
+    await page.click(`#boardsPanel button[data-trash="${home}"]`);
+    await until(page, (b) => { const e = window.__mm.boards().list.find((y) => y.id === b); return !!e && e.trashed > 0 && !window.__mm.boards().busy; }, home);
+    const keptTrashed = await assets();
+    await openBoardsPane(page);
+    await page.click('#boardsPanel button[data-empty-trash]');
+    await page.click('#boardsPanel button[data-empty-confirm]');
+    await until(page, (b) => !window.__mm.boards().list.some((e) => e.id === b) && !window.__mm.boards().busy, home);
+    await sleep(300);
+    const keptByCopy = await assets();
+    const copyAgain = await look();
+    check('N21b. a duplicate names the same two assets and stores no bytes of its own; with the original trashed — its assets kept while it can be restored — and the trash emptied, the copy still draws both',
+      !!copyId && afterDup === 2 && close(copyLook, COLOURS) && keptTrashed === 2 && keptByCopy === 2 && close(copyAgain, COLOURS),
+      { copyId, afterDup, copyLook, keptTrashed, keptByCopy, copyAgain });
+
+    // ---- N21c. nothing uses them: collected when the trash is emptied -----------------------------
+    await openBoardsPane(page);
+    await page.click(`#boardsPanel button[data-trash="${copyId}"]`);
+    await until(page, (b) => { const e = window.__mm.boards().list.find((y) => y.id === b); return !!e && e.trashed > 0 && window.__mm.boards().current !== b && !window.__mm.boards().switching && !window.__mm.boards().busy; }, copyId);
+    const heldInTrash = await assets();
+    await openBoardsPane(page);
+    await page.click('#boardsPanel button[data-empty-trash]');
+    await page.click('#boardsPanel button[data-empty-confirm]');
+    await until(page, (b) => !window.__mm.boards().list.some((e) => e.id === b) && !window.__mm.boards().busy, copyId);
+    let left = await assets();
+    for (let i = 0; i < 30 && left !== 0; i++) { await sleep(100); left = await assets(); }
+    check('N21c. the last board that used the pictures trashed: they stay while it is in the trash, and the emptied trash collects them — the store is empty', heldInTrash === 2 && left === 0, { heldInTrash, left });
+  } catch (err) {
+    check('N21. the pictures test ran to its end', false, { error: String(err && err.stack ? err.stack : err) });
+    await ctx.screenshot(page, 'boards-pictures');
+  }
+  await page.close().catch(() => {});
+  return guards;
+}
+
 /** The scenario the gate runs. */
 export async function runBoards(browser, servers, ctx) {
   const steps = [];
@@ -825,5 +927,8 @@ export async function runBoards(browser, servers, ctx) {
   const t4 = Date.now();
   const storage = await storageTest(browser, servers, { ...ctx, steps });
   measured['storage s'] = +((Date.now() - t4) / 1000).toFixed(1);
-  return { steps, guards: [guards, ...first, format, ...storage], measured };
+  const t5 = Date.now();
+  const pictures = await picturesTest(browser, servers, { ...ctx, steps });
+  measured['pictures s'] = +((Date.now() - t5) / 1000).toFixed(1);
+  return { steps, guards: [guards, ...first, format, ...storage, pictures], measured };
 }

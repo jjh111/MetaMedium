@@ -93,6 +93,7 @@ function manipulationOf(ev: Extract<SessionEvent, { type: 'move' | 'scale' | 'ro
 import { FIGURE_MEET_SHARE, LETTER_TINY_PX, WORD_WINDOW_MS, endsPairUp, isLetterLike, joinsRun, longAgainst, wordConfidence, xHeightOf } from './words';
 import { type StructuralSignature, type Examples, structuralSignature, matchDefinition, addExample, MATCH_FLOOR } from './signature';
 import type { Kind } from '../kinds/kinds';
+import { isPictureKind, isAssetRef } from '../kinds/picture';
 import type { Behaviour } from '../behave/verbs';
 import type { Connection } from '../frames/frame';
 import type { Pack, PackNotice } from '../packs/pack';
@@ -361,9 +362,12 @@ type SessionEventUnion =
    * A file of a known kind, or a traced picture, brought onto the canvas
    * (ARCHITECTURE-v8 §11, §17). With `code` it is an artifact of that kind
    * at `bounds`, its path kept so a folder can write it back; with `strokes`
-   * it is ink, drawn as declared content attributed to the importer.
+   * it is ink, drawn as declared content attributed to the importer. **A picture**
+   * (PLAN-IPAD-NOTES I1) names the asset its bytes are kept under — `asset`, a
+   * `sha256:` reference, with its `mime` and its size in pixels, `w` × `h` — and
+   * never carries them; an event with no asset is a log from before, drawn as its name.
    */
-  | { type: 'import'; kind: Kind; path: string; name?: string; bounds: Bounds; code?: string; strokes?: Point[][]; at: number; participantId?: string }
+  | { type: 'import'; kind: Kind; path: string; name?: string; bounds: Bounds; code?: string; strokes?: Point[][]; asset?: string; mime?: string; w?: number; h?: number; at: number; participantId?: string }
   /** An artifact's clock: play (the bless to run), pause, reset, or reseed. */
   | { type: 'clock'; nodeId: string; op: 'play' | 'pause' | 'reset' | 'seed'; seed?: number; reason?: string; at: number; participantId?: string }
   /**
@@ -659,7 +663,7 @@ export interface Session {
    */
   teachCommandMark(mark: CommandMark | null, at: number): void;
   /** Bring a file, or a traced picture, onto the canvas. Returns the artifact's id, or the first stroke's. */
-  import(args: { kind: Kind; path: string; name?: string; bounds: Bounds; code?: string; strokes?: Point[][]; at: number; participantId?: string }): string | null;
+  import(args: { kind: Kind; path: string; name?: string; bounds: Bounds; code?: string; strokes?: Point[][]; asset?: string; mime?: string; w?: number; h?: number; at: number; participantId?: string }): string | null;
   /** Wire artifacts into a frame, by reference. Returns the frame's id. */
   frame(args: { ids: string[]; name: string; connections: Connection[]; at: number; participantId?: string }): string | null;
   /** Give a definition a behaviour. A human's is blessed by the act; a model's or the fit's is held until a human gives it. */
@@ -3545,14 +3549,24 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       }
       return first;
     }
-    if (ev.code === undefined) return null;
+    // A picture is held by its asset and has no code; a file by its text.
+    const picture = isPictureKind(ev.kind);
+    if (ev.code === undefined && !(picture && ev.asset !== undefined)) return null;
     const name = ev.name?.trim() || ev.path.split('/').pop() || ev.path;
+    // What a picture names, read: an asset that is not a reference, a size that is not a number, a mime that is not an image are not kept.
+    const kept: Record<string, unknown> = {};
+    if (picture) {
+      if (isAssetRef(ev.asset)) kept.asset = ev.asset;
+      if (typeof ev.mime === 'string' && /^image\/[a-z0-9.+-]+$/i.test(ev.mime)) kept.mime = ev.mime;
+      if (typeof ev.w === 'number' && Number.isFinite(ev.w) && ev.w > 0) kept.w = Math.round(ev.w);
+      if (typeof ev.h === 'number' && Number.isFinite(ev.h) && ev.h > 0) kept.h = Math.round(ev.h);
+    }
     const node: MMNode = {
       id: nextId('artifact'),
       reps: [
         { modality: 'word', data: name, source: pid },
         { modality: 'bounds', data: { ...ev.bounds }, source: pid },
-        { modality: 'code', data: { code: ev.code, language: ev.kind, kind: ev.kind, path: ev.path, regions: [], at: ev.at }, source: pid },
+        { modality: 'code', data: { code: ev.code ?? '', language: ev.kind, kind: ev.kind, path: ev.path, regions: [], at: ev.at, ...kept }, source: pid },
         { modality: 'signature', data: { shapes: { [ev.kind]: 1 }, links: {}, size: 1 }, source: TIER0_PARTICIPANT },
       ],
       edges: [{ to: pid, rel: 'made-by' }],
@@ -3564,7 +3578,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     artifacts.push(node.id);
     contentPush(node.id);
     definitionsChanged = true;
-    if (ev.kind !== 'png' && ev.kind !== 'jpg') live.push(node.id);
+    if (!picture) live.push(node.id);
     recomputeClusterCandidates();
     return node.id;
   }

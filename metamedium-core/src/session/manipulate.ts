@@ -11,6 +11,7 @@
 import type { Bounds, Point } from '../types';
 import type { MMNode, Rep } from './nodes';
 import { fingerprintOf, getRep } from './nodes';
+import { pictureOf } from '../kinds/picture';
 
 /** A move, a scale about a point, or a turn about a point — what a drag of the selection writes. */
 export type Manipulation =
@@ -18,7 +19,11 @@ export type Manipulation =
   | { type: 'scale'; about: Point; sx: number; sy: number }
   | { type: 'rotate'; about: Point; radians: number };
 
-/** The strokes a manipulation of these marks moves: a stroke itself, or an artifact's or a word's members, recursively — never an erased one. */
+/**
+ * The marks a manipulation of these marks moves: a stroke itself, or an artifact's or a word's members,
+ * recursively — never an erased one — and a picture, which has no ink to move in its place and is moved as
+ * itself (PLAN-IPAD-NOTES I1): a picture is a mark of the board, drawn under the ink.
+ */
 export function manipulableOf(nodes: ReadonlyMap<string, MMNode>, ids: readonly string[]): MMNode[] {
   const out: MMNode[] = [];
   const seen = new Set<string>();
@@ -27,7 +32,7 @@ export function manipulableOf(nodes: ReadonlyMap<string, MMNode>, ids: readonly 
     seen.add(id);
     const n = nodes.get(id);
     if (!n || getRep(n, 'erased')) return;
-    if (getRep(n, 'stroke')) {
+    if (getRep(n, 'stroke') || pictureOf(n)) {
       out.push(n);
       return;
     }
@@ -41,7 +46,8 @@ export function manipulableOf(nodes: ReadonlyMap<string, MMNode>, ids: readonly 
 export function markFrameOf(node: MMNode): Bounds | undefined {
   const moved = getRep(node, 'transform')?.data as Bounds | undefined;
   if (moved) return moved;
-  return fingerprintOf(node)?.bounds;
+  // A picture has no fingerprint: the box it was placed in is its frame.
+  return fingerprintOf(node)?.bounds ?? (getRep(node, 'bounds')?.data as Bounds | undefined);
 }
 
 /** A scale's factors as the reducer takes them: never under a thousandth, so a frame is never flattened. */

@@ -369,8 +369,8 @@
       const col = placed % CARD.cols, row = Math.floor(placed / CARD.cols);
       const bounds = { minX: col * (CARD.w + CARD.gap), minY: below + row * (CARD.h + CARD.gap), maxX: col * (CARD.w + CARD.gap) + CARD.w, maxY: below + row * (CARD.h + CARD.gap) + CARD.h };
       placed++;
-      if (e.kind === 'png' || e.kind === 'jpg') {
-        try { folder.urls.set(e.path, URL.createObjectURL(new Blob([content], { type: e.kind === 'png' ? 'image/png' : 'image/jpeg' }))); } catch (err) { /* no url */ }
+      if (MM.isPictureKind(e.kind)) {
+        try { folder.urls.set(e.path, URL.createObjectURL(new Blob([content], { type: MM.rowOf(e.kind).mime }))); } catch (err) { /* no url */ }
         session.import({ kind: e.kind, path: e.path, bounds: bounds, code: '', at: Date.now() });
       } else {
         session.import({ kind: e.kind, path: e.path, bounds: bounds, code: String(content), at: Date.now() });
@@ -1308,6 +1308,8 @@
       }
     } finally { for (const g of got) g.release(); }
     boardsChanged();
+    // The pictures only those boards used go with them — now, and not before (a trashed board is restorable).
+    try { await collectAssets(); } catch (err) { /* a board that could not be read: nothing is collected on a guess */ }
     return { gone: got.map((g) => g.id), kept: plan.gone.map((e) => e.id).filter((x) => !got.some((g) => g.id === x)).concat(plan.kept.map((e) => e.id)) };
   }
   /**
@@ -1598,8 +1600,10 @@
       const r = codeRepOf(n);
       const kind = r ? r.data.kind : MM.isFrame(n) ? 'frame' : 'drawing';
       const path = r && r.data.path ? r.data.path : '';
-      const preview = r && kind !== 'png' && kind !== 'jpg' ? esc(String(r.data.code).slice(0, 160)) : '';
-      const img = (kind === 'png' || kind === 'jpg') && r && imageUrlFor(r.data.path) ? '<img src="' + imageUrlFor(r.data.path) + '" alt="">' : '';
+      const pic = MM.isPictureKind(kind);
+      const src = pic && r ? pictureSrc(r) : null;
+      const preview = r && !pic ? esc(String(r.data.code).slice(0, 160)) : '';
+      const img = src ? '<img src="' + esc(src) + '" alt="">' : '';
       html += '<button class="card" data-id="' + esc(id) + '"><span class="name">' + esc(MM.wordOf(n) || id) + '</span><span class="kind">' + esc(kind) + (path ? ' · ' + esc(path) : '') + '</span>' + (img || '<pre>' + preview + '</pre>') + '</button>';
     }
     gridEl.innerHTML = html + '</div>';

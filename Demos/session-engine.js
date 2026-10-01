@@ -3885,7 +3885,11 @@
   /** An artifact that renders as a figure on the board rather than on a page. */
   function isFigureArtifact(node) {
     for (let i = node.reps.length - 1; i >= 0; i--) {
-      if (node.reps[i].modality === 'code') return FIGURE_KINDS.has(node.reps[i].data.kind || 'html');
+      if (node.reps[i].modality === 'code') {
+        const d = node.reps[i].data;
+        // A picture kept in the asset store is drawn on the board, a figure like a drawing; one that is only a name is a card with its brackets.
+        return FIGURE_KINDS.has(d.kind || 'html') || (!!d.asset && MM.isPictureKind(d.kind));
+      }
     }
     return false;
   }
@@ -4514,6 +4518,7 @@
     if (paintHeld) { state = s; return; }
     paints++;
     state = s;
+    picturesBegin();
     chipHits = [];
     chromeDrawn = [];
     readingDrawn = null;
@@ -4601,7 +4606,22 @@
     // off screen at working zoom — except while a tank moves bodies about.
     paintView = vb && !tank.place.size ? vb : null;
 
-    for (const id of ix ? paintOrder(s, ix, vb, inspectedId, pv, followShown) : s.contentIds) {
+    // The pictures first — they are the ground the ink is drawn over: a picture kept in the asset store is
+    // painted on this canvas, under every stroke, culled to the screen with the rest of the paint (and a
+    // picture held and being dragged is drawn where the drag takes it).
+    const order = ix ? paintOrder(s, ix, vb, inspectedId, pv, followShown) : s.contentIds;
+    for (const id of order) {
+      if (!artifactSet.has(id)) continue;
+      const pn = s.nodes.get(id);
+      if (!pn || !MM.pictureOf(pn)) continue;
+      const heldPic = pv && pv.ids.includes(id);
+      if (heldPic) { ctx.save(); applyPreview(pv); }
+      const st = drawPicture(pn, id);
+      if (heldPic) ctx.restore();
+      if (st && paintOps) { const pb = MM.boundsOf(pn); recordOp({ kind: 'picture', id: id, text: st === 'drawn' ? 'drawn' : 'standing', box: boxOfRect(pb.minX, pb.minY, pb.maxX - pb.minX, pb.maxY - pb.minY), moved: !!heldPic }); }
+    }
+
+    for (const id of order) {
       const follows = followShown && followShown.get(id);
       const node = follows || s.nodes.get(id);
       const isArtifact = artifactSet.has(id);
@@ -4664,6 +4684,7 @@
       }
     }
     paintView = null;
+    picturesPainted();
 
     renderLabels(s, inspectedId, ix, vb);
     // What the board's numbers say, beside its figures and its page (M5, 25-maths.js).
@@ -5980,6 +6001,8 @@
     duplicate: (o, scope) => duplicateMarks(scope.summon, o.data.ids),
     // A Mermaid text drawn as ink, at this zoom and beside everything (25-mermaid.js).
     'mermaid-draw': (o) => drawMermaidFrom(o.data.artifact),
+    // A held picture traced into ink over itself (18-images.js): its pixels are read again from the asset store, so it lands a moment after the tap.
+    trace: (o) => { traceFrom(o.data.artifact, o.data.asset); },
     'behave-model': (o) => { const d = o.data; writers().forEach((a) => withWork('behave:' + a.id + ':' + d.nodeId, [d.nodeId], modelWords(a) + ' · reading the words', a.behave({ nodeId: d.nodeId, words: d.words, at: Date.now() })).then(() => render(session.getState()))); },
   };
   /** What the surface does around a tool's act: before it (the field rebuilt from what it leaves), and after (what to say). */
@@ -7151,7 +7174,7 @@
         html += '<div class="row"><span class="k">addresses</span><span class="v">' +
           esc(parts.map((r) => r.id).join(' ') || 'nothing yet') + '</span></div>';
       }
-      if (kind !== 'png' && kind !== 'jpg' && kind !== 'control') {
+      if (!MM.isPictureKind(kind) && kind !== 'control') {
         html += '<div class="acts">' + (kind === 'text' ? '<button class="mini" data-act="edit-text" data-id="' + esc(id) + '">edit the words</button>' : '') +
           '<button class="mini" data-act="export-code" data-id="' + esc(id) + '">save as .' + esc(kind === 'text' ? 'txt' : kind) + '</button></div>';
       }
@@ -7384,7 +7407,7 @@
       const name = MM.wordOf(node);
       const rep = codeRepOf(node);
       const kind = rep ? (rep.data.kind || 'html') : null;
-      const what = !rep ? 'a thing you named' : kind === 'html' ? 'a page' : kind === 'run' ? 'a program' : kind === 'text' ? 'text' : kind === 'mermaid' ? 'a diagram written in Mermaid' : kind === 'png' || kind === 'jpg' ? 'a picture' : 'a ' + kind + ' file';
+      const what = !rep ? 'a thing you named' : kind === 'html' ? 'a page' : kind === 'run' ? 'a program' : kind === 'text' ? 'text' : kind === 'mermaid' ? 'a diagram written in Mermaid' : MM.isPictureKind(kind) ? 'a picture' : 'a ' + kind + ' file';
       out += row('is', (name ? '“' + name + '”, ' : '') + what + (members ? ' made of ' + members + ' mark' + (members === 1 ? '' : 's') : '') + (o.author !== MM.LOCAL_PARTICIPANT ? ', by ' + o.authorName : ''));
       out += row('becomes', !rep ? 'another drawing like it is offered as one · a brief builds on it · its tank plays' : kind === 'mermaid' ? 'Draw it puts it on the board as marks · edit the text for a new version' : 'draw over it to change a part · a brief is a new version');
       return out;
@@ -7426,7 +7449,7 @@
       const rep = a && codeRepOf(a);
       if (rep) {
         const kind = rep.data.kind || 'html';
-        const what = kind === 'run' ? (rep.data.code && rep.data.code.startsWith(MM.GRAPH3D_MARK) ? 'a 3D thing' : 'a program') : kind === 'html' ? 'a page' : kind === 'text' ? 'text' : kind === 'mermaid' ? 'a diagram written in Mermaid' : kind === 'png' || kind === 'jpg' ? 'a picture' : 'a ' + kind + ' file';
+        const what = kind === 'run' ? (rep.data.code && rep.data.code.startsWith(MM.GRAPH3D_MARK) ? 'a 3D thing' : 'a program') : kind === 'html' ? 'a page' : kind === 'text' ? 'text' : kind === 'mermaid' ? 'a diagram written in Mermaid' : MM.isPictureKind(kind) ? 'a picture' : 'a ' + kind + ' file';
         return { here: 'an artifact, ' + what, next: kind === 'mermaid' ? (paletteItems.some((i) => i.key === 'mermaid-draw') ? 'Draw it puts it on the board as marks · ' : '') + 'edit the text for a new version · ink over a node addresses its marks' : 'ink over it addresses its parts · a brief is a new version · wire it in a frame' };
       }
       return { here: 'a definition' + (MM.wordOf(a) ? ' “' + MM.wordOf(a) + '”' : ''), next: 'another like it is matched · a brief builds on it · its tank plays' };
@@ -8040,8 +8063,8 @@
     }
     // A diagram said as Mermaid: its text stands, and the library draws it in place of the text when it can.
     if (kind === 'mermaid') return mermaidDocument(ctx && ctx.id || '', code, w, h);
-    if (kind === 'png' || kind === 'jpg') {
-      const url = rep.data.path ? imageUrlFor(rep.data.path) : null;
+    if (MM.isPictureKind(kind)) {
+      const url = pictureSrc(rep);
       return '<!doctype html><html><head><meta charset="utf-8"><style>' + SOURCE_CSS +
         '#mmroot{width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px;display:flex;align-items:center;justify-content:center;}img{max-width:100%;max-height:100%;}</style></head>' +
         '<body><div id="mmroot" data-region="picture">' + (url ? '<img src="' + esc(url) + '" alt="">' : '<span class="gap">' + esc(rep.data.path || 'a picture') + '</span>') + '</div></body></html>';
@@ -8779,6 +8802,246 @@
       const shown = pv && pv.controlId === aid ? (() => { const p = MM.alongSegment(knobDrag.track.a, knobDrag.track.b, { x: kx, y: ky }); return c.min + (c.max - c.min) * p.t; })() : c.value;
       text((+shown.toFixed(2)).toString(), kx + wpx(10), ky - wpx(10), C.gold);
     }
+  }
+
+// ===== assets (the pictures' bytes) =====
+// Provides: the pure half of keeping pictures (PLAN-IPAD-NOTES I1) — sha256Hex (the digest an asset is
+//   kept under), assetRef / isAssetRef, fitLongSide, pictureFormat / pictureExt (what a picture is kept
+//   as), safePictureName / uniquePicturePath (the name and path it gets), assetsOfEvents / assetGcPlan
+//   (which assets nothing uses any more), pictureCells / fitInCell / clearShift / pictureGrid / pickWords (where a pick is laid out and how the
+//   status line says it) and pictureTier / decodedCost / evictPlan (what the decoded pictures cost and
+//   which to let go).
+// Uses: NOTHING. Like 17-board.js this fragment names no closure variable and touches no DOM, no storage
+//   and no session: bytes, sizes and clocks arrive as arguments, and what it decides leaves as values.
+//   18-images.js is the adapter — IndexedDB, workers, canvas, the status line. Because it stands alone it
+//   loads on its own in Node, which is how it is tested:  node --test Demos/surface/17-assets.test.mjs
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+//
+// WHY AN ASSET STORE. A picture's pixels used to be an in-memory blob URL: gone on reload, in no log, in no
+// journal. The log is events and stays small; the bytes are kept beside it, once, under the SHA-256 of the
+// bytes — so the same photo brought in twice is one asset, a duplicated board names the assets it already
+// has, and an `import` event is a hundred bytes however big the picture.
+
+  /** The longest side a kept picture has, in pixels: a 12 MP camera photo is 2,560 by 1,920 (PLAN-IPAD-NOTES §5.4). */
+  const ASSET_LONG_SIDE = 2560;
+  /** An asset stored this recently is never collected: another tab may be between its bytes and its event. */
+  const ASSET_GRACE_MS = 30000;
+  /** The long side a decoded picture has while the screen shows it small. */
+  const PICTURE_THUMB_PX = 640;
+  /** What the decoded pictures may cost together, in pixels (four bytes each): about 160 MB. */
+  const DECODED_BUDGET_PX = 40000000;
+
+  // ----- the digest -----------------------------------------------------------
+  const SHA_K = [
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+  ];
+  /**
+   * The SHA-256 of some bytes as 64 hex digits — in plain code, so a page that is not a secure context (the
+   * canvas opened from a machine on the local network) can still name an asset; the adapter asks the
+   * browser's own `crypto.subtle` first and falls back to this.
+   */
+  function sha256Hex(bytes) {
+    const n = bytes.length;
+    const total = (((n + 9 + 63) >> 6) << 6);
+    const buf = new Uint8Array(total);
+    buf.set(bytes, 0);
+    buf[n] = 0x80;
+    const dv = new DataView(buf.buffer);
+    dv.setUint32(total - 8, Math.floor((n * 8) / 4294967296), false);
+    dv.setUint32(total - 4, (n * 8) >>> 0, false);
+    const h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+    const w = new Uint32Array(64);
+    const rotr = (x, k) => (x >>> k) | (x << (32 - k));
+    for (let off = 0; off < total; off += 64) {
+      for (let i = 0; i < 16; i++) w[i] = dv.getUint32(off + i * 4, false);
+      for (let i = 16; i < 64; i++) {
+        const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+        const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+      }
+      let a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7];
+      for (let i = 0; i < 64; i++) {
+        const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+        const ch = (e & f) ^ (~e & g);
+        const t1 = (hh + S1 + ch + SHA_K[i] + w[i]) | 0;
+        const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+        const maj = (a & b) ^ (a & c) ^ (b & c);
+        const t2 = (S0 + maj) | 0;
+        hh = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      h[0] = (h[0] + a) | 0; h[1] = (h[1] + b) | 0; h[2] = (h[2] + c) | 0; h[3] = (h[3] + d) | 0;
+      h[4] = (h[4] + e) | 0; h[5] = (h[5] + f) | 0; h[6] = (h[6] + g) | 0; h[7] = (h[7] + hh) | 0;
+    }
+    let out = '';
+    for (let i = 0; i < 8; i++) out += (h[i] >>> 0).toString(16).padStart(8, '0');
+    return out;
+  }
+
+  /** What an `import` event names an asset by. */
+  function assetRef(hex) { return 'sha256:' + hex; }
+  /** Core's own test (`ASSET_REF`): `sha256:` and 64 lower-case hex digits, nothing else. */
+  function isAssetRef(v) { return typeof v === 'string' && /^sha256:[0-9a-f]{64}$/.test(v); }
+
+  // ----- what a picture is kept as -----------------------------------------------
+  /** A picture's size once its long side is held to `max`: never enlarged, never under a pixel a side. */
+  function fitLongSide(w, h, max) {
+    if (!(w > 0) || !(h > 0)) return { w: 1, h: 1, scaled: false };
+    const long = Math.max(w, h);
+    if (long <= max) return { w: Math.round(w), h: Math.round(h), scaled: false };
+    const k = max / long;
+    return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)), scaled: true };
+  }
+  /**
+   * The format a picture is kept in: PNG where it has transparency (a JPEG would turn it black), WebP where
+   * it came out clearly smaller than the JPEG (a tenth), else JPEG — which every browser draws and every
+   * decoder reads. `webpBytes` is null where the browser would not write WebP.
+   */
+  function pictureFormat(o) {
+    if (o.hasAlpha) return 'png';
+    if (o.webpBytes && o.jpegBytes && o.webpBytes < o.jpegBytes * 0.9) return 'webp';
+    return 'jpeg';
+  }
+  /** The extension and kind a format is kept under. */
+  function pictureExt(format) { return format === 'jpeg' ? 'jpg' : format; }
+
+  /** A file's name, made safe for a path: the characters a path may hold, a run of the others one dash. */
+  function safePictureName(name) {
+    const s = String(name == null ? '' : name).replace(/[^A-Za-z0-9._-]+/g, '-');
+    return s && s !== '-' ? s : 'picture';
+  }
+  /**
+   * A picture's path in the board: `imports/<name>.<ext>` — the extension the picture is KEPT as — and a
+   * counter when two pictures share a name (cameras call every file `image.jpg`). The path is a label; the
+   * picture's identity is its asset.
+   */
+  function uniquePicturePath(name, taken, ext) {
+    let stem = safePictureName(name);
+    const dot = stem.lastIndexOf('.');
+    if (dot > 0 && /^[A-Za-z0-9]{1,5}$/.test(stem.slice(dot + 1))) stem = stem.slice(0, dot);
+    if (!stem) stem = 'picture';
+    let path = 'imports/' + stem + '.' + ext;
+    for (let n = 2; taken && taken.has(path); n++) path = 'imports/' + stem + '-' + n + '.' + ext;
+    return path;
+  }
+
+  // ----- which assets are used -------------------------------------------------------
+  /** The assets a log's pictures name, each once. */
+  function assetsOfEvents(events) {
+    const out = new Set();
+    if (!events) return out;
+    for (const ev of events) if (ev && ev.type === 'import' && isAssetRef(ev.asset)) out.add(ev.asset);
+    return out;
+  }
+  /**
+   * What collecting does: an asset no board uses goes — unless it is new (another tab may be between its
+   * bytes and its event) or in flight in this one. `held` is `[{ hash, at }]`, `used` a set of hashes.
+   */
+  function assetGcPlan(held, used, o) {
+    const now = o.now, grace = o.graceMs === undefined ? ASSET_GRACE_MS : o.graceMs, pending = o.pending || new Set();
+    const drop = [], keep = [];
+    for (const a of held) {
+      const idle = !used.has(a.hash) && !pending.has(a.hash) && !(grace > 0 && now - (a.at || 0) < grace);
+      (idle ? drop : keep).push(a.hash);
+    }
+    return { drop, keep };
+  }
+
+  // ----- a pick, laid out ----------------------------------------------------------------
+  /**
+   * The cells a pick of `n` is laid out in: a grid in the view (the area of the board the hand is looking at),
+   * in reading order — left to right, then down. One is a large cell; many are small enough to stand in the
+   * view together, so a pick of ten is never ten on one point. Cells have a floor, so a pick of thirty runs
+   * past the view rather than into dust. A cell depends on the count and the view, never on the pictures, so
+   * a pick can be placed one picture at a time as each is ready.
+   * @returns {Array<{x:number,y:number,w:number,h:number}>}
+   */
+  function pictureCells(n, view) {
+    if (!(n > 0)) return [];
+    const vw = Math.max(1, view.maxX - view.minX), vh = Math.max(1, view.maxY - view.minY);
+    const margin = Math.min(vw, vh) * 0.05, gap = margin;
+    const FLOOR = 100;
+    let cols, rows, cw, ch;
+    if (n === 1) { cols = 1; rows = 1; cw = vw * 0.6; ch = vh * 0.6; }
+    else {
+      cols = Math.min(n, Math.max(1, Math.round(Math.sqrt(n * vw / vh))));
+      rows = Math.ceil(n / cols);
+      cw = Math.max(FLOOR, (vw - 2 * margin - (cols - 1) * gap) / cols);
+      ch = Math.max(FLOOR, (vh - 2 * margin - (rows - 1) * gap) / rows);
+    }
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const col = i % cols, row = Math.floor(i / cols);
+      out.push({ x: view.minX + margin + col * (cw + gap), y: view.minY + margin + row * (ch + gap), w: cw, h: ch });
+    }
+    return out;
+  }
+  /**
+   * How far right a grid of cells must stand to be clear of what is already on the board: none if the view's own
+   * place is free; else just past what is in the way, and past what is in the way there, until it is clear — so a
+   * second picture never lands on the first, and a pick never lands on the writing it was brought in beside.
+   * `boxes` are the board's marks as `{ minX, minY, maxX, maxY }`. With no clear place in reach, none.
+   * @returns {{dx:number, dy:number, moved:boolean}}
+   */
+  function clearShift(cells, boxes, gap) {
+    if (!cells.length) return { dx: 0, dy: 0, moved: false };
+    const r = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    for (const c of cells) { r.minX = Math.min(r.minX, c.x); r.minY = Math.min(r.minY, c.y); r.maxX = Math.max(r.maxX, c.x + c.w); r.maxY = Math.max(r.maxY, c.y + c.h); }
+    let dx = 0;
+    for (let i = 0; i < 24; i++) {
+      const hit = boxes.filter((b) => b.maxX > r.minX + dx && b.minX < r.maxX + dx && b.maxY > r.minY && b.minY < r.maxY);
+      if (!hit.length) return { dx: dx, dy: 0, moved: dx !== 0 };
+      dx = Math.max(...hit.map((b) => b.maxX)) + gap - r.minX;
+    }
+    return { dx: 0, dy: 0, moved: false };
+  }
+  /** A picture of a size, fitted into a cell with its own proportions, standing at the cell's top left. */
+  function fitInCell(size, cell) {
+    const sw = Math.max(1, size.w || 1), sh = Math.max(1, size.h || 1);
+    const k = Math.min(cell.w / sw, cell.h / sh);
+    return { x: cell.x, y: cell.y, w: sw * k, h: sh * k };
+  }
+  /** Where a whole pick stands, each picture fitted into its cell: `sizes` are `{ w, h }` (the proportions are what is used). */
+  function pictureGrid(sizes, view) {
+    const cells = pictureCells(sizes.length, view);
+    return sizes.map((s, i) => fitInCell(s, cells[i]));
+  }
+  /** How far a pick has come, said to the person: *3 of 10 pictures*, or *1 picture*. */
+  function pickWords(i, n) {
+    return n <= 1 ? '1 picture' : i + ' of ' + n + ' pictures';
+  }
+
+  // ----- what the decoded pictures cost ------------------------------------------------------
+  /** Whether the screen wants a picture large or small: small while it is drawn no larger than a thumbnail. */
+  function pictureTier(longSidePx) { return longSidePx <= PICTURE_THUMB_PX ? 'thumb' : 'full'; }
+  /** What a decoded picture costs in pixels: its own, or a thumbnail's. */
+  function decodedCost(size, tier) {
+    const w = Math.max(1, size.w || 1), h = Math.max(1, size.h || 1);
+    if (tier === 'full') return w * h;
+    const k = Math.min(1, PICTURE_THUMB_PX / Math.max(w, h));
+    return Math.max(1, Math.round(w * k) * Math.round(h * k));
+  }
+  /**
+   * Which decoded pictures to let go: while they cost more than the budget, the least recently drawn first —
+   * never one drawn in the latest paint (`drawn >= paintedAt`), whatever the budget says.
+   * @param entries `[{ key, cost, drawn }]`
+   */
+  function evictPlan(entries, o) {
+    let total = 0;
+    for (const e of entries) total += e.cost;
+    if (total <= o.budgetPx) return [];
+    const out = [];
+    const idle = entries.filter((e) => e.drawn < o.paintedAt).sort((a, b) => a.drawn - b.drawn);
+    for (const e of idle) {
+      if (total <= o.budgetPx) break;
+      out.push(e.key);
+      total -= e.cost;
+    }
+    return out;
   }
 
 // ===== board (the journal) =====
@@ -9865,8 +10128,8 @@
       const col = placed % CARD.cols, row = Math.floor(placed / CARD.cols);
       const bounds = { minX: col * (CARD.w + CARD.gap), minY: below + row * (CARD.h + CARD.gap), maxX: col * (CARD.w + CARD.gap) + CARD.w, maxY: below + row * (CARD.h + CARD.gap) + CARD.h };
       placed++;
-      if (e.kind === 'png' || e.kind === 'jpg') {
-        try { folder.urls.set(e.path, URL.createObjectURL(new Blob([content], { type: e.kind === 'png' ? 'image/png' : 'image/jpeg' }))); } catch (err) { /* no url */ }
+      if (MM.isPictureKind(e.kind)) {
+        try { folder.urls.set(e.path, URL.createObjectURL(new Blob([content], { type: MM.rowOf(e.kind).mime }))); } catch (err) { /* no url */ }
         session.import({ kind: e.kind, path: e.path, bounds: bounds, code: '', at: Date.now() });
       } else {
         session.import({ kind: e.kind, path: e.path, bounds: bounds, code: String(content), at: Date.now() });
@@ -10804,6 +11067,8 @@
       }
     } finally { for (const g of got) g.release(); }
     boardsChanged();
+    // The pictures only those boards used go with them — now, and not before (a trashed board is restorable).
+    try { await collectAssets(); } catch (err) { /* a board that could not be read: nothing is collected on a guess */ }
     return { gone: got.map((g) => g.id), kept: plan.gone.map((e) => e.id).filter((x) => !got.some((g) => g.id === x)).concat(plan.kept.map((e) => e.id)) };
   }
   /**
@@ -11094,8 +11359,10 @@
       const r = codeRepOf(n);
       const kind = r ? r.data.kind : MM.isFrame(n) ? 'frame' : 'drawing';
       const path = r && r.data.path ? r.data.path : '';
-      const preview = r && kind !== 'png' && kind !== 'jpg' ? esc(String(r.data.code).slice(0, 160)) : '';
-      const img = (kind === 'png' || kind === 'jpg') && r && imageUrlFor(r.data.path) ? '<img src="' + imageUrlFor(r.data.path) + '" alt="">' : '';
+      const pic = MM.isPictureKind(kind);
+      const src = pic && r ? pictureSrc(r) : null;
+      const preview = r && !pic ? esc(String(r.data.code).slice(0, 160)) : '';
+      const img = src ? '<img src="' + esc(src) + '" alt="">' : '';
       html += '<button class="card" data-id="' + esc(id) + '"><span class="name">' + esc(MM.wordOf(n) || id) + '</span><span class="kind">' + esc(kind) + (path ? ' · ' + esc(path) : '') + '</span>' + (img || '<pre>' + preview + '</pre>') + '</button>';
     }
     gridEl.innerHTML = html + '</div>';
@@ -11139,65 +11406,263 @@
   });
 
 // ===== images =====
-// Provides: pictures in and the board out — importFile/importBitmap/importText (drop, paste, the Import…
-//   button, a phone's camera), tracing into ink beside the raster; exportBoardSVG/exportBoardPNG/exportLog,
+// Provides: pictures in and the board out — importPictures (a pick of files: drop, paste, the photos and camera
+//   inputs; laid out, kept in the asset store, named by an `import` event), importText, the asset store
+//   (assetPut/assetGet/assetList/collectAssets), the pictures drawn on the board (pictureBitmap, drawPicture,
+//   pictureSrc), tracing a held picture into ink (traceFrom); exportBoardSVG/exportBoardPNG/exportLog,
 //   downloadText/downloadBlob.
-// Uses: core, view, folder (folder, imageUrlFor), render.
+// Uses: core, view (viewportWorld), folder (folder, boards, boardDB, journalFold, isKept, session), render, 17-assets.js
+//   (the rules: what a picture is kept as, where a pick stands, which assets are unused, what the decoded cost).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
 
-  // ===== Pictures in =========================================================
-  // Import keeps both representations (ARCHITECTURE-v8 §17): the raster as an
-  // image artifact — the file in the folder when there is one, a URL in memory
-  // when there is not — and the traced strokes as ink that gets everything a
-  // pen stroke gets. A photographed sketch of boxes is a page the engine can
-  // build. Direct SVG import is the same path with the tracing skipped.
-  const IMPORT_MAX_PX = 1400;
-  const IMPORT_DIR = 'imports';
-
-  /** A picture's pixels, downsampled so the longest side fits, as ImageData-like {width, height, data}. */
-  async function bitmapOf(blob) {
-    const bmp = await createImageBitmap(blob);
-    const k = Math.min(1, IMPORT_MAX_PX / Math.max(bmp.width, bmp.height));
-    const w = Math.max(1, Math.round(bmp.width * k)), h = Math.max(1, Math.round(bmp.height * k));
-    const off = document.createElement('canvas');
-    off.width = w; off.height = h;
-    const c = off.getContext('2d', { willReadFrequently: true });
-    c.drawImage(bmp, 0, 0, w, h);
-    return c.getImageData(0, 0, w, h);
+  // ===== The asset store: a picture's bytes, kept once ==========================
+  // The log is events and stays small; a picture's bytes live beside the board's journal in IndexedDB
+  // (`mm-assets`), under the SHA-256 of the bytes (PLAN-IPAD-NOTES I1). The same photo brought in twice is
+  // one asset; a duplicated board names the assets it already has; the `import` event is a hundred bytes.
+  // ORDER IS THE SAFETY: the bytes are committed (their own transaction, strict durability) BEFORE the event
+  // exists, and the event goes to the board's journal in the task that makes it, as every event does — so a
+  // tab killed at any point leaves no event naming bytes that were not kept (it can leave bytes nothing names,
+  // which the next emptied trash collects). `assets.pending` is what is stored and not yet named.
+  const ASSET_DB = 'mm-assets';
+  const assets = {
+    mem: new Map(),        // no IndexedDB here: the bytes are held for the life of the page, and said once
+    pending: new Set(),    // stored, and the event naming them not yet written: never collected
+    graceMs: ASSET_GRACE_MS,
+    saidMem: false,
+  };
+  let assetDbPromise = null;
+  function openAssetDB() {
+    return new Promise((resolve, reject) => {
+      let req;
+      try { req = indexedDB.open(ASSET_DB, 1); } catch (err) { reject(err); return; }
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('assets')) db.createObjectStore('assets', { keyPath: 'hash' });
+        // What each asset is, apart from its bytes: listing and collecting never read a picture.
+        if (!db.objectStoreNames.contains('info')) db.createObjectStore('info', { keyPath: 'hash' });
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        db.onversionchange = () => { db.close(); assetDbPromise = null; };
+        db.onclose = () => { assetDbPromise = null; };
+        resolve(db);
+      };
+      req.onerror = () => reject(req.error || new DOMException('the browser would not open its storage', 'UnknownError'));
+    });
   }
-
-  function safeName(name) {
-    return String(name || 'picture').replace(/[^A-Za-z0-9._-]+/g, '-');
+  /** The one connection — or null where this browser keeps nothing (the bytes are then held by the page). */
+  function assetDB() {
+    if (!assetDbPromise) {
+      assetDbPromise = (typeof indexedDB === 'undefined' ? Promise.reject(new Error('no IndexedDB')) : openAssetDB()).catch(() => { assetDbPromise = null; return null; });
+    }
+    return assetDbPromise;
+  }
+  const idbDone = (tx) => new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onabort = () => reject(tx.error || new DOMException('the browser abandoned the write', 'AbortError'));
+    if (tx.commit) tx.commit();
+  });
+  /** Keep some bytes under their hash: resolves when the browser holds them. `rec`: { hash, bytes: Uint8Array, mime, w, h }. */
+  async function assetPut(rec) {
+    assets.pending.add(rec.hash);
+    try {
+      const db = await assetDB();
+      const info = { hash: rec.hash, at: Date.now(), size: rec.bytes.length, mime: rec.mime, w: rec.w, h: rec.h };
+      if (!db) {
+        assets.mem.set(rec.hash, Object.assign({ bytes: rec.bytes }, info));
+        if (!assets.saidMem) { assets.saidMem = true; flash('this browser will not keep pictures — they stay only while this page is open'); }
+        return;
+      }
+      const tx = db.transaction(['assets', 'info'], 'readwrite', { durability: 'strict' });
+      tx.objectStore('assets').put({ hash: rec.hash, bytes: rec.bytes.buffer.byteLength === rec.bytes.length ? rec.bytes.buffer : rec.bytes.slice().buffer, mime: rec.mime });
+      tx.objectStore('info').put(info);
+      await idbDone(tx);
+    } catch (err) { assets.pending.delete(rec.hash); throw err; }
+  }
+  /** What a hash is kept as — { hash, bytes (ArrayBuffer or Uint8Array), mime, w, h } — or null. */
+  async function assetGet(hash) {
+    const m = assets.mem.get(hash);
+    if (m) return m;
+    const db = await assetDB();
+    if (!db) return null;
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(['assets', 'info'], 'readonly');
+      let bytes = null, info = null;
+      tx.objectStore('assets').get(hash).onsuccess = (e) => { bytes = e.target.result || null; };
+      tx.objectStore('info').get(hash).onsuccess = (e) => { info = e.target.result || null; };
+      tx.oncomplete = () => resolve(bytes ? { hash: hash, bytes: bytes.bytes, mime: bytes.mime || (info && info.mime) || 'image/jpeg', w: info && info.w, h: info && info.h } : null);
+      tx.onabort = () => reject(tx.error);
+    });
+  }
+  /** Every asset kept, without its bytes: { hash, at, size, mime, w, h }. */
+  async function assetList() {
+    const out = new Map();
+    for (const [k, v] of assets.mem) out.set(k, { hash: k, at: v.at, size: v.size, mime: v.mime, w: v.w, h: v.h });
+    const db = await assetDB();
+    if (db) {
+      const rows = await new Promise((resolve, reject) => {
+        const tx = db.transaction(['info'], 'readonly');
+        let got = [];
+        tx.objectStore('info').getAll().onsuccess = (e) => { got = e.target.result || []; };
+        tx.oncomplete = () => resolve(got);
+        tx.onabort = () => reject(tx.error);
+      });
+      for (const r of rows) out.set(r.hash, r);
+    }
+    return [...out.values()].sort((a, b) => (a.at || 0) - (b.at || 0));
+  }
+  async function assetDrop(hashes) {
+    if (!hashes.length) return;
+    for (const h of hashes) assets.mem.delete(h);
+    const db = await assetDB();
+    if (!db) return;
+    const tx = db.transaction(['assets', 'info'], 'readwrite');
+    for (const h of hashes) { tx.objectStore('assets').delete(h); tx.objectStore('info').delete(h); }
+    await idbDone(tx);
+  }
+  /** The digest of some bytes, as hex: the browser's own where the page is a secure context, else plain code (17-assets.js). */
+  async function digestHex(bytes) {
+    try {
+      if (window.crypto && window.crypto.subtle) {
+        const d = new Uint8Array(await window.crypto.subtle.digest('SHA-256', bytes));
+        let out = '';
+        for (const b of d) out += b.toString(16).padStart(2, '0');
+        return out;
+      }
+    } catch (err) { /* not a secure context: plain code */ }
+    return sha256Hex(bytes);
   }
 
   /**
-   * A picture becomes ink at a place on the board: traced, scaled so it lands
-   * at `at` with its longest side `size` world units, and imported as declared
-   * content. The raster is imported beside it as an image artifact.
+   * Collect the assets nothing uses: every asset kept that no board names — this page's board as it stands,
+   * and every board the browser keeps, the trash's included (a trashed board is restorable, so its pictures
+   * stay) — except what is new or in flight (17-assets.js `assetGcPlan`). Run when the trash is emptied and
+   * never before; and never on a guess: a board that cannot be read stops the whole collection.
    */
-  function importBitmap(bitmap, name, at, opts) {
-    const o = opts || {};
-    const size = o.size || 600;
-    const traced = MM.trace(bitmap, o.trace);
-    const k = size / Math.max(bitmap.width, bitmap.height);
-    const strokes = traced.strokes.map((s) => s.points.map((p) => ({ x: at.x + p.x * k, y: at.y + p.y * k })));
-    const bounds = { minX: at.x, minY: at.y, maxX: at.x + bitmap.width * k, maxY: at.y + bitmap.height * k };
-    const path = IMPORT_DIR + '/' + safeName(name);
-    const now = Date.now();
-    let inkId = null;
-    if (strokes.length) inkId = session.import({ kind: 'png', path: path, bounds: bounds, strokes: strokes, at: now });
-    // The raster, kept beside the ink: parked to the right of it, so the ink
-    // stays what the hand works on and the picture stays what it came from.
-    let imageId = null;
-    if (o.keepRaster !== false && o.url) {
-      folder.urls.set(path, o.url);
-      const rb = { minX: bounds.maxX + 40, minY: bounds.minY, maxX: bounds.maxX + 40 + (bounds.maxX - bounds.minX), maxY: bounds.maxY };
-      imageId = session.import({ kind: /\.jpe?g$/i.test(path) ? 'jpg' : 'png', path: path, name: safeName(name), bounds: rb, code: '', at: now + 1 });
+  async function collectAssets() {
+    const held = await assetList();
+    if (!held.length) return { dropped: [], kept: [] };
+    const used = assetsOfEvents(session.getEvents());
+    if (boards.how === 'indexeddb') {
+      const db = await boardDB();
+      for (const e of boards.entries.values()) {
+        if (!isKept(e)) continue;
+        if (e.id === board.id && onBoardHere()) continue; // on screen: its events are the log just read
+        for (const a of assetsOfEvents(journalFold((await idbBackend(db, e.id).read()).records).events)) used.add(a);
+      }
     }
-    flash('traced ' + name + ': ' + strokes.length + ' stroke' + (strokes.length === 1 ? '' : 's') + ' — ' + traced.reasoning);
-    return { inkId: inkId, imageId: imageId, strokes: strokes.length, reasoning: traced.reasoning };
+    const plan = assetGcPlan(held, used, { now: Date.now(), graceMs: assets.graceMs, pending: assets.pending });
+    await assetDrop(plan.drop);
+    return { dropped: plan.drop, kept: plan.keep };
+  }
+
+  // ===== The picture on the way in ==============================================
+  // Decoded in a worker where the browser has OffscreenCanvas (off the main thread: a 12 MP photo is a
+  // second of decoding and 48 MB), the main thread otherwise; the EXIF turn is honoured (a phone's photo is
+  // stored turned the way it is seen); the long side held to 2,560 px; kept as a JPEG, WebP where it came out
+  // clearly smaller, PNG where it has transparency; the bitmap closed. The original is not kept (an option for
+  // later, PLAN-IPAD-NOTES §5.4). One file at a time, whatever the pick.
+  const PICTURE_QUALITY = 0.85;
+  const PICTURE_WORKER_SRC = [
+    // One definition of the fit, taken from the closure by its own source.
+    fitLongSide.toString(),
+    'async function bitmapOf(file) { try { return await createImageBitmap(file, { imageOrientation: "from-image" }); } catch (err) { return await createImageBitmap(file); } }',
+    'onmessage = async (e) => {',
+    '  const m = e.data;',
+    '  try {',
+    '    const bmp = await bitmapOf(m.file);',
+    '    const fit = fitLongSide(bmp.width, bmp.height, m.max);',
+    '    const c = new OffscreenCanvas(fit.w, fit.h);',
+    '    c.getContext("2d").drawImage(bmp, 0, 0, fit.w, fit.h);',
+    '    bmp.close();',
+    '    const sw = Math.min(256, fit.w), sh = Math.min(256, fit.h);',
+    '    const small = new OffscreenCanvas(sw, sh), sg = small.getContext("2d", { willReadFrequently: true });',
+    '    sg.drawImage(c, 0, 0, sw, sh);',
+    '    const d = sg.getImageData(0, 0, sw, sh).data;',
+    '    let alpha = false;',
+    '    for (let i = 3; i < d.length; i += 4) if (d[i] < 255) { alpha = true; break; }',
+    '    const out = { ok: true, w: fit.w, h: fit.h, hasAlpha: alpha };',
+    '    if (alpha) out.png = await c.convertToBlob({ type: "image/png" });',
+    '    else {',
+    '      out.jpeg = await c.convertToBlob({ type: "image/jpeg", quality: m.quality });',
+    '      try { const wb = await c.convertToBlob({ type: "image/webp", quality: m.quality }); if (wb.type === "image/webp") out.webp = wb; } catch (err) { /* no webp here */ }',
+    '    }',
+    '    postMessage(out);',
+    '  } catch (err) { postMessage({ ok: false, error: String(err && err.message || err) }); }',
+    '};',
+  ].join('\n');
+  /** A worker for decoding, or null where the browser cannot (no OffscreenCanvas, no Worker, a blocked blob). */
+  function pictureWorker() {
+    try {
+      if (typeof OffscreenCanvas === 'undefined' || typeof Worker === 'undefined' || typeof createImageBitmap === 'undefined') return null;
+      const url = URL.createObjectURL(new Blob([PICTURE_WORKER_SRC], { type: 'text/javascript' }));
+      const w = new Worker(url);
+      w.url = url;
+      return w;
+    } catch (err) { return null; }
+  }
+  function endPictureWorker(w) { if (w) { try { w.terminate(); } catch (err) { /* gone */ } try { URL.revokeObjectURL(w.url); } catch (err) { /* gone */ } } }
+  function viaWorker(w, file) {
+    return new Promise((resolve, reject) => {
+      w.onmessage = (e) => (e.data && e.data.ok ? resolve(e.data) : reject(new Error((e.data && e.data.error) || 'the worker could not read it')));
+      w.onerror = (e) => reject(new Error((e && e.message) || 'the worker failed'));
+      w.postMessage({ file: file, max: ASSET_LONG_SIDE, quality: PICTURE_QUALITY });
+    });
+  }
+  /** The same on the main thread, with an ordinary canvas. */
+  async function onMainThread(file) {
+    let bmp;
+    try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (err) { bmp = await createImageBitmap(file); }
+    try {
+      const fit = fitLongSide(bmp.width, bmp.height, ASSET_LONG_SIDE);
+      const c = document.createElement('canvas');
+      c.width = fit.w; c.height = fit.h;
+      c.getContext('2d').drawImage(bmp, 0, 0, fit.w, fit.h);
+      const sw = Math.min(256, fit.w), sh = Math.min(256, fit.h);
+      const small = document.createElement('canvas');
+      small.width = sw; small.height = sh;
+      const sg = small.getContext('2d', { willReadFrequently: true });
+      sg.drawImage(c, 0, 0, sw, sh);
+      const d = sg.getImageData(0, 0, sw, sh).data;
+      let alpha = false;
+      for (let i = 3; i < d.length; i += 4) if (d[i] < 255) { alpha = true; break; }
+      const toBlob = (type, q) => new Promise((resolve) => c.toBlob((b) => resolve(b), type, q));
+      const out = { ok: true, w: fit.w, h: fit.h, hasAlpha: alpha };
+      if (alpha) out.png = await toBlob('image/png');
+      else {
+        out.jpeg = await toBlob('image/jpeg', PICTURE_QUALITY);
+        const wb = await toBlob('image/webp', PICTURE_QUALITY);
+        if (wb && wb.type === 'image/webp') out.webp = wb;
+      }
+      return out;
+    } finally { bmp.close(); }
+  }
+  /** A picture file as the bytes it is kept as: { blob, format, w, h }. */
+  async function encodePicture(file, worker) {
+    let r = null;
+    if (worker) { try { r = await viaWorker(worker, file); } catch (err) { r = null; } }
+    if (!r) r = await onMainThread(file);
+    const format = pictureFormat({ hasAlpha: r.hasAlpha, jpegBytes: r.jpeg ? r.jpeg.size : 0, webpBytes: r.webp ? r.webp.size : null });
+    const blob = r[format === 'jpeg' ? 'jpeg' : format] || r.jpeg || r.png;
+    if (!blob) throw new Error('could not make a picture of it');
+    return { blob: blob, format: blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpeg', w: r.w, h: r.h };
+  }
+
+  // ===== Pictures in ===============================================================
+  const IMPORT_MAX_PX = 1400; // the long side a picture is traced at: tracing is not for a photograph's every pixel
+  const IMPORT_DIR = 'imports';
+
+  function safeName(name) {
+    return safePictureName(name);
+  }
+
+  /** The paths the board's artifacts already carry, so two pictures called image.jpg are told apart. */
+  function pathsOnBoard() {
+    const s = session.getState(), out = new Set();
+    for (const id of s.artifacts) { const n = s.nodes.get(id), r = n && codeRepOf(n); if (r && r.data.path) out.add(r.data.path); }
+    return out;
   }
 
   /** Text of a known kind becomes an artifact at a place on the board. */
@@ -11212,25 +11677,275 @@
     return id;
   }
 
-  /** A file from a drop, a paste, the picker or a camera. */
-  async function importFile(file, at) {
-    const where = at || screenToWorld(innerWidth / 2, innerHeight / 2);
-    const name = file.name || ('pasted-' + Date.now() + '.png');
-    if (/^image\/svg/.test(file.type) || /\.svg$/i.test(name)) {
-      return importText(name.replace(/\.svg$/i, '') + '.svg', await file.text(), where);
+  /**
+   * One picture, kept and placed: encoded, hashed, stored — and only then named on the board by an `import`
+   * event carrying the asset, never the bytes. `cell` is where it stands (a box in world units); the picture
+   * is fitted into it with its own proportions.
+   */
+  async function importPicture(file, name, cell, taken, worker) {
+    const enc = await encodePicture(file, worker);
+    const buf = new Uint8Array(await enc.blob.arrayBuffer());
+    const ref = assetRef(await digestHex(buf));
+    const ext = pictureExt(enc.format);
+    const mime = enc.blob.type || ('image/' + (ext === 'jpg' ? 'jpeg' : ext));
+    await assetPut({ hash: ref, bytes: buf, mime: mime, w: enc.w, h: enc.h });
+    const path = uniquePicturePath(name, taken, ext);
+    taken.add(path);
+    // A folder that can be written gets the file beside the log, as it always did.
+    if (folder.store && folder.store.capabilities().write) {
+      try { await folder.store.write(path, buf); } catch (err) { /* the board still has it */ }
     }
-    if (/^image\//.test(file.type)) {
-      const bitmap = await bitmapOf(file);
-      const url = URL.createObjectURL(file);
-      // The file lands in the folder when there is one to write to.
-      if (folder.store && folder.store.capabilities().write) {
-        try { await folder.store.write(IMPORT_DIR + '/' + safeName(name), new Uint8Array(await file.arrayBuffer())); } catch (err) { /* stays in memory */ }
+    const at = fitInCell({ w: enc.w, h: enc.h }, cell);
+    const id = session.import({ kind: ext, path: path, name: safeName(name), bounds: { minX: at.x, minY: at.y, maxX: at.x + at.w, maxY: at.y + at.h }, asset: ref, mime: mime, w: enc.w, h: enc.h, at: Date.now() });
+    assets.pending.delete(ref);
+    return id;
+  }
+
+  let pickChain = Promise.resolve();
+  /** What the last pick said, for tests. */
+  let pickSaid = [];
+  /**
+   * A pick of files — several at once from the photos input, a drop, a paste — laid out in a grid in the view
+   * (`opts.view`, a box in world units, else the ground the hand is looking at; `opts.at` to begin at a point,
+   * as a drop does), one file at a time so a pick of twenty never holds twenty decoded photographs, each
+   * placed the moment it is kept — the status line says how far it has come (*3 of 10 pictures*). A picture
+   * is a picture on the board, drawn there; it is NOT traced (*Trace into ink* is an offer). An SVG or a file
+   * of a known kind is an artifact of its kind in its cell. Picks are queued: a paste during a pick waits.
+   * @returns {Promise<{ids: string[], skipped: Array<{name:string, why:string}>}>}
+   */
+  function importPictures(files, opts) {
+    const o = opts || {};
+    const list = [...(files || [])].filter(Boolean);
+    const run = async () => {
+      const out = { ids: [], skipped: [] };
+      if (!list.length) return out;
+      let view = o.view;
+      if (!view) {
+        const vw = viewportWorld();
+        view = o.at ? { minX: o.at.x, minY: o.at.y, maxX: o.at.x + (vw.maxX - vw.minX), maxY: o.at.y + (vw.maxY - vw.minY) } : vw;
       }
-      return importBitmap(bitmap, name, where, { url: url });
+      let cells = pictureCells(list.length, view);
+      // Clear of what is on the board already: a second picture never lands on the first.
+      const st0 = session.getState();
+      const shift = clearShift(cells, st0.contentIds.map((id) => MM.boundsOf(st0.nodes.get(id))).filter((b) => b && MM.finiteBounds(b)), cells.length ? Math.min(cells[0].w, cells[0].h) * 0.1 : 0);
+      if (shift.moved) cells = cells.map((c) => ({ x: c.x + shift.dx, y: c.y + shift.dy, w: c.w, h: c.h }));
+      const taken = pathsOnBoard();
+      const rasters = list.filter((f) => /^image\//.test(f.type) && !/^image\/svg/.test(f.type)).length;
+      const worker = rasters ? pictureWorker() : null;
+      pickSaid = [];
+      try {
+        for (let i = 0; i < list.length; i++) {
+          const f = list[i];
+          const name = f.name || ('pasted-' + Date.now() + '.png');
+          const cell = cells[i];
+          const say1 = (t) => { pickSaid.push(t); flash(t); };
+          try {
+            let id = null;
+            if (/^image\/svg/.test(f.type) || /\.svg$/i.test(name)) {
+              say1(list.length > 1 ? 'importing ' + pickWords(i + 1, list.length) + ' — ' + name : 'importing ' + name);
+              id = importText(name.replace(/\.svg$/i, '') + '.svg', await f.text(), { x: cell.x, y: cell.y }, cell.w);
+            } else if (/^image\//.test(f.type)) {
+              say1(list.length > 1 ? 'importing ' + pickWords(i + 1, list.length) + ' — keeping ' + name : 'keeping ' + name);
+              id = await importPicture(f, name, cell, taken, worker);
+            } else if (MM.kindOf(name)) {
+              id = importText(name, await f.text(), { x: cell.x, y: cell.y }, cell.w);
+            } else { out.skipped.push({ name: name, why: 'not a kind the canvas knows' }); continue; }
+            if (id) out.ids.push(id); else out.skipped.push({ name: name, why: 'nothing was made of it' });
+          } catch (err) {
+            out.skipped.push({ name: name, why: String((err && err.message) || err) });
+          }
+        }
+      } finally { endPictureWorker(worker); }
+      // Placed clear of the view's own ground, the pick is shown: the view goes to what was just kept.
+      if (shift.moved && out.ids.length) {
+        const sn = session.getState();
+        const bs = out.ids.map((id) => sn.nodes.get(id)).filter(Boolean).map((nd) => MM.boundsOf(nd)).filter(Boolean);
+        const vis = viewportWorld();
+        if (bs.length && bs.some((b) => b.minX > vis.maxX || b.maxX < vis.minX || b.minY > vis.maxY || b.maxY < vis.minY)) fitTo(union(bs));
+      }
+      const n = out.ids.length;
+      const said = (n ? (n === 1 ? '1 picture kept' : n + ' pictures kept') + ' — laid out here, drawn under your ink' : 'nothing was imported') +
+        (out.skipped.length ? ' · could not read ' + out.skipped.map((x) => x.name + ' (' + x.why + ')').join(', ') : '');
+      pickSaid.push(said); flash(said);
+      return out;
+    };
+    const next = pickChain.then(run, run);
+    pickChain = next.then(() => undefined, () => undefined);
+    return next;
+  }
+
+  /** A file from a drop, a paste, the picker or a camera: the one-file form of a pick. */
+  async function importFile(file, at) {
+    return (await importPictures([file], at ? { at: at } : {})).ids[0] || null;
+  }
+
+  // ===== Pictures drawn on the board =================================================
+  // A picture artifact is painted on the canvas UNDER the ink (08-render.js asks `pictureBitmap` and draws
+  // it) — not an iframe, so the live budget of frames is none of its business. The decoded bitmap is cached
+  // by asset: a thumbnail while the screen shows the picture small, the picture whole once it is shown large;
+  // read from the asset store and decoded once, off the paint; and let go — closed — when the decoded
+  // pictures cost more than a budget (the least recently drawn first, never one in the paint just made) or
+  // have not been drawn for a while. The cache is runtime: it holds nothing the log or the store does not.
+  const PICTURE_IDLE_MS = 20000;
+  const pictures = new Map();   // asset → { state: 'loading' | 'ready' | 'missing', tier, bmp, cost, drawn, drawnAt, size, want }
+  let paintSerial = 0;
+  let picturesLoading = 0;
+  let sweepTimer = 0;
+  /** Which pictures the last paint drew and in what state, for tests. */
+  let drawnPictures = [];
+
+  /** One decode: the asset's bytes into a bitmap at a tier — a thumbnail's long side, or whole. */
+  async function decodeAsset(asset, tier) {
+    const rec = await assetGet(asset);
+    if (!rec) return null;
+    const blob = new Blob([rec.bytes], { type: rec.mime || 'image/jpeg' });
+    if (tier === 'thumb' && rec.w && rec.h) {
+      const k = Math.min(1, PICTURE_THUMB_PX / Math.max(rec.w, rec.h));
+      if (k < 1) {
+        try { return { bmp: await createImageBitmap(blob, { resizeWidth: Math.max(1, Math.round(rec.w * k)), resizeHeight: Math.max(1, Math.round(rec.h * k)), resizeQuality: 'medium' }), size: { w: rec.w, h: rec.h }, tier: 'thumb' }; } catch (err) { /* whole, then */ }
+      }
     }
-    if (MM.kindOf(name)) return importText(name, await file.text(), where);
-    flash(name + ': not a kind the canvas knows');
-    return null;
+    const bmp = await createImageBitmap(blob);
+    return { bmp: bmp, size: { w: rec.w || bmp.width, h: rec.h || bmp.height }, tier: 'full' };
+  }
+
+  /**
+   * The bitmap to draw for an asset at the tier the screen wants — what is held, while a better one is read —
+   * or null while there is none (and a read is under way, which repaints when it lands). Marks the asset as
+   * drawn in this paint. `missing` is the asset this browser does not hold: a log that came from elsewhere.
+   */
+  function pictureBitmap(asset, tier) {
+    let e = pictures.get(asset);
+    if (!e) { e = { state: 'loading', tier: null, bmp: null, cost: 0, drawn: 0, drawnAt: 0, size: null, want: null }; pictures.set(asset, e); }
+    e.drawn = paintSerial; e.drawnAt = Date.now();
+    // A picture held whole is never decoded small again for a screen that has shrunk a little: the budget lets it go when it must.
+    const needs = !e.bmp || (e.tier === 'thumb' && tier === 'full');
+    if (e.state !== 'missing' && needs && e.want !== tier) {
+      e.want = tier;
+      picturesLoading++;
+      decodeAsset(asset, tier).then((got) => {
+        picturesLoading--;
+        const cur = pictures.get(asset);
+        if (!cur) { if (got) got.bmp.close(); return; }
+        if (!got) { cur.state = 'missing'; viewChanged(); return; }
+        if (cur.bmp) cur.bmp.close();
+        cur.bmp = got.bmp; cur.tier = got.tier; cur.size = got.size; cur.state = 'ready';
+        cur.cost = decodedCost(got.size, got.tier);
+        viewChanged();
+      }, () => { picturesLoading--; const cur = pictures.get(asset); if (cur) { cur.state = cur.bmp ? 'ready' : 'missing'; cur.want = null; } });
+    }
+    return e.bmp ? { bmp: e.bmp, tier: e.tier } : null;
+  }
+  /** What the paint just made has cost: let go of what the budget cannot hold and what has not been drawn for a while. */
+  function picturesPainted() {
+    const entries = [...pictures].filter(([, e]) => e.bmp).map(([k, e]) => ({ key: k, cost: e.cost, drawn: e.drawn }));
+    for (const k of evictPlan(entries, { budgetPx: DECODED_BUDGET_PX, paintedAt: paintSerial })) releasePicture(k);
+    if (!sweepTimer && pictures.size) sweepTimer = setTimeout(sweepPictures, PICTURE_IDLE_MS + 500);
+  }
+  function releasePicture(asset) {
+    const e = pictures.get(asset);
+    if (!e) return;
+    if (e.bmp) e.bmp.close();
+    pictures.delete(asset);
+  }
+  function sweepPictures() {
+    sweepTimer = 0;
+    const now = Date.now();
+    for (const [k, e] of [...pictures]) if (e.bmp && e.drawn < paintSerial && now - e.drawnAt > PICTURE_IDLE_MS) releasePicture(k);
+    if ([...pictures.values()].some((e) => e.bmp)) sweepTimer = setTimeout(sweepPictures, PICTURE_IDLE_MS);
+  }
+  /** Everything decoded, let go — what a reload would do; for tests. */
+  function forgetPictures() { for (const k of [...pictures.keys()]) releasePicture(k); }
+  const pictureState = () => ({
+    loading: picturesLoading,
+    decoded: [...pictures].filter(([, e]) => e.bmp).map(([k, e]) => ({ asset: k, tier: e.tier, cost: e.cost })),
+    missing: [...pictures].filter(([, e]) => e.state === 'missing').map(([k]) => k),
+  });
+
+  /**
+   * Draw a picture artifact in the box where it stands: its bitmap at the tier the screen wants, or — while
+   * the bytes are being read, or when this browser does not hold them — a faint plate where it stands, so the
+   * place is never empty. Called by the paint under the ink, in world space. Returns its state.
+   */
+  function drawPicture(node, id) {
+    const p = MM.pictureOf(node);
+    const b = MM.boundsOf(node);
+    if (!p || !p.asset || !b) return null;
+    const w = b.maxX - b.minX, h = b.maxY - b.minY;
+    const dpr = window.devicePixelRatio || 1;
+    const got = pictureBitmap(p.asset, pictureTier(Math.max(w, h) * view.zoom * dpr));
+    if (got) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      // A picture the hand turned stands in its frame turned about its centre, as a stroke does.
+      const turn = MM.getRep(node, 'rotation');
+      if (turn && typeof turn.data === 'number' && turn.data) {
+        ctx.save();
+        ctx.translate(b.minX + w / 2, b.minY + h / 2); ctx.rotate(turn.data);
+        ctx.drawImage(got.bmp, -w / 2, -h / 2, w, h);
+        ctx.restore();
+      } else ctx.drawImage(got.bmp, b.minX, b.minY, w, h);
+    } else {
+      ctx.fillStyle = `rgba(${C.goldRGB},0.06)`;
+      ctx.fillRect(b.minX, b.minY, w, h);
+    }
+    const state = got ? 'drawn' : (pictures.get(p.asset) || {}).state === 'missing' ? 'missing' : 'loading';
+    drawnPictures.push({ id: id, asset: p.asset, state: state, tier: got ? got.tier : null, box: { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY } });
+    return state;
+  }
+  /** The start of a paint: the serial the pictures drawn in it are marked with. */
+  function picturesBegin() { paintSerial++; drawnPictures = []; }
+
+  /** A picture's `src` for a card or a frame (the grid view): the asset as a URL, once it is read; else the folder's file. */
+  const assetUrls = new Map();
+  function pictureSrc(rep) {
+    const a = rep && rep.data && rep.data.asset;
+    if (a) {
+      if (assetUrls.has(a)) return assetUrls.get(a);
+      assetUrls.set(a, null);
+      assetGet(a).then((rec) => {
+        if (!rec) return;
+        assetUrls.set(a, URL.createObjectURL(new Blob([rec.bytes], { type: rec.mime || 'image/jpeg' })));
+        if (viewMode === 'grid') renderGrid(session.getState());
+      }, () => {});
+      return null;
+    }
+    return rep && rep.data && rep.data.path ? imageUrlFor(rep.data.path) : null;
+  }
+
+  // ===== Tracing: an offer, not an import ==================================================
+  // The host act of *Trace into ink* (tools/trace.ts names it). A picture used to be traced the moment it
+  // came in, whatever it was; now it is traced when a hand asks, over the picture, which stays. The pixels
+  // are the asset's, read again here; the strokes land as one `import` event — one act, one undo — placed
+  // exactly over the picture's own box. A later unit may filter by what the shape rung reads with confidence.
+  async function traceFrom(artifactId, asset) {
+    const s = session.getState();
+    const node = s.nodes.get(artifactId);
+    const b = node && MM.boundsOf(node);
+    if (!b) { flash('that picture is no longer there'); return null; }
+    let bitmap;
+    try {
+      const rec = await assetGet(asset);
+      if (!rec) { flash('the pixels of that picture are not on this device, so it cannot be traced'); return null; }
+      const bmp = await createImageBitmap(new Blob([rec.bytes], { type: rec.mime || 'image/jpeg' }));
+      try {
+        const k = Math.min(1, IMPORT_MAX_PX / Math.max(bmp.width, bmp.height));
+        const w = Math.max(1, Math.round(bmp.width * k)), h = Math.max(1, Math.round(bmp.height * k));
+        const off = document.createElement('canvas');
+        off.width = w; off.height = h;
+        const c = off.getContext('2d', { willReadFrequently: true });
+        c.drawImage(bmp, 0, 0, w, h);
+        bitmap = c.getImageData(0, 0, w, h);
+      } finally { bmp.close(); }
+    } catch (err) { flash('could not read that picture: ' + ((err && err.message) || err)); return null; }
+    const traced = MM.trace(bitmap);
+    const kx = (b.maxX - b.minX) / bitmap.width, ky = (b.maxY - b.minY) / bitmap.height;
+    const strokes = traced.strokes.map((st) => st.points.map((p) => ({ x: b.minX + p.x * kx, y: b.minY + p.y * ky })));
+    const p = MM.pictureOf(session.getState().nodes.get(artifactId) || node);
+    let ink = null;
+    if (strokes.length) ink = session.withTool('trace', () => session.import({ kind: (p && p.kind) || 'png', path: (p && p.path) || 'imports/traced', bounds: { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY }, strokes: strokes, at: Date.now() }), 'trace');
+    flash('traced ' + ((p && p.name) || 'the picture') + ': ' + strokes.length + ' stroke' + (strokes.length === 1 ? '' : 's') + ' of ink over it — ' + traced.reasoning);
+    return { inkId: ink, strokes: strokes.length, reasoning: traced.reasoning };
   }
 
   // Drop, paste, the picker, the camera.
@@ -11238,25 +11953,42 @@
   canvas.addEventListener('drop', (e) => {
     e.preventDefault();
     const at = screenToWorld(e.clientX, e.clientY);
-    for (const f of e.dataTransfer.files) importFile(f, at);
+    importPictures([...e.dataTransfer.files], { at: at });
   });
+  /** A field the hand types in: a paste there is the field's, never the board's. */
+  const isTextField = (el) => !!el && el.nodeType === 1 && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
   addEventListener('paste', (e) => {
-    if (e.target !== document.body) return;
+    if (isTextField(e.target)) return;
     const items = [...(e.clipboardData ? e.clipboardData.items : [])];
     const files = items.filter((i) => i.kind === 'file').map((i) => i.getAsFile()).filter(Boolean);
     const at = lastPen ? screenToWorld(lastPen.x, lastPen.y) : screenToWorld(innerWidth / 2, innerHeight / 2);
     // No file on the clipboard: what Copy held is pasted where the pen last was.
     if (!files.length) { if (clip) { e.preventDefault(); pasteClip(at); } return; }
     e.preventDefault();
-    for (const f of files) importFile(f, at);
+    importPictures(files, { at: at });
   });
   const importInput = document.getElementById('importInput');
-  document.getElementById('importBtn').onclick = () => importInput.click();
-  importInput.onchange = () => {
-    const at = screenToWorld(innerWidth / 2, innerHeight / 2);
-    for (const f of importInput.files) importFile(f, at);
-    importInput.value = '';
-  };
+  const photosInput = document.getElementById('photosInput');
+  const cameraInput = document.getElementById('cameraInput');
+  const importPanel = document.getElementById('importPanel');
+  const importBtn = document.getElementById('importBtn');
+  ui.pane(importPanel, 'import', () => closePanel(importPanel, importBtn));
+  importBtn.onclick = () => togglePanel(importPanel, importBtn);
+  // The file dialog opens inside the tap that asks for it (a browser will not open one otherwise).
+  importPanel.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('button[data-import]');
+    if (!b) return;
+    const input = { photos: photosInput, camera: cameraInput, file: importInput }[b.dataset.import];
+    if (input) input.click();
+    closePanel(importPanel, importBtn);
+  });
+  for (const input of [photosInput, cameraInput, importInput]) {
+    input.onchange = () => {
+      const files = [...input.files];
+      input.value = '';
+      importPictures(files);
+    };
+  }
 
   // ===== The board out ======================================================
   // Export is the kinds list read backwards: the board as SVG or PNG, the
@@ -11616,7 +12348,7 @@
       : { why: 'which side of the pen tip the field opens on' });
     ui.tile(tiles.autoRead, 'auto-read', autoRead ? 'on' : 'off', { on: autoRead, why: 'read handwriting with a model as it is written; off asks only when you say read' });
     ui.tile(tiles.folder, folder.store ? (folder.how === 'git' ? 'repo' : folder.how === 'static' ? 'site' : 'folder') : 'folder', folder.store ? (folder.name || 'open') : 'open…', { on: !!folder.store, why: 'a folder is the canvas: its files are artifacts, your ink is saved beside them' });
-    ui.tile(tiles.imp, 'import', '…', { why: 'a picture is traced into ink; a file of a known kind becomes an artifact. Drop or paste works too' });
+    ui.tile(tiles.imp, 'import', '…', { why: 'photos from your library, a picture from the camera, or a file of a known kind — pictures are kept with the board and drawn on it, under your ink. Drop or paste works too' });
     ui.tile(tiles.exp, 'export', '…', { why: 'the board as SVG or PNG, or the session as its log' });
     const seated = agents.map((a) => modelWords(a)).concat(deciderHost() ? [deciderHost().name + ' (decider)'] : []);
     ui.tile(tiles.models, 'models', seated.length ? seated.join(', ') : 'none', { on: seated.length > 0, why: 'a model joins as a participant, in a seat if you give it one; it is asked only when you ask' });
@@ -13122,7 +13854,7 @@
     // Text as an element, for tests.
     typeText: typeText, editText: editText, wordToText: wordToText, beginTextEdit: beginTextEdit, commitTextEdit: commitTextEdit,
     // Pictures in and the board out, for tests.
-    importBitmap: importBitmap, importText: importText, exportBoardSVG: exportBoardSVG, exportLog: exportLog,
+    importPictures: importPictures, importText: importText, exportBoardSVG: exportBoardSVG, exportLog: exportLog,
     // The folder, for tests: open any store (a MemoryStore stands in for a folder), and read the board's home.
     openStore: (store, how, name) => openStore(store, how, name),
     openGit: (spec, token, remember) => openGit(spec, token, remember),
@@ -13155,6 +13887,13 @@
     }),
   };
 
+
+  // Pictures kept and drawn (PLAN-IPAD-NOTES I1), for tests: the asset store, what is decoded, what the last paint drew, what a pick said.
+  Object.assign(window.__mm, {
+    assets: assetList, collectAssets: collectAssets, setAssetGrace: (ms) => { assets.graceMs = ms; },
+    pictureState: pictureState, forgetPictures: forgetPictures, picturesDrawn: () => drawnPictures.map((d) => Object.assign({}, d)),
+    pickSaid: () => pickSaid.slice(), traceFrom: traceFrom,
+  });
 
   // Mermaid (V1-PLAN D2, D3), for tests: the library a frame loads (a stand-in, or the CDN's again), what a frame said of itself, what Draw it drew.
   Object.assign(window.__mm, {

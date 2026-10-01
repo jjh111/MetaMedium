@@ -409,8 +409,8 @@
     }
     // A diagram said as Mermaid: its text stands, and the library draws it in place of the text when it can.
     if (kind === 'mermaid') return mermaidDocument(ctx && ctx.id || '', code, w, h);
-    if (kind === 'png' || kind === 'jpg') {
-      const url = rep.data.path ? imageUrlFor(rep.data.path) : null;
+    if (MM.isPictureKind(kind)) {
+      const url = pictureSrc(rep);
       return '<!doctype html><html><head><meta charset="utf-8"><style>' + SOURCE_CSS +
         '#mmroot{width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px;display:flex;align-items:center;justify-content:center;}img{max-width:100%;max-height:100%;}</style></head>' +
         '<body><div id="mmroot" data-region="picture">' + (url ? '<img src="' + esc(url) + '" alt="">' : '<span class="gap">' + esc(rep.data.path || 'a picture') + '</span>') + '</div></body></html>';

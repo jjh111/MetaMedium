@@ -821,6 +821,97 @@ export async function runBig(browser, servers, ctx) {
   return { steps, guards: [guards], measured };
 }
 
+/**
+ * A picture imported right before the tab dies is there on reopen (PLAN-IPAD-NOTES I1). The bytes are written
+ * to the asset store first (its own transaction, committed before the event exists) and the event is written to
+ * the journal in the task that makes it, as every event is — so a kill can land before the asset (no picture,
+ * nothing half-made), between the asset and the event (an asset nothing names: collected one day), or after the
+ * event (the picture, whole). It can never leave an event naming bytes that were not kept. Each cycle imports a
+ * picture of its own colour and is killed right after it (`after`: the import was awaited, so it MUST be there),
+ * or a few milliseconds into it (`mid`: there whole, or not at all); the next page finds every picture the board
+ * holds drawn in its own colour — read from the asset store, not from anything the first page kept.
+ */
+export async function pictureTest(browser, servers, ctx) {
+  const { freshContext, engineName, steps } = ctx;
+  const check = (name, ok, detail) => steps.push({ name, ok: !!ok, detail });
+  const guards = await freshContext(browser, { origins: [servers.staticOrigin], label: 'keep-pictures' });
+  const url = `${servers.staticOrigin}/Demos/session-engine.html?nosw=1`;
+  const seed = Number(process.env.E2E_KEEP_SEED || (Date.now() % 1e9)) + 17;
+  const rand = rng(seed);
+  const COLOURS = [[200, 40, 40], [40, 160, 60], [50, 70, 210], [210, 170, 30], [150, 60, 170], [20, 150, 160]];
+  const expected = []; // the colours of the pictures the board must hold, in the order imported
+  let optional = null;
+  const phases = ['after', 'mid', 'after', 'mid', 'after', 'after'];
+  let page = null;
+  // The pictures on the board, each with the colour the canvas shows where it stands and whether its asset is in the store.
+  const look = (pg) => pg.evaluate(async () => {
+    const mm = window.__mm, MM = mm.MM;
+    // Every picture stands clear of the one before (a second never lands on the first): fit them all on screen.
+    mm.fitAll();
+    const st = mm.session.getState();
+    const pics = st.artifacts.map((id) => ({ id, p: MM.pictureOf(st.nodes.get(id)) })).filter((x) => x.p);
+    const held = new Set((await mm.assets()).map((a) => a.hash));
+    const cv = document.getElementById('canvas'), dpr = window.devicePixelRatio || 1;
+    const sample = (id) => {
+      const b = MM.boundsOf(mm.session.getState().nodes.get(id)), p = mm.worldToScreen((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
+      const d = cv.getContext('2d').getImageData(Math.round(p.x * dpr) - 2, Math.round(p.y * dpr) - 2, 5, 5).data;
+      let r = 0, g = 0, b2 = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b2 += d[i + 2]; }
+      const n = d.length / 4; return [Math.round(r / n), Math.round(g / n), Math.round(b2 / n)];
+    };
+    // Every picture read and decoded, then painted: asked for, nothing loading, two frames on.
+    const frames = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await frames();
+    for (let i = 0; i < 100 && mm.pictureState().loading; i++) await new Promise((r) => setTimeout(r, 50));
+    await frames();
+    const out = pics.map((x) => ({ asset: x.p.asset || null, stored: !!x.p.asset && held.has(x.p.asset), colour: sample(x.id) }));
+    const orphans = st.artifacts.length;
+    return { pictures: out, artifacts: orphans, assets: held.size };
+  });
+  const close = (a, b) => a.every((v, i) => Math.abs(v - b[i]) <= 26);
+  try {
+    for (let c = 1; c <= phases.length + 1; c++) {
+      page = await guards.context.newPage();
+      await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+      await waitReady(page);
+      const seen = await look(page);
+      const colours = seen.pictures.map((p) => p.colour);
+      if (c > 1) {
+        const want = expected.slice();
+        let ok = seen.pictures.length === want.length || (optional && seen.pictures.length === want.length + 1);
+        if (ok && optional && seen.pictures.length === want.length + 1) { want.push(optional); }
+        optional = null;
+        ok = ok && seen.pictures.length === want.length && want.every((w, i) => close(colours[i], w)) && seen.pictures.every((p) => p.stored);
+        if (ok && seen.pictures.length > expected.length) expected.push(want[want.length - 1]);
+        check(`P${c - 1}. reopened after kill ${c - 1} (${phases[c - 2]}): every picture imported is on the board, drawn in its own colour from the asset store, and every event's bytes are kept`,
+          ok, { seed, cycle: c - 1, want, got: colours, stored: seen.pictures.map((p) => p.stored) });
+      }
+      if (c > phases.length) break;
+      const colour = COLOURS[(c - 1) % COLOURS.length];
+      const how = engineName === 'chromium' && rand() < 0.6 ? 'crash' : 'close';
+      const cdp = how === 'crash' ? await guards.context.newCDPSession(page) : null;
+      const phase = phases[c - 1];
+      const run = page.evaluate(async ([rgb, n]) => {
+        const cvs = document.createElement('canvas'); cvs.width = 640; cvs.height = 480;
+        const g = cvs.getContext('2d'); g.fillStyle = 'rgb(' + rgb.join(',') + ')'; g.fillRect(0, 0, 640, 480);
+        const blob = await new Promise((res) => cvs.toBlob(res, 'image/png'));
+        const file = new File([blob], 'keep-' + n + '.png', { type: 'image/png' });
+        await window.__mm.importPictures([file], { view: { minX: 480, minY: 140, maxX: 1380, maxY: 740 } });
+        return true;
+      }, [colour, c]).catch(() => false);
+      if (phase === 'after') { await run; expected.push(colour); }
+      else { await sleep(Math.floor(rand() * 60)); optional = colour; }
+      await killPage(page, how, cdp);
+      page = null;
+    }
+    check(`P. ${phases.length} kills right after (and during) a picture's import, seed ${seed}`, true, { seed });
+    if (page) await page.close().catch(() => {});
+  } catch (err) {
+    check(`P. the picture kill test ran to its end (seed ${seed})`, false, { error: String(err && err.stack ? err.stack : err) });
+    if (page) await ctx.screenshot(page, 'keep-pictures');
+  }
+  return guards;
+}
+
 /** The scenario the gate runs: the kill test, the forced failures, the import, two tabs, and the pages that are not the board. */
 export async function runKeep(browser, servers, ctx) {
   const steps = [];
@@ -835,6 +926,7 @@ export async function runKeep(browser, servers, ctx) {
   else steps.push({ name: 'F. flush on the way out — skipped: a write waiting for its retry needs the quota, forced through the DevTools protocol, which is Chromium\'s', ok: true });
   all.push(await timed('blocked s', () => blockedTest(browser, servers, inner)));
   all.push(...(await timed('import s', () => importTest(browser, servers, inner))));
+  all.push(await timed('pictures s', () => pictureTest(browser, servers, inner)));
   all.push(await timed('tabs s', () => tabsTest(browser, servers, inner)));
   all.push(await timed('not mine s', () => notMineTest(browser, servers, inner)));
   return { steps, guards: all, measured };

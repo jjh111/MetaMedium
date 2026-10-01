@@ -61,6 +61,19 @@ flowchart, a class diagram and a pattern page wait too.
   tap **Erase**. Twice only says *one more pass erases it*.
 - **Write**: write words in your hand. Hold them and press Enter to have a
   model read them; then make them text, a name, or a label.
+- **Bring in pictures**: **controls › Board › import** has *photos* (pick
+  several at once from your library or your files — SVGs too), *camera* (one
+  shot of a page or a whiteboard) and *other files*. You can also drop pictures
+  on the board or paste one. A pick is laid out in a grid on the ground you are
+  looking at, one picture at a time (the status line says *3 of 10 pictures*).
+  A picture is **kept with the board** — a browser copy, scaled to at most 2,560
+  pixels on its long side, the way it is seen — and **drawn on it, under your
+  ink**: write and draw on top of a photo of a page. Move, scale and turn it
+  like any mark. It is still there after a reload, on a duplicate of the board
+  and in the trash; its pixels are removed only when the trash is emptied and no
+  board uses it. The same photo brought in twice is kept once. To turn a
+  drawing's lines into ink, hold the picture and choose **Trace into ink** — the
+  picture stays and one undo takes the ink away.
 - **Type text**: double-click empty ground.
 - **Say a diagram as text**: hold a drawing that reads as a flowchart, a class
   diagram, a sequence diagram, a state diagram, an ER diagram or a mind map and
@@ -152,7 +165,7 @@ whole. **reset** is a fresh board — the old one goes to the trash. Under
 *examples*, a flowchart (with its Mermaid beside it), a class diagram, a
 molecule and a pattern page: opening one makes a new board of your own from
 it — the example itself never changes, so draw on it freely. Every
-board is kept in this browser as you draw; **export** writes it out as SVG, PNG
+board is kept in this browser as you draw — its pictures too; **export** writes it out as SVG, PNG
 or its log — and, when what you hold or the board reads as a diagram, as Mermaid
 text — and **folder** makes a folder on your computer the canvas.
 

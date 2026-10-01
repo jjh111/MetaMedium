@@ -187,7 +187,10 @@ function describeMark(node, s) {
   const rep = codeRepOf(node);
   const who = authorOf(node, s);
   const parts = [node.id + (name ? ' “' + name + '”' : '')];
-  if (rep) parts.push((rep.data.kind || 'html') + (rep.data.path ? ' ' + rep.data.path : ''));
+  // A picture: its name and size. Its pixels are kept by the page that imported it (the browser's asset store) — this hand has none, and says so.
+  const pic = MM.pictureOf(node);
+  if (pic) parts.push('a picture ' + pic.name + (pic.w && pic.h ? ' ' + pic.w + '×' + pic.h : '') + (pic.asset ? ' · its pixels are kept in the tab that imported it — this hand has none to see' : ' · no pixels were kept for it'));
+  else if (rep) parts.push((rep.data.kind || 'html') + (rep.data.path ? ' ' + rep.data.path : ''));
   if (MM.isWord(node)) parts.push('a word of ' + MM.lettersOf(node).length + ' strokes');
   parts.push(reads.join(', ') || 'unread');
   if (lab) parts.push('labelled “' + lab.text + '”');

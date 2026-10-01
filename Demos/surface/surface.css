@@ -197,9 +197,9 @@ html, body {
 #teachStatus { margin-top: 9px; color: var(--dim); font-size: 10.5px; line-height: 1.45; }
 #teachStatus.warn { color: var(--gold); }
 
-/* The export pane: three files. */
-#exportPanel .exRow { display: flex; gap: 7px; }
-#exportPanel .exRow button { flex: 1; font-family: var(--mono); font-size: 11px; }
+/* The export pane: three files; the import pane: photos, camera, other files. */
+#exportPanel .exRow, #importPanel .exRow { display: flex; gap: 7px; }
+#exportPanel .exRow button, #importPanel .exRow button { flex: 1; font-family: var(--mono); font-size: 11px; }
 #exportPanel .exRow + .exRow { margin-top: 7px; }
 #exportPanel .exRow button:disabled { opacity: 0.45; cursor: default; }
 /* The live pane: a room, a name, a relay. */

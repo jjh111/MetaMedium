@@ -21,7 +21,7 @@ const standIn = (s: Session, code: string, kind: 'mermaid' | 'text' = 'mermaid',
 describe('the Draw it tool', () => {
   it('is a built-in, registered after the exporter, then routing, then Which is it?', () => {
     const ids = BUILTIN_TOOLS.map((t) => t.id);
-    expect(ids.slice(-4)).toEqual(['mermaid', 'mermaid-draw', 'route', 'which']);
+    expect(ids.slice(-5)).toEqual(['mermaid', 'mermaid-draw', 'route', 'which', 'trace']);
     expect(getTool('mermaid-draw')).toBe(MERMAID_DRAW);
     expect(MERMAID_DRAW.describe().length).toBeGreaterThan(20);
   });
