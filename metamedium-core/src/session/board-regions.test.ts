@@ -13,7 +13,7 @@ import { connectorEnds } from './follow';
 import { activeBindingsOf } from './magnets';
 import { rectStroke, lineStroke } from '../test/strokes';
 import {
-  REGION_HOLDS, regionRepOf, regionMembers, regionCarries, describeRegion, regionSaid, regionsOfBoard,
+  REGION_HOLDS, regionRepOf, regionMembers, regionCarries, describeRegion, regionSaid, regionsOfBoard, regionOutline,
 } from './board-regions';
 import { mergeLogs } from '../store/merge';
 
@@ -275,5 +275,21 @@ describe('regions — a named rectangle holds what stands inside it', () => {
     withR.region({ name: 'Monday', bounds: R(0, 0, 600, 400), at: 1002 });
     expect(withR.getState().clusterCandidates.map((c) => c.nodeIds)).toEqual(plain.getState().clusterCandidates.map((c) => c.nodeIds));
     expect(withR.getState().contentIds).toEqual(plain.getState().contentIds);
+  });
+
+  it('the outline is the regions as a tree, in reading order, each with what it holds', () => {
+    const s = createSession();
+    box(s, 60, 60, 80, 60, 1000);
+    const week = s.region({ name: 'Week', bounds: R(0, 0, 1000, 400), at: 1001 })!;
+    const tue = s.region({ name: 'Tuesday', bounds: R(520, 20, 300, 300), at: 1002 })!;
+    const mon = s.region({ name: 'Monday', bounds: R(20, 20, 300, 300), at: 1003 })!;
+    const later = s.region({ name: 'Later', bounds: R(2000, 0, 300, 300), at: 1004 })!;
+    const o = regionOutline(s.getState());
+    expect(o.map((e) => [e.name, e.depth, e.parent])).toEqual([['Week', 0, null], ['Monday', 1, week], ['Tuesday', 1, week], ['Later', 0, null]]);
+    expect(o[1].holds.marks).toBe(1);
+    expect(o[0].holds.regions).toBe(2);
+    expect([mon, tue, later]).toHaveLength(3);
+    s.erase(week, 1005);
+    expect(regionOutline(s.getState()).map((e) => [e.name, e.depth])).toEqual([['Monday', 0], ['Tuesday', 0], ['Later', 0]]);
   });
 });

@@ -224,6 +224,11 @@ var MetaMediumCore = (() => {
     RECENT_EVENTS_MAX: () => RECENT_EVENTS_MAX,
     RECENT_MS: () => RECENT_MS,
     RECENT_SAME_TOOL: () => RECENT_SAME_TOOL,
+    REGION: () => REGION,
+    REGION_HOLDS: () => REGION_HOLDS,
+    REGION_MARGIN_MIN: () => REGION_MARGIN_MIN,
+    REGION_MARGIN_SHARE: () => REGION_MARGIN_SHARE,
+    REGION_MIN_HELD: () => REGION_MIN_HELD,
     RIGHT_ANGLE_TOLERANCE: () => RIGHT_ANGLE_TOLERANCE,
     ROLES: () => ROLES,
     ROUNDED_BY: () => ROUNDED_BY,
@@ -403,6 +408,7 @@ var MetaMediumCore = (() => {
     describePackNotice: () => describePackNotice,
     describePackRefusal: () => describePackRefusal,
     describeReading: () => describeReading,
+    describeRegion: () => describeRegion,
     describeRegions: () => describeRegions,
     describeRelations: () => describeRelations,
     describeRoles: () => describeRoles,
@@ -478,6 +484,7 @@ var MetaMediumCore = (() => {
     heldParticipant: () => heldParticipant,
     holdReach: () => holdReach,
     holds: () => holds,
+    holdsSaid: () => holdsSaid,
     idealize: () => idealize,
     inkMeasure: () => inkMeasure,
     insideFigure: () => insideFigure,
@@ -537,6 +544,7 @@ var MetaMediumCore = (() => {
     magnetRadius: () => magnetRadius,
     magnetSites: () => magnetSites,
     magnetsNear: () => magnetsNear,
+    makeRegion: () => makeRegion,
     makersOf: () => makersOf,
     manipulableOf: () => manipulableOf,
     manipulatedReps: () => manipulatedReps,
@@ -570,6 +578,7 @@ var MetaMediumCore = (() => {
     nearestModelIds: () => nearestModelIds,
     nearnessOf: () => nearnessOf,
     negateQuantity: () => negateQuantity,
+    nextRegionName: () => nextRegionName,
     nodeIdsIn: () => nodeIdsIn,
     normName: () => normName,
     normalizeStroke: () => normalizeStroke,
@@ -654,8 +663,16 @@ var MetaMediumCore = (() => {
     reasonOf: () => reasonOf,
     refusalOf: () => refusalOf,
     regionAt: () => regionAt,
+    regionCarries: () => regionCarries,
+    regionFrameOf: () => regionFrameOf,
     regionIdsIn: () => regionIdsIn,
+    regionMembers: () => regionMembers,
+    regionOutline: () => regionOutline,
+    regionRepOf: () => regionRepOf,
+    regionRound: () => regionRound,
+    regionSaid: () => regionSaid,
     regionsOf: () => regionsOf,
+    regionsOfBoard: () => regionsOfBoard,
     regionsOverlapping: () => regionsOverlapping,
     registerMermaidReader: () => registerMermaidReader,
     registerMermaidWriter: () => registerMermaidWriter,
@@ -700,6 +717,7 @@ var MetaMediumCore = (() => {
     shapeExtent: () => shapeExtent,
     shapeTokens: () => shapeTokens,
     shapesSummary: () => shapesSummary,
+    shareInside: () => shareInside,
     sheetEntry: () => sheetEntry,
     sheetLines: () => sheetLines,
     sheetValue: () => sheetValue,
@@ -721,6 +739,7 @@ var MetaMediumCore = (() => {
     sourcesOf: () => sourcesOf,
     stanceOf: () => stanceOf,
     standStructure: () => standStructure,
+    standingBoxOf: () => standingBoxOf,
     standingPointsOf: () => standingPointsOf,
     standsClosed: () => standsClosed,
     standsOn: () => standsOn,
@@ -738,6 +757,7 @@ var MetaMediumCore = (() => {
     textOf: () => textOf3,
     theirMarks: () => theirMarks,
     thin: () => thin,
+    thingKindOf: () => thingKindOf,
     tidyPlanOf: () => tidyPlanOf,
     tiedMatches: () => tiedMatches,
     tightBox: () => tightBox,
@@ -1020,13 +1040,13 @@ var MetaMediumCore = (() => {
     const L = Math.hypot(hint.x - tail.x, hint.y - tail.y);
     if (!(L > 0) || points.length === 0) return head === "start" ? 0 : Math.max(0, points.length - 1);
     const ux = (hint.x - tail.x) / L, uy = (hint.y - tail.y) / L;
-    const along = (p) => (p.x - tail.x) * ux + (p.y - tail.y) * uy;
+    const along2 = (p) => (p.x - tail.x) * ux + (p.y - tail.y) * uy;
     const order2 = head === "start" ? points.map((_, i) => points.length - 1 - i) : points.map((_, i) => i);
     let far = -Infinity;
-    for (const p of points) far = Math.max(far, along(p));
-    let at = order2.findIndex((i) => along(points[i]) >= far - near);
+    for (const p of points) far = Math.max(far, along2(p));
+    let at = order2.findIndex((i) => along2(points[i]) >= far - near);
     if (at < 0) at = order2.length - 1;
-    while (at + 1 < order2.length && along(points[order2[at + 1]]) >= along(points[order2[at]])) at++;
+    while (at + 1 < order2.length && along2(points[order2[at + 1]]) >= along2(points[order2[at]])) at++;
     return order2[at];
   }
   function arrowTipIndex(points, arrow, near) {
@@ -1628,9 +1648,9 @@ var MetaMediumCore = (() => {
     const corner = order2[0];
     const L = Math.hypot(corner.x - tail.x, corner.y - tail.y) || 1;
     const ux = (corner.x - tail.x) / L, uy = (corner.y - tail.y) / L;
-    const along = (p) => (p.x - tail.x) * ux + (p.y - tail.y) * uy;
-    const far = Math.max(...order2.map(along));
-    const k = Math.max(0, order2.findIndex((p) => along(p) >= far - HAND_RESOLUTION_PX * scale));
+    const along2 = (p) => (p.x - tail.x) * ux + (p.y - tail.y) * uy;
+    const far = Math.max(...order2.map(along2));
+    const k = Math.max(0, order2.findIndex((p) => along2(p) >= far - HAND_RESOLUTION_PX * scale));
     const tip = order2[k];
     let reach = 0;
     for (let i = k; i < order2.length; i++) reach = Math.max(reach, Math.hypot(order2[i].x - tip.x, order2[i].y - tip.y));
@@ -2012,6 +2032,15 @@ var MetaMediumCore = (() => {
   function frameOfNode(node) {
     return getRep(node, "frame")?.data;
   }
+  function regionRepOf(node) {
+    for (let i = node.reps.length - 1; i >= 0; i--) {
+      const r = node.reps[i];
+      if (r.modality !== "region") continue;
+      const d = r.data;
+      return d && typeof d.name === "string" ? { name: d.name, ...typeof d.from === "string" ? { from: d.from } : {}, at: typeof d.at === "number" ? d.at : 0 } : null;
+    }
+    return null;
+  }
 
   // src/notations/shape.ts
   var sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
@@ -2368,13 +2397,13 @@ var MetaMediumCore = (() => {
     if (Math.abs(det) < 1e-9 || hiA - loA < 1e-9 || hiB - loB < 1e-9) return null;
     const corners = [loA, hiA].flatMap((u) => [loB, hiB].map((v) => ({ u, v, p: { x: (u * nb.y - na.y * v) / det, y: (na.x * v - u * nb.x) / det } })));
     const across2 = offLevel(a) <= offLevel(b) ? "u" : "v";
-    const along = across2 === "u" ? "v" : "u";
+    const along2 = across2 === "u" ? "v" : "u";
     const meanY = (k) => corners.filter((c) => c[across2] === k).reduce((y, c) => y + c.p.y, 0) / 2;
     const [first, second] = across2 === "u" ? [loA, hiA] : [loB, hiB];
     const topSide = meanY(first) <= meanY(second) ? first : second;
     const [tl, tr] = corners.filter((c) => c[across2] === topSide).sort((p, q) => p.p.x - q.p.x);
-    const br = corners.find((c) => c[across2] !== topSide && c[along] === tr[along]);
-    const bl = corners.find((c) => c[across2] !== topSide && c[along] === tl[along]);
+    const br = corners.find((c) => c[across2] !== topSide && c[along2] === tr[along2]);
+    const bl = corners.find((c) => c[across2] !== topSide && c[along2] === tl[along2]);
     const points = [tl.p, tr.p, br.p, bl.p];
     const top = sub2(points[1], points[0]), side = sub2(points[3], points[0]);
     const base = Math.hypot(top.x, top.y);
@@ -4691,12 +4720,12 @@ var MetaMediumCore = (() => {
   }
   function sheetEntry(sheet, key2) {
     const k = key2.trim();
-    const live = (e) => (e.kind === "definition" || e.kind === "step") && !e.conflict;
-    const direct2 = sheet.entries.find((e) => live(e) && e.key === k);
+    const live3 = (e) => (e.kind === "definition" || e.kind === "step") && !e.conflict;
+    const direct2 = sheet.entries.find((e) => live3(e) && e.key === k);
     if (direct2) return direct2;
     const n2 = normName(k.replace(/^step\s+/i, "").replace(/[.)]$/, ""));
     return sheet.entries.find((e) => {
-      if (!live(e)) return false;
+      if (!live3(e)) return false;
       if (e.kind === "definition") return normName(e.key) === n2 || !!e.name && normName(e.name) === n2 || !!e.letter && normName(e.letter) === n2;
       return e.kind === "step" && normName(e.key) === n2;
     });
@@ -4979,12 +5008,12 @@ var MetaMediumCore = (() => {
     return null;
   }
   function portSiteOf(node, nodes, kind, index) {
-    const along = kind.startsWith("along:");
-    if (!along && !kind.startsWith("port:")) return null;
-    const notation = kind.slice(along ? "along:".length : "port:".length);
+    const along2 = kind.startsWith("along:");
+    if (!along2 && !kind.startsWith("port:")) return null;
+    const notation = kind.slice(along2 ? "along:".length : "port:".length);
     const provider = known.get(notation) ?? registry.get(notation);
     if (!provider || !Number.isInteger(index) || index < 0) return null;
-    if (along) return alongSiteOf(node, nodes, notation, index, provider);
+    if (along2) return alongSiteOf(node, nodes, notation, index, provider);
     const read2 = readingOf(provider, node, nodes);
     if (!read2) return null;
     let k = 0;
@@ -5960,11 +5989,11 @@ var MetaMediumCore = (() => {
       if (L < 1e-6) return side;
       const tol = magnetRadius(L);
       const ts = [];
-      const along = (p) => ((p.x - side.from.x) * (side.to.x - side.from.x) + (p.y - side.from.y) * (side.to.y - side.from.y)) / (L * L);
+      const along2 = (p) => ((p.x - side.from.x) * (side.to.x - side.from.x) + (p.y - side.from.y) * (side.to.y - side.from.y)) / (L * L);
       for (const g of others) {
         if (g === f || g.ids.some((id) => f.ids.includes(id))) continue;
         const points = g.kind === "line" ? g.vertices : g.kind === "circle" || g.kind === "arc" ? [] : g.vertices;
-        for (const p of points) if (distToSegment2(p, side.from, side.to) <= tol) ts.push(along(p));
+        for (const p of points) if (distToSegment2(p, side.from, side.to) <= tol) ts.push(along2(p));
         if (g.kind === "line") {
           const t = crossAt(side.from, side.to, g.vertices[0], g.vertices[1]);
           if (t !== null) ts.push(t);
@@ -8382,9 +8411,9 @@ var MetaMediumCore = (() => {
         return { id: node.id, shape, length: dist4(tip, tail), scale, ends: headAtEnd ? [tailEnd, tipEnd] : [tipEnd, tailEnd] };
       }
     }
-    const along = (t) => pts[Math.min(pts.length - 1, Math.max(0, Math.round(t * (pts.length - 1))))];
-    const outStart = shape === "arc" ? unit(sub4(first, along(0.15))) : unit(sub4(first, last));
-    const outEnd = shape === "arc" ? unit(sub4(last, along(0.85))) : unit(sub4(last, first));
+    const along2 = (t) => pts[Math.min(pts.length - 1, Math.max(0, Math.round(t * (pts.length - 1))))];
+    const outStart = shape === "arc" ? unit(sub4(first, along2(0.15))) : unit(sub4(first, last));
+    const outEnd = shape === "arc" ? unit(sub4(last, along2(0.85))) : unit(sub4(last, first));
     return {
       id: node.id,
       shape,
@@ -9514,11 +9543,16 @@ var MetaMediumCore = (() => {
       seen.add(id);
       const n2 = nodes.get(id);
       if (!n2 || getRep(n2, "erased")) return;
-      if (getRep(n2, "stroke") || pictureOf(n2)) {
+      if (getRep(n2, "stroke") || pictureOf(n2) || regionRepOf(n2)) {
         out.push(n2);
         return;
       }
-      for (const e of n2.edges) if (e.rel === "has-part") visit(e.to);
+      const parts = n2.edges.filter((e) => e.rel === "has-part");
+      if (!parts.length && getRep(n2, "code") && getRep(n2, "bounds")) {
+        out.push(n2);
+        return;
+      }
+      for (const e of parts) visit(e.to);
     };
     ids.forEach(visit);
     return out;
@@ -10126,7 +10160,7 @@ var MetaMediumCore = (() => {
       }
     }
     const flow = dy >= dx ? "down" : "across";
-    const along = (i) => flow === "down" ? i.cy : i.cx;
+    const along2 = (i) => flow === "down" ? i.cy : i.cx;
     const extent = (i) => flow === "down" ? i.h : i.w;
     const across2 = (i) => flow === "down" ? i.cx : i.cy;
     const out = /* @__PURE__ */ new Map();
@@ -10134,7 +10168,7 @@ var MetaMediumCore = (() => {
     for (const c of reading7.connectors) {
       const p = bySym.get(c.from), q = bySym.get(c.to);
       if (!p || !q || p === q) continue;
-      const forward = c.direction === "forward" || c.direction === "both" || along(p) <= along(q);
+      const forward = c.direction === "forward" || c.direction === "both" || along2(p) <= along2(q);
       const [u, v] = forward ? [p, q] : [q, p];
       if (!out.has(u.sym)) out.set(u.sym, []);
       out.get(u.sym).push(v.sym);
@@ -10168,11 +10202,11 @@ var MetaMediumCore = (() => {
     }
     const ranks = [];
     for (const r of [...byRank.keys()].sort((p, q) => p - q)) {
-      const sorted = byRank.get(r).slice().sort((p, q) => along(p) - along(q) || (p.id < q.id ? -1 : 1));
+      const sorted = byRank.get(r).slice().sort((p, q) => along2(p) - along2(q) || (p.id < q.id ? -1 : 1));
       let cur = [];
       const flush = () => {
         if (cur.length > 1) {
-          const cs = cur.map(along);
+          const cs = cur.map(along2);
           const small = Math.min(...cur.map(extent));
           if (Math.max(...cs) - Math.min(...cs) <= RANK_SPREAD * small) {
             ranks.push({ ids: cur.slice().sort((p, q) => across2(p) - across2(q) || (p.id < q.id ? -1 : 1)).map((i) => i.id), axis: flow === "down" ? "row" : "column", spread: Math.max(...cs) - Math.min(...cs) });
@@ -10182,12 +10216,219 @@ var MetaMediumCore = (() => {
       };
       for (const it of sorted) {
         const last = cur[cur.length - 1];
-        if (last && along(it) - along(last) > RANK_BAND * Math.min(extent(it), extent(last)) * RANK_SPREAD) flush();
+        if (last && along2(it) - along2(last) > RANK_BAND * Math.min(extent(it), extent(last)) * RANK_SPREAD) flush();
         cur.push(it);
       }
       flush();
     }
     return { flow, ranks, figures };
+  }
+
+  // src/session/board-regions.ts
+  var REGION_HOLDS = 0.6;
+  var EPS2 = 1e-6;
+  var live = (n2) => !!n2 && !getRep(n2, "erased");
+  function along(a0, a1, w0, w1) {
+    const len4 = a1 - a0;
+    if (len4 <= EPS2) return a0 >= w0 - EPS2 && a0 <= w1 + EPS2 ? 1 : 0;
+    return Math.max(0, Math.min(a1, w1) - Math.max(a0, w0)) / len4;
+  }
+  function shareInside(box, within2) {
+    return along(box.minX, box.maxX, within2.minX, within2.maxX) * along(box.minY, box.maxY, within2.minY, within2.maxY);
+  }
+  function standingBoxOf(nodes, node) {
+    let box;
+    let held2 = false;
+    for (const e of node.edges) {
+      if (e.rel !== "has-part") continue;
+      const m = nodes.get(e.to);
+      if (!live(m)) continue;
+      const b = standingBoxOf(nodes, m);
+      if (!b) continue;
+      held2 = true;
+      box = box ? { minX: Math.min(box.minX, b.minX), minY: Math.min(box.minY, b.minY), maxX: Math.max(box.maxX, b.maxX), maxY: Math.max(box.maxY, b.maxY) } : { ...b };
+    }
+    return held2 ? box : boundsOf(node);
+  }
+  var areaOf2 = (b) => (b.maxX - b.minX) * (b.maxY - b.minY);
+  function regionsOfBoard(board) {
+    const out = [];
+    for (const id of board.regions) {
+      const n2 = board.nodes.get(id);
+      const rep = n2 && live(n2) ? regionRepOf(n2) : null;
+      const bounds = n2 && boundsOf(n2);
+      if (!n2 || !rep || !bounds) continue;
+      out.push({ id, name: rep.name, bounds, ...rep.from ? { from: rep.from } : {} });
+    }
+    return out;
+  }
+  function ownInkOf(board) {
+    const out = /* @__PURE__ */ new Set();
+    for (const r of regionsOfBoard(board)) if (r.from) out.add(r.from);
+    return out;
+  }
+  function regionMembers(board, id) {
+    const regions = regionsOfBoard(board);
+    const me = regions.find((r) => r.id === id);
+    if (!me) return [];
+    const inks = ownInkOf(board);
+    const out = [];
+    for (const cid of board.contentIds) {
+      if (inks.has(cid)) continue;
+      const n2 = board.nodes.get(cid);
+      if (!live(n2)) continue;
+      const b = standingBoxOf(board.nodes, n2);
+      if (b && shareInside(b, me.bounds) >= REGION_HOLDS) out.push(cid);
+    }
+    const mine = areaOf2(me.bounds);
+    for (const r of regions) {
+      if (r.id === id || areaOf2(r.bounds) >= mine - EPS2) continue;
+      if (shareInside(r.bounds, me.bounds) >= REGION_HOLDS) out.push(r.id);
+    }
+    return out;
+  }
+  function gather(board, id) {
+    const out = /* @__PURE__ */ new Set();
+    const regions = new Set(board.regions);
+    const visit = (rid) => {
+      for (const m of regionMembers(board, rid)) {
+        if (out.has(m)) continue;
+        out.add(m);
+        if (regions.has(m)) visit(m);
+      }
+    };
+    visit(id);
+    out.delete(id);
+    return out;
+  }
+  function regionCarries(board, ids) {
+    const regions = new Set(board.regions);
+    const named2 = new Set(ids);
+    const carried = /* @__PURE__ */ new Set();
+    const added = /* @__PURE__ */ new Set();
+    const inks = /* @__PURE__ */ new Map();
+    for (const r of regionsOfBoard(board)) inks.set(r.id, r.from);
+    const take = (id, geometric) => {
+      if (carried.has(id)) return;
+      carried.add(id);
+      if (geometric && !named2.has(id)) added.add(id);
+    };
+    for (const id of ids) {
+      take(id, false);
+      if (!inks.has(id)) continue;
+      const from = inks.get(id);
+      if (from) take(from, false);
+      for (const m of gather(board, id)) {
+        take(m, true);
+        const nf = inks.get(m);
+        if (nf) take(nf, false);
+      }
+    }
+    if (added.size) {
+      for (let again = true; again; ) {
+        again = false;
+        for (const id of added) {
+          if (!carried.has(id) || regions.has(id)) continue;
+          const n2 = board.nodes.get(id);
+          if (!n2) continue;
+          if (activeBindingsOf(n2, board.nodes).some((b) => !carried.has(b.nodeId))) {
+            carried.delete(id);
+            again = true;
+          }
+        }
+      }
+    }
+    return [...carried];
+  }
+  function thingKindOf(node) {
+    if (pictureOf(node)) return "pictures";
+    let code = null;
+    for (let i = node.reps.length - 1; i >= 0; i--) {
+      if (node.reps[i].modality === "code") {
+        code = node.reps[i];
+        break;
+      }
+    }
+    if (!code) return node.edges.some((e) => e.rel === "has-part") && !getRep(node, "stroke") ? "things" : "marks";
+    let renderer;
+    try {
+      renderer = rowOf(code.data.kind ?? "html")?.renderer;
+    } catch {
+      renderer = void 0;
+    }
+    if (renderer === "text" || renderer === "prose") return "texts";
+    if (renderer === "vector" || renderer === "run" || renderer === "mermaid") return "figures";
+    return "things";
+  }
+  function describeRegion(board, id) {
+    const me = regionsOfBoard(board).find((r) => r.id === id);
+    if (!me) return null;
+    const held2 = gather(board, id);
+    const regions = new Set(board.regions);
+    const inks = ownInkOf(board);
+    const holds2 = { marks: 0, pictures: 0, texts: 0, figures: 0, things: 0, regions: 0 };
+    const things = [];
+    for (const cid of board.contentIds) {
+      if (!held2.has(cid) || inks.has(cid)) continue;
+      const n2 = board.nodes.get(cid);
+      if (!live(n2)) continue;
+      holds2[thingKindOf(n2)]++;
+      things.push(cid);
+    }
+    for (const h2 of held2) if (regions.has(h2)) {
+      holds2.regions++;
+      things.push(h2);
+    }
+    return { id, name: me.name, bounds: me.bounds, things, holds: holds2 };
+  }
+  var NOUNS = [
+    ["marks", "mark", "marks"],
+    ["pictures", "picture", "pictures"],
+    ["texts", "text", "texts"],
+    ["figures", "figure", "figures"],
+    ["things", "thing", "things"],
+    ["regions", "region", "regions"]
+  ];
+  function holdsSaid(holds2) {
+    const parts = NOUNS.filter(([k]) => holds2[k] > 0).map(([k, one, many]) => holds2[k] + " " + (holds2[k] === 1 ? one : many));
+    return parts.length ? parts.join(", ") : "nothing yet";
+  }
+  function regionSaid(d) {
+    return "a region \u201C" + d.name + "\u201D \u2014 holds " + holdsSaid(d.holds);
+  }
+  function regionOutline(board) {
+    const all = regionsOfBoard(board);
+    const parentOf = /* @__PURE__ */ new Map();
+    for (const r of all) {
+      let best = null;
+      const mine = areaOf2(r.bounds);
+      for (const o of all) {
+        if (o.id === r.id) continue;
+        const area3 = areaOf2(o.bounds);
+        if (area3 <= mine + EPS2 || shareInside(r.bounds, o.bounds) < REGION_HOLDS) continue;
+        if (!best || area3 < best.area) best = { id: o.id, area: area3 };
+      }
+      parentOf.set(r.id, best ? best.id : null);
+    }
+    const reading7 = (list5) => {
+      const byTop = list5.slice().sort((a, b) => a.bounds.minY - b.bounds.minY || a.bounds.minX - b.bounds.minX);
+      const rows = [];
+      for (const r of byTop) {
+        const row = rows[rows.length - 1];
+        if (row && r.bounds.minY - row[0].bounds.minY < 0.5 * (r.bounds.maxY - r.bounds.minY)) row.push(r);
+        else rows.push([r]);
+      }
+      return rows.flatMap((row) => row.sort((a, b) => a.bounds.minX - b.bounds.minX));
+    };
+    const out = [];
+    const walk = (parent, depth2) => {
+      for (const r of reading7(all.filter((x) => parentOf.get(x.id) === parent))) {
+        out.push({ id: r.id, name: r.name, bounds: r.bounds, depth: depth2, parent, holds: describeRegion(board, r.id).holds });
+        walk(r.id, depth2 + 1);
+      }
+    };
+    walk(null, 0);
+    return out;
   }
 
   // src/session/words.ts
@@ -10923,7 +11164,8 @@ var MetaMediumCore = (() => {
     let clusterCandidates = [];
     let participants = [];
     let explanations = [];
-    let live = [];
+    let regions = [];
+    let live3 = [];
     let clocks = {};
     let packs = [];
     let library = [];
@@ -11003,7 +11245,8 @@ var MetaMediumCore = (() => {
         clusterCandidates: clusterCandidates.slice(),
         participants: participants.slice(),
         explanations: explanations.slice(),
-        live: live.slice(),
+        regions: regions.slice(),
+        live: live3.slice(),
         gestures: structuredClone(gestures),
         markHands: new Map(markHands),
         lastAt,
@@ -11039,7 +11282,8 @@ var MetaMediumCore = (() => {
       clusterCandidates = s.clusterCandidates.slice();
       participants = s.participants.slice();
       explanations = s.explanations.slice();
-      live = s.live.slice();
+      regions = (s.regions ?? []).slice();
+      live3 = s.live.slice();
       gestures = structuredClone(s.gestures);
       markHands = new Map(s.markHands);
       lastAt = s.lastAt;
@@ -11152,7 +11396,8 @@ var MetaMediumCore = (() => {
       clusterCandidates = [];
       participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
       explanations = [];
-      live = [];
+      regions = [];
+      live3 = [];
       clocks = {};
       packs = [];
       library = [];
@@ -11337,7 +11582,7 @@ var MetaMediumCore = (() => {
       const fresh = [];
       for (const id of unsettled) {
         if (!linked.has(id) || componentOf.has(id)) continue;
-        fresh.push(gather2(id));
+        fresh.push(gather3(id));
       }
       unsettled.clear();
       const defs = definitionIds();
@@ -11350,7 +11595,7 @@ var MetaMediumCore = (() => {
         assemble(c);
       }
     }
-    function gather2(start) {
+    function gather3(start) {
       const seen = /* @__PURE__ */ new Set([start]);
       const stack = [start];
       let first = start;
@@ -11642,7 +11887,7 @@ var MetaMediumCore = (() => {
       };
     }
     function liveArtifactUnder(b, excludeId) {
-      for (const aid of live) {
+      for (const aid of live3) {
         if (aid === excludeId) continue;
         const ab = boundsOf(nodes.get(aid));
         if (ab && boundsOverlap(ab, b)) return aid;
@@ -11899,12 +12144,19 @@ var MetaMediumCore = (() => {
       const node = nodes.get(nodeId);
       if (!node || node.id.startsWith("type:") || isLibraryNode(node.id)) return;
       if (getRep(node, "erased")) return;
+      const ri = regions.indexOf(node.id);
+      if (ri >= 0) {
+        node.reps.push({ modality: "erased", data: { at }, source: "user" });
+        regions.splice(ri, 1);
+        for (const g of gestures.values()) g.selection = g.selection.filter((id) => id !== node.id);
+        return;
+      }
       node.reps.push({ modality: "erased", data: { at }, source: "user" });
       removeFromContent(node.id);
       ink.delete(node.id);
       definitionsChanged = true;
-      const li = live.indexOf(node.id);
-      if (li >= 0) live.splice(li, 1);
+      const li = live3.indexOf(node.id);
+      if (li >= 0) live3.splice(li, 1);
       for (const g of gestures.values()) {
         g.selection = g.selection.filter((id) => id !== node.id);
         if (g.pendingLasso?.id === node.id) g.pendingLasso = null;
@@ -11917,8 +12169,8 @@ var MetaMediumCore = (() => {
         removeFromContent(artifactId);
         const ai = artifacts.indexOf(artifactId);
         if (ai >= 0) artifacts.splice(ai, 1);
-        const li2 = live.indexOf(artifactId);
-        if (li2 >= 0) live.splice(li2, 1);
+        const li2 = live3.indexOf(artifactId);
+        if (li2 >= 0) live3.splice(li2, 1);
         for (const e of artifact.edges) {
           if (e.rel !== "has-part") continue;
           const member = nodes.get(e.to);
@@ -11989,6 +12241,37 @@ var MetaMediumCore = (() => {
       node.reps.push({ modality: "label", data: { text: ev.text, at: ev.at }, source: pid });
       return node.id;
     }
+    function applyRegion(ev) {
+      const name = typeof ev.name === "string" ? ev.name.trim() : "";
+      const b = ev.bounds;
+      if (!name || !b || ![b.minX, b.minY, b.maxX, b.maxY].every((v) => typeof v === "number" && Number.isFinite(v)) || b.maxX - b.minX <= 0 || b.maxY - b.minY <= 0) return null;
+      const pid = ev.participantId ?? LOCAL_PARTICIPANT;
+      if (!participants.includes(pid)) return null;
+      const frame = typeof ev.from === "string" ? nodes.get(ev.from) : void 0;
+      const from = frame && getRep(frame, "stroke") && !getRep(frame, "erased") ? frame.id : void 0;
+      const node = {
+        id: nextId("region"),
+        reps: [
+          { modality: "region", data: { name, ...from ? { from } : {}, at: ev.at }, source: pid },
+          { modality: "bounds", data: { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY }, source: pid }
+        ],
+        edges: [{ to: pid, rel: "made-by" }],
+        capability: 0,
+        createdAt: ev.at
+      };
+      nodes.set(node.id, node);
+      markHands.set(node.id, handOf(ev));
+      regions.push(node.id);
+      return node.id;
+    }
+    function applyRename(ev) {
+      const node = nodes.get(ev.nodeId);
+      const name = typeof ev.name === "string" ? ev.name.trim() : "";
+      const rep = node && !getRep(node, "erased") ? regionRepOf(node) : null;
+      if (!node || !rep || !name) return null;
+      node.reps = [...node.reps, { modality: "region", data: { name, ...rep.from ? { from: rep.from } : {}, at: ev.at }, source: ev.participantId ?? LOCAL_PARTICIPANT }];
+      return node.id;
+    }
     function applyAnswer(ev) {
       if (!participants.includes(ev.participantId)) return null;
       const about = ev.aboutIds.filter((id) => {
@@ -12045,8 +12328,8 @@ var MetaMediumCore = (() => {
           return { id: t.id, to: { minX: cx2 - tw / 2, maxX: cx2 + tw / 2, minY: cy2 - th / 2, maxY: cy2 + th / 2 } };
         });
       } else {
-        const along = (b) => axis === "row" ? (b.minX + b.maxX) / 2 : (b.minY + b.maxY) / 2;
-        const ordered2 = [...targets].sort((a, b) => along(a.bounds) - along(b.bounds));
+        const along2 = (b) => axis === "row" ? (b.minX + b.maxX) / 2 : (b.minY + b.maxY) / 2;
+        const ordered2 = [...targets].sort((a, b) => along2(a.bounds) - along2(b.bounds));
         const sizes = ordered2.map((t) => axis === "row" ? w2(t.bounds) : h2(t.bounds));
         const total = sizes.reduce((a, b) => a + b, 0);
         const start = axis === "row" ? span.minX : span.minY;
@@ -12549,12 +12832,12 @@ var MetaMediumCore = (() => {
       word.edges = word.edges.filter((e) => e.rel !== "has-part");
     }
     function applySelect(ev) {
-      gesturesOf(handOf(ev)).selection = ev.ids.filter((id) => inContent.has(id));
+      gesturesOf(handOf(ev)).selection = ev.ids.filter((id) => inContent.has(id) || regions.includes(id));
     }
     function applyManipulation(ev) {
       const moved2 = [];
       const m = manipulationOf(ev);
-      for (const n2 of manipulableOf(nodes, ev.ids)) {
+      for (const n2 of manipulableOf(nodes, manipulatedIds(ev))) {
         const reps = manipulatedReps(n2, m);
         if (!reps) continue;
         n2.reps = reps;
@@ -12564,6 +12847,11 @@ var MetaMediumCore = (() => {
       }
       followFrom(moved2);
       recomputeClusterCandidates();
+    }
+    function manipulatedIds(ev) {
+      if (!regions.length || !ev.ids.some((id) => regions.includes(id))) return ev.ids;
+      if (ev.type === "rotate") return ev.ids.filter((id) => !regions.includes(id));
+      return regionCarries({ nodes, contentIds, regions }, ev.ids);
     }
     function refreshWordBounds(letter) {
       for (const e of letter.edges) {
@@ -12597,7 +12885,7 @@ var MetaMediumCore = (() => {
       }
     }
     function applyClock(ev) {
-      if (!artifacts.includes(ev.nodeId) && !live.includes(ev.nodeId)) return;
+      if (!artifacts.includes(ev.nodeId) && !live3.includes(ev.nodeId)) return;
       const prev = clocks[ev.nodeId] ?? { playing: false, seed: 1, at: ev.at };
       switch (ev.op) {
         case "play":
@@ -12681,7 +12969,7 @@ var MetaMediumCore = (() => {
       artifacts.push(node.id);
       contentPush(node.id);
       definitionsChanged = true;
-      if (!picture) live.push(node.id);
+      if (!picture) live3.push(node.id);
       recomputeClusterCandidates();
       return node.id;
     }
@@ -12925,7 +13213,7 @@ var MetaMediumCore = (() => {
         },
         source: ev.participantId
       });
-      if (!live.includes(node.id)) live.push(node.id);
+      if (!live3.includes(node.id)) live3.push(node.id);
       definitionsChanged = true;
       return node.id;
     }
@@ -12971,6 +13259,10 @@ var MetaMediumCore = (() => {
           return applyAnswer(ev);
         case "label":
           return applyLabel(ev);
+        case "region":
+          return applyRegion(ev);
+        case "rename":
+          return applyRename(ev);
         case "teach":
           applyTeach(ev);
           return null;
@@ -13176,7 +13468,7 @@ var MetaMediumCore = (() => {
       }
     }
     function manipulate(ev) {
-      const releases = boundBy.size ? releasedBy(nodes, ev.ids, manipulationOf(ev)) : [];
+      const releases = boundBy.size ? releasedBy(nodes, manipulatedIds(ev), manipulationOf(ev)) : [];
       if (!releases.length) {
         dispatch(ev);
         return;
@@ -13199,12 +13491,13 @@ var MetaMediumCore = (() => {
         artifacts: [...artifacts],
         participants: [...participants],
         explanations: [...explanations],
+        regions: [...regions],
         commandMark: reader.commandMark,
         markMiss: reader.markMiss,
         staleResult,
         generation,
         recentIds: recentWithin(lastAt, LOCAL_PARTICIPANT),
-        live: [...live],
+        live: [...live3],
         clocks: { ...clocks },
         selection: [...reader.selection],
         packs: [...packs],
@@ -13246,6 +13539,16 @@ var MetaMediumCore = (() => {
       correct: (args) => void dispatch({ type: "correct", ...args }),
       clock: (args) => void dispatch({ type: "clock", ...args }),
       behave: (args) => void dispatch({ type: "behave", ...args }),
+      region: (args) => {
+        const b = args.bounds;
+        if (!args.name?.trim() || !b || b.maxX - b.minX <= 0 || b.maxY - b.minY <= 0 || ![b.minX, b.minY, b.maxX, b.maxY].every(Number.isFinite)) return null;
+        return dispatch({ type: "region", ...args });
+      },
+      renameRegion: (args) => {
+        const n2 = nodes.get(args.nodeId);
+        if (!n2 || getRep(n2, "erased") || !regionRepOf(n2) || !args.name?.trim()) return null;
+        return dispatch({ type: "rename", ...args });
+      },
       frame: (args) => dispatch({ type: "frame", ...args }),
       import: (args) => dispatch({ type: "import", ...args }),
       matchesOf: (ids) => matchesFor(ids),
@@ -13475,7 +13778,7 @@ var MetaMediumCore = (() => {
     if (symbol === "terminator" && o.frame) {
       const { centre: c, axis: u, long, short } = o.frame;
       const v = { x: -u.y, y: u.x };
-      const across2 = (k, along) => ({ x: c.x + u.x * along + v.x * k, y: c.y + u.y * along + v.y * k });
+      const across2 = (k, along2) => ({ x: c.x + u.x * along2 + v.x * k, y: c.y + u.y * along2 + v.y * k });
       const level = Math.abs(u.x) >= Math.abs(u.y);
       const ends = [across2(0, -long / 2), across2(0, long / 2)].sort((p, q) => level ? p.x - q.x : p.y - q.y);
       const flat = Math.max(0, long / 2 - short / 2);
@@ -14390,8 +14693,8 @@ var MetaMediumCore = (() => {
     const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
     const u = { x: Math.cos(angle), y: Math.sin(angle) };
     const n2 = { x: -u.y, y: u.x };
-    const along = pts.map((p) => (p.x - c.x) * u.x + (p.y - c.y) * u.y);
-    const L = Math.max(...along) - Math.min(...along);
+    const along2 = pts.map((p) => (p.x - c.x) * u.x + (p.y - c.y) * u.y);
+    const L = Math.max(...along2) - Math.min(...along2);
     if (L < 1e-9) return 0;
     const band = Math.max(1.5 * scale, 0.012 * L);
     let side = 0, crossings2 = 0;
@@ -17913,10 +18216,10 @@ var MetaMediumCore = (() => {
       if (!pc || sh.length < Math.max(LINE_MIN_PX * sh.scale, GRAIN_SHARE * pc.long)) continue;
       const sides = pc.corners.map((c, i) => between3(dir, sub9(pc.corners[(i + 1) % pc.corners.length], c)));
       const nearest2 = sides.indexOf(Math.min(...sides));
-      const along = sides[nearest2] <= PARALLEL_DEG ? nearest2 : void 0;
+      const along2 = sides[nearest2] <= PARALLEL_DEG ? nearest2 : void 0;
       const conf = MAX9 * (0.95 - 2 * sh.dev) * (sh.heads.start === "hook" && sh.heads.end === "hook" ? 0.9 : 1);
-      const how = along !== void 0 ? `parallel to the ${along + 1 === 1 ? "first" : `${along + 1}th`} side` : "on the bias";
-      mark(pc, "grain", sh.ids, sh.id, conf, `a straight line with a head at each end, ${pct8(sh.length / pc.long)} of the piece's length, ${how}`, [sh.a, sh.b], { from: sh.a, to: sh.b, heading, ...along !== void 0 ? { along } : {}, length: sh.length });
+      const how = along2 !== void 0 ? `parallel to the ${along2 + 1 === 1 ? "first" : `${along2 + 1}th`} side` : "on the bias";
+      mark(pc, "grain", sh.ids, sh.id, conf, `a straight line with a head at each end, ${pct8(sh.length / pc.long)} of the piece's length, ${how}`, [sh.a, sh.b], { from: sh.a, to: sh.b, heading, ...along2 !== void 0 ? { along: along2 } : {}, length: sh.length });
       sh.ids.forEach((x) => owned.add(x));
     }
     const rings = (pc) => pc.seam ? [pc.ring, pc.seam.ring] : [pc.ring];
@@ -18426,17 +18729,17 @@ var MetaMediumCore = (() => {
       if (grainMark && grainMark.from && grainMark.to) {
         result2.ink.grain = { from: grainMark.from, to: grainMark.to };
         let text = "the grain runs on the bias";
-        let along;
+        let along2;
         if (frame) {
           const dir = sub10(grainMark.to, grainMark.from);
           const angles = frame.ink.map((p, i) => Math.acos(Math.min(1, Math.abs(dot7(norm(dir), norm(sub10(frame.ink[(i + 1) % frame.ink.length], p)))))) * DEG9);
           const k = angles.indexOf(Math.min(...angles));
           if (angles[k] <= PARALLEL_DEG) {
-            along = k;
+            along2 = k;
             text = frame.kind === "rectangle" ? `the grain runs along the ${len3(frame.lengths[k], unit6)} sides` : `the grain runs along the ${len3(frame.lengths[k], unit6)} side`;
           }
         }
-        result2.grain = { id: grainMark.id, text, ...along !== void 0 ? { along } : {} };
+        result2.grain = { id: grainMark.id, text, ...along2 !== void 0 ? { along: along2 } : {} };
         lines.push(text);
         rows.push({ k: "grain", v: text.replace(/^the grain runs /, "") });
       }
@@ -18445,8 +18748,8 @@ var MetaMediumCore = (() => {
         result2.ink.notches.push({ from: n2.from, to: n2.to });
         if (!frame) continue;
         const m = sideNear(frame.ink, mid7(n2.from, n2.to));
-        const along = Math.min(m.at, 1 - m.at) * frame.lengths[m.side];
-        result2.notches.push({ id: n2.id, side: m.side, along, at: m.at });
+        const along2 = Math.min(m.at, 1 - m.at) * frame.lengths[m.side];
+        result2.notches.push({ id: n2.id, side: m.side, along: along2, at: m.at });
       }
       if (result2.notches.length && frame) {
         const bySide = /* @__PURE__ */ new Map();
@@ -18793,11 +19096,11 @@ var MetaMediumCore = (() => {
       { key: "rise", label: riseV.label, from: M, to: B, length: h2, text: sideTextOf(c, "rise"), source: riseV.from }
     ];
     const riseText = `rise ${drawnText(c, "rise")}`;
-    const along = readable2(Math.atan2(u.y, u.x) * DEG10);
-    const t = { x: Math.round(Math.cos(along / DEG10)), y: Math.round(Math.sin(along / DEG10)) };
+    const along2 = readable2(Math.atan2(u.y, u.x) * DEG10);
+    const t = { x: Math.round(Math.cos(along2 / DEG10)), y: Math.round(Math.sin(along2 / DEG10)) };
     const texts = [
       alongSide(c, drawnText(c, "chord"), A, C, mul3(w2, -sb), 1, "chord"),
-      { text: riseText, at: add3(add3(M, mul3(w2, sb * h2 / 2)), mul3(t, F.labelGap + textWidth(riseText, F.label) / 2)), angle: along, size: F.label, anchor: "middle", key: "rise" }
+      { text: riseText, at: add3(add3(M, mul3(w2, sb * h2 / 2)), mul3(t, F.labelGap + textWidth(riseText, F.label) / 2)), angle: along2, size: F.label, anchor: "middle", key: "rise" }
     ];
     return {
       outline: { type: "arc", from: A, to: C, r, large, sweep, samples },
@@ -22291,7 +22594,7 @@ ${lines.join("\n")}
     }
     const n2 = list5.length;
     const across2 = opts.direction === "LR" || opts.direction === "RL";
-    const along = (v) => across2 ? v.w : v.h;
+    const along2 = (v) => across2 ? v.w : v.h;
     const wide = (v) => across2 ? v.h : v.w;
     const forward = list5.map(() => []);
     const before = list5.map(() => []);
@@ -22356,7 +22659,7 @@ ${lines.join("\n")}
         row.forEach((i, k) => c[i] = placed2[k]);
       }
     }
-    const thick = ranks.map((row) => Math.max(0, ...row.map((i) => along(list5[i]))));
+    const thick = ranks.map((row) => Math.max(0, ...row.map((i) => along2(list5[i]))));
     const base = [];
     thick.forEach((t, r) => base.push(r ? base[r - 1] + (thick[r - 1] + t) / 2 : t / 2));
     let sideways = 0, fixed = 0, spans = 0;
@@ -23207,9 +23510,9 @@ ${lines.join("\n")}
       const drawn = drawnOf(l);
       const ink = connectorInk(r, P, Q, drawn, scale);
       const pts = ink.points, n2 = pts.length;
-      const along = (t2) => pts[Math.min(n2 - 1, Math.max(0, Math.round(t2 * (n2 - 1))))];
+      const along2 = (t2) => pts[Math.min(n2 - 1, Math.max(0, Math.round(t2 * (n2 - 1))))];
       const length = Math.max(Math.hypot(Q.x - P.x, Q.y - P.y), 1e-6);
-      const outs = r.kind === "arc" ? [unitOf({ x: P.x - along(0.15).x, y: P.y - along(0.15).y }), unitOf({ x: Q.x - along(0.85).x, y: Q.y - along(0.85).y })] : [unitOf({ x: P.x - Q.x, y: P.y - Q.y }), unitOf({ x: Q.x - P.x, y: Q.y - P.y })];
+      const outs = r.kind === "arc" ? [unitOf({ x: P.x - along2(0.15).x, y: P.y - along2(0.15).y }), unitOf({ x: Q.x - along2(0.85).x, y: Q.y - along2(0.85).y })] : [unitOf({ x: P.x - Q.x, y: P.y - Q.y }), unitOf({ x: Q.x - P.x, y: Q.y - P.y })];
       return { link: l, route: r, drawn, ink, P, Q, ends: [{ point: P, out: outs[0], length }, { point: Q, out: outs[1], length }], marks: [ink.points, ...ink.heads].map(weigh) };
     };
     const mayRead = (e, m) => {
@@ -23765,7 +24068,7 @@ ${lines.join("\n")}
   function headInk(kind, tip, out, len4, step2) {
     const u = unit4(out);
     const v = { x: -u.y, y: u.x };
-    const at = (along, side) => ({ x: tip.x - u.x * along + v.x * side, y: tip.y - u.y * along + v.y * side });
+    const at = (along2, side) => ({ x: tip.x - u.x * along2 + v.x * side, y: tip.y - u.y * along2 + v.y * side });
     if (kind === "triangle") return inkAround2([tip, at(len4, 0.55 * len4), at(len4, -0.55 * len4)], step2);
     return inkAround2([tip, at(len4 / 2, len4 / 2), at(len4, 0), at(len4 / 2, -len4 / 2)], step2);
   }
@@ -23975,8 +24278,8 @@ ${lines.join("\n")}
       const [cls, side] = key2.split(/:(?=[a-z]+$)/);
       const [p, q] = sideEnds(standing2.get(cls).box, side);
       const d = { x: q.x - p.x, y: q.y - p.y };
-      const along = (x) => ((x.x - p.x) * d.x + (x.y - p.y) * d.y) / (d.x * d.x + d.y * d.y);
-      list5.sort((m, n2) => along(m.toward) - along(n2.toward) || m.l.index - n2.l.index);
+      const along2 = (x) => ((x.x - p.x) * d.x + (x.y - p.y) * d.y) / (d.x * d.x + d.y * d.y);
+      list5.sort((m, n2) => along2(m.toward) - along2(n2.toward) || m.l.index - n2.l.index);
       list5.forEach((e, i) => {
         const share = (i + 1) / (list5.length + 1);
         endPoint.set(`${e.l.index}:${e.which}`, { point: { x: p.x + d.x * share, y: p.y + d.y * share }, share, side, count: list5.length });
@@ -24483,7 +24786,7 @@ ${lines.join("\n")}
       drawnMarks.push(id);
       return { id, top: from, bottom: { x: xs[i], y: bottom2 } };
     });
-    const along = (i, yy) => {
+    const along2 = (i, yy) => {
       const l = lifelines[i];
       const share = (yy - l.top.y) / Math.max(1e-9, l.bottom.y - l.top.y);
       return { nodeId: l.id, site: { kind: `along:${T2.notation}`, index: alongIndex(0, share) }, of: "notation", port: "lifeline", point: { x: l.top.x, y: yy } };
@@ -24493,7 +24796,7 @@ ${lines.join("\n")}
     for (const [k, l] of links.entries()) {
       const i = col.get(l.from), j = col.get(l.to);
       const yy = rows[k];
-      const ends = { start: along(i, yy), end: along(j, l.self ? yy + LOOP_H * U : yy) };
+      const ends = { start: along2(i, yy), end: along2(j, l.self ? yy + LOOP_H * U : yy) };
       const own = [];
       let bound = false;
       if (l.self) {
@@ -24676,8 +24979,8 @@ ${lines.join("\n")}
       const [id, side] = key2.split("\0");
       const [p, q] = sideEnds2(standing2.get(id).box, side);
       const d = sub12(q, p);
-      const along = (x) => ((x.x - p.x) * d.x + (x.y - p.y) * d.y) / (d.x * d.x + d.y * d.y);
-      list5.sort((m, n2) => along(m.toward) - along(n2.toward) || m.index - n2.index);
+      const along2 = (x) => ((x.x - p.x) * d.x + (x.y - p.y) * d.y) / (d.x * d.x + d.y * d.y);
+      list5.sort((m, n2) => along2(m.toward) - along2(n2.toward) || m.index - n2.index);
       list5.forEach((e, i) => {
         const share = (i + 1) / (list5.length + 1);
         ends.set(`${e.index}:${e.which}`, { point: { x: p.x + d.x * share, y: p.y + d.y * share }, share, side, count: list5.length });
@@ -26739,7 +27042,7 @@ if (mm.THREE && mm.scene) {
     }
     return o;
   }
-  function gather(tools, each) {
+  function gather2(tools, each) {
     const out = [];
     const keys = /* @__PURE__ */ new Set();
     for (const tool of tools) {
@@ -26752,10 +27055,10 @@ if (mm.THREE && mm.scene) {
     return out;
   }
   function offersFor(scope, ctx = NO_CONTEXT) {
-    return gather(registry3.values(), (tool) => tool.offers(scope, ctx));
+    return gather2(registry3.values(), (tool) => tool.offers(scope, ctx));
   }
   function completionsFor(scope, ctx = NO_CONTEXT) {
-    return gather(registry3.values(), (tool) => tool.completes ? tool.completes(scope, ctx) : []);
+    return gather2(registry3.values(), (tool) => tool.completes ? tool.completes(scope, ctx) : []);
   }
   function toolsFor(scope, ctx = NO_CONTEXT) {
     return registeredTools().filter((tool) => tool.offers(scope, ctx).length > 0);
@@ -28044,8 +28347,101 @@ if (mm.THREE && mm.scene) {
     }
   };
 
+  // src/tools/region.ts
+  var REGION_MIN_HELD = 3;
+  var REGION_MARGIN_SHARE = 0.06;
+  var REGION_MARGIN_MIN = 20;
+  var live2 = (state, id) => {
+    const n2 = state.nodes.get(id);
+    return !!n2 && !getRep(n2, "erased");
+  };
+  function isBox2(state, id) {
+    const n2 = state.nodes.get(id);
+    if (!n2 || !getRep(n2, "stroke")) return false;
+    return topInterpretation(n2) === "rectangle" || cleanOf(n2)?.shape === "rectangle";
+  }
+  function regionFrameOf(state, ids) {
+    const marks = ids.filter((id) => live2(state, id));
+    let best = null;
+    for (const id of marks) {
+      if (!isBox2(state, id)) continue;
+      const b = boundsOf(state.nodes.get(id));
+      if (!b) continue;
+      const others = marks.filter((o) => o !== id);
+      if (!others.length) continue;
+      const inside = others.every((o) => {
+        const ob = standingBoxOf(state.nodes, state.nodes.get(o));
+        return !!ob && shareInside(ob, b) >= REGION_HOLDS;
+      });
+      if (!inside) continue;
+      const area3 = (b.maxX - b.minX) * (b.maxY - b.minY);
+      if (!best || area3 > best.area) best = { frame: id, held: others, area: area3 };
+    }
+    return best ? { frame: best.frame, held: best.held } : null;
+  }
+  function regionRound(state, ids) {
+    let box = null;
+    for (const id of ids) {
+      const n2 = state.nodes.get(id);
+      const b = n2 && live2(state, id) ? standingBoxOf(state.nodes, n2) : void 0;
+      if (!b) continue;
+      box = box ? { minX: Math.min(box.minX, b.minX), minY: Math.min(box.minY, b.minY), maxX: Math.max(box.maxX, b.maxX), maxY: Math.max(box.maxY, b.maxY) } : { ...b };
+    }
+    if (!box) return null;
+    const m = Math.max(REGION_MARGIN_MIN, REGION_MARGIN_SHARE * Math.max(box.maxX - box.minX, box.maxY - box.minY));
+    return { minX: box.minX - m, minY: box.minY - m, maxX: box.maxX + m, maxY: box.maxY + m };
+  }
+  function nextRegionName(state) {
+    const taken = new Set(regionsOfBoard(state).map((r) => r.name.toLowerCase()));
+    for (let n2 = 1; ; n2++) if (!taken.has("region " + n2)) return "Region " + n2;
+  }
+  function makeRegion(session, args) {
+    const state = session.getState();
+    const name = (args.name ?? "").trim() || nextRegionName(state);
+    const found = regionFrameOf(state, args.ids);
+    let bounds = null, from, around = "marks";
+    if (found) {
+      bounds = boundsOf(state.nodes.get(found.frame)) ?? null;
+      from = found.frame;
+      around = "frame";
+    } else if (!args.frameOnly) {
+      bounds = regionRound(state, args.ids);
+    }
+    if (!bounds) return null;
+    const b = bounds;
+    return session.withTool(REGION.id, () => {
+      if (args.summonId && state.summon && state.summon.id === args.summonId) session.dismiss(args.summonId, args.at);
+      if (session.getState().selection.length) session.deselect(args.at);
+      const id = session.region({ name, bounds: b, ...from ? { from } : {}, at: args.at });
+      return id ? { id, name, around, bounds: b } : null;
+    }, args.offer ?? "region");
+  }
+  var REGION = {
+    id: "region",
+    name: "regions",
+    describe: () => "a named rectangle on the board that holds whatever stands inside it \u2014 ink, pictures, text, figures \u2014 and takes it along when it moves; made of a rectangle drawn round things, or typed (region: Monday) round the marks held",
+    offers(scope) {
+      const found = regionFrameOf(scope.state, scope.marks);
+      if (!found || found.held.length < REGION_MIN_HELD) return [];
+      return [{
+        key: "region",
+        label: "Make it a region",
+        reason: "the rectangle holds " + found.held.length + " marks \u2014 make it a place on the board, named, that takes what stands inside it when it moves; your ink stays, and type region: and a name to name it",
+        base: 0.3,
+        tool: "region",
+        verbs: ["make it a region", "make a region", "region"],
+        data: { ids: scope.marks.slice() }
+      }];
+    },
+    take(offer, scope, session, at) {
+      const d = offer.data;
+      const made = makeRegion(session, { ids: d.ids, at, summonId: scope.summon.id, offer: offer.key });
+      return made ? { made: made.id, detail: made } : { detail: null };
+    }
+  };
+
   // src/tools/builtin.ts
-  var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH, TRACE];
+  var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH, TRACE, REGION];
   registerTool(CORRECT);
   registerTool(TEXT);
   registerTool(NAME2);
@@ -28069,6 +28465,7 @@ if (mm.THREE && mm.scene) {
   registerTool(ROUTE);
   registerTool(WHICH);
   registerTool(TRACE);
+  registerTool(REGION);
 
   // src/context/context.ts
   var CONTEXT_FADE = 2.5;

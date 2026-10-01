@@ -41,10 +41,10 @@ const centreY = (s: Session, text: string) => {
 
 describe('the routing tool', () => {
   it('is a built-in, registered at the end (only Which is it? and Trace into ink follow), so the field’s existing order stands', () => {
-    expect(BUILTIN_TOOLS[BUILTIN_TOOLS.length - 3]).toBe(ROUTE);
-    expect(BUILTIN_TOOLS[BUILTIN_TOOLS.length - 2].id).toBe('which');
+    const at = BUILTIN_TOOLS.indexOf(ROUTE);
+    expect(BUILTIN_TOOLS.slice(at, at + 3).map((t) => t.id)).toEqual(['route', 'which', 'trace']);
     expect(getTool('route')).toBe(ROUTE);
-    expect(registeredTools().map((t) => t.id).indexOf('route')).toBe(BUILTIN_TOOLS.length - 3);
+    expect(registeredTools().map((t) => t.id).indexOf('route')).toBe(at);
     expect(ROUTE.describe().length).toBeGreaterThan(20);
   });
 

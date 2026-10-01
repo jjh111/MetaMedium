@@ -247,3 +247,56 @@ export function holdsSaid(holds: RegionDescription['holds']): string {
 export function regionSaid(d: RegionDescription): string {
   return 'a region “' + d.name + '” — holds ' + holdsSaid(d.holds);
 }
+
+/** One line of a board's outline: a region, how deep it nests, and what it holds. */
+export interface OutlineEntry {
+  id: string;
+  name: string;
+  bounds: Bounds;
+  depth: number;
+  /** The smallest region that holds this one, or null at the top. */
+  parent: string | null;
+  holds: RegionDescription['holds'];
+}
+
+/**
+ * The board's outline (PLAN-IPAD-NOTES I5): its regions as a tree, a region under the smallest one that
+ * holds it, siblings in reading order — top to bottom, then left to right — with what each holds. Derived
+ * from where the regions stand; the panel lists it and a tap on a line takes the view to that place.
+ */
+export function regionOutline(board: RegionBoard): OutlineEntry[] {
+  const all = regionsOfBoard(board);
+  const parentOf = new Map<string, string | null>();
+  for (const r of all) {
+    let best: { id: string; area: number } | null = null;
+    const mine = areaOf(r.bounds);
+    for (const o of all) {
+      if (o.id === r.id) continue;
+      const area = areaOf(o.bounds);
+      if (area <= mine + EPS || shareInside(r.bounds, o.bounds) < REGION_HOLDS) continue;
+      if (!best || area < best.area) best = { id: o.id, area };
+    }
+    parentOf.set(r.id, best ? best.id : null);
+  }
+  // Reading order: rows from the top — a region starts a new row only when it stands off the row's top
+  // by half its own height — and each row from the left, so neighbours a hand drew a little off level read as one row.
+  const reading = <T extends { bounds: Bounds }>(list: T[]): T[] => {
+    const byTop = list.slice().sort((a, b) => a.bounds.minY - b.bounds.minY || a.bounds.minX - b.bounds.minX);
+    const rows: T[][] = [];
+    for (const r of byTop) {
+      const row = rows[rows.length - 1];
+      if (row && r.bounds.minY - row[0].bounds.minY < 0.5 * (r.bounds.maxY - r.bounds.minY)) row.push(r);
+      else rows.push([r]);
+    }
+    return rows.flatMap((row) => row.sort((a, b) => a.bounds.minX - b.bounds.minX));
+  };
+  const out: OutlineEntry[] = [];
+  const walk = (parent: string | null, depth: number) => {
+    for (const r of reading(all.filter((x) => parentOf.get(x.id) === parent))) {
+      out.push({ id: r.id, name: r.name, bounds: r.bounds, depth, parent, holds: describeRegion(board, r.id)!.holds });
+      walk(r.id, depth + 1);
+    }
+  };
+  walk(null, 0);
+  return out;
+}

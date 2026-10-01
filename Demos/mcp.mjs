@@ -214,13 +214,21 @@ function look(args) {
   for (const n of s.packNotices) lines.push('board says: ' + n.detail);
   const marks = s.contentIds.filter((id) => !s.artifacts.includes(id));
   lines.push(marks.length + ' mark' + (marks.length === 1 ? '' : 's') + ' · ' + s.artifacts.length + ' artifact' + (s.artifacts.length === 1 ? '' : 's') + ' · ' + s.live.length + ' live' +
-    (s.selection.length ? ' · ' + s.selection.length + ' selected' : '') + (s.summon ? ' · the field is open on ' + s.summon.enclosedIds.length : '') + (s.pendingLassoId ? ' · a loop waits' : ''));
+    (s.selection.length ? ' · ' + s.selection.length + ' selected' : '') + (s.summon ? ' · the field is open on ' + s.summon.enclosedIds.length : '') + (s.pendingLassoId ? ' · a loop waits' : '') + (s.regions.length ? ' · ' + s.regions.length + ' region' + (s.regions.length === 1 ? '' : 's') : ''));
   if (args.detail === 'full') {
     lines.push(MM.describeSession(s, { nodeIds: args.ids }));
   } else {
     const ids = args.ids && args.ids.length ? args.ids : s.contentIds;
     for (const id of ids) { const n = s.nodes.get(id); if (n) lines.push(describeMark(n, s)); }
     if (!ids.length) lines.push('(nothing on the canvas)');
+  }
+  // The regions (PLAN-IPAD-NOTES I5): named places on the board, each with what stands inside it now. Read only —
+  // a hand does not make one yet; what a region holds is derived from where things stand, never written.
+  for (const reg of MM.regionsOfBoard(s)) {
+    const d = MM.describeRegion(s, reg.id);
+    if (!d) continue;
+    lines.push(reg.id + ' · ' + MM.regionSaid(d) + ' · at ' + r(d.bounds.minX) + ',' + r(d.bounds.minY) + ' ' + r(d.bounds.maxX - d.bounds.minX) + '×' + r(d.bounds.maxY - d.bounds.minY) +
+      (d.things.length ? ' · holds ' + d.things.slice(0, 12).join(', ') + (d.things.length > 12 ? ' and ' + (d.things.length - 12) + ' more' : '') : ''));
   }
   for (const id of s.explanations) {
     const n = s.nodes.get(id);
@@ -514,7 +522,7 @@ const num = { type: 'number' };
 const TOOLS = [
   {
     name: 'canvas_look',
-    description: 'What is on the MetaMedium canvas, in words: every mark with what the engine reads it as (shape and confidence), names, transcripts, artifacts and their kinds, what is playing, the selection, who else is in the room. Use ids from here in the other tools. detail "full" is the brief a model gets (relations included).',
+    description: 'What is on the MetaMedium canvas, in words: every mark with what the engine reads it as (shape and confidence), names, transcripts, artifacts and their kinds, the regions (named places, with what each holds), what is playing, the selection, who else is in the room. Use ids from here in the other tools. detail "full" is the brief a model gets (relations included).',
     inputSchema: { type: 'object', properties: { detail: { type: 'string', enum: ['brief', 'full'] }, ids: { type: 'array', items: { type: 'string' } } } },
     run: look,
   },
