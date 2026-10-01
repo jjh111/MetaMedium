@@ -924,7 +924,7 @@ export async function findTest(browser, servers, ctx) {
   const url = `${servers.staticOrigin}/Demos/session-engine.html?nosw=1`;
   const guards = await freshContext(browser, { origins: [servers.staticOrigin], label: 'boards-find' });
   const page = await guards.context.newPage();
-  const hits = () => page.evaluate(() => [...document.querySelectorAll('#findPanel .fdHit')].map((h) => ({ board: h.dataset.board, id: h.dataset.id || null, text: h.textContent.replace(/\s+/g, ' ').trim() })));
+  const hits = () => page.evaluate(() => [...document.querySelectorAll('#findPanel .fdHit')].map((h) => ({ board: h.dataset.board, id: h.dataset.id || null, name: (h.closest('.fdGroup').querySelector('.fdBoardName') || {}).textContent || '', text: h.textContent.replace(/\s+/g, ' ').trim() })));
   const openFind = async () => {
     const open = await page.evaluate(() => { const p = document.getElementById('findPanel'); return !!p && !p.hasAttribute('hidden'); });
     if (!open) { await page.click('#findBtn'); await page.waitForSelector('#findPanel:not([hidden])', { timeout: 5000 }); }
@@ -975,8 +975,8 @@ export async function findTest(browser, servers, ctx) {
     // ---- N23. typing pric lists both ---------------------------------------------------------
     const both = await find('pric', (h) => new Set(h.map((x) => x.board)).size >= 2);
     const a = both.find((h) => h.board === alpha), n = both.find((h) => h.board === notes);
-    check('N23. two boards, a label “Pricing” on a box in one and a typed text “Pricing notes for the review” in the other: typing pric in the search lists both, each hit in its board’s group, saying what it is and the board — label on a box · Board “Alpha”; typed text · Board “Notes”',
-      !!a && !!n && /Pricing/.test(a.text) && /label on a box/.test(a.text) && /Alpha/.test(a.text) && /Pricing notes for the review/.test(n.text) && /typed text/.test(n.text) && /Notes/.test(n.text),
+    check('N23. two boards, a label “Pricing” on a box in one and a typed text “Pricing notes for the review” in the other: typing pric in the search lists both, each hit in its board’s group, saying what it is — “Pricing” — label on a box under Alpha; “Pricing notes for the review” — typed text under Notes',
+      !!a && !!n && /Pricing/.test(a.text) && /label on a box/.test(a.text) && a.name === 'Alpha' && /Pricing notes for the review/.test(n.text) && /typed text/.test(n.text) && n.name === 'Notes',
       { hits: both });
 
     // ---- N23b. a tap opens it in place, the hit in view, nothing written ------------------------
@@ -1023,11 +1023,12 @@ export async function findTest(browser, servers, ctx) {
     await waitReady(page);
     await page.evaluate(() => window.__mm.findIdle());
     await guards.context.setOffline(true);
-    const re = await find('pric', (h) => new Set(h.map((x) => x.board)).size >= 2);
-    const st = await page.evaluate(() => window.__mm.findState());
+    const reA = await find('gant', (h) => h.some((x) => x.board === alpha));
+    const reN = await find('pric', (h) => h.some((x) => x.board === notes));
+    const st = await page.evaluate(() => ({ state: window.__mm.findState(), boards: window.__mm.boards().list.map((e) => [e.id, e.stats]) }));
     await guards.context.setOffline(false);
-    check('N23f. after a reload — and with the network off — the index answers: both boards found; and nothing was built again (the kept index for each board matched the board’s own record of its change)',
-      new Set(re.map((x) => x.board)).size >= 2 && st.builds === 0, { builds: st.builds, found: re.length });
+    check('N23f. after a reload — and with the network off — the index answers: “gant” finds Alpha, “pric” finds Notes; and nothing was built again (the kept index for each board matched the board’s own record of its change)',
+      reA.some((x) => x.board === alpha) && reN.some((x) => x.board === notes) && st.state.builds === 0, { st });
 
     // ---- N23g. thumbnails in the boards list ---------------------------------------------------------------
     await page.evaluate(() => window.__mm.findIdle());
@@ -1050,6 +1051,49 @@ export async function findTest(browser, servers, ctx) {
     check('N23g. the boards pane shows a small picture of each board — a decoded image with the board’s marks in it, more than one colour — made when the board was left, and for the board still on screen as well',
       [alpha, notes].every((id) => thumbs[id] && thumbs[id].src === 'data:image/' && thumbs[id].w > 0 && thumbs[id].colours > 1), { thumbs });
     await closeBoardsPane(page);
+
+    // ---- N23g2. a picture is in the board's picture; and a board with none is drawn when it is first read ----------
+    const redPixels = (id) => page.evaluate(async (b) => {
+      const img = document.querySelector('#boardsPanel .bdItem[data-id="' + b + '"] img.bdThumb');
+      if (!img) return -1;
+      await img.decode().catch(() => {});
+      const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data;
+      let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 150 && d[i + 1] < 90 && d[i + 2] < 90) n++;
+      return n;
+    }, id);
+    await page.evaluate(async () => {
+      const c = document.createElement('canvas'); c.width = 500; c.height = 400;
+      const g = c.getContext('2d'); g.fillStyle = 'rgb(220,30,30)'; g.fillRect(0, 0, 500, 400);
+      const f = new File([await new Promise((r) => c.toBlob(r, 'image/png'))], 'red.png', { type: 'image/png' });
+      await window.__mm.importPictures([f], { view: { minX: 480, minY: 140, maxX: 1380, maxY: 740 } });
+      await window.__mm.boardIdle();
+      for (let i = 0; i < 100 && window.__mm.pictureState().loading; i++) await new Promise((r) => setTimeout(r, 50));
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    });
+    await switchTo(page, alpha); // leaving Notes draws it, the picture as the canvas holds it
+    await switchTo(page, notes);
+    await openBoardsPane(page);
+    await page.waitForSelector(`#boardsPanel .bdItem[data-id="${notes}"] img.bdThumb`, { timeout: 10000 }).catch(() => {});
+    const redLeft = await redPixels(notes);
+    await closeBoardsPane(page);
+    // The kept index and pictures lost (a browser that cleared them): a reload reads every board again — the board
+    // left from its own records, in a scratch session, its picture from the asset store — and draws both.
+    await switchTo(page, alpha); // the board with the picture is not the one the page reopens on
+    await page.evaluate(() => window.__mm.findIdle());
+    await page.evaluate(() => new Promise((resolve) => { const r = indexedDB.deleteDatabase('mm-find'); r.onsuccess = r.onerror = r.onblocked = () => resolve(); }));
+    await page.reload({ waitUntil: 'load' });
+    await waitReady(page);
+    await page.evaluate(() => window.__mm.findIdle());
+    await openBoardsPane(page);
+    await page.waitForSelector(`#boardsPanel .bdItem[data-id="${alpha}"] img.bdThumb`, { timeout: 15000 }).catch(() => {});
+    const afterLoss = { red: await redPixels(notes), alpha: await redPixels(alpha), st: await page.evaluate(() => window.__mm.findState()) };
+    await closeBoardsPane(page);
+    const reAfter = await find('gant', (h) => h.some((x) => x.board === alpha));
+    check('N23g2. a picture on a board is in its picture in the list — red where the red picture stands, as the canvas drew it (' + redLeft + ' red pixels) — and with the kept index and pictures gone, a reload reads every board again and draws them: the board on screen from its state, the one with the picture from its own records and the asset store (' + afterLoss.red + ' red) — and search finds what was said (' + afterLoss.st.builds + ' indexes built)',
+      redLeft > 20 && afterLoss.red > 20 && afterLoss.st.builds >= 2 && reAfter.some((x) => x.board === alpha), { redLeft, afterLoss });
+    await page.keyboard.press('Escape');
 
     // ---- N23h. the keys ---------------------------------------------------------------------------------------
     await page.keyboard.press('Escape');
@@ -1074,7 +1118,7 @@ export async function findTest(browser, servers, ctx) {
     const goneNow = await hits();
     const byName = await find('notes', (h) => h.some((x) => x.board === notes));
     check('N23i. a board in the trash is not searched — “gant” finds nothing once Alpha is trashed — and a board is found by its name: “notes” lists the board Notes',
-      !goneNow.some((x) => x.board === alpha) && byName.some((x) => x.board === notes && /Notes/.test(x.text)), { gone, goneNow, byName });
+      !goneNow.some((x) => x.board === alpha) && byName.some((x) => x.board === notes && x.name === 'Notes' && /its name says it/.test(x.text)), { gone, goneNow, byName });
   } catch (err) {
     check('N23. the find test ran to its end', false, { error: String(err && err.stack ? err.stack : err) });
     await ctx.screenshot(page, 'boards-find');

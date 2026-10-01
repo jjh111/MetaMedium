@@ -54,6 +54,10 @@ export interface SearchGroup { board: string; name: string; recency: number; sco
 
 interface Lexical { score: number; spans: [number, number][] }
 
+/** An entry's words, cut once: a query is asked at every key, of every board, and the entries do not change. */
+const wordsOfEntry = new WeakMap<SearchEntry, Token[]>();
+const wordsOf = (e: SearchEntry): Token[] => { let w = wordsOfEntry.get(e); if (!w) { w = tokenize(e.text); wordsOfEntry.set(e, w); } return w; };
+
 /** How the typed words match an entry's words, or null when one of them is not there. */
 function lexical(q: Token[], words: Token[]): Lexical | null {
   if (!q.length || !words.length) return null;
@@ -115,7 +119,7 @@ export function searchBoards(boards: readonly SearchBoard[], query: string, opti
     const nameLex = lexical(q, tokenize(b.name));
     if (nameLex) add({ id: null, kind: 'board', text: b.name, what: 'board name' }, nameLex, 0);
     for (const e of b.entries) {
-      const lex = lexical(q, tokenize(e.text));
+      const lex = lexical(q, wordsOf(e));
       const sem = options.semantic ? Math.max(0, Math.min(1, options.semantic(query, e, b) || 0)) : 0;
       add(e, lex, sem);
     }

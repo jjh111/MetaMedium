@@ -14178,7 +14178,7 @@ var MetaMediumCore = (() => {
     const place2 = new Map(ordered2.map((s, i) => [s.id, i]));
     const unread = [];
     const unreadIds = /* @__PURE__ */ new Set();
-    const wordsOf2 = (own, labelIds, owner, on, where) => {
+    const wordsOf3 = (own, labelIds, owner, on, where) => {
       const mine = [.../* @__PURE__ */ new Set([...labelIds, ...reading7.labels.filter((l) => l.of === owner).map((l) => l.id)])].map(
         (id) => labels.get(id) ?? { id, of: owner, where: "beside", role: "label", confidence: 0, reason: "writing" }
       );
@@ -14207,7 +14207,7 @@ var MetaMediumCore = (() => {
     for (const s of ordered2) {
       const m = idOf.get(s.id);
       const shape = T6.symbols[s.symbol].mermaid;
-      const words = wordsOf2(s.text, s.labels, s.id, "symbol", m);
+      const words = wordsOf3(s.text, s.labels, s.id, "symbol", m);
       if (words === null) blank.push(m);
       const text = words ?? BLANK;
       lines.push(`    ${m}${shape.open}${mermaidString(text, { colons: PREPROCESSED.test(m + text) })}${shape.close}`);
@@ -14220,7 +14220,7 @@ var MetaMediumCore = (() => {
     for (const c of written2) {
       const a = idOf.get(c.from), b = idOf.get(c.to);
       const arrow = c.direction === "forward" ? arrows.forward : c.direction === "both" ? arrows.both : arrows.none;
-      const words = wordsOf2(c.text, c.labels, c.id, "flow", `${a} ${arrow} ${b}`);
+      const words = wordsOf3(c.text, c.labels, c.id, "flow", `${a} ${arrow} ${b}`);
       const label = words === null ? "" : arrows.label.replace("%label%", mermaidString(words, { colons: PREPROCESSED.test(a + b + words) }));
       lines.push(`    ${a} ${arrow}${label} ${b}`);
       links.push({ index: links.length, id: c.id, ids: [c.id, ...[...new Set(c.ids)].filter((x) => x !== c.id).sort(naturalCompare)], from: a, to: b });
@@ -16382,7 +16382,7 @@ var MetaMediumCore = (() => {
     const labels = new Map(reading7.labels.map((l) => [l.id, l]));
     const unread = [];
     const unreadIds = /* @__PURE__ */ new Set();
-    const wordsOf2 = (own, labelIds, owner, where) => {
+    const wordsOf3 = (own, labelIds, owner, where) => {
       const mine = [.../* @__PURE__ */ new Set([...labelIds, ...reading7.labels.filter((l) => l.of === owner).map((l) => l.id)])].map(
         (id) => labels.get(id) ?? { id, of: owner, where: "beside", role: "label", confidence: 0, reason: "writing" }
       );
@@ -16404,7 +16404,7 @@ var MetaMediumCore = (() => {
       }
       return parts.length ? parts.join(" ") : null;
     };
-    return { wordsOf: wordsOf2, unread, unreadIds };
+    return { wordsOf: wordsOf3, unread, unreadIds };
   }
   function notesFor(reading7, said3, unread, blank, extra = []) {
     const notes = [];
@@ -24730,7 +24730,7 @@ ${lines.join("\n")}
     const across2 = direction.value === "LR";
     const ordered2 = inReadingOrder(symbols, (s) => s.bounds, (s) => s.id, across2);
     const place2 = new Map(ordered2.map((s, i) => [s.id, i]));
-    const { wordsOf: wordsOf2, unread, unreadIds } = wordsFor2(reading7, opts);
+    const { wordsOf: wordsOf3, unread, unreadIds } = wordsFor2(reading7, opts);
     const lines = [T3.mermaid.header];
     if (across2) lines.push("    direction LR");
     const ids = {};
@@ -24738,7 +24738,7 @@ ${lines.join("\n")}
     const blank = [];
     for (const s of ordered2.filter((x) => x.symbol === "state")) {
       const m = idOf.get(s.id);
-      const words = wordsOf2(s.text, s.labels, s.id, `the name of ${m}`);
+      const words = wordsOf3(s.text, s.labels, s.id, `the name of ${m}`);
       if (words === null) blank.push(m);
       const text = words ?? " ";
       lines.push(`    state "${stateText(text, { colons: PREPROCESSED3.test(m + text) })}" as ${m}`);
@@ -24753,7 +24753,7 @@ ${lines.join("\n")}
       const from = byId.get(k.from), to = byId.get(k.to);
       const a = from.symbol === "state" ? idOf.get(from.id) : START_END;
       const b = to.symbol === "state" ? idOf.get(to.id) : START_END;
-      const words = wordsOf2(k.text, k.labels, k.id, `the label of ${a} --> ${b}`);
+      const words = wordsOf3(k.text, k.labels, k.id, `the label of ${a} --> ${b}`);
       if (from.symbol === "final") backwards.push(`${a} --> ${b} leaves a final ring`);
       if (to.symbol === "initial") backwards.push(`${a} --> ${b} arrives at an initial dot`);
       if (a === START_END && b === START_END) said3.push("a transition straight from the initial dot to the final ring cannot be said in Mermaid: both are [*]");
@@ -30933,6 +30933,15 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
   var FOLLOWS = 0.3;
   var KIND_WEIGHT = { label: 1.15, name: 1.1, board: 1.1, region: 1.1, picture: 1, text: 1, figure: 1, mermaid: 1, page: 0.95, transcript: 0.95 };
   var EXCERPT_CHARS = 80;
+  var wordsOfEntry = /* @__PURE__ */ new WeakMap();
+  var wordsOf2 = (e) => {
+    let w2 = wordsOfEntry.get(e);
+    if (!w2) {
+      w2 = tokenize(e.text);
+      wordsOfEntry.set(e, w2);
+    }
+    return w2;
+  };
   function lexical(q, words) {
     if (!q.length || !words.length) return null;
     let total = 0, follows = true, last = -1;
@@ -30996,7 +31005,7 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
       const nameLex = lexical(q, tokenize(b.name));
       if (nameLex) add7({ id: null, kind: "board", text: b.name, what: "board name" }, nameLex, 0);
       for (const e of b.entries) {
-        const lex = lexical(q, tokenize(e.text));
+        const lex = lexical(q, wordsOf2(e));
         const sem = options.semantic ? Math.max(0, Math.min(1, options.semantic(query, e, b) || 0)) : 0;
         add7(e, lex, sem);
       }
