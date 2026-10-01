@@ -271,6 +271,13 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   line, the field by the hand, relevant offers, Enter as the likely act, the control
   centre grouped, help as a user guide), U2 the audit walked again; the J5 and J4
   briefs in case the local lanes stop
+- `PLAN-IPAD-NOTES.md` — **dyna.ink on the iPad, 1 Oct 2026**: is the canvas ready for
+  hand notes, many pictures and SVGs on an iPad Pro with a Pencil? Not yet — a picture's
+  pixels are never kept or drawn, every picture is traced into ink (a camera photo is
+  ~3,900 strokes), many traced marks beside an artifact are very slow, exports drop what
+  came in, nothing asks for persistent storage, there is no search or region; the seats
+  per job (reader, parser, semantic, decider — Jev — and writer), each with its own key;
+  the MVP units I1–I10, John's decisions, and what to check on the real iPad
 - `UX-AUDIT-2026-09-28.md` — **the canvas as a user meets it**: sixteen findings
   from a walk of `/app/` using only what the screen gives (the models pane that
   pops and drops the question, no way to reach Claude, the inspector as the panel,
