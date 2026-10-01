@@ -1,0 +1,14 @@
+{
+  "name": "dyna-relay",
+  "private": true,
+  "type": "module",
+  "description": "The room relay of Demos/relay.mjs as a Cloudflare Worker and Durable Object",
+  "scripts": {
+    "test": "node --test relay.worker.test.mjs relay.parity.test.mjs",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}
