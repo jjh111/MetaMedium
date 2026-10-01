@@ -100,6 +100,19 @@ export interface RelayNotice {
   kept?: number;
 }
 
+/**
+ * A relay that asks for a key (cloudflare/relay) refused this hand: it is not
+ * the relay's word on the stream — a refused stream has none — but the
+ * transport's, made of the status it was answered with, so a wrong or missing
+ * key is a sentence in every hand's status and never a room that is silently
+ * empty. Like the truncation, it carries no `participant`.
+ */
+export interface RelayRefusal {
+  relay: 'refused';
+  room?: string;
+  status: number;
+}
+
 export interface LiveTransport {
   /**
    * Put a line on the wire. A transport that is asynchronous — a POST to a
@@ -107,7 +120,7 @@ export interface LiveTransport {
    * line, so a hand's lines reach the relay in the order it wrote them.
    */
   send(line: LiveLine): void | Promise<unknown>;
-  onMessage(cb: (line: LiveLine | RelayNotice) => void): () => void;
+  onMessage(cb: (line: LiveLine | RelayNotice | RelayRefusal) => void): () => void;
   close?(): void;
 }
 
@@ -196,6 +209,8 @@ export class LiveStore implements Store {
   private readonly later: (fn: () => void, ms: number) => () => void;
   /** The relay's word that this room is older than its buffer. */
   private truncated: RelayNotice | null = null;
+  /** The relay's refusal of this hand's key (the transport's word). */
+  private refused: RelayRefusal | null = null;
   /** Whether this store has put MY log on the wire yet, in any form. */
   private published = false;
   private lastAt = 0;
@@ -346,6 +361,16 @@ export class LiveStore implements Store {
     return `the room is older than the relay remembers — ${n.dropped} earlier line${n.dropped === 1 ? ' is' : 's are'} gone`;
   }
 
+  /** A relay that refused this hand — no key, a wrong one — as a sentence, or null. The key is never in it. */
+  refusal(): string | null {
+    const r = this.refused;
+    if (!r) return null;
+    if (r.status === 401) return 'the relay wants a key for this room and none was given — the room is not reached';
+    if (r.status === 403) return 'the relay does not take this key for this room — the room is not reached';
+    if (r.status === 503) return 'the relay has no keys set up yet — the room is not reached';
+    return `the relay refused this room (HTTP ${r.status}) — the room is not reached`;
+  }
+
   /**
    * Log names two DIFFERENT events were both numbered under, in the logs held
    * here — one sentence per name. The same event heard in two logs is one
@@ -365,6 +390,8 @@ export class LiveStore implements Store {
    */
   notices(): string[] {
     const out = this.collisions().concat(this.misnumberings());
+    const f = this.refusal();
+    if (f) out.push(f);
     const t = this.truncation();
     if (t) out.push(t);
     return out;
@@ -496,8 +523,14 @@ export class LiveStore implements Store {
     this.notify(name, []);
   }
 
-  private receive(raw: LiveLine | RelayNotice | null | undefined): void {
+  private receive(raw: LiveLine | RelayNotice | RelayRefusal | null | undefined): void {
     if (this.closed || !raw || typeof raw !== 'object') return;
+    if ((raw as RelayRefusal).relay === 'refused') {
+      const r = raw as RelayRefusal;
+      this.refused = { relay: 'refused', room: r.room, status: Number(r.status) || 0 };
+      this.notify('', []);
+      return;
+    }
     if ((raw as RelayNotice).relay === 'truncated') {
       const n = raw as RelayNotice;
       this.truncated = { relay: 'truncated', room: n.room, dropped: Math.max(0, Number(n.dropped) || 0), kept: n.kept };

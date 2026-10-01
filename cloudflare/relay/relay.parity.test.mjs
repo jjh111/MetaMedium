@@ -74,7 +74,7 @@ test('a hand with the wrong key is told so, not left waiting: checkRelay says wh
     assert.equal(heard.find((l) => l.relay === 'refused').status, 403);
     t.close();
     const store = new MM.LiveStore(relayTransport(url, 'claude', { key: 'nope' }), 'ada~1', 'claude');
-    assert.ok(await until(() => store.notices().some((n) => /refused/.test(n))), JSON.stringify(store.notices()));
+    assert.ok(await until(() => store.notices().some((n) => /does not take this key for this room/.test(n))), JSON.stringify(store.notices()));
     store.close();
   } finally { await close(); }
 });
