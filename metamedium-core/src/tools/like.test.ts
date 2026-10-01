@@ -7,6 +7,7 @@ import { rectStroke, circleStroke } from '../test/strokes';
 import type { ToolHost } from './tool';
 import { offersFor, toolScope, takeOffer, describeTools, registeredTools } from './registry';
 import { LIKE } from './like';
+import { wordsOfMarks } from '../semantic';
 import './builtin';
 
 let clock = 1000;
@@ -49,15 +50,14 @@ describe('Notes like this', () => {
     expect(all.filter((o) => o.tool === 'like' && !o.hidden)).toEqual([]);
   });
 
-  it('says a held region by the words it carries: its name and what it holds', () => {
+  it('a region is not held by the field (the selection carries it), so its offer is the panel\'s, from the same words', () => {
     const s = createSession();
     const inner = s.addStroke(rectStroke(40, 400, 100, 60), (clock += 100), undefined, 1, { content: true })!;
     s.label({ nodeId: inner, text: 'Margins', at: (clock += 100) });
     const region = s.region({ name: 'Monday', bounds: { minX: 0, minY: 380, maxX: 300, maxY: 520 }, at: (clock += 100) })!;
     s.summonMarks([region], (clock += 100));
-    const o = like(s);
-    // A region reaches the field by the selection, not the content plane: when the field holds it, the offer says its words.
-    if (o.length) expect((o[0].data as { text: string }).text).toBe('Monday Margins');
+    expect(s.getState().summon).toBeFalsy();            // no field stands on a region: nothing here to offer
+    expect(wordsOfMarks(s.getState(), [region])).toBe('Monday Margins');
   });
 
   it('taking it writes nothing and names the host act with the words and the marks it was asked about', () => {

@@ -2122,13 +2122,13 @@ var UNIT_WORD = {
   mm: ["millimetre", "millimetres"],
   m: ["metre", "metres"]
 };
-function quantity(value, unit6 = null, opts = {}) {
-  const q = { lo: value, hi: value, unit: unit6, dim: opts.dim ?? (unit6 ? 1 : 0), approx: !!opts.approx };
+function quantity(value, unit7 = null, opts = {}) {
+  const q = { lo: value, hi: value, unit: unit7, dim: opts.dim ?? (unit7 ? 1 : 0), approx: !!opts.approx };
   if (opts.precision !== void 0) q.precision = opts.precision;
   return q;
 }
-function rangeOf(lo, hi, unit6 = null, opts = {}) {
-  const q = quantity(Math.min(lo, hi), unit6, opts);
+function rangeOf(lo, hi, unit7 = null, opts = {}) {
+  const q = quantity(Math.min(lo, hi), unit7, opts);
   q.hi = Math.max(lo, hi);
   return q;
 }
@@ -2153,16 +2153,16 @@ function formatNumber(v, digits = 2) {
   const s = digits > 0 ? r.toFixed(digits).replace(/\.?0+$/, "") : r.toFixed(0);
   return s.startsWith("-") ? "\u2212" + s.slice(1) : s;
 }
-function unitSuffix(unit6, dim, words = false) {
-  if (!unit6 || dim === 0) return "";
+function unitSuffix(unit7, dim, words = false) {
+  if (!unit7 || dim === 0) return "";
   if (dim === 1) {
-    if (!words && unit6 === "in") return "\u2033";
-    if (!words && unit6 === "ft") return "\u2032";
-    return " " + unit6;
+    if (!words && unit7 === "in") return "\u2033";
+    if (!words && unit7 === "ft") return "\u2032";
+    return " " + unit7;
   }
   const sup = { 2: "\xB2", 3: "\xB3" };
-  if (dim > 0) return " " + unit6 + (sup[dim] ?? `^${dim}`);
-  return " per " + unit6 + (dim < -1 ? sup[-dim] ?? `^${-dim}` : "");
+  if (dim > 0) return " " + unit7 + (sup[dim] ?? `^${dim}`);
+  return " per " + unit7 + (dim < -1 ? sup[-dim] ?? `^${-dim}` : "");
 }
 var FRACTION_GLYPH = {
   "1/2": "\xBD",
@@ -2205,8 +2205,8 @@ function formatQuantity(q, opts = {}) {
   else body = `${n2(q.lo)}\u2013${n2(q.hi)}`;
   return (q.approx ? "~" : "") + body + unitSuffix(q.unit, q.dim, opts.words);
 }
-function unitName(unit6, plural) {
-  return UNIT_WORD[unit6][plural ? 1 : 0];
+function unitName(unit7, plural) {
+  return UNIT_WORD[unit7][plural ? 1 : 0];
 }
 var VULGAR = {
   "\xBD": [1, 2],
@@ -2308,13 +2308,13 @@ function scanUnit(s, i) {
   const m = /^[A-Za-z]+\.?/.exec(s.slice(k));
   if (!m) return null;
   let word = m[0];
-  let unit6 = UNIT_WORDS[word.toLowerCase()];
-  if (!unit6 && word.endsWith(".")) {
+  let unit7 = UNIT_WORDS[word.toLowerCase()];
+  if (!unit7 && word.endsWith(".")) {
     word = word.slice(0, -1);
-    unit6 = UNIT_WORDS[word.toLowerCase()];
+    unit7 = UNIT_WORDS[word.toLowerCase()];
   }
-  if (!unit6) return null;
-  return { unit: unit6, text: s.slice(i, k + word.length), end: k + word.length };
+  if (!unit7) return null;
+  return { unit: unit7, text: s.slice(i, k + word.length), end: k + word.length };
 }
 function scanMeasure(s, i) {
   const n2 = scanNumber(s, i);
@@ -2351,7 +2351,7 @@ function parseQuantity(text) {
   i = a.end;
   let lo = sign * a.value;
   let hi = lo;
-  let unit6 = a.unit;
+  let unit7 = a.unit;
   let precision = a.precision;
   let isRangeWritten = false;
   const note = [];
@@ -2361,39 +2361,39 @@ function parseQuantity(text) {
     if (!b) return null;
     if (b.value <= lo) return null;
     const bv = b.value;
-    if (unit6 && b.unit && unit6 !== b.unit) {
-      const c = convertQuantity(quantity(lo, unit6), b.unit);
+    if (unit7 && b.unit && unit7 !== b.unit) {
+      const c = convertQuantity(quantity(lo, unit7), b.unit);
       note.push(c.note ?? "");
       lo = c.quantity.lo;
       if (bv <= lo) return null;
     }
-    unit6 = b.unit ?? unit6;
+    unit7 = b.unit ?? unit7;
     hi = bv;
     precision = Math.min(precision, b.precision);
     isRangeWritten = true;
     i = b.end;
   }
   if (s.slice(i).trim().length > 0) return null;
-  const q = rangeOf(lo, hi, unit6, { approx, precision });
-  const unitWords = unit6 ? ` ${unitName(unit6, true)}` : "";
+  const q = rangeOf(lo, hi, unit7, { approx, precision });
+  const unitWords = unit7 ? ` ${unitName(unit7, true)}` : "";
   let reason;
   if (isRangeWritten) reason = `a range, from ${formatNumber(lo)} to ${formatNumber(hi)}${unitWords}`;
-  else reason = unit6 ? `${formatNumber(lo)} ${unitName(unit6, lo !== 1)}` : `the number ${formatNumber(lo)}, no unit written`;
+  else reason = unit7 ? `${formatNumber(lo)} ${unitName(unit7, lo !== 1)}` : `the number ${formatNumber(lo)}, no unit written`;
   if (approx) reason = `approximate: ${reason}`;
   if (a.text.includes("/") || a.text.includes("\u2044") || Object.keys(VULGAR).some((v) => a.text.includes(v))) reason += `, written as a fraction`;
   if (note.length) reason += ` (${note.filter(Boolean).join("; ")})`;
   return { quantity: q, text: s, reason };
 }
-function convertQuantity(q, unit6) {
-  if (!q.unit || q.dim === 0 || q.unit === unit6) return { quantity: q };
-  const f = (MM_PER[q.unit] / MM_PER[unit6]) ** q.dim;
-  const out = { ...q, lo: q.lo * f, hi: q.hi * f, unit: unit6 };
+function convertQuantity(q, unit7) {
+  if (!q.unit || q.dim === 0 || q.unit === unit7) return { quantity: q };
+  const f = (MM_PER[q.unit] / MM_PER[unit7]) ** q.dim;
+  const out = { ...q, lo: q.lo * f, hi: q.hi * f, unit: unit7 };
   delete out.precision;
   return { quantity: out, note: `${formatQuantity(q)} is ${formatQuantity(out)}` };
 }
 var dimName = (q) => q.dim === 0 ? "a number" : q.dim === 1 ? "a length" : q.dim === 2 ? "an area" : `a quantity of dimension ${q.dim}`;
-function computed(lo, hi, unit6, dim, approx) {
-  return { lo: Math.min(lo, hi), hi: Math.max(lo, hi), unit: dim === 0 ? null : unit6, dim, approx };
+function computed(lo, hi, unit7, dim, approx) {
+  return { lo: Math.min(lo, hi), hi: Math.max(lo, hi), unit: dim === 0 ? null : unit7, dim, approx };
 }
 function negateQuantity(q) {
   const out = { ...q, lo: -q.hi, hi: -q.lo };
@@ -2413,9 +2413,9 @@ function arithmetic(op, a, b) {
       if (c.note) notes.push(c.note);
       y2 = c.quantity;
     }
-    const unit7 = x.unit ?? y2.unit;
-    if (op === "+") return { quantity: computed(x.lo + y2.lo, x.hi + y2.hi, unit7, x.dim, approx), notes };
-    return { quantity: computed(x.lo - y2.hi, x.hi - y2.lo, unit7, x.dim, approx), notes };
+    const unit8 = x.unit ?? y2.unit;
+    if (op === "+") return { quantity: computed(x.lo + y2.lo, x.hi + y2.hi, unit8, x.dim, approx), notes };
+    return { quantity: computed(x.lo - y2.hi, x.hi - y2.lo, unit8, x.dim, approx), notes };
   }
   let y = b;
   if (a.unit && y.unit && a.unit !== y.unit && y.dim !== 0) {
@@ -2423,17 +2423,17 @@ function arithmetic(op, a, b) {
     if (c.note) notes.push(c.note);
     y = c.quantity;
   }
-  const unit6 = a.unit ?? y.unit;
+  const unit7 = a.unit ?? y.unit;
   if (op === "*") {
     const p3 = [a.lo * y.lo, a.lo * y.hi, a.hi * y.lo, a.hi * y.hi];
-    return { quantity: computed(Math.min(...p3), Math.max(...p3), unit6, a.dim + y.dim, approx), notes };
+    return { quantity: computed(Math.min(...p3), Math.max(...p3), unit7, a.dim + y.dim, approx), notes };
   }
   if (y.lo <= 0 && y.hi >= 0) {
     const error = isRange(y) ? `cannot divide by ${formatQuantity(y)}: it holds zero` : "cannot divide by zero";
     return { quantity: null, notes, error };
   }
   const p = [a.lo / y.lo, a.lo / y.hi, a.hi / y.lo, a.hi / y.hi];
-  return { quantity: computed(Math.min(...p), Math.max(...p), unit6, a.dim - y.dim, approx), notes };
+  return { quantity: computed(Math.min(...p), Math.max(...p), unit7, a.dim - y.dim, approx), notes };
 }
 function compareQuantities(computedQ, written2) {
   const w2 = formatQuantity(written2);
@@ -3072,14 +3072,14 @@ function parseLine(text) {
   }
   return { ...base, shape: "formula" };
 }
-function scopeOf(names = {}, steps = {}, unit6 = null) {
+function scopeOf(names = {}, steps = {}, unit7 = null) {
   const toQ2 = (v) => typeof v === "string" ? parseQuantity(v)?.quantity ?? null : v;
   const table = /* @__PURE__ */ new Map();
   for (const [k, v] of Object.entries(names)) {
     table.set(normName(k), Array.isArray(v) ? v : [{ value: toQ2(v), key: k }]);
   }
   return {
-    unit: unit6,
+    unit: unit7,
     name: (n2) => table.get(normName(n2)),
     step: (n2) => steps[n2] !== void 0 ? { value: toQ2(steps[n2]), key: String(n2) } : void 0
   };
@@ -3664,8 +3664,8 @@ function readSheet(input, options = {}) {
   );
   const drafts = sources2.map((src, line) => classify(src, line));
   proseToNotes(drafts);
-  const { unit: unit6, reason: unitReason } = options.unit !== void 0 ? { unit: options.unit, reason: options.unit ? `${UNIT_NAMES[options.unit]}, as given` : "no unit, as given" } : inferUnit(drafts.map((d) => d.parse));
-  const withUnit = (q) => isBare(q) && unit6 ? { ...q, unit: unit6, dim: 1 } : q;
+  const { unit: unit7, reason: unitReason } = options.unit !== void 0 ? { unit: options.unit, reason: options.unit ? `${UNIT_NAMES[options.unit]}, as given` : "no unit, as given" } : inferUnit(drafts.map((d) => d.parse));
+  const withUnit = (q) => isBare(q) && unit7 ? { ...q, unit: unit7, dim: 1 } : q;
   const nameIndex = /* @__PURE__ */ new Map();
   const defByKey = /* @__PURE__ */ new Map();
   const stepByKey = /* @__PURE__ */ new Map();
@@ -3708,7 +3708,7 @@ function readSheet(input, options = {}) {
     if (d.kind !== "check" || !above || above.kind !== "step" || above.conflict || above.workedLine !== void 0 || hasNames2(d.chain)) return;
     if (above.chain.segments.some((g) => g.join === "gap")) return;
     const joined = parseChain(`${above.parse.body}   ${d.parse.body}`);
-    if (!evaluateChain(joined, { unit: unit6 }).some((r) => r.restated > 0)) return;
+    if (!evaluateChain(joined, { unit: unit7 }).some((r) => r.restated > 0)) return;
     above.chain = joined;
     above.workedLine = d.line;
     d.kind = "worked";
@@ -3732,7 +3732,7 @@ function readSheet(input, options = {}) {
     const values = /* @__PURE__ */ new Map();
     const readings2 = /* @__PURE__ */ new Map();
     const scopeFor = (allowance) => ({
-      unit: unit6,
+      unit: unit7,
       describeUnknown: (name) => `${name} is not on this sheet`,
       name: (n2) => {
         const key2 = nameIndex.get(normName(n2));
@@ -3821,7 +3821,7 @@ function readSheet(input, options = {}) {
       case "definition": {
         const value = d.value ? withUnit(d.value) : null;
         const head = [d.letter, d.name].filter(Boolean).join(" \xB7 ");
-        const reason = d.conflict ? d.conflict : value ? `${head} = ${fmt(value)}${d.value && isBare(d.value) && unit6 ? `, in the ${UNIT_NAMES[unit6]} this page writes` : ""}` : `${head}: a measurement with no number yet`;
+        const reason = d.conflict ? d.conflict : value ? `${head} = ${fmt(value)}${d.value && isBare(d.value) && unit7 ? `, in the ${UNIT_NAMES[unit7]} this page writes` : ""}` : `${head}: a measurement with no number yet`;
         return { ...base, kind: "definition", key: d.key, ...d.letter ? { letter: d.letter } : {}, ...d.name ? { name: d.name } : {}, value, ...d.conflict ? { conflict: d.conflict } : {}, reason };
       }
       case "step": {
@@ -3869,7 +3869,7 @@ function readSheet(input, options = {}) {
         return { ...base, kind: "note", reason: d.note ?? `cannot read \u201C${d.parse.body}\u201D` };
     }
   });
-  return { entries, unit: unit6, unitReason };
+  return { entries, unit: unit7, unitReason };
 }
 function nameOf(r, readings2) {
   return r.label ?? (readings2.some((x) => x.label) ? "from the measurements" : `as ${r.formula}`);
@@ -5433,18 +5433,18 @@ function isLengthKey(key2) {
   return !/^angle\d+$/.test(key2) && key2 !== "area" && key2 !== "piece";
 }
 var UNIT_NAMES2 = { in: "inches", ft: "feet", cm: "centimetres", mm: "millimetres", m: "metres" };
-function scaleOf(labels, unit6) {
+function scaleOf(labels, unit7) {
   const ratios = [];
   const counted2 = /* @__PURE__ */ new Set();
   for (const { figure, label } of labels) {
-    if (label.declared || !isLengthKey(label.key) || isRange(label.value) || label.value.dim !== (unit6 ? 1 : label.value.dim)) continue;
+    if (label.declared || !isLengthKey(label.key) || isRange(label.value) || label.value.dim !== (unit7 ? 1 : label.value.dim)) continue;
     if (label.number) {
       if (counted2.has(label.number)) continue;
       counted2.add(label.number);
     }
     const ink = inkMeasure(figure, label.key);
     if (!ink || ink <= 0) continue;
-    const v = unit6 && label.value.unit && label.value.unit !== unit6 ? convertQuantity(label.value, unit6).quantity : label.value;
+    const v = unit7 && label.value.unit && label.value.unit !== unit7 ? convertQuantity(label.value, unit7).quantity : label.value;
     if (!(v.lo > 0)) continue;
     ratios.push({ figure: figure.id, key: label.key, text: label.text, r: v.lo / ink });
   }
@@ -5461,14 +5461,14 @@ function scaleOf(labels, unit6) {
     }
   }
   const px2 = 1 / scale;
-  const one = `1${unit6 ? unitSuffix(unit6, 1) : ""} \u2248 ${formatNumber(px2)} px`;
+  const one = `1${unit7 ? unitSuffix(unit7, 1) : ""} \u2248 ${formatNumber(px2)} px`;
   const toScale = spread2 <= TO_SCALE_WITHIN;
   let reason;
   if (ratios.length === 1) reason = `one label sets the scale, ${one}; nothing to check it against`;
   else if (toScale) reason = `${one}, to scale within ${Math.max(1, Math.ceil(spread2 * 100 - 1e-9))}%`;
   else reason = `${one}; not to scale; the labels rule (${worst.text} on ${worst.key} is ${pct(spread2)} off the ink)`;
   return {
-    unit: unit6,
+    unit: unit7,
     unitsPerCanvasUnit: scale,
     pxPerUnit: px2,
     labels: ratios.length,
@@ -5596,13 +5596,13 @@ function dimensionsOf(state, options = {}) {
     for (const f of members) for (const l of raw.get(f.id) ?? []) if (!l.declared && l.value.unit && l.value.dim >= 1) count9.set(l.value.unit, (count9.get(l.value.unit) ?? 0) + 1);
     let written2 = null;
     for (const [u, n2] of count9) if (!written2 || n2 > count9.get(written2)) written2 = u;
-    const unit6 = written2 ?? fallback;
-    const unitReason = written2 ? `${UNIT_NAMES2[written2]}, written on ${count9.get(written2)} of its labels` : unit6 ? `${UNIT_NAMES2[unit6]}, the unit the page speaks` : "no unit written, so its numbers stay bare";
+    const unit7 = written2 ?? fallback;
+    const unitReason = written2 ? `${UNIT_NAMES2[written2]}, written on ${count9.get(written2)} of its labels` : unit7 ? `${UNIT_NAMES2[unit7]}, the unit the page speaks` : "no unit written, so its numbers stay bare";
     const given2 = [];
     for (const f of members) {
       const ls = (raw.get(f.id) ?? []).map((l) => {
-        if (l.declared || /^angle\d+$/.test(l.key) || l.value.unit || !unit6) return l;
-        return { ...l, value: { ...l.value, unit: unit6, dim: l.key === "area" ? 2 : 1 } };
+        if (l.declared || /^angle\d+$/.test(l.key) || l.value.unit || !unit7) return l;
+        return { ...l, value: { ...l.value, unit: unit7, dim: l.key === "area" ? 2 : 1 } };
       });
       if (ls.length) labels.set(f.id, ls);
       for (const l of ls) given2.push({ figure: f, label: l });
@@ -5612,9 +5612,9 @@ function dimensionsOf(state, options = {}) {
       id: `drawing:${first.id}`,
       figures: members.map((f) => f.id),
       ids: [...new Set(members.flatMap((f) => f.ids))],
-      unit: unit6,
+      unit: unit7,
       unitReason,
-      scale: scaleOf(given2, unit6)
+      scale: scaleOf(given2, unit7)
     });
   }
   return { figures, numbers, attachments, labels, rightAngles, underlines, drawings, numberIds };
@@ -6108,11 +6108,11 @@ function sideModels(f, facts) {
   }
   return out;
 }
-function toQ(iv, unit6, dim, approx = false) {
-  return { lo: iv.lo, hi: iv.hi, unit: dim === 0 ? null : unit6, dim: unit6 ? dim : 0, approx };
+function toQ(iv, unit7, dim, approx = false) {
+  return { lo: iv.lo, hi: iv.hi, unit: dim === 0 ? null : unit7, dim: unit7 ? dim : 0, approx };
 }
 var dimOf = (key2) => /^angle\d$/.test(key2) || key2 === "sweep" ? 0 : key2 === "area" ? 2 : 1;
-function check(model, facts, unit6) {
+function check(model, facts, unit7) {
   const kept2 = [...model.basis];
   const conflicts = [];
   const used = new Set(model.basis.map((x) => x.group));
@@ -6125,7 +6125,7 @@ function check(model, facts, unit6) {
     for (const x of alts) {
       const v = model.vals.get(x.key);
       if (!v) continue;
-      const cmp = compareQuantities(toQ(v.iv, unit6, dimOf(x.key)), x.q);
+      const cmp = compareQuantities(toQ(v.iv, unit7, dimOf(x.key)), x.q);
       if (cmp.status === "ok" || cmp.status === "rounded" || cmp.status === "within") {
         hit = x;
         break;
@@ -6168,7 +6168,7 @@ function numText(x) {
   if (x.parts) return fmtIv(x.iv);
   return formatQuantity({ ...x.q, unit: null, dim: 0 });
 }
-function factsOf(f, labels, unit6, notes) {
+function factsOf(f, labels, unit7, notes) {
   const facts = [];
   const keyOf = (k) => {
     if (/^angle\d+$/.test(k)) return f.kind === "triangle" ? k : null;
@@ -6185,10 +6185,10 @@ function factsOf(f, labels, unit6, notes) {
   };
   const inUnit = (q, dim) => {
     if (dim === 0) return q.unit ? null : { ...q, dim: 0 };
-    if (!q.unit) return unit6 ? { ...q, unit: unit6, dim } : { ...q, dim: 0 };
-    if (!unit6) return q;
-    if (q.unit === unit6) return q;
-    const c = convertQuantity({ ...q, dim }, unit6);
+    if (!q.unit) return unit7 ? { ...q, unit: unit7, dim } : { ...q, dim: 0 };
+    if (!unit7) return q;
+    if (q.unit === unit7) return q;
+    const c = convertQuantity({ ...q, dim }, unit7);
     if (c.note) notes.push(c.note);
     return c.quantity;
   };
@@ -6256,25 +6256,25 @@ function labelOf2(f, key2, right2) {
   }
   return key2 === "arc" ? "the arc length" : `the ${key2}`;
 }
-function textOf2(iv, key2, unit6, approx = false) {
+function textOf2(iv, key2, unit7, approx = false) {
   const d = dimOf(key2);
-  const suffix = d === 0 ? "\xB0" : unitSuffix(unit6, d);
+  const suffix = d === 0 ? "\xB0" : unitSuffix(unit7, d);
   return `${approx ? "~" : ""}${fmtIv(iv)}${suffix}`;
 }
 var lengthWord = (key2, more) => dimOf(key2) === 1 ? more ? "longer" : "shorter" : more ? "larger" : "smaller";
-function conflictOf(f, c, reading7, unit6, right2) {
+function conflictOf(f, c, reading7, unit7, right2) {
   const x = c.fact;
   const model = c.against ?? reading7;
   const d = c.derived.lo - x.iv.lo;
   const share = Math.abs(d) / Math.max(TOL, Math.abs(x.iv.lo));
   const verb = model.basis.length > 1 || /\band\b/.test(model.how) ? "make" : "makes";
-  const head = x.parts ? `${x.text} make ${textOf2(x.iv, x.key, unit6)}` : `labelled ${x.text}`;
+  const head = x.parts ? `${x.text} make ${textOf2(x.iv, x.key, unit7)}` : `labelled ${x.text}`;
   const reason = `${head}; ${model.how} ${verb} it ${fmtIv(c.derived)}, ${fmtV(Math.abs(d))} ${lengthWord(x.key, d > 0)} (${Math.round(share * 100)}%)`;
   return {
     key: x.key,
     label: labelOf2(f, x.key, right2),
     written: x.q,
-    derived: toQ(c.derived, unit6, dimOf(x.key)),
+    derived: toQ(c.derived, unit7, dimOf(x.key)),
     difference: d,
     share,
     text: x.text,
@@ -6285,8 +6285,8 @@ function conflictOf(f, c, reading7, unit6, right2) {
 function solveFigure(figure, labels, options = {}) {
   const notes = [];
   const written2 = labels.find((l) => !l.declared && l.value.unit && l.value.dim >= 1)?.value.unit ?? null;
-  const unit6 = options.unit !== void 0 && options.unit !== null ? options.unit : written2;
-  const { facts, partChecks, partLabels } = factsOf(figure, labels, unit6, notes);
+  const unit7 = options.unit !== void 0 && options.unit !== null ? options.unit : written2;
+  const { facts, partChecks, partLabels } = factsOf(figure, labels, unit7, notes);
   const f = figure;
   let models = [];
   if (f.kind === "triangle") {
@@ -6315,7 +6315,7 @@ function solveFigure(figure, labels, options = {}) {
   else if (f.kind === "arc") models = arcModels(f, facts);
   else models = sideModels(f, facts);
   const checked = models.map((m) => {
-    const c = check(m, facts, unit6);
+    const c = check(m, facts, unit7);
     c.ink = inkDistance(f, m);
     return c;
   });
@@ -6334,8 +6334,8 @@ function solveFigure(figure, labels, options = {}) {
   };
   const readings2 = distinct.map((c) => {
     const right2 = f.kind === "triangle" ? rightOf(c.model) : null;
-    const values = valuesOf(f, c, unit6, right2, partLabels);
-    const conflicts = c.conflicts.map((x) => conflictOf(f, x, c.model, unit6, right2));
+    const values = valuesOf(f, c, unit7, right2, partLabels);
+    const conflicts = c.conflicts.map((x) => conflictOf(f, x, c.model, unit7, right2));
     const verb = c.model.basis.filter((x) => !x.assumed).length > 1 || /\band\b/.test(c.model.how) ? "make" : "makes";
     const made = c.model.makes.map((k) => {
       const v = values.find((x) => x.key === k);
@@ -6345,7 +6345,7 @@ function solveFigure(figure, labels, options = {}) {
     }).filter((x) => !!x);
     const assumes = c.model.assumed ? [c.model.assumed] : void 0;
     const lead = c.model.assumed ? `if the corner at ${V[Number(c.model.basis.find((x) => x.assumed).key.slice(-1))]} is right, ` : "";
-    const sentence = made.length ? `${lead}${c.model.how} ${verb} ${joinAnd(made)}` : `${lead}${c.model.basis.map((x) => `${labelOf2(f, x.key, right2)} ${textOf2(x.iv, x.key, unit6)}`).join(", ")}, as labelled`;
+    const sentence = made.length ? `${lead}${c.model.how} ${verb} ${joinAnd(made)}` : `${lead}${c.model.basis.map((x) => `${labelOf2(f, x.key, right2)} ${textOf2(x.iv, x.key, unit7)}`).join(", ")}, as labelled`;
     return {
       values,
       keeps: c.kept.filter((x) => !x.assumed).map((x) => x.text),
@@ -6361,7 +6361,7 @@ function solveFigure(figure, labels, options = {}) {
     for (const pc of partChecks) {
       if (!top.kept.includes(pc.fact)) continue;
       const whole = top.kept.find((x) => x !== pc.fact && x.key === pc.fact.key);
-      if (whole) checks.push(`${pc.fact.text} make ${textOf2(pc.fact.iv, pc.fact.key, unit6)} \u2713`);
+      if (whole) checks.push(`${pc.fact.text} make ${textOf2(pc.fact.iv, pc.fact.key, unit7)} \u2713`);
     }
   }
   if (f.kind === "triangle" && f.angles) {
@@ -6375,7 +6375,7 @@ function solveFigure(figure, labels, options = {}) {
     }
     const declared = facts.filter((x) => x.fixed && !x.assumed);
     if (declared.length) {
-      const free = triangleModels(facts.filter((x) => !x.fixed)).map((m) => check(m, facts.filter((x) => !x.fixed), unit6)).filter((c) => !c.conflicts.length);
+      const free = triangleModels(facts.filter((x) => !x.fixed)).map((m) => check(m, facts.filter((x) => !x.fixed), unit7)).filter((c) => !c.conflicts.length);
       for (const c of free) {
         for (const d of declared) {
           const v = c.model.vals.get(d.key);
@@ -6403,13 +6403,13 @@ function solveFigure(figure, labels, options = {}) {
     ink.push({
       key: key2,
       label: labelOf2(f, key2, null),
-      value: toQ(iv, scale?.unit ?? unit6, d),
+      value: toQ(iv, scale?.unit ?? unit7, d),
       from: "ink",
       text,
       reason: d === 0 ? `drawn, it measures ${text} \u2014 the ink\u2019s, not the thing\u2019s` : `drawn to scale this would be ${text} \u2014 the ink\u2019s, not the thing\u2019s (${scale.reason})`
     });
   }
-  return { figure: f, unit: unit6, readings: readings2, conflicts: readings2[0]?.conflicts ?? [], checks, ink, notes };
+  return { figure: f, unit: unit7, readings: readings2, conflicts: readings2[0]?.conflicts ?? [], checks, ink, notes };
 }
 function joinAnd(xs) {
   return xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
@@ -6434,7 +6434,7 @@ function keysOf(f) {
       return f.sides.map((s) => s.key);
   }
 }
-function valuesOf(f, c, unit6, right2, parts) {
+function valuesOf(f, c, unit7, right2, parts) {
   const out = [];
   const keys = keysOf(f);
   const all = [...keys, ...[...c.model.vals.keys()].filter((k) => !keys.includes(k))];
@@ -6443,8 +6443,8 @@ function valuesOf(f, c, unit6, right2, parts) {
     if (!v) continue;
     const approx = !!v.fact?.q.approx;
     const labelled2 = v.from === "labelled" || v.from === "declared" || v.from === "assumed";
-    const value = labelled2 && v.fact && !v.fact.parts ? { ...v.fact.q, ...dimOf(key2) === 0 ? { unit: null, dim: 0 } : {} } : toQ(v.iv, unit6, dimOf(key2), approx);
-    const text = labelled2 && v.fact && !v.fact.parts && dimOf(key2) > 0 && v.fact.q.unit === unit6 ? formatQuantity(v.fact.q) : textOf2(v.iv, key2, unit6, approx);
+    const value = labelled2 && v.fact && !v.fact.parts ? { ...v.fact.q, ...dimOf(key2) === 0 ? { unit: null, dim: 0 } : {} } : toQ(v.iv, unit7, dimOf(key2), approx);
+    const text = labelled2 && v.fact && !v.fact.parts && dimOf(key2) > 0 && v.fact.q.unit === unit7 ? formatQuantity(v.fact.q) : textOf2(v.iv, key2, unit7, approx);
     const label = labelOf2(f, key2, right2);
     const formula = v.formula ? bracketRanges(v.formula) : void 0;
     const reason = v.from === "derived" ? `${label} ${text}${formula ? ` = ${formula}` : ""}` : v.from === "declared" ? `${label} is right: a square in the corner declares it` : v.from === "assumed" ? v.fact?.assumed ?? `${label}, assumed` : `${label} ${text}, as labelled`;
@@ -6465,9 +6465,9 @@ function valuesOf(f, c, unit6, right2, parts) {
     const hi = whole.iv.hi - known2.reduce((a, w2) => a + w2.q.lo, 0);
     if (!(hi > TOL)) continue;
     const iv = { lo: Math.max(0, lo), hi };
-    const text = textOf2(iv, side.key, unit6);
+    const text = textOf2(iv, side.key, unit7);
     const formula = bracketRanges([fmtIv(whole.iv), ...known2.map((w2) => formatQuantity({ ...w2.q, unit: null, dim: 0 }))].join(" \u2212 "));
-    out.push({ key: open[0].key, label: open[0].label, value: toQ(iv, unit6, 1), from: "derived", formula, text, reason: `${open[0].label} ${text} = ${formula}` });
+    out.push({ key: open[0].key, label: open[0].label, value: toQ(iv, unit7, 1), from: "derived", formula, text, reason: `${open[0].label} ${text} = ${formula}` });
   }
   return out;
 }
@@ -6501,8 +6501,8 @@ function solveBoard(state, options = {}) {
     pages.push(sheet2);
     return sheet2;
   };
-  const unit6 = options.unit !== void 0 ? options.unit : (except) => readPage(except).unit;
-  const dimensions = dimensionsOf(state, { unit: unit6, ...options.figures ? { figures: options.figures } : {} });
+  const unit7 = options.unit !== void 0 ? options.unit : (except) => readPage(except).unit;
+  const dimensions = dimensionsOf(state, { unit: unit7, ...options.figures ? { figures: options.figures } : {} });
   const sheet = pages[0] ?? readPage(dimensions.numberIds);
   const figures = dimensions.figures.map((figure) => {
     const labels = dimensions.labels.get(figure.id) ?? [];
@@ -6968,8 +6968,8 @@ function wrap(text, width, size2) {
 function unitFactor(from, to) {
   return from === to ? 1 : convertQuantity(quantity(1, from), to).quantity.lo;
 }
-function systemOf(unit6) {
-  return unit6 === "in" || unit6 === "ft" ? "imperial" : "metric";
+function systemOf(unit7) {
+  return unit7 === "in" || unit7 === "ft" ? "imperial" : "metric";
 }
 function unionBounds(boxes) {
   return {
@@ -8730,9 +8730,9 @@ function reshapeClean(clean, handle, to, floor = 0) {
         q[head ? 0 : q.length - 1] = fixed;
         how = `its ${kind} dragged, its sweep kept`;
       }
-      const ea = q[0], ez = q[q.length - 1], half = q[Math.round((q.length - 1) / 2)];
+      const ea = q[0], ez = q[q.length - 1], half2 = q[Math.round((q.length - 1) / 2)];
       const ch = dist5(ea, ez);
-      const sag = ch > 0 ? Math.abs(cross4(sub5(ez, ea), sub5(half, ea))) / ch : 0;
+      const sag = ch > 0 ? Math.abs(cross4(sub5(ez, ea), sub5(half2, ea))) / ch : 0;
       const r = sag > 0 ? ch * ch / (8 * sag) + sag / 2 : Infinity;
       const sweep = Number.isFinite(r) ? deg2(2 * Math.atan2(ch / 2, r - sag)) : 0;
       return made(q, `${how}: an arc of radius ${Number.isFinite(r) ? r02(r) : "\u221E"} sweeping ${r02(sweep)}\xB0`);
@@ -11696,8 +11696,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       let cursor = start;
       placed2 = ordered2.map((t, i) => {
         const size2 = sizes[i];
-        const half = (axis === "row" ? h2(t.bounds) : w2(t.bounds)) / 2;
-        const to = axis === "row" ? { minX: cursor, maxX: cursor + size2, minY: cross9 - half, maxY: cross9 + half } : { minX: cross9 - half, maxX: cross9 + half, minY: cursor, maxY: cursor + size2 };
+        const half2 = (axis === "row" ? h2(t.bounds) : w2(t.bounds)) / 2;
+        const to = axis === "row" ? { minX: cursor, maxX: cursor + size2, minY: cross9 - half2, maxY: cross9 + half2 } : { minX: cross9 - half2, maxX: cross9 + half2, minY: cursor, maxY: cursor + size2 };
         cursor += size2 + gap;
         return { id: t.id, to };
       });
@@ -17948,8 +17948,8 @@ function labelled(fm) {
 }
 function frameOf2(fm) {
   const reading7 = fm.solution.readings[0];
-  const unit6 = fm.solution.unit;
-  if (!reading7 || !unit6) return null;
+  const unit7 = fm.solution.unit;
+  if (!reading7 || !unit7) return null;
   const val = (key2) => {
     const v = reading7.values.find((x) => x.key === key2)?.value;
     return v && !isRange(v) && v.lo > 0 ? v.lo : NaN;
@@ -17961,7 +17961,7 @@ function frameOf2(fm) {
     if (lengths.some((x) => !(x > 0))) return null;
     const truth = [{ x: 0, y: 0 }, { x: lengths[0], y: 0 }, { x: lengths[0], y: lengths[1] }, { x: 0, y: lengths[1] }];
     const map = affineFit(f.vertices, truth);
-    return map ? { fm, kind: "rectangle", unit: unit6, lengths, truth, ink: f.vertices, map } : null;
+    return map ? { fm, kind: "rectangle", unit: unit7, lengths, truth, ink: f.vertices, map } : null;
   }
   if (f.kind === "triangle" && f.vertices.length === 3) {
     const lengths = [0, 1, 2].map((k) => val(`side${k}`));
@@ -17970,13 +17970,13 @@ function frameOf2(fm) {
     const x = (l0 * l0 + l2 * l2 - l1 * l1) / (2 * l0), y = Math.sqrt(Math.max(0, l2 * l2 - x * x));
     const truth = [{ x: 0, y: 0 }, { x: l0, y: 0 }, { x, y }];
     const map = affineFit(f.vertices, truth);
-    return map ? { fm, kind: "triangle", unit: unit6, lengths, truth, ink: f.vertices, map } : null;
+    return map ? { fm, kind: "triangle", unit: unit7, lengths, truth, ink: f.vertices, map } : null;
   }
   return null;
 }
 var num = (v) => formatNumber(v, 2);
-var dims = (d, unit6) => `${num(d.width)} \xD7 ${num(d.height)}${unitSuffix(unit6, 1)}`;
-var len3 = (v, unit6) => `${num(v)}${unitSuffix(unit6, 1)}`;
+var dims = (d, unit7) => `${num(d.width)} \xD7 ${num(d.height)}${unitSuffix(unit7, 1)}`;
+var len3 = (v, unit7) => `${num(v)}${unitSuffix(unit7, 1)}`;
 function sideName2(frame, k) {
   return `${len3(frame.lengths[k], frame.unit)} side`;
 }
@@ -18013,7 +18013,7 @@ function garmentMaths(state, board2, read2 = garmentOf(state)) {
     const fmP = figureOf3(piece.id), fmS = seamMark ? figureOf3(seamMark.id) : void 0;
     const numbers = labelled(fmP) ? { fm: fmP, on: "sewing" } : labelled(fmS) ? { fm: fmS, on: "cutting" } : null;
     const frame = numbers ? frameOf2(numbers.fm) : null;
-    const unit6 = numbers?.fm.solution.unit ?? null;
+    const unit7 = numbers?.fm.solution.unit ?? null;
     const lines = [];
     const rows = [];
     const result2 = {
@@ -18021,7 +18021,7 @@ function garmentMaths(state, board2, read2 = garmentOf(state)) {
       ids,
       ...piece.name?.text ? { name: piece.name.text } : {},
       ...numbers ? { figure: { id: numbers.fm.figure.id, kind: numbers.fm.figure.kind, on: numbers.on } } : {},
-      unit: unit6,
+      unit: unit7,
       notches: [],
       darts: [],
       lines,
@@ -18033,11 +18033,11 @@ function garmentMaths(state, board2, read2 = garmentOf(state)) {
       const fm = numbers.fm;
       const scale = fm.drawing?.scale?.unitsPerCanvasUnit;
       const ink = seamMark.offset !== void 0 && scale ? seamMark.offset * scale : void 0;
-      const page = allowance ? allowance.amount.unit && allowance.amount.unit !== unit6 && unit6 ? convertQuantity(allowance.amount, unit6).quantity : allowance.amount : null;
+      const page = allowance ? allowance.amount.unit && allowance.amount.unit !== unit7 && unit7 ? convertQuantity(allowance.amount, unit7).quantity : allowance.amount : null;
       const amount2 = page ? page.lo : ink;
       if (amount2 !== void 0 && amount2 > 0) {
         const from = page ? "page" : "ink";
-        const said3 = page ? formatQuantity(page) : len3(amount2, unit6);
+        const said3 = page ? formatQuantity(page) : len3(amount2, unit7);
         const seam = { id: seamMark.id, amount: amount2, from, ...ink !== void 0 ? { ink } : {}, reason: "" };
         if (frame?.kind === "rectangle") {
           const w2 = frame.lengths[widePair(fm.figure)[0]], h2 = frame.lengths[widePair(fm.figure)[0] === 0 ? 1 : 0];
@@ -18048,23 +18048,23 @@ function garmentMaths(state, board2, read2 = garmentOf(state)) {
           } else {
             seam.cut = { width: w2, height: h2 };
             seam.sewn = grown(-amount2);
-            seam.or = `or, if ${dims(seam.cut, unit6)} is the finished size, cut at ${dims(grown(amount2), unit6)}`;
+            seam.or = `or, if ${dims(seam.cut, unit7)} is the finished size, cut at ${dims(grown(amount2), unit7)}`;
           }
         }
         const because = from === "page" ? ", as the page says" : ", as the ink draws it";
-        seam.reason = from === "page" ? `${said3} \u2014 the page's allowance` : `${len3(amount2, unit6)} \u2014 the ink's own offset at the drawing's scale`;
+        seam.reason = from === "page" ? `${said3} \u2014 the page's allowance` : `${len3(amount2, unit7)} \u2014 the ink's own offset at the drawing's scale`;
         result2.seam = seam;
         if (seam.cut && seam.sewn) {
-          lines.push(`cut at ${dims(seam.cut, unit6)}, sewn at ${dims(seam.sewn, unit6)} \u2014 ${said3} of seam allowance all round${because}`);
-          rows.push({ k: "cutting size", v: dims(seam.cut, unit6), why: numbers.on === "cutting" ? "the numbers written on the cutting line" : `the sewing size and ${said3} either side` });
-          rows.push({ k: "sewing size", v: dims(seam.sewn, unit6), why: numbers.on === "sewing" ? "the numbers written on the piece" : `the cutting size less ${said3} either side` });
+          lines.push(`cut at ${dims(seam.cut, unit7)}, sewn at ${dims(seam.sewn, unit7)} \u2014 ${said3} of seam allowance all round${because}`);
+          rows.push({ k: "cutting size", v: dims(seam.cut, unit7), why: numbers.on === "cutting" ? "the numbers written on the cutting line" : `the sewing size and ${said3} either side` });
+          rows.push({ k: "sewing size", v: dims(seam.sewn, unit7), why: numbers.on === "sewing" ? "the numbers written on the piece" : `the cutting size less ${said3} either side` });
           if (seam.or) rows.push({ k: "or", v: seam.or.replace(/^or, /, "") });
         } else {
           lines.push(`the cutting line stands ${said3} off the piece all round${because}`);
         }
         rows.push({ k: "seam allowance", v: said3, why: seam.reason });
         if (page && ink !== void 0 && Math.abs(ink - page.lo) > INK_AGREES * page.lo) {
-          lines.push(`the ink stands ${len3(ink, unit6)} off at this scale; the page says ${said3} and rules`);
+          lines.push(`the ink stands ${len3(ink, unit7)} off at this scale; the page says ${said3} and rules`);
         }
       }
     }
@@ -18077,8 +18077,8 @@ function garmentMaths(state, board2, read2 = garmentOf(state)) {
       if (frame?.kind === "rectangle" && at) {
         fold2.drawn = frame.lengths[(at.side + 1) % 4];
         fold2.opened = 2 * fold2.drawn;
-        lines.push(`cut on the fold: opened, ${len3(fold2.opened, unit6)} across (${len3(fold2.drawn, unit6)} as drawn)`);
-        rows.push({ k: "on the fold", v: `${len3(fold2.opened, unit6)} across opened`, why: `the piece is drawn as one half, ${len3(fold2.drawn, unit6)} across the fold` });
+        lines.push(`cut on the fold: opened, ${len3(fold2.opened, unit7)} across (${len3(fold2.drawn, unit7)} as drawn)`);
+        rows.push({ k: "on the fold", v: `${len3(fold2.opened, unit7)} across opened`, why: `the piece is drawn as one half, ${len3(fold2.drawn, unit7)} across the fold` });
       } else {
         lines.push("cut on the fold: the piece is drawn as one half");
       }
@@ -18095,7 +18095,7 @@ function garmentMaths(state, board2, read2 = garmentOf(state)) {
         const k = angles.indexOf(Math.min(...angles));
         if (angles[k] <= PARALLEL_DEG) {
           along2 = k;
-          text = frame.kind === "rectangle" ? `the grain runs along the ${len3(frame.lengths[k], unit6)} sides` : `the grain runs along the ${len3(frame.lengths[k], unit6)} side`;
+          text = frame.kind === "rectangle" ? `the grain runs along the ${len3(frame.lengths[k], unit7)} sides` : `the grain runs along the ${len3(frame.lengths[k], unit7)} side`;
         }
       }
       result2.grain = { id: grainMark.id, text, ...along2 !== void 0 ? { along: along2 } : {} };
@@ -18113,9 +18113,9 @@ function garmentMaths(state, board2, read2 = garmentOf(state)) {
     if (result2.notches.length && frame) {
       const bySide = /* @__PURE__ */ new Map();
       for (const n2 of result2.notches) bySide.set(n2.side, [...bySide.get(n2.side) ?? [], n2]);
-      const said3 = [...bySide].map(([side, ns]) => `${ns.map((n2) => len3(n2.along, unit6)).join(" and ")} in from the nearer corner of the ${sideName2(frame, side)}`);
+      const said3 = [...bySide].map(([side, ns]) => `${ns.map((n2) => len3(n2.along, unit7)).join(" and ")} in from the nearer corner of the ${sideName2(frame, side)}`);
       lines.push(`${result2.notches.length} ${result2.notches.length === 1 ? "notch" : "notches"}: ${said3.join("; ")}`);
-      for (const n2 of result2.notches) rows.push({ k: "notch", v: `${len3(n2.along, unit6)} from the nearer corner`, why: `${num(n2.at * 100)}% of the way along the ${sideName2(frame, n2.side)}` });
+      for (const n2 of result2.notches) rows.push({ k: "notch", v: `${len3(n2.along, unit7)} from the nearer corner`, why: `${num(n2.at * 100)}% of the way along the ${sideName2(frame, n2.side)}` });
     }
     for (const d of of("dart")) {
       if (!d.base || !d.apex) continue;
@@ -18125,9 +18125,9 @@ function garmentMaths(state, board2, read2 = garmentOf(state)) {
       result2.darts.push({ id: d.id, side: sideNear(frame.ink, mid7(d.base[0], d.base[1])).side, width: dist10(a, b), depth: dist10(p, mid7(a, b)) });
     }
     if (result2.darts.length) {
-      const said3 = result2.darts.map((d) => `a dart ${len3(d.width, unit6)} wide and ${len3(d.depth, unit6)} long`);
+      const said3 = result2.darts.map((d) => `a dart ${len3(d.width, unit7)} wide and ${len3(d.depth, unit7)} long`);
       lines.push(result2.darts.length === 1 ? said3[0] : `${result2.darts.length} darts: ${said3.join(", ")}`);
-      for (const d of result2.darts) rows.push({ k: "dart", v: `${len3(d.width, unit6)} wide, ${len3(d.depth, unit6)} long`, why: "measured on the piece\u2019s true sides, from the ink\u2019s corners" });
+      for (const d of result2.darts) rows.push({ k: "dart", v: `${len3(d.width, unit7)} wide, ${len3(d.depth, unit7)} long`, why: "measured on the piece\u2019s true sides, from the ink\u2019s corners" });
     }
     if (lines.length || result2.seam || result2.fold) out.push(result2);
     else if (numbers || own.length) out.push(result2);
@@ -18148,13 +18148,13 @@ function garmentDecor(piece, truth, opts) {
   const texts = [];
   const notes = [];
   let title;
-  const unit6 = piece.unit;
+  const unit7 = piece.unit;
   if (piece.seam) {
     const d = piece.seam.amount * opts.factor * (piece.figure.on === "sewing" ? 1 : -1);
     const ring2 = offsetPolygon(truth, d);
     marks.push({ kind: "seam", points: ring2, closed: true, dashed: true });
     const top = ring2.reduce((b, p) => p.y < b.y ? p : b, ring2[0]);
-    texts.push({ text: piece.figure.on === "sewing" ? `cutting line +${len3(piece.seam.amount, unit6)}` : `sewing line \u2212${len3(piece.seam.amount, unit6)}`, at: { x: top.x, y: top.y - opts.gap }, angle: 0, key: "seam" });
+    texts.push({ text: piece.figure.on === "sewing" ? `cutting line +${len3(piece.seam.amount, unit7)}` : `sewing line \u2212${len3(piece.seam.amount, unit7)}`, at: { x: top.x, y: top.y - opts.gap }, angle: 0, key: "seam" });
   }
   if (piece.ink.grain) {
     const a = at(piece.ink.grain.from), b = at(piece.ink.grain.to);
@@ -18180,14 +18180,14 @@ function garmentDecor(piece, truth, opts) {
     marks.push({ kind: "fold", points: [p, q], heads: [chevron(p, q, opts.head), chevron(q, p, opts.head)] });
     texts.push({ text: "fold", at: add2(mid7(p, q), mul2(out, opts.gap * 1.6)), angle: 0, key: "fold" });
     if (piece.fold.opened !== void 0 && piece.fold.drawn !== void 0) {
-      notes.push(`cut on the fold \u2014 opened it is ${len3(piece.fold.opened, unit6)} across (${len3(piece.fold.drawn, unit6)} as drawn, half of it)`);
-      title = `cut on the fold, opened ${len3(piece.fold.opened, unit6)} across`;
+      notes.push(`cut on the fold \u2014 opened it is ${len3(piece.fold.opened, unit7)} across (${len3(piece.fold.drawn, unit7)} as drawn, half of it)`);
+      title = `cut on the fold, opened ${len3(piece.fold.opened, unit7)} across`;
     } else {
       notes.push("cut on the fold \u2014 the piece is drawn as one half");
       title = "cut on the fold";
     }
   }
-  if (piece.seam && piece.figure.on === "cutting") notes.push(`the numbers are on the cutting line; the sewing line is ${len3(piece.seam.amount, unit6)} in from it${piece.seam.or ? ` (${piece.seam.or})` : ""}`);
+  if (piece.seam && piece.figure.on === "cutting") notes.push(`the numbers are on the cutting line; the sewing line is ${len3(piece.seam.amount, unit7)} in from it${piece.seam.or ? ` (${piece.seam.or})` : ""}`);
   return { marks, texts, notes, ...title ? { title } : {} };
 }
 function pieceOfFigure(board2, figureId) {
@@ -18202,9 +18202,9 @@ function garmentOwned(board2) {
 // src/maths/truesize.ts
 var IMPERIAL = { margin: 0.25, gap: 1, block: 0.3, label: 0.16, title: 0.2, note: 0.12, caption: 0.14, stroke: 0.02, thin: 0.01, labelGap: 0.1, corner: 0.15, minWidth: 6.5 };
 var METRIC = { margin: 6, gap: 25, block: 8, label: 4, title: 5, note: 3, caption: 3.5, stroke: 0.5, thin: 0.25, labelGap: 2.5, corner: 4, minWidth: 160 };
-function furniture(unit6) {
-  const imperial = systemOf(unit6) === "imperial";
-  const k = unitFactor(imperial ? "in" : "mm", unit6);
+function furniture(unit7) {
+  const imperial = systemOf(unit7) === "imperial";
+  const k = unitFactor(imperial ? "in" : "mm", unit7);
   const base = imperial ? IMPERIAL : METRIC;
   const out = {};
   for (const key2 of Object.keys(base)) out[key2] = base[key2] * k;
@@ -18245,13 +18245,13 @@ function derivedNumber(v, p) {
   if ("fractions" in form) return formatQuantity(quantity(Math.round(v * form.fractions) / form.fractions), { fractions: form.fractions });
   return formatNumber(v, form.places);
 }
-function derivedText(q, p, unit6) {
+function derivedText(q, p, unit7) {
   const body = isRange(q) ? `${derivedNumber(q.lo, p)}\u2013${derivedNumber(q.hi, p)}` : derivedNumber(q.lo, p);
-  return (q.approx ? "~" : "") + body + unitSuffix(unit6, q.dim || 1);
+  return (q.approx ? "~" : "") + body + unitSuffix(unit7, q.dim || 1);
 }
-function valueText(v, p, unit6) {
-  if (v.from === "labelled" && v.value.precision !== void 0 && v.value.unit === unit6) return formatQuantity(v.value);
-  return derivedText(v.value, p, unit6);
+function valueText(v, p, unit7) {
+  if (v.from === "labelled" && v.value.precision !== void 0 && v.value.unit === unit7) return formatQuantity(v.value);
+  return derivedText(v.value, p, unit7);
 }
 function figurePrecision(reading7) {
   const labelled2 = reading7.values.filter((v) => v.from === "labelled");
@@ -18806,9 +18806,9 @@ function rowName(r) {
   for (let n2 = r + 1; n2 > 0; n2 = Math.floor((n2 - 1) / 26)) s = String.fromCharCode(65 + (n2 - 1) % 26) + s;
   return s;
 }
-function amount(v, unit6) {
-  const q = quantity(v, unit6);
-  return systemOf(unit6) === "imperial" ? formatQuantity(q, { fractions: 16, words: true }) : formatQuantity(q, { words: true });
+function amount(v, unit7) {
+  const q = quantity(v, unit7);
+  return systemOf(unit7) === "imperial" ? formatQuantity(q, { fractions: 16, words: true }) : formatQuantity(q, { words: true });
 }
 function tidy2(v, places) {
   return Number(fmt2(v, places));
@@ -19274,11 +19274,11 @@ function garmentChips(board2) {
   for (const g of board2.garment ?? []) {
     const cx2 = (g.bounds.minX + g.bounds.maxX) / 2;
     let row = 0;
-    const unit6 = g.unit ? unitSuffix(g.unit, 1) : "";
+    const unit7 = g.unit ? unitSuffix(g.unit, 1) : "";
     const n2 = (v) => formatNumber(v, 2);
     const say = (key2, text, reason) => out.push({ key: `garment:${g.id}:${key2}`, kind: "garment", text, ids: g.ids.slice(), at: { x: cx2, y: g.bounds.maxY + CHIP_OFFSET * ++row }, align: "centre", standing: false, reason });
-    if (g.seam?.cut && g.seam.sewn) say("seam", `cut ${n2(g.seam.cut.width)} \xD7 ${n2(g.seam.cut.height)}${unit6} \xB7 sewn ${n2(g.seam.sewn.width)} \xD7 ${n2(g.seam.sewn.height)}${unit6}`, g.lines.join(" \u2014 "));
-    if (g.fold?.opened !== void 0) say("fold", `cut on the fold \xB7 ${n2(g.fold.opened)}${unit6} across opened`, g.fold.reason);
+    if (g.seam?.cut && g.seam.sewn) say("seam", `cut ${n2(g.seam.cut.width)} \xD7 ${n2(g.seam.cut.height)}${unit7} \xB7 sewn ${n2(g.seam.sewn.width)} \xD7 ${n2(g.seam.sewn.height)}${unit7}`, g.lines.join(" \u2014 "));
+    if (g.fold?.opened !== void 0) say("fold", `cut on the fold \xB7 ${n2(g.fold.opened)}${unit7} across opened`, g.fold.reason);
   }
   return out;
 }
@@ -21364,14 +21364,14 @@ function applyWalls(body, boxes, dt, state = { contactSteps: 0 }) {
   if (!boxes.length) return { vx, vy, x, y, reasoning, state };
   const size2 = sizeOf6(body);
   const standoff = Math.max(9, size2 * 0.45);
-  const half = Math.max(6, Math.min(body.w, body.h) * 0.5);
+  const half2 = Math.max(6, Math.min(body.w, body.h) * 0.5);
   const speed = Math.hypot(vx, vy);
   const heading = speed > 1e-6 ? Math.atan2(vy, vx) : body.heading;
   let contact = false;
   for (const r of boxes) {
     const look = 24 + size2 * 1.2;
     const px2 = x + Math.cos(heading) * look, py = y + Math.sin(heading) * look;
-    const s = standoff + half;
+    const s = standoff + half2;
     if (px2 > r.minX - s && px2 < r.maxX + s && py > r.minY - s && py < r.maxY + s) {
       const away = Math.atan2(y - (r.minY + r.maxY) / 2, x - (r.minX + r.maxX) / 2);
       const t1 = away + Math.PI / 2, t2 = away - Math.PI / 2;
@@ -21383,7 +21383,7 @@ function applyWalls(body, boxes, dt, state = { contactSteps: 0 }) {
       vy = Math.sin(turned2) * sp;
       reasoning = "sliding along a wall ahead";
     }
-    const m = half + 2;
+    const m = half2 + 2;
     if (x > r.minX - m && x < r.maxX + m && y > r.minY - m && y < r.maxY + m) {
       contact = true;
       const pushLeft = x - (r.minX - m), pushRight = r.maxX + m - x, pushUp = y - (r.minY - m), pushDown = r.maxY + m - y;
@@ -22095,11 +22095,11 @@ function openText(text) {
   const all = String(text ?? "").replace(/\r\n?/g, "\n").split("\n");
   const lines = [];
   const refused = [];
-  let header = null, keyword = "", rest = "";
+  let header2 = null, keyword = "", rest = "";
   for (let i = 0; i < all.length; i++) {
     const t = all[i].trim();
     if (!t) continue;
-    if (!header && t === "---") {
+    if (!header2 && t === "---") {
       const close = all.findIndex((l, k) => k > i && l.trim() === "---");
       const last = close >= 0 ? close : all.length - 1;
       refused.push({ line: i + 1, text: "---", reason: `front matter (lines ${i + 1}\u2013${last + 1}) configures mermaid.js \u2014 nothing on the board takes it` });
@@ -22111,8 +22111,8 @@ function openText(text) {
       continue;
     }
     if (t.startsWith("%%")) continue;
-    if (!header) {
-      header = { n: i + 1, text: t };
+    if (!header2) {
+      header2 = { n: i + 1, text: t };
       const m = /^([A-Za-z][\w-]*)(.*)$/.exec(t);
       keyword = m ? m[1] : "";
       rest = m ? m[2] : t;
@@ -22120,7 +22120,7 @@ function openText(text) {
     }
     lines.push({ n: i + 1, text: t });
   }
-  return { lines, refused, header, keyword, rest };
+  return { lines, refused, header: header2, keyword, rest };
 }
 function readMermaid(text) {
   const open = openText(text);
@@ -22508,17 +22508,17 @@ function figureOf2(symbol, text) {
     case "terminator": {
       const w2 = clamp(tw + BOX_H * U, CORE_MIN * U, CORE_MAX * U);
       const h2 = clamp(Math.max(th + 2 * U, w2 / STADIUM_MAX), BOX_H * U, w2 / STADIUM_MIN);
-      const r = h2 / 2, half = w2 / 2 - r;
+      const r = h2 / 2, half2 = w2 / 2 - r;
       const ink = () => {
         const pts = [];
         const n2 = 16;
         for (let i = 0; i <= n2; i++) {
           const a = -Math.PI / 2 + i / n2 * Math.PI;
-          pts.push({ x: half + r * Math.cos(a), y: r * Math.sin(a) });
+          pts.push({ x: half2 + r * Math.cos(a), y: r * Math.sin(a) });
         }
         for (let i = 0; i <= n2; i++) {
           const a = Math.PI / 2 + i / n2 * Math.PI;
-          pts.push({ x: -half + r * Math.cos(a), y: r * Math.sin(a) });
+          pts.push({ x: -half2 + r * Math.cos(a), y: r * Math.sin(a) });
         }
         return inkAround(pts, INK_STEP);
       };
@@ -22552,8 +22552,8 @@ function triangleHead(apex, out, size2) {
   const l = Math.hypot(out.x, out.y) || 1;
   const u = { x: out.x / l, y: out.y / l };
   const base = { x: apex.x - u.x * size2, y: apex.y - u.y * size2 };
-  const half = size2 * 0.55;
-  const v = { x: -u.y * half, y: u.x * half };
+  const half2 = size2 * 0.55;
+  const v = { x: -u.y * half2, y: u.x * half2 };
   return inkAround([apex, add4(base, v), { x: base.x - v.x, y: base.y - v.y }], INK_STEP / 1.5);
 }
 function outsideBy(p, hull2) {
@@ -22715,7 +22715,7 @@ function lexLess(a, b) {
 function connectorInk(route2, P, Q, drawn, scale) {
   const hand = (p) => ({ x: p.x / scale, y: p.y / scale });
   const toWorld = (p) => ({ x: p.x * scale, y: p.y * scale });
-  const unit6 = (v) => {
+  const unit7 = (v) => {
     const l = Math.hypot(v.x, v.y) || 1;
     return { x: v.x / l, y: v.y / l };
   };
@@ -22727,15 +22727,15 @@ function connectorInk(route2, P, Q, drawn, scale) {
     const n2 = clamp(Math.round(chord * th / (2 * Math.sin(th / 2)) / INK_STEP), 16, 300);
     const points2 = arcThrough2(hand(P), hand(Q), route2.sweep, route2.side, n2).map(toWorld);
     const heads = [];
-    if (drawn !== "---") heads.push(head(Q, unit6({ x: points2[n2].x - points2[n2 - 1].x, y: points2[n2].y - points2[n2 - 1].y })));
-    if (drawn === "<-->") heads.push(head(P, unit6({ x: points2[0].x - points2[1].x, y: points2[0].y - points2[1].y })));
+    if (drawn !== "---") heads.push(head(Q, unit7({ x: points2[n2].x - points2[n2 - 1].x, y: points2[n2].y - points2[n2 - 1].y })));
+    if (drawn === "<-->") heads.push(head(P, unit7({ x: points2[0].x - points2[1].x, y: points2[0].y - points2[1].y })));
     return { points: points2, heads };
   }
   if (drawn === "---") return { points: strokeFor({ shape: "line", from: hand(P), to: hand(Q) }).map(toWorld), heads: [] };
   const k = Math.max(1, chord / ARROW_PROPORTION_PX);
   const f = (p) => ({ x: p.x / (scale * k), y: p.y / (scale * k) });
   const points = strokeFor({ shape: "arrow", from: f(P), to: f(Q) }).map((p) => ({ x: p.x * scale * k, y: p.y * scale * k }));
-  return { points, heads: drawn === "<-->" ? [head(P, unit6({ x: P.x - Q.x, y: P.y - Q.y }))] : [] };
+  return { points, heads: drawn === "<-->" ? [head(P, unit7({ x: P.x - Q.x, y: P.y - Q.y }))] : [] };
 }
 function endsOf3(route2, drawn) {
   if (route2.kind === "arc") return { start: drawn === "<-->" ? 1 : "none", end: drawn === "---" ? "none" : 0 };
@@ -23201,7 +23201,7 @@ function readClassDiagramText(text) {
   };
   let body = null;
   let depth2 = 0;
-  let header = null;
+  let header2 = null;
   for (let i = 0; i < all.length; i++) {
     const n2 = i + 1;
     let t = all[i].trim();
@@ -23210,7 +23210,7 @@ function readClassDiagramText(text) {
       continue;
     }
     if (t.startsWith("%%")) continue;
-    if (header === null) {
+    if (header2 === null) {
       if (t === "---") {
         const close = all.findIndex((l, k) => k > i && l.trim() === "---");
         const last = close >= 0 ? close : all.length - 1;
@@ -23219,7 +23219,7 @@ function readClassDiagramText(text) {
         continue;
       }
       const m = /^(classDiagram(?:-v2)?)\b\s*(.*)$/.exec(t);
-      header = n2;
+      header2 = n2;
       keyword = m ? m[1] : /^[A-Za-z][\w-]*/.exec(t)?.[0] ?? "";
       if (!m) refused.push({ line: n2, text: t, reason: "a class diagram opens with \u201CclassDiagram\u201D" });
       else if (m[2]) refused.push({ line: n2, text: m[2], reason: "nothing is read after the header on its own line" });
@@ -23330,7 +23330,7 @@ function readClassDiagramText(text) {
     }
     refused.push({ line: n2, text: t, reason: "a statement the class diagram\u2019s reader cannot parse" });
   }
-  if (header === null) refused.push({ line: 1, text: "", reason: "nothing to read: a class diagram opens with \u201CclassDiagram\u201D" });
+  if (header2 === null) refused.push({ line: 1, text: "", reason: "nothing to read: a class diagram opens with \u201CclassDiagram\u201D" });
   if (body) refused.push({ line: all.length, text: "", reason: `the body of ${body.n.id} is never closed with \u201C}\u201D \u2014 its members are read` });
   const said3 = [...notes];
   if (direction === "RL" || direction === "BT")
@@ -23444,8 +23444,8 @@ function fillInk(kind, tip, out, len4, step2) {
   const n2 = 9;
   for (let k = 0; k <= n2; k++) {
     const a = 0.12 + 0.76 * k / n2;
-    const half = kind === "triangle" ? 0.55 * len4 * a : len4 / 2 * (1 - Math.abs(2 * a - 1));
-    const w2 = 0.8 * half * (k % 2 ? 1 : -1);
+    const half2 = kind === "triangle" ? 0.55 * len4 * a : len4 / 2 * (1 - Math.abs(2 * a - 1));
+    const w2 = 0.8 * half2 * (k % 2 ? 1 : -1);
     pts.push({ x: tip.x - u.x * len4 * a + v.x * w2, y: tip.y - u.y * len4 * a + v.y * w2 });
   }
   return inkAlong2(pts, step2);
@@ -23892,7 +23892,7 @@ function readSequenceText(text) {
   const links = [];
   const byId = /* @__PURE__ */ new Map();
   let keyword = "";
-  let header = null;
+  let header2 = null;
   let depth2 = 0;
   const node = (id, line, symbol, alias) => {
     let n2 = byId.get(id);
@@ -23917,7 +23917,7 @@ function readSequenceText(text) {
       continue;
     }
     if (t.startsWith("%%")) continue;
-    if (header === null) {
+    if (header2 === null) {
       if (t === "---") {
         const close = all.findIndex((l, k) => k > i && l.trim() === "---");
         const last = close >= 0 ? close : all.length - 1;
@@ -23926,7 +23926,7 @@ function readSequenceText(text) {
         continue;
       }
       const m = /^(sequenceDiagram)\b\s*(.*)$/.exec(t);
-      header = n2;
+      header2 = n2;
       keyword = m ? m[1] : /^[A-Za-z][\w-]*/.exec(t)?.[0] ?? "";
       if (!m) refused.push({ line: n2, text: t, reason: "a sequence diagram opens with \u201CsequenceDiagram\u201D" });
       else if (m[2]) refused.push({ line: n2, text: m[2], reason: "nothing is read after the header on its own line" });
@@ -24011,7 +24011,7 @@ function readSequenceText(text) {
     }
     refused.push({ line: n2, text: t, reason: "a statement the sequence diagram\u2019s reader cannot parse" });
   }
-  if (header === null) refused.push({ line: 1, text: "", reason: "nothing to read: a sequence diagram opens with \u201CsequenceDiagram\u201D" });
+  if (header2 === null) refused.push({ line: 1, text: "", reason: "nothing to read: a sequence diagram opens with \u201CsequenceDiagram\u201D" });
   const said3 = [...notes];
   const dashedSelf = links.filter((l) => l.self && l.dashed);
   if (dashedSelf.length) said3.push(`the board reads a self-message\u2019s loop drawn solid: ${dashedSelf.length === 1 ? "a dashed self-message is" : "dashed self-messages are"} drawn solid and read back as ${dashedSelf.length === 1 ? "a call" : "calls"} \u2014 ${some3(dashedSelf.map((l) => `${l.from}${l.written}${l.to}`))}`);
@@ -24200,10 +24200,10 @@ function drawSequenceRead(session, read2, opts) {
       const x0 = P.x + dir * startGap, x1 = Q.x - dir * endGap;
       const span = Math.abs(x1 - x0);
       const n2 = Math.max(3, Math.round((span + GAP * U) / ((DASH2 + GAP) * U)));
-      const unit6 = (span + GAP * U) / n2;
-      const dash = unit6 - GAP * U;
+      const unit7 = (span + GAP * U) / n2;
+      const dash = unit7 - GAP * U;
       for (let d = 0; d < n2; d++) {
-        const a = x0 + dir * d * unit6, b = a + dir * dash;
+        const a = x0 + dir * d * unit7, b = a + dir * dash;
         own.push(session.addStroke(strokeFor({ shape: "line", from: hand({ x: a, y: yy }), to: hand({ x: b, y: yy }) }).map(world), next(), pid, scale, { content: true }));
       }
       if (l.head !== "none") own.push(session.addStroke(triangleAt2(Q, { x: dir, y: 0 }, HEAD2 * U, INK_STEP3 * scale / 1.5), next(), pid, scale, { content: true }));
@@ -24456,7 +24456,7 @@ function readStateText(text) {
   const links = [];
   const byId = /* @__PURE__ */ new Map();
   let keyword = "";
-  let header = null;
+  let header2 = null;
   let direction = "TD";
   let depth2 = 0;
   const decoded2 = (raw) => unescapeMermaid(raw.trim()).replace(/[ \t]+/g, " ").trim();
@@ -24485,7 +24485,7 @@ function readStateText(text) {
       continue;
     }
     if (t.startsWith("%%")) continue;
-    if (header === null) {
+    if (header2 === null) {
       if (t === "---") {
         const close = all.findIndex((l, k) => k > i && l.trim() === "---");
         const last = close >= 0 ? close : all.length - 1;
@@ -24494,7 +24494,7 @@ function readStateText(text) {
         continue;
       }
       const m = /^(stateDiagram(?:-v2)?)\b\s*(.*)$/.exec(t);
-      header = n2;
+      header2 = n2;
       keyword = m ? m[1] : /^[A-Za-z][\w-]*/.exec(t)?.[0] ?? "";
       if (!m) refused.push({ line: n2, text: t, reason: "a state diagram opens with \u201CstateDiagram-v2\u201D" });
       else if (m[2]) refused.push({ line: n2, text: m[2], reason: "nothing is read after the header on its own line" });
@@ -24594,7 +24594,7 @@ ${words}`;
     }
     refused.push({ line: n2, text: t, reason: "a statement the state diagram\u2019s reader cannot parse" });
   }
-  if (header === null) refused.push({ line: 1, text: "", reason: "nothing to read: a state diagram opens with \u201CstateDiagram-v2\u201D" });
+  if (header2 === null) refused.push({ line: 1, text: "", reason: "nothing to read: a state diagram opens with \u201CstateDiagram-v2\u201D" });
   const said3 = [...notes];
   const finals = nodes.filter((n2) => n2.symbol === "final").length;
   if (nodes.some((n2) => n2.symbol === "initial") && nodes.filter((n2) => n2.symbol === "initial").length > 1) said3.push("every [*] a transition leaves is one start");
@@ -28030,8 +28030,211 @@ var REGION = {
   }
 };
 
+// src/search/extract.ts
+var sources = /* @__PURE__ */ new Map();
+function registerSearchSource(src) {
+  sources.set(src.id, src);
+}
+function unregisterSearchSource(id) {
+  sources.delete(id);
+}
+function sourceIds() {
+  return [...sources.keys()].sort();
+}
+var MAX_ENTRIES = 800;
+var CHUNK_CHARS = 600;
+var MAX_CHUNKS = 40;
+var MAX_SVG_TEXTS = 60;
+var NOUN = {
+  rectangle: "a box",
+  circle: "a circle",
+  line: "a line",
+  arrow: "an arrow",
+  triangle: "a triangle",
+  arc: "a curve",
+  dot: "a dot",
+  text: "writing"
+};
+var ARTIFACT_NOUN = {
+  text: "a text",
+  md: "a text",
+  svg: "a figure",
+  mermaid: "a Mermaid diagram",
+  html: "a page",
+  png: "a picture",
+  jpg: "a picture",
+  webp: "a picture",
+  run: "a program",
+  js: "a script",
+  json: "data",
+  control: "a control"
+};
+function nounOf(node) {
+  if (isWord(node)) return "a word";
+  const top = topInterpretation(node);
+  if (!top) return "a mark";
+  const t = top.replace(/^type:/, "");
+  return NOUN[t] || "a " + t;
+}
+var ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+function decodeEntities(s) {
+  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
+    if (e[0] === "#") {
+      const n2 = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+      return n2 > 0 && n2 < 1114112 ? String.fromCodePoint(n2) : m;
+    }
+    const r = ENTITIES[e.toLowerCase()];
+    return r === void 0 ? m : r;
+  });
+}
+var squash = (s) => s.replace(/\s+/g, " ").trim();
+function pageWords(html) {
+  return squash(decodeEntities(html.replace(/<!--[\s\S]*?-->/g, " ").replace(/<(script|style|template)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(/<[^>]*>/g, " ")));
+}
+function svgWords(svg) {
+  const out = [];
+  const re = /<(text|title|desc)\b[^>]*>([\s\S]*?)<\/\1\s*>/gi;
+  let m;
+  while ((m = re.exec(svg)) && out.length < MAX_SVG_TEXTS) {
+    const t = squash(decodeEntities(m[2].replace(/<[^>]*>/g, "")));
+    if (t) out.push(t);
+  }
+  return out;
+}
+function chunksOf(text, size2 = CHUNK_CHARS) {
+  const out = [];
+  const t = text.replace(/\r\n?/g, "\n").trim();
+  let i = 0;
+  while (i < t.length && out.length < MAX_CHUNKS) {
+    let end = Math.min(t.length, i + size2);
+    if (end < t.length) {
+      const cut = Math.max(t.lastIndexOf("\n", end), t.lastIndexOf(" ", end));
+      if (cut > i + size2 / 2) end = cut;
+    }
+    const piece = squash(t.slice(i, end));
+    if (piece) out.push(piece);
+    i = end;
+  }
+  return out;
+}
+function codeOf(node) {
+  for (let i = node.reps.length - 1; i >= 0; i--) {
+    if (node.reps[i].modality === "code") {
+      const d = node.reps[i].data;
+      return { code: typeof d.code === "string" ? d.code : "", kind: typeof d.kind === "string" ? d.kind : void 0 };
+    }
+  }
+  return null;
+}
+function artifactEntries(node, box, out) {
+  const code = codeOf(node);
+  const kind = code && code.kind;
+  const name = wordOf(node);
+  const noun = kind && ARTIFACT_NOUN[kind] || "a thing";
+  const pic = pictureOf(node);
+  const push = (k, text, what) => {
+    if (text) out.push({ id: node.id, kind: k, text, what, ...box ? { box } : {} });
+  };
+  if (pic) push("picture", pic.name, "picture name");
+  else if (name && !/^text \d+$/.test(name)) push("name", name, "name of " + noun);
+  if (!code || pic) return;
+  if (kind === "text" || kind === "md") for (const c of chunksOf(code.code)) push("text", c, "typed text");
+  else if (kind === "svg") for (const t of svgWords(code.code)) push("figure", t, "text in a figure");
+  else if (kind === "mermaid") for (const c of chunksOf(code.code)) push("mermaid", c, "Mermaid text");
+  else if (kind === "html") for (const c of chunksOf(pageWords(code.code))) push("page", c, "words on a page");
+}
+function searchEntriesOf(state, only) {
+  const out = [];
+  const artifacts = new Set(state.artifacts);
+  const answers = new Set(state.explanations);
+  const nodes = only ? [...only].map((id) => state.nodes.get(id)).filter((n2) => !!n2) : state.nodes.values();
+  for (const node of nodes) {
+    if (out.length >= MAX_ENTRIES) break;
+    if (answers.has(node.id) || getRep(node, "participant") || getRep(node, "erased")) continue;
+    const box = boundsOf(node);
+    const isArtifact = artifacts.has(node.id);
+    if (isArtifact) artifactEntries(node, box, out);
+    const lab = labelOf(node);
+    if (lab) out.push({ id: node.id, kind: "label", text: lab.text, what: "label on " + (isArtifact ? ARTIFACT_NOUN[codeOf(node)?.kind || ""] || "a thing" : nounOf(node)), ...box ? { box } : {} });
+    if (!isArtifact) {
+      const seen = /* @__PURE__ */ new Set();
+      for (const t of transcriptsOf(node)) {
+        if (seen.has(t.text)) continue;
+        seen.add(t.text);
+        out.push({ id: node.id, kind: "transcript", text: t.text, what: "read writing", ...box ? { box } : {} });
+      }
+    }
+  }
+  for (const r of regionsOfBoard(state)) {
+    if (out.length >= MAX_ENTRIES) break;
+    if (only && !only.has(r.id)) continue;
+    out.push({ id: r.id, kind: "region", text: r.name, what: "a region", box: r.bounds });
+  }
+  for (const src of only ? [] : sources.values()) {
+    if (out.length >= MAX_ENTRIES) break;
+    try {
+      for (const e of src.entries(state) || []) {
+        if (e && typeof e.text === "string" && e.text && typeof e.kind === "string" && typeof e.what === "string") out.push(e);
+      }
+    } catch (err) {
+    }
+  }
+  return out.slice(0, MAX_ENTRIES);
+}
+
+// src/semantic/words.ts
+var LIKE_MAX_CHARS = 1200;
+function wordsOfMarks(state, ids) {
+  const regions = new Set(state.regions ?? []);
+  const order2 = [];
+  const take = (id) => {
+    if (!order2.includes(id)) order2.push(id);
+  };
+  for (const id of ids) {
+    take(id);
+    if (regions.has(id)) for (const m of regionMembers(state, id)) take(m);
+  }
+  const said3 = [];
+  for (const id of order2) {
+    for (const e of searchEntriesOf(state, /* @__PURE__ */ new Set([id]))) {
+      const t = e.text.replace(/\s+/g, " ").trim();
+      if (t && !said3.includes(t)) said3.push(t);
+    }
+  }
+  const text = said3.join(" ");
+  return text.length > LIKE_MAX_CHARS ? text.slice(0, LIKE_MAX_CHARS) : text;
+}
+
+// src/tools/like.ts
+var LIKE = {
+  id: "like",
+  name: "notes like this",
+  describe: () => "list the notes nearest in meaning to the marks held, across every board, by the small model that runs on this device \u2014 when one is seated",
+  asks: "model",
+  offers(scope) {
+    const seat = scope.host.semantic;
+    if (!seat) return [];
+    const held2 = scope.summon.enclosedIds ?? [];
+    if (!held2.length) return [];
+    const text = wordsOfMarks(scope.state, held2);
+    if (!text) return [];
+    return [{
+      key: "like",
+      label: "Notes like this",
+      reason: `lists the notes nearest in meaning to \u201C${text.length > 60 ? text.slice(0, 60) + "\u2026" : text}\u201D across every board, by ${seat.name} on this device \u2014 nothing is sent anywhere`,
+      base: 0.5,
+      tool: "like",
+      asks: "model",
+      hidden: true,
+      verbs: ["like", "notes like this", "notes like", "similar", "similar notes", "near"],
+      data: { text, ids: held2.slice() }
+    }];
+  },
+  take: () => ({ host: "like" })
+};
+
 // src/tools/builtin.ts
-var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH, TRACE, REGION];
+var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH, TRACE, REGION, LIKE];
 registerTool(CORRECT);
 registerTool(TEXT);
 registerTool(NAME2);
@@ -28056,6 +28259,7 @@ registerTool(ROUTE);
 registerTool(WHICH);
 registerTool(TRACE);
 registerTool(REGION);
+registerTool(LIKE);
 
 // src/context/context.ts
 var CONTEXT_FADE = 2.5;
@@ -30100,7 +30304,7 @@ function readErText(text) {
   const links = [];
   const byId = /* @__PURE__ */ new Map();
   let keyword = "";
-  let header = null;
+  let header2 = null;
   let direction = "TD";
   let block = null;
   const node = (id, line) => {
@@ -30121,7 +30325,7 @@ function readErText(text) {
       continue;
     }
     if (t.startsWith("%%")) continue;
-    if (header === null) {
+    if (header2 === null) {
       if (t === "---") {
         const close = all.findIndex((l, k) => k > i && l.trim() === "---");
         const last = close >= 0 ? close : all.length - 1;
@@ -30130,7 +30334,7 @@ function readErText(text) {
         continue;
       }
       const m = /^(erDiagram)\b\s*(.*)$/.exec(t);
-      header = n2;
+      header2 = n2;
       keyword = m ? m[1] : /^[A-Za-z][\w-]*/.exec(t)?.[0] ?? "";
       if (!m) refused.push({ line: n2, text: t, reason: "an ER diagram opens with \u201CerDiagram\u201D" });
       else if (m[2]) refused.push({ line: n2, text: m[2], reason: "nothing is read after the header on its own line" });
@@ -30190,7 +30394,7 @@ function readErText(text) {
     }
     refused.push({ line: n2, text: t, reason: "a statement the ER diagram\u2019s reader cannot parse" });
   }
-  if (header === null) refused.push({ line: 1, text: "", reason: "nothing to read: an ER diagram opens with \u201CerDiagram\u201D" });
+  if (header2 === null) refused.push({ line: 1, text: "", reason: "nothing to read: an ER diagram opens with \u201CerDiagram\u201D" });
   return { keyword, notation: keyword ? T4.notation : null, direction, nodes, links, notes: [...notes], refused: refused.sort((x, y) => x.line - y.line) };
 }
 var CHAR5 = 0.6;
@@ -30489,7 +30693,7 @@ function readMindMapText(text) {
   const links = [];
   const taken = /* @__PURE__ */ new Set();
   let keyword = "";
-  let header = null;
+  let header2 = null;
   const stack = [];
   let skipping = null;
   const unique = (id) => {
@@ -30508,7 +30712,7 @@ function readMindMapText(text) {
       continue;
     }
     if (t.startsWith("%%")) continue;
-    if (header === null) {
+    if (header2 === null) {
       if (t === "---") {
         const close = all.findIndex((l, k) => k > i && l.trim() === "---");
         const last = close >= 0 ? close : all.length - 1;
@@ -30517,7 +30721,7 @@ function readMindMapText(text) {
         continue;
       }
       const m = /^(mindmap)\b\s*(.*)$/.exec(t);
-      header = n2;
+      header2 = n2;
       keyword = m ? m[1] : /^[A-Za-z][\w-]*/.exec(t)?.[0] ?? "";
       if (!m) refused.push({ line: n2, text: t, reason: "a mind map opens with \u201Cmindmap\u201D" });
       else if (m[2]) refused.push({ line: n2, text: m[2], reason: "nothing is read after the header on its own line" });
@@ -30568,7 +30772,7 @@ function readMindMapText(text) {
     stack.push({ indent, node });
     if (parent) links.push({ index: links.length, line: n2, from: parent.id, to: node.id, head: "none", written: "" });
   }
-  if (header === null) refused.push({ line: 1, text: "", reason: "nothing to read: a mind map opens with \u201Cmindmap\u201D" });
+  if (header2 === null) refused.push({ line: 1, text: "", reason: "nothing to read: a mind map opens with \u201Cmindmap\u201D" });
   return { keyword, notation: keyword ? T5.notation : null, direction: "TD", nodes, links, notes: [...notes], refused: refused.sort((x, y) => x.line - y.line) };
 }
 var CHAR6 = 0.6;
@@ -30646,10 +30850,10 @@ function drawMindMapRead(session, read2, opts) {
   const byDepth = /* @__PURE__ */ new Map();
   for (const x of nodes) (byDepth.get(x.depth) ?? byDepth.set(x.depth, []).get(x.depth)).push(x);
   const radius = /* @__PURE__ */ new Map([[0, 0]]);
-  const half = (d) => Math.max(...(byDepth.get(d) ?? []).map((x) => big(x.id) / 2), 0);
+  const half2 = (d) => Math.max(...(byDepth.get(d) ?? []).map((x) => big(x.id) / 2), 0);
   for (let d = 1; d <= Math.max(...byDepth.keys()); d++) {
     const level = (byDepth.get(d) ?? []).sort((a, b) => angle.get(a.id) - angle.get(b.id));
-    let R = radius.get(d - 1) + half(d - 1) + half(d) + RING_GAP * U;
+    let R = radius.get(d - 1) + half2(d - 1) + half2(d) + RING_GAP * U;
     for (let i = 1; i < level.length; i++) {
       const gap = angle.get(level[i].id) - angle.get(level[i - 1].id);
       if (gap > 1e-6) R = Math.max(R, ((big(level[i].id) + big(level[i - 1].id)) / 2 + SIBLING_GAP * U) / gap);
@@ -30808,156 +31012,6 @@ function normalise(s) {
   return tokenize(s).map((t) => t.text).join(" ");
 }
 
-// src/search/extract.ts
-var sources = /* @__PURE__ */ new Map();
-function registerSearchSource(src) {
-  sources.set(src.id, src);
-}
-function unregisterSearchSource(id) {
-  sources.delete(id);
-}
-function sourceIds() {
-  return [...sources.keys()].sort();
-}
-var MAX_ENTRIES = 800;
-var CHUNK_CHARS = 600;
-var MAX_CHUNKS = 40;
-var MAX_SVG_TEXTS = 60;
-var NOUN = {
-  rectangle: "a box",
-  circle: "a circle",
-  line: "a line",
-  arrow: "an arrow",
-  triangle: "a triangle",
-  arc: "a curve",
-  dot: "a dot",
-  text: "writing"
-};
-var ARTIFACT_NOUN = {
-  text: "a text",
-  md: "a text",
-  svg: "a figure",
-  mermaid: "a Mermaid diagram",
-  html: "a page",
-  png: "a picture",
-  jpg: "a picture",
-  webp: "a picture",
-  run: "a program",
-  js: "a script",
-  json: "data",
-  control: "a control"
-};
-function nounOf(node) {
-  if (isWord(node)) return "a word";
-  const top = topInterpretation(node);
-  if (!top) return "a mark";
-  const t = top.replace(/^type:/, "");
-  return NOUN[t] || "a " + t;
-}
-var ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
-function decodeEntities(s) {
-  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
-    if (e[0] === "#") {
-      const n2 = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-      return n2 > 0 && n2 < 1114112 ? String.fromCodePoint(n2) : m;
-    }
-    const r = ENTITIES[e.toLowerCase()];
-    return r === void 0 ? m : r;
-  });
-}
-var squash = (s) => s.replace(/\s+/g, " ").trim();
-function pageWords(html) {
-  return squash(decodeEntities(html.replace(/<!--[\s\S]*?-->/g, " ").replace(/<(script|style|template)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(/<[^>]*>/g, " ")));
-}
-function svgWords(svg) {
-  const out = [];
-  const re = /<(text|title|desc)\b[^>]*>([\s\S]*?)<\/\1\s*>/gi;
-  let m;
-  while ((m = re.exec(svg)) && out.length < MAX_SVG_TEXTS) {
-    const t = squash(decodeEntities(m[2].replace(/<[^>]*>/g, "")));
-    if (t) out.push(t);
-  }
-  return out;
-}
-function chunksOf(text, size2 = CHUNK_CHARS) {
-  const out = [];
-  const t = text.replace(/\r\n?/g, "\n").trim();
-  let i = 0;
-  while (i < t.length && out.length < MAX_CHUNKS) {
-    let end = Math.min(t.length, i + size2);
-    if (end < t.length) {
-      const cut = Math.max(t.lastIndexOf("\n", end), t.lastIndexOf(" ", end));
-      if (cut > i + size2 / 2) end = cut;
-    }
-    const piece = squash(t.slice(i, end));
-    if (piece) out.push(piece);
-    i = end;
-  }
-  return out;
-}
-function codeOf(node) {
-  for (let i = node.reps.length - 1; i >= 0; i--) {
-    if (node.reps[i].modality === "code") {
-      const d = node.reps[i].data;
-      return { code: typeof d.code === "string" ? d.code : "", kind: typeof d.kind === "string" ? d.kind : void 0 };
-    }
-  }
-  return null;
-}
-function artifactEntries(node, box, out) {
-  const code = codeOf(node);
-  const kind = code && code.kind;
-  const name = wordOf(node);
-  const noun = kind && ARTIFACT_NOUN[kind] || "a thing";
-  const pic = pictureOf(node);
-  const push = (k, text, what) => {
-    if (text) out.push({ id: node.id, kind: k, text, what, ...box ? { box } : {} });
-  };
-  if (pic) push("picture", pic.name, "picture name");
-  else if (name && !/^text \d+$/.test(name)) push("name", name, "name of " + noun);
-  if (!code || pic) return;
-  if (kind === "text" || kind === "md") for (const c of chunksOf(code.code)) push("text", c, "typed text");
-  else if (kind === "svg") for (const t of svgWords(code.code)) push("figure", t, "text in a figure");
-  else if (kind === "mermaid") for (const c of chunksOf(code.code)) push("mermaid", c, "Mermaid text");
-  else if (kind === "html") for (const c of chunksOf(pageWords(code.code))) push("page", c, "words on a page");
-}
-function searchEntriesOf(state) {
-  const out = [];
-  const artifacts = new Set(state.artifacts);
-  const answers = new Set(state.explanations);
-  for (const node of state.nodes.values()) {
-    if (out.length >= MAX_ENTRIES) break;
-    if (answers.has(node.id) || getRep(node, "participant") || getRep(node, "erased")) continue;
-    const box = boundsOf(node);
-    const isArtifact = artifacts.has(node.id);
-    if (isArtifact) artifactEntries(node, box, out);
-    const lab = labelOf(node);
-    if (lab) out.push({ id: node.id, kind: "label", text: lab.text, what: "label on " + (isArtifact ? ARTIFACT_NOUN[codeOf(node)?.kind || ""] || "a thing" : nounOf(node)), ...box ? { box } : {} });
-    if (!isArtifact) {
-      const seen = /* @__PURE__ */ new Set();
-      for (const t of transcriptsOf(node)) {
-        if (seen.has(t.text)) continue;
-        seen.add(t.text);
-        out.push({ id: node.id, kind: "transcript", text: t.text, what: "read writing", ...box ? { box } : {} });
-      }
-    }
-  }
-  for (const r of regionsOfBoard(state)) {
-    if (out.length >= MAX_ENTRIES) break;
-    out.push({ id: r.id, kind: "region", text: r.name, what: "a region", box: r.bounds });
-  }
-  for (const src of sources.values()) {
-    if (out.length >= MAX_ENTRIES) break;
-    try {
-      for (const e of src.entries(state) || []) {
-        if (e && typeof e.text === "string" && e.text && typeof e.kind === "string" && typeof e.what === "string") out.push(e);
-      }
-    } catch (err) {
-    }
-  }
-  return out.slice(0, MAX_ENTRIES);
-}
-
 // src/search/query.ts
 var EXACT = 3;
 var PREFIX = 1.5;
@@ -31033,7 +31087,7 @@ function searchBoards(boards, query, options = {}) {
       if (!lex && sem < SEMANTIC_FLOOR) return;
       const score2 = (lex ? lex.score : 0) * KIND_WEIGHT[e.kind] + sem * SEMANTIC_WEIGHT;
       const ex = excerptOf(e.text, lex ? lex.spans : []);
-      hits.push({ board: b.id, boardName: b.name, id: e.id, kind: e.kind, what: e.what, text: ex.text, spans: ex.spans, ...e.box ? { box: e.box } : {}, score: score2 });
+      hits.push({ board: b.id, boardName: b.name, id: e.id, kind: e.kind, what: e.what, text: ex.text, spans: ex.spans, ...e.box ? { box: e.box } : {}, score: score2, ...sem > 0 ? { meaning: sem } : {} });
     };
     const nameLex = lexical(q, tokenize(b.name));
     if (nameLex) add7({ id: null, kind: "board", text: b.name, what: "board name" }, nameLex, 0);
@@ -31074,6 +31128,467 @@ function thumbFit(box, w2, h2, pad = 8) {
   const bw = Math.max(1, box.maxX - box.minX), bh = Math.max(1, box.maxY - box.minY);
   const scale = Math.min(Math.max(1, w2 - 2 * pad) / bw, Math.max(1, h2 - 2 * pad) / bh, 1);
   return { scale, x: w2 / 2 - (box.minX + box.maxX) / 2 * scale, y: h2 / 2 - (box.minY + box.maxY) / 2 * scale };
+}
+
+// src/semantic/embed.ts
+var EmbedError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "EmbedError";
+  }
+};
+function cosine(a, b) {
+  if (a.length !== b.length || !a.length) return 0;
+  let dot8 = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot8 += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  if (!na || !nb) return 0;
+  return dot8 / Math.sqrt(na * nb);
+}
+function unit6(v) {
+  const out = new Float32Array(v.length);
+  let n2 = 0;
+  for (let i = 0; i < v.length; i++) n2 += v[i] * v[i];
+  if (!n2) return out;
+  const k = 1 / Math.sqrt(n2);
+  for (let i = 0; i < v.length; i++) out[i] = v[i] * k;
+  return out;
+}
+function createEmbedCache(max = 2e4) {
+  const m = /* @__PURE__ */ new Map();
+  const key2 = (t, x) => t + "\0" + x;
+  return {
+    get: (t, x) => m.get(key2(t, x)),
+    set(t, x, v) {
+      const k = key2(t, x);
+      m.delete(k);
+      m.set(k, v);
+      while (m.size > max) m.delete(m.keys().next().value);
+    },
+    get size() {
+      return m.size;
+    }
+  };
+}
+var EMBED_BATCH = 128;
+async function embedAll(transport, texts, cache, opts = {}) {
+  const out = /* @__PURE__ */ new Map();
+  const need = [];
+  for (const t of texts) {
+    if (out.has(t)) continue;
+    const held2 = cache.get(transport.name, t);
+    if (held2) out.set(t, held2);
+    else if (!need.includes(t)) need.push(t);
+  }
+  const size2 = Math.max(1, opts.batch ?? EMBED_BATCH);
+  for (let i = 0; i < need.length; i += size2) {
+    if (opts.signal?.aborted) throw new Error("cancelled");
+    const part = need.slice(i, i + size2);
+    const got = await transport.embed(part, opts.signal ? { signal: opts.signal } : void 0);
+    if (!Array.isArray(got) || got.length !== part.length) {
+      throw new EmbedError(`${transport.name} answered ${Array.isArray(got) ? got.length : "no"} vectors for ${part.length} texts`);
+    }
+    const vecs = got.map((v) => v instanceof Float32Array ? v : Float32Array.from(v));
+    for (const v of vecs) {
+      if (v.length !== transport.dimension) throw new EmbedError(`${transport.name} promised a dimension of ${transport.dimension} and answered a vector of ${v.length}`);
+    }
+    part.forEach((t, j) => {
+      cache.set(transport.name, t, vecs[j]);
+      out.set(t, vecs[j]);
+    });
+  }
+  return out;
+}
+var fnv = (s) => {
+  let h2 = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h2 ^= s.charCodeAt(i);
+    h2 = Math.imul(h2, 16777619) >>> 0;
+  }
+  return h2 >>> 0;
+};
+function createStubEmbedTransport(opts = {}) {
+  const dimension = opts.dimension ?? 256;
+  const where = /* @__PURE__ */ new Map();
+  (opts.groups ?? []).forEach((g, i) => g.forEach((w2) => where.set(tokenize(w2).map((t) => t.text).join(""), "g:" + i)));
+  const placeOf2 = (w2) => {
+    if (where.has(w2)) return where.get(w2);
+    if (w2.length > 3 && w2.endsWith("s") && where.has(w2.slice(0, -1))) return where.get(w2.slice(0, -1));
+    return "w:" + w2;
+  };
+  return {
+    name: opts.name ?? "stub-embed",
+    dimension,
+    async embed(texts) {
+      return texts.map((text) => {
+        const v = new Float32Array(dimension);
+        for (const t of tokenize(text)) v[fnv(placeOf2(t.text)) % dimension] += 1;
+        return unit6(v);
+      });
+    }
+  };
+}
+
+// src/semantic/scorer.ts
+var clamp013 = (x) => x < 0 ? 0 : x > 1 ? 1 : x;
+async function semanticScorer(transport, query, entries, opts = {}) {
+  const cache = opts.cache ?? createEmbedCache();
+  if (!tokenize(query).length) return () => 0;
+  const q = query.trim();
+  await embedAll(transport, [q, ...entries.map((e) => e.text)], cache, opts);
+  return (asked, entry) => {
+    const qv = cache.get(transport.name, asked.trim());
+    const ev = cache.get(transport.name, entry.text);
+    return qv && ev ? clamp013(cosine(qv, ev)) : 0;
+  };
+}
+var FUNCTION_WORDS = /* @__PURE__ */ new Set(["a", "an", "and", "the", "of", "for", "to", "in", "on", "at", "is", "it", "or", "by", "with", "as", "be"]);
+function sharedWords(a, b) {
+  const mine = new Set(tokenize(a).map((t) => t.text));
+  const out = [];
+  for (const t of tokenize(b)) if (mine.has(t.text) && !FUNCTION_WORDS.has(t.text) && !out.includes(t.text)) out.push(t.text);
+  return out;
+}
+function reasonOf4(score2, transport, source, text) {
+  const band = score2 >= 0.85 ? "says nearly the same thing" : score2 >= 0.7 ? "is about the same thing" : "is near in meaning";
+  const shared2 = sharedWords(source, text).slice(0, 3);
+  return `${band} \u2014 ${score2.toFixed(2)} by ${transport}; ` + (shared2.length ? "shares " + shared2.map((w2) => `\u201C${w2}\u201D`).join(", ") : "no word in common");
+}
+async function notesLike(transport, boards, source, opts = {}) {
+  if (!tokenize(source.text).length) return [];
+  const own = new Set(source.ids ?? []);
+  const candidates = [];
+  let order2 = 0;
+  for (const b of boards) {
+    for (const e of b.entries) {
+      if (!e.text || !tokenize(e.text).length) continue;
+      if (source.board !== void 0 && b.id === source.board && e.id && own.has(e.id)) continue;
+      candidates.push({ board: b, entry: e, order: order2++ });
+    }
+  }
+  if (!candidates.length) return [];
+  const cache = opts.cache ?? createEmbedCache();
+  const said3 = source.text.trim();
+  await embedAll(transport, [said3, ...candidates.map((c) => c.entry.text)], cache, opts);
+  const sv = cache.get(transport.name, said3);
+  if (!sv) return [];
+  const floor = opts.floor ?? SEMANTIC_FLOOR;
+  const found = candidates.map((c) => ({ c, score: clamp013(cosine(sv, cache.get(transport.name, c.entry.text) ?? new Float32Array(0))) })).filter((x) => x.score >= floor).sort((x, y) => y.score - x.score || y.c.board.recency - x.c.board.recency || x.c.order - y.c.order).slice(0, Math.max(1, opts.limit ?? 20));
+  return found.map(({ c, score: score2 }) => {
+    const ex = excerptOf(c.entry.text, []);
+    return {
+      board: c.board.id,
+      boardName: c.board.name,
+      id: c.entry.id,
+      kind: c.entry.kind,
+      what: c.entry.what,
+      text: ex.text,
+      spans: [],
+      ...c.entry.box ? { box: c.entry.box } : {},
+      score: score2,
+      meaning: score2,
+      reason: reasonOf4(score2, transport.name, said3, c.entry.text)
+    };
+  });
+}
+function groupLikes(likes, boards) {
+  const by = /* @__PURE__ */ new Map();
+  const info = new Map(boards.map((b) => [b.id, b]));
+  for (const l of likes) {
+    let g = by.get(l.board);
+    if (!g) {
+      const b = info.get(l.board);
+      g = { board: l.board, name: b ? b.name : l.boardName, recency: b ? b.recency : 0, score: l.score, hits: [], more: 0 };
+      by.set(l.board, g);
+    }
+    g.hits.push(l);
+    if (l.score > g.score) g.score = l.score;
+  }
+  const groups = [...by.values()];
+  for (const g of groups) g.hits.sort((x, y) => y.score - x.score);
+  groups.sort((x, y) => y.score - x.score || y.recency - x.recency || (x.board < y.board ? -1 : x.board > y.board ? 1 : 0));
+  return groups;
+}
+
+// src/semantic/static.ts
+var StaticModelError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "StaticModelError";
+  }
+};
+var MAX_HEADER = 16 * 1024 * 1024;
+var ascii = (b, n2) => Array.from(b.subarray(0, n2)).map((c) => c >= 32 && c < 127 ? String.fromCharCode(c) : "\xB7").join("");
+function header(bytes) {
+  if (bytes.length < 8) throw new StaticModelError(`the safetensors header is missing \u2014 the file is only ${bytes.length} bytes`);
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const n2 = Number(dv.getBigUint64(0, true));
+  if (!Number.isFinite(n2) || n2 < 2 || n2 > MAX_HEADER || 8 + n2 > bytes.length) {
+    throw new StaticModelError(`the safetensors header does not read \u2014 the file's first bytes say \u201C${ascii(bytes, 12)}\u201D, which is not a safetensors file (a page from the host, perhaps)`);
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(bytes.subarray(8, 8 + n2)));
+  } catch {
+    throw new StaticModelError("the safetensors header is not JSON \u2014 this is not a safetensors file");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new StaticModelError("the safetensors header is not an object of tensors");
+  const info = {};
+  for (const [k, v] of Object.entries(parsed)) {
+    if (k === "__metadata__") continue;
+    const t = v;
+    if (!t || typeof t.dtype !== "string" || !Array.isArray(t.shape) || !Array.isArray(t.data_offsets) || t.data_offsets.length !== 2) throw new StaticModelError(`the tensor \u201C${k}\u201D has no dtype, shape and place in the safetensors header`);
+    info[k] = { dtype: t.dtype, shape: t.shape.map(Number), data_offsets: [Number(t.data_offsets[0]), Number(t.data_offsets[1])] };
+  }
+  return { info, start: 8 + n2 };
+}
+function safetensorsNames(bytes) {
+  const { info } = header(bytes);
+  return Object.fromEntries(Object.entries(info).map(([k, t]) => [k, { dtype: t.dtype, shape: t.shape }]));
+}
+var BYTES = { F32: 4, F16: 2, BF16: 2 };
+function half(h2) {
+  const s = h2 & 32768 ? -1 : 1, e = h2 >> 10 & 31, f = h2 & 1023;
+  if (e === 0) return s * f * 2 ** -24;
+  if (e === 31) return f ? NaN : s * Infinity;
+  return s * (1 + f / 1024) * 2 ** (e - 15);
+}
+function parseSafetensors(bytes, wanted) {
+  const { info, start } = header(bytes);
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const out = {};
+  for (const [name, t] of Object.entries(info)) {
+    if (wanted && !wanted.includes(name)) continue;
+    const width = BYTES[t.dtype];
+    if (!width) throw new StaticModelError(`the tensor \u201C${name}\u201D is dtype ${t.dtype}, which this reader does not take (F32, F16 and BF16 are read)`);
+    const [from, to] = t.data_offsets;
+    const count9 = t.shape.reduce((a, b) => a * b, 1);
+    if (!(from >= 0 && to >= from) || to - from !== count9 * width) throw new StaticModelError(`the tensor \u201C${name}\u201D says ${count9} values of ${t.dtype} at bytes ${from}\u2013${to}, which do not fit`);
+    if (start + to > bytes.length) throw new StaticModelError(`the weights end before the table does \u2014 the file is cut off (the table of \u201C${name}\u201D ends at byte ${start + to}, the file at ${bytes.length})`);
+    const data = new Float32Array(count9);
+    const at = start + from;
+    if (t.dtype === "F32") for (let i = 0; i < count9; i++) data[i] = dv.getFloat32(at + i * 4, true);
+    else if (t.dtype === "F16") for (let i = 0; i < count9; i++) data[i] = half(dv.getUint16(at + i * 2, true));
+    else for (let i = 0; i < count9; i++) data[i] = bf16(dv.getUint16(at + i * 2, true));
+    out[name] = { dtype: t.dtype, shape: t.shape, data };
+  }
+  return out;
+}
+var bf = new DataView(new ArrayBuffer(4));
+function bf16(h2) {
+  bf.setUint32(0, h2 << 16);
+  return bf.getFloat32(0);
+}
+var isPunct = (cp, ch) => cp >= 33 && cp <= 47 || cp >= 58 && cp <= 64 || cp >= 91 && cp <= 96 || cp >= 123 && cp <= 126 || /\p{P}/u.test(ch);
+var isCjk = (cp) => cp >= 19968 && cp <= 40959 || cp >= 13312 && cp <= 19903 || cp >= 131072 && cp <= 173791 || cp >= 63744 && cp <= 64255 || cp >= 194560 && cp <= 195103;
+function normaliserOf(n2) {
+  let lower = false, strip = false;
+  const walk = (x) => {
+    if (!x) return;
+    if (x.type === "BertNormalizer") {
+      lower = lower || x.lowercase !== false;
+      strip = strip || (x.strip_accents ?? x.lowercase !== false) === true;
+    } else if (x.type === "Lowercase") lower = true;
+    else if (x.type === "StripAccents") strip = true;
+    else if (Array.isArray(x.normalizers)) x.normalizers.forEach(walk);
+  };
+  walk(n2);
+  return { lower, strip };
+}
+function wordPieceOf(file) {
+  let json;
+  if (typeof file === "string") {
+    try {
+      json = JSON.parse(file);
+    } catch {
+      throw new StaticModelError("the tokenizer is not JSON \u2014 tokenizer.json did not come back as a tokenizer");
+    }
+  } else json = file;
+  const model = json && typeof json === "object" ? json.model : void 0;
+  if (!model || typeof model !== "object") throw new StaticModelError("the tokenizer has no model \u2014 this is not a tokenizer.json");
+  if (model.type !== "WordPiece") throw new StaticModelError(`the tokenizer is ${model.type || "of no kind"}, and only WordPiece is read here`);
+  if (!model.vocab || typeof model.vocab !== "object") throw new StaticModelError("the tokenizer names no vocabulary");
+  const vocab = new Map(Object.entries(model.vocab));
+  const unkToken = model.unk_token ?? "[UNK]";
+  const prefix = model.continuing_subword_prefix ?? "##";
+  const maxWord = model.max_input_chars_per_word ?? 100;
+  const unkId = vocab.has(unkToken) ? vocab.get(unkToken) : -1;
+  const { lower, strip } = normaliserOf(json.normalizer);
+  const normalise2 = (text) => {
+    let s = text.normalize("NFC");
+    s = s.replace(/[\u0000�]/g, "").replace(/[\u0009\u000a\u000d ]/g, " ");
+    if (lower) s = s.toLowerCase();
+    if (strip) s = s.normalize("NFD").replace(/\p{M}/gu, "");
+    return s;
+  };
+  const words = (s) => {
+    const out = [];
+    let cur = "";
+    const flush = () => {
+      if (cur) {
+        out.push(cur);
+        cur = "";
+      }
+    };
+    for (const ch of s) {
+      const cp = ch.codePointAt(0);
+      if (/\s/u.test(ch)) flush();
+      else if (isPunct(cp, ch) || isCjk(cp)) {
+        flush();
+        out.push(ch);
+      } else cur += ch;
+    }
+    flush();
+    return out;
+  };
+  const piecesOf = (word) => {
+    const cps = Array.from(word);
+    if (cps.length > maxWord) return unkId >= 0 ? [unkId] : [];
+    const ids = [];
+    let at = 0;
+    while (at < cps.length) {
+      let end = cps.length, found = -1;
+      while (end > at) {
+        const piece = (at > 0 ? prefix : "") + cps.slice(at, end).join("");
+        const id = vocab.get(piece);
+        if (id !== void 0) {
+          found = id;
+          break;
+        }
+        end--;
+      }
+      if (found < 0) return unkId >= 0 ? [unkId] : [];
+      ids.push(found);
+      at = end;
+    }
+    return ids;
+  };
+  const fn = ((text) => {
+    const out = [];
+    for (const w2 of words(normalise2(typeof text === "string" ? text : ""))) out.push(...piecesOf(w2));
+    return out;
+  });
+  fn.unkId = unkId;
+  fn.size = vocab.size;
+  return fn;
+}
+var MAX_TOKENS = 512;
+function createStaticTransport(files) {
+  const tokenize2 = wordPieceOf(files.tokenizer);
+  const names = safetensorsNames(files.weights);
+  if (names.mapping) throw new StaticModelError("this model keeps a vocabulary mapping (a quantised vocabulary), which this reader does not read");
+  const tensors = parseSafetensors(files.weights, ["embeddings", "weights"]);
+  const table = tensors.embeddings;
+  if (!table) throw new StaticModelError(`the weights hold no embeddings table (they hold: ${Object.keys(names).join(", ") || "nothing"})`);
+  if (table.shape.length !== 2) throw new StaticModelError(`the embeddings table is ${table.shape.length}-dimensional, and a table of vectors is two`);
+  const [rows, dim] = table.shape;
+  if (rows !== tokenize2.size) throw new StaticModelError(`the tokenizer's vocabulary names ${tokenize2.size} tokens and the table holds ${rows} rows \u2014 they are not one model's`);
+  const data = table.data;
+  const scale = tensors.weights && tensors.weights.data.length === rows ? tensors.weights.data : null;
+  return {
+    name: files.name,
+    dimension: dim,
+    async embed(texts, opts) {
+      if (opts?.signal?.aborted) throw new Error("cancelled");
+      return texts.map((text) => {
+        const sum = new Float32Array(dim);
+        let n2 = 0;
+        const ids = tokenize2(text);
+        for (let i = 0; i < ids.length && n2 < MAX_TOKENS; i++) {
+          const id = ids[i];
+          if (id === tokenize2.unkId || id < 0 || id >= rows) continue;
+          const k = scale ? scale[id] : 1;
+          const at = id * dim;
+          for (let d = 0; d < dim; d++) sum[d] += data[at + d] * k;
+          n2++;
+        }
+        if (!n2) return sum;
+        for (let d = 0; d < dim; d++) sum[d] /= n2;
+        return unit6(sum);
+      });
+    }
+  };
+}
+var mulberry322 = (a) => () => {
+  a = a + 1831565813 | 0;
+  let t = Math.imul(a ^ a >>> 15, 1 | a);
+  t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+  return ((t ^ t >>> 14) >>> 0) / 4294967296;
+};
+var fnv2 = (w2) => {
+  let h2 = 2166136261;
+  for (let i = 0; i < w2.length; i++) {
+    h2 ^= w2.charCodeAt(i);
+    h2 = Math.imul(h2, 16777619) >>> 0;
+  }
+  return h2 >>> 0;
+};
+var gauss = (r) => Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r());
+function toHalf(x) {
+  const f = new Float32Array([x]), u = new Uint32Array(f.buffer)[0];
+  const sign = u >>> 16 & 32768;
+  const e = (u >>> 23 & 255) - 127 + 15;
+  const m = u & 8388607;
+  if (e <= 0) return e < -10 ? sign : sign | (m | 8388608) >> 1 - e + 13;
+  if (e >= 31) return sign | 31744;
+  return sign | e << 10 | m >> 13;
+}
+function buildStaticModel(o) {
+  const dim = o.dimension ?? 64;
+  const dtype = o.dtype ?? "F32";
+  const seed = o.seed ?? 1;
+  const vocab = ["[UNK]"];
+  const rows = [];
+  const row = (rand, base, own) => {
+    const own_ = Array.from({ length: dim }, () => gauss(rand));
+    const n2 = Math.hypot(...own_) || 1;
+    return own_.map((x, d) => (base ? base[d] : 0) + own * x / n2);
+  };
+  rows.push(new Array(dim).fill(0));
+  const seen = /* @__PURE__ */ new Set(["[UNK]"]);
+  const add7 = (w2, vec) => {
+    if (!seen.has(w2)) {
+      seen.add(w2);
+      vocab.push(w2);
+      rows.push(vec);
+    }
+  };
+  o.groups.forEach((g, gi) => {
+    const rand = mulberry322(seed * 7919 + gi * 104729);
+    const base = row(rand, null, 1);
+    for (const w2 of g) add7(w2.toLowerCase(), row(mulberry322(seed * 31 + gi * 977 + fnv2(w2) | 0), base, 0.3));
+  });
+  (o.extra ?? []).forEach((w2, i) => add7(w2.toLowerCase(), row(mulberry322(seed * 131 + fnv2(w2) + i | 0), null, 0.2)));
+  add7("##s", row(mulberry322(seed * 17), null, 0.05));
+  const count9 = rows.length * dim;
+  const width = dtype === "F16" ? 2 : 4;
+  const head = JSON.stringify({ embeddings: { dtype, shape: [rows.length, dim], data_offsets: [0, count9 * width] }, __metadata__: { format: "pt" } });
+  const pad = (8 - head.length % 8) % 8;
+  const headBytes = new TextEncoder().encode(head + " ".repeat(pad));
+  const bytes = new Uint8Array(8 + headBytes.length + count9 * width);
+  const dv = new DataView(bytes.buffer);
+  dv.setBigUint64(0, BigInt(headBytes.length), true);
+  bytes.set(headBytes, 8);
+  let at = 8 + headBytes.length;
+  for (const r of rows) for (const x of r) {
+    if (dtype === "F16") {
+      dv.setUint16(at, toHalf(x), true);
+      at += 2;
+    } else {
+      dv.setFloat32(at, x, true);
+      at += 4;
+    }
+  }
+  const tokenizer = {
+    version: "1.0",
+    normalizer: { type: "BertNormalizer", clean_text: true, handle_chinese_chars: true, strip_accents: null, lowercase: true },
+    pre_tokenizer: { type: "BertPreTokenizer" },
+    model: { type: "WordPiece", unk_token: "[UNK]", continuing_subword_prefix: "##", max_input_chars_per_word: 100, vocab: Object.fromEntries(vocab.map((w2, i) => [w2, i])) }
+  };
+  return { tokenizer, weights: bytes, vocab };
 }
 export {
   ALONG_STEPS,
@@ -31140,6 +31655,7 @@ export {
   DIAMOND_SLACK,
   DIRECTED_LINKS,
   DOT_FILLED,
+  EMBED_BATCH,
   END_SHARE,
   ENGAGING_KINDS,
   ENGINE_NAME,
@@ -31152,6 +31668,7 @@ export {
   ER_READER,
   ER_TABLE,
   EVIDENCE,
+  EmbedError,
   FILLED_AT,
   FILLED_PATH,
   FILL_CORE,
@@ -31204,6 +31721,8 @@ export {
   LIFELINE_OF_BOX,
   LIFELINE_PLUMB,
   LIFELINE_PX,
+  LIKE,
+  LIKE_MAX_CHARS,
   LINES_PER_CALL,
   LINE_PX,
   LOCAL_PARTICIPANT,
@@ -31321,6 +31840,7 @@ export {
   STATE,
   STATE_READER,
   STATE_TABLE,
+  MAX_TOKENS as STATIC_MAX_TOKENS,
   STEADY_MARGIN,
   STEADY_MS,
   STEP_GAP,
@@ -31329,6 +31849,7 @@ export {
   STUB_PX,
   STUB_SHARE,
   SYMMETRIC_LINKS,
+  StaticModelError,
   StaticStore,
   TARGETED,
   TIER0_PARTICIPANT,
@@ -31397,6 +31918,7 @@ export {
   buildGraph3D,
   buildGraphScaffold,
   buildScaffold,
+  buildStaticModel,
   buildStructure,
   bySource,
   byTier,
@@ -31438,11 +31960,14 @@ export {
   createBridgeParticipant,
   createChatDecideTransport,
   createDecideParticipant,
+  createEmbedCache,
   createExplanationNode,
   createParticipantNode,
   createSeatParticipant,
   createSession,
+  createStaticTransport,
   createStubDecideTransport,
+  createStubEmbedTransport,
   dashedHeads,
   dashedLines,
   decodeLog,
@@ -31494,6 +32019,7 @@ export {
   drawingStrokes,
   drawingsOf,
   elementsOf,
+  embedAll,
   enclosedBy,
   encodeLog,
   encodeLogTail,
@@ -31538,6 +32064,7 @@ export {
   getFingerprint,
   getRep,
   getTool,
+  groupLikes,
   guessVision,
   handLabel,
   handLike,
@@ -31652,6 +32179,7 @@ export {
   notationById,
   notationsInUse,
   notationsOf,
+  notesLike,
   noul,
   numbersOf,
   offerPorts,
@@ -31687,6 +32215,7 @@ export {
   parseProgram,
   parseQuantity,
   parseReadings,
+  parseSafetensors,
   parseShapes,
   parseTranscripts,
   participantOfLog,
@@ -31771,6 +32300,7 @@ export {
   routeStands,
   rowOf,
   runsOf,
+  safetensorsNames,
   sameExpr,
   saysOf,
   scopeOf,
@@ -31787,6 +32317,9 @@ export {
   seedOf,
   seeded,
   segmentsIntersect,
+  cosine as semanticCosine,
+  semanticScorer,
+  unit6 as semanticUnit,
   sequencePortsOf,
   sequenceText,
   shapeExtent,
@@ -31872,6 +32405,8 @@ export {
   withinReach,
   wordConfidence,
   wordOf,
+  wordPieceOf,
+  wordsOfMarks,
   worldOf,
   writeEr,
   writeMindMap,
