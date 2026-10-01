@@ -24,7 +24,10 @@
 //   - a release renames the cache, so after the new release's first network
 //     fetch the old release's shell is never served — beside a control that
 //     shows what a cache that kept its name serves instead;
-//   - a request that carries a key is never kept by the worker.
+//   - a request that carries a key is never kept by the worker;
+//   - installed on an iPad (PLAN-IPAD-NOTES I3): iOS wants a PNG apple-touch-icon of
+//     180 x 180 and the web-app meta, and the manifest's icons are PNGs (192, 512 and a
+//     maskable 512) that answer — kept by both workers, so the icon is there offline.
 //
 // "Offline" here is the server gone — connection refused — not Playwright's
 // offline switch, which in WebKit fails a request before the worker can answer
@@ -44,8 +47,10 @@ const root = resolve(here, '..');
 const versionIn = (dir) => readFileSync(join(dir, 'VERSION'), 'utf8').trim();
 /** What the app's worker must hold after one visit, relative to the site's root. */
 const APP_SHELL = ['app/', 'app/manifest.webmanifest', 'Demos/session-engine.js', 'Demos/surface/surface.css', 'Demos/metamedium-core.browser.js', 'HELP.md'];
+/** The icons the page and its manifest name (PLAN-IPAD-NOTES I3): a PNG each, made by scripts/make-icons.mjs. */
+const ICON_FILES = ['apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 /** What a copy of the site needs for the app to open and for its build to run (the release, in part C). */
-const SITE = ['VERSION', 'HELP.md', 'app', 'Demos/session-engine.html', 'Demos/session-engine.js', 'Demos/metamedium-core.browser.js', 'Demos/surface/surface.css', 'Demos/sw.js', 'Demos/manifest.webmanifest'];
+const SITE = ['VERSION', 'HELP.md', 'app', 'Demos/session-engine.html', 'Demos/session-engine.js', 'Demos/metamedium-core.browser.js', 'Demos/surface/surface.css', 'Demos/sw.js', 'Demos/manifest.webmanifest', 'Demos/icons'];
 
 /** Every response of the site's own origin that failed while the page was open (the host's favicon is not the site's). */
 function watchFailures(page, origin) {
@@ -80,6 +85,20 @@ const cachesOf = (page, file) => page.evaluate(async (f) => {
   }
   return out;
 }, file || null);
+
+/** A PNG's own size, read from its header (the eight-byte signature, then IHDR's width and height) — null for anything else. */
+function pngSize(buf) {
+  const sig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (!buf || buf.length < 24 || !sig.every((b, i) => buf[i] === b) || buf.toString('latin1', 12, 16) !== 'IHDR') return null;
+  return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+}
+/** The ground the surface paints, in each theme, read from the stylesheet that defines them — the one home of the colour. */
+function groundTokens() {
+  const css = readFileSync(join(root, 'Demos', 'surface', 'surface.css'), 'utf8');
+  const light = /:root\s*\{[^}]*?--ground:\s*(#[0-9a-fA-F]{3,8})/.exec(css);
+  const dark = /:root\[data-theme="dark"\]\s*\{[^}]*?--ground:\s*(#[0-9a-fA-F]{3,8})/.exec(css);
+  return { light: light && light[1].toLowerCase(), dark: dark && dark[1].toLowerCase() };
+}
 
 /** The version the page says: its meta, and the help pane's line. */
 const versionSaid = (page) => page.evaluate(() => ({
@@ -252,7 +271,8 @@ async function appTest(browser, servers, ctx) {
       { status: r9 && r9.status(), sw: sw9, strokes: back9.length, failed: failedOld });
 
     // ---- A10. …and its worker keeps to its own caches -------------------------------------------
-    const keys10 = ready9 ? Object.keys(await cachesOf(page)) : [];
+    const held10 = ready9 ? await cachesOf(page) : {};
+    const keys10 = Object.keys(held10);
     await page.close();
     page = await guards.context.newPage();
     await page.goto(appUrl, { waitUntil: 'load', timeout: 60000 });
@@ -261,12 +281,66 @@ async function appTest(browser, servers, ctx) {
       keys10.includes(cacheName) && keys10.some((k) => k.startsWith('mm-shell-')) && sw10.controlled && sw10.script === `${origin}/app/sw.js`,
       { caches: keys10, app: sw10 });
 
+    // ---- A15. Both workers keep the icons, so the icon is there offline ----------------------------------
+    const urlsIn = (prefix) => Object.keys(held10).filter((k) => k.startsWith(prefix)).flatMap((k) => held10[k].urls);
+    const missing15 = (urls) => ICON_FILES.filter((f) => !urls.some((u) => u === `${origin}/Demos/icons/${f}`));
+    const appMiss = missing15(urlsIn('mm-app-')), oldMiss = missing15(urlsIn('mm-shell-'));
+    check(`A15. both workers keep the icons — the app's cache${appMiss.length ? ' misses ' + appMiss.join(', ') : ' holds all ' + ICON_FILES.length}, the old address's${oldMiss.length ? ' misses ' + oldMiss.join(', ') : ' holds all ' + ICON_FILES.length}`,
+      ready9 && appMiss.length === 0 && oldMiss.length === 0, { appMiss, oldMiss });
+
     // ---- A11. Every address the whitepaper links into the site still answers --------------------
     const links = publishedLinks();
     const broken = [];
     for (const p of links) { const st = (await page.request.get(`${origin}/${p}`)).status(); if (st !== 200) broken.push(`${st} ${p}`); }
     check(`A11. every address the whitepaper, its 404 page and the README link into the site still answers — ${links.length - broken.length} of ${links.length}${broken.length ? '; broken: ' + broken.join(', ') : ''}`,
       links.length > 0 && broken.length === 0, { links, broken });
+
+    // ---- A12. Installed on an iPad: a PNG apple-touch-icon of 180 x 180 ------------------------------
+    // iOS ignores a manifest's SVG icon and takes the page's touch icon for the Home Screen; it wants a PNG.
+    const meta = await page.evaluate(() => {
+      const one = (sel, attr) => [...document.querySelectorAll(sel)].map((el) => el.getAttribute(attr));
+      return {
+        touch: [...document.querySelectorAll('link[rel="apple-touch-icon"]')].map((l) => ({ href: l.href, sizes: l.getAttribute('sizes') || '' })),
+        capable: one('meta[name="apple-mobile-web-app-capable"]', 'content'),
+        mobileCapable: one('meta[name="mobile-web-app-capable"]', 'content'),
+        status: one('meta[name="apple-mobile-web-app-status-bar-style"]', 'content'),
+        title: one('meta[name="apple-mobile-web-app-title"]', 'content'),
+        themes: [...document.querySelectorAll('meta[name="theme-color"]')].map((m) => ({ content: (m.getAttribute('content') || '').toLowerCase(), media: m.getAttribute('media') || '' })),
+      };
+    });
+    const touch = meta.touch[0] || null;
+    const touchRes = touch ? await page.request.get(touch.href) : null;
+    const touchPng = touchRes && touchRes.ok() ? pngSize(await touchRes.body()) : null;
+    const touchType = touchRes ? touchRes.headers()['content-type'] || '' : '';
+    const oldHtml = readFileSync(join(root, 'Demos', 'session-engine.html'), 'utf8');
+    check(`A12. an apple-touch-icon answers as a PNG of 180 × 180 — ${touch ? touch.href.slice(origin.length) : 'none linked'} (${touchType || 'no answer'}, ${touchPng ? touchPng.w + '×' + touchPng.h : 'not a PNG'}); the old address's page names one too`,
+      !!touch && /image\/png/.test(touchType) && !!touchPng && touchPng.w === 180 && touchPng.h === 180 && /rel="apple-touch-icon"/.test(oldHtml),
+      { touch, touchType, touchPng });
+
+    // ---- A13. The manifest's icons are PNGs, answer, and say their sizes (192, 512, a maskable 512) --
+    const mHref = `${origin}/app/manifest.webmanifest`;
+    const man = await page.request.get(mHref).then((r) => (r.ok() ? r.json() : null)).catch(() => null);
+    const icons = [];
+    for (const ic of (man && man.icons) || []) {
+      // A data: address is no file the server answers (the SVG icon this replaced was one).
+      const res = /^data:/.test(ic.src) ? null : await page.request.get(new URL(ic.src, mHref).href);
+      const png = res && res.ok() ? pngSize(await res.body()) : null;
+      icons.push({ src: ic.src.slice(0, 80), sizes: ic.sizes, type: ic.type, purpose: ic.purpose || 'any', status: res ? res.status() : 0, png });
+    }
+    const honest = icons.every((i) => i.type === 'image/png' && i.status === 200 && i.png && i.sizes === `${i.png.w}x${i.png.h}`);
+    const has = (size, purpose) => icons.some((i) => i.sizes === `${size}x${size}` && i.purpose.split(/\s+/).includes(purpose));
+    const oldMan = JSON.parse(readFileSync(join(root, 'Demos', 'manifest.webmanifest'), 'utf8'));
+    check(`A13. the manifest's icons are PNG and answer — ${icons.map((i) => i.sizes + ' ' + i.purpose).join(', ') || 'none'} — each as large as it says; the old address's manifest names PNGs too`,
+      icons.length >= 3 && honest && has(192, 'any') && has(512, 'any') && has(512, 'maskable') && (oldMan.icons || []).length >= 3 && oldMan.icons.every((i) => i.type === 'image/png' && !/^data:/.test(i.src)),
+      { icons, old: oldMan.icons });
+
+    // ---- A14. The iOS meta, and the theme colour from the tokens ---------------------------------------
+    const ground = groundTokens();
+    const themeSet = new Set(meta.themes.map((t) => t.content));
+    check(`A14. the page is a web app on iOS — capable, a status-bar style, a title (${(meta.title || [])[0] || 'none'}) — and its theme colour is the surface's own ground in each theme (${meta.themes.map((t) => t.content + (t.media ? ' ' + t.media : '')).join('; ')})`,
+      meta.capable[0] === 'yes' && meta.mobileCapable[0] === 'yes' && ['default', 'black', 'black-translucent'].includes(meta.status[0]) && !!(meta.title[0] || '').trim()
+        && !!ground.light && !!ground.dark && themeSet.has(ground.light) && themeSet.has(ground.dark) && man && [ground.light, ground.dark].includes(String(man.theme_color).toLowerCase()),
+      { meta, ground, theme_color: man && man.theme_color });
   } catch (err) {
     check('A. the app scenario ran to its end', false, String(err && err.stack ? err.stack : err));
     if (ctx.screenshot) await ctx.screenshot(page, 'app');

@@ -23,6 +23,7 @@ const NAMES = [
   'emptyTrashPlan', 'agoWords', 'sizeWords', 'countMarks', 'statsOf', 'statsAfter', 'kindWords', 'placeEntry',
   'placesPlan', 'boardRows', 'leaveVerdict', 'switchPlan', 'boardTitle', 'boardSearch',
   'EXAMPLES_BASE', 'exampleUrl', 'exampleRows', 'exampleName', 'starterOf',
+  'spaceWords', 'storageWords', 'persistPlan', 'PERSIST_KEY',
 ];
 const file = join(dirname(fileURLToPath(import.meta.url)), '17-boards.js');
 // Loaded as the browser loads it. While the fragment is not written, every
@@ -364,4 +365,56 @@ test('the starter is the index\'s own choice when it can be opened; else the fir
   assert.equal(B.starterOf({ examples: INDEX.examples.slice(1) }), 'molecule');
   assert.equal(B.starterOf({ starter: 'x', examples: [] }), null);
   assert.equal(B.starterOf(null), null);
+});
+
+// ----- Kept on the iPad (PLAN-IPAD-NOTES I3): the browser's room, said in words, and when to ask for it -----
+
+test('room in words: bytes as a person says them — KB, MB with a decimal only while small, GB', () => {
+  assert.equal(B.spaceWords(0), 'nothing');
+  assert.equal(B.spaceWords(600), 'under 1 KB');
+  assert.equal(B.spaceWords(300 * 1024), '300 KB');
+  assert.equal(B.spaceWords(12.4 * 1024 * 1024), '12 MB');
+  assert.equal(B.spaceWords(1.25 * 1024 * 1024), '1.3 MB');
+  assert.equal(B.spaceWords(40 * 1024 ** 3), '40 GB');
+  assert.equal(B.spaceWords(2.5 * 1024 ** 3), '2.5 GB');
+  // Nothing a browser might answer makes it throw.
+  for (const v of [undefined, null, NaN, -5, Infinity, '12']) assert.equal(typeof B.spaceWords(v), 'string');
+});
+
+test('the storage line: kept on this device with the room said, or may be cleared after a week with the way out said', () => {
+  const MB = 1024 * 1024, GB = 1024 ** 3;
+  // Persistent: the browser agreed to keep it.
+  assert.equal(B.storageWords({ usage: 12 * MB, quota: 40 * GB, persisted: true, installed: false }), 'kept on this device — 12 MB of about 40 GB');
+  // Not persistent, in a tab: Safari clears a site's storage after seven days unused.
+  const tab = B.storageWords({ usage: 12 * MB, quota: 40 * GB, persisted: false, installed: false });
+  assert.match(tab, /^this browser may clear it after a week unused — add to Home Screen/);
+  assert.match(tab, /12 MB of about 40 GB/);
+  // Installed to the Home Screen: that is the way out, so the warning goes, whatever persisted() says.
+  const app = B.storageWords({ usage: 12 * MB, quota: 40 * GB, persisted: false, installed: true });
+  assert.match(app, /^kept with the app on this device — 12 MB of about 40 GB/);
+  assert.doesNotMatch(app, /clear/);
+  // What a browser does not say is said, not guessed: no figures, no persisted().
+  assert.match(B.storageWords({ usage: undefined, quota: undefined, persisted: null, installed: false }), /does not say how much room/);
+  // A figure missing is left out; the sentence still stands.
+  assert.equal(B.storageWords({ usage: 12 * MB, quota: undefined, persisted: true, installed: false }), 'kept on this device — 12 MB');
+  // No ids, no jargon in what a person reads.
+  for (const w of [tab, app]) assert.doesNotMatch(w, /IndexedDB|quota|persist/i);
+});
+
+test('asking the browser to keep the device\'s storage: once, when a board holds something, never for a figure', () => {
+  const ok = { supported: true, asked: false, holds: true, mode: 'restore' };
+  assert.equal(B.persistPlan(ok).ask, true);
+  assert.equal(B.persistPlan(Object.assign({}, ok, { holds: false })).ask, false, 'an empty board has nothing to keep');
+  assert.equal(B.persistPlan(Object.assign({}, ok, { asked: true })).ask, false, 'once per device');
+  assert.equal(B.persistPlan(Object.assign({}, ok, { supported: false })).ask, false);
+  // ?fresh=1 is a test\'s page; a replay, an embed, a room, a folder are not the device\'s board (boardMode 'off').
+  assert.equal(B.persistPlan(Object.assign({}, ok, { mode: 'fresh' })).ask, false);
+  assert.equal(B.persistPlan(Object.assign({}, ok, { mode: 'off' })).ask, false);
+  // Each refusal says which, for a test and a log to read.
+  assert.equal(B.persistPlan(ok).why, 'ask');
+  assert.equal(B.persistPlan(Object.assign({}, ok, { asked: true })).why, 'already');
+  assert.equal(B.persistPlan(Object.assign({}, ok, { mode: 'off' })).why, 'not-the-devices');
+  assert.equal(B.persistPlan(Object.assign({}, ok, { holds: false })).why, 'empty');
+  assert.equal(B.persistPlan({}).ask, false, 'nothing known, nothing asked');
+  assert.equal(typeof B.PERSIST_KEY, 'string');
 });
