@@ -4,7 +4,8 @@
 //   as), safePictureName / uniquePicturePath (the name and path it gets), assetsOfEvents / assetGcPlan
 //   (which assets nothing uses any more), pictureCells / fitInCell / clearShift / pictureGrid / pickWords (where a pick is laid out and how the
 //   status line says it) and pictureTier / decodedCost / evictPlan (what the decoded pictures cost and
-//   which to let go).
+//   which to let go), and what a picture needs to travel in a room (PLAN-IPAD-NOTES A1: roomAssetHashes, roomAssetUrl,
+//   roomAssetRetryMs, roomAssetWords).
 // Uses: NOTHING. Like 17-board.js this fragment names no closure variable and touches no DOM, no storage
 //   and no session: bytes, sizes and clocks arrive as arguments, and what it decides leaves as values.
 //   18-images.js is the adapter — IndexedDB, workers, canvas, the status line. Because it stands alone it
@@ -236,4 +237,45 @@
       total -= e.cost;
     }
     return out;
+  }
+
+  // ----- pictures in a room (PLAN-IPAD-NOTES A1) -------------------------------------------------
+  // A room carries LOG LINES, and an `import` event names a picture's bytes by their hash and carries none. So a tab
+  // that publishes such an event puts the bytes on the room's relay first (`PUT /rooms/<room>/assets/<sha256>`), and a
+  // tab that merges one it holds no bytes for asks for them by that hash. What decides it is here; 17-folder.js (the
+  // relay transport, which does the asking) and 18-images.js (which draws the picture when it lands) are the adapters.
+
+  /** The most a room takes of one picture, in bytes — the relay's own limit (relay-protocol.mjs `MAX_ASSET_BYTES`). */
+  const ROOM_ASSET_MAX_BYTES = 12 * 1024 * 1024;
+  /** How long, in ms, before a picture the room did not hold is asked for again, each wait longer — then it is left. */
+  const ROOM_ASSET_RETRY_MS = [1500, 4000, 10000, 25000];
+
+  /** The pictures a line sent to a room names, as bare hashes (what the relay's address takes), each once. */
+  function roomAssetHashes(line) {
+    const out = [];
+    const events = line && Array.isArray(line.events) ? line.events : [];
+    for (const ev of events) {
+      if (!ev || ev.type !== 'import' || !isAssetRef(ev.asset)) continue;
+      const hex = ev.asset.slice('sha256:'.length);
+      if (out.indexOf(hex) < 0) out.push(hex);
+    }
+    return out;
+  }
+  /** Where a room keeps a picture: the relay, the room as text, the bare hash — from a `sha256:` reference or a hash; null for neither. */
+  function roomAssetUrl(relay, room, ref) {
+    const hex = typeof ref === 'string' ? ref.replace(/^sha256:/, '') : '';
+    if (!/^[0-9a-f]{64}$/.test(hex)) return null;
+    return String(relay).replace(/\/+$/, '') + '/rooms/' + encodeURIComponent(room) + '/assets/' + hex;
+  }
+  /** How long to wait before asking again for a picture the room did not hold, the `n`th time (from 0) — or null: it is left. */
+  function roomAssetRetryMs(n) {
+    return n >= 0 && n < ROOM_ASSET_RETRY_MS.length ? ROOM_ASSET_RETRY_MS[n] : null;
+  }
+  /** What the room's answer to a put is said as, to the person: the relay's own sentence where it sent one. */
+  function roomAssetWords(status, body) {
+    const said = String(body || '').trim();
+    const why = status === 0 ? 'the room could not be reached — the picture stays on this device'
+      : status === 401 || status === 403 ? 'the room does not take this key — the picture stays on this device'
+      : said || ('the room answered ' + status);
+    return 'a picture could not go to the room — ' + why;
   }

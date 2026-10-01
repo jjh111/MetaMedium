@@ -8837,7 +8837,8 @@
 //   as), safePictureName / uniquePicturePath (the name and path it gets), assetsOfEvents / assetGcPlan
 //   (which assets nothing uses any more), pictureCells / fitInCell / clearShift / pictureGrid / pickWords (where a pick is laid out and how the
 //   status line says it) and pictureTier / decodedCost / evictPlan (what the decoded pictures cost and
-//   which to let go).
+//   which to let go), and what a picture needs to travel in a room (PLAN-IPAD-NOTES A1: roomAssetHashes, roomAssetUrl,
+//   roomAssetRetryMs, roomAssetWords).
 // Uses: NOTHING. Like 17-board.js this fragment names no closure variable and touches no DOM, no storage
 //   and no session: bytes, sizes and clocks arrive as arguments, and what it decides leaves as values.
 //   18-images.js is the adapter — IndexedDB, workers, canvas, the status line. Because it stands alone it
@@ -9069,6 +9070,47 @@
       total -= e.cost;
     }
     return out;
+  }
+
+  // ----- pictures in a room (PLAN-IPAD-NOTES A1) -------------------------------------------------
+  // A room carries LOG LINES, and an `import` event names a picture's bytes by their hash and carries none. So a tab
+  // that publishes such an event puts the bytes on the room's relay first (`PUT /rooms/<room>/assets/<sha256>`), and a
+  // tab that merges one it holds no bytes for asks for them by that hash. What decides it is here; 17-folder.js (the
+  // relay transport, which does the asking) and 18-images.js (which draws the picture when it lands) are the adapters.
+
+  /** The most a room takes of one picture, in bytes — the relay's own limit (relay-protocol.mjs `MAX_ASSET_BYTES`). */
+  const ROOM_ASSET_MAX_BYTES = 12 * 1024 * 1024;
+  /** How long, in ms, before a picture the room did not hold is asked for again, each wait longer — then it is left. */
+  const ROOM_ASSET_RETRY_MS = [1500, 4000, 10000, 25000];
+
+  /** The pictures a line sent to a room names, as bare hashes (what the relay's address takes), each once. */
+  function roomAssetHashes(line) {
+    const out = [];
+    const events = line && Array.isArray(line.events) ? line.events : [];
+    for (const ev of events) {
+      if (!ev || ev.type !== 'import' || !isAssetRef(ev.asset)) continue;
+      const hex = ev.asset.slice('sha256:'.length);
+      if (out.indexOf(hex) < 0) out.push(hex);
+    }
+    return out;
+  }
+  /** Where a room keeps a picture: the relay, the room as text, the bare hash — from a `sha256:` reference or a hash; null for neither. */
+  function roomAssetUrl(relay, room, ref) {
+    const hex = typeof ref === 'string' ? ref.replace(/^sha256:/, '') : '';
+    if (!/^[0-9a-f]{64}$/.test(hex)) return null;
+    return String(relay).replace(/\/+$/, '') + '/rooms/' + encodeURIComponent(room) + '/assets/' + hex;
+  }
+  /** How long to wait before asking again for a picture the room did not hold, the `n`th time (from 0) — or null: it is left. */
+  function roomAssetRetryMs(n) {
+    return n >= 0 && n < ROOM_ASSET_RETRY_MS.length ? ROOM_ASSET_RETRY_MS[n] : null;
+  }
+  /** What the room's answer to a put is said as, to the person: the relay's own sentence where it sent one. */
+  function roomAssetWords(status, body) {
+    const said = String(body || '').trim();
+    const why = status === 0 ? 'the room could not be reached — the picture stays on this device'
+      : status === 401 || status === 403 ? 'the room does not take this key — the picture stays on this device'
+      : said || ('the room answered ' + status);
+    return 'a picture could not go to the room — ' + why;
   }
 
 // ===== board (the journal) =====
@@ -9919,6 +9961,8 @@
       close: () => ch.close(),
     };
   }
+  /** How long a line waits for the pictures it names to reach the room — under core's own wait on a send. */
+  const ROOM_ASSET_WAIT_MS = 8000;
   function relayTransport(url, room, key) {
     // A relay that asks for a key (cloudflare/relay) takes it as `?key=`: an EventSource cannot set a
     // header. The key is the page's own — from the address or a typed field — and goes nowhere but
@@ -9953,14 +9997,74 @@
       es.addEventListener('message', onLine);
       es.addEventListener('error', () => { if (es.readyState === 2 && !closed) refusedOr(); });
     };
+    // ----- pictures in the room (PLAN-IPAD-NOTES A1; the rules are 17-assets.js's) -----
+    // A header, not `?key=`: a fetch can send one, and an address is kept by logs and caches.
+    const assetAuth = key ? { authorization: 'Bearer ' + key } : {};
+    const held = new Set();     // pictures the room is known to hold
+    const owed = new Set();     // pictures this tab kept that the room could not be given yet: tried again with the next line
+    const said = new Set();     // pictures whose trouble was already said
+    const sayOnce = (ref, words) => { if (said.has(ref)) return; said.add(ref); say(words); };
+    /** Put one picture this tab kept on the relay: once (a HEAD first), never more than the room takes. */
+    async function putAsset(ref) {
+      if (held.has(ref)) return true;
+      const rec = await assetGet(ref).catch(() => null);
+      if (!rec) return false;   // not kept here: another hand's, whose writer put it
+      const at = roomAssetUrl(url, room, ref);
+      try {
+        const head = await fetch(at, { method: 'HEAD', headers: assetAuth, cache: 'no-store' });
+        if (head.status === 200) { held.add(ref); owed.delete(ref); return true; }
+        const bytes = rec.bytes instanceof Uint8Array ? rec.bytes : new Uint8Array(rec.bytes);
+        if (bytes.length > ROOM_ASSET_MAX_BYTES) { sayOnce(ref, 'a picture could not go to the room — it is larger than the 12 MB a room takes'); return false; }
+        const res = await fetch(at, { method: 'PUT', headers: Object.assign({ 'content-type': rec.mime || 'application/octet-stream' }, assetAuth), body: bytes });
+        if (res.status === 204) { held.add(ref); owed.delete(ref); return true; }
+        // A refusal that will not change (too large, no key, not a picture) is said and let go; a relay in trouble is tried again.
+        if (res.status >= 500) owed.add(ref); else owed.delete(ref);
+        sayOnce(ref, roomAssetWords(res.status, await res.text()));
+        return false;
+      } catch (err) { owed.add(ref); sayOnce(ref, roomAssetWords(0, '')); return false; }
+    }
+    /** Several pictures, three at a time. */
+    async function putAssets(refs) {
+      let i = 0;
+      const lane = async () => { while (i < refs.length) await putAsset(refs[i++]); };
+      await Promise.all([lane(), lane(), lane()]);
+    }
+    /** A picture the room holds, asked for by its hash: verified against it (the relay is not trusted with what a hash names), kept in this browser's asset store, and returned as the store holds it — or null. */
+    async function getAsset(ref, dims) {
+      const at = roomAssetUrl(url, room, ref);
+      if (!at) return null;
+      try {
+        const res = await fetch(at, { headers: assetAuth });
+        if (res.status !== 200) return null;
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        if (assetRef(await digestHex(bytes)) !== ref) return null;
+        const mime = (res.headers.get('content-type') || '').split(';')[0] || 'image/jpeg';
+        await assetPut({ hash: ref, bytes: bytes, mime: mime, w: dims && dims.w, h: dims && dims.h });
+        assets.pending.delete(ref);   // stored under an event already in the log: never "in flight"
+        held.add(ref);
+        return await assetGet(ref);
+      } catch (err) { return null; }
+    }
     open();
     return {
       // The POST's promise goes back to the store, which sends the next line
       // only when this one has gone — two POSTs in flight can land the wrong
       // way round.
-      send: (line) => fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(line) }).then(() => undefined, () => undefined),
+      send: (line) => {
+        // A picture's bytes go first (PLAN-IPAD-NOTES A1): a line that names a picture this tab kept goes only once the
+        // room holds the bytes — or after ROOM_ASSET_WAIT_MS, so a slow link never wedges the room (a hand that
+        // merges the event before the bytes asks again, `roomAssetRetryMs`). A line handed on for another hand (`via`)
+        // names what its writer put; one with no pictures waits for nothing.
+        const refs = line && !line.via ? roomAssetHashes(line).map((h) => 'sha256:' + h) : [];
+        for (const r of owed) if (refs.indexOf(r) < 0) refs.push(r);
+        const todo = refs.filter((r) => !held.has(r));
+        const ready = todo.length ? Promise.race([putAssets(todo), new Promise((ok) => setTimeout(ok, ROOM_ASSET_WAIT_MS))]) : Promise.resolve();
+        return ready.catch(() => undefined).then(() => fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(line) })).then(() => undefined, () => undefined);
+      },
       onMessage: (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
       close: () => { closed = true; clearTimeout(retry); if (es) es.close(); },
+      // The room's pictures: `get` is what 18-images.js asks for a picture this browser holds no bytes for.
+      assets: { get: getAsset },
     };
   }
   // The merge runs on a microtask, not a timer: a hidden tab throttles timers
@@ -10004,6 +10108,8 @@
     const store = new MM.LiveStore(transport, me, room, { sitting: PAGE_SITTING });
     // Which relay carries the room: the seat parks its questions only through one on this machine (V1-PLAN J4).
     folder.relay = opts.relay || '';
+    // The room's pictures, when its relay keeps them (PLAN-IPAD-NOTES A1): between tabs on one machine the asset store is shared already.
+    folder.roomAssets = (transport && transport.assets) || null;
     // What this hand already drew is its opening log in the room — sent whole,
     // as a store's first send always is, so joining the same room again in
     // this sitting replaces what the room holds of it instead of doubling it.
@@ -10027,6 +10133,18 @@
   /** A name for this hand in a room: the person's name (a preference), and this page load's suffix. */
   function handName() {
     return MM.sittingName(prefs.get('hand-name', '') || 'hand', PAGE_SUFFIX);
+  }
+  /**
+   * A picture this browser holds no bytes for, asked of the room's relay by its hash (PLAN-IPAD-NOTES A1): an
+   * `import` another hand wrote names the bytes and carries none. Null when there is no room that keeps pictures
+   * or it does not hold them (yet); 18-images.js draws a plate and asks again later (`roomAssetRetryMs`).
+   */
+  async function roomAssetFetch(ref) {
+    const ra = folder.roomAssets;
+    if (!ra || folder.how !== 'live') return null;
+    let dims = {};
+    for (const ev of session.getEvents()) if (ev && ev.type === 'import' && ev.asset === ref) { dims = { w: ev.w, h: ev.h }; break; }
+    return ra.get(ref, dims);
   }
   /** A hand's name as shown: the person's, without the sitting's suffix (core's one rule). */
   function handLabel(name) { return MM.handLabel(name); }
@@ -10088,6 +10206,7 @@
     // browser keeps stays as it was (where the hand left it too), and is not written again from this page.
     leaveBoard();
     folder.store = store; folder.how = how || 'store'; folder.name = name || ''; folder.error = ''; folder.saveTrouble = null;
+    if (folder.how !== 'live') folder.roomAssets = null;
     // A room's merge stands for that room only; `openLive` makes the next one.
     folder.merge = null;
     // A folder is written under the device's own stable name, whatever a live
@@ -11823,7 +11942,8 @@
 
   /** One decode: the asset's bytes into a bitmap at a tier — a thumbnail's long side, or whole. */
   async function decodeAsset(asset, tier) {
-    const rec = await assetGet(asset);
+    // Bytes this browser holds not at all — a picture another hand imported in a room — are asked of the room (17-folder.js).
+    const rec = (await assetGet(asset)) || (await roomAssetFetch(asset));
     if (!rec) return null;
     const blob = new Blob([rec.bytes], { type: rec.mime || 'image/jpeg' });
     if (tier === 'thumb' && rec.w && rec.h) {
@@ -11854,7 +11974,7 @@
         picturesLoading--;
         const cur = pictures.get(asset);
         if (!cur) { if (got) got.bmp.close(); return; }
-        if (!got) { cur.state = 'missing'; viewChanged(); return; }
+        if (!got) { cur.state = 'missing'; askAgainLater(asset); viewChanged(); return; }
         if (cur.bmp) cur.bmp.close();
         cur.bmp = got.bmp; cur.tier = got.tier; cur.size = got.size; cur.state = 'ready';
         cur.cost = decodedCost(got.size, got.tier);
@@ -11862,6 +11982,16 @@
       }, () => { picturesLoading--; const cur = pictures.get(asset); if (cur) { cur.state = cur.bmp ? 'ready' : 'missing'; cur.want = null; } });
     }
     return e.bmp ? { bmp: e.bmp, tier: e.tier } : null;
+  }
+  // A picture the room did not hold yet (a hand's line can beat its bytes, or the relay was busy) is asked for again,
+  // a few times, later each time (17-assets.js `roomAssetRetryMs`) — only in a room, and only while it stays missing.
+  const askedAgain = new Map();
+  function askAgainLater(asset) {
+    if (!folder.roomAssets) return;
+    const n = askedAgain.get(asset) || 0, ms = roomAssetRetryMs(n);
+    if (ms === null) return;
+    askedAgain.set(asset, n + 1);
+    setTimeout(() => { const e = pictures.get(asset); if (e && e.state === 'missing') { pictures.delete(asset); viewChanged(); } }, ms);
   }
   /** What the paint just made has cost: let go of what the budget cannot hold and what has not been drawn for a while. */
   function picturesPainted() {
