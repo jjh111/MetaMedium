@@ -650,7 +650,7 @@ export async function logFormatTest(browser, servers, ctx) {
     // ---- N19d. a version this build does not know is refused, in a sentence ---------------
     const future = JSON.stringify({ type: 'format', format: 'metamedium-log', version: 2, app: '9.9.9' }) + '\n' + lines.slice(1).join('\n') + '\n';
     await openBoardsPane(page);
-    const boards19 = (await boardsNow(page)).list.map((e) => e.id);
+    const boards19 = (await boardsNow(page)).list.filter((e) => e.kind === 'board').map((e) => e.id);
     await page.setInputFiles('#boardsFile', { name: 'future.jsonl', mimeType: 'application/json', buffer: Buffer.from(future, 'utf8') });
     await page.waitForFunction(() => /version 2/.test((document.getElementById('boardsStatus') || {}).textContent || ''), null, { timeout: 10000 }).catch(() => {});
     const refused = await page.evaluate(() => ({
