@@ -364,30 +364,44 @@ describe('generate — revise', () => {
 });
 
 describe('an agent never claims what the canvas refused', () => {
+  // These two used to undo the agent's join and ask: the ask was refused at the door, *not in this
+  // session*. Since the I7 finding an ask seats the agent first (participants/seated.ts), so an agent
+  // whose join is gone is joined again and the ask succeeds — what is still the door's to say is what
+  // a participant the board does not hold may do, which is asked here at the door itself.
   it('reports failure when the session rejects the code', async () => {
     const { s, id } = board();
-    stubOpenAI(fillReply({ r1: { html: 'x' } }));
     const agent = createAgentParticipant(s, config, 3100);
     s.undo(); // drops the join event, un-registering the agent
 
-    const r = await agent.generate({ prompt: 'a page', artifactId: id, at: 3200 });
-    expect(r.ok).toBe(false);
+    const accepted = s.attachCode({ participantId: agent.id, nodeId: id, code: '<p>x</p>', kind: 'page', prompt: 'a page', at: 3200 } as never);
+    expect(accepted).toBeFalsy();
     // The refusal says which refusal it was (STATE-1): a generic "did not
     // accept" is the silent drop with a sentence in front of it.
-    expect(r.error).toMatch(/not in this session/);
+    expect(s.getState().staleResult?.detail).toMatch(/not in this session/);
     expect(s.getState().live).toEqual([]);
   });
 
   it('reports failure when the session rejects the answer', async () => {
+    const { s, id } = board();
+    const agent = createAgentParticipant(s, config, 3100);
+    s.undo();
+
+    const answered = s.answer({ participantId: agent.id, question: 'why?', text: 'Because the three boxes share a frame.', aboutIds: [id], at: 3200 });
+    expect(answered).toBeNull();
+    expect(s.getState().staleResult?.detail).toMatch(/not in this session/);
+    expect(s.getState().explanations).toEqual([]);
+  });
+
+  it('an agent whose join was undone is seated again by its next ask, and the ask answers', async () => {
     const { s, id } = board();
     stubOpenAI('Because the three boxes share a frame.');
     const agent = createAgentParticipant(s, config, 3100);
     s.undo();
 
     const r = await agent.ask('why?', [id], 3200);
-    expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/not in this session/);
-    expect(s.getState().explanations).toEqual([]);
+    expect(r.ok).toBe(true);
+    expect(s.getState().participants).toContain(agent.id);
+    expect(s.getState().explanations).toHaveLength(1);
   });
 });
 

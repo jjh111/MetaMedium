@@ -498,6 +498,8 @@ export function createSeatParticipant(session: Session, at: number = 0, options:
 
   return {
     ...agent,
+    // The spread copies a value; the agent's id moves when a board is loaded in place and it is seated again.
+    get id() { return agent.id; },
     interpret: (nodeIds, t, signal) => via({ ask: 'what', about: alive(nodeIds) }, () => agent.interpret(nodeIds, t, signal)),
     ask: (question, nodeIds, t, signal) => via({ ask: 'ask', about: alive(nodeIds), words: question }, () => agent.ask(question, nodeIds, t, signal)),
     // A line read as one image names every mark in the picture (`about`); one mark names itself.

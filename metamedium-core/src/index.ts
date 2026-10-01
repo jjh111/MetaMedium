@@ -821,6 +821,8 @@ export type { BenchDrawing, BenchCorpus, BenchMiss, BenchRead, PackBenchOptions,
 export { HERE, createAgentParticipant, parseReadings, parseCode, parseFill, parseTranscripts, parseBehaviourReply, parseProgram, readingsToEdges, MAX_READINGS } from './participants/agent';
 export type { BehaveResult, ProgramResult } from './participants/agent';
 export type { AgentParticipant, AgentReading, InterpretResult, AskResult, GenerateResult, ReadResult, TranscriptReading, DrawResult, RegionFill } from './participants/agent';
+export { seatOn, heldParticipant } from './participants/seated';
+export type { Seating } from './participants/seated';
 export { describeSession, describeSignature, describeRegions, describeAddressed, describeReading } from './participants/serialize';
 export type { ReadingLike, DescribeReadingOptions } from './participants/serialize';
 export type { Transport, AgentOptions } from './participants/agent';

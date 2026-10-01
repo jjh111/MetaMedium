@@ -18,6 +18,7 @@ import { describeSession, describeSignature, describeReading } from './serialize
 import { frameOf, regionsOf } from '../session/regions';
 import { planFor } from '../parse/plan';
 import { getRep } from '../session/nodes';
+import { seatOn, type Seating } from './seated';
 import { validateRegions, type RegionContent, type Theme } from '../parse/scaffold';
 import { type DrawnShape, parseShapes, strokeFor, MAX_DRAWN } from '../session/synthesize';
 import type { Behaviour, Term, Verb } from '../behave/verbs';
@@ -526,8 +527,19 @@ export function readingsToEdges(readings: AgentReading[], targetIsCluster: boole
 }
 
 export interface AgentParticipant {
-  /** The participant node id — use it to attribute anything this agent does. */
-  id: string;
+  /**
+   * The participant node id on the board as it stands — use it to attribute anything this agent does.
+   * It is the id the agent last joined or was found under: a board loaded in place takes the join
+   * with it, so it names the agent only once `seat()` — which every ask below does first — has run.
+   * A key for the agent itself is the caller's own (an id is a board's counter, reused by the next board).
+   */
+  readonly id: string;
+  /**
+   * Seat the agent on the board as it stands and return its participant id: the join this board already
+   * holds for it, else one new `join` — the one event, lazily, written by the first ask and never by
+   * loading a board. Idempotent. Never asks a model anything.
+   */
+  seat(at?: number): string;
   /** Display name, e.g. `llm:qwen3`. */
   name: string;
   config: ProviderConfig;
@@ -761,7 +773,11 @@ export function createAgentParticipant(
   const name = options.name ?? providerLabel(config);
   // Join at the provider's tier (2: a model) with its locality, so surfaces
   // can group readings by voice and the router can ask the cheaper first.
-  const id = session.join('agent', name, at, options.tier ?? providerTier(config), options.locality ?? providerLocality(config));
+  const seating: Seating = { kind: 'agent', name, capability: options.tier ?? providerTier(config), locality: options.locality ?? providerLocality(config) };
+  let id = session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
+  // A board loaded in place takes this join with it (`participants/seated.ts`): every ask seats the agent
+  // on the board it is asked on first — found there if the board holds its join, joined once if not.
+  const seat = (now: number = at): string => (id = seatOn(session, seating, id, now));
 
   // A model thinks for a long time — a cold local one for minutes — and the
   // human keeps drawing. Every result therefore says which board it was asked
@@ -772,6 +788,7 @@ export function createAgentParticipant(
   const staleWhy = (fallback: string) => session.getState().staleResult?.detail ?? fallback;
 
   async function interpret(nodeIds: string[], now: number, signal?: AbortSignal): Promise<InterpretResult> {
+    seat(now);
     const state = session.getState();
     const generation = state.generation;
     const targets = nodeIds.filter((n) => state.nodes.has(n));
@@ -819,6 +836,7 @@ export function createAgentParticipant(
   }
 
   async function ask(question: string, nodeIds: string[], now: number, signal?: AbortSignal): Promise<AskResult> {
+    seat(now);
     const q = question.trim();
     if (!q) return { ok: false, error: 'no question' };
 
@@ -864,6 +882,7 @@ export function createAgentParticipant(
     addressed?: string[];
     signal?: AbortSignal;
   }): Promise<GenerateResult> {
+    seat(args.at);
     const prompt = args.prompt.trim();
     if (!prompt) return { ok: false, error: 'no prompt' };
 
@@ -1006,6 +1025,7 @@ export function createAgentParticipant(
   }
 
   async function read(args: { nodeId: string; image: string; at: number; signal?: AbortSignal; hold?: boolean }): Promise<ReadResult> {
+    seat(args.at);
     if (!config.vision) return { ok: false, transcripts: [], error: `${name} cannot see images` };
     const state = session.getState();
     const generation = state.generation;
@@ -1044,6 +1064,7 @@ export function createAgentParticipant(
   }
 
   async function draw(args: { prompt: string; nodeIds?: string[]; at: number; signal?: AbortSignal }): Promise<DrawResult> {
+    seat(args.at);
     const prompt = args.prompt.trim();
     if (!prompt) return { ok: false, ids: [], shapes: [], error: 'no prompt' };
     const state = session.getState();
@@ -1095,6 +1116,7 @@ export function createAgentParticipant(
   }
 
   async function program(args: { prompt: string; artifactId: string; library?: { id: string; name: string }[]; at: number; signal?: AbortSignal }): Promise<ProgramResult> {
+    seat(args.at);
     const prompt = args.prompt.trim();
     if (!prompt) return { ok: false, error: 'no prompt' };
     const state = session.getState();
@@ -1125,6 +1147,7 @@ export function createAgentParticipant(
   }
 
   async function behave(args: { nodeId: string; words: string; at: number; signal?: AbortSignal }): Promise<BehaveResult> {
+    seat(args.at);
     const words = args.words.trim();
     if (!words) return { ok: false, behaviour: null, via: 'none', unread: [], error: 'no words' };
     const state = session.getState();
@@ -1162,5 +1185,5 @@ export function createAgentParticipant(
     return { ok: true, behaviour, via: 'model', unread: reply.unread, raw: result.text };
   }
 
-  return { id, name, config, interpret, ask, generate, read, draw, behave, program };
+  return { get id() { return id; }, seat, name, config, interpret, ask, generate, read, draw, behave, program };
 }

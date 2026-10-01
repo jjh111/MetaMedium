@@ -40,6 +40,19 @@
 
   const DEFAULT_MODEL = { openRouter: 'anthropic/claude-opus-5', anthropic: 'claude-opus-5', custom: '' };
   const agents = [];       // AgentParticipant[] — several models can coexist
+  const agentKeys = new WeakMap(); // agent → what this page knows it by
+  let agentsMade = 0;
+  /**
+   * What a joined model is known by on this page — its own, and never its participant id. An id is the
+   * board's counter, and a board loaded in place hands the same one to whoever joins there next: a model
+   * is seated again on every board it is asked on (core's `seat`, `participants/seated.ts`), so its
+   * participant id moves while the model stays. Every map below is keyed by this.
+   */
+  function agentKey(a) {
+    let k = agentKeys.get(a);
+    if (!k) { k = 'model:' + (++agentsMade); agentKeys.set(a, k); }
+    return k;
+  }
   let localServers = [];   // [{ source, host, baseUrl, models, skipped }]
 
   const store = {
@@ -129,7 +142,7 @@
   function recording(holder) {
     return (config, messages, opts) => {
       const t0 = performance.now();
-      if (holder.agent) { asking.set(holder.agent.id, (asking.get(holder.agent.id) || 0) + 1); renderAgents(); }
+      if (holder.agent) { asking.set(agentKey(holder.agent), (asking.get(agentKey(holder.agent)) || 0) + 1); renderAgents(); }
       return MM.complete(config, messages, opts).then((res) => {
         if (holder.agent) noteCall(holder.agent, res, performance.now() - t0);
         return res;
@@ -137,25 +150,25 @@
     };
   }
   function sendFor(agent) {
-    if (!sendOf.has(agent.id)) sendOf.set(agent.id, recording({ agent: agent }));
-    return sendOf.get(agent.id);
+    if (!sendOf.has(agentKey(agent))) sendOf.set(agentKey(agent), recording({ agent: agent }));
+    return sendOf.get(agentKey(agent));
   }
   /** A call ended: kept for the row, whatever it came to — except a cancel, which is no outcome. */
   function noteCall(agent, res, ms) {
-    asking.set(agent.id, Math.max(0, (asking.get(agent.id) || 1) - 1));
+    asking.set(agentKey(agent), Math.max(0, (asking.get(agentKey(agent)) || 1) - 1));
     if (!(res && !res.ok && res.error === 'cancelled')) {
-      lastCall.set(agent.id, { ok: !!res.ok, ms: ms, at: Date.now(), reply: res.ok ? res.text : null, error: res.ok ? null : res.error, truncated: !!(res.ok && res.truncated), what: null });
+      lastCall.set(agentKey(agent), { ok: !!res.ok, ms: ms, at: Date.now(), reply: res.ok ? res.text : null, error: res.ok ? null : res.error, truncated: !!(res.ok && res.truncated), what: null });
     }
     renderAgents();
   }
   /** What the call came to in the canvas's terms — read “hello”, reads it as molecule — or why its answer was no use. */
   function noteOutcome(agent, ok, what) {
     if (!agent || (!ok && what === 'cancelled')) return;
-    const c = lastCall.get(agent.id) || { ok: ok, ms: null, at: Date.now(), reply: null, error: null, truncated: false, what: null };
+    const c = lastCall.get(agentKey(agent)) || { ok: ok, ms: null, at: Date.now(), reply: null, error: null, truncated: false, what: null };
     const next = Object.assign({}, c);
     if (ok) { next.ok = true; next.what = what; }
     else if (c.ok !== false) { next.ok = false; next.error = what + (c.truncated ? ' — the answer was cut off at the token limit' : ''); next.what = null; }
-    lastCall.set(agent.id, next);
+    lastCall.set(agentKey(agent), next);
     renderAgents();
   }
   /** A row's last call, in a line: "ok · 1.8 s · read “hello”", or "failed · 0.4 s · HTTP 401 — bad key: …". */
@@ -366,12 +379,12 @@
     const send = recording(holder);
     const agent = made || MM.createAgentParticipant(session, config, Date.now(), { transport: send });
     holder.agent = agent;
-    if (!made) sendOf.set(agent.id, send);
-    if (facts) factsOf.set(agent.id, facts);
+    if (!made) sendOf.set(agentKey(agent), send);
+    if (facts) factsOf.set(agentKey(agent), facts);
     agents.push(agent);
     // The seat it takes (I7) and what is kept of it: what the provider said (whether it sees, what it is called) — never the key,
     // which is the provider's, entered once (04-seatpane.js).
-    if (pick) { metaOfAgent.set(agent.id, pick); assignSeat(pick.seat || 'any', agent); }
+    if (pick) { metaOfAgent.set(agentKey(agent), pick); assignSeat(pick.seat || 'any', agent); }
     mpStatus.textContent = modelWords(agent) + ' joined' + (pick && pick.seat && pick.seat !== 'any' ? ' as the ' + pick.seat : '') + ' (' + MM.providerLocality(config) + (config.vision ? ', sees' : '') + ').';
     renderAgents();
     renderLocal();
@@ -418,7 +431,7 @@
     const f = MM.modelFacts(agent.config.model, catalog, where);
     if (!f.ok) { noteOutcome(agent, false, f.error); mpStatus.textContent = f.error; return; }
     applyFacts(agent.config, f.facts);
-    factsOf.set(agent.id, f.facts);
+    factsOf.set(agentKey(agent), f.facts);
     rememberFacts(agent.config);
     renderAgents();
     syncTiles();
@@ -428,7 +441,7 @@
   function leave(agent) {
     const i = agents.indexOf(agent);
     if (i >= 0) agents.splice(i, 1);
-    factsOf.delete(agent.id); lastCall.delete(agent.id); asking.delete(agent.id); sendOf.delete(agent.id);
+    factsOf.delete(agentKey(agent)); lastCall.delete(agentKey(agent)); asking.delete(agentKey(agent)); sendOf.delete(agentKey(agent));
     // The session keeps the join in its history; it simply stops being asked. Its seats are let go, and a key no joined model
     // on its provider still uses is forgotten, as it was.
     forgetSeats(agent);
@@ -455,11 +468,11 @@
   // what its provider said, or why that is a guess — its last call, kept until the next, and *try it*.
   function renderAgents() {
     mpList.innerHTML = agents.map((a, i) => {
-      const f = factsOf.get(a.id);
+      const f = factsOf.get(agentKey(a));
       const tags = [a.config.kind === 'mcp' ? 'mcp' : MM.providerLocality(a.config)];
       if (isModel(a)) tags.push(a.config.vision ? 'sees' : 'text only');
       if (a.config.contextLength) tags.push(tokensShort(a.config.contextLength));
-      const c = lastCall.get(a.id), busy = (asking.get(a.id) || 0) > 0;
+      const c = lastCall.get(agentKey(a)), busy = (asking.get(agentKey(a)) || 0) > 0;
       const line = busy ? 'asking now' + (c ? ' · last: ' + callLine(c) : '') : callLine(c);
       return '<div class="mpItem">' +
         '<div class="mpItemHead"><span class="n" title="' + esc(a.name) + '">' + esc(modelWords(a)) + '</span>' +
@@ -537,7 +550,10 @@
   // that — the field keeps working through the others.
   function mcpAgent(endpoint, serverName, roles) {
     const name = 'mcp:' + serverName;
-    const id = session.join('agent', name, Date.now(), 2, MM.providerLocality({ baseUrl: endpoint }));
+    // Seated like every model (core's `seat`): a board loaded in place takes the join with it, and an ask joins it again there.
+    const seating = { kind: 'agent', name: name, capability: 2, locality: MM.providerLocality({ baseUrl: endpoint }) };
+    let id = session.join(seating.kind, seating.name, Date.now(), seating.capability, seating.locality);
+    const seat = (at) => (id = MM.seatOn(session, seating, id, at));
     const briefFor = (ids) => MM.describeSession(session.getState(), { nodeIds: ids });
     const call = async (tool, args) => {
       const res = await fetch(endpoint + '/call', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: tool, arguments: args }) });
@@ -554,8 +570,9 @@
     };
     const slug = (s) => String(s).toLowerCase().replace(/\s+/g, '-');
     return {
-      id: id, name: name, config: { kind: 'mcp', baseUrl: endpoint, model: serverName },
+      get id() { return id; }, seat: seat, name: name, config: { kind: 'mcp', baseUrl: endpoint, model: serverName },
       async interpret(ids, at) {
+        seat(at);
         if (!roles.read) return { ok: false, readings: [], error: 'no read tool mapped' };
         try {
           const out = await call(roles.read, { brief: briefFor(ids), ids: ids });
@@ -569,6 +586,7 @@
         } catch (err) { return { ok: false, readings: [], error: err.message }; }
       },
       async ask(question, ids, at) {
+        seat(at);
         if (!roles.answer) return { ok: false, error: 'no answer tool mapped' };
         try {
           const out = await call(roles.answer, { question: question, ids: ids, brief: briefFor(ids) });
@@ -578,6 +596,7 @@
       },
       async generate() { return { ok: false, error: 'an MCP participant reads, answers and draws; it does not write pages (yet)' }; },
       async read(args) {
+        seat(args.at);
         if (!roles.read) return { ok: false, transcripts: [], error: 'no read tool mapped' };
         try {
           const out = await call(roles.read, { image: args.image, nodeId: args.nodeId, brief: 'Read the handwriting in this ink.' });
@@ -587,6 +606,7 @@
         } catch (err) { return { ok: false, transcripts: [], error: err.message }; }
       },
       async draw({ prompt, nodeIds, at }) {
+        seat(at);
         if (!roles.draw) return { ok: false, ids: [], shapes: [], error: 'no draw tool mapped' };
         try {
           const out = await call(roles.draw, { prompt: prompt, ids: nodeIds });
@@ -761,7 +781,7 @@
     reading = ctl;
     let left = asked.length;
     asked.forEach((agent) => {
-      withWork('read:' + agent.id + ':' + ids.join('+'), ids, modelWords(agent) + ' · reading the group', agent.interpret(ids, Date.now(), ctl.signal)).then((res) => {
+      withWork('read:' + agentKey(agent) + ':' + ids.join('+'), ids, modelWords(agent) + ' · reading the group', agent.interpret(ids, Date.now(), ctl.signal)).then((res) => {
         if (ctl.signal.aborted) return;
         if (--left === 0 && reading === ctl) reading = null;
         // The row keeps what it came to; the status line says it once — a reading in words, a failure in full (J5).

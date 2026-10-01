@@ -2624,7 +2624,16 @@ reader or decider seat is not asked a brief. `resolveReaders` (`readers()` in
 `06-handwriting.js`): the reader seat, else Claude Code while it is seated, else the
 writer if it sees, else the smallest model that sees — and the fallback is said in
 the row (`fallbackWords`). The decider is not in `agents[]` at all (it has its own
-participant, made again on a board loaded in place, `makeDeciderSeat`). **What is
+participant). **A model stays joined across boards** (the I7 finding, 1 Oct 2026;
+`participants/seated.ts`, e2e M20–M23): a board loaded in place — a switch through the
+boards pane, *from a file…*, an example, Reset — takes every `join` with it, because
+joins are events in the old board's log, so every seat's model (the agent, the decider,
+the MCP door's, Claude Code) is **seated on the board it is asked on, lazily and once**:
+`agent.seat(at)`, which every ask calls first, finds the join the board already holds
+(by kind, name and tier — never by an id alone, which is the board's counter) or writes
+one `join`, so a board only looked at is never written and a board reopened that holds
+its join gets no second. A participant's id therefore moves, and the surface keys every
+map by `agentKey` (04-models.js), never by `agent.id`. **What is
 kept, `mm-seats`, is a pick a seat** (`{ reader, writer, decider, any }`: where, which,
 what the provider said — `pickOf`, never a key); `any` is the one model last joined
 with no seat, as the single pick always was. An older device's `mm-model-pick` and

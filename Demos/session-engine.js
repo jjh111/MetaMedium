@@ -1178,6 +1178,19 @@
 
   const DEFAULT_MODEL = { openRouter: 'anthropic/claude-opus-5', anthropic: 'claude-opus-5', custom: '' };
   const agents = [];       // AgentParticipant[] — several models can coexist
+  const agentKeys = new WeakMap(); // agent → what this page knows it by
+  let agentsMade = 0;
+  /**
+   * What a joined model is known by on this page — its own, and never its participant id. An id is the
+   * board's counter, and a board loaded in place hands the same one to whoever joins there next: a model
+   * is seated again on every board it is asked on (core's `seat`, `participants/seated.ts`), so its
+   * participant id moves while the model stays. Every map below is keyed by this.
+   */
+  function agentKey(a) {
+    let k = agentKeys.get(a);
+    if (!k) { k = 'model:' + (++agentsMade); agentKeys.set(a, k); }
+    return k;
+  }
   let localServers = [];   // [{ source, host, baseUrl, models, skipped }]
 
   const store = {
@@ -1267,7 +1280,7 @@
   function recording(holder) {
     return (config, messages, opts) => {
       const t0 = performance.now();
-      if (holder.agent) { asking.set(holder.agent.id, (asking.get(holder.agent.id) || 0) + 1); renderAgents(); }
+      if (holder.agent) { asking.set(agentKey(holder.agent), (asking.get(agentKey(holder.agent)) || 0) + 1); renderAgents(); }
       return MM.complete(config, messages, opts).then((res) => {
         if (holder.agent) noteCall(holder.agent, res, performance.now() - t0);
         return res;
@@ -1275,25 +1288,25 @@
     };
   }
   function sendFor(agent) {
-    if (!sendOf.has(agent.id)) sendOf.set(agent.id, recording({ agent: agent }));
-    return sendOf.get(agent.id);
+    if (!sendOf.has(agentKey(agent))) sendOf.set(agentKey(agent), recording({ agent: agent }));
+    return sendOf.get(agentKey(agent));
   }
   /** A call ended: kept for the row, whatever it came to — except a cancel, which is no outcome. */
   function noteCall(agent, res, ms) {
-    asking.set(agent.id, Math.max(0, (asking.get(agent.id) || 1) - 1));
+    asking.set(agentKey(agent), Math.max(0, (asking.get(agentKey(agent)) || 1) - 1));
     if (!(res && !res.ok && res.error === 'cancelled')) {
-      lastCall.set(agent.id, { ok: !!res.ok, ms: ms, at: Date.now(), reply: res.ok ? res.text : null, error: res.ok ? null : res.error, truncated: !!(res.ok && res.truncated), what: null });
+      lastCall.set(agentKey(agent), { ok: !!res.ok, ms: ms, at: Date.now(), reply: res.ok ? res.text : null, error: res.ok ? null : res.error, truncated: !!(res.ok && res.truncated), what: null });
     }
     renderAgents();
   }
   /** What the call came to in the canvas's terms — read “hello”, reads it as molecule — or why its answer was no use. */
   function noteOutcome(agent, ok, what) {
     if (!agent || (!ok && what === 'cancelled')) return;
-    const c = lastCall.get(agent.id) || { ok: ok, ms: null, at: Date.now(), reply: null, error: null, truncated: false, what: null };
+    const c = lastCall.get(agentKey(agent)) || { ok: ok, ms: null, at: Date.now(), reply: null, error: null, truncated: false, what: null };
     const next = Object.assign({}, c);
     if (ok) { next.ok = true; next.what = what; }
     else if (c.ok !== false) { next.ok = false; next.error = what + (c.truncated ? ' — the answer was cut off at the token limit' : ''); next.what = null; }
-    lastCall.set(agent.id, next);
+    lastCall.set(agentKey(agent), next);
     renderAgents();
   }
   /** A row's last call, in a line: "ok · 1.8 s · read “hello”", or "failed · 0.4 s · HTTP 401 — bad key: …". */
@@ -1504,12 +1517,12 @@
     const send = recording(holder);
     const agent = made || MM.createAgentParticipant(session, config, Date.now(), { transport: send });
     holder.agent = agent;
-    if (!made) sendOf.set(agent.id, send);
-    if (facts) factsOf.set(agent.id, facts);
+    if (!made) sendOf.set(agentKey(agent), send);
+    if (facts) factsOf.set(agentKey(agent), facts);
     agents.push(agent);
     // The seat it takes (I7) and what is kept of it: what the provider said (whether it sees, what it is called) — never the key,
     // which is the provider's, entered once (04-seatpane.js).
-    if (pick) { metaOfAgent.set(agent.id, pick); assignSeat(pick.seat || 'any', agent); }
+    if (pick) { metaOfAgent.set(agentKey(agent), pick); assignSeat(pick.seat || 'any', agent); }
     mpStatus.textContent = modelWords(agent) + ' joined' + (pick && pick.seat && pick.seat !== 'any' ? ' as the ' + pick.seat : '') + ' (' + MM.providerLocality(config) + (config.vision ? ', sees' : '') + ').';
     renderAgents();
     renderLocal();
@@ -1556,7 +1569,7 @@
     const f = MM.modelFacts(agent.config.model, catalog, where);
     if (!f.ok) { noteOutcome(agent, false, f.error); mpStatus.textContent = f.error; return; }
     applyFacts(agent.config, f.facts);
-    factsOf.set(agent.id, f.facts);
+    factsOf.set(agentKey(agent), f.facts);
     rememberFacts(agent.config);
     renderAgents();
     syncTiles();
@@ -1566,7 +1579,7 @@
   function leave(agent) {
     const i = agents.indexOf(agent);
     if (i >= 0) agents.splice(i, 1);
-    factsOf.delete(agent.id); lastCall.delete(agent.id); asking.delete(agent.id); sendOf.delete(agent.id);
+    factsOf.delete(agentKey(agent)); lastCall.delete(agentKey(agent)); asking.delete(agentKey(agent)); sendOf.delete(agentKey(agent));
     // The session keeps the join in its history; it simply stops being asked. Its seats are let go, and a key no joined model
     // on its provider still uses is forgotten, as it was.
     forgetSeats(agent);
@@ -1593,11 +1606,11 @@
   // what its provider said, or why that is a guess — its last call, kept until the next, and *try it*.
   function renderAgents() {
     mpList.innerHTML = agents.map((a, i) => {
-      const f = factsOf.get(a.id);
+      const f = factsOf.get(agentKey(a));
       const tags = [a.config.kind === 'mcp' ? 'mcp' : MM.providerLocality(a.config)];
       if (isModel(a)) tags.push(a.config.vision ? 'sees' : 'text only');
       if (a.config.contextLength) tags.push(tokensShort(a.config.contextLength));
-      const c = lastCall.get(a.id), busy = (asking.get(a.id) || 0) > 0;
+      const c = lastCall.get(agentKey(a)), busy = (asking.get(agentKey(a)) || 0) > 0;
       const line = busy ? 'asking now' + (c ? ' · last: ' + callLine(c) : '') : callLine(c);
       return '<div class="mpItem">' +
         '<div class="mpItemHead"><span class="n" title="' + esc(a.name) + '">' + esc(modelWords(a)) + '</span>' +
@@ -1675,7 +1688,10 @@
   // that — the field keeps working through the others.
   function mcpAgent(endpoint, serverName, roles) {
     const name = 'mcp:' + serverName;
-    const id = session.join('agent', name, Date.now(), 2, MM.providerLocality({ baseUrl: endpoint }));
+    // Seated like every model (core's `seat`): a board loaded in place takes the join with it, and an ask joins it again there.
+    const seating = { kind: 'agent', name: name, capability: 2, locality: MM.providerLocality({ baseUrl: endpoint }) };
+    let id = session.join(seating.kind, seating.name, Date.now(), seating.capability, seating.locality);
+    const seat = (at) => (id = MM.seatOn(session, seating, id, at));
     const briefFor = (ids) => MM.describeSession(session.getState(), { nodeIds: ids });
     const call = async (tool, args) => {
       const res = await fetch(endpoint + '/call', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: tool, arguments: args }) });
@@ -1692,8 +1708,9 @@
     };
     const slug = (s) => String(s).toLowerCase().replace(/\s+/g, '-');
     return {
-      id: id, name: name, config: { kind: 'mcp', baseUrl: endpoint, model: serverName },
+      get id() { return id; }, seat: seat, name: name, config: { kind: 'mcp', baseUrl: endpoint, model: serverName },
       async interpret(ids, at) {
+        seat(at);
         if (!roles.read) return { ok: false, readings: [], error: 'no read tool mapped' };
         try {
           const out = await call(roles.read, { brief: briefFor(ids), ids: ids });
@@ -1707,6 +1724,7 @@
         } catch (err) { return { ok: false, readings: [], error: err.message }; }
       },
       async ask(question, ids, at) {
+        seat(at);
         if (!roles.answer) return { ok: false, error: 'no answer tool mapped' };
         try {
           const out = await call(roles.answer, { question: question, ids: ids, brief: briefFor(ids) });
@@ -1716,6 +1734,7 @@
       },
       async generate() { return { ok: false, error: 'an MCP participant reads, answers and draws; it does not write pages (yet)' }; },
       async read(args) {
+        seat(args.at);
         if (!roles.read) return { ok: false, transcripts: [], error: 'no read tool mapped' };
         try {
           const out = await call(roles.read, { image: args.image, nodeId: args.nodeId, brief: 'Read the handwriting in this ink.' });
@@ -1725,6 +1744,7 @@
         } catch (err) { return { ok: false, transcripts: [], error: err.message }; }
       },
       async draw({ prompt, nodeIds, at }) {
+        seat(at);
         if (!roles.draw) return { ok: false, ids: [], shapes: [], error: 'no draw tool mapped' };
         try {
           const out = await call(roles.draw, { prompt: prompt, ids: nodeIds });
@@ -1899,7 +1919,7 @@
     reading = ctl;
     let left = asked.length;
     asked.forEach((agent) => {
-      withWork('read:' + agent.id + ':' + ids.join('+'), ids, modelWords(agent) + ' · reading the group', agent.interpret(ids, Date.now(), ctl.signal)).then((res) => {
+      withWork('read:' + agentKey(agent) + ':' + ids.join('+'), ids, modelWords(agent) + ' · reading the group', agent.interpret(ids, Date.now(), ctl.signal)).then((res) => {
         if (ctl.signal.aborted) return;
         if (--left === 0 && reading === ctl) reading = null;
         // The row keeps what it came to; the status line says it once — a reading in words, a failure in full (J5).
@@ -1997,29 +2017,35 @@
   /** The joined models as the rules read them. */
   function seatModels() {
     return agents.map((a) => ({
-      id: a.id, vision: !!(a.config && a.config.vision), seats: [...(seatsOfAgent.get(a.id) || [])], size: sizeOf(a),
+      id: agentKey(a), vision: !!(a.config && a.config.vision), seats: [...(seatsOfAgent.get(agentKey(a)) || [])], size: sizeOf(a),
       claude: isSeatAgent(a), local: !!a.config && a.config.kind !== 'mcp' && MM.providerLocality(a.config) === 'local',
     }));
   }
-  const agentById = (id) => agents.find((a) => a.id === id) || null;
+  const agentById = (key) => agents.find((a) => agentKey(a) === key) || null;
   /** Who is asked a brief, a page, a program, a question, *What is this?* — Claude Code first while it is seated. */
   function writers() { return resolveWriters(seatModels()).who.map(agentById).filter(Boolean); }
+  /**
+   * The writers, seated on this board before an act that blesses a loop for them. A board loaded in place took
+   * their joins with it, and core's ask joins one again — which, after the bless, would stand between the bless
+   * and what takes a failed brief back (`dropFailedBless`: the bless must still be this hand's last act).
+   */
+  function seatWriters(at) { for (const a of writers()) if (a.seat) a.seat(at); }
   /** The seat a model holds, if any: the first agent that holds it. */
-  const holderOf = (seat) => agents.find((a) => (seatsOfAgent.get(a.id) || new Set()).has(seat)) || null;
+  const holderOf = (seat) => agents.find((a) => (seatsOfAgent.get(agentKey(a)) || new Set()).has(seat)) || null;
 
   /** Put a model in a seat — one holder a seat — and keep what is needed to bring it back. `any` is a model with no seat: remembered as the one last joined, as the single pick always was. */
   function assignSeat(seat, agent) {
     if (!agent || !isModel(agent)) return;
-    const pick = pickOf(agent.config, metaOfAgent.get(agent.id));
+    const pick = pickOf(agent.config, metaOfAgent.get(agentKey(agent)));
     if (seat === 'reader' || seat === 'writer') {
       const was = holderOf(seat);
       if (was && was !== agent) letGoOf(was, seat);
-      const set = seatsOfAgent.get(agent.id) || new Set();
+      const set = seatsOfAgent.get(agentKey(agent)) || new Set();
       set.add(seat);
-      seatsOfAgent.set(agent.id, set);
+      seatsOfAgent.set(agentKey(agent), set);
       seatPicks[seat] = pick;
       if (samePick(seatPicks.any, agent.config)) delete seatPicks.any; // it has a seat now: kept under it
-    } else if (!(seatsOfAgent.get(agent.id) || new Set()).size) {
+    } else if (!(seatsOfAgent.get(agentKey(agent)) || new Set()).size) {
       seatPicks.any = pick;
     }
     saveSeats();
@@ -2027,10 +2053,10 @@
   }
   /** A model lets go of a seat (another took it, or the hand chose nothing): with no seat left it is "any job" again, and kept so. */
   function letGoOf(agent, seat) {
-    const set = seatsOfAgent.get(agent.id);
-    if (set) { set.delete(seat); if (!set.size) seatsOfAgent.delete(agent.id); }
+    const set = seatsOfAgent.get(agentKey(agent));
+    if (set) { set.delete(seat); if (!set.size) seatsOfAgent.delete(agentKey(agent)); }
     if (samePick(seatPicks[seat], agent.config)) delete seatPicks[seat];
-    if (!(seatsOfAgent.get(agent.id) || new Set()).size && !seatPicks.any) seatPicks.any = pickOf(agent.config, metaOfAgent.get(agent.id));
+    if (!(seatsOfAgent.get(agentKey(agent)) || new Set()).size && !seatPicks.any) seatPicks.any = pickOf(agent.config, metaOfAgent.get(agentKey(agent)));
   }
   /** The hand chose nothing for a seat: whoever held it is "any job" again. */
   function unseat(seat) {
@@ -2043,9 +2069,9 @@
   }
   /** A model left: its seats, its kept picks and, if none joined uses its provider, its key. */
   function forgetSeats(agent) {
-    const held = seatsOfAgent.get(agent.id) || new Set();
-    seatsOfAgent.delete(agent.id);
-    metaOfAgent.delete(agent.id);
+    const held = seatsOfAgent.get(agentKey(agent)) || new Set();
+    seatsOfAgent.delete(agentKey(agent));
+    metaOfAgent.delete(agentKey(agent));
     for (const s of held) if (samePick(seatPicks[s], agent.config)) delete seatPicks[s];
     if (samePick(seatPicks.any, agent.config)) delete seatPicks.any;
     saveSeats();
@@ -2069,7 +2095,7 @@
   // only by a deliberate act, and opening the field is not one — so the tie is offered and the hand decides to ask.
   // Its answer is one more held, attributed reading beside the engine's (`jev 0.99`, never evicting) and is taken
   // only where it leads by DECIDER_TAKE_AT; under that, the status line says what it said and why it was not used.
-  /** The seat as a participant of THIS board: a board loaded in place takes every join with it, so the seat is made again where it is not. */
+  /** The seat as a participant: core seats it on whichever board it is asked on (`participants/seated.ts`), so a board loaded in place needs nothing here. */
   function makeDeciderSeat(transport, name, config) {
     return MM.createDecideParticipant(session, transport, Date.now(), { name: name, locality: MM.providerLocality(config), takeAt: MM.DECIDER_TAKE_AT });
   }
@@ -2094,13 +2120,13 @@
       const name = MM.modelWords(config);
       const seat = makeDeciderSeat(transport, name, config);
       decider = { config: config, seat: seat, pseudo: pseudo, name: name, meta: meta || {}, transport: transport };
-      factsOf.set(pseudo.id, got.first.facts);
+      factsOf.set(agentKey(pseudo), got.first.facts);
       seatPicks.decider = pickOf(config, meta ? { provider: meta.provider, endpoint: meta.endpoint } : undefined);
       saveSeats();
       mpStatus.textContent = name + ' joined as the decider — ' + got.first.facts.said + '.';
       // The choice the unit asked to be said: why the decider is never asked on its own.
       say(name + ' is the decider — asked only when you tap “Which is it?” on a tie between two definitions, never on its own; its answer is taken only when it is ' + MM.DECIDER_TAKE_AT + ' sure');
-      if (got.later) got.later.then((catalog) => { if (decider && decider.seat === seat && catalog && catalog.ok) { const f = MM.modelFacts(config.model, catalog, got.where); if (f.ok) { applyFacts(config, f.facts); factsOf.set(pseudo.id, f.facts); refreshPicks(config); renderSeats(); } } });
+      if (got.later) got.later.then((catalog) => { if (decider && decider.seat === seat && catalog && catalog.ok) { const f = MM.modelFacts(config.model, catalog, got.where); if (f.ok) { applyFacts(config, f.facts); factsOf.set(agentKey(pseudo), f.facts); refreshPicks(config); renderSeats(); } } });
       renderSeats();
       syncTiles();
       refreshPalette();
@@ -2113,7 +2139,7 @@
     if (!decider) return;
     const d = decider;
     decider = null;
-    factsOf.delete(d.pseudo.id); lastCall.delete(d.pseudo.id); asking.delete(d.pseudo.id);
+    factsOf.delete(agentKey(d.pseudo)); lastCall.delete(agentKey(d.pseudo)); asking.delete(agentKey(d.pseudo));
     delete seatPicks.decider;
     saveSeats();
     forgetKeyIfUnused(d.config.baseUrl);
@@ -2128,11 +2154,10 @@
   function askDecider(data) {
     if (!decider) { say('no decider is seated — choose one under models'); return false; }
     const d = decider;
-    if (!session.getState().participants.includes(d.seat.id)) d.seat = makeDeciderSeat(d.transport, d.name, d.config);
     const ids = (data.ids || []).filter((id) => session.getState().nodes.has(id));
     if (!ids.length || !data.candidates || data.candidates.length < 2) { say('nothing to decide'); return false; }
     const q = MM.choice('which:' + ids[0], 'which of these is the group of marks?', data.candidates.map((c) => ({ id: c.id, text: c.text })), ids);
-    const key = 'decide:' + d.pseudo.id + ':' + ids.join('+');
+    const key = 'decide:' + agentKey(d.pseudo) + ':' + ids.join('+');
     const ctl = new AbortController();
     workControllers.set(key, ctl);
     say(d.name + ' is choosing between ' + data.candidates.map((c) => c.id).join(' and ') + '…');
@@ -2282,17 +2307,17 @@
         if (decider) {
           who = decider.name + ' · ' + MM.providerLocality(decider.config) + ' · taken only at ' + MM.DECIDER_TAKE_AT;
           body = '<button class="ghost" data-seat-try="decider" title="one tiny question: is it there, and does it answer in the shape asked?">try it</button><button class="ghost" data-seat-leave="decider">leave</button>';
-          call = callOf(decider.pseudo.id);
+          call = callOf(agentKey(decider.pseudo));
         } else { who = 'nothing chosen'; note = fallbackWords('decider'); body = '<button class="ghost" data-seat-set="decider">choose a model</button>'; }
       } else {
         const held = holderOf(seat);
         const pool = agents.filter((a) => isModel(a) && !isSeatAgent(a) && (seat === 'writer' || a.config.vision));
         const rows = orderedPool(pool);
         body = '<select class="seatPick" data-seat-pick="' + seat + '"><option value="">' + (held ? '— nothing (let go of it)' : '— nothing chosen') + '</option>' +
-          rows.map((r) => '<option value="' + esc(r.id) + '"' + (held && held.id === r.id ? ' selected' : '') + '>' + esc(r.name) + (r.local ? ' · local' : ' · hosted') + '</option>').join('') + '</select>' +
+          rows.map((r) => '<option value="' + esc(r.id) + '"' + (held && agentKey(held) === r.id ? ' selected' : '') + '>' + esc(r.name) + (r.local ? ' · local' : ' · hosted') + '</option>').join('') + '</select>' +
           '<button class="ghost" data-seat-set="' + seat + '" title="join a model for this seat — the key already entered is used">another…</button>' +
           (held ? '<button class="ghost" data-seat-try="' + seat + '">try it</button>' : '');
-        if (held) { who = agentWords(held); call = callOf(held.id); }
+        if (held) { who = agentWords(held); call = callOf(agentKey(held)); }
         else { who = 'nothing chosen'; note = fallbackWords(seat) + (names(seat === 'reader' ? readerNow : writerNow) ? ' — now: ' + names(seat === 'reader' ? readerNow : writerNow) : ''); }
       }
       html += '<div class="seatRow" data-seat="' + seat + '"><div class="seatHead"><b>' + seat + '</b><span class="seatJob">' + esc(w.job) + '</span></div>' +
@@ -2321,7 +2346,7 @@
   }
   /** Choices for a seat's select: local before hosted, the quickest last call first (03-seats.js). */
   function orderedPool(pool) {
-    return orderChoices(pool.map((a) => { const c = lastCall.get(a.id); return { id: a.id, name: modelWords(a), local: MM.providerLocality(a.config) === 'local', ms: c && c.ok ? c.ms : null }; }));
+    return orderChoices(pool.map((a) => { const c = lastCall.get(agentKey(a)); return { id: agentKey(a), name: modelWords(a), local: MM.providerLocality(a.config) === 'local', ms: c && c.ok ? c.ms : null }; }));
   }
   // The pane opens on the seats as they are now.
   new MutationObserver(() => { if (!panel.hasAttribute('hidden')) renderSeats(); }).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
@@ -2334,7 +2359,7 @@
       reader: who(holderOf('reader')),
       writer: who(holderOf('writer')),
       decider: decider ? { model: decider.config.model, name: decider.name, local: MM.providerLocality(decider.config) === 'local' } : null,
-      any: agents.filter((a) => isModel(a) && !isSeatAgent(a) && !(seatsOfAgent.get(a.id) || new Set()).size).map(who),
+      any: agents.filter((a) => isModel(a) && !isSeatAgent(a) && !(seatsOfAgent.get(agentKey(a)) || new Set()).size).map(who),
       keys: [...heldKeys.keys()],
       remembered: [...rememberedKeys],
       pending: pendingPicks.map((p) => ({ model: p.pick.model, seats: p.seats.slice() })),
@@ -2826,7 +2851,7 @@
    * seconds. The order is 03-seats.js's `resolveReaders`, tested in Node.
    */
   function readers() {
-    return resolveReaders(seatModels()).who.map((id) => agents.find((a) => a.id === id)).filter(Boolean);
+    return resolveReaders(seatModels()).who.map((key) => agents.find((a) => agentKey(a) === key)).filter(Boolean);
   }
   /** The models that read now — for the panel's *read it* and the like: who can answer a read, by seat. */
   const seeing = () => readers();
@@ -2886,7 +2911,7 @@
     const image = inkImage(node);
     if (!image) return false;
     who.forEach((agent) => {
-      withWork('write:' + agent.id + ':' + node.id, [node.id], modelWords(agent) + ' · reading the writing', agent.read({ nodeId: node.id, image: image, at: Date.now() })).then((res) => {
+      withWork('write:' + agentKey(agent) + ':' + node.id, [node.id], modelWords(agent) + ' · reading the writing', agent.read({ nodeId: node.id, image: image, at: Date.now() })).then((res) => {
         // The row keeps what the read came to; the status line says it once (J5).
         noteOutcome(agent, res.ok, res.ok ? 'read “' + res.transcripts[0].text + '”' : res.error);
         say(res.ok
@@ -2919,7 +2944,7 @@
     if (!image) return false;
     const first = nodes[0];
     who.forEach((agent) => {
-      withWork('write:' + agent.id + ':' + first.id, ids, modelWords(agent) + ' · reading the line', agent.read({ nodeId: first.id, about: nodes.map((n) => n.id), image: image, at: Date.now(), hold: false })).then((res) => {
+      withWork('write:' + agentKey(agent) + ':' + first.id, ids, modelWords(agent) + ' · reading the line', agent.read({ nodeId: first.id, about: nodes.map((n) => n.id), image: image, at: Date.now(), hold: false })).then((res) => {
         noteOutcome(agent, res.ok, res.ok ? 'read “' + res.transcripts[0].text + '”' : res.error);
         if (res.ok) {
           const top = res.transcripts[0];
@@ -2965,7 +2990,7 @@
     const models = agents.filter((a) => a.config && (a.config.kind === 'openai-compatible' || a.config.kind === 'anthropic'));
     const others = agents.filter((a) => !models.includes(a));
     if (!agents.length) return 'Read the writing needs a model that can see — none is joined';
-    const said = models.map((a) => { const f = factsOf.get(a.id); return modelWords(a) + ' reads text only' + (f && f.because ? ' (' + f.because + ')' : ''); })
+    const said = models.map((a) => { const f = factsOf.get(agentKey(a)); return modelWords(a) + ' reads text only' + (f && f.because ? ' (' + f.because + ')' : ''); })
       .concat(others.map((a) => modelWords(a) + ' is not asked to read writing'));
     return 'Read the writing needs a model that can see — ' + said.join('; ');
   }
@@ -6003,7 +6028,7 @@
     'mermaid-draw': (o) => drawMermaidFrom(o.data.artifact),
     // A held picture traced into ink over itself (18-images.js): its pixels are read again from the asset store, so it lands a moment after the tap.
     trace: (o) => { traceFrom(o.data.artifact, o.data.asset); },
-    'behave-model': (o) => { const d = o.data; writers().forEach((a) => withWork('behave:' + a.id + ':' + d.nodeId, [d.nodeId], modelWords(a) + ' · reading the words', a.behave({ nodeId: d.nodeId, words: d.words, at: Date.now() })).then(() => render(session.getState()))); },
+    'behave-model': (o) => { const d = o.data; writers().forEach((a) => withWork('behave:' + agentKey(a) + ':' + d.nodeId, [d.nodeId], modelWords(a) + ' · reading the words', a.behave({ nodeId: d.nodeId, words: d.words, at: Date.now() })).then(() => render(session.getState()))); },
   };
   /** What the surface does around a tool's act: before it (the field rebuilt from what it leaves), and after (what to say). */
   const TOOL_ACTS = {
@@ -6289,7 +6314,7 @@
     }
     if (cmd.do === 'behave') {
       session.behave({ nodeId: cmd.definitionId, behaviour: cmd.behaviour, participantId: MM.LOCAL_PARTICIPANT, at: at });
-      if (cmd.ask) writers().forEach((a) => withWork('behave:' + a.id + ':' + cmd.definitionId, [cmd.definitionId], modelWords(a) + ' · reading the words', a.behave({ nodeId: cmd.definitionId, words: cmd.words, at: Date.now() })).then(() => render(session.getState())));
+      if (cmd.ask) writers().forEach((a) => withWork('behave:' + agentKey(a) + ':' + cmd.definitionId, [cmd.definitionId], modelWords(a) + ' · reading the words', a.behave({ nodeId: cmd.definitionId, words: cmd.words, at: Date.now() })).then(() => render(session.getState())));
       return;
     }
     // With no model here, what was typed is kept, said once, and run when one joins — never the pane popped over the field (J5).
@@ -6901,6 +6926,7 @@
       // frame its origin. The name is the brief, so the artifact says what it
       // was asked to be.
       const name = brief.length > 30 ? brief.slice(0, 30) + '…' : brief;
+      seatWriters(at);
       artifactId = session.bless({ summonId: sum.id, name: name, at: at });
       addressed = undefined;
       if (!artifactId) { releasePrompted(); say('could not hold that group'); return; }
@@ -6940,6 +6966,7 @@
   function runProgram(sum, brief) {
     const at = Date.now();
     const name = brief.length > 30 ? brief.slice(0, 30) + '…' : brief;
+    seatWriters(at);
     const artifactId = session.bless({ summonId: sum.id, name: name, at: at });
     if (!artifactId) { releasePrompted(); say('could not hold that group'); return; }
     cancelReading();
@@ -6975,7 +7002,7 @@
     session.dismiss(sum.id, Date.now());
     cancelReading();
     writers().forEach((agent) => {
-      withWork('draw:' + agent.id, ids, modelWords(agent) + ' · drawing', agent.draw({ prompt: q, nodeIds: ids, at: Date.now() })).then((res) => {
+      withWork('draw:' + agentKey(agent), ids, modelWords(agent) + ' · drawing', agent.draw({ prompt: q, nodeIds: ids, at: Date.now() })).then((res) => {
         noteOutcome(agent, res.ok, res.ok ? 'drew ' + res.ids.length + ' mark' + (res.ids.length === 1 ? '' : 's') : res.error);
         if (res.ok) say(modelWords(agent) + ' drew ' + res.ids.length + ' mark' + (res.ids.length === 1 ? '' : 's') + ': ' + res.shapes.map((x) => x.shape).join(', '));
         else { say(modelWords(agent) + ' drew nothing (' + res.error + ')'); if (res.raw) window.__mm.lastRaw = res.raw; }
@@ -6989,7 +7016,7 @@
     const ids = sum.enclosedIds.slice();
     cancelReading();
     writers().forEach((agent) => {
-      withWork('ask:' + agent.id, ids, modelWords(agent) + ' · answering', agent.ask(q, ids, Date.now())).then((res) => {
+      withWork('ask:' + agentKey(agent), ids, modelWords(agent) + ' · answering', agent.ask(q, ids, Date.now())).then((res) => {
         noteOutcome(agent, res.ok, res.ok ? 'answered beside the marks' : res.error);
         if (!res.ok) say(modelWords(agent) + ' could not answer (' + res.error + ')');
         render(session.getState());
@@ -13779,7 +13806,7 @@
     keptAsk: () => (keptAsk ? { what: keptAsk.what, needs: keptAsk.needs } : null),
     // Seats per job (V1-PLAN I7), for tests: who holds each seat, which provider's key is held (never the key), who is asked to read and to write.
     seats: () => seatsNow(),
-    lastCalls: () => agents.map((a) => ({ id: a.id, model: a.config.model, line: callLine(lastCall.get(a.id)) })),
+    lastCalls: () => agents.map((a) => ({ id: agentKey(a), model: a.config.model, line: callLine(lastCall.get(agentKey(a))) })),
     // Device preferences and the chrome, for tests: the theme, the hand, auto-read, the field's reader, the clip.
     themeMode: () => themeMode, setThemeMode: setThemeMode, hand: () => hand, setHand: setHand,
     // Pen, finger and palm (V1-PLAN R6), for tests: what draws, the magnet a hovering pen feels, and the hands down.

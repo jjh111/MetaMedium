@@ -17,7 +17,7 @@
     keptAsk: () => (keptAsk ? { what: keptAsk.what, needs: keptAsk.needs } : null),
     // Seats per job (V1-PLAN I7), for tests: who holds each seat, which provider's key is held (never the key), who is asked to read and to write.
     seats: () => seatsNow(),
-    lastCalls: () => agents.map((a) => ({ id: a.id, model: a.config.model, line: callLine(lastCall.get(a.id)) })),
+    lastCalls: () => agents.map((a) => ({ id: agentKey(a), model: a.config.model, line: callLine(lastCall.get(agentKey(a))) })),
     // Device preferences and the chrome, for tests: the theme, the hand, auto-read, the field's reader, the clip.
     themeMode: () => themeMode, setThemeMode: setThemeMode, hand: () => hand, setHand: setHand,
     // Pen, finger and palm (V1-PLAN R6), for tests: what draws, the magnet a hovering pen feels, and the hands down.
