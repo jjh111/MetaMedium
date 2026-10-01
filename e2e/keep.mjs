@@ -846,7 +846,8 @@ export async function pictureTest(browser, servers, ctx) {
   // The pictures on the board, each with the colour the canvas shows where it stands and whether its asset is in the store.
   const look = (pg) => pg.evaluate(async () => {
     const mm = window.__mm, MM = mm.MM;
-    mm.setView(1, 0, 0);
+    // Every picture stands clear of the one before (a second never lands on the first): fit them all on screen.
+    mm.fitAll();
     const st = mm.session.getState();
     const pics = st.artifacts.map((id) => ({ id, p: MM.pictureOf(st.nodes.get(id)) })).filter((x) => x.p);
     const held = new Set((await mm.assets()).map((a) => a.hash));

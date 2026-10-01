@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 const NAMES = [
   'ASSET_LONG_SIDE', 'ASSET_GRACE_MS', 'sha256Hex', 'assetRef', 'isAssetRef', 'fitLongSide', 'pictureFormat', 'pictureExt',
-  'safePictureName', 'uniquePicturePath', 'assetsOfEvents', 'assetGcPlan', 'pictureGrid', 'pictureCells', 'fitInCell', 'pickWords',
+  'safePictureName', 'uniquePicturePath', 'assetsOfEvents', 'assetGcPlan', 'pictureGrid', 'pictureCells', 'fitInCell', 'clearShift', 'pickWords',
   'pictureTier', 'decodedCost', 'evictPlan', 'PICTURE_THUMB_PX', 'DECODED_BUDGET_PX',
 ];
 const file = join(dirname(fileURLToPath(import.meta.url)), '17-assets.js');
@@ -184,4 +184,24 @@ test('a pick can be placed a picture at a time: the cells depend on the count an
   // The same pictures, whole, stand where the pick was placed one at a time.
   assert.deepEqual(A.pictureGrid([{ w: 2560, h: 1920 }, { w: 1920, h: 2560 }, { w: 1, h: 1 }, { w: 1, h: 1 }], view).slice(0, 2), [a, b]);
   assert.deepEqual(A.pictureCells(0, view), []);
+});
+
+test('a pick stands clear of what is on the board: where the view says if that is free, else just past what is in the way', () => {
+  const view = { minX: 0, minY: 0, maxX: 1000, maxY: 700 };
+  const cells = A.pictureCells(1, view);
+  assert.deepEqual(A.clearShift(cells, [], 20), { dx: 0, dy: 0, moved: false });
+  // Far away from the cells: nothing in the way.
+  assert.deepEqual(A.clearShift(cells, [{ minX: 5000, minY: 5000, maxX: 5100, maxY: 5100 }], 20), { dx: 0, dy: 0, moved: false });
+  // A picture where the cell is: the next stands just right of it.
+  const first = A.fitInCell({ w: 4, h: 3 }, cells[0]);
+  const one = A.clearShift(cells, [{ minX: first.x, minY: first.y, maxX: first.x + first.w, maxY: first.y + first.h }], 20);
+  assert.equal(one.moved, true);
+  assert.equal(cells[0].x + one.dx, first.x + first.w + 20);
+  // Something in the way there too: past that as well.
+  const second = { minX: first.x + first.w + 20, minY: first.y, maxX: first.x + first.w + 20 + 300, maxY: first.y + 200 };
+  const two = A.clearShift(cells, [{ minX: first.x, minY: first.y, maxX: first.x + first.w, maxY: first.y + first.h }, second], 20);
+  assert.equal(cells[0].x + two.dx, second.maxX + 20);
+  // Marks above or below the band the cells stand in are not in the way.
+  assert.deepEqual(A.clearShift(cells, [{ minX: 0, minY: 5000, maxX: 9999, maxY: 5100 }], 20).moved, false);
+  assert.deepEqual(A.clearShift([], [{ minX: 0, minY: 0, maxX: 1, maxY: 1 }], 20), { dx: 0, dy: 0, moved: false });
 });

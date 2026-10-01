@@ -2,7 +2,7 @@
 // Provides: the pure half of keeping pictures (PLAN-IPAD-NOTES I1) — sha256Hex (the digest an asset is
 //   kept under), assetRef / isAssetRef, fitLongSide, pictureFormat / pictureExt (what a picture is kept
 //   as), safePictureName / uniquePicturePath (the name and path it gets), assetsOfEvents / assetGcPlan
-//   (which assets nothing uses any more), pictureCells / fitInCell / pictureGrid / pickWords (where a pick is laid out and how the
+//   (which assets nothing uses any more), pictureCells / fitInCell / clearShift / pictureGrid / pickWords (where a pick is laid out and how the
 //   status line says it) and pictureTier / decodedCost / evictPlan (what the decoded pictures cost and
 //   which to let go).
 // Uses: NOTHING. Like 17-board.js this fragment names no closure variable and touches no DOM, no storage
@@ -173,6 +173,25 @@
       out.push({ x: view.minX + margin + col * (cw + gap), y: view.minY + margin + row * (ch + gap), w: cw, h: ch });
     }
     return out;
+  }
+  /**
+   * How far right a grid of cells must stand to be clear of what is already on the board: none if the view's own
+   * place is free; else just past what is in the way, and past what is in the way there, until it is clear — so a
+   * second picture never lands on the first, and a pick never lands on the writing it was brought in beside.
+   * `boxes` are the board's marks as `{ minX, minY, maxX, maxY }`. With no clear place in reach, none.
+   * @returns {{dx:number, dy:number, moved:boolean}}
+   */
+  function clearShift(cells, boxes, gap) {
+    if (!cells.length) return { dx: 0, dy: 0, moved: false };
+    const r = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    for (const c of cells) { r.minX = Math.min(r.minX, c.x); r.minY = Math.min(r.minY, c.y); r.maxX = Math.max(r.maxX, c.x + c.w); r.maxY = Math.max(r.maxY, c.y + c.h); }
+    let dx = 0;
+    for (let i = 0; i < 24; i++) {
+      const hit = boxes.filter((b) => b.maxX > r.minX + dx && b.minX < r.maxX + dx && b.maxY > r.minY && b.minY < r.maxY);
+      if (!hit.length) return { dx: dx, dy: 0, moved: dx !== 0 };
+      dx = Math.max(...hit.map((b) => b.maxX)) + gap - r.minX;
+    }
+    return { dx: 0, dy: 0, moved: false };
   }
   /** A picture of a size, fitted into a cell with its own proportions, standing at the cell's top left. */
   function fitInCell(size, cell) {

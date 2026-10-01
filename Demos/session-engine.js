@@ -8218,7 +8218,7 @@
 // Provides: the pure half of keeping pictures (PLAN-IPAD-NOTES I1) — sha256Hex (the digest an asset is
 //   kept under), assetRef / isAssetRef, fitLongSide, pictureFormat / pictureExt (what a picture is kept
 //   as), safePictureName / uniquePicturePath (the name and path it gets), assetsOfEvents / assetGcPlan
-//   (which assets nothing uses any more), pictureCells / fitInCell / pictureGrid / pickWords (where a pick is laid out and how the
+//   (which assets nothing uses any more), pictureCells / fitInCell / clearShift / pictureGrid / pickWords (where a pick is laid out and how the
 //   status line says it) and pictureTier / decodedCost / evictPlan (what the decoded pictures cost and
 //   which to let go).
 // Uses: NOTHING. Like 17-board.js this fragment names no closure variable and touches no DOM, no storage
@@ -8389,6 +8389,25 @@
       out.push({ x: view.minX + margin + col * (cw + gap), y: view.minY + margin + row * (ch + gap), w: cw, h: ch });
     }
     return out;
+  }
+  /**
+   * How far right a grid of cells must stand to be clear of what is already on the board: none if the view's own
+   * place is free; else just past what is in the way, and past what is in the way there, until it is clear — so a
+   * second picture never lands on the first, and a pick never lands on the writing it was brought in beside.
+   * `boxes` are the board's marks as `{ minX, minY, maxX, maxY }`. With no clear place in reach, none.
+   * @returns {{dx:number, dy:number, moved:boolean}}
+   */
+  function clearShift(cells, boxes, gap) {
+    if (!cells.length) return { dx: 0, dy: 0, moved: false };
+    const r = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    for (const c of cells) { r.minX = Math.min(r.minX, c.x); r.minY = Math.min(r.minY, c.y); r.maxX = Math.max(r.maxX, c.x + c.w); r.maxY = Math.max(r.maxY, c.y + c.h); }
+    let dx = 0;
+    for (let i = 0; i < 24; i++) {
+      const hit = boxes.filter((b) => b.maxX > r.minX + dx && b.minX < r.maxX + dx && b.maxY > r.minY && b.minY < r.maxY);
+      if (!hit.length) return { dx: dx, dy: 0, moved: dx !== 0 };
+      dx = Math.max(...hit.map((b) => b.maxX)) + gap - r.minX;
+    }
+    return { dx: 0, dy: 0, moved: false };
   }
   /** A picture of a size, fitted into a cell with its own proportions, standing at the cell's top left. */
   function fitInCell(size, cell) {
@@ -11024,7 +11043,11 @@
         const vw = viewportWorld();
         view = o.at ? { minX: o.at.x, minY: o.at.y, maxX: o.at.x + (vw.maxX - vw.minX), maxY: o.at.y + (vw.maxY - vw.minY) } : vw;
       }
-      const cells = pictureCells(list.length, view);
+      let cells = pictureCells(list.length, view);
+      // Clear of what is on the board already: a second picture never lands on the first.
+      const st0 = session.getState();
+      const shift = clearShift(cells, st0.contentIds.map((id) => MM.boundsOf(st0.nodes.get(id))).filter((b) => b && MM.finiteBounds(b)), cells.length ? Math.min(cells[0].w, cells[0].h) * 0.1 : 0);
+      if (shift.moved) cells = cells.map((c) => ({ x: c.x + shift.dx, y: c.y + shift.dy, w: c.w, h: c.h }));
       const taken = pathsOnBoard();
       const rasters = list.filter((f) => /^image\//.test(f.type) && !/^image\/svg/.test(f.type)).length;
       const worker = rasters ? pictureWorker() : null;
@@ -11052,6 +11075,13 @@
           }
         }
       } finally { endPictureWorker(worker); }
+      // Placed clear of the view's own ground, the pick is shown: the view goes to what was just kept.
+      if (shift.moved && out.ids.length) {
+        const sn = session.getState();
+        const bs = out.ids.map((id) => sn.nodes.get(id)).filter(Boolean).map((nd) => MM.boundsOf(nd)).filter(Boolean);
+        const vis = viewportWorld();
+        if (bs.length && bs.some((b) => b.minX > vis.maxX || b.maxX < vis.minX || b.minY > vis.maxY || b.maxY < vis.minY)) fitTo(union(bs));
+      }
       const n = out.ids.length;
       const said = (n ? (n === 1 ? '1 picture kept' : n + ' pictures kept') + ' — laid out here, drawn under your ink' : 'nothing was imported') +
         (out.skipped.length ? ' · could not read ' + out.skipped.map((x) => x.name + ' (' + x.why + ')').join(', ') : '');

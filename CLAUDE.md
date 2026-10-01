@@ -326,7 +326,7 @@ any structural change.
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
-| `Demos/surface/` | **The reference surface's source**: `surface.css` and thirty-two script fragments (`00-core`, `00-ui` … `20-controls`, `21-minimap`, `22-boards`, `23-packs`, `24-seat`, `25-maths`, `25-mermaid`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Because they are one closure, the build and its `--check` refuse a name declared at the top of two fragments — the last would silently replace the first everywhere, which broke rendering once — reading the fragments as one strict block, so they must also compile as strict code (`Demos/build-surface.test.mjs`, in CI's `core` job). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. **`17-board.js` is the second** (V1-PLAN R3): the journal the board this browser keeps is written through, driven in Node by a store held in memory — `node --test Demos/surface/17-board.test.mjs`, in CI's `core` job too. **`17-boards.js` is the third** (R1): the list of boards — names, the trash, which board a page opens, whether the one on screen may be left — `node --test Demos/surface/17-boards.test.mjs`, also in CI. **`07-hand.js` is the fourth** (R6): the hand's rules — what a pen, a finger and a palm do, and the hand tile's face and cycle — `node --test Demos/surface/07-hand.test.mjs`, also in CI; `07-input.js` is its adapter. A fragment's `.test.mjs` is not concatenated into the build. `09-palette.js` is the adapter over core's tools (B1): it reads the readings, maps `MM.offersFor` to pills and performs what only the surface can, and builds no affordance by hand |
+| `Demos/surface/` | **The reference surface's source**: `surface.css` and thirty-three script fragments (`00-core`, `00-ui` … `17-assets`, … `20-controls`, `21-minimap`, `22-boards`, `23-packs`, `24-seat`, `25-maths`, `25-mermaid`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Because they are one closure, the build and its `--check` refuse a name declared at the top of two fragments — the last would silently replace the first everywhere, which broke rendering once — reading the fragments as one strict block, so they must also compile as strict code (`Demos/build-surface.test.mjs`, in CI's `core` job). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. **`17-board.js` is the second** (V1-PLAN R3): the journal the board this browser keeps is written through, driven in Node by a store held in memory — `node --test Demos/surface/17-board.test.mjs`, in CI's `core` job too. **`17-boards.js` is the third** (R1): the list of boards — names, the trash, which board a page opens, whether the one on screen may be left — `node --test Demos/surface/17-boards.test.mjs`, also in CI. **`17-assets.js` is the fifth** (I1): what a picture is kept as, its name, where a pick stands, which assets nothing uses and what the decoded pictures cost — `node --test Demos/surface/17-assets.test.mjs`, also in CI (`18-images.js` is its adapter: IndexedDB, workers, canvas). **`07-hand.js` is the fourth** (R6): the hand's rules — what a pen, a finger and a palm do, and the hand tile's face and cycle — `node --test Demos/surface/07-hand.test.mjs`, also in CI; `07-input.js` is its adapter. A fragment's `.test.mjs` is not concatenated into the build. `09-palette.js` is the adapter over core's tools (B1): it reads the readings, maps `MM.offersFor` to pills and performs what only the surface can, and builds no affordance by hand |
 | `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file (and exports the same build as `standalone(dir)`, which the release script attaches to a release). **`sw.js` is the service worker for both addresses** — this one and `/app/` — copied to `app/sw.js` by `scripts/build-app.mjs`, which stamps `VERSION` into it and into the page's `<meta name="metamedium-version">` (*One app address*, below). **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture and `mcp-smoke.mjs` as its stdio test; it is also the canvas's seat's answerer, and **`seat-watch.mjs`** is the silent reader that prints one line per brief parked there — what wakes a Claude Code session (*The canvas's seat*, below); `metamedium-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). **`relay.test.mjs`** is the relay's own test (`node --test Demos/relay.test.mjs`, in CI's `core` job): the catch-up as a pure function, and, over a real relay on a free port, the truncation line and three hands with one departed. `Demos/programs/` holds `run` programs written for the canvas (`metamedium-explained.run.js`: the loop told as a program, ending on a real measurement of the viewer's own stroke). Plus fish, composition diagrams, no-modes graph, etc. |
 | `app/` | **The app — v1's one address, `https://jjh111.github.io/MetaMedium/app/`** (V1-PLAN R7). Made, never edited: `index.html` is `Demos/session-engine.html` with each file it asks for asked for from `/app/` (`../Demos/…`), `sw.js` is `Demos/sw.js` byte for byte, `manifest.webmanifest` is the old address's starting and scoped at `./` — all three written by `node scripts/build-app.mjs` and drift-checked in CI (`--check`). Installable there, and it opens with no network after one visit. `Demos/session-engine.html` stays where it was and works as it always has |
 | `HELP.md` | **The help pane's page**, for a person using the canvas (PLAN-USER-SURFACE U1g): the loop, the field, handling marks, models and Claude, boards, rooms, your mark, undo, the shortcuts. The help tile reads it (`20-controls.js`), both service workers keep it for offline, and the gate's `app` scenario asks for it. Keep it true to the surface — it names controls and keys |
@@ -900,7 +900,7 @@ said after the reason, and what makes it specific to these marks),
 `verbs`, `hidden` (typed, never a slot), `lead` (stands with the readings:
 *Fold “…” into the text*), and `data` for its take. `offersFor(scope, ctx)`
 asks every tool in **registry order** — `builtin.ts` registers the
-twenty-one built-ins in the order the field always built its pills (the maths
+twenty-two built-ins (the last, *Trace into ink*, I1) in the order the field always built its pills (the maths
 tool, M5 — *Show the sizes*, *Check the steps*, *Print at true size*, host
 acts that write nothing — then *Mermaid*, *drawing from Mermaid* and *routing*
 (D7), appended at the end, so the order and e2e 49's golden stand), which is
@@ -2814,6 +2814,9 @@ killed right after a switch and in the middle of one; both whole). The list
 never stands between a board and its journal: an entry the store refuses (full)
 is held and written once a record lands. With no IndexedDB there is one board
 and the pane says so.
+**A picture's bytes are not in a board's journal** (PLAN-IPAD-NOTES I1): the events name an asset kept in
+`mm-assets` beside it (*Pictures: kept, drawn and traced on request*, below) — a duplicate names the same assets, the
+trash keeps them, and emptying the trash is when the ones no board uses are collected.
 
 **Examples, and the first run** (V1-PLAN R5; `boards/examples/`,
 `scripts/examples.mjs`, `17-boards.js`, `22-boards.js`; e2e 65–65f and the boards
@@ -2955,6 +2958,10 @@ line for a folder — which is **not opened at all**, so nothing writes over it
 — and in the shard's panel. The journal a browser keeps a board in (R3) is
 records of events, not a file, and has no header; the file the board leaves as
 is one.
+A picture's `import` event (I1) carries an `asset`, a `mime` and a size and no bytes, in a version 1 log as
+in any other: a reader that does not know an asset draws the picture's name, as a version 0 or 1 picture
+always was — and a log taken out as a file names assets this browser holds and a file carries none of (the
+board bundle that does is I4).
 
 **The trap, and how it is answered.** A surface from before R2 takes every
 line that parses for an event and its boards pane refuses a file whose lines
@@ -3505,11 +3512,92 @@ setting the value, and the `move` that records the drag is the only event.
 A frame built once is offered again by the name written beside a loop or by
 resemblance, and export writes it as a folder of wired files.
 
-### Pictures become ink (v8, WP-9a)
+### Pictures: kept, drawn and traced on request (v8 WP-9a; PLAN-IPAD-NOTES I1, 1 Oct 2026)
 
-> `metamedium-core/src/image/trace.ts` — `trace(bitmap)`.
+> `metamedium-core/src/kinds/picture.ts` (`isPictureKind`, `pictureOf`, `isAssetRef`),
+> `tools/trace.ts`, `image/trace.ts` — `trace(bitmap)`; the surface's
+> `Demos/surface/17-assets.js` (pure, `node --test Demos/surface/17-assets.test.mjs`)
+> and `18-images.js`; e2e 69–69k, `keep`'s P and `boards`' N20.
 
-A photographed sketch is pixels, not marks. `trace` takes an RGBA bitmap
+**A picture is kept and drawn.** Its pixels used to be a blob URL in memory — gone on
+reload, in no log, never painted on the board (an image artifact is not live). Now:
+
+- **The asset store** (`mm-assets`, IndexedDB beside the board journal, `18-images.js`):
+  `assets` (the bytes, `ArrayBuffer`) and `info` (hash, time, size, mime, w, h) keyed by
+  **`sha256:` and 64 hex** of the bytes kept — `crypto.subtle`, or plain code
+  (`sha256Hex`, 17-assets.js) where the page is not a secure context — so the same photo
+  brought in twice is one asset. **Order is the safety**: the bytes are committed (their
+  own transaction, strict durability) *before* the event exists, and the event goes to the
+  board's journal in the task that makes it, so a kill leaves no event naming bytes that
+  were not kept (`assets.pending` is what is stored and not yet named; `keep`'s P records
+  kill right after and during an import). With no IndexedDB the bytes are held by the page
+  and the line says so.
+- **The event** names, never carries: `import { kind: 'jpg' | 'png' | 'webp', asset,
+  mime, w, h, name, path, bounds }` (`SessionEvent`'s `import`, `session.ts`). A picture has
+  **no code** — an `import` with an `asset` and no `code` is held; the code rep carries
+  `asset`, `mime`, `w`, `h` (read, never trusted: an asset that is not `sha256:…`, a size
+  that is not a positive number and a mime that is not an image are left out), and
+  `pictureOf(node)` reads them. **A version-1 log's picture** (a path and an empty code,
+  no asset) replays as it always did, an artifact that draws its name. `webp` joins `png`
+  and `jpg` in the closed kinds table; a picture is never live (`isPictureKind`).
+  The identity of a picture is its asset; its **path** (`imports/<name>.<kept
+  extension>`, `-2`, `-3` … for a name already on the board — cameras call every file
+  `image.jpg`) is a label.
+- **On the way in** (`importPictures(files, { view?, at? })`): decoded in a **Worker**
+  where the browser has `OffscreenCanvas` (its source is a string, taking `fitLongSide`
+  from the closure by its own source), the main thread otherwise; **EXIF orientation
+  honoured** (`createImageBitmap`'s `imageOrientation: 'from-image'`, tried without where
+  a browser refuses the option); the **long side held to 2,560 px** (`ASSET_LONG_SIDE`, the
+  original not kept — an option for later); kept as **JPEG, WebP where clearly smaller,
+  PNG where it has transparency** (`pictureFormat`); every `ImageBitmap` closed. **One
+  file at a time**, picks queued; a pick is **laid out in a grid in the view**
+  (`pictureCells`, `fitInCell`: cells depend on the count and the view, never on the
+  pictures, so each is placed the moment it is kept; `clearShift` moves a grid clear of
+  what is on the board — a second picture never lands on the first — and the view goes to
+  it when it left the screen), the status line saying *importing 3 of 10 pictures*. A
+  picture is **not traced on import**.
+- **Drawn on the board, under the ink** (`08-render.js`, `drawPicture`): a picture artifact
+  with an asset is painted on the canvas — not an iframe, so the live budget of twelve is
+  none of its business — **first**, before any stroke, culled to the screen with the rest
+  of the paint (R4c), a held one drawn where a drag takes it, turned by its `rotation`. A
+  figure wears its chrome only while pointed at. Decoded bitmaps are cached **by asset**
+  (`pictureBitmap`): a **thumbnail** while the screen shows the picture small, whole once
+  shown large (`pictureTier`), read from the store and decoded off the paint (a repaint when
+  one lands), **closed** when the decoded pictures cost more than `DECODED_BUDGET_PX`
+  (`evictPlan`: least recently drawn first, never one in the paint just made) or have not
+  been drawn for twenty seconds. An asset this browser does not hold (a log from elsewhere)
+  draws its plate and is `missing` in `mm.pictureState()`. **Pictures are moved, scaled and
+  turned as themselves**: a picture has no ink of its own, so `manipulableOf` and
+  `markFrameOf` (`session/manipulate.ts`) take it as a mark (an artifact's members move with
+  it as before). A loop round ink on a picture takes the picture too — it is content inside
+  the loop (e2e 24b moves it aside first); whether that should differ is open.
+- **Kept with the board**: a duplicate's events name the same assets (nothing copied); the
+  trash keeps them while a board can be restored; **emptying the trash collects the assets
+  no board uses** (`collectAssets`, called by `emptyTrash`, 17-folder.js; every board the
+  browser keeps is read, the trash's included, and a board that cannot be read stops the
+  whole collection — never on a guess) — except an asset stored in the last
+  `ASSET_GRACE_MS` (another tab may be between its bytes and its event) or in flight. An
+  import undone leaves its bytes until then.
+- **Inputs** (`session-engine.html`): the *import* tile opens a pane — *photos*
+  (`accept="image/*,.svg"`, `multiple`, no `capture`), *camera* (`capture="environment"`,
+  one) and *other files* — because one input asking for both may open the camera alone. A
+  drop lands at the drop point; **a paste anywhere on the page** is taken unless it is
+  meant for a text field.
+- **The MCP hand** reads the event: `canvas_look` says *a picture holiday.jpg 2560×1920* and
+  that this hand has no pixels of it (the hand has no asset bytes; `canvas_see` cannot show a
+  picture). A later unit adds `canvas_import`.
+
+**Tracing is an offer** (`tools/trace.ts`: *Trace into ink*, tool `trace`, host act `trace`,
+appended last in `builtin.ts`): on a picture held alone with an asset, `traceFrom`
+(18-images.js) reads the pixels again from the store, traces them as below at a long side of
+`IMPORT_MAX_PX` and writes **one `import` event of strokes** over the picture's own box inside
+the tool's stamp — one act, one undo — and the picture stays. A photo is no longer ink on
+arrival (a camera photo was ~3,900 strokes). *To do*: filter to what the shape rung reads with
+confidence and offer it by default for a scan of a drawing (PLAN-IPAD-NOTES §5.5); folder
+discovery still imports a folder's pictures without an asset (they draw their name).
+
+**The trace itself** (`image/trace.ts`): a photographed sketch is pixels, not marks. `trace`
+takes an RGBA bitmap
 (the shape of `ImageData`; no canvas API in core) and returns strokes in
 pixel coordinates: Otsu's threshold on luminance (inverted when most of the
 picture reads as ink, so a chalkboard photo works), Zhang–Suen thinning to the
@@ -3520,12 +3608,10 @@ ink spacing**: the engine measures along the path, and a polyline that is
 only its corners has nothing between them to measure, so a perfect traced box
 read as a circle until it was given the density a hand leaves. Every result
 carries its reasoning (the threshold, the ink fraction, how many flecks were
-dropped). On the surface (`18-images.js`) a picture arrives by drop, paste,
-*Import…* or a phone's camera, lands as declared ink at the drop point with
-the raster kept beside it as an image artifact, and can then be circled and
-prompted into a page inside its own ink; an SVG or any file of a known kind
-becomes an artifact of its kind. *Export…* writes the board as SVG or PNG
-or the session as its log, and the panel saves any artifact's code.
+dropped). An SVG or any file of a known kind becomes an artifact of its kind
+(an SVG in a pick takes its cell). *Export…* writes the board as SVG or PNG
+or the session as its log (pictures are not in them yet — I4), and the panel saves any
+artifact's code.
 
 ### Programs, and the library first (v9 S5)
 

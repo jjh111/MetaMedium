@@ -64,6 +64,11 @@ jobs:
       # which board a page opens and whether the one on screen may be left.
       - name: The boards list, on its own
         run: node --test ../Demos/surface/17-boards.test.mjs
+      # And the pictures' bytes (PLAN-IPAD-NOTES I1): what a picture is kept as,
+      # its name, where a pick stands, which assets nothing uses, what the
+      # decoded pictures cost.
+      - name: The asset store's rules, on their own
+        run: node --test ../Demos/surface/17-assets.test.mjs
       # The app at /app/ (V1-PLAN R7): its page, its worker and its manifest
       # are made from the old address's, and VERSION is stamped into the page
       # and into both workers' caches — what is committed must be that build.

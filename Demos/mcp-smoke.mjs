@@ -226,6 +226,17 @@ try {
   const notHisWord = await call('canvas_label', { id: navId, text: 'not mine' });
   check('canvas_label is refused on the tab\'s word, with the reason in words', /was made by tab/.test(textOf(notHisWord)) && /your own ink/.test(textOf(notHisWord)) && !/“not mine” on/.test(textOf(notHisWord)), textOf(notHisWord));
 
+  // A picture on the tab's board (PLAN-IPAD-NOTES I1): an event naming an asset and no bytes. The hand's look lists it as a
+  // picture with its name and size, and says it has no pixels — they are kept by the tab that imported it.
+  const picAt = Date.now() + 20;
+  const picId = tabSession.import({ kind: 'jpg', path: 'imports/holiday.jpg', name: 'holiday.jpg', bounds: { minX: 900, minY: 100, maxX: 1300, maxY: 400 }, asset: 'sha256:' + 'ab'.repeat(32), mime: 'image/jpeg', w: 2560, h: 1920, at: picAt });
+  await tab.publish(tabSession.getEvents().filter((e) => !e.by));
+  const picLine = (text) => (picId && text.split('\n').find((l) => l.startsWith(picId + ' '))) || '';
+  let t8 = '';
+  for (let i = 0; i < 25 && !picLine(t8); i++) { t8 = textOf(await call('canvas_look', {})); if (!picLine(t8)) await wait(100); }
+  check('canvas_look lists the tab\'s picture as "a picture holiday.jpg 2560×1920", says this hand has no pixels of it, and prints nothing of the bytes\' place',
+    !!picId && /a picture holiday\.jpg 2560×1920/.test(picLine(t8)) && /this hand has none to see/.test(picLine(t8)) && !/sha256|imports\//.test(picLine(t8)) && /by tab/.test(picLine(t8)), { picId, line: picLine(t8) });
+
   // ===== Two hands in one room: an id crosses the boundary (T8) =============
   // The defect: a node id used to be a counter over the MERGED replay, and no
   // two hands in a room merge the same set of logs. A SECOND tab whose mark
