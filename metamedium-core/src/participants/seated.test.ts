@@ -115,7 +115,7 @@ describe('a model joined on one board is asked on the next', () => {
 
   it('a bridge, which wraps an agent, keeps up with it', async () => {
     const { s } = boardWithMark();
-    const bridge = createBridgeParticipant(s, 'hand', 1100);
+    const bridge = createBridgeParticipant(s, 1100, { name: 'hand' });
     s.load([]);
     bridge.seat(2000);
     expect(s.getState().participants).toContain(bridge.id);

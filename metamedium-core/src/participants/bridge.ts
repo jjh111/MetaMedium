@@ -131,6 +131,7 @@ export function createBridgeParticipant(
 
   return {
     ...agent,
+    get id() { return agent.id; }, // the agent's id moves when a board is loaded in place and it is seated again
     pending: () => waiting?.request ?? null,
     deliver(requestId, text) {
       if (!waiting || waiting.request.id !== requestId) return false;

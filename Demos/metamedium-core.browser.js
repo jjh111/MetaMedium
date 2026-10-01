@@ -474,6 +474,7 @@ var MetaMediumCore = (() => {
     hasMultipleSources: () => hasMultipleSources,
     headingsOf: () => headingsOf,
     headsOf: () => headsOf,
+    heldParticipant: () => heldParticipant,
     holdReach: () => holdReach,
     holds: () => holds,
     idealize: () => idealize,
@@ -685,6 +686,7 @@ var MetaMediumCore = (() => {
     score: () => score,
     scratchedOut: () => scratchedOut,
     seatBriefs: () => seatBriefs,
+    seatOn: () => seatOn,
     seatReplyText: () => seatReplyText,
     seedOf: () => seedOf,
     seeded: () => seeded,
@@ -26104,6 +26106,27 @@ ${pad}</${tag}>`;
     return { ok: true, facts };
   }
 
+  // src/participants/seated.ts
+  function kindOf3(state, id) {
+    const node = state.nodes.get(id);
+    const rep = node ? getRep(node, "participant") : void 0;
+    const kind = rep?.data?.kind;
+    return kind === "human" || kind === "agent" || kind === "engine" ? kind : null;
+  }
+  function heldParticipant(state, seating, was) {
+    const is = (id) => {
+      const node = state.nodes.get(id);
+      return !!node && kindOf3(state, id) === seating.kind && wordOf(node) === seating.name && node.capability === seating.capability;
+    };
+    if (was && state.participants.includes(was) && is(was)) return was;
+    return state.participants.find(is) ?? null;
+  }
+  function seatOn(session, seating, was, at) {
+    const held2 = heldParticipant(session.getState(), seating, was);
+    if (held2) return held2;
+    return session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
+  }
+
   // src/participants/decide.ts
   var NO_MATCH = "no-match";
   var DECIDER_TAKE_AT = 0.99;
@@ -26173,8 +26196,11 @@ ${pad}</${tag}>`;
     const tier = options.tier ?? 1.5;
     const margin = options.flatMargin ?? FLAT_MARGIN;
     const takeAt = options.takeAt ?? 0;
-    const id = session.join("agent", name, at, tier, options.locality ?? "local");
+    const seating = { kind: "agent", name, capability: tier, locality: options.locality ?? "local" };
+    let id = session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
+    const seat = (now = at) => id = seatOn(session, seating, id, now);
     async function ask(questions, now, signal) {
+      seat(now);
       const snapshot = session.getState().generation;
       const started = Date.now();
       let result2;
@@ -26259,7 +26285,9 @@ ${pad}</${tag}>`;
       }
       return { ok: true, rows, unanswered, snapshot, ms, via: result2.via };
     }
-    return { id, name, tier, ask };
+    return { get id() {
+      return id;
+    }, seat, name, tier, ask };
   }
   var even = (outcomes) => outcomes.map((of) => ({ of, p: outcomes.length ? 1 / outcomes.length : 0 }));
   function spread(outcomes, lead, p) {
@@ -29004,9 +29032,12 @@ Reply with ONLY a JSON array, no prose, no code fences.`;
   function createAgentParticipant(session, config, at = 0, options = {}) {
     const send = options.transport ?? ((c, m, o) => complete(c, m, o));
     const name = options.name ?? providerLabel(config);
-    const id = session.join("agent", name, at, options.tier ?? providerTier(config), options.locality ?? providerLocality(config));
+    const seating = { kind: "agent", name, capability: options.tier ?? providerTier(config), locality: options.locality ?? providerLocality(config) };
+    let id = session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
+    const seat = (now = at) => id = seatOn(session, seating, id, now);
     const staleWhy = (fallback) => session.getState().staleResult?.detail ?? fallback;
     async function interpret(nodeIds, now, signal) {
+      seat(now);
       const state = session.getState();
       const generation = state.generation;
       const targets = nodeIds.filter((n2) => state.nodes.has(n2));
@@ -29045,6 +29076,7 @@ ${question}` }
       return { ok: true, readings: readings2, raw: result2.text };
     }
     async function ask(question, nodeIds, now, signal) {
+      seat(now);
       const q = question.trim();
       if (!q) return { ok: false, error: "no question" };
       const state = session.getState();
@@ -29079,6 +29111,7 @@ Question: ${q}` }
       return { ok: true, text, explanationId };
     }
     async function generate(args) {
+      seat(args.at);
       const prompt2 = args.prompt.trim();
       if (!prompt2) return { ok: false, error: "no prompt" };
       const state = session.getState();
@@ -29194,6 +29227,7 @@ ${brief}`, ids: planned.ids, build: planned.build };
       };
     }
     async function read2(args) {
+      seat(args.at);
       if (!config.vision) return { ok: false, transcripts: [], error: `${name} cannot see images` };
       const state = session.getState();
       const generation = state.generation;
@@ -29226,6 +29260,7 @@ ${brief}`, ids: planned.ids, build: planned.build };
       return { ok: true, transcripts, raw: result2.text };
     }
     async function draw(args) {
+      seat(args.at);
       const prompt2 = args.prompt.trim();
       if (!prompt2) return { ok: false, ids: [], shapes: [], error: "no prompt" };
       const state = session.getState();
@@ -29272,6 +29307,7 @@ The human asks: ${prompt2}` }
       return { ok: true, ids, shapes, raw: result2.text };
     }
     async function program(args) {
+      seat(args.at);
       const prompt2 = args.prompt.trim();
       if (!prompt2) return { ok: false, error: "no prompt" };
       const state = session.getState();
@@ -29308,6 +29344,7 @@ The human typed: ${prompt2}` }
       return { ok: true, name: parsed.name, parts: parsed.parts, code: parsed.code, raw: result2.text };
     }
     async function behave(args) {
+      seat(args.at);
       const words = args.words.trim();
       if (!words) return { ok: false, behaviour: null, via: "none", unread: [], error: "no words" };
       const state = session.getState();
@@ -29342,7 +29379,9 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
       session.behave({ nodeId: args.nodeId, behaviour, participantId: id, at: args.at });
       return { ok: true, behaviour, via: "model", unread: reply.unread, raw: result2.text };
     }
-    return { id, name, config, interpret, ask, generate, read: read2, draw, behave, program };
+    return { get id() {
+      return id;
+    }, seat, name, config, interpret, ask, generate, read: read2, draw, behave, program };
   }
 
   // src/participants/bridge.ts
@@ -29393,6 +29432,10 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
     });
     return {
       ...agent,
+      get id() {
+        return agent.id;
+      },
+      // the agent's id moves when a board is loaded in place and it is seated again
       pending: () => waiting?.request ?? null,
       deliver(requestId, text) {
         if (!waiting || waiting.request.id !== requestId) return false;
@@ -29672,6 +29715,10 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
     };
     return {
       ...agent,
+      // The spread copies a value; the agent's id moves when a board is loaded in place and it is seated again.
+      get id() {
+        return agent.id;
+      },
       interpret: (nodeIds, t, signal) => via({ ask: "what", about: alive(nodeIds) }, () => agent.interpret(nodeIds, t, signal)),
       ask: (question, nodeIds, t, signal) => via({ ask: "ask", about: alive(nodeIds), words: question }, () => agent.ask(question, nodeIds, t, signal)),
       // A line read as one image names every mark in the picture (`about`); one mark names itself.

@@ -47,6 +47,7 @@
 
 import type { Session, ProposedEdge, ProposedRep } from '../session/session';
 import type { Capability, Locality } from '../session/nodes';
+import { seatOn, type Seating } from './seated';
 
 /** The outcome that means *none of these* — always offered, never inferred. */
 export const NO_MATCH = 'no-match';
@@ -323,8 +324,14 @@ export interface DecideRun {
 }
 
 export interface DecideSeat {
-  /** The participant node id — everything this seat says is attributed to it. */
-  id: string;
+  /**
+   * The participant node id on the board as it stands — everything this seat says is attributed to it.
+   * A board loaded in place takes the join with it; `seat()`, which `ask` does first, finds the seat
+   * on the board again or joins it there once (`participants/seated.ts`).
+   */
+  readonly id: string;
+  /** Seat it on the board as it stands and return its participant id — the join the board holds, else one new `join`. Idempotent. */
+  seat(at?: number): string;
   name: string;
   tier: Capability;
   /**
@@ -354,13 +361,16 @@ export function createDecideParticipant(
   const tier: Capability = options.tier ?? 1.5;
   const margin = options.flatMargin ?? FLAT_MARGIN;
   const takeAt = options.takeAt ?? 0;
-  const id = session.join('agent', name, at, tier, options.locality ?? 'local');
+  const seating: Seating = { kind: 'agent', name, capability: tier, locality: options.locality ?? 'local' };
+  let id = session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
+  const seat = (now: number = at): string => (id = seatOn(session, seating, id, now));
 
   async function ask(
     questions: readonly DecisionQuestion[],
     now: number,
     signal?: AbortSignal
   ): Promise<DecideRun> {
+    seat(now);
     const snapshot = session.getState().generation;
     const started = Date.now();
     let result: DecideResult;
@@ -460,7 +470,7 @@ export function createDecideParticipant(
     return { ok: true, rows, unanswered, snapshot, ms, via: result.via };
   }
 
-  return { id, name, tier, ask };
+  return { get id() { return id; }, seat, name, tier, ask };
 }
 
 // ---- a stub seat -----------------------------------------------------------
