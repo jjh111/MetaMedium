@@ -660,8 +660,8 @@ export async function logFormatTest(browser, servers, ctx) {
     }));
     check('N19d. a file of version 2 is refused in the boards pane with a sentence naming both versions and what wrote it — no board is made, and the one on screen is as it was',
       /future\.jsonl/.test(refused.said) && /version 2/.test(refused.said) && /versions 0 and 1/.test(refused.said) && /9\.9\.9/.test(refused.said) &&
-        JSON.stringify(refused.list) === JSON.stringify(boards19.filter((id) => refused.list.includes(id))) && refused.list.length === boards19.length && refused.current === (await boardsNow(page)).current,
-      refused);
+        JSON.stringify([...refused.list].sort()) === JSON.stringify([...boards19].sort()) && refused.current === (await boardsNow(page)).current,
+      { ...refused, before: boards19 });
 
     // ---- N19e. a folder whose log is of a newer version is refused whole; a version 0 one is written back as 1 -----
     const folderOut = await page.evaluate(async (futureText) => {
