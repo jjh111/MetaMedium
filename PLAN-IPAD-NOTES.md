@@ -201,6 +201,14 @@ texts, figures. Moving or scaling it moves what it holds, one act. It has a
 title, a colour from the tokens, and an entry in a board's outline (the panel)
 that pans to it. Derived membership (what stands inside), never copied.
 
+*Status, 1 Oct 2026: built on `unit/i5-regions` (`V1-PLAN.md` §9, *The iPad*, has the unit's line).* A region
+is a node of its own (`session/board-regions.ts`; events `region` and `rename`), not ink and not content; what it
+holds is derived by one rule (`REGION_HOLDS`: most of a thing's box inside) and never written; a move or scale of it
+is one event that carries what it holds, bound connectors following; *Make it a region* (`tools/region.ts`) is offered
+on a rectangle held with at least three things, and `region: Monday` is typed. The panel, the outline and the minimap
+show it (`12-regions.js`); e2e 71–71m. Open: whether a region should be resizable without scaling what it holds, and
+the name of the first untyped region (*Region 1*).
+
 **I6 — find.** Search across every board (an index kept beside the journal,
 derived, rebuilt when missing): labels, names, typed text, SVG text, Mermaid,
 transcripts. Lexical first; a hit opens the board at the region. Thumbnails in
