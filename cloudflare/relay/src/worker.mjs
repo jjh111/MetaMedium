@@ -12,6 +12,9 @@
 // bounded in characters as well as lines. The relay has no truth of its own and
 // holds no key of anyone's: a line is a hand's log, carried.
 //
+// (A Worker's entry module may export only handlers and classes — workerd refuses
+// the module otherwise — so its limits are constants here, not exports.)
+//
 // Environment (wrangler.toml and `wrangler secret put`; README.md):
 //   ROOMS               the Durable Object namespace (binding)
 //   MM_RELAY_SECRET     secret; room keys are HMACs of the room name under it.
@@ -26,11 +29,11 @@ import { kindOf, replay, truncationNotice, maxLinesFrom } from '../../../Demos/r
 import { secretsOf, keyOpens } from './auth.mjs';
 
 /** The largest line a POST may carry, in characters (the Node relay's cap). */
-export const MAX_LINE_CHARS = 4e6;
+const MAX_LINE_CHARS = 4e6;
 /** What a room keeps in characters when nothing says otherwise. */
-export const DEFAULT_MAX_CHARS = 32e6;
+const DEFAULT_MAX_CHARS = 32e6;
 /** A value in a Durable Object's storage may be held to 128 KiB: a line is kept in pieces under it, even of 3-byte characters. */
-export const CHUNK_CHARS = 40000;
+const CHUNK_CHARS = 40000;
 const MAX_ROOM_NAME = 128;
 const BEAT_MS = 25000;
 

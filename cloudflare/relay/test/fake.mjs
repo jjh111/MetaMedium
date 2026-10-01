@@ -69,11 +69,14 @@ export async function readUntil(res, done, ms = 3000) {
   const dec = new TextDecoder();
   let text = '';
   const end = Date.now() + ms;
+  let pending = null;   // one read at a time: a read left behind by a timeout would swallow the next chunk
   try {
     while (!done(text)) {
       if (Date.now() > end) throw new Error('timed out reading the stream; got ' + JSON.stringify(text));
-      const r = await Promise.race([reader.read(), new Promise((r) => setTimeout(() => r({ timeout: true }), 50))]);
+      pending = pending || reader.read();
+      const r = await Promise.race([pending, new Promise((r) => setTimeout(() => r({ timeout: true }), 50))]);
       if (r.timeout) continue;
+      pending = null;
       if (r.done) break;
       text += dec.decode(r.value, { stream: true });
     }

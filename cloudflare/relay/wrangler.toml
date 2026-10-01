@@ -1,0 +1,29 @@
+# The room relay: a Worker in front of one Durable Object per room (README.md, ../README.md).
+#   wrangler deploy                      # from this folder; the deploy workflow does it on a push to master
+#   wrangler secret put MM_RELAY_SECRET  # once: the secret room keys are made from (room-key.mjs)
+name = "dyna-relay"
+main = "src/worker.mjs"
+compatibility_date = "2025-09-01"
+# `request.signal` aborts when a hand's stream is dropped, so its writer is let go at once.
+compatibility_flags = ["enable_request_signal"]
+workers_dev = true
+
+# relay.dyna.ink, once dyna.ink is a zone in this Cloudflare account (or add the custom domain
+# to the Worker in the dashboard, which does the same):
+# routes = [{ pattern = "relay.dyna.ink", custom_domain = true }]
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+# SQLite-backed, which the free plan requires, and what a room's lines are kept in.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
+
+[vars]
+# More origins a browser may call from, comma-separated (dyna.ink, its www, the github.io
+# address and localhost are built in):
+# MM_RELAY_ORIGINS = "https://preview.dyna.ink"
+# MM_RELAY_MAX_LINES = "5000"
+# MM_RELAY_MAX_BYTES = "32000000"
