@@ -283,9 +283,11 @@ try {
   // ---- canvas_look for notes: writing in reading order with what it says ----
   let lw = '';
   for (let i = 0; i < 25 && !/^writing · /m.test(lw); i++) { lw = textOf(await call('canvas_look', {})); if (!/^writing · /m.test(lw)) await wait(100); }
-  const wLine = lw.split('\n').find((l) => l.startsWith('writing · ') && l.includes(navId)) || '';
-  check('canvas_look lists a line of writing — its marks\' ids, unread, with what to do about it — and where it stands', !!wLine && /unread/.test(wLine) && /canvas_transcribe/.test(wLine) && /at 100,9\d+ /.test(wLine), { wLine });
-  await call('canvas_transcribe', { id: navId, text: 'navigate', confidence: 0.8 });
+  // The letters the tab printed at y 900 stand in the hand's board as the hand's merge gathered them; the line is found by where it stands, never by an id that merge may have remade.
+  const wLine = lw.split('\n').find((l) => /^writing · /.test(l) && / · at \d+,9\d\d /.test(l)) || '';
+  const wId = (wLine.match(/^writing · (\S+)/) || [])[1] || '';
+  check('canvas_look lists a line of writing — its marks\' ids, unread, with what to do about it — and where it stands', !!wLine && /unread/.test(wLine) && /canvas_transcribe/.test(wLine) && / · at \d+,9\d\d \d+×\d+/.test(wLine) && !!wId, { wLine, words: lw.split("\n").filter((l) => /word:/.test(l)) });
+  await call('canvas_transcribe', { id: wId, text: 'navigate', confidence: 0.8 });
   let lw2 = '';
   for (let i = 0; i < 25 && !/reads “navigate”/.test(lw2); i++) { lw2 = textOf(await call('canvas_look', {})); if (!/reads “navigate”/.test(lw2)) await wait(100); }
   check('…and once a hand has read it, the line says what it reads', /^writing · .*reads “navigate”/m.test(lw2), lw2.split('\n').filter((l) => /^writing/.test(l)));

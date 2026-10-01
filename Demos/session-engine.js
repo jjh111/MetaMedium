@@ -14894,13 +14894,58 @@
     refreshPalette();
   }
 
+// ===== relay =====
+// Provides: where *with Claude* looks for the room's relay (PLAN-IPAD-NOTES A2) — the pure half: CLAUDE_RELAY_LOCAL
+//   and CLAUDE_RELAY_HOSTED (the two addresses), claudeRelayFor (which one a page defaults to, from the hostname it
+//   is served from) and ownRelay (whether an address is the product's own relay, the one hosted relay the seat
+//   accepts besides one on this machine).
+// Uses: NOTHING. No closure variable, no DOM, no storage, no session — so it is tested on its own in Node:
+//   node --test Demos/surface/24-relay.test.mjs
+//   24-seat.js is the adapter (it reads `location.hostname` and puts the answer in the Live pane).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+//
+// On the dyna.ink origin the Live pane's *with Claude* defaults to the hosted relay, https://relay.dyna.ink
+// (cloudflare/README.md): a person on an iPad has no relay on the device, and the one on the machine Claude Code
+// runs on is not reachable from there. Everywhere else — this machine, the GitHub Pages address, a file — it is the
+// relay on this machine, as it always was. A relay typed into the pane always wins over either.
+//
+// THE KEY IS NOT HERE. A hosted room wants a key (a key per room, the HMAC of its name under a secret only the relay
+// holds); a tab takes it from the page address's `?key=` where the room is opened (17-folder.js, `openLive`), and a
+// key never enters the log, a board, an export, a cache or a sentence of the page's. This fragment says where the
+// relay is and never holds, reads or repeats a key — an address that carries one in it is not judged the relay's own.
+
+  const CLAUDE_RELAY_LOCAL = 'http://127.0.0.1:8020';
+  const CLAUDE_RELAY_HOSTED = 'https://relay.dyna.ink';
+
+  /** The relay *with Claude* defaults to for a page served from `hostname`: the hosted one on dyna.ink and its subdomains, else the one on this machine. */
+  function claudeRelayFor(hostname) {
+    if (typeof hostname !== 'string') return CLAUDE_RELAY_LOCAL;
+    const host = hostname.trim().toLowerCase().replace(/\.$/, '');
+    return host === 'dyna.ink' || host.endsWith('.dyna.ink') ? CLAUDE_RELAY_HOSTED : CLAUDE_RELAY_LOCAL;
+  }
+
+  /**
+   * Whether an address is the product's own relay: `https://relay.dyna.ink`, the origin and nothing more — the seat
+   * accepts it as it accepts a relay on this machine, because it is the one hosted relay this build's page is made
+   * to reach (its content-security policy names it) and it keeps a room only for a key. Anything else, and an
+   * address with a key or a login in it, is not.
+   */
+  function ownRelay(url) {
+    if (typeof url !== 'string' || !url) return false;
+    let u;
+    try { u = new URL(url); } catch (err) { return false; }
+    return u.protocol + '//' + u.host === CLAUDE_RELAY_HOSTED && (u.pathname === '/' || u.pathname === '') && !u.search && !u.hash && !u.username && !u.password;
+  }
+
 // ===== seat =====
 // Provides: the seat — Claude Code, over MCP, as a model the field asks (V1-PLAN J4): the models
 //   pane's first section (seatSection: "Claude Code — in this room", one tap; or what to do, in a
 //   sentence), joinSeat/leaveSeat, withClaude (the Live pane's "with Claude": the room and the seat
 //   in one act), isSeatAgent (the reader's preference), seatRoomOpened (a room's presence followed),
 //   seatState (for tests), and the door moved under "advanced".
-// Uses: core (MM, prefs, esc), models (agents, join, leave, renderAgents, workControllers, addMcp,
+// Uses: relay (24-relay.js: claudeRelayFor, ownRelay — which relay "with Claude" defaults to, A2), core (MM, prefs, esc), models (agents, join, leave, renderAgents, workControllers, addMcp,
 //   syncProviderFields, the pane's elements), input (say), folder (folder, openLive, saveNow),
 //   teach (closePanel), controls (livePanel, tiles, syncTiles).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -14934,7 +14979,9 @@
   // back when given up on; its card is never drawn — the answer is.
 
   const CLAUDE_ROOM = 'claude';
-  const CLAUDE_RELAY = 'http://127.0.0.1:8020';
+  // The relay "with Claude" defaults to: the one on this machine, and on the dyna.ink origin the hosted one (24-relay.js; A2).
+  // A relay typed in the Live pane wins. The room's key, for a hosted relay, is the page address's ?key= — never held here.
+  const CLAUDE_RELAY = claudeRelayFor(location.hostname);
   /** How recently a hand must have been heard to be in the room — the status line's own minute. */
   const HEARD_MS = 60000;
   /** What the status line says when the seat is taken. */
@@ -14949,10 +14996,10 @@
   /** Why the seat cannot take a question on this page now, in one sentence — or null. */
   function whyNoSeat() {
     if (folder.how !== 'live' || !folder.store) {
-      return 'Claude answers here once this page is in its room — tap “with Claude” in the live tile, or open this page with ?live=' + CLAUDE_ROOM + '&relay=' + CLAUDE_RELAY + '.';
+      return 'Claude answers here once this page is in its room — tap “with Claude” in the live tile, or open this page with ?live=' + CLAUDE_ROOM + '&relay=' + CLAUDE_RELAY + (ownRelay(CLAUDE_RELAY) ? '&key=… (the room’s key)' : '') + '.';
     }
     if (!folder.relay) return 'This room is between tabs on this machine, and Claude’s hand reaches a room only through a relay — tap “with Claude” in the live tile.';
-    if (MM.providerLocality({ baseUrl: folder.relay }) !== 'local') return 'This room’s relay is on another machine, and the seat asks only through a relay on this one — tap “with Claude” in the live tile.';
+    if (MM.providerLocality({ baseUrl: folder.relay }) !== 'local' && !ownRelay(folder.relay)) return 'This room’s relay is on another machine, and the seat asks only through a relay on this one or the dyna.ink relay — tap “with Claude” in the live tile.';
     return null;
   }
 
@@ -15007,7 +15054,7 @@
 
   /**
    * The Live pane's "with Claude": room "claude" through the relay on this
-   * machine (or the one typed), and the seat — one act. Taken at once when
+   * machine — on the dyna.ink origin, the hosted one — or the one typed, and the seat — one act. Taken at once when
    * Claude's hand is heard; otherwise taken the moment it is, and said.
    */
   async function withClaude() {
@@ -15134,6 +15181,7 @@
       wanted: seatWanted,
       room: folder.how === 'live' ? folder.name : null,
       why: whyNoSeat(),
+      relay: CLAUDE_RELAY,
       waiting: seatAgent ? seatAgent.waiting() : [],
     };
   }

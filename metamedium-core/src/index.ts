@@ -315,6 +315,9 @@ export {
   shareInside, standingBoxOf, thingKindOf, regionOutline,
 } from './session/board-regions';
 export type { RegionRep, RegionBoard, RegionDescription, OutlineEntry } from './session/board-regions';
+// What a hand may move (PLAN-IPAD-NOTES A2): what it made, and a region of its own only while it carries only that.
+export { handMoves } from './session/hand-moves';
+export type { MoveWhy, MoveRefusal, MoveVerdict } from './session/hand-moves';
 export type { Affine } from './session/affine';
 
 // Words from letters — printed letters gathered into one held mark (words.ts).

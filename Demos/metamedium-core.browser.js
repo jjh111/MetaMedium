@@ -487,6 +487,7 @@ var MetaMediumCore = (() => {
     guessVision: () => guessVision,
     handLabel: () => handLabel,
     handLike: () => handLike,
+    handMoves: () => handMoves,
     handlesOf: () => handlesOf,
     has: () => has,
     hasMultipleSources: () => hasMultipleSources,
@@ -4747,12 +4748,12 @@ var MetaMediumCore = (() => {
   }
   function sheetEntry(sheet, key2) {
     const k = key2.trim();
-    const live3 = (e) => (e.kind === "definition" || e.kind === "step") && !e.conflict;
-    const direct2 = sheet.entries.find((e) => live3(e) && e.key === k);
+    const live4 = (e) => (e.kind === "definition" || e.kind === "step") && !e.conflict;
+    const direct2 = sheet.entries.find((e) => live4(e) && e.key === k);
     if (direct2) return direct2;
     const n2 = normName(k.replace(/^step\s+/i, "").replace(/[.)]$/, ""));
     return sheet.entries.find((e) => {
-      if (!live3(e)) return false;
+      if (!live4(e)) return false;
       if (e.kind === "definition") return normName(e.key) === n2 || !!e.name && normName(e.name) === n2 || !!e.letter && normName(e.letter) === n2;
       return e.kind === "step" && normName(e.key) === n2;
     });
@@ -11284,7 +11285,7 @@ var MetaMediumCore = (() => {
     let participants = [];
     let explanations = [];
     let regions = [];
-    let live3 = [];
+    let live4 = [];
     let clocks = {};
     let packs = [];
     let library = [];
@@ -11367,7 +11368,7 @@ var MetaMediumCore = (() => {
         participants: participants.slice(),
         explanations: explanations.slice(),
         regions: regions.slice(),
-        live: live3.slice(),
+        live: live4.slice(),
         gestures: structuredClone(gestures),
         markHands: new Map(markHands),
         lastAt,
@@ -11406,7 +11407,7 @@ var MetaMediumCore = (() => {
       participants = s.participants.slice();
       explanations = s.explanations.slice();
       regions = (s.regions ?? []).slice();
-      live3 = s.live.slice();
+      live4 = s.live.slice();
       gestures = structuredClone(s.gestures);
       markHands = new Map(s.markHands);
       lastAt = s.lastAt;
@@ -11524,7 +11525,7 @@ var MetaMediumCore = (() => {
       participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
       explanations = [];
       regions = [];
-      live3 = [];
+      live4 = [];
       clocks = {};
       packs = [];
       library = [];
@@ -12074,7 +12075,7 @@ var MetaMediumCore = (() => {
       };
     }
     function liveArtifactUnder(b, excludeId) {
-      for (const aid of live3) {
+      for (const aid of live4) {
         if (aid === excludeId) continue;
         const ab = boundsOf(nodes.get(aid));
         if (ab && boundsOverlap(ab, b)) return aid;
@@ -12342,8 +12343,8 @@ var MetaMediumCore = (() => {
       removeFromContent(node.id);
       ink.delete(node.id);
       definitionsChanged = true;
-      const li = live3.indexOf(node.id);
-      if (li >= 0) live3.splice(li, 1);
+      const li = live4.indexOf(node.id);
+      if (li >= 0) live4.splice(li, 1);
       for (const g of gestures.values()) {
         g.selection = g.selection.filter((id) => id !== node.id);
         if (g.pendingLasso?.id === node.id) g.pendingLasso = null;
@@ -12356,8 +12357,8 @@ var MetaMediumCore = (() => {
         removeFromContent(artifactId);
         const ai = artifacts.indexOf(artifactId);
         if (ai >= 0) artifacts.splice(ai, 1);
-        const li2 = live3.indexOf(artifactId);
-        if (li2 >= 0) live3.splice(li2, 1);
+        const li2 = live4.indexOf(artifactId);
+        if (li2 >= 0) live4.splice(li2, 1);
         for (const e of artifact.edges) {
           if (e.rel !== "has-part") continue;
           const member = nodes.get(e.to);
@@ -13072,7 +13073,7 @@ var MetaMediumCore = (() => {
       }
     }
     function applyClock(ev) {
-      if (!artifacts.includes(ev.nodeId) && !live3.includes(ev.nodeId)) return;
+      if (!artifacts.includes(ev.nodeId) && !live4.includes(ev.nodeId)) return;
       const prev = clocks[ev.nodeId] ?? { playing: false, seed: 1, at: ev.at };
       switch (ev.op) {
         case "play":
@@ -13156,7 +13157,7 @@ var MetaMediumCore = (() => {
       artifacts.push(node.id);
       contentPush(node.id);
       definitionsChanged = true;
-      if (!picture) live3.push(node.id);
+      if (!picture) live4.push(node.id);
       recomputeClusterCandidates();
       return node.id;
     }
@@ -13400,7 +13401,7 @@ var MetaMediumCore = (() => {
         },
         source: ev.participantId
       });
-      if (!live3.includes(node.id)) live3.push(node.id);
+      if (!live4.includes(node.id)) live4.push(node.id);
       definitionsChanged = true;
       return node.id;
     }
@@ -13684,7 +13685,7 @@ var MetaMediumCore = (() => {
         staleResult,
         generation,
         recentIds: recentWithin(lastAt, LOCAL_PARTICIPANT),
-        live: [...live3],
+        live: [...live4],
         clocks: { ...clocks },
         selection: [...reader.selection],
         packs: [...packs],
@@ -20183,6 +20184,32 @@ ${p.svg}</section>`),
       words: body.includes("=") ? body : `${top.formula} = ${result2}`,
       ...second && second.value ? { also: `${second.formula} = ${fmt3(second.value)}` } : {}
     };
+  }
+
+  // src/session/hand-moves.ts
+  var live2 = (n2) => !!n2 && !getRep(n2, "erased");
+  function handMoves(board2, ids, isMine) {
+    const allowed = [];
+    const refused = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const id of ids) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      if (!live2(board2.nodes.get(id))) {
+        refused.push({ id, why: "missing", of: id });
+        continue;
+      }
+      if (!isMine(id)) {
+        refused.push({ id, why: "not-yours", of: id });
+        continue;
+      }
+      const carried = regionCarries(board2, [id]);
+      const moved2 = manipulableOf(board2.nodes, carried).map((n2) => n2.id);
+      const other = [...carried, ...moved2].find((c) => c !== id && live2(board2.nodes.get(c)) && !isMine(c));
+      if (other !== void 0) refused.push({ id, why: "carries-not-yours", of: other });
+      else allowed.push(id);
+    }
+    return { allowed, refused };
   }
 
   // src/store/merge.ts
@@ -28771,7 +28798,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
   var REGION_MIN_HELD = 3;
   var REGION_MARGIN_SHARE = 0.06;
   var REGION_MARGIN_MIN = 20;
-  var live2 = (state, id) => {
+  var live3 = (state, id) => {
     const n2 = state.nodes.get(id);
     return !!n2 && !getRep(n2, "erased");
   };
@@ -28781,7 +28808,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
     return topInterpretation(n2) === "rectangle" || cleanOf(n2)?.shape === "rectangle";
   }
   function regionFrameOf(state, ids) {
-    const marks = ids.filter((id) => live2(state, id));
+    const marks = ids.filter((id) => live3(state, id));
     let best = null;
     for (const id of marks) {
       if (!isBox2(state, id)) continue;
@@ -28803,7 +28830,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
     let box = null;
     for (const id of ids) {
       const n2 = state.nodes.get(id);
-      const b = n2 && live2(state, id) ? standingBoxOf(state.nodes, n2) : void 0;
+      const b = n2 && live3(state, id) ? standingBoxOf(state.nodes, n2) : void 0;
       if (!b) continue;
       box = box ? { minX: Math.min(box.minX, b.minX), minY: Math.min(box.minY, b.minY), maxX: Math.max(box.maxX, b.maxX), maxY: Math.max(box.maxY, b.maxY) } : { ...b };
     }
