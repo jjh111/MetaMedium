@@ -2755,6 +2755,74 @@ fingerprint carries it, so the model is asked to *read*, not to interpret.
   reader has the phrase; one word per mark lands on each mark, otherwise
   the line is held on the first and the rest were read with it. The field
   then leads with the line as one name and offers *Make it text* once.
+- **Reading my notes: every line, in a batch** (PLAN-IPAD-NOTES I8; core
+  `participants/readlines.ts`, `agent.readLines`, the read tool's offers in
+  `tools/read.ts`; the surface's side in `06-handwriting.js`, `09-palette.js`'s
+  host acts; e2e `models` M24–M28). **Several lines held are ONE offer, *Read
+  these*** (key `read-lines`; while the marks held are all unread writing it
+  stands as the one *writing* reading, W2's, whose Enter is *read these*), a
+  batch of every line of handwriting among the marks — `writingLinesIn` finds
+  them with `writingLines`, **the `writing` concept's own bands and gap, one
+  home** (`concepts/concept.ts`: the concept reads the fullest line, a read of
+  a page reads every one, top to bottom, left to right; a word alone is a line
+  of one). Each line is drawn **from its own strokes** — never a crop of the
+  board — by `sheetOf`, which says where every point and numeral go: **one
+  sheet of numbered rows, ink black on white at one line height** (`LINE_PX`),
+  one stroke width, **the pen's pressure ignored**, the sheet capped inside
+  what readers take (`SHEET_MAX_PX`); `06-handwriting.js` draws it exactly as
+  said. **One image with numbered lines, not one image a line:** a small vision
+  model reads one picture far better than several (many take one image a
+  message, a provider may cap them, each image is tokens and a place to lose
+  track of which is which), the number in the margin is a key the reply cannot
+  slip, one line height gives every line the same size however it was
+  written, and one image is one round trip. The reply is a JSON array, an
+  object a line (`{"line":2,"text":"…","confidence":0.8}`, a second object for
+  the same line a lower reading), read back line by line by `parseLineReadings`
+  — tolerant of an object with `lines`, plain strings by position and numbered
+  plain lines; **a line the reply leaves out has no reading, said, never
+  invented**. A call asks at most `LINES_PER_CALL` lines; more are further calls
+  **one after another** (a local server answers one at a time, and Esc stops
+  the rest), each with its dots on its own marks and its label in the status
+  line (*GLM 4.5V · reading lines 1–8 of 12*, `withWork`), a sentence between
+  (*read 8 of 12 lines — 4 to go*) and one at the end (*read 2 of 3 lines —
+  line 2: no reading came back for line 2*). Lines already read — a transcript
+  held, or read with their line — **are skipped** unless asked again (*Read
+  these again*, typed); *Read the board* is the same for the whole board, typed
+  (`read the board`, offered only where the host says there is writing:
+  `ToolHost.writing`, kept while the log stands); `readScopeHooks` is where a
+  region's marks join what is held (I5). **`agent.readLines` holds each line
+  where it was written**, attributed and never blessed: a line of several marks
+  whose reading has as many words gets a word on each, any other line is held
+  whole on its first mark (the rest *read with* it); a line fails by itself with
+  its reason (no reading came back for it; its mark was erased while the model
+  thought, STATE-1's refusal); a failed call fails every line with the
+  provider's words. **One deliberate act is one batch, nothing on draw**, and a
+  read with no model that sees is kept (J5) and runs when one joins. Through
+  Claude Code's seat the brief is one, naming every mark of the sheet, and the
+  hand that answers draws their ink. **Latency is measured**: the reader's row
+  keeps the last call as *ok · 1.2 s · read 3 lines · 12 KB · 0.4 s a line*, and
+  `window.__mm.lastReads()` the lines, payload bytes, ms and ms a line of each
+  call; a sheet of eight lines is tens of KB. The panel says what each line
+  said (`linesPanel`, *handwriting · 3 lines*) or why it was not read.
+- **A picture, read** (I8; `tools/read.ts`'s *Read the picture*,
+  `agent.readPicture`, `readPictureFrom` in `06-handwriting.js`): a picture held
+  alone with its pixels kept is offered *Read the picture*; the pixels are read
+  from the asset store, **downscaled to a long side of 1,568 px and sent as
+  JPEG** to the reader seat with *what does this page say*, and the answer —
+  `{"lines":[…]}`, text one line each — lands as **a text artifact BESIDE the
+  picture, never over it**, made by the reader (an `import` in its name, so it
+  is held as the reader's), editable like any text, named for the picture it
+  came from (*notes-page.jpg, read*); the picture is untouched, and a picture
+  gone before the answer lands writes nothing. **Claude Code at the desk cannot
+  yet read a picture** — the log carries no pixels, so the seat's hand has
+  nothing to see — and is left out of who reads one (`pictureReaders`); the
+  ask is kept for a model that sees. **A spike, not the product**: `?spike=trocr`
+  opens `Demos/spike-trocr.html` — TrOCR-small-handwritten through
+  transformers.js loaded lazily from jsDelivr on a tap, a pad to write a line
+  on, and what it measures (load time, memory where the browser says, ms a line,
+  the text, the error rate against what was typed). **It is unrun**: the
+  container it was written in cannot reach jsDelivr or Hugging Face (403), so
+  the model id, the CDN path and every number are unseen; it fails in words.
 
 ### Time: clocks, tanks, and code that runs (v8)
 
