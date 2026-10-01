@@ -7,7 +7,16 @@
 <link rel="stylesheet" href="surface/surface.css">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="metamedium-version" content="0.0.0">
-<meta name="theme-color" content="#0a0a0f">
+<!-- Installed on an iPad (PLAN-IPAD-NOTES I3): iOS takes the Home Screen icon from the page, as a PNG, and
+     the rest of what makes it an app from these. The theme colour is the surface's own ground in each theme
+     (surface.css --ground); icons/ is made by scripts/make-icons.mjs. -->
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="MetaMedium">
+<meta name="theme-color" content="#f8f6f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a0a0f" media="(prefers-color-scheme: dark)">
 </head>
 <body>
 <div id="stage"></div>

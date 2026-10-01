@@ -31,7 +31,7 @@ const SHELL = [
   '../Demos/surface/surface.css',
   '../Demos/metamedium-core.browser.js',
 ];
-// The help pane's text, and the boards pane's examples (R5: the index and each log, so an example opens with no network
+// The help pane's text, the icons, and the boards pane's examples (R5: the index and each log, so an example opens with no network
 // after one visit): kept for offline when they answer, never the reason a shell is not kept.
 const EXTRA = [
   '../HELP.md',
@@ -40,6 +40,11 @@ const EXTRA = [
   '../boards/examples/class-diagram.jsonl',
   '../boards/examples/molecule.jsonl',
   '../boards/examples/pattern-page.jsonl',
+  // The icons (PLAN-IPAD-NOTES I3): the Home Screen's, which the page and its manifest name — kept so the installed app's icon is there offline.
+  '../Demos/icons/apple-touch-icon.png',
+  '../Demos/icons/icon-192.png',
+  '../Demos/icons/icon-512.png',
+  '../Demos/icons/icon-maskable-512.png',
 ];
 
 // `reload`: the release's own files, never a copy the browser's HTTP cache still holds.

@@ -82,10 +82,14 @@ export function appPage(html) {
   return body.replace(doctype, (d) => d + '<!-- The app, at /app/ (V1-PLAN R7). Made from Demos/session-engine.html by scripts/build-app.mjs — edit that page, run the build. -->\n');
 }
 
-/** The app's manifest: the old address's, starting and scoped at the app. */
+/**
+ * The app's manifest: the old address's, starting and scoped at the app — its icons asked for from /app/
+ * (`../Demos/icons/…`), since a manifest's icons are relative to the manifest, as the page's files are.
+ */
 export function appManifest(text) {
   const m = JSON.parse(text);
-  return JSON.stringify(Object.assign({}, m, { start_url: './', scope: './' }), null, 2) + '\n';
+  const icons = (m.icons || []).map((ic) => (typeof ic.src === 'string' && !/^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(ic.src) ? Object.assign({}, ic, { src: '../Demos/' + ic.src }) : ic));
+  return JSON.stringify(Object.assign({}, m, { start_url: './', scope: './' }, m.icons ? { icons } : {}), null, 2) + '\n';
 }
 
 /**

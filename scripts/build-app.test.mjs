@@ -75,7 +75,13 @@ test("the app's manifest starts and is scoped at the app; the rest is the old ad
   const app = JSON.parse(appManifest(read('Demos/manifest.webmanifest')));
   assert.equal(app.start_url, './');
   assert.equal(app.scope, './');
-  for (const k of Object.keys(old)) if (k !== 'start_url' && k !== 'scope') assert.deepEqual(app[k], old[k], k);
+  for (const k of Object.keys(old)) if (k !== 'start_url' && k !== 'scope' && k !== 'icons') assert.deepEqual(app[k], old[k], k);
+  // The icons are the same files, asked for from /app/ instead of Demos/ (PLAN-IPAD-NOTES I3).
+  assert.equal(app.icons.length, old.icons.length);
+  app.icons.forEach((ic, i) => {
+    assert.equal(new URL(ic.src, APP + 'manifest.webmanifest').href, new URL(old.icons[i].src, APP + '../Demos/manifest.webmanifest').href, ic.src);
+    assert.deepEqual({ ...ic, src: 0 }, { ...old.icons[i], src: 0 });
+  });
   assert.equal(new URL(app.start_url, APP + 'manifest.webmanifest').href, APP);
 });
 
