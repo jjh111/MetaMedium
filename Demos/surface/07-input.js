@@ -50,6 +50,40 @@
     if (e.pointerType === 'pen') w.p = Math.round(Math.max(0, Math.min(1, e.pressure || 0)) * 1000) / 1000;
     return w;
   }
+  // ----- Pencil fidelity (PLAN-IPAD-NOTES I3) -----
+  // A pencil reports at 240 Hz and the browser folds the samples between two frames into one move;
+  // `getCoalescedEvents()` has them all. Every sample is a point, in order, and every point of a stroke
+  // — the mouse's, a finger's, the pen's — says when, as whole milliseconds since the press that began
+  // the stroke (core's `Point.t`: kept in the log as the hand gave it, rounded as `p` is; no reading uses
+  // it, so a log with it reads as the same log without). The hold, the tap and the magnets are unchanged.
+  let strokeT0 = 0;   // the press's own timeStamp, which every `t` of the stroke under way counts from
+  /** A sample of the hand's — a move, or one of the moves folded into it — as a point with its time. */
+  function samplePoint(s) {
+    const w = pointOf(s);
+    w.t = Math.max(0, Math.round((s.timeStamp || 0) - strokeT0));
+    return w;
+  }
+  /**
+   * The samples a move carries, oldest first. A browser lists the event itself last; one that leaves it
+   * out gets it added, and a move that is no more than the one before it is no new sample (`pushSample`).
+   */
+  function samplesOf(e) {
+    let list = null;
+    try { list = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : null; } catch (err) { list = null; }
+    if (!list || !list.length) return [e];
+    const last = list[list.length - 1];
+    return last.clientX === e.clientX && last.clientY === e.clientY ? list : list.concat([e]);
+  }
+  /** One sample onto the stroke under way: never before the one it follows in time, never the same sample twice. */
+  function pushSample(points, s) {
+    const w = samplePoint(s);
+    const last = points[points.length - 1];
+    if (last) {
+      if (last.t !== undefined && w.t < last.t) w.t = last.t;
+      if (last.x === w.x && last.y === w.y && last.t === w.t && last.p === w.p) return;
+    }
+    points.push(w);
+  }
   /** Is a touch landing now a palm? */
   function palmHere() { return palmNow({ penDown: pen.down.size > 0, sincePen: handClock() - pen.at }); }
   /** The fingers down that draw, pan or pinch — not the palms, and not one left resting after a pinch. */
@@ -234,6 +268,8 @@
     const pf = pointerFrameAt(w0);
     if (pf && !insideWaitingLoop(w0)) { forward = pf; postPointer(pf, 'down', e, w0); return; }
     pressBegin(e, w0);
+    strokeT0 = e.timeStamp || 0;
+    w0.t = 0;
     live = [w0];
     liveFrom = { x: e.clientX, y: e.clientY, far: 0 };
     // The stroke may begin ON a magnet — an arrow drawn out of a box's corner.
@@ -364,7 +400,7 @@
       if (e.pointerType === 'pen') penHoverAt(w); else penHoverOff();
       return;
     }
-    live.push(pointOf(e));
+    for (const smp of samplesOf(e)) pushSample(live, smp);
     if (liveFrom) liveFrom.far = Math.max(liveFrom.far, Math.hypot(e.clientX - liveFrom.x, e.clientY - liveFrom.y));
     magnetHold = magnetQuery(live[live.length - 1]); // the offer follows the pen; out of reach, it lets go
     drawLive(); // the pen and its magnet, on their own layer; the board is as it was (R4c)
