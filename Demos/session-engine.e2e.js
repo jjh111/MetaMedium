@@ -4811,6 +4811,203 @@ window.__scenario = async function(){
     fresh68();
   }
 
+  // ---- 69. A picture is kept and drawn (PLAN-IPAD-NOTES I1) ----
+  // Three pictures picked at once land laid out, are DRAWN on the board under the ink (the canvas's own
+  // pixels where each stands are the picture's colour), are kept by what they are (a SHA-256, once) and
+  // not by a URL that dies with the page, survive the board being read again, are there on a copy of the
+  // board, are collected when nothing uses them and the trash is emptied — and tracing is an offer.
+  {
+    const cv69 = document.getElementById('canvas');
+    const bd69 = () => window.__mm.boards();
+    const settled69 = async (pred, ms) => { const end = Date.now() + (ms || 15000); while (Date.now() < end) { const b = bd69(); if (b.ready && !b.switching && !b.busy && pred(b)) return true; await wait(50); } return false; };
+    const fileOf69 = (name, w, h, paint, type) => new Promise((res) => {
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      paint(c.getContext('2d'), w, h);
+      c.toBlob((b) => res(new File([b], name, { type: type || 'image/png' })), type || 'image/png', 0.92);
+    });
+    const solid69 = (rgb) => (g, w, h) => { g.fillStyle = 'rgb(' + rgb.join(',') + ')'; g.fillRect(0, 0, w, h); };
+    const RED = [200, 40, 40], GREEN = [40, 160, 60], BLUE = [50, 70, 210];
+    // What the canvas shows at a world point, as the average of a small square of its pixels.
+    const pixelAt69 = (wx, wy) => {
+      const p = mm.worldToScreen(wx, wy), dpr = window.devicePixelRatio || 1;
+      const d = cv69.getContext('2d').getImageData(Math.round(p.x * dpr) - 2, Math.round(p.y * dpr) - 2, 5, 5).data;
+      let r = 0, g = 0, b = 0, a = 0; const n = d.length / 4;
+      for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; a += d[i + 3]; }
+      return [Math.round(r / n), Math.round(g / n), Math.round(b / n), Math.round(a / n)];
+    };
+    const near69 = (got, want, tol) => !!got && got.slice(0, 3).every((v, i) => Math.abs(v - want[i]) <= (tol || 22)) && got[3] > 250;
+    const centre69 = (id) => { const b = MM.boundsOf(mm.session.getState().nodes.get(id)); return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2, b }; };
+    // Wait until the canvas shows the colour where the picture stands (the asset is read and decoded after the event).
+    const drawnAs69 = async (id, want, ms) => { const end = Date.now() + (ms || 6000); let got = null; while (Date.now() < end) { const c = centre69(id); got = pixelAt69(c.x, c.y); if (near69(got, want)) return { ok: true, got }; await wait(60); } return { ok: false, got }; };
+    const pics69 = () => { const st = mm.session.getState(); return st.artifacts.map((id) => ({ id, p: MM.pictureOf(st.nodes.get(id)) })).filter((x) => x.p); };
+    const importEvs69 = () => mm.session.getEvents().filter((e) => e.type === 'import' && e.asset);
+    const bytesOf69 = (f) => f.arrayBuffer().then((b) => new Uint8Array(b));
+    const jpegWithOrientation69 = async (name, w, h, orient) => {
+      const base = await fileOf69(name, w, h, (g) => { g.fillStyle = 'rgb(200,40,40)'; g.fillRect(0, 0, w / 2, h); g.fillStyle = 'rgb(50,70,210)'; g.fillRect(w / 2, 0, w / 2, h); }, 'image/jpeg');
+      const src = await bytesOf69(base);
+      // APP1 / Exif: a TIFF header (big endian), one IFD entry — Orientation (0x0112), a SHORT — and no next IFD.
+      const exif = [0xFF, 0xE1, 0x00, 0x22, 0x45, 0x78, 0x69, 0x66, 0x00, 0x00, 0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08, 0x00, 0x01, 0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, orient, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+      const out = new Uint8Array(src.length + exif.length);
+      out.set(src.subarray(0, 2), 0); out.set(exif, 2); out.set(src.subarray(2), 2 + exif.length);
+      return new File([out], name, { type: 'image/jpeg' });
+    };
+
+    // An empty board, the view pinned, the hand's own wait on the asset store's time.
+    mm.session.load([]); mm.setView(1, 0, 0); await wait(80);
+    mm.setAssetGrace(0);
+    const home69 = bd69().current;
+    const fA = await fileOf69('image.png', 600, 400, solid69(RED));
+    const fB = await fileOf69('image.png', 600, 400, solid69(GREEN));   // the same name: pictures are told apart by their bytes
+    const fC = await fileOf69('IMG 0003.png', 400, 600, solid69(BLUE));
+    // Picked at once, through the photos input the way the picker fills it.
+    const input69 = document.getElementById('photosInput');
+    const before69 = mm.session.getEvents().length;
+    const dt69 = new DataTransfer(); [fA, fB, fC].forEach((f) => dt69.items.add(f));
+    if (input69) { input69.files = dt69.files; input69.dispatchEvent(new Event('change', { bubbles: true })); }
+    for (let i = 0; i < 100 && pics69().length < 3; i++) await wait(100);
+    const got69 = pics69();
+    const boxes69 = got69.map((x) => MM.boundsOf(mm.session.getState().nodes.get(x.id)));
+    const apart69 = boxes69.every((a, i) => boxes69.every((b, j) => i === j || a.maxX <= b.minX || b.maxX <= a.minX || a.maxY <= b.minY || b.maxY <= a.minY));
+    const vp69 = { minX: 0, minY: 0, maxX: innerWidth, maxY: innerHeight };
+    const inView69 = boxes69.every((b) => b.minX >= vp69.minX && b.minY >= vp69.minY && b.minX < vp69.maxX && b.minY < vp69.maxY);
+    step('69. three pictures picked at once through the photos input land as three picture artifacts, laid out in a grid in the view — nothing overlaps, each begins on screen — and none was traced into ink',
+      !!input69 && got69.length === 3 && apart69 && inView69 && mm.session.getEvents().slice(before69).every((e) => e.type === 'import') && mm.session.getState().contentIds.length === 3,
+      { input: !!input69, n: got69.length, apart: apart69, inView: inView69, boxes: boxes69, types: mm.session.getEvents().slice(before69).map((e) => e.type) });
+    const ev69 = importEvs69();
+    const paths69 = ev69.map((e) => e.path);
+    step('69a. each event names its asset (a SHA-256), its mime and size, a kind and a path — and carries no bytes; two pictures both called image.png have two paths',
+      ev69.length === 3 && ev69.every((e) => /^sha256:[0-9a-f]{64}$/.test(e.asset) && /^image\/(jpeg|webp|png)$/.test(e.mime) && e.w > 0 && e.h > 0 && ['jpg', 'png', 'webp'].includes(e.kind) && JSON.stringify(e).length < 600 && e.code === undefined) &&
+        new Set(paths69).size === 3 && new Set(ev69.map((e) => e.asset)).size === 3 && ev69[0].name === 'image.png' && ev69[1].name === 'image.png',
+      ev69.map((e) => ({ kind: e.kind, path: e.path, name: e.name, asset: String(e.asset).slice(0, 14), mime: e.mime, w: e.w, h: e.h })));
+    // Drawn: the board's own canvas shows each picture's colour where it stands.
+    const ids69 = got69.map((x) => x.id);
+    const drawn69 = [await drawnAs69(ids69[0], RED), await drawnAs69(ids69[1], GREEN), await drawnAs69(ids69[2], BLUE)];
+    step('69b. each picture is DRAWN on the board: the canvas pixels where it stands are its colour — red, green, blue — not brackets and a filename',
+      drawn69.every((d) => d.ok), drawn69.map((d) => d.got));
+    // Under the ink: a stroke drawn across a picture is seen over it.
+    {
+      const c0 = centre69(ids69[0]);
+      const a = mm.worldToScreen(c0.b.minX + 20, c0.y), z = mm.worldToScreen(c0.b.maxX - 20, c0.y);
+      t.stroke(t.line(a, z, 30)); await wait(60);
+      const on = pixelAt69(c0.x, c0.y);
+      const stroked = mm.session.getState().contentIds.length === 4;
+      step('69c. ink drawn across a picture is drawn over it — the picture is under the ink, and the stroke is a mark of its own',
+        stroked && !near69(on, RED, 6), { pixel: on, stroked });
+      mm.session.undo(); await wait(40);
+    }
+    // Kept once: the same bytes brought in again are one asset.
+    const listed69 = await mm.assets();
+    const againN = mm.session.getEvents().length;
+    await mm.importPictures([fA]);
+    const listedAgain69 = await mm.assets();
+    step('69d. the asset store holds each picture once: three assets; the same bytes picked again make a fourth picture on the board and no fourth asset',
+      listed69.length === 3 && listedAgain69.length === 3 && pics69().length === 4 && mm.session.getEvents().length > againN && listed69.every((a) => a.size > 100 && a.size < 60000),
+      { first: listed69.length, again: listedAgain69.length, pictures: pics69().length, sizes: listed69.map((a) => a.size) });
+    mm.session.undo(); await wait(40);
+    // Respected orientation and the long side: an EXIF-turned JPEG is kept as it is seen, a 4000 px picture at 2,560.
+    {
+      const turned = await jpegWithOrientation69('turned.jpg', 600, 400, 6);   // 6: turn 90° clockwise — the left half (red) lies on top
+      const big = await fileOf69('big.png', 4000, 3000, solid69(GREEN));
+      const n0 = pics69().length;
+      const out = await mm.importPictures([turned, big]);
+      const [tid, bid] = out.ids;
+      const te = importEvs69().find((e) => e.name === 'turned.jpg'), be = importEvs69().find((e) => e.name === 'big.png');
+      const tc = tid && centre69(tid);
+      const topOk = tc ? await (async () => { const end = Date.now() + 6000; let top = null, bottom = null; while (Date.now() < end) { top = pixelAt69(tc.x, tc.b.minY + (tc.b.maxY - tc.b.minY) * 0.25); bottom = pixelAt69(tc.x, tc.b.minY + (tc.b.maxY - tc.b.minY) * 0.75); if (near69(top, RED, 30) && near69(bottom, BLUE, 30)) return { ok: true, top, bottom }; await wait(60); } return { ok: false, top, bottom }; })() : { ok: false };
+      step('69e. an EXIF-turned photo is kept as it is seen — 400 × 600, the red half on top — and a 4,000 × 3,000 picture is kept at a long side of 2,560',
+        pics69().length === n0 + 2 && !!te && te.w === 400 && te.h === 600 && topOk.ok && !!be && be.w === 2560 && be.h === 1920,
+        { turned: te && { w: te.w, h: te.h, mime: te.mime }, pixels: topOk, big: be && { w: be.w, h: be.h, mime: be.mime } });
+      mm.session.undo(); mm.session.undo(); await wait(40);
+    }
+    // Culled and cached: only what is on screen is held decoded; the rest is let go when it is far away.
+    {
+      const decoded = mm.pictureState().decoded.length;
+      mm.setView(1, 100000, 100000); await wait(120);
+      const off = mm.picturesDrawn();
+      mm.setView(1, 0, 0); await wait(120);
+      const back = mm.picturesDrawn();
+      step('69f. pictures off screen are not drawn (culled like the rest of the paint), and are drawn again at once when the view returns',
+        decoded >= 1 && off.length === 0 && back.length === 3 && back.every((d) => d.state === 'drawn'),
+        { decoded, off: off.length, back: back.map((d) => d.state) });
+    }
+    // Read again: the board brought back from its journal, the decoded pictures forgotten, the assets read again from the store.
+    {
+      const note69 = mm.session.getEvents().length;
+      mm.forgetPictures();
+      mm.session.load(JSON.parse(JSON.stringify(mm.session.getEvents())));
+      mm.setView(1, 0, 0); await wait(60);
+      const ids = pics69().map((x) => x.id);
+      const again = [await drawnAs69(ids[0], RED), await drawnAs69(ids[1], GREEN), await drawnAs69(ids[2], BLUE)];
+      step('69g. a board read again from its log — nothing decoded left — draws the same pictures from the asset store: the same colours where they stand',
+        ids.length === 3 && again.every((d) => d.ok) && mm.session.getEvents().length === note69, again.map((d) => d.got));
+    }
+    // A copy of the board: the same asset, in a second board.
+    {
+      await mm.boardIdle();
+      const copy = await mm.duplicateBoard(home69);
+      const copyId = copy && copy.id;
+      await mm.switchBoard(copyId); await settled69((b) => b.current === copyId); mm.setView(1, 0, 0); await wait(80);
+      const ids = pics69().map((x) => x.id);
+      const copyDrawn = ids.length === 3 ? [await drawnAs69(ids[0], RED), await drawnAs69(ids[1], GREEN), await drawnAs69(ids[2], BLUE)] : [];
+      const sameAssets = importEvs69().map((e) => e.asset).sort().join() === [...new Set(listed69.map((a) => a.hash))].sort().join();
+      const stillThree = (await mm.assets()).length === 3;
+      step('69h. a duplicated board shows the same three pictures, drawn — its events name the same assets, and the store gained none',
+        !!copyId && ids.length === 3 && copyDrawn.every((d) => d.ok) && sameAssets && stillThree,
+        { copyId, n: ids.length, drawn: copyDrawn.map((d) => d.got), sameAssets, assets: (await mm.assets()).length });
+      // The trash keeps them: the original is trashed and restored with its pictures standing.
+      await mm.switchBoard(home69); await settled69((b) => b.current === home69);
+      await mm.trashBoard(copyId); await settled69((b) => b.list.find((e) => e.id === copyId && e.trashed));
+      const keptInTrash = (await mm.assets()).length === 3;
+      await mm.restoreBoard(copyId); await settled69((b) => b.list.find((e) => e.id === copyId && !e.trashed));
+      step('69i. a board in the trash holds its pictures — nothing is collected while it can be restored, and a restored board has them', keptInTrash && (await mm.assets()).length === 3, { assets: (await mm.assets()).length });
+    }
+    // Collected: a picture only a trashed board used goes when the trash is emptied; what a board still uses stays.
+    {
+      const bd = await mm.newBoard(); await settled69((b) => b.current === bd.id);
+      const lone = await fileOf69('lone.png', 300, 300, solid69([10, 200, 200]));
+      await mm.importPictures([lone]);
+      const withLone = (await mm.assets()).length;
+      await mm.boardIdle();
+      await mm.switchBoard(home69); await settled69((b) => b.current === home69);
+      await mm.trashBoard(bd.id); await settled69((b) => b.list.find((e) => e.id === bd.id && e.trashed));
+      const keptWhileTrashed = (await mm.assets()).length === withLone;
+      const plan = await mm.planEmptyTrash();
+      await mm.emptyTrash(plan);
+      const after = await mm.assets();
+      step('69j. the asset only a trashed board used is collected when the trash is emptied — not before — and the three the boards still use stay',
+        withLone === 4 && keptWhileTrashed && after.length === 3 && after.every((a) => listed69.some((l) => l.hash === a.hash)),
+        { withLone, keptWhileTrashed, after: after.length });
+    }
+    // Tracing is an offer, not an import.
+    {
+      mm.session.load([]); mm.setView(1, 0, 0); await wait(60);
+      const sketch = await fileOf69('sketch.png', 300, 200, (g, w, h) => {
+        g.fillStyle = '#e9e6de'; g.fillRect(0, 0, w, h);
+        g.strokeStyle = '#2a2620'; g.lineWidth = 3;
+        g.strokeRect(20, 20, 260, 40); g.strokeRect(20, 80, 120, 100); g.strokeRect(160, 80, 120, 100);
+      });
+      const out = await mm.importPictures([sketch], { view: { minX: 600, minY: 200, maxX: 1600, maxY: 900 } });
+      const pid = out.ids[0];
+      const inkAfterImport = mm.session.getState().contentIds.length;
+      mm.session.summonMarks([pid], Date.now()); await wait(90);
+      const pill = document.querySelector('#summon .pill[data-key="trace"]');
+      const evs0 = mm.session.getEvents().length;
+      if (pill) pill.click();
+      for (let i = 0; i < 60 && mm.session.getEvents().length === evs0; i++) await wait(100);
+      await wait(120);
+      const st = mm.session.getState();
+      const ink = st.contentIds.filter((id) => MM.strokePointsOf(st.nodes.get(id)));
+      const evsAfter = mm.session.getEvents().length;
+      mm.session.undo(); await wait(60);
+      const afterUndo = mm.session.getState();
+      step('69k. Trace into ink is an offer on a held picture: imported, the sketch is one picture and no ink; taking the offer makes the three boxes as ink; one undo takes all of it back and leaves the picture',
+        inkAfterImport === 1 && !!pill && /Trace into ink/.test(pill.textContent) && ink.length === 3 && afterUndo.contentIds.length === 1 && afterUndo.artifacts.includes(pid) && mm.session.getEvents().length === evs0 && evsAfter > evs0,
+        { inkAfterImport, pill: !!pill, ink: ink.length, left: afterUndo.contentIds.length, evs: [evs0, evsAfter, mm.session.getEvents().length] });
+    }
+    mm.setAssetGrace(30000);
+    mm.session.load([]); mm.setView(1, 0, 0);
+  }
+
 
   return R;
 };
