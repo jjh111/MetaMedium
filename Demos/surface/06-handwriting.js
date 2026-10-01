@@ -1,7 +1,8 @@
 // ===== handwriting =====
 // Provides: handwriting: inkImage, isWriting, isRead, readOne, readLine (a line of writing as one image), readWriting; the auto-read preference (off by default);
 //   (V1-PLAN J5) whyNoReader — which joined models cannot read writing, and why — and keepRead, a read kept for a model that can see.
-// Uses: core (prefs), models (agents, withWork, factsOf, keepAsk, noteOutcome, modelWords), render, input (say), seat (isSeatAgent: the seat reads while seated).
+// Uses: core (prefs), models (agents, withWork, factsOf, keepAsk, noteOutcome, modelWords), render, input (say), seat (isSeatAgent: the seat reads while seated),
+//   seats (03-seats.js: resolveReaders — who reads, by seat; seatModels in 04-seatpane.js).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -13,23 +14,18 @@
   // SEE, once. What comes back is held on the mark as transcripts, attributed
   // and ranked, never blessed (v7 Stage E). A model that cannot see is never
   // asked; with none present the mark simply stays "text".
-  const seeing = () => agents.filter((a) => a.config.vision);
   /**
-   * Who READS: the smallest model that can see, not every one. Reading a word
-   * is a small job, and a 27B model takes minutes at it while a 0.8B answers
-   * in seconds; a dedicated handwriting model is the next step (v10 F11).
-   * The size is read from the model's name (0.8b, 8b, 27b); with none to
-   * read, the first that sees.
+   * Who READS: the reader seat when the hand chose one (I7) — a model that sees, quick and exact, asked for
+   * reading alone — else, as before, Claude Code while it is seated (V1-PLAN J4: sitting down there is a
+   * deliberate act that says *ask me*), else the writer if it sees, else the smallest model that sees, not
+   * every one. Reading a word is a small job, and a 27B model takes minutes at it while a 0.8B answers in
+   * seconds. The order is 03-seats.js's `resolveReaders`, tested in Node.
    */
   function readers() {
-    const sees = seeing();
-    // The seat taken is a deliberate act that says *ask me* (V1-PLAN J4): Claude reads.
-    const seat = sees.find(isSeatAgent);
-    if (seat) return [seat];
-    if (sees.length <= 1) return sees;
-    const size = (a) => { const m = /(\d+(?:\.\d+)?)\s*b\b/i.exec(a.config.model || ''); return m ? parseFloat(m[1]) : Infinity; };
-    return [sees.slice().sort((a, b) => size(a) - size(b))[0]];
+    return resolveReaders(seatModels()).who.map((id) => agents.find((a) => a.id === id)).filter(Boolean);
   }
+  /** The models that read now — for the panel's *read it* and the like: who can answer a read, by seat. */
+  const seeing = () => readers();
   // Reading as you write is a preference, off by default: a model is asked
   // when you say *read* (§6.3). On, every mark that reads as writing is handed
   // to the models that can see as it lands.
@@ -144,7 +140,7 @@
   }
 
   function readWriting(s) {
-    if (!seeing().length) return;
+    if (!readers().length) return;
     const ids = s.contentIds.filter((id) => !s.artifacts.includes(id));
     for (const aid of s.artifacts) for (const e of s.nodes.get(aid).edges) if (e.rel === 'has-part') ids.push(e.to);
     for (const id of ids) {

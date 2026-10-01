@@ -13,7 +13,7 @@
 //   applyLibrary, targetOf); renderSummon/refreshPalette/paintField.
 // Uses: core (hand, lastPen), ui, field (readFieldCommand, verbFor, libraryMatch, typedWord — pure,
 //   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading,
-//   askModelsAbout, offerModel), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
+//   askModelsAbout, offerModel), seatpane (writers, readers, deciderHost, askDecider — who is asked, by seat), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
 //   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
 //   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
 //   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
@@ -56,7 +56,9 @@
   function toolHost() {
     return {
       snap: snapMode,
-      models: agents.map((a) => ({ name: a.name, sees: !!(a.config && a.config.vision) })),
+      // `sees`: who READS, by seat (I7) — a model that sees but sits elsewhere does not answer a read; `decider`: the decision model seated, if one is (*Which is it?*).
+      models: agents.map((a) => ({ name: a.name, sees: readers().includes(a) })),
+      decider: deciderHost(),
       isRead: (id) => { const n = session.getState().nodes.get(id); return !!n && isRead(n); },
       isFlipped: (id) => flipped.has(id),
       nameOf: nameOfParticipant,
@@ -289,13 +291,15 @@
       if (!any) say('nothing there to read — the marks held have no ink an image can be made of');
     },
     what: (o) => askModelsAbout(o.data.ids.slice()),
+    // *Which is it?* asks the decider — only by this tap (I7; 04-seatpane.js), never on a hold.
+    which: (o) => askDecider(o.data),
     // The maths tool's acts (M5): the sizes said and left showing beside their figure, the drawing printed at its real size.
     'maths-show': (o) => mathsShow(o.data),
     'maths-print': () => mathsPrint(),
     duplicate: (o, scope) => duplicateMarks(scope.summon, o.data.ids),
     // A Mermaid text drawn as ink, at this zoom and beside everything (25-mermaid.js).
     'mermaid-draw': (o) => drawMermaidFrom(o.data.artifact),
-    'behave-model': (o) => { const d = o.data; agents.forEach((a) => withWork('behave:' + a.id + ':' + d.nodeId, [d.nodeId], modelWords(a) + ' · reading the words', a.behave({ nodeId: d.nodeId, words: d.words, at: Date.now() })).then(() => render(session.getState()))); },
+    'behave-model': (o) => { const d = o.data; writers().forEach((a) => withWork('behave:' + a.id + ':' + d.nodeId, [d.nodeId], modelWords(a) + ' · reading the words', a.behave({ nodeId: d.nodeId, words: d.words, at: Date.now() })).then(() => render(session.getState()))); },
   };
   /** What the surface does around a tool's act: before it (the field rebuilt from what it leaves), and after (what to say). */
   const TOOL_ACTS = {
@@ -581,7 +585,7 @@
     }
     if (cmd.do === 'behave') {
       session.behave({ nodeId: cmd.definitionId, behaviour: cmd.behaviour, participantId: MM.LOCAL_PARTICIPANT, at: at });
-      if (cmd.ask) agents.forEach((a) => withWork('behave:' + a.id + ':' + cmd.definitionId, [cmd.definitionId], modelWords(a) + ' · reading the words', a.behave({ nodeId: cmd.definitionId, words: cmd.words, at: Date.now() })).then(() => render(session.getState())));
+      if (cmd.ask) writers().forEach((a) => withWork('behave:' + a.id + ':' + cmd.definitionId, [cmd.definitionId], modelWords(a) + ' · reading the words', a.behave({ nodeId: cmd.definitionId, words: cmd.words, at: Date.now() })).then(() => render(session.getState())));
       return;
     }
     // With no model here, what was typed is kept, said once, and run when one joins — never the pane popped over the field (J5).
@@ -1202,14 +1206,14 @@
       // (The structure tool's act, `MM.standStructure`: stamped with its id.)
       const structure = MM.standStructure(session, artifactId, brief, at + 1);
       if (structure.ok) {
-        if (!agents.length) { say('the structure (tier 1): ' + structure.ids.join(', ') + ' — join a model for the words'); return; }
-      } else if (!agents.length) { say('could not build the structure: ' + structure.error); return; }
+        if (!writers().length) { say('the structure (tier 1): ' + structure.ids.join(', ') + ' — join a model for the words'); return; }
+      } else if (!writers().length) { say('could not build the structure: ' + structure.error); return; }
     }
 
     // What the human typed outranks a reading nobody asked for.
     cancelReading();
     const aboutIds = session.getState().nodes.get(artifactId) ? [artifactId] : sum.enclosedIds;
-    agents.forEach((agent) => {
+    writers().forEach((agent) => {
       const key = 'build:' + agent.id + ':' + artifactId;
       withWork(key, aboutIds, modelWords(agent) + (revising ? ' · changing “' : ' · building “') + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”',
         agent.generate({ prompt: brief, artifactId: artifactId, at: Date.now(), addressed: addressed, signal: workSignal(key) }))
@@ -1236,7 +1240,7 @@
     if (!artifactId) { releasePrompted(); say('could not hold that group'); return; }
     cancelReading();
     const library = libraryEntries(session.getState()).map((e) => ({ id: e.id, name: e.name }));
-    agents.forEach((agent) => {
+    writers().forEach((agent) => {
       const key = 'program:' + agent.id + ':' + artifactId;
       withWork(key, [artifactId], modelWords(agent) + ' · writing “' + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”',
         agent.program({ prompt: brief, artifactId: artifactId, library: library, at: Date.now(), signal: workSignal(key) }))
@@ -1266,7 +1270,7 @@
     const ids = sum.enclosedIds.slice();
     session.dismiss(sum.id, Date.now());
     cancelReading();
-    agents.forEach((agent) => {
+    writers().forEach((agent) => {
       withWork('draw:' + agent.id, ids, modelWords(agent) + ' · drawing', agent.draw({ prompt: q, nodeIds: ids, at: Date.now() })).then((res) => {
         noteOutcome(agent, res.ok, res.ok ? 'drew ' + res.ids.length + ' mark' + (res.ids.length === 1 ? '' : 's') : res.error);
         if (res.ok) say(modelWords(agent) + ' drew ' + res.ids.length + ' mark' + (res.ids.length === 1 ? '' : 's') + ': ' + res.shapes.map((x) => x.shape).join(', '));
@@ -1280,7 +1284,7 @@
   function runAsk(sum, q) {
     const ids = sum.enclosedIds.slice();
     cancelReading();
-    agents.forEach((agent) => {
+    writers().forEach((agent) => {
       withWork('ask:' + agent.id, ids, modelWords(agent) + ' · answering', agent.ask(q, ids, Date.now())).then((res) => {
         noteOutcome(agent, res.ok, res.ok ? 'answered beside the marks' : res.error);
         if (!res.ok) say(modelWords(agent) + ' could not answer (' + res.error + ')');

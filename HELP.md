@@ -124,6 +124,21 @@ asked only when you ask — never while you draw.
   key. A key stays on this device, and only if you tick *remember*.
 - **Claude**: *controls › Helpers › live › with Claude* joins the room Claude Code is in
   and makes Claude the one who reads for you.
+- **Seats.** The pane is four seats, one job each. **Reader** reads handwriting
+  into text — a model that can see, the quickest you have. **Writer** writes
+  briefs, pages and programs and says what a group is. **Decider** is a
+  decision model (Jev): when two things you have named match a group about
+  equally, *Which is it?* asks it, and its answer joins the readings — taken
+  only when it is 0.99 sure, otherwise what the canvas ranked stands.
+  **Semantic** (notes like this) runs on this device, and is coming. Choose a
+  model for a seat from its list, or join one **for** that seat; local ones
+  are listed before hosted, each row says how long its last call took. A seat
+  you do not choose does what it did before: nothing is narrowed until you
+  choose one.
+- **One key a provider.** Type your OpenRouter key once; the reader, the writer
+  and the decider on OpenRouter all use it, and each seat after the first
+  needs no key typed. It stays on this device only if you tick *remember*; a
+  device that did not keep it brings the seats back and asks for it once.
 - Ask with no model here and the ask is **kept**: the field says what it needs,
   and it runs when one joins.
 - A model at work shows a dot over the marks it is working on. **Esc**, with

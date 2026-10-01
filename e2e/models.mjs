@@ -553,10 +553,13 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       const e = await everywhere(page);
       const has = (text) => typeof text === 'string' && (text.includes(STUB_KEY) || text.includes(WRONG_KEY));
       const lsHolding = Object.entries(e.localStorage).filter(([, v]) => has(v)).map(([k]) => k);
-      const pick = JSON.parse(e.localStorage['mm-model-pick'] || 'null');
+      // Since I7 the pick is kept under the seats it holds (`mm-seats`) and the key under its provider (`mm-model-keys`), never together.
+      const seatsKept = JSON.parse(e.localStorage['mm-seats'] || 'null');
+      const pick = seatsKept && seatsKept.any;
+      const keysKept = JSON.parse(e.localStorage['mm-model-keys'] || 'null');
       check(`M12. the key is nowhere it was not asked to be — not in the log (${e.log.length} characters), the board's journal (${e.idbStores} stores), a cache (${e.cacheEntries} entries), the DOM or the address; in this browser's storage only under ${lsHolding.join(', ') || 'nothing'}, where "remember" put it; the wrong key nowhere at all`,
         !has(e.log) && !has(e.idb) && !has(e.caches) && !has(e.dom) && !has(e.address) && e.idbStores > 0 &&
-          JSON.stringify(lsHolding) === '["mm-model-key"]' && e.localStorage['mm-model-key'] === JSON.stringify(STUB_KEY) && !!pick && !('apiKey' in pick) && pick.model === 'z-ai/glm-5.3-flash',
+          JSON.stringify(lsHolding) === '["mm-model-keys"]' && !!keysKept && JSON.stringify(Object.values(keysKept)) === JSON.stringify([STUB_KEY]) && !!pick && !JSON.stringify(seatsKept).includes('apiKey') && pick.model === 'z-ai/glm-5.3-flash',
         { lsHolding, pick, idbStores: e.idbStores, cacheEntries: e.cacheEntries });
     });
 
@@ -584,12 +587,12 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       const keyField = await p2.inputValue('#mpKey');
       const rows = { reader: await seatRow(p2, 'reader'), writer: await seatRow(p2, 'writer'), decider: await seatRow(p2, 'decider'), semantic: await seatRow(p2, 'semantic') };
       check(`M13. four joins, the key typed once — for the writer ("${w.slice(0, 70)}") — and the reader, the decider and a model with no seat joined with the key field empty ("${r.slice(0, 60)}")`,
-        /^GLM 5\.3 Flash joined/.test(w) && /^GLM 4\.5V joined/.test(r) && /Jev/.test(d) && /joined/.test(d) && /^GPT-4o-mini joined/i.test(a) && keyField === '' &&
+        /^GLM 5\.3 Flash joined/.test(w) && /^GLM 4\.5V joined/.test(r) && /Jev/.test(d) && /joined as the decider/.test(d) && /^GPT-4o-mini joined/i.test(a) && keyField === '' &&
           seats.writer && seats.writer.model === 'z-ai/glm-5.3-flash' && seats.reader && seats.reader.model === 'z-ai/glm-4.5v' && seats.decider && seats.decider.model === JEV &&
           seats.any.length === 1 && seats.any[0].model === 'openai/gpt-4o-mini' && seats.keys.length === 1 && seats.keys[0] === KEYS_AT(base) && chats().length === before,
         { w, r, d, a, seats, keyField });
       check(`M13b. each seat says who holds it — ${['reader', 'writer', 'decider'].map((k) => k + ': ' + (rows[k] && rows[k].who)).join(' / ')} — and the semantic seat says it is on this device and coming`,
-        !!rows.reader && /GLM 4\.5V/.test(rows.reader.who) && /sees/.test(rows.reader.who) && /GLM 5\.3 Flash/.test(rows.writer.who) && /Jev/.test(rows.decider.who) && /hosted/.test(rows.decider.who) &&
+        !!rows.reader && /GLM 4\.5V/.test(rows.reader.who) && /sees/.test(rows.reader.who) && /GLM 5\.3 Flash/.test(rows.writer.who) && /Jev/.test(rows.decider.who) && /local/.test(rows.decider.who) && /0\.99/.test(rows.decider.who) &&
           !!rows.semantic && /on this device/.test(rows.semantic.who + rows.semantic.fallback) && /coming/.test(rows.semantic.who + rows.semantic.fallback) && !rows.semantic.tryable,
         rows);
       const seen = [];
@@ -603,6 +606,8 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
     // ---- M14. Routing: the reader reads, the writer writes ----
     let seatBoard = null;
     await record('M14', async () => {
+      const m14 = chats().length;
+      await closeModels(p2);
       seatBoard = await p2.evaluate(drawBoard, MOLECULE_AT);
       await sleep(200);
       const calls = chats().length;
@@ -616,6 +621,7 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
         held && took && readCalls.length === 1 && readCalls[0].model === 'z-ai/glm-4.5v' && readCalls[0].job === 'read' && readCalls[0].image === true && read === 'hello',
         { held, took, readCalls, read });
       await letGo(p2);
+      await closeModels(p2);
       const before = chats().length;
       const held2 = await holdAt(p2, MOLECULE_AT.x, MOLECULE_AT.y);
       const took2 = held2 && await takePill(p2, 'What is this?');
@@ -625,7 +631,7 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       check(`M14b. What is this? asks the writer seat alone — ${after.map((c) => c.model + ' ' + c.job).join(', ')} — and the model with no seat, the reader and the decider are not asked`,
         held2 && took2 && whatCalls.length >= 1 && after.length === 1 && after[0].model === 'z-ai/glm-5.3-flash' && after[0].job === 'what',
         { held2, took2, after });
-      const decides = chats().filter((c) => c.job === 'decide');
+      const decides = chats(m14).filter((c) => c.job === 'decide');
       const mini = chats().filter((c) => c.model === 'openai/gpt-4o-mini');
       check('M14c. neither act asked the decider, and the model with no seat was never asked at all (the seats narrow who is asked; asking nothing is the default)',
         decides.length === 0 && mini.length === 0, { decides: decides.length, mini: mini.length });
@@ -634,6 +640,7 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
 
     // ---- M15. The decider, on a tie ----
     await record('M15', async () => {
+      await closeModels(p2);
       await p2.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
       await sleep(150);
       const A = { x: 420, y: 130 }, B = { x: 860, y: 130 }, C = { x: 420, y: 500 };
