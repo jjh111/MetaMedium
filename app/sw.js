@@ -63,6 +63,8 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET' || url.origin !== self.location.origin) return;
   // A key never enters a cache: a request that carries one is the network's alone. So is a relay's stream, which never ends.
   if (req.headers.has('authorization') || (req.headers.get('accept') || '').includes('text/event-stream')) return;
+  // …and so is a request carrying a key in its address (a room's, to a relay on this origin): the page itself is kept once, whatever its query, below.
+  if (url.searchParams.has('key') && req.mode !== 'navigate') return;
   // A page is kept once, whatever its query: ?board=, ?live=, ?fresh= are the page's to read, not the cache's to split on.
   const key = req.mode === 'navigate' ? url.origin + url.pathname.replace(/\/index\.html$/, '/') : req;
   // `no-cache` revalidates with the server every time, so a fresh build is never hidden behind the browser's own HTTP cache.
