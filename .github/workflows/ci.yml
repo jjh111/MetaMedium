@@ -74,6 +74,11 @@ jobs:
       # decoded pictures cost.
       - name: The asset store's rules, on their own
         run: node --test ../Demos/surface/17-assets.test.mjs
+      # And the board out and back whole (PLAN-IPAD-NOTES I4): the zip a board
+      # and its pictures are one file in, the SVG, the PNG's size and the PDF
+      # written by hand.
+      - name: The board bundle, the SVG and the PDF, on their own
+        run: node --test ../Demos/surface/17-bundle.test.mjs
       # The app at /app/ (V1-PLAN R7): its page, its worker and its manifest
       # are made from the old address's, and VERSION is stamped into the page
       # and into both workers' caches — what is committed must be that build.

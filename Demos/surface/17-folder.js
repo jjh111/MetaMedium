@@ -1336,16 +1336,43 @@
     const app = ((document.querySelector('meta[name="metamedium-version"]') || {}).content || '').trim();
     return app ? { app } : {};
   }
-  /** A log file as a new board: one event per line (as *export* writes it, header first), or a JSON array. */
+  /**
+   * A file as a new board: a board bundle (a zip made by Export — the log and its pictures: every picture is stored
+   * first, its hash checked, and only then do the board's events land), a log — one event per line, as *export*
+   * writes it, header first — or a JSON array. A zip is known by its first bytes, never its name. What a file does
+   * not carry that it names is said once through `o.note` (a bare log's pictures, a bundle's damaged ones); a file
+   * that cannot be read is a sentence through `o.said`, and no board is made.
+   * (PLAN-IPAD-NOTES I4; the rules are 17-bundle.js's, the storing 18-out.js's `bundleLoad`.)
+   */
   async function boardFromFile(file, o) {
-    const text = await file.text();
-    const r = readLogText(text, file.name);
-    if (!r.events) {
-      const v = { kind: 'file', words: r.refused || '“' + file.name + '” is not a board’s log — one event per line, as export writes it', ways: [] };
-      if (o && o.said) o.said(v); else say(v.words);
-      return false;
+    const refuse = (words) => { const v = { kind: 'file', words: words, ways: [] }; if (o && o.said) o.said(v); else say(words); return false; };
+    const note = (words) => { if (o && o.note) o.note(words); };
+    const name = String(file.name || '').replace(/\.dyna\.zip$/i, '').replace(/\.[^.]*$/, '') || null;
+    const zipped = isZipBytes(new Uint8Array(await file.slice(0, 4).arrayBuffer()));
+    let events = null, stored = [], notes = null;
+    if (zipped) {
+      if (boards.how !== 'indexeddb') return newBoard(o);   // says why, and stores nothing
+      const b = await bundleLoad(file);
+      if (!b.ok) return refuse('“' + file.name + '”: ' + b.words);
+      events = b.events; stored = b.pending;
+      notes = [];
+      if (b.damaged.length) notes.push(plural(b.damaged.length, 'picture') + ' in the file ' + (b.damaged.length === 1 ? 'is' : 'are') + ' damaged (' + b.damaged.map((d) => d.name.replace(/^.*\//, '').replace(/^([0-9a-f]{8})[0-9a-f]+/, '$1…') + ' — ' + d.why).join('; ') + ') and left out — ' + (b.damaged.length === 1 ? 'it stands' : 'they stand') + ' as ' + (b.damaged.length === 1 ? 'its name' : 'their names'));
+      else if (b.notCarried.length) notes.push(plural(b.notCarried.length, 'picture') + ' named in this board ' + (b.notCarried.length === 1 ? 'is' : 'are') + ' not in the file — ' + (b.notCarried.length === 1 ? 'it stands' : 'they stand') + ' as ' + (b.notCarried.length === 1 ? 'its name' : 'their names'));
+    } else {
+      const r = readLogText(await file.text(), file.name);
+      if (!r.events) return refuse(r.refused || '“' + file.name + '” is not a board’s log — one event per line, as export writes it');
+      events = r.events;
+      // A bare log names pictures it does not carry: the ones this device holds draw, the rest stand as their names.
+      const named = [...assetsOfEvents(events)];
+      const lacking = [];
+      for (const ref of named) if (!(await assetGet(ref))) lacking.push(ref);
+      if (lacking.length) { notes = [plural(lacking.length, 'picture') + (lacking.length === 1 ? ' is' : ' are') + ' named in this log but ' + (lacking.length === 1 ? 'is' : 'are') + ' not in it — ' + (lacking.length === 1 ? 'it stands' : 'they stand') + ' as ' + (lacking.length === 1 ? 'its name' : 'their names') + '; export “board + pictures”, a .zip, to carry them']; }
     }
-    return newBoard(Object.assign({}, o, { name: String(file.name || '').replace(/\.[^.]*$/, '') || null, events: r.events }));
+    try {
+      const made = await newBoard(Object.assign({}, o, { name: name, events: events }));
+      if (made && notes) for (const n of notes) note(n);
+      return made;
+    } finally { for (const ref of stored) assets.pending.delete(ref); }
   }
   /**
    * Reset: a fresh board, never one tap from losing this one. The board on

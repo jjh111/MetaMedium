@@ -2,8 +2,8 @@
 // Provides: pictures in and the board out — importPictures (a pick of files: drop, paste, the photos and camera
 //   inputs; laid out, kept in the asset store, named by an `import` event), importText, the asset store
 //   (assetPut/assetGet/assetList/collectAssets), the pictures drawn on the board (pictureBitmap, drawPicture,
-//   pictureSrc), tracing a held picture into ink (traceFrom); exportBoardSVG/exportBoardPNG/exportLog,
-//   downloadText/downloadBlob.
+//   pictureSrc), tracing a held picture into ink (traceFrom). The board out — SVG, PNG, PDF, the bundle, the
+//   log, downloadText/downloadBlob — is 18-out.js's.
 // Uses: core, view (viewportWorld), folder (folder, boards, boardDB, journalFold, isKept, session), render, 17-assets.js
 //   (the rules: what a picture is kept as, where a pick stands, which assets are unused, what the decoded cost).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -582,71 +582,3 @@
       importPictures(files);
     };
   }
-
-  // ===== The board out ======================================================
-  // Export is the kinds list read backwards: the board as SVG or PNG, the
-  // session as its log. A page's HTML, a behaviour's source and a frame's
-  // bundle are exported from the panel, each by its own kind.
-  function exportBoardSVG() {
-    return svgOf(session.getState().contentIds);
-  }
-
-  /** Some marks as SVG paths, the clean form where one is held, each path naming its node and reading. */
-  function svgOf(ids) {
-    const s = session.getState();
-    const boxes = ids.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean);
-    if (!boxes.length) return '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>';
-    const b = union(boxes);
-    const pad = 20;
-    let out = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + [b.minX - pad, b.minY - pad, b.maxX - b.minX + pad * 2, b.maxY - b.minY + pad * 2].map((v) => Math.round(v)).join(' ') + '">\n';
-    const path = (pts, closed) => pts.map((p, i) => (i ? 'L' : 'M') + p.x.toFixed(1) + ' ' + p.y.toFixed(1)).join(' ') + (closed ? ' Z' : '');
-    const draw = (node, depth) => {
-      const clean = MM.cleanPointsOf(node);
-      const pts = MM.strokePointsOf(node);
-      if (pts) {
-        const name = MM.wordOf(node) || MM.topInterpretation(node) || '';
-        out += '  <path data-node="' + esc(node.id) + '"' + (name ? ' data-reads="' + esc(name) + '"' : '') + ' d="' + path(clean || pts, !!(clean && MM.cleanOf(node).closed)) + '" fill="none" stroke="#1a1a2e" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>\n';
-        return;
-      }
-      if (depth > 6) return;
-      for (const e of node.edges) if (e.rel === 'has-part') { const p = s.nodes.get(e.to); if (p) draw(p, depth + 1); }
-    };
-    for (const id of ids) { const n = s.nodes.get(id); if (n) draw(n, 0); }
-    return out + '</svg>\n';
-  }
-
-  function exportBoardPNG() {
-    return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), 'image/png'));
-  }
-
-  function exportLog() {
-    return JSON.stringify(session.getEvents());
-  }
-
-  function downloadBlob(name, blob) {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-  }
-  function downloadText(name, text, type) {
-    downloadBlob(name, new Blob([text], { type: type || 'text/plain' }));
-  }
-
-  // The export pane: the board as SVG or PNG, the session as its log.
-  const exportPanel = document.getElementById('exportPanel');
-  const exportBtn = document.getElementById('exportBtn');
-  ui.pane(exportPanel, 'export', () => closePanel(exportPanel, exportBtn));
-  exportBtn.onclick = () => togglePanel(exportPanel, exportBtn);
-  exportPanel.addEventListener('click', (e) => {
-    const b = e.target.closest && e.target.closest('button[data-export]');
-    if (!b) return;
-    const which = b.dataset.export;
-    const n = session.getState().contentIds.length;
-    if (which === 'svg') { downloadText('board.svg', exportBoardSVG(), 'image/svg+xml'); flash('board.svg — ' + n + ' marks as paths'); }
-    else if (which === 'png') exportBoardPNG().then((blob) => { if (blob) { downloadBlob('board.png', blob); flash('board.png — the canvas as pixels'); } });
-    else if (which === 'log') { const evs = session.getEvents(); downloadText('canvas.jsonl', MM.encodeLog(evs, logWrite()), 'application/json'); flash('canvas.jsonl — ' + evs.length + ' events' + logFileNote()); }
-    closePanel(exportPanel, exportBtn);
-  });
