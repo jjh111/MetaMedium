@@ -911,6 +911,125 @@ export async function picturesTest(browser, servers, ctx) {
   return guards;
 }
 
+/**
+ * Out and back whole (PLAN-IPAD-NOTES I4), driven from outside through the export pane and the boards pane. Two
+ * pictures and an SVG figure are imported; the export pane's bundle is REALLY downloaded; the board is trashed and
+ * the trash emptied, which collects the pictures; "from a file…" opens the bundle — the pictures are stored again
+ * and drawn in their colours. A bare log opens with its pictures standing as names and one sentence; a bundle cut
+ * off is refused in a sentence and makes no board.
+ */
+export async function bundleTest(browser, servers, ctx) {
+  const { freshContext, steps } = ctx;
+  const check = (name, ok, detail) => steps.push({ name, ok: !!ok, detail });
+  const url = `${servers.staticOrigin}/Demos/session-engine.html?nosw=1`;
+  const guards = await freshContext(browser, { origins: [servers.staticOrigin], label: 'boards-bundle' });
+  const page = await guards.context.newPage();
+  const COLOURS = [[200, 40, 40], [40, 160, 60]];
+  const look = () => page.evaluate(async () => {
+    const mm = window.__mm, MM = mm.MM;
+    mm.setView(1, 0, 0);
+    const frames = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await frames();
+    for (let i = 0; i < 100 && mm.pictureState().loading; i++) await new Promise((r) => setTimeout(r, 50));
+    await frames();
+    const st = mm.session.getState();
+    const cv = document.getElementById('canvas'), dpr = window.devicePixelRatio || 1;
+    return st.artifacts.filter((id) => MM.pictureOf(st.nodes.get(id))).map((id) => {
+      const b = MM.boundsOf(st.nodes.get(id)), p = mm.worldToScreen((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
+      const d = cv.getContext('2d').getImageData(Math.round(p.x * dpr) - 2, Math.round(p.y * dpr) - 2, 5, 5).data;
+      let r = 0, g = 0, bl = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; bl += d[i + 2]; }
+      const n = d.length / 4; return [Math.round(r / n), Math.round(g / n), Math.round(bl / n)];
+    });
+  });
+  const close = (got, want) => got.length === want.length && want.every((w) => got.some((g) => g.every((v, k) => Math.abs(v - w[k]) <= 26)));
+  const assets = () => page.evaluate(async () => (await window.__mm.assets()).length);
+  const paneSaid = () => page.evaluate(() => ((document.getElementById('boardsStatus') || {}).textContent || '').replace(/\s+/g, ' ').trim());
+  const fromFile = async (name, mimeType, buffer) => {
+    await openBoardsPane(page);
+    const before = (await boardsNow(page)).list.map((e) => e.id);
+    await page.setInputFiles('#boardsFile', { name, mimeType, buffer });
+    const got = await page.waitForFunction((b4) => {
+      const x = window.__mm.boards();
+      const e = x.list.find((y) => y.kind === 'board' && !b4.includes(y.id));
+      return e && x.current === e.id && !x.switching && !x.busy && window.__mm.board().ready ? { id: e.id, name: e.name } : false;
+    }, before, { timeout: 15000, polling: 50 }).then((h) => h.jsonValue()).catch(() => null);
+    return { before, got };
+  };
+  try {
+    await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+    await waitReady(page);
+    await page.evaluate(() => window.__mm.setAssetGrace(0));
+    await page.evaluate(async (colours) => {
+      const files = [];
+      for (const [i, rgb] of colours.entries()) {
+        const c = document.createElement('canvas'); c.width = 500; c.height = 400;
+        const g = c.getContext('2d'); g.fillStyle = 'rgb(' + rgb.join(',') + ')'; g.fillRect(0, 0, 500, 400);
+        files.push(new File([await new Promise((r) => c.toBlob(r, 'image/png'))], 'photo-' + i + '.png', { type: 'image/png' }));
+      }
+      files.push(new File(['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"/></svg>'], 'logo.svg', { type: 'image/svg+xml' }));
+      await window.__mm.importPictures(files, { view: { minX: 480, minY: 140, maxX: 1380, maxY: 740 } });
+      await window.__mm.boardIdle();
+    }, COLOURS);
+    const first = await look();
+    const marks = await page.evaluate(() => window.__mm.session.getState().contentIds.length);
+
+    // ---- N22. the export pane's bundle, really downloaded ------------------------------------------
+    await page.click('#ccBtn');
+    await page.click('#exportBtn', { timeout: 5000 });
+    await page.waitForSelector('#exportPanel:not([hidden])', { timeout: 5000 });
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), page.click('#exportPanel button[data-export="bundle"]', { timeout: 5000 })]);
+    const bytes = Buffer.from(await (await import('node:fs/promises')).readFile(await download.path()));
+    const head = bytes.slice(0, 4).toString('latin1');
+    const logLine = await page.evaluate(() => window.__mm.lastDownload() && window.__mm.lastDownload().name);
+    check('N22. the export pane\'s “board + pictures” downloads one zip — a .dyna.zip, named for the board, beginning PK — and the status line says its two pictures',
+      /\.dyna\.zip$/.test(download.suggestedFilename()) && head === 'PK\x03\x04' && bytes.length > 500 && logLine === download.suggestedFilename() && /2 pictures/.test(await page.evaluate(() => document.getElementById('status').textContent || '')),
+      { name: download.suggestedFilename(), head, size: bytes.length });
+
+    // ---- N22b. the board deleted for good, its pictures collected, then opened from the file ---------
+    const home = (await boardsNow(page)).current;
+    await page.evaluate(() => window.__mm.newBoard());
+    await until(page, (h) => window.__mm.boards().current !== h && !window.__mm.boards().busy && !window.__mm.boards().switching, home);
+    await openBoardsPane(page);
+    await page.click(`#boardsPanel button[data-trash="${home}"]`);
+    await until(page, (b) => { const e = window.__mm.boards().list.find((y) => y.id === b); return !!e && e.trashed > 0 && !window.__mm.boards().busy; }, home);
+    await openBoardsPane(page);
+    await page.click('#boardsPanel button[data-empty-trash]');
+    await page.click('#boardsPanel button[data-empty-confirm]');
+    await until(page, (b) => !window.__mm.boards().list.some((e) => e.id === b) && !window.__mm.boards().busy, home);
+    let left = await assets();
+    for (let i = 0; i < 30 && left !== 0; i++) { await sleep(100); left = await assets(); }
+    const opened = await fromFile(download.suggestedFilename(), 'application/zip', bytes);
+    const reopened = await look();
+    const n2 = await assets();
+    const marks2 = await page.evaluate(() => window.__mm.session.getState().contentIds.length);
+    check('N22b. the board deleted for good and its pictures collected (the store is empty), "from a file…" opens the bundle as a new board named for the file: both pictures stored again and drawn in their own colours, every mark of it back',
+      first.length === 2 && close(first, COLOURS) && left === 0 && !!opened.got && opened.got.name === download.suggestedFilename().replace(/\.dyna\.zip$/, '') && close(reopened, COLOURS) && n2 === 2 && marks2 === marks,
+      { left, opened: opened.got, reopened, assets: n2, marks, marks2 });
+
+    // ---- N22c. a bare log opens; its pictures stand as names, in one sentence ------------------------
+    await page.evaluate(async () => { const mm = window.__mm; await mm.dropAssets((await mm.assets()).map((a) => 'sha256:' + a.hash.replace(/^sha256:/, ''))); mm.forgetPictures(); });
+    const log = await page.evaluate(() => window.__mm.MM.encodeLog(window.__mm.session.getEvents(), {}));
+    const bare = await fromFile('canvas.jsonl', 'application/json', Buffer.from(log, 'utf8'));
+    const said = await paneSaid();
+    const standing = await page.evaluate(() => { const mm = window.__mm; return { artifacts: mm.session.getState().artifacts.length, missing: mm.pictureState().missing.length }; });
+    check('N22c. a bare canvas.jsonl opens as a board — and says in the boards pane, in one sentence, that its two pictures are named in it and not in it, with the way to carry them; they stand as their names',
+      !!bare.got && standing.artifacts === 3 && /2 pictures/.test(said) && /not in it/.test(said) && /zip/.test(said) && (said.match(/picture/g) || []).length >= 2, { got: bare.got, said, standing });
+
+    // ---- N22d. a bundle cut off is refused in a sentence ---------------------------------------------
+    const nBoards = (await boardsNow(page)).list.filter((e) => e.kind === 'board').length;
+    const cut = await fromFile('cut.dyna.zip', 'application/zip', bytes.slice(0, Math.floor(bytes.length * 0.5)));
+    const said2 = await paneSaid();
+    const nAfter = (await boardsNow(page)).list.filter((e) => e.kind === 'board').length;
+    check('N22d. a bundle cut off half way is refused in the boards pane in a sentence — no board is made, the one on screen stays',
+      !cut.got && /cut off|damaged/.test(said2) && /cut\.dyna\.zip|zip/.test(said2) && nAfter === nBoards, { cut: cut.got, said: said2, nBoards, nAfter });
+  } catch (err) {
+    check('N22. the bundle test ran to its end', false, { error: String(err && err.stack ? err.stack : err) });
+    await ctx.screenshot(page, 'boards-bundle');
+  }
+  await page.close().catch(() => {});
+  return guards;
+}
+
 /** The scenario the gate runs. */
 export async function runBoards(browser, servers, ctx) {
   const steps = [];
@@ -930,5 +1049,8 @@ export async function runBoards(browser, servers, ctx) {
   const t5 = Date.now();
   const pictures = await picturesTest(browser, servers, { ...ctx, steps });
   measured['pictures s'] = +((Date.now() - t5) / 1000).toFixed(1);
-  return { steps, guards: [guards, ...first, format, ...storage, pictures], measured };
+  const t6 = Date.now();
+  const bundle = await bundleTest(browser, servers, { ...ctx, steps });
+  measured['bundle s'] = +((Date.now() - t6) / 1000).toFixed(1);
+  return { steps, guards: [guards, ...first, format, ...storage, pictures, bundle], measured };
 }

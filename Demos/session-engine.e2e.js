@@ -1666,6 +1666,236 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0); await wait(60);
   }
 
+  // ---- 70. Out and back whole (PLAN-IPAD-NOTES I4) ----
+  // A board with two pictures, an SVG figure, a line of writing and ink is exported three ways and one more.
+  // The BUNDLE is one file (a zip: the log, and each picture under its hash) that "from a file…" opens whole —
+  // the pictures stored before the board's events land, the hash of each checked; board.svg carries the pictures
+  // as <image>, the figure as an image of its own svg and the writing as <text>, all under the ink;
+  // board.png draws the WHOLE board (the held marks when something is held), pictures and figures and all, on an
+  // offscreen canvas, never the viewport; the PDF is one page holding one picture of it, written by hand.
+  // It stands here, with 69, before the rooms (28 …): from a room a board opens in a page of its own.
+  {
+    const bd70 = () => window.__mm.boards();
+    const settled70 = async (pred, ms) => { const end = Date.now() + (ms || 15000); while (Date.now() < end) { const b = bd70(); if (b.ready && !b.switching && !b.busy && pred(b)) return true; await wait(50); } return false; };
+    const RED = [200, 40, 40], BLUE = [50, 70, 210], GREEN = [40, 160, 60];
+    const png70 = (name, w, h, rgb) => new Promise((res) => {
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const g = c.getContext('2d'); g.fillStyle = 'rgb(' + rgb.join(',') + ')'; g.fillRect(0, 0, w, h);
+      c.toBlob((b) => res(new File([b], name, { type: 'image/png' })), 'image/png');
+    });
+    const near70 = (got, want, tol) => !!got && want.every((v, i) => Math.abs(got[i] - v) <= (tol || 26));
+    const bytes70 = async (blob) => new Uint8Array(await blob.arrayBuffer());
+    const bitmapOf70 = (blob) => createImageBitmap(blob);
+    const sample70 = (bmp, x, y) => {
+      const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+      const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(bmp, 0, 0);
+      const d = g.getImageData(Math.max(0, Math.round(x) - 1), Math.max(0, Math.round(y) - 1), 3, 3).data;
+      let r = 0, gg = 0, b = 0, n = d.length / 4;
+      for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; }
+      return [Math.round(r / n), Math.round(gg / n), Math.round(b / n), d[3]];
+    };
+    const centre70 = (id) => { const b = MM.boundsOf(mm.session.getState().nodes.get(id)); return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2, b }; };
+    const kinds70 = () => { const st = mm.session.getState(); return st.artifacts.map((id) => { const n = st.nodes.get(id), p = MM.pictureOf(n); const c = MM.getRep(n, 'code'); return { id, picture: !!p, kind: c && c.data.kind, name: MM.wordOf(n) }; }); };
+    const orig70 = bd70().current;
+    const own70 = await mm.newBoard();
+    await settled70((b) => b.current === own70.id);
+    mm.session.load([]); mm.setView(1, 0, 0); mm.setAssetGrace(0); await wait(80);
+    const base70 = (await mm.assets()).length;
+    const svgText70 = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="rgb(40,160,60)"/></svg>';
+    const files70 = [await png70('red.png', 500, 400, RED), await png70('blue.png', 400, 500, BLUE), new File([svgText70], 'logo.svg', { type: 'image/svg+xml' }), new File(['hello bundle'], 'note.txt', { type: 'text/plain' })];
+    const out70 = await mm.importPictures(files70, { view: { minX: 100, minY: 100, maxX: 1300, maxY: 800 } });
+    await mm.boardIdle();
+    t.stroke(t.line(mm.worldToScreen(150, 850), mm.worldToScreen(700, 900), 20)); await wait(60);
+    t.stroke(t.rect(800, 840, 120, 70)); await wait(60);
+    const st70 = mm.session.getState();
+    const ink70 = st70.contentIds.filter((id) => MM.strokePointsOf(st70.nodes.get(id)));
+    const k70 = kinds70();
+    const picIds70 = k70.filter((k) => k.picture).map((k) => k.id);
+    const svgId70 = (k70.find((k) => k.kind === 'svg') || {}).id, txtId70 = (k70.find((k) => k.kind === 'text') || {}).id;
+    step('70 setup. a board of two pictures, an svg figure, a line of writing and two marks of ink',
+      out70.ids.length === 4 && picIds70.length === 2 && !!svgId70 && !!txtId70 && ink70.length === 2, { ids: out70.ids.length, kinds: k70, ink: ink70.length, skipped: out70.skipped });
+    const hashes70 = [...new Set(mm.session.getEvents().filter((e) => e.type === 'import' && e.asset).map((e) => e.asset))];
+
+    // The bundle.
+    const bun = await mm.exportBundle();
+    const zbytes = await bytes70(bun.blob);
+    const readZ = await window.__mm.bundleProbe(zbytes);
+    step('70a. the bundle is one zip, named for the board: board.jsonl first — a version 1 log whose header says two pictures sit beside it, and whose events are the board\'s own — then each picture under assets/<its hash>',
+      /\.dyna\.zip$/.test(bun.name) && zbytes[0] === 0x50 && zbytes[1] === 0x4B && readZ.ok && readZ.names[0] === 'board.jsonl' && readZ.names.length === 3 &&
+        readZ.names.slice(1).every((n) => /^assets\/[0-9a-f]{64}\.(jpg|png|webp)$/.test(n)) && readZ.header && readZ.header.version === 1 && readZ.header.assets === 2 &&
+        readZ.events === mm.session.getEvents().length && hashes70.every((h) => readZ.names.some((n) => n.includes(h.slice(7)))) && bun.assets === 2 && bun.missing === 0 && /2 pictures/.test(bun.said),
+      { name: bun.name, said: bun.said, zip: readZ, hashes: hashes70.length });
+    // Through the export pane, the real button, the real download.
+    document.getElementById('exportBtn').click(); await wait(60);
+    const dlBtn = document.querySelector('#exportPanel button[data-export="bundle"]');
+    const dl0 = mm.lastDownload();
+    if (dlBtn) dlBtn.click();
+    for (let i = 0; i < 60 && (!mm.lastDownload() || mm.lastDownload() === dl0); i++) await wait(50);
+    const dl = mm.lastDownload();
+    step('70a2. the export pane has it as a button of its own and a tap saves it: the same bytes, the same name, said in the status line',
+      !!dlBtn && !!dl && dl !== dl0 && dl.name === bun.name && dl.blob.size === bun.blob.size && /pictures/.test(document.getElementById('status').textContent || ''),
+      { btn: !!dlBtn, name: dl && dl.name, size: dl && dl.blob.size, status: (document.getElementById('status').textContent || '').slice(0, 120) });
+
+    // The SVG.
+    const sv = mm.exportSvg();
+    const doc70 = new DOMParser().parseFromString(sv.text, 'image/svg+xml');
+    const imgs70 = [...doc70.querySelectorAll('image')];
+    const hrefOf = (e) => e.getAttribute('xlink:href') || e.getAttribute('href') || '';
+    const pics70 = imgs70.filter((e) => /^data:image\/(png|jpeg|webp);base64,/.test(hrefOf(e)));
+    const figs70 = imgs70.filter((e) => /^data:image\/svg\+xml;base64,/.test(hrefOf(e)));
+    const kids70 = [...doc70.documentElement.children].map((e) => e.localName);
+    const lastBelow70 = Math.max(kids70.lastIndexOf('image'), kids70.lastIndexOf('g'));
+    const firstInk70 = kids70.indexOf('path');
+    const vb70 = (doc70.documentElement.getAttribute('viewBox') || '').split(' ').map(Number);
+    const picBox70 = (id) => { const b = centre70(id).b; return [b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY].map((v) => +v.toFixed(2)); };
+    step('70b. board.svg parses, and carries the two pictures as <image> data URLs at their bounds, the svg figure as an image of its own text — its script could never run — and the writing as <text>, all before the ink, the two strokes as paths',
+      !doc70.querySelector('parsererror') && pics70.length === 2 && figs70.length === 1 && !!doc70.querySelector('text') && /hello bundle/.test(sv.text) && !/<rect width="100"/.test(sv.text) &&
+        firstInk70 > lastBelow70 && doc70.querySelectorAll('path[data-node]').length === 2 &&
+        pics70.every((e) => { const b = [+e.getAttribute('x'), +e.getAttribute('y'), +e.getAttribute('width'), +e.getAttribute('height')]; return picIds70.some((id) => picBox70(id).every((v, i) => Math.abs(v - b[i]) < 0.02)); }) &&
+        sv.scope === 'board' && sv.n === 6,
+      { parse: !!doc70.querySelector('parsererror'), pics: pics70.length, figs: figs70.length, kids: kids70, vb: vb70, scope: sv.scope });
+    // It draws: the file loaded as an image, the picture's colour where it stands.
+    {
+      const blob = new Blob([sv.text], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('the svg did not load as an image')); i.src = url; });
+      const c = document.createElement('canvas'); c.width = Math.round(vb70[2]); c.height = Math.round(vb70[3]);
+      const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      const at = (wx, wy) => { const d = g.getImageData(Math.round(wx - vb70[0]) - 1, Math.round(wy - vb70[1]) - 1, 3, 3).data; return [d[0], d[1], d[2]]; };
+      const cs = picIds70.map((id) => centre70(id));
+      const gotCols = cs.map((c1) => at(c1.x, c1.y));
+      const fig = centre70(svgId70);
+      step('70b2. loaded as a picture the svg shows each picture\'s colour where it stands, and the figure\'s green where the figure stands — what Safari and Inkscape will draw',
+        gotCols.some((c1) => near70(c1, RED)) && gotCols.some((c1) => near70(c1, BLUE)) && near70(at(fig.x, fig.y), GREEN), { gotCols, fig: at(fig.x, fig.y) });
+    }
+
+    // The PNG: the whole board, drawn offscreen.
+    const pg = await mm.exportPng();
+    const bmp70 = await bitmapOf70(pg.blob);
+    const at70 = (wx, wy) => sample70(bmp70, (wx - pg.origin.x) * pg.k, (wy - pg.origin.y) * pg.k);
+    const fig70 = centre70(svgId70), txt70 = centre70(txtId70);
+    const redPic = picIds70.map(centre70).find((c1) => near70(at70(c1.x, c1.y), RED)), bluePic = picIds70.map(centre70).find((c1) => near70(at70(c1.x, c1.y), BLUE));
+    const bare70 = at70(1200, 880);
+    step('70c. board.png draws the whole board: its size is twice the marks\' own and said, the red and the blue picture are their colour where each stands, the svg figure its green, the ground paper where nothing is — and the viewport was never read (the view is panned far away)',
+      pg.blob.type === 'image/png' && bmp70.width === pg.w && bmp70.height === pg.h && !!redPic && !!bluePic && near70(at70(fig70.x, fig70.y), GREEN) && bare70[0] > 225 && bare70[1] > 220 && bare70[2] > 205 && pg.scope === 'board' && pg.said === '',
+      { w: pg.w, h: pg.h, k: pg.k, red: !!redPic, blue: !!bluePic, fig: at70(fig70.x, fig70.y), bare: bare70 });
+    {
+      mm.setView(1, 90000, 90000); await wait(60);
+      const far = await mm.exportPng();
+      const fb = await bitmapOf70(far.blob);
+      const c1 = redPic;
+      const x = (c1.x - far.origin.x) * far.k, y = (c1.y - far.origin.y) * far.k;
+      step('70c2. with the view panned a hundred thousand units away the picture of the board is the same: the red picture is red where it stands',
+        far.w === pg.w && far.h === pg.h && near70(sample70(fb, x, y), RED), { w: far.w, h: far.h, px: sample70(fb, x, y) });
+      mm.setView(1, 0, 0); await wait(60);
+    }
+    // Held marks: only those are drawn, in svg and in png.
+    {
+      const held = redPic ? picIds70.find((id) => { const c1 = centre70(id); return Math.abs(c1.x - redPic.x) < 1 && Math.abs(c1.y - redPic.y) < 1; }) : null;
+      mm.session.select([held], Date.now()); await wait(60);
+      const hs = mm.exportSvg(), hp = await mm.exportPng();
+      const hb = await bitmapOf70(hp.blob);
+      const hc = centre70(held);
+      step('70c3. with one picture held, board.svg holds that picture alone (one image, no ink, no figure) and board.png is of its place — red there — and each says it is of what is held',
+        (hs.text.match(/<image /g) || []).length === 1 && !/<path /.test(hs.text) && hs.scope === 'held' && hs.n === 1 && hp.scope === 'held' &&
+          Math.abs(hp.w / hp.h - 1.25) < 0.4 && near70(sample70(hb, (hc.x - hp.origin.x) * hp.k, (hc.y - hp.origin.y) * hp.k), RED) && /held/.test(hp.words),
+        { svgImages: (hs.text.match(/<image /g) || []).length, scope: [hs.scope, hp.scope], n: hs.n, size: [hp.w, hp.h], words: hp.words });
+      mm.session.deselect(Date.now()); await wait(40);
+    }
+
+    // The PDF: one page, one picture.
+    const pdf = await mm.exportPdf();
+    const pb = await bytes70(pdf.blob);
+    const latin = new TextDecoder('latin1').decode(pb);
+    const imgDict = /\/Subtype \/Image[^>]*?\/Length (\d+)/s.exec(latin);
+    let pdfPx = null;
+    if (imgDict) {
+      const at = latin.indexOf('stream\n', latin.indexOf('/Subtype /Image')) + 7;
+      const raw = pb.slice(at, at + Number(imgDict[1]));
+      const rgb = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate'))).arrayBuffer());
+      const w = pdf.plan.rasterW, h = pdf.plan.rasterH;
+      const px = (wx, wy) => { const x = Math.round((wx - pdf.origin.x) / pdf.span.w * w), y = Math.round((wy - pdf.origin.y) / pdf.span.h * h); const o = (y * w + x) * 3; return [rgb[o], rgb[o + 1], rgb[o + 2]]; };
+      pdfPx = { len: rgb.length, want: w * h * 3, red: px(redPic.x, redPic.y), blue: px(bluePic.x, bluePic.y) };
+    }
+    step('70d. the PDF begins %PDF-, is one page whose size is Letter or A4 turned the way the board lies, holds one image, ends %%EOF — the image inflates to exactly its pixels, and the red and blue pictures are their colours where they stand — and it says how much smaller the board is',
+      latin.startsWith('%PDF-') && latin.trimEnd().endsWith('%%EOF') && (latin.match(/\/Subtype \/Image/g) || []).length === 1 && (latin.match(/\/Type \/Page\b/g) || []).length === 1 &&
+        /\/MediaBox \[0 0 (612 792|792 612|595 842|842 595)\]/.test(latin) && !!pdfPx && pdfPx.len === pdfPx.want && near70(pdfPx.red, RED) && near70(pdfPx.blue, BLUE) && /one page/.test(pdf.said) && /%/.test(pdf.said),
+      { head: latin.slice(0, 8), said: pdf.said, plan: pdf.plan && { paper: pdf.plan.paper, w: pdf.plan.pageW, h: pdf.plan.pageH, raster: [pdf.plan.rasterW, pdf.plan.rasterH] }, px: pdfPx });
+
+    // Deleted, and opened from the file.
+    const markCount70 = mm.session.getState().contentIds.length;
+    const inkJson70 = JSON.stringify(ink70.map((id) => MM.getRep(mm.session.getState().nodes.get(id), 'stroke').data));
+    const svgCode70 = MM.getRep(mm.session.getState().nodes.get(svgId70), 'code').data.code;
+    await mm.boardIdle();
+    await mm.dropAssets(hashes70); mm.forgetPictures();
+    const gone70 = (await mm.assets()).length;
+    const said70 = [];
+    const file70 = new File([bun.blob], bun.name, { type: 'application/zip' });
+    const made70 = await mm.boardFromFile(file70, { said: (v) => said70.push(typeof v === 'string' ? v : v.words), note: (n) => said70.push(n) });
+    await settled70((b) => b.current === (made70 && made70.id));
+    mm.setView(1, 0, 0); await wait(120);
+    const st70b = mm.session.getState();
+    const pics70b = st70b.artifacts.map((id) => ({ id, p: MM.pictureOf(st70b.nodes.get(id)) })).filter((x) => x.p);
+    const drawn70 = async (id, want) => { const end = Date.now() + 8000; let got = null; while (Date.now() < end) { const c1 = centre70(id); const p = mm.worldToScreen(c1.x, c1.y), dpr = window.devicePixelRatio || 1; const d = document.getElementById('canvas').getContext('2d').getImageData(Math.round(p.x * dpr) - 2, Math.round(p.y * dpr) - 2, 5, 5).data; let r = 0, g = 0, b = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; } got = [Math.round(r / 25), Math.round(g / 25), Math.round(b / 25)]; if (near70(got, want)) return { ok: true, got }; await wait(60); } return { ok: false, got }; };
+    const dr1 = pics70b.length === 2 ? await drawn70(pics70b[0].id, RED) : null, dr2 = pics70b.length === 2 ? await drawn70(pics70b[1].id, BLUE) : null;
+    const k70b = kinds70(), inkB = st70b.contentIds.filter((id) => MM.strokePointsOf(st70b.nodes.get(id)));
+    step('70e. the pictures deleted from this device, the bundle opened with "from a file…": a new board — its two pictures stored again before its events landed, each drawn in its own colour (red, blue), the svg figure, the writing and the two marks of ink back exactly',
+      gone70 === base70 && !!made70 && pics70b.length === 2 && !!dr1 && dr1.ok && dr2.ok && (await mm.assets()).length === base70 + 2 &&
+        k70b.filter((k) => k.kind === 'svg').length === 1 && k70b.filter((k) => k.kind === 'text').length === 1 && inkB.length === 2 &&
+        JSON.stringify(inkB.map((id) => MM.getRep(st70b.nodes.get(id), 'stroke').data)) === inkJson70 && MM.getRep(st70b.nodes.get(k70b.find((k) => k.kind === 'svg').id), 'code').data.code === svgCode70 &&
+        st70b.contentIds.length === markCount70,
+      { gone: gone70, base: base70, made: made70 && made70.name, pics: pics70b.length, dr: [dr1 && dr1.got, dr2 && dr2.got], said: said70, assets: (await mm.assets()).length });
+    step('70e2. the board it made is not the one it was exported from: a board of its own, named for the file without its .dyna.zip',
+      !!made70 && made70.id !== own70.id && made70.name === bun.name.replace(/\.dyna\.zip$/, '') && said70.every((s) => !/could not|damaged/.test(s)), { name: made70 && made70.name, said: said70 });
+
+    // A bare log: the pictures it names but does not carry draw their name, said in one sentence.
+    await mm.dropAssets(hashes70); mm.forgetPictures();
+    const bare = MM.encodeLog(mm.session.getEvents(), {});
+    const notes70 = [];
+    const bareMade = await mm.boardFromFile(new File([bare], 'canvas.jsonl', { type: 'application/json' }), { said: (v) => notes70.push(typeof v === 'string' ? v : v.words), note: (n) => notes70.push(n) });
+    await settled70((b) => b.current === (bareMade && bareMade.id)); mm.setView(1, 0, 0); await wait(200);
+    const stB = mm.session.getState();
+    const missing70 = mm.pictureState().missing.length;
+    const one70 = notes70.filter((n) => /picture/.test(n));
+    step('70f. a bare .jsonl still opens whole — the board, its svg and its ink — and its two pictures, named in it and not carried, stand as their names, said in ONE sentence that says how to bring them',
+      !!bareMade && stB.artifacts.length === 4 && stB.contentIds.length === markCount70 && one70.length === 1 && /2 pictures/.test(one70[0]) && /not (in|carried)/.test(one70[0]) && /zip|bundle|pictures/.test(one70[0]) && missing70 === 2 && (await mm.assets()).length === base70,
+      { made: !!bareMade, artifacts: stB.artifacts.length, notes: notes70, missing: missing70 });
+
+    // A bundle with a damaged picture opens with the rest; a smashed one is refused, and no board is made.
+    {
+      const flipped = zbytes.slice();
+      const hit = (() => { const names = readZ.entries; const e = names.find((x) => x.name.startsWith('assets/')); return e.dataAt + 5; })();
+      flipped[hit] ^= 0x5a;
+      const said = [], boardsBefore = bd70().list.filter((e) => e.kind === 'board').length;
+      const madeD = await mm.boardFromFile(new File([flipped], 'damaged.dyna.zip', { type: 'application/zip' }), { said: (v) => said.push(typeof v === 'string' ? v : v.words), note: (n) => said.push(n) });
+      await settled70((b) => b.current === (madeD && madeD.id));
+      const stD = mm.session.getState();
+      const damagedSaid = said.filter((s) => /damaged|match|checksum/.test(s));
+      const heldPics = (await mm.assets()).length;
+      step('70g. a bundle with one picture damaged still opens: the board, the sound picture stored, the damaged one left out and said by its name',
+        !!madeD && stD.artifacts.length === 4 && damagedSaid.length >= 1 && heldPics === base70 + 1, { made: !!madeD, said, held: heldPics - base70 });
+      const smashed = zbytes.slice(0, Math.floor(zbytes.length * 0.6));
+      const said2 = [];
+      let threw = null, madeS = null;
+      try { madeS = await mm.boardFromFile(new File([smashed], 'cut.dyna.zip', { type: 'application/zip' }), { said: (v) => said2.push(typeof v === 'string' ? v : v.words) }); } catch (err) { threw = String(err); }
+      const boardsAfter = bd70().list.filter((e) => e.kind === 'board').length;
+      step('70h. a bundle cut off half way is refused in a sentence — it is never thrown at the person, no board is made, and the board on screen is as it was',
+        !threw && madeS === false && said2.length === 1 && /cut off|damaged|zip/.test(said2[0]) && boardsAfter === boardsBefore + 1 && bd70().current === madeD.id, { threw, madeS, said2, boardsBefore, boardsAfter });
+    }
+    // The log the export pane writes says its pictures are not in it.
+    {
+      document.getElementById('exportBtn').click(); await wait(60);
+      const b0 = mm.lastDownload();
+      document.querySelector('#exportPanel button[data-export="log"]').click(); await wait(60);
+      const st = (document.getElementById('status').textContent || '');
+      step('70i. canvas.jsonl says, when the board holds pictures, that they are not in it and which export carries them', mm.lastDownload() !== b0 && /picture/.test(st) && /not in it|zip|bundle/.test(st), { status: st.slice(0, 200) });
+    }
+    mm.setAssetGrace(30000);
+    await mm.switchBoard(orig70); await settled70((b) => b.current === orig70);
+    mm.session.load([]); mm.setView(1, 0, 0); await wait(60);
+  }
+
   // ---- 28. A live room: another hand's log arrives live, its ink in its own colour ----
   {
     mm.session.load([]); mm.setView(1, 0, 0);
