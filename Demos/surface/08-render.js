@@ -64,7 +64,11 @@
   /** An artifact that renders as a figure on the board rather than on a page. */
   function isFigureArtifact(node) {
     for (let i = node.reps.length - 1; i >= 0; i--) {
-      if (node.reps[i].modality === 'code') return FIGURE_KINDS.has(node.reps[i].data.kind || 'html');
+      if (node.reps[i].modality === 'code') {
+        const d = node.reps[i].data;
+        // A picture kept in the asset store is drawn on the board, a figure like a drawing; one that is only a name is a card with its brackets.
+        return FIGURE_KINDS.has(d.kind || 'html') || (!!d.asset && MM.isPictureKind(d.kind));
+      }
     }
     return false;
   }
@@ -693,6 +697,7 @@
     if (paintHeld) { state = s; return; }
     paints++;
     state = s;
+    picturesBegin();
     chipHits = [];
     chromeDrawn = [];
     readingDrawn = null;
@@ -780,7 +785,22 @@
     // off screen at working zoom — except while a tank moves bodies about.
     paintView = vb && !tank.place.size ? vb : null;
 
-    for (const id of ix ? paintOrder(s, ix, vb, inspectedId, pv, followShown) : s.contentIds) {
+    // The pictures first — they are the ground the ink is drawn over: a picture kept in the asset store is
+    // painted on this canvas, under every stroke, culled to the screen with the rest of the paint (and a
+    // picture held and being dragged is drawn where the drag takes it).
+    const order = ix ? paintOrder(s, ix, vb, inspectedId, pv, followShown) : s.contentIds;
+    for (const id of order) {
+      if (!artifactSet.has(id)) continue;
+      const pn = s.nodes.get(id);
+      if (!pn || !MM.pictureOf(pn)) continue;
+      const heldPic = pv && pv.ids.includes(id);
+      if (heldPic) { ctx.save(); applyPreview(pv); }
+      const st = drawPicture(pn, id);
+      if (heldPic) ctx.restore();
+      if (st && paintOps) { const pb = MM.boundsOf(pn); recordOp({ kind: 'picture', id: id, text: st === 'drawn' ? 'drawn' : 'standing', box: boxOfRect(pb.minX, pb.minY, pb.maxX - pb.minX, pb.maxY - pb.minY), moved: !!heldPic }); }
+    }
+
+    for (const id of order) {
       const follows = followShown && followShown.get(id);
       const node = follows || s.nodes.get(id);
       const isArtifact = artifactSet.has(id);
@@ -843,6 +863,7 @@
       }
     }
     paintView = null;
+    picturesPainted();
 
     renderLabels(s, inspectedId, ix, vb);
     // What the board's numbers say, beside its figures and its page (M5, 25-maths.js).

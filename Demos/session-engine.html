@@ -56,7 +56,10 @@
     <button id="teachBtn" aria-pressed="false"></button>
     <button id="helpBtn"></button>
   </div></div>
-  <input id="importInput" type="file" accept="image/*,.svg,.html,.htm,.js,.mjs,.json,.md,.txt" multiple capture="environment" hidden>
+  <!-- Pictures come in by one of two inputs, never one with both: a single input that asks for the camera too may open the camera alone. photos: the library, several at once; camera: one shot. The third is every other kind of file. -->
+  <input id="photosInput" type="file" accept="image/*,.svg" multiple hidden>
+  <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
+  <input id="importInput" type="file" accept=".svg,.html,.htm,.js,.mjs,.json,.md,.txt,.mmd,.mermaid" multiple hidden>
 </div>
 
 <div id="teachPanel" hidden>
@@ -102,6 +105,13 @@
   </div>
 </div>
 
+<div id="importPanel" hidden>
+  <div class="exRow">
+    <button data-import="photos" title="Pictures and SVGs from your library or your files — several at once. They are kept with the board and drawn on it, under your ink">photos</button>
+    <button data-import="camera" title="Take a picture of a page or a whiteboard now">camera</button>
+    <button data-import="file" title="A page, a script, a text, Mermaid, JSON — a file of a kind the canvas knows becomes a thing on the board">other files</button>
+  </div>
+</div>
 <div id="exportPanel" hidden>
   <div class="exRow">
     <button data-export="svg" title="Every mark as a path, the clean form where one is held">board.svg</button>

@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createSession } from './session';
-import { LOCAL_PARTICIPANT, wordOf } from './nodes';
+import { LOCAL_PARTICIPANT, wordOf, boundsOf } from './nodes';
 import { rectStroke } from '../test/strokes';
 import { isPictureKind, pictureOf } from '../kinds/picture';
 import { kindOf } from '../kinds/kinds';
@@ -117,5 +117,25 @@ describe('import', () => {
     const s = createSession();
     const id = s.import({ kind: 'md', path: 'README.md', bounds: BOX, code: '# hi', at: 1 })!;
     expect(pictureOf(s.getState().nodes.get(id)!)).toBeNull();
+  });
+
+  it('a picture is a mark the hand can move, scale and turn: it has no ink of its own, so it is manipulated as itself, and undo springs it back', () => {
+    const s = createSession();
+    const id = s.import({ kind: 'jpg', path: 'imports/a.jpg', name: 'a.jpg', bounds: { minX: 100, minY: 100, maxX: 500, maxY: 400 }, asset: HASH, mime: 'image/jpeg', w: 400, h: 300, at: 1000 })!;
+    const box = () => boundsOf(s.getState().nodes.get(id)!)!;
+    s.select([id], 1001);
+    s.move({ ids: [id], dx: 50, dy: -20, at: 1002 });
+    expect(box()).toEqual({ minX: 150, minY: 80, maxX: 550, maxY: 380 });
+    s.scale({ ids: [id], about: { x: 150, y: 80 }, sx: 2, sy: 2, at: 1003 });
+    expect(box()).toEqual({ minX: 150, minY: 80, maxX: 950, maxY: 680 });
+    s.undo(); s.undo();
+    expect(box()).toEqual({ minX: 100, minY: 100, maxX: 500, maxY: 400 });
+    // The picture is still a picture, with its asset, wherever it stands.
+    s.move({ ids: [id], dx: 10, dy: 10, at: 1004 });
+    expect(pictureOf(s.getState().nodes.get(id)!)!.asset).toBe(HASH);
+    // A replay of the log stands it in the same place.
+    const copy = createSession();
+    copy.load(JSON.parse(JSON.stringify(s.getEvents())));
+    expect(boundsOf(copy.getState().nodes.get(copy.getState().artifacts[0])!)).toEqual({ minX: 110, minY: 110, maxX: 510, maxY: 410 });
   });
 });

@@ -2,7 +2,7 @@
 // Provides: the pure half of keeping pictures (PLAN-IPAD-NOTES I1) — sha256Hex (the digest an asset is
 //   kept under), assetRef / isAssetRef, fitLongSide, pictureFormat / pictureExt (what a picture is kept
 //   as), safePictureName / uniquePicturePath (the name and path it gets), assetsOfEvents / assetGcPlan
-//   (which assets nothing uses any more), pictureGrid / pickWords (where a pick is laid out and how the
+//   (which assets nothing uses any more), pictureCells / fitInCell / pictureGrid / pickWords (where a pick is laid out and how the
 //   status line says it) and pictureTier / decodedCost / evictPlan (what the decoded pictures cost and
 //   which to let go).
 // Uses: NOTHING. Like 17-board.js this fragment names no closure variable and touches no DOM, no storage
@@ -147,16 +147,15 @@
 
   // ----- a pick, laid out ----------------------------------------------------------------
   /**
-   * Where a pick of pictures stands: a grid of cells in the view (the area of the board the hand is looking
-   * at), each picture fitted into a cell with its own proportions, in reading order — left to right, then
-   * down. One picture is a large one; many are small enough to stand in the view together, so a pick of ten
-   * is never ten on one point. `sizes` are `{ w, h }` (the proportions are what is used), `view` a box in
-   * world units. Cells have a floor, so a pick of thirty runs past the view rather than into dust.
-   * @returns {Array<{x:number,y:number,w:number,h:number}>} one place a picture, in the order given
+   * The cells a pick of `n` is laid out in: a grid in the view (the area of the board the hand is looking at),
+   * in reading order — left to right, then down. One is a large cell; many are small enough to stand in the
+   * view together, so a pick of ten is never ten on one point. Cells have a floor, so a pick of thirty runs
+   * past the view rather than into dust. A cell depends on the count and the view, never on the pictures, so
+   * a pick can be placed one picture at a time as each is ready.
+   * @returns {Array<{x:number,y:number,w:number,h:number}>}
    */
-  function pictureGrid(sizes, view) {
-    const n = sizes.length;
-    if (!n) return [];
+  function pictureCells(n, view) {
+    if (!(n > 0)) return [];
     const vw = Math.max(1, view.maxX - view.minX), vh = Math.max(1, view.maxY - view.minY);
     const margin = Math.min(vw, vh) * 0.05, gap = margin;
     const FLOOR = 100;
@@ -170,12 +169,21 @@
     }
     const out = [];
     for (let i = 0; i < n; i++) {
-      const s = sizes[i], sw = Math.max(1, s.w || 1), sh = Math.max(1, s.h || 1);
-      const k = Math.min(cw / sw, ch / sh);
       const col = i % cols, row = Math.floor(i / cols);
-      out.push({ x: view.minX + margin + col * (cw + gap), y: view.minY + margin + row * (ch + gap), w: sw * k, h: sh * k });
+      out.push({ x: view.minX + margin + col * (cw + gap), y: view.minY + margin + row * (ch + gap), w: cw, h: ch });
     }
     return out;
+  }
+  /** A picture of a size, fitted into a cell with its own proportions, standing at the cell's top left. */
+  function fitInCell(size, cell) {
+    const sw = Math.max(1, size.w || 1), sh = Math.max(1, size.h || 1);
+    const k = Math.min(cell.w / sw, cell.h / sh);
+    return { x: cell.x, y: cell.y, w: sw * k, h: sh * k };
+  }
+  /** Where a whole pick stands, each picture fitted into its cell: `sizes` are `{ w, h }` (the proportions are what is used). */
+  function pictureGrid(sizes, view) {
+    const cells = pictureCells(sizes.length, view);
+    return sizes.map((s, i) => fitInCell(s, cells[i]));
   }
   /** How far a pick has come, said to the person: *3 of 10 pictures*, or *1 picture*. */
   function pickWords(i, n) {

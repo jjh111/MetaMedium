@@ -9426,6 +9426,76 @@ var MetaMediumCore = (() => {
     return null;
   }
 
+  // src/kinds/kinds.ts
+  var KINDS = [
+    { kind: "html", extensions: ["html", "htm"], mime: "text/html", renderer: "page", addressing: "regions", textual: true },
+    { kind: "js", extensions: ["js", "mjs", "ts"], mime: "text/javascript", renderer: "source", addressing: "functions", textual: true },
+    { kind: "json", extensions: ["json"], mime: "application/json", renderer: "tree", addressing: "keys", textual: true },
+    { kind: "svg", extensions: ["svg"], mime: "image/svg+xml", renderer: "vector", addressing: "elements", textual: true },
+    { kind: "md", extensions: ["md", "markdown"], mime: "text/markdown", renderer: "prose", addressing: "headings", textual: true },
+    { kind: "png", extensions: ["png"], mime: "image/png", renderer: "image", addressing: "pixels", textual: false },
+    { kind: "jpg", extensions: ["jpg", "jpeg"], mime: "image/jpeg", renderer: "image", addressing: "pixels", textual: false },
+    { kind: "webp", extensions: ["webp"], mime: "image/webp", renderer: "image", addressing: "pixels", textual: false },
+    { kind: "text", extensions: ["txt"], mime: "text/plain", renderer: "text", addressing: "runs", textual: true },
+    { kind: "control", extensions: [], mime: "application/json", renderer: "control", addressing: "value", textual: true },
+    // A program that renders itself (a three.js scene, a 2D drawing) in a
+    // scripts-only, opaque-origin frame with a clear background, and REPORTS
+    // its parts — named things at named places — so ink over it lands on them.
+    { kind: "run", extensions: ["run.js"], mime: "text/javascript", renderer: "run", addressing: "parts", textual: true },
+    // A diagram said as Mermaid text (V1-PLAN §3, D2): drawn by mermaid.js in the
+    // same scripts-only, opaque-origin frame a program runs in, which REPORTS each
+    // node as a part — named for the marks it was written from — so ink over the
+    // rendered diagram lands on them. The text always stands, drawn or not; and a
+    // text is data, never code: nothing here is played.
+    { kind: "mermaid", extensions: ["mmd", "mermaid"], mime: "text/vnd.mermaid", renderer: "mermaid", addressing: "parts", textual: true }
+  ];
+  function kindOf(path) {
+    const lower = path.toLowerCase();
+    for (const row of KINDS) for (const e of row.extensions) if (e.includes(".") && lower.endsWith("." + e)) return row;
+    const ext = (path.split(".").pop() ?? "").toLowerCase();
+    if (!ext || ext === path.toLowerCase()) return void 0;
+    return KINDS.find((k) => k.extensions.includes(ext));
+  }
+  function rowOf(kind) {
+    return KINDS.find((k) => k.kind === kind);
+  }
+
+  // src/kinds/picture.ts
+  function isPictureKind(kind) {
+    if (!kind) return false;
+    try {
+      return rowOf(kind)?.renderer === "image";
+    } catch {
+      return false;
+    }
+  }
+  var ASSET_REF = /^sha256:[0-9a-f]{64}$/;
+  function isAssetRef(v) {
+    return typeof v === "string" && ASSET_REF.test(v);
+  }
+  var size = (v) => typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(v) : void 0;
+  function pictureOf(node) {
+    let code = null;
+    for (let i = node.reps.length - 1; i >= 0; i--) {
+      if (node.reps[i].modality === "code") {
+        code = node.reps[i];
+        break;
+      }
+    }
+    if (!code) return null;
+    const kind = code.data.kind;
+    if (!isPictureKind(kind)) return null;
+    const word = node.reps.find((r) => r.modality === "word");
+    const path = typeof code.data.path === "string" ? code.data.path : "";
+    const out = { kind, path, name: typeof word?.data === "string" && word.data || path.split("/").pop() || path };
+    if (isAssetRef(code.data.asset)) out.asset = code.data.asset;
+    if (typeof code.data.mime === "string" && /^image\/[a-z0-9.+-]+$/i.test(code.data.mime)) out.mime = code.data.mime;
+    const w2 = size(code.data.w), h2 = size(code.data.h);
+    if (w2) out.w = w2;
+    if (h2) out.h = h2;
+    return out;
+  }
+
   // src/session/manipulate.ts
   function manipulableOf(nodes, ids) {
     const out = [];
@@ -9435,7 +9505,7 @@ var MetaMediumCore = (() => {
       seen.add(id);
       const n2 = nodes.get(id);
       if (!n2 || getRep(n2, "erased")) return;
-      if (getRep(n2, "stroke")) {
+      if (getRep(n2, "stroke") || pictureOf(n2)) {
         out.push(n2);
         return;
       }
@@ -9447,7 +9517,7 @@ var MetaMediumCore = (() => {
   function markFrameOf(node) {
     const moved2 = getRep(node, "transform")?.data;
     if (moved2) return moved2;
-    return fingerprintOf(node)?.bounds;
+    return fingerprintOf(node)?.bounds ?? getRep(node, "bounds")?.data;
   }
   function scaleFactors(sx, sy) {
     return { sx: sx > 1e-3 ? sx : 1e-3, sy: sy > 1e-3 ? sy : 1e-3 };
@@ -10259,76 +10329,6 @@ var MetaMediumCore = (() => {
       if (!ex.rejected.some(same)) ex.rejected.push(sig2);
     }
     return ex;
-  }
-
-  // src/kinds/kinds.ts
-  var KINDS = [
-    { kind: "html", extensions: ["html", "htm"], mime: "text/html", renderer: "page", addressing: "regions", textual: true },
-    { kind: "js", extensions: ["js", "mjs", "ts"], mime: "text/javascript", renderer: "source", addressing: "functions", textual: true },
-    { kind: "json", extensions: ["json"], mime: "application/json", renderer: "tree", addressing: "keys", textual: true },
-    { kind: "svg", extensions: ["svg"], mime: "image/svg+xml", renderer: "vector", addressing: "elements", textual: true },
-    { kind: "md", extensions: ["md", "markdown"], mime: "text/markdown", renderer: "prose", addressing: "headings", textual: true },
-    { kind: "png", extensions: ["png"], mime: "image/png", renderer: "image", addressing: "pixels", textual: false },
-    { kind: "jpg", extensions: ["jpg", "jpeg"], mime: "image/jpeg", renderer: "image", addressing: "pixels", textual: false },
-    { kind: "webp", extensions: ["webp"], mime: "image/webp", renderer: "image", addressing: "pixels", textual: false },
-    { kind: "text", extensions: ["txt"], mime: "text/plain", renderer: "text", addressing: "runs", textual: true },
-    { kind: "control", extensions: [], mime: "application/json", renderer: "control", addressing: "value", textual: true },
-    // A program that renders itself (a three.js scene, a 2D drawing) in a
-    // scripts-only, opaque-origin frame with a clear background, and REPORTS
-    // its parts — named things at named places — so ink over it lands on them.
-    { kind: "run", extensions: ["run.js"], mime: "text/javascript", renderer: "run", addressing: "parts", textual: true },
-    // A diagram said as Mermaid text (V1-PLAN §3, D2): drawn by mermaid.js in the
-    // same scripts-only, opaque-origin frame a program runs in, which REPORTS each
-    // node as a part — named for the marks it was written from — so ink over the
-    // rendered diagram lands on them. The text always stands, drawn or not; and a
-    // text is data, never code: nothing here is played.
-    { kind: "mermaid", extensions: ["mmd", "mermaid"], mime: "text/vnd.mermaid", renderer: "mermaid", addressing: "parts", textual: true }
-  ];
-  function kindOf(path) {
-    const lower = path.toLowerCase();
-    for (const row of KINDS) for (const e of row.extensions) if (e.includes(".") && lower.endsWith("." + e)) return row;
-    const ext = (path.split(".").pop() ?? "").toLowerCase();
-    if (!ext || ext === path.toLowerCase()) return void 0;
-    return KINDS.find((k) => k.extensions.includes(ext));
-  }
-  function rowOf(kind) {
-    return KINDS.find((k) => k.kind === kind);
-  }
-
-  // src/kinds/picture.ts
-  function isPictureKind(kind) {
-    if (!kind) return false;
-    try {
-      return rowOf(kind)?.renderer === "image";
-    } catch {
-      return false;
-    }
-  }
-  var ASSET_REF = /^sha256:[0-9a-f]{64}$/;
-  function isAssetRef(v) {
-    return typeof v === "string" && ASSET_REF.test(v);
-  }
-  var size = (v) => typeof v === "number" && Number.isFinite(v) && v > 0 ? Math.round(v) : void 0;
-  function pictureOf(node) {
-    let code = null;
-    for (let i = node.reps.length - 1; i >= 0; i--) {
-      if (node.reps[i].modality === "code") {
-        code = node.reps[i];
-        break;
-      }
-    }
-    if (!code) return null;
-    const kind = code.data.kind;
-    if (!isPictureKind(kind)) return null;
-    const word = node.reps.find((r) => r.modality === "word");
-    const path = typeof code.data.path === "string" ? code.data.path : "";
-    const out = { kind, path, name: typeof word?.data === "string" && word.data || path.split("/").pop() || path };
-    if (isAssetRef(code.data.asset)) out.asset = code.data.asset;
-    if (typeof code.data.mime === "string" && /^image\/[a-z0-9.+-]+$/i.test(code.data.mime)) out.mime = code.data.mime;
-    const w2 = size(code.data.w), h2 = size(code.data.h);
-    if (w2) out.w = w2;
-    if (h2) out.h = h2;
-    return out;
   }
 
   // src/packs/pack.ts

@@ -90,7 +90,7 @@
     // Text as an element, for tests.
     typeText: typeText, editText: editText, wordToText: wordToText, beginTextEdit: beginTextEdit, commitTextEdit: commitTextEdit,
     // Pictures in and the board out, for tests.
-    importBitmap: importBitmap, importText: importText, exportBoardSVG: exportBoardSVG, exportLog: exportLog,
+    importPictures: importPictures, importText: importText, exportBoardSVG: exportBoardSVG, exportLog: exportLog,
     // The folder, for tests: open any store (a MemoryStore stands in for a folder), and read the board's home.
     openStore: (store, how, name) => openStore(store, how, name),
     openGit: (spec, token, remember) => openGit(spec, token, remember),
@@ -123,6 +123,13 @@
     }),
   };
 
+
+  // Pictures kept and drawn (PLAN-IPAD-NOTES I1), for tests: the asset store, what is decoded, what the last paint drew, what a pick said.
+  Object.assign(window.__mm, {
+    assets: assetList, collectAssets: collectAssets, setAssetGrace: (ms) => { assets.graceMs = ms; },
+    pictureState: pictureState, forgetPictures: forgetPictures, picturesDrawn: () => drawnPictures.map((d) => Object.assign({}, d)),
+    pickSaid: () => pickSaid.slice(), traceFrom: traceFrom,
+  });
 
   // Mermaid (V1-PLAN D2, D3), for tests: the library a frame loads (a stand-in, or the CDN's again), what a frame said of itself, what Draw it drew.
   Object.assign(window.__mm, {

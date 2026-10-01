@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 const NAMES = [
   'ASSET_LONG_SIDE', 'ASSET_GRACE_MS', 'sha256Hex', 'assetRef', 'isAssetRef', 'fitLongSide', 'pictureFormat', 'pictureExt',
-  'safePictureName', 'uniquePicturePath', 'assetsOfEvents', 'assetGcPlan', 'pictureGrid', 'pickWords',
+  'safePictureName', 'uniquePicturePath', 'assetsOfEvents', 'assetGcPlan', 'pictureGrid', 'pictureCells', 'fitInCell', 'pickWords',
   'pictureTier', 'decodedCost', 'evictPlan', 'PICTURE_THUMB_PX', 'DECODED_BUDGET_PX',
 ];
 const file = join(dirname(fileURLToPath(import.meta.url)), '17-assets.js');
@@ -171,4 +171,17 @@ test('what the decoded pictures cost is held to a budget: the least recently dra
   // A budget that cannot be met by the unpainted ones leaves the painted ones alone.
   assert.deepEqual(A.evictPlan([e('a', 9e6, NOW), e('b', 9e6, NOW)], { budgetPx: 1000, now: NOW, paintedAt: NOW }), []);
   assert.equal(A.DECODED_BUDGET_PX >= 16_000_000, true);
+});
+
+test('a pick can be placed a picture at a time: the cells depend on the count and the view, never on the pictures', () => {
+  const view = { minX: 100, minY: 50, maxX: 1700, maxY: 950 };
+  const cells = A.pictureCells(4, view);
+  assert.equal(cells.length, 4);
+  for (const c of cells) assert.ok(c.x >= view.minX && c.y >= view.minY && c.w > 0 && c.h > 0);
+  const a = A.fitInCell({ w: 2560, h: 1920 }, cells[0]), b = A.fitInCell({ w: 1920, h: 2560 }, cells[1]);
+  assert.ok(a.w <= cells[0].w + 1e-9 && a.h <= cells[0].h + 1e-9 && b.w <= cells[1].w + 1e-9 && b.h <= cells[1].h + 1e-9);
+  assert.equal(a.x, cells[0].x); assert.equal(b.y, cells[1].y);
+  // The same pictures, whole, stand where the pick was placed one at a time.
+  assert.deepEqual(A.pictureGrid([{ w: 2560, h: 1920 }, { w: 1920, h: 2560 }, { w: 1, h: 1 }, { w: 1, h: 1 }], view).slice(0, 2), [a, b]);
+  assert.deepEqual(A.pictureCells(0, view), []);
 });
