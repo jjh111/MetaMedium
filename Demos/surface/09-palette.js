@@ -317,6 +317,8 @@
     frames: { after: (o, scope, t) => { if (o.data.act !== 'frame' || !t.made) return; const st = session.getState(); flash('framed ' + t.detail.members + ' — ' + MM.describeFrame(MM.frameOfNode(st.nodes.get(t.made)), st.nodes)); } },
     // The drawing said as Mermaid stands beside it: say so, remember which marks it was written from, and keep the field.
     mermaid: { after: (o, scope, t) => { if (!t.made) { say(t.detail.error); return; } mermaidMadeFrom.set(t.made, scope.marks.slice()); flash('the drawing as Mermaid, beside it — ' + t.detail.reading + '; Draw it puts it back as marks'); refreshPalette(); } },
+    // A rectangle taken as a region: said, with what it holds (12-regions.js).
+    region: { after: (o, scope, t) => { regionMadeSaid(t.detail); } },
     label: { after: (o, scope, t) => { const d = t.detail; if (d.done.length || d.saying.length || d.refused.length) say(labelSentence(String(o.data.word).trim(), d.done, d.saying, d.refused)); } },
   };
 
@@ -576,6 +578,8 @@
     // The marks this summon held when Enter was read — not whatever is held when a stale
     // closure runs again, so a second run finds them already saying the word (L2e).
     if (cmd.do === 'label') { const s = session.getState(); labelMarks(sum, sum.enclosedIds.filter((id) => s.contentIds.includes(id)), cmd.text); return; }
+    // A region round what is held, or of the rectangle that holds the rest: the region tool's act, as its pill takes it (I5).
+    if (cmd.do === 'region') { const s = session.getState(); regionMadeSaid(MM.makeRegion(session, { ids: sum.enclosedIds.filter((id) => s.contentIds.includes(id)), name: cmd.name, at: at, summonId: sum.id, offer: 'region-named' })); return; }
     if (cmd.do === 'ask-what') { askModelsAbout(selectionMarks(session.getState())); return; }
     if (cmd.do === 'ask') { runAsk(sum, cmd.text); return; }
     if (cmd.do === 'draw') { runDraw(sum, cmd.text); return; }

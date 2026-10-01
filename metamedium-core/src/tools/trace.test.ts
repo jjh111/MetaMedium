@@ -17,9 +17,11 @@ const offered = (s: Session) => rankOffers(offersFor(toolScope(s))).map((o) => o
 
 describe('the trace tool', () => {
   it('is a built-in, registered last of the tools that stood before it', () => {
-    expect(BUILTIN_TOOLS[BUILTIN_TOOLS.length - 1]).toBe(TRACE);
+    // After Which is it?, and before whatever is appended after it (a later tool is one line at the end).
+    const at = BUILTIN_TOOLS.indexOf(TRACE);
+    expect(BUILTIN_TOOLS[at - 1].id).toBe('which');
     expect(getTool('trace')).toBe(TRACE);
-    expect(registeredTools().map((t) => t.id).indexOf('trace')).toBe(BUILTIN_TOOLS.length - 1);
+    expect(registeredTools().map((t) => t.id).indexOf('trace')).toBe(at);
     expect(TRACE.describe().length).toBeGreaterThan(20);
   });
 

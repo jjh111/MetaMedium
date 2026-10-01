@@ -2983,6 +2983,28 @@ still imported without an asset (they draw their name; `discover`), and a pictur
 on a real iPad: `createImageBitmap`'s `imageOrientation: 'from-image'` and the resize options, WebP encoding in
 a worker, OffscreenCanvas in a Worker, IndexedDB durability — all have fallbacks; WebKit was not run here.
 (6) `boards` N19d failed once in three full runs and passed in four alone (its list order); not touched.
+*I5, regions — status, 1 Oct 2026 (branch `unit/i5-regions`; red `f801279`, core `41b9ba6`, tool `c9c94af`, surface
+`e4f16dd`):* **a region is a named rectangle that holds whatever stands inside it, and a move of it takes that along
+in one act.** Core: `session/board-regions.ts` (the rule `REGION_HOLDS`, nesting by area, `regionCarries` — what a
+move carries, a connector tied to something the region does not carry following instead of walking off its site —,
+`describeRegion`/`regionSaid` for the panel and the hand's look, `regionOutline`), the `region` and `rename` events,
+`SessionState.regions`, erase keeps what was held, turn leaves a region be; the tool `tools/region.ts` (the
+twenty-fourth built-in, registered last; pill only for a rectangle holding three things, so e2e 49's golden is unchanged,
+`region: Monday` typed round marks with no rectangle). Surface: `12-regions.js` (a quiet frame in the label colour under
+pictures and ink, its name top left in board units; a press on the title selects and drags — a selected region moves by
+its title and edge band, never its inside, and shows no turning knob; the panel's *is*; the outline at the panel's foot, a
+tap fits the view; Delete erases the region alone and says what stays; the minimap outlines regions), `09-field.js` gains
+the `region:` prefix. `canvas_look` lists regions with what they hold (read only: the hand does not make one yet).
+**Found and fixed on the way:** a text, a figure or a page brought in or made from writing did not move with its marks —
+`manipulableOf` took strokes and pictures only, and `frameOf` ignored a transform, so a moved page's frame stayed where
+it was blessed (I1's finding 2). Now an artifact made of marks and a file with none move as themselves and their frames
+follow, in the drag too (`dragFrameOffset`). Tests: core `board-regions.test.ts` 18 and `region.test.ts` 8; the five
+tests that pinned 'registered last' now pin relative order; `09-field.test.mjs` 44 (3 new); canvas 453 passed, 2 skipped
+by name (**71–71m** added); `mcp-smoke` one check more. **Found for other owners:** (1) the e2e for 71 was written after
+the code (core was red first). (2) A rectangle round a flowchart's box with a three-word label is a rectangle holding
+three things and is offered *Make it a region* (ranked low); `REGION_MIN_HELD` is the knob. (3) A region cannot be
+resized without scaling what it holds. (4) `fitAll` fits the content, not the regions; a board of only an empty region
+fits to nothing.
 **V1** — the review of use: John and the drafter on real work, on John's
 machine; the faults written up as `NOTES-V1-REVIEW.md`. **V2** — its fixes,
 each with its regression. **V3** — the whitepaper's v1 figures (week 1's

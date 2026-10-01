@@ -73,7 +73,7 @@
    *           on the branch that needs one (M5).
    *
    * @typedef {Object} FieldCommand  what Enter will do, named rather than closed over
-   * @property {'take'|'name'|'label'|'ask-what'|'ask'|'draw'|'build'|'library'|'behave'|'need-model'|'maths'} do
+   * @property {'take'|'name'|'label'|'region'|'ask-what'|'ask'|'draw'|'build'|'library'|'behave'|'need-model'|'maths'} do
    *
    * @typedef {Object} FieldReading  the reader's whole answer
    * @property {string} kind        empty|default|name|label|what|ask|draw|brief|structure|verb|library|behaviour|blocked|page|run|program|new
@@ -84,9 +84,9 @@
    */
 
   /** The acts a typed prefix names. */
-  const FIELD_PREFIXES = /^(ask|draw|page|run|program|new|name|what|label)\s*:\s*([\s\S]*)$/i;
+  const FIELD_PREFIXES = /^(ask|draw|page|run|program|new|name|what|label|region)\s*:\s*([\s\S]*)$/i;
   /** The same acts typed bare, before their colon: a command half-typed, never a word to put on marks. */
-  const PREFIX_WORDS = /^(ask|draw|page|run|program|new|name|what|label)$/i;
+  const PREFIX_WORDS = /^(ask|draw|page|run|program|new|name|what|label|region)$/i;
   /** A sum: `=` and what follows, spaced or not (`= 24 ÷ 3`, `=(39+6)/2`). */
   const SUM = /^=\s*([\s\S]*)$/;
   /** The longest word the row offers as a pill; a longer one is still taken by its prefix and Enter. */
@@ -226,6 +226,8 @@
       // nothing and never asks a model. It goes on each held mark the person made; the
       // line says before Enter which marks it will not go on, and whose they are.
       if (act === 'label') return readLabel(rest, c.marks);
+      // A named place on the board (PLAN-IPAD-NOTES I5): a region made round what is held, or of the rectangle that holds the rest. Makes nothing else; asks no model.
+      if (act === 'region') return readRegion(rest, c.marks);
       if (act === 'what') return models.length ? { kind: 'what', line: '↵ ask ' + who + ' what this is', command: { do: 'ask-what' } } : needsModel('reading the group');
       if (!models.length) return needsModel(act === 'ask' ? 'a question' : act === 'draw' ? 'drawing' : 'building');
       if (!rest) return { kind: act, line: '↵ ' + act + ':… (say what)', quiet: true, command: null };
@@ -317,6 +319,21 @@
       ? ' — on ' + (mine === 1 ? 'yours' : 'your ' + mine) + ', not ' + theirMarks(others)
       : mine > 1 ? ' — on each of your ' + mine + ' marks' : '';
     return { kind: 'label', line: '↵ label it “' + word + '”' + tail, command: command };
+  }
+
+  /**
+   * Pure: `region: Monday`, read against what is held: a named rectangle that holds whatever stands inside
+   * it. Said before Enter: what will be made, or quietly why not.
+   * @param {string} name
+   * @param {{mine:number,others:string[]}} [marks]
+   * @returns {FieldReading}
+   */
+  function readRegion(name, marks) {
+    const ink = marks || {};
+    const held = (ink.mine || 0) + (ink.others || []).length;
+    if (!name) return { kind: 'region', line: '↵ region: … type the place\'s name', quiet: true, command: null };
+    if (!held) return { kind: 'region', line: '↵ region… — nothing held to stand it round', quiet: true, command: null };
+    return { kind: 'region', line: '↵ make a region “' + name + '” — round what is held; what stands inside goes with it', command: { do: 'region', name: name } };
   }
 
   /**

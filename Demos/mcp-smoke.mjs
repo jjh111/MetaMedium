@@ -237,6 +237,16 @@ try {
   check('canvas_look lists the tab\'s picture as "a picture holiday.jpg 2560×1920", says this hand has no pixels of it, and prints nothing of the bytes\' place',
     !!picId && /a picture holiday\.jpg 2560×1920/.test(picLine(t8)) && /this hand has none to see/.test(picLine(t8)) && !/sha256|imports\//.test(picLine(t8)) && /by tab/.test(picLine(t8)), { picId, line: picLine(t8) });
 
+  // A region on the tab's board (PLAN-IPAD-NOTES I5): the hand's look lists it by its name with what it holds, derived from
+  // where things stand — here the picture above — and reads it only: the hand makes none yet.
+  const regId = tabSession.region({ name: 'Monday', bounds: { minX: 880, minY: 80, maxX: 1320, maxY: 420 }, at: Date.now() + 30 });
+  await tab.publish(tabSession.getEvents().filter((e) => !e.by));
+  const regLine = (text) => (regId && text.split('\n').find((l) => l.startsWith(regId + ' '))) || '';
+  let t9 = '';
+  for (let i = 0; i < 25 && !regLine(t9); i++) { t9 = textOf(await call('canvas_look', {})); if (!regLine(t9)) await wait(100); }
+  check('canvas_look lists the tab\'s region by name with what it holds — a region “Monday” — holds 1 picture, at where it stands, holding the picture\'s id — and counts it in the header',
+    !!regId && /a region “Monday” — holds 1 picture/.test(regLine(t9)) && /at 880,80 440×340/.test(regLine(t9)) && regLine(t9).includes(picId) && /· 1 region\b/.test(t9), { regId, line: regLine(t9) });
+
   // ===== Two hands in one room: an id crosses the boundary (T8) =============
   // The defect: a node id used to be a counter over the MERGED replay, and no
   // two hands in a room merge the same set of logs. A SECOND tab whose mark

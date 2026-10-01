@@ -501,3 +501,29 @@ test('a notation reading is never what Enter takes: with only readings held Ente
   const act = readFieldCommand(ctx({ items: [only[0], ITEMS[1]] }));
   assert.equal(act.command.key, 'snap');
 });
+
+// `region: Monday` (PLAN-IPAD-NOTES I5): a named place round what is held, said before Enter; it asks no
+// model, is never a name or a label, and typed bare it is a command half-typed, never a word to put on marks.
+test('region: a place named for what is held — the line says it before Enter, and no model is asked', () => {
+  const r = readFieldCommand(ctx({ text: 'region: Monday', models: ['llm:stub'] }));
+  assert.equal(r.kind, 'region');
+  assert.equal(r.line, '↵ make a region “Monday” — round what is held; what stands inside goes with it');
+  assert.deepEqual(r.command, { do: 'region', name: 'Monday' });
+  assert.ok(!r.model && !r.quiet);
+});
+
+test('region: with no name it waits, with nothing held it says so, and neither is a command', () => {
+  const none = readFieldCommand(ctx({ text: 'region:' }));
+  assert.equal(none.kind, 'region');
+  assert.equal(none.command, null);
+  assert.ok(none.quiet);
+  const empty = readFieldCommand(ctx({ text: 'region: Monday', marks: { mine: 0, others: [] } }));
+  assert.equal(empty.command, null);
+  assert.match(empty.line, /nothing held/);
+});
+
+test('region: is no word to name or label with — typed, bare or with its colon', () => {
+  assert.equal(typedWord(ctx({ text: 'region: Monday' })), null);
+  assert.equal(typedWord(ctx({ text: 'region' })), null);
+  assert.ok(typedWord(ctx({ text: 'Monday' })));
+});

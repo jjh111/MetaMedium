@@ -71,6 +71,8 @@
   // had opened in it. Every write to the panel goes through here.
   let panelSaid = null;
   function showPanel(html) {
+    // The board's outline stands at the foot of every panel the board has regions for (12-regions.js).
+    html += regionOutlineHtml(session.getState());
     if (html === panelSaid) return;
     panelSaid = html;
     inspectorEl.innerHTML = html;
@@ -78,6 +80,9 @@
 
   function renderInspector(s, id) {
     if (s.summon) return renderSummonScope(s);
+    // One region selected alone: what it is and holds, in words (I5; 12-regions.js).
+    const rid = selectedRegion(s);
+    if (rid) { showPanel(regionPanelHtml(s, rid)); return; }
 
     const node = id && s.nodes.get(id);
     if (!node) {

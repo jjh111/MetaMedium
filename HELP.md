@@ -74,6 +74,19 @@ flowchart, a class diagram and a pattern page wait too.
   board uses it. The same photo brought in twice is kept once. To turn a
   drawing's lines into ink, hold the picture and choose **Trace into ink** — the
   picture stays and one undo takes the ink away.
+- **Regions** — named places on the board, like *Monday* or *Pricing*: draw a
+  big rectangle round some notes and pictures, hold them all, and choose
+  **Make it a region**. Or hold marks and type `region: Monday` — a region is
+  drawn round them. A region is a quiet frame with its name at the top left, under
+  your ink and pictures, and it holds whatever stands inside it — ink, pictures,
+  text, figures, other regions — as you look, so a note you drag in is held and one
+  you drag out is let go. **Press its title** to take hold of the region and drag it:
+  everything it holds goes along in one move, lines tied to what moved follow, and one
+  undo takes the whole move back. Tap the title and the panel says what it holds and
+  lets you rename it. **Delete** on a selected region erases the region only —
+  everything it held stays. The **outline** at the foot of the panel lists the
+  board's regions, each with what it holds; tap one and the view goes to it. A region
+  does not turn.
 - **Type text**: double-click empty ground.
 - **Say a diagram as text**: hold a drawing that reads as a flowchart, a class
   diagram, a sequence diagram, a state diagram, an ER diagram or a mind map and

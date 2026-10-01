@@ -10,7 +10,7 @@
 
 import type { Bounds, Point } from '../types';
 import type { MMNode, Rep } from './nodes';
-import { fingerprintOf, getRep } from './nodes';
+import { fingerprintOf, getRep, regionRepOf } from './nodes';
 import { pictureOf } from '../kinds/picture';
 
 /** A move, a scale about a point, or a turn about a point — what a drag of the selection writes. */
@@ -22,7 +22,8 @@ export type Manipulation =
 /**
  * The marks a manipulation of these marks moves: a stroke itself, or an artifact's or a word's members,
  * recursively — never an erased one — and a picture, which has no ink to move in its place and is moved as
- * itself (PLAN-IPAD-NOTES I1): a picture is a mark of the board, drawn under the ink.
+ * itself (PLAN-IPAD-NOTES I1): a picture is a mark of the board, drawn under the ink. So is a region
+ * (I5), a file brought in with no marks in it, and each carries its own `transform`.
  */
 export function manipulableOf(nodes: ReadonlyMap<string, MMNode>, ids: readonly string[]): MMNode[] {
   const out: MMNode[] = [];
@@ -32,11 +33,21 @@ export function manipulableOf(nodes: ReadonlyMap<string, MMNode>, ids: readonly 
     seen.add(id);
     const n = nodes.get(id);
     if (!n || getRep(n, 'erased')) return;
-    if (getRep(n, 'stroke') || pictureOf(n)) {
+    if (getRep(n, 'stroke') || pictureOf(n) || regionRepOf(n)) {
       out.push(n);
       return;
     }
-    for (const e of n.edges) if (e.rel === 'has-part') visit(e.to);
+    const parts = n.edges.filter((e) => e.rel === 'has-part');
+    // A file brought onto the board — a text, a figure — has no marks in it and stands at its own box:
+    // it is moved as itself, as a picture is (PLAN-IPAD-NOTES I5: a region carries them).
+    if (!parts.length && getRep(n, 'code') && getRep(n, 'bounds')) {
+      out.push(n);
+      return;
+    }
+    // An artifact made of marks moves by its marks, and its own frame with them (its box was where it was
+    // blessed): a page, a text made from writing, a program over its ink.
+    if (parts.length && getRep(n, 'bounds')) out.push(n);
+    for (const e of parts) visit(e.to);
   };
   ids.forEach(visit);
   return out;

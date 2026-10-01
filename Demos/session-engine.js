@@ -633,9 +633,9 @@
       }
       // Where the drawing put it, plus where its own behaviour has taken it
       // (runtime only — never in the log).
-      const o = runtimeOffset(id);
-      f.wrap.style.left = (fr.x + o.dx) + 'px';
-      f.wrap.style.top = (fr.y + o.dy) + 'px';
+      const o = runtimeOffset(id), dd = dragFrameOffset(id);
+      f.wrap.style.left = (fr.x + o.dx + dd.dx) + 'px';
+      f.wrap.style.top = (fr.y + o.dy + dd.dy) + 'px';
       f.wrap.style.width = fr.w + 'px';
       f.wrap.style.height = fr.h + 'px';
       f.wrap.classList.toggle('broken', !!runtimeBroken(id));
@@ -2412,7 +2412,7 @@
   /** The handles the selection offers now: the one selected mark's own points, when it has them and stands big enough on screen. */
   function markHandles(s) {
     s = s || state;
-    if (s.selection.length !== 1) return [];
+    if (s.selection.length !== 1 || (s.regions && s.regions.includes(s.selection[0]))) return [];
     const key = logKey() + '|' + s.selection[0] + '|' + view.zoom;
     if (s === state && handlesAt.key === key) return handlesAt.list;
     const n = s.nodes.get(s.selection[0]);
@@ -2454,16 +2454,18 @@
     if (!drag || !drag.moved) return null;
     if (drag.mode === 'reshape') return { ids: [], kind: 'reshape', id: drag.id, handle: drag.handle, to: drag.to, node: drag.pv ? drag.pv.node : null, shape: drag.pv ? drag.pv.clean.shape : null, end: drag.end, hold: drag.hold };
     const dx = drag.last.x - drag.start.x, dy = drag.last.y - drag.start.y;
-    if (drag.mode === 'move') return { ids: drag.ids, kind: 'move', dx, dy };
+    // What a drag acts on is what the replay will carry: a region takes what it holds (12-regions.js).
+    const acts = drag.carried || drag.ids;
+    if (drag.mode === 'move') return { ids: acts, kind: 'move', dx, dy };
     if (drag.mode === 'scale') {
       const b = drag.bounds;
       const sx = Math.max(0.05, (drag.corner.x + dx - drag.about.x) / (drag.corner.x - drag.about.x || 1e-6));
       const sy = Math.max(0.05, (drag.corner.y + dy - drag.about.y) / (drag.corner.y - drag.about.y || 1e-6));
-      return { ids: drag.ids, kind: 'scale', about: drag.about, sx: b ? sx : 1, sy: b ? sy : 1 };
+      return { ids: acts, kind: 'scale', about: drag.about, sx: b ? sx : 1, sy: b ? sy : 1 };
     }
     const a0 = Math.atan2(drag.start.y - drag.about.y, drag.start.x - drag.about.x);
     const a1 = Math.atan2(drag.last.y - drag.about.y, drag.last.x - drag.about.x);
-    return { ids: drag.ids, kind: 'rotate', about: drag.about, radians: a1 - a0 };
+    return { ids: acts, kind: 'rotate', about: drag.about, radians: a1 - a0 };
   }
 
   /** Apply the preview to the canvas transform for one mark's drawing. */
@@ -2499,9 +2501,13 @@
       if (d <= r && d < bestD) { best = hit; bestD = d; }
     };
     for (const k of Object.keys(h.corners)) offer({ kind: 'scale', corner: k, at: h.corners[k], bounds: b }, h.corners[k]);
-    offer({ kind: 'rotate', bounds: b }, h.knob);
+    // A region does not turn (a turned rectangle is not a rectangle): no knob while one is selected (12-regions.js).
+    const regionSelected = state.selection.some((id) => state.regions && state.regions.includes(id));
+    if (!regionSelected) offer({ kind: 'rotate', bounds: b }, h.knob);
     for (const mh of markHandles()) offer({ kind: 'reshape', id: mh.nodeId, handle: { kind: mh.kind, index: mh.index }, at: mh.point, bounds: b }, mh.point);
     if (best) return best;
+    // A selected region moves by its title and the band along its edge, not its inside: the inside is where the hand writes.
+    if (regionsOnlySelected(state)) return regionMoveZone(w) ? { kind: 'move', bounds: b } : null;
     const o = h.outline;
     if (w.x >= o.minX && w.x <= o.maxX && w.y >= o.minY && w.y <= o.maxY) return { kind: 'move', bounds: b };
     return null;
@@ -2522,7 +2528,8 @@
     const opposite = hit.kind === 'scale'
       ? { x: hit.corner.includes('w') ? b.maxX : b.minX, y: hit.corner.includes('n') ? b.maxY : b.minY }
       : centre;
-    drag = { ids: state.selection.slice(), mode: hit.kind, start: w, last: w, moved: false, about: opposite, corner: hit.at || null, bounds: b };
+    const ids = state.selection.slice();
+    drag = { ids: ids, carried: dragCarried(ids), mode: hit.kind, start: w, last: w, moved: false, about: opposite, corner: hit.at || null, bounds: b };
     canvas.style.cursor = hit.kind === 'move' ? 'grabbing' : hit.kind === 'scale' ? 'nwse-resize' : 'grab';
   }
 
@@ -2648,8 +2655,10 @@
     ctx.fillStyle = C.gold;
     const hs = HANDLE();
     for (const k of Object.keys(h.corners)) { const c = h.corners[k]; ctx.fillRect(c.x - hs / 2, c.y - hs / 2, hs, hs); }
-    ctx.beginPath(); ctx.moveTo(h.knob.x, o.minY); ctx.lineTo(h.knob.x, h.knob.y); ctx.strokeStyle = `rgba(${C.goldRGB},0.6)`; ctx.lineWidth = wpx(1); ctx.stroke();
-    ctx.beginPath(); ctx.arc(h.knob.x, h.knob.y, hs * 0.7, 0, Math.PI * 2); ctx.fill();
+    if (!(s.regions && s.selection.some((id) => s.regions.includes(id)))) {
+      ctx.beginPath(); ctx.moveTo(h.knob.x, o.minY); ctx.lineTo(h.knob.x, h.knob.y); ctx.strokeStyle = `rgba(${C.goldRGB},0.6)`; ctx.lineWidth = wpx(1); ctx.stroke();
+      ctx.beginPath(); ctx.arc(h.knob.x, h.knob.y, hs * 0.7, 0, Math.PI * 2); ctx.fill();
+    }
     // The one mark's own points, where they are — or will be, while one is dragged.
     const own = reshaping ? MM.handlesOf(pv.node, s.nodes) : markHandles(s);
     for (const mh of own) {
@@ -3391,7 +3400,8 @@
     const w0 = pointOf(e);
     // A hand on a control's knob slides it: no selection needed, one move when it lets go.
     if (knobBegin(w0)) return;
-    const hit = state.selection.length ? handleAt(w0) : null;
+    // A press on a region's title takes hold of the region (12-regions.js).
+    const hit = (state.selection.length ? handleAt(w0) : null) || regionTitlePress(w0);
     // A hand on a body in a running tank is acting it out, not moving ink.
     if (hit && hit.kind === 'move' && demoBegin(state.selection, w0)) return;
     if (hit) { beginDrag(hit, w0); return; }
@@ -3769,9 +3779,7 @@
     else if (e.target === document.body && e.key === 'Escape' && !state.selection.length && !state.summon) cancelWork();
     if (e.target === document.body && (e.key === 'Backspace' || e.key === 'Delete') && state.selection.length) {
       e.preventDefault();
-      const ids = state.selection.slice();
-      ids.forEach((id) => session.erase(id, Date.now()));
-      flash('erased ' + ids.length + ' mark' + (ids.length === 1 ? '' : 's'));
+      eraseSelection();
     }
     if (e.key === '0' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); fitAll(); }
     if (e.target === document.body && (e.key === '=' || e.key === '+')) zoomAround(innerWidth / 2, innerHeight / 2, 1.2);
@@ -3847,7 +3855,7 @@
 // ===== render =====
 // Provides: queries over state, the rungs cache, render(), ink, the reading under the inspected mark
 //   (readingUnder: its readings ranked by MM.rank, as the field ranks — V1-PLAN §2.2),
-//   a hand's label on its own mark (labelsDrawn), match chips,
+//   a hand's label on its own mark (labelsDrawn), a region's frame under everything (renderRegions, 12-regions.js), match chips,
 //   the working dot, the explanation plane and its layout, the status line (one sentence).
 // Uses: core, view, artifacts, snap, models, palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
 //   packs (packShort — a match chip says its pack; a pack this build lacks is said in the standing line),
@@ -4631,6 +4639,9 @@
     // off screen at working zoom — except while a tank moves bodies about.
     paintView = vb && !tank.place.size ? vb : null;
 
+    // The regions first of all, a quiet frame with a name: the ground the pictures and the ink stand on (12-regions.js).
+    renderRegions(s, vb, pv);
+
     // The pictures first — they are the ground the ink is drawn over: a picture kept in the asset store is
     // painted on this canvas, under every stroke, culled to the screen with the rest of the paint (and a
     // picture held and being dragged is drawn where the drag takes it).
@@ -4755,6 +4766,7 @@
       const running = liveSet(s).size;
       parts.push(s.artifacts.length + ' thing' + (s.artifacts.length === 1 ? '' : 's') + ' made' + (s.live.length ? ' (' + (running < s.live.length ? running + ' of ' + s.live.length + ' live, the rest parked' : s.live.length + ' live') + ')' : ''));
     }
+    if (s.regions.length) parts.push(s.regions.length + ' region' + (s.regions.length === 1 ? '' : 's'));
     const fs = folderStatus();
     if (fs) parts.push(fs);
     // A pack this board names that this build cannot give it is said, never hidden (V1-PLAN B3).
@@ -5447,7 +5459,7 @@
    *           on the branch that needs one (M5).
    *
    * @typedef {Object} FieldCommand  what Enter will do, named rather than closed over
-   * @property {'take'|'name'|'label'|'ask-what'|'ask'|'draw'|'build'|'library'|'behave'|'need-model'|'maths'} do
+   * @property {'take'|'name'|'label'|'region'|'ask-what'|'ask'|'draw'|'build'|'library'|'behave'|'need-model'|'maths'} do
    *
    * @typedef {Object} FieldReading  the reader's whole answer
    * @property {string} kind        empty|default|name|label|what|ask|draw|brief|structure|verb|library|behaviour|blocked|page|run|program|new
@@ -5458,9 +5470,9 @@
    */
 
   /** The acts a typed prefix names. */
-  const FIELD_PREFIXES = /^(ask|draw|page|run|program|new|name|what|label)\s*:\s*([\s\S]*)$/i;
+  const FIELD_PREFIXES = /^(ask|draw|page|run|program|new|name|what|label|region)\s*:\s*([\s\S]*)$/i;
   /** The same acts typed bare, before their colon: a command half-typed, never a word to put on marks. */
-  const PREFIX_WORDS = /^(ask|draw|page|run|program|new|name|what|label)$/i;
+  const PREFIX_WORDS = /^(ask|draw|page|run|program|new|name|what|label|region)$/i;
   /** A sum: `=` and what follows, spaced or not (`= 24 ÷ 3`, `=(39+6)/2`). */
   const SUM = /^=\s*([\s\S]*)$/;
   /** The longest word the row offers as a pill; a longer one is still taken by its prefix and Enter. */
@@ -5600,6 +5612,8 @@
       // nothing and never asks a model. It goes on each held mark the person made; the
       // line says before Enter which marks it will not go on, and whose they are.
       if (act === 'label') return readLabel(rest, c.marks);
+      // A named place on the board (PLAN-IPAD-NOTES I5): a region made round what is held, or of the rectangle that holds the rest. Makes nothing else; asks no model.
+      if (act === 'region') return readRegion(rest, c.marks);
       if (act === 'what') return models.length ? { kind: 'what', line: '↵ ask ' + who + ' what this is', command: { do: 'ask-what' } } : needsModel('reading the group');
       if (!models.length) return needsModel(act === 'ask' ? 'a question' : act === 'draw' ? 'drawing' : 'building');
       if (!rest) return { kind: act, line: '↵ ' + act + ':… (say what)', quiet: true, command: null };
@@ -5691,6 +5705,21 @@
       ? ' — on ' + (mine === 1 ? 'yours' : 'your ' + mine) + ', not ' + theirMarks(others)
       : mine > 1 ? ' — on each of your ' + mine + ' marks' : '';
     return { kind: 'label', line: '↵ label it “' + word + '”' + tail, command: command };
+  }
+
+  /**
+   * Pure: `region: Monday`, read against what is held: a named rectangle that holds whatever stands inside
+   * it. Said before Enter: what will be made, or quietly why not.
+   * @param {string} name
+   * @param {{mine:number,others:string[]}} [marks]
+   * @returns {FieldReading}
+   */
+  function readRegion(name, marks) {
+    const ink = marks || {};
+    const held = (ink.mine || 0) + (ink.others || []).length;
+    if (!name) return { kind: 'region', line: '↵ region: … type the place\'s name', quiet: true, command: null };
+    if (!held) return { kind: 'region', line: '↵ region… — nothing held to stand it round', quiet: true, command: null };
+    return { kind: 'region', line: '↵ make a region “' + name + '” — round what is held; what stands inside goes with it', command: { do: 'region', name: name } };
   }
 
   /**
@@ -6044,6 +6073,8 @@
     frames: { after: (o, scope, t) => { if (o.data.act !== 'frame' || !t.made) return; const st = session.getState(); flash('framed ' + t.detail.members + ' — ' + MM.describeFrame(MM.frameOfNode(st.nodes.get(t.made)), st.nodes)); } },
     // The drawing said as Mermaid stands beside it: say so, remember which marks it was written from, and keep the field.
     mermaid: { after: (o, scope, t) => { if (!t.made) { say(t.detail.error); return; } mermaidMadeFrom.set(t.made, scope.marks.slice()); flash('the drawing as Mermaid, beside it — ' + t.detail.reading + '; Draw it puts it back as marks'); refreshPalette(); } },
+    // A rectangle taken as a region: said, with what it holds (12-regions.js).
+    region: { after: (o, scope, t) => { regionMadeSaid(t.detail); } },
     label: { after: (o, scope, t) => { const d = t.detail; if (d.done.length || d.saying.length || d.refused.length) say(labelSentence(String(o.data.word).trim(), d.done, d.saying, d.refused)); } },
   };
 
@@ -6303,6 +6334,8 @@
     // The marks this summon held when Enter was read — not whatever is held when a stale
     // closure runs again, so a second run finds them already saying the word (L2e).
     if (cmd.do === 'label') { const s = session.getState(); labelMarks(sum, sum.enclosedIds.filter((id) => s.contentIds.includes(id)), cmd.text); return; }
+    // A region round what is held, or of the rectangle that holds the rest: the region tool's act, as its pill takes it (I5).
+    if (cmd.do === 'region') { const s = session.getState(); regionMadeSaid(MM.makeRegion(session, { ids: sum.enclosedIds.filter((id) => s.contentIds.includes(id)), name: cmd.name, at: at, summonId: sum.id, offer: 'region-named' })); return; }
     if (cmd.do === 'ask-what') { askModelsAbout(selectionMarks(session.getState())); return; }
     if (cmd.do === 'ask') { runAsk(sum, cmd.text); return; }
     if (cmd.do === 'draw') { runDraw(sum, cmd.text); return; }
@@ -7097,6 +7130,8 @@
   // had opened in it. Every write to the panel goes through here.
   let panelSaid = null;
   function showPanel(html) {
+    // The board's outline stands at the foot of every panel the board has regions for (12-regions.js).
+    html += regionOutlineHtml(session.getState());
     if (html === panelSaid) return;
     panelSaid = html;
     inspectorEl.innerHTML = html;
@@ -7104,6 +7139,9 @@
 
   function renderInspector(s, id) {
     if (s.summon) return renderSummonScope(s);
+    // One region selected alone: what it is and holds, in words (I5; 12-regions.js).
+    const rid = selectedRegion(s);
+    if (rid) { showPanel(regionPanelHtml(s, rid)); return; }
 
     const node = id && s.nodes.get(id);
     if (!node) {
@@ -7678,6 +7716,229 @@
   });
   // A stroke of the reader's own continues the recording from where it stands.
   canvas.addEventListener('pointerdown', () => { if (rp.rec && rp.timer) { rpStop(); rpCaption.innerHTML = '<b>' + (rp.step + 1) + '.</b> ' + esc(rp.rec.steps[rp.step].caption) + ' <span style="color:var(--dim)">— continuing from here with your marks</span>'; } });
+
+// ===== regions =====
+// Provides: regions as the board's named places (PLAN-IPAD-NOTES I5) — the quiet titled frame under the
+//   pictures and the ink (renderRegions), the title as a handle to move it (regionTitleAt, regionTitlePress,
+//   the move zone of a selected region), the panel's words for one (regionPanelHtml) and the board's outline
+//   (regionOutlineHtml; a tap on a line fits the view to it), dragFrameOffset (a text or figure in a dragged region follows it),
+//   the minimap's frames (regionsFor), and what is
+//   said of a region made or erased (regionMadeSaid, eraseSaid).
+// Uses: core (MM.regionsOfBoard, describeRegion, regionSaid, holdsSaid, regionOutline, regionCarries, boundsOf),
+//   view (view, wpx, fitTo), render (ctx, C, roundRect, applyPreview, boxMeets, boxOfRect, recordOp, logKey,
+//   paintReference, dragPreview from selection), the closure's esc, flash, say, session, state, inspectorEl.
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== What a region is on the board =======================================
+  // A region is a named rectangle that holds whatever stands inside it (core's `board-regions.ts`): not ink and
+  // not content, so it is a frame drawn UNDER the pictures and the ink, quiet — the board's own label colour,
+  // never the gold the hand's chrome wears — with its name at the top left, in board units, so it scales with
+  // the place it names. What it holds is derived from where things stand; nothing here writes that. Its title is
+  // a handle: press it and the region is selected and dragged, one `move` that takes what it holds along.
+  // A selected region's move zone is its title and the band along its edge, never its inside — the inside is
+  // where the hand writes.
+
+  /** The regions this paint knows, largest first so a nested one is drawn over the one that holds it; kept while the log stands. */
+  let regionSeen = { key: null, list: [], said: new Map() };
+  function regionsFor(s) {
+    const key = logKey();
+    if (!paintReference && regionSeen.key === key) return regionSeen;
+    const list = s.regions && s.regions.length ? MM.regionsOfBoard(s) : [];
+    list.sort((a, b) => (b.bounds.maxX - b.bounds.minX) * (b.bounds.maxY - b.bounds.minY) - (a.bounds.maxX - a.bounds.minX) * (a.bounds.maxY - a.bounds.minY));
+    const seen = { key: paintReference ? null : key, list: list, said: new Map() };
+    if (!paintReference) regionSeen = seen;
+    return seen;
+  }
+  /** What a region holds, read once while the log stands. */
+  function regionHolds(s, id) {
+    const seen = regionsFor(s);
+    if (!seen.said.has(id)) seen.said.set(id, MM.describeRegion(s, id));
+    return seen.said.get(id);
+  }
+
+  // The title: a size in board units that grows with the region and never falls under a legible size on
+  // screen, and the box it and its hit stand in — never less than a fingertip on screen.
+  const REGION_TITLE_FONT = "'Space Grotesk', system-ui, sans-serif";
+  function regionTitleBox(r) {
+    const b = r.bounds, side = Math.min(b.maxX - b.minX, b.maxY - b.minY);
+    const base = Math.max(14, Math.min(40, side * 0.06));
+    const fs = Math.min(Math.max(base, wpx(11)), Math.max(wpx(11), side * 0.4));
+    ctx.font = fs.toFixed(2) + 'px ' + REGION_TITLE_FONT;
+    const pad = fs * 0.55;
+    const w = ctx.measureText(r.name).width + pad * 2, h = fs * 1.55;
+    return { x: b.minX, y: b.minY, w: w, h: h, fs: fs, pad: pad, hitW: Math.max(w, wpx(44)), hitH: Math.max(h, wpx(30)) };
+  }
+
+  function renderRegions(s, vb, pv) {
+    const seen = regionsFor(s);
+    if (!seen.list.length) return;
+    const selected = new Set(s.selection);
+    for (const r of seen.list) {
+      const held = !!pv && pv.ids.includes(r.id);
+      const b = r.bounds;
+      if (!held && vb && !boxMeets(b, vb)) continue;
+      if (held) { ctx.save(); applyPreview(pv); }
+      const rw = b.maxX - b.minX, rh = b.maxY - b.minY, t = regionTitleBox(r);
+      ctx.save();
+      roundRect(b.minX, b.minY, rw, rh, Math.min(wpx(8), rw / 6, rh / 6));
+      ctx.fillStyle = 'rgba(' + C.labelRGB + ',0.045)';
+      ctx.fill();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(' + C.labelRGB + (selected.has(r.id) ? ',0.95)' : ',0.55)');
+      ctx.lineWidth = wpx(selected.has(r.id) ? 1.8 : 1.2);
+      ctx.stroke();
+      // The title, on the frame's own top left, its ground the board's so it reads over what stands behind it.
+      roundRect(t.x, t.y, t.w, t.h, Math.min(t.h / 2, wpx(10)));
+      ctx.fillStyle = 'rgba(' + C.panelRGB + ',0.78)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(' + C.labelRGB + ',0.55)';
+      ctx.lineWidth = wpx(1);
+      ctx.stroke();
+      ctx.font = t.fs.toFixed(2) + 'px ' + REGION_TITLE_FONT;
+      ctx.fillStyle = 'rgba(' + C.labelRGB + ',1)';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(r.name, t.x + t.pad, t.y + t.h / 2 + t.fs * 0.04);
+      ctx.restore();
+      if (held) ctx.restore();
+      if (paintOps) recordOp({ kind: 'region', id: r.id, text: r.name, box: boxOfRect(b.minX, b.minY, rw, rh), moved: held });
+    }
+  }
+
+  // ===== The hand on a region ================================================
+  /** The region whose title is under a world point — the smaller on top — or null. */
+  function regionTitleAt(w) {
+    const list = regionsFor(state).list;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const r = list[i], t = regionTitleBox(r);
+      if (w.x >= t.x && w.x <= t.x + t.hitW && w.y >= t.y && w.y <= t.y + t.hitH) return r.id;
+    }
+    return null;
+  }
+  /** Whether the selection is regions and nothing else. */
+  function regionsOnlySelected(s) {
+    s = s || state;
+    return s.selection.length > 0 && s.selection.every((id) => s.regions && s.regions.includes(id));
+  }
+  /** The one region selected alone, or null. */
+  function selectedRegion(s) {
+    s = s || state;
+    return s.selection.length === 1 && s.regions && s.regions.includes(s.selection[0]) ? s.selection[0] : null;
+  }
+  /**
+   * A selected region moves by its title and the band along its edge, never its inside (the inside is where
+   * the hand writes): true when a world point is on either of any selected region.
+   */
+  function regionMoveZone(w) {
+    const band = wpx(14);
+    for (const id of state.selection) {
+      const r = regionsFor(state).list.find((x) => x.id === id);
+      if (!r) continue;
+      const b = r.bounds, t = regionTitleBox(r);
+      if (w.x >= t.x && w.x <= t.x + t.hitW && w.y >= t.y && w.y <= t.y + t.hitH) return true;
+      const inOuter = w.x >= b.minX - band && w.x <= b.maxX + band && w.y >= b.minY - band && w.y <= b.maxY + band;
+      const inInner = w.x > b.minX + band && w.x < b.maxX - band && w.y > b.minY + band && w.y < b.maxY - band;
+      if (inOuter && !inInner) return true;
+    }
+    return false;
+  }
+  /**
+   * A press on a region's title takes hold of the region: it is selected and a move begins, as the
+   * selection's own would — one `move` when the hand lets go. A field open, or a press that is not on a
+   * title, is nothing to it.
+   */
+  function regionTitlePress(w) {
+    if (state.summon) return null;
+    const id = regionTitleAt(w);
+    if (!id) return null;
+    if (!(state.selection.length === 1 && state.selection[0] === id)) session.select([id], Date.now());
+    const n = state.nodes.get(id), b = n && MM.boundsOf(n);
+    return b ? { kind: 'move', bounds: b } : null;
+  }
+  /** What a drag of these ids acts on: a region takes what it holds, as the replay will carry it. */
+  function dragCarried(ids) {
+    return state.regions && state.regions.length && ids.some((id) => state.regions.includes(id)) ? MM.regionCarries(state, ids) : ids;
+  }
+
+  /** Where a hand's move drags an artifact's frame to, before the log has it: a text or a figure in a region follows the drag. */
+  function dragFrameOffset(id) {
+    const pv = dragPreview();
+    return pv && pv.kind === 'move' && pv.ids.includes(id) ? { dx: pv.dx, dy: pv.dy } : { dx: 0, dy: 0 };
+  }
+
+  // ===== What is said ========================================================
+  /** The status line after a region is made. */
+  function regionMadeSaid(made) {
+    if (!made) { say('nothing to stand a region round'); return; }
+    const d = MM.describeRegion(session.getState(), made.id);
+    flash((d ? MM.regionSaid(d) : 'a region “' + made.name + '”') + (made.around === 'frame' ? ' — your rectangle is its frame' : ' — drawn round what was held') + ' · press its title to move it; undo takes it away, what it holds stays');
+  }
+  /** The status line after an erase of the selection: a region is erased alone, and what it held stays. */
+  function eraseSaid(ids, regionNames) {
+    const regions = regionNames.length, marks = ids.length - regions;
+    if (!regions) return 'erased ' + marks + ' mark' + (marks === 1 ? '' : 's');
+    const r = regions === 1 ? 'the region “' + regionNames[0] + '”' : regions + ' regions';
+    return 'erased ' + r + ' — what it held stays where it is; undo brings it back' + (marks ? ' · and ' + marks + ' mark' + (marks === 1 ? '' : 's') : '');
+  }
+  /** Erase the selection (Delete): a region erases alone and says what stays. */
+  function eraseSelection() {
+    const s = session.getState();
+    const ids = s.selection.slice();
+    const names = ids.filter((id) => s.regions && s.regions.includes(id)).map((id) => { const r = regionsFor(s).list.find((x) => x.id === id); return r ? r.name : id; });
+    ids.forEach((id) => session.erase(id, Date.now()));
+    flash(eraseSaid(ids, names));
+  }
+
+  // ===== The panel: one region, and the board's outline ======================
+  /** The panel for a region selected alone: what it is, what it holds, its name to change. */
+  function regionPanelHtml(s, id) {
+    const d = regionHolds(s, id);
+    if (!d) return '<div class="eyebrow">region</div><div class="empty">that region is gone</div>';
+    return '<div class="eyebrow">region</div>' +
+      '<div class="row"><span class="k">is</span><span class="v">' + esc(MM.regionSaid(d)) + '</span></div>' +
+      '<div class="row"><span class="k">becomes</span><span class="v">move it by its title — what it holds goes with it, in one act</span></div>' +
+      '<div class="acts"><input class="regionName" type="text" value="' + esc(d.name) + '" maxlength="60" aria-label="the region\'s name" data-region-name="' + esc(id) + '">' +
+      '<button class="mini" type="button" data-region-rename="' + esc(id) + '" title="give it this name">rename</button>' +
+      '<button class="mini" type="button" data-region-fit="' + esc(id) + '" title="take the view to it">show it</button></div>' +
+      '<div class="why">erasing it keeps everything it holds; a mark moved out of it is let go, and one drawn in is held</div>';
+  }
+  /** The board's outline, at the foot of the panel: its regions as a tree, a tap on a line takes the view there. Empty when there are none. */
+  function regionOutlineHtml(s) {
+    if (!s.regions || !s.regions.length) return '';
+    const rows = MM.regionOutline(s);
+    if (!rows.length) return '';
+    return '<div class="sep"></div><div class="eyebrow">outline <span class="srccount">' + rows.length + ' region' + (rows.length === 1 ? '' : 's') + '</span></div>' +
+      '<div class="outline">' + rows.map((o) =>
+        '<button class="mini outlineRow" type="button" data-region-fit="' + esc(o.id) + '" style="margin-left:' + (o.depth * 14) + 'px" title="take the view to it">' +
+        '<b>' + esc(o.name) + '</b> <span class="v">' + esc(MM.holdsSaid(o.holds)) + '</span></button>').join('') + '</div>';
+  }
+  /** The view to a region: fitted to it, with room. */
+  function regionFit(id) {
+    const r = regionsFor(session.getState()).list.find((x) => x.id === id);
+    if (!r) return;
+    fitTo(r.bounds);
+    flash('“' + r.name + '” — ' + MM.holdsSaid(regionHolds(session.getState(), id).holds));
+  }
+  function regionRename(id, name) {
+    const done = session.renameRegion({ nodeId: id, name: name, at: Date.now() });
+    flash(done ? 'renamed to “' + name.trim() + '” — undo takes the old name back' : 'a region needs a name');
+    return done;
+  }
+  inspectorEl.addEventListener('click', (e) => {
+    const t = e.target && e.target.closest && e.target.closest('[data-region-fit],[data-region-rename]');
+    if (!t) return;
+    if (t.hasAttribute('data-region-fit')) { regionFit(t.getAttribute('data-region-fit')); return; }
+    const id = t.getAttribute('data-region-rename');
+    const input = inspectorEl.querySelector('input[data-region-name="' + id + '"]');
+    if (input) regionRename(id, input.value);
+  });
+  inspectorEl.addEventListener('keydown', (e) => {
+    const t = e.target;
+    if (e.key !== 'Enter' || !t || !t.hasAttribute || !t.hasAttribute('data-region-name')) return;
+    e.preventDefault();
+    regionRename(t.getAttribute('data-region-name'), t.value);
+  });
 
 // ===== kinds =====
 // Provides: documentForKind (the renderers: every kind as a document ink can address), the mermaid harness (mermaidFrom, mermaidStates), postPointer (a hand forwarded into a playing frame), the worker runtime
@@ -13231,6 +13492,8 @@
     const said = s.explanations.filter((id) => { const n = s.nodes.get(id); return !!n && !MM.isSeatTraffic(n, s.nodes); });
     const arts = new Set(s.artifacts), answers = new Set(said);
     const items = [];
+    // A region stands as its outline, under the marks it holds (I5).
+    for (const r of s.regions.length ? regionsFor(s).list : []) items.push({ id: r.id, b: r.bounds, region: true });
     for (const id of s.contentIds.concat(said)) {
       const b = MM.boundsOf(s.nodes.get(id));
       if (b) items.push({ id: id, b: b, artifact: arts.has(id), answer: answers.has(id) });
@@ -13263,7 +13526,8 @@
       const x = ox + b.minX * scale, y = oy + b.minY * scale;
       const bw = Math.max(1.5, (b.maxX - b.minX) * scale), bh = Math.max(1.5, (b.maxY - b.minY) * scale);
       if (paintOps) recordOp({ kind: 'mini', id: it.id, box: boxOfRect(x, y, bw, bh), moved: true });
-      if (it.artifact) { g.strokeStyle = 'rgba(' + C.goldRGB + ',0.8)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, bw, bh); }
+      if (it.region) { g.strokeStyle = 'rgba(' + C.labelRGB + ',0.85)'; g.lineWidth = 1; g.setLineDash([2, 2]); g.strokeRect(x + 0.5, y + 0.5, bw, bh); g.setLineDash([]); }
+      else if (it.artifact) { g.strokeStyle = 'rgba(' + C.goldRGB + ',0.8)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, bw, bh); }
       else { g.fillStyle = it.answer ? answerFill : C.inkFaint; g.fillRect(x, y, bw, bh); }
     }
     g.strokeStyle = C.ink; g.lineWidth = 1; g.setLineDash([]);
