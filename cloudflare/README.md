@@ -93,6 +93,8 @@ node cloudflare/relay/room-key.mjs '*'             # opens every room — yours;
   or add it to the Home Screen from that address; the app leaves the key out of any board's address, the log, the
   board, an export and every cache, and sends `Referrer-Policy: no-referrer`. The key is in the address bar and in
   Cloudflare's request log — it is a room key, not an account password; rotate it if a screenshot shows it.
+  On dyna.ink the Live pane's *with Claude* uses this relay by default (room `claude`; the key is the address's
+  `?key=`, so open the app from the address above first), and takes the seat through it.
 - **An agent** (Claude Code anywhere, `Demos/mcp.mjs`; `Demos/seat-watch.mjs`): the environment,
   `MM_RELAY=https://relay.dyna.ink MM_RELAY_KEY=<key> MM_ROOM=claude`, sent as `Authorization: Bearer`.
   (`--relay` / `--key` also work, but an argument is in the process list.)

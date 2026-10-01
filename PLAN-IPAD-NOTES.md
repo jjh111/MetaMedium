@@ -321,6 +321,34 @@ JPEG or WebP, so the agent sees them as images of their own, not in the composit
 composite shows a frame for them); EXIF orientation on a picture the hand imports; garbage-collecting a room's pictures
 (a room that fills is refused, never pruned); the free-plan Durable Object storage and row limits are unverified.
 
+**A2 — the agent's hand organises notes (1 Oct 2026, branch `unit/a2-agent-hand`).** *Status: built.* The person's side of
+organising notes was built (I5 regions, I6 Find, I8 reading); the agent's was a look, a see and an import. Now the MCP hand
+**finds** (`canvas_find`: core's search — the same words a tab's Find reads — over the room's board, each hit with its id,
+what it stands on and where), **makes a region** round anyone's marks and renames its own (`canvas_region`: `makeRegion`,
+the field's act, or a box), and **moves what it made** (`canvas_move`: `dx, dy`, `to {x, y}` or `into` a region, one event).
+**The ruling** — checked against *The MCP hand*, *A label*, *Regions* and *Live logs*, which agree with the director's
+suggestion: a hand makes a region round anyone's marks, because a region holds by geometry and writes nothing about what it
+holds; it moves and renames only what it made. The reason that decides it is undo: per hand (L2j), so a person's own undo
+cannot take back another hand's move of their marks. One thing the suggestion did not say, found in `regionCarries`: **a
+region the hand made, moved, carries what it holds** (I5) — so a region round John's notes is not the hand's to move; it is
+refused, with the note named, and the way round is a new region round the hand's own marks. `handMoves`
+(`session/hand-moves.ts`) is the rule, pure, at the hand's door and not the board's (a person still moves anything in
+front of them; a log carrying another hand's move is applied on replay, unlike another's label). `canvas_look` now gives
+what organising needs: the regions in the outline's reading order with *inside “…”* and what each holds, a line for what
+stands in no region, **the region each mark stands in**, and **handwriting a line at a time in reading order with what it
+reads as** (or *unread — canvas_see, then canvas_transcribe*). **And "with Claude" on dyna.ink defaults to
+`https://relay.dyna.ink`** (`24-relay.js`, pure, tested; elsewhere `http://127.0.0.1:8020`; the key is the page's `?key=`
+as it was). The A1 note's other open item is closed: `whyNoSeat` refused any relay not on this machine, so a hosted default
+would have joined the room and never seated Claude — the product's own relay (exactly `https://relay.dyna.ink`) is accepted,
+the seat `hosted` to `providerLocality`. Tests, red first (`651f378`): `hand-moves.test.ts` 9, `24-relay.test.mjs` 7, the
+MCP smoke 30 new checks and the tool count raised to fourteen (find, region, move and the look), the gate's `hand` H1.26–28 (a region the hand made
+in the tab's outline, a find answered, a move refused on his box, his word and the region that would carry them while its
+own circle moves). **Not done:** a hand does not scale, turn, tidy or line marks up (move is the one verb; a hand's *tidy*
+of its own marks is a later unit); no `canvas_read` batch of the hand's own — it reads with `canvas_see` and
+`canvas_transcribe` a mark at a time; *Make it a region* from a rectangle the hand drew is `canvas_region`'s frame case,
+untested over a hand's own rectangle; nothing is said of a person's arrow tied to the hand's own box that follows it when
+the box is moved (derived, E2).
+
 Cut order if time runs short: I9, then I8's spike, then I5's outline. Never cut
 I1–I4.
 
