@@ -10,7 +10,10 @@
 //   switchPlan (what opening an entry does), boardTitle / boardSearch (the page's title and address),
 //   and the examples (R5) — EXAMPLES_BASE / exampleUrl (where boards/examples stands from the page),
 //   exampleRows (the pane's Examples, read from the index and never trusted), exampleName (what a board
-//   made from one is called), starterOf (which one a first run's tap opens).
+//   made from one is called), starterOf (which one a first run's tap opens), and what the iPad needs kept
+//   (PLAN-IPAD-NOTES I3) — spaceWords / storageWords (how much room this browser holds and has left, and
+//   whether it may clear it, in words) and persistPlan / PERSIST_KEY (when the app asks the browser to keep
+//   the device's storage: once, when a board holds something).
 // Uses: NOTHING. Like 17-board.js (R3's journal: ONE board's log) this fragment names no closure
 //   variable and touches no DOM, no storage and no session; 17-folder.js is the adapter (IndexedDB,
 //   the lock, the switch) and 22-boards.js the pane. Tested on its own in Node:
@@ -148,6 +151,52 @@
     if (!stat) return 'size not known yet';
     if (!stat.events && !stat.marks) return 'empty';
     return marksWords(stat) + ' · ' + bytesWords(stat.chars);
+  }
+
+  /** A size of the browser's room as a person says it: "300 KB", "12 MB" (a decimal only while small), "40 GB". */
+  function spaceWords(bytes) {
+    const b = typeof bytes === 'number' && isFinite(bytes) && bytes > 0 ? bytes : 0;
+    if (!b) return 'nothing';
+    if (b < 1024) return 'under 1 KB';
+    const unit = (x, u) => (x >= 9.95 ? Math.round(x) : Math.round(x * 10) / 10) + ' ' + u;
+    const kb = Math.round(b / 1024);
+    if (kb < 1024) return kb + ' KB';
+    const mb = b / (1024 * 1024);
+    if (Math.round(mb) < 1024) return unit(mb, 'MB');
+    return unit(mb / 1024, 'GB');
+  }
+  /**
+   * What the browser keeps of this page's storage, and whether it may take it back, in words — the foot of
+   * the boards pane. `usage` and `quota` are `navigator.storage.estimate()`'s (bytes, or not said), `persisted`
+   * `navigator.storage.persisted()`'s (true, false, or null when it cannot say) and `installed` whether the page
+   * runs from the Home Screen. Safari clears a site's storage after seven days without a visit unless the
+   * site is installed or the browser agreed to keep it, so a page in a tab says so and the way out.
+   */
+  function storageWords(o) {
+    const q = o || {};
+    const known = (n) => typeof n === 'number' && isFinite(n) && n >= 0;
+    const used = known(q.usage) && q.usage > 0, quota = known(q.quota) && q.quota > 0;
+    if (!known(q.usage) && !quota && q.persisted !== true && q.persisted !== false) return 'this browser does not say how much room it keeps for boards';
+    const room = used && quota ? spaceWords(q.usage) + ' of about ' + spaceWords(q.quota) : used ? spaceWords(q.usage) : quota ? 'room for about ' + spaceWords(q.quota) : '';
+    if (q.persisted === true) return 'kept on this device' + (room ? ' — ' + room : '');
+    if (q.installed) return 'kept with the app on this device' + (room ? ' — ' + room : '');
+    return 'this browser may clear it after a week unused — add to Home Screen' + (room ? ' · ' + room : '');
+  }
+  /** The device preference that says the browser has been asked to keep this device's storage (once, whatever it answered). */
+  const PERSIST_KEY = 'mm-persist-asked';
+  /**
+   * Whether to ask the browser, now, to keep this device's storage (`navigator.storage.persist()`): once per
+   * device, when a board the device keeps holds something — never for `?fresh=1` (a test's page), a replay, an
+   * embed, a room, a folder or a repository (`mode` is boardMode's: only 'restore' is the device's own board).
+   * `why` says which: 'ask', 'unsupported', 'not-the-devices', 'already', 'empty'.
+   */
+  function persistPlan(o) {
+    const q = o || {};
+    if (!q.supported) return { ask: false, why: 'unsupported' };
+    if (q.mode !== 'restore') return { ask: false, why: 'not-the-devices' };
+    if (q.asked) return { ask: false, why: 'already' };
+    if (!q.holds) return { ask: false, why: 'empty' };
+    return { ask: true, why: 'ask' };
   }
 
   /**

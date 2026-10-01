@@ -2611,6 +2611,40 @@
     if (e.pointerType === 'pen') w.p = Math.round(Math.max(0, Math.min(1, e.pressure || 0)) * 1000) / 1000;
     return w;
   }
+  // ----- Pencil fidelity (PLAN-IPAD-NOTES I3) -----
+  // A pencil reports at 240 Hz and the browser folds the samples between two frames into one move;
+  // `getCoalescedEvents()` has them all. Every sample is a point, in order, and every point of a stroke
+  // — the mouse's, a finger's, the pen's — says when, as whole milliseconds since the press that began
+  // the stroke (core's `Point.t`: kept in the log as the hand gave it, rounded as `p` is; no reading uses
+  // it, so a log with it reads as the same log without). The hold, the tap and the magnets are unchanged.
+  let strokeT0 = 0;   // the press's own timeStamp, which every `t` of the stroke under way counts from
+  /** A sample of the hand's — a move, or one of the moves folded into it — as a point with its time. */
+  function samplePoint(s) {
+    const w = pointOf(s);
+    w.t = Math.max(0, Math.round((s.timeStamp || 0) - strokeT0));
+    return w;
+  }
+  /**
+   * The samples a move carries, oldest first. A browser lists the event itself last; one that leaves it
+   * out gets it added, and a move that is no more than the one before it is no new sample (`pushSample`).
+   */
+  function samplesOf(e) {
+    let list = null;
+    try { list = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : null; } catch (err) { list = null; }
+    if (!list || !list.length) return [e];
+    const last = list[list.length - 1];
+    return last.clientX === e.clientX && last.clientY === e.clientY ? list : list.concat([e]);
+  }
+  /** One sample onto the stroke under way: never before the one it follows in time, never the same sample twice. */
+  function pushSample(points, s) {
+    const w = samplePoint(s);
+    const last = points[points.length - 1];
+    if (last) {
+      if (last.t !== undefined && w.t < last.t) w.t = last.t;
+      if (last.x === w.x && last.y === w.y && last.t === w.t && last.p === w.p) return;
+    }
+    points.push(w);
+  }
   /** Is a touch landing now a palm? */
   function palmHere() { return palmNow({ penDown: pen.down.size > 0, sincePen: handClock() - pen.at }); }
   /** The fingers down that draw, pan or pinch — not the palms, and not one left resting after a pinch. */
@@ -2795,6 +2829,8 @@
     const pf = pointerFrameAt(w0);
     if (pf && !insideWaitingLoop(w0)) { forward = pf; postPointer(pf, 'down', e, w0); return; }
     pressBegin(e, w0);
+    strokeT0 = e.timeStamp || 0;
+    w0.t = 0;
     live = [w0];
     liveFrom = { x: e.clientX, y: e.clientY, far: 0 };
     // The stroke may begin ON a magnet — an arrow drawn out of a box's corner.
@@ -2925,7 +2961,7 @@
       if (e.pointerType === 'pen') penHoverAt(w); else penHoverOff();
       return;
     }
-    live.push(pointOf(e));
+    for (const smp of samplesOf(e)) pushSample(live, smp);
     if (liveFrom) liveFrom.far = Math.max(liveFrom.far, Math.hypot(e.clientX - liveFrom.x, e.clientY - liveFrom.y));
     magnetHold = magnetQuery(live[live.length - 1]); // the offer follows the pen; out of reach, it lets go
     drawLive(); // the pen and its magnet, on their own layer; the board is as it was (R4c)
@@ -8525,7 +8561,10 @@
 //   switchPlan (what opening an entry does), boardTitle / boardSearch (the page's title and address),
 //   and the examples (R5) — EXAMPLES_BASE / exampleUrl (where boards/examples stands from the page),
 //   exampleRows (the pane's Examples, read from the index and never trusted), exampleName (what a board
-//   made from one is called), starterOf (which one a first run's tap opens).
+//   made from one is called), starterOf (which one a first run's tap opens), and what the iPad needs kept
+//   (PLAN-IPAD-NOTES I3) — spaceWords / storageWords (how much room this browser holds and has left, and
+//   whether it may clear it, in words) and persistPlan / PERSIST_KEY (when the app asks the browser to keep
+//   the device's storage: once, when a board holds something).
 // Uses: NOTHING. Like 17-board.js (R3's journal: ONE board's log) this fragment names no closure
 //   variable and touches no DOM, no storage and no session; 17-folder.js is the adapter (IndexedDB,
 //   the lock, the switch) and 22-boards.js the pane. Tested on its own in Node:
@@ -8663,6 +8702,52 @@
     if (!stat) return 'size not known yet';
     if (!stat.events && !stat.marks) return 'empty';
     return marksWords(stat) + ' · ' + bytesWords(stat.chars);
+  }
+
+  /** A size of the browser's room as a person says it: "300 KB", "12 MB" (a decimal only while small), "40 GB". */
+  function spaceWords(bytes) {
+    const b = typeof bytes === 'number' && isFinite(bytes) && bytes > 0 ? bytes : 0;
+    if (!b) return 'nothing';
+    if (b < 1024) return 'under 1 KB';
+    const unit = (x, u) => (x >= 9.95 ? Math.round(x) : Math.round(x * 10) / 10) + ' ' + u;
+    const kb = Math.round(b / 1024);
+    if (kb < 1024) return kb + ' KB';
+    const mb = b / (1024 * 1024);
+    if (Math.round(mb) < 1024) return unit(mb, 'MB');
+    return unit(mb / 1024, 'GB');
+  }
+  /**
+   * What the browser keeps of this page's storage, and whether it may take it back, in words — the foot of
+   * the boards pane. `usage` and `quota` are `navigator.storage.estimate()`'s (bytes, or not said), `persisted`
+   * `navigator.storage.persisted()`'s (true, false, or null when it cannot say) and `installed` whether the page
+   * runs from the Home Screen. Safari clears a site's storage after seven days without a visit unless the
+   * site is installed or the browser agreed to keep it, so a page in a tab says so and the way out.
+   */
+  function storageWords(o) {
+    const q = o || {};
+    const known = (n) => typeof n === 'number' && isFinite(n) && n >= 0;
+    const used = known(q.usage) && q.usage > 0, quota = known(q.quota) && q.quota > 0;
+    if (!known(q.usage) && !quota && q.persisted !== true && q.persisted !== false) return 'this browser does not say how much room it keeps for boards';
+    const room = used && quota ? spaceWords(q.usage) + ' of about ' + spaceWords(q.quota) : used ? spaceWords(q.usage) : quota ? 'room for about ' + spaceWords(q.quota) : '';
+    if (q.persisted === true) return 'kept on this device' + (room ? ' — ' + room : '');
+    if (q.installed) return 'kept with the app on this device' + (room ? ' — ' + room : '');
+    return 'this browser may clear it after a week unused — add to Home Screen' + (room ? ' · ' + room : '');
+  }
+  /** The device preference that says the browser has been asked to keep this device's storage (once, whatever it answered). */
+  const PERSIST_KEY = 'mm-persist-asked';
+  /**
+   * Whether to ask the browser, now, to keep this device's storage (`navigator.storage.persist()`): once per
+   * device, when a board the device keeps holds something — never for `?fresh=1` (a test's page), a replay, an
+   * embed, a room, a folder or a repository (`mode` is boardMode's: only 'restore' is the device's own board).
+   * `why` says which: 'ask', 'unsupported', 'not-the-devices', 'already', 'empty'.
+   */
+  function persistPlan(o) {
+    const q = o || {};
+    if (!q.supported) return { ask: false, why: 'unsupported' };
+    if (q.mode !== 'restore') return { ask: false, why: 'not-the-devices' };
+    if (q.asked) return { ask: false, why: 'already' };
+    if (!q.holds) return { ask: false, why: 'empty' };
+    return { ask: true, why: 'ask' };
   }
 
   /**
@@ -8867,11 +8952,12 @@
 //   logWrite, logFileNote; a folder whose log is of a newer version is refused before it is opened),
 //   the view per board, browser
 //   storage where there is no IndexedDB, the one import of browser storage's old copy, the lock one
-//   tab holds per board, and what the status line says when a save fails (boardWarning, keepBoardIn).
+//   tab holds per board, what the status line says when a save fails (boardWarning, keepBoardIn), and the one
+//   ask that the browser keep the device's storage (askPersist; PLAN-IPAD-NOTES I3).
 // Uses: core, board (createJournal, openPlan, troubleOf, troubleWords, journalEvents, journalFold,
 //   journalText), boards (the list's pure half), view (fitAll, afterViewChange, clampZoom), teach
 //   (savedMark, restoreMark), artifacts, render, input (say, flash), images (downloadText), controls
-//   (syncTiles), the boards pane (renderBoardsPane), the seat (seatRoomOpened: who is heard in a room).
+//   (syncTiles), the boards pane (renderBoardsPane, roomChanged), the seat (seatRoomOpened: who is heard in a room).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -10216,6 +10302,25 @@
     if (board.restoring) return; // the log being loaded is what the store holds
     if (folder.store) { if (board.journal.state !== 'off') leaveBoard(); return; }
     board.journal.sync(session.getEvents());
+    if (!persistAsked.done) askPersist();
+  }
+  // Kept on the iPad (PLAN-IPAD-NOTES I3). Safari clears a site's storage after seven days without a visit
+  // unless it is installed or the browser agreed to keep it, so once a board holds something the page asks
+  // `navigator.storage.persist()` — once per device (the preference is written before the answer, whatever it
+  // is: the browser decides, and asking again is nagging), never for what is not the device's own board
+  // (`persistPlan`, 17-boards.js: ?fresh=1, a replay, an embed, a room, a folder). The pane's foot says what it
+  // answered (22-boards.js).
+  const persistAsked = { done: false };
+  function askPersist() {
+    let asked = false;
+    try { asked = !!localStorage.getItem(PERSIST_KEY); } catch (err) { asked = true; } // no way to remember it: not to be asked on every stroke
+    const st = typeof navigator !== 'undefined' ? navigator.storage : null;
+    const plan = persistPlan({ supported: !!st && typeof st.persist === 'function', asked: asked, holds: session.getEvents().length > 0, mode: board.mode });
+    if (plan.why === 'empty') return; // asked when there is something to keep
+    persistAsked.done = true;
+    if (!plan.ask) return;
+    try { localStorage.setItem(PERSIST_KEY, String(Date.now())); } catch (err) { /* private mode */ }
+    Promise.resolve().then(() => st.persist()).then(() => { if (typeof roomChanged === 'function') roomChanged(); }, () => { /* the browser said nothing: the pane says so */ });
   }
   /** On the way out — the tab hidden, the page going — anything not yet written goes now, and where the hand left the board. */
   function flushBoard() {
@@ -11139,9 +11244,10 @@
 //   and the examples (V1-PLAN R5): a few boards made by the engine, each opened as a NEW board of
 //   your own, a copy — the example is never written — and the empty board's panel start (the
 //   starter, one tap; *more examples* opens this pane).
-//   renderBoardsPane (the adapter calls it when the list changes).
+//   renderBoardsPane (the adapter calls it when the list changes), and at its foot how much room this browser
+//   holds and has left and whether it may clear it (PLAN-IPAD-NOTES I3: loadRoom, roomChanged).
 // Uses: ui (pane, chip), controls (tiles.boards, togglePanel/closePanel), boards list (boardRows,
-//   sizeWords, isKept), folder (the boards adapter: boards, board, onBoardHere, switchBoard, newBoard,
+//   sizeWords, storageWords, isKept), folder (the boards adapter: boards, board, onBoardHere, switchBoard, newBoard,
 //   renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash, emptyTrash, boardFromFile,
 //   rereadBoards, boardEntryName, exportLogNow, readLogText), input (flash, say), the
 //   inspector's element (the panel's start), boards list (exampleUrl, exampleRows, exampleName, starterOf).
@@ -11172,7 +11278,39 @@
       // Another tab may have changed the list, and what its boards hold, since this page read it.
       rereadBoards();
       loadExamples();
+      loadRoom();
     };
+  }
+
+  // ----- The browser's room (PLAN-IPAD-NOTES I3) -------------------------------------------------------
+  // `navigator.storage.estimate()` and `.persisted()`, read when the pane opens and again when the browser has
+  // answered the ask (17-folder.js's askPersist), said at the foot by storageWords (17-boards.js). A browser
+  // with neither says that, and nothing is guessed.
+  const room = { state: 'idle', usage: undefined, quota: undefined, persisted: null };
+  function loadRoom() {
+    const st = typeof navigator !== 'undefined' ? navigator.storage : null;
+    const ask = (f) => { try { return st && typeof st[f] === 'function' ? Promise.resolve(st[f]()).catch(() => undefined) : Promise.resolve(undefined); } catch (err) { return Promise.resolve(undefined); } };
+    room.state = 'loading';
+    return Promise.all([ask('estimate'), ask('persisted')]).then((got) => {
+      const est = got[0] || {};
+      room.usage = typeof est.usage === 'number' ? est.usage : undefined;
+      room.quota = typeof est.quota === 'number' ? est.quota : undefined;
+      room.persisted = typeof got[1] === 'boolean' ? got[1] : null;
+      room.state = 'ready';
+      renderBoardsPane();
+    });
+  }
+  /** The browser answered the ask, or the boards changed under it: read the room again if the pane is showing it. */
+  function roomChanged() {
+    if (boardsPanel && !boardsPanel.hasAttribute('hidden')) loadRoom();
+    else room.state = 'idle';
+  }
+  /** Installed to the Home Screen: iOS's own flag, else the display mode — the one place the page can tell. */
+  function runsInstalled() {
+    try { return navigator.standalone === true || (typeof matchMedia === 'function' && matchMedia('(display-mode: standalone)').matches); } catch (err) { return false; }
+  }
+  function roomEl() {
+    return bdEl('p', 'bdStorage hint', room.state === 'ready' ? storageWords({ usage: room.usage, quota: room.quota, persisted: room.persisted, installed: runsInstalled() }) : 'reading how much room this browser keeps…');
   }
 
   /** The list changed (a record landed, another tab spoke): the pane again, if it stands — never under a name being typed. */
@@ -11288,6 +11426,7 @@
       // With nothing it could take yet (a board open elsewhere), asking again is the next move.
       if (rows.trash.length && (!c || !c.gone.length)) tr.appendChild(bdButton('Empty the trash…', 'bdEmpty', { emptyTrash: '' }, 'says what it will delete, and asks again'));
     }
+    frag.appendChild(roomEl());
     bdList.replaceChildren(frag);
     paintBoardsSaid();
   }

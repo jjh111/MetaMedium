@@ -2700,8 +2700,7 @@ nothing — also in a shallow, detached, tagless checkout like CI's. Not done:
 instruction; its section is the whole history (today 442 commits: 191 under 66
 units, 251 naming none) unless `--since` starts it later. Pages publishes `master` as it stands, so
 between releases the app runs master's code under the last release's number.
-The app's icon is the old address's SVG (Chromium installs with it; no
-`apple-touch-icon` for an iPad's home screen yet — R6's). The WebKit run of
+The app's icon was the old address's SVG (Chromium installs with it; the iPad's PNG icons are I3's). The WebKit run of
 `app` is not in CI's `webkit` job, which runs the smoke on Linux; it passes
 here on macOS.
 
@@ -2825,6 +2824,36 @@ was written: the field slid back over the press at the right edge (e2e 58),
 held writing opened a field over itself (58c), and the panel's *becomes*
 named *Show it in 3D* the field no longer offered (56d) and said writing
 *becomes a name* where Enter reads it (56e).
+
+### The iPad (`PLAN-IPAD-NOTES.md`, 1 October 2026)
+
+*I3 status, 1 Oct 2026: built on `unit/i3-ipad`* — red first `eaf16d1` (the Node cases for the
+room's words and the ask, e2e app A12–A15, boards N20–N20f, pencil P13–P13b, each
+failing alone), then `3e933a1` (the pencil's coalesced samples and a time on every point),
+`5d8f3f0` (installable: PNG icons, the iOS meta, a theme colour from the tokens) and
+`6944726` (the ask that the browser keep its storage, and the boards pane's foot). *Installed:*
+`scripts/make-icons.mjs` rasterises the manifest's old SVG glyph with Playwright's Chromium
+into `Demos/icons/` (`apple-touch-icon.png` 180, `icon-192/512.png`, `icon-maskable-512.png`;
+committed); the page names the touch icon, the iOS web-app meta and a `theme-color` per scheme
+(the surface's own `--ground`, read from `surface.css` by the test); the manifest's icons are
+PNGs, and `build-app.mjs` asks for them from `/app/`; both workers keep them (`sw.js` `EXTRA`).
+*Kept:* `persistPlan` / `storageWords` / `spaceWords` in `17-boards.js` (25 Node cases); the app
+asks `navigator.storage.persist()` once per device when a board first holds something (never
+`?fresh=1`, a replay, an embed, a room or a folder; the preference is written before the answer),
+and the boards pane's foot says *kept on this device — 12 MB of about 40 GB*, *kept with the
+app on this device*, or *this browser may clear it after a week unused — add to Home Screen*.
+HELP.md has *On an iPad*. *Pencil:* `07-input.js` reads `getCoalescedEvents()` on every move
+while drawing and gives every point `t` (whole ms since the press, never before the point it
+follows, none twice) beside `p`; `point-time.test.ts` (core) shows the same marks read the
+same with and without `t` and `p`, and `bench/equivalence.mjs --ref=HEAD` reports nothing
+differently. e2e: app 18 (A12–A15 added), boards 37 (N20–N20f), pencil 18 (P13, P13b). Not
+done: nothing here has touched an iPad or WebKit (this machine has neither: `--browser webkit`
+was not run), so `apple-touch-icon` taking, `persist()`'s answer, standalone detection by
+`navigator.standalone` and the Pencil's real coalescing are `PLAN-IPAD-NOTES.md` §6's, by hand.
+The theme-color meta follows the OS, not the *theme* tile. *For other owners:* the pane's size
+per board is marks · KB of the journal only — I1's pictures live in `mm-assets` and want
+adding to it; HELP.md's *Import a photo / Take a photo* wording is I1's inputs, to be matched
+to their final labels.
 
 ### Phase 7 — review and release
 **H1** — week 1's U7 (the `hand` gate scenario) plus `QA-v1.md`, a hand

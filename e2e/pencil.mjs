@@ -41,6 +41,9 @@
 //        stroke and no summon; a finger on a handle, with a pen present, pans and takes none
 //   P12  a tap off the open field with a few pixels of wobble closes it and leaves no dot — the
 //        pen's, and a finger's that draws (PLAN-USER-SURFACE W3)
+//   P13  the pencil's coalesced samples are all recorded, in order, none twice (PLAN-IPAD-NOTES I3)
+//   P13b every point has a time t — whole milliseconds since the stroke began, rising — a mouse's
+//        too, and nothing else is added to a point
 
 import { sleep, waitReady } from './keep.mjs';
 
@@ -80,6 +83,21 @@ function installHand() {
       this.penDown(pts[0].x, pts[0].y, ps ? ps[0] : 0.5);
       for (let i = 1; i < pts.length; i++) this.penMove(pts[i].x, pts[i].y, ps ? ps[i] : 0.5);
       this.penUp(pts[pts.length - 1].x, pts[pts.length - 1].y);
+    },
+    /**
+     * A pencil's move that carries the samples the system folded into it, as Chromium and WebKit deliver them:
+     * `samples` oldest first, each `ago` ms before this event, the last the event itself. `again`, when given, is
+     * the last sample of the move before ({ x, y, p, ts }), delivered a second time — a list that repeats one.
+     * Returns this move's own sample, to be handed to the next as `again`.
+     */
+    penMoveCoalesced(x, y, p, samples, again, el) {
+      const mk = (q) => new PointerEvent('pointermove', Object.assign({}, base, pen({ clientX: q.x, clientY: q.y, pressure: q.p, button: -1, buttons: 1 })));
+      const ev = mk({ x, y, p });
+      const list = samples.map((q) => { const c = mk(q); Object.defineProperty(c, 'timeStamp', { value: ev.timeStamp - q.ago }); return c; });
+      if (again) { const c = mk(again); Object.defineProperty(c, 'timeStamp', { value: again.ts }); list.unshift(c); }
+      Object.defineProperty(ev, 'getCoalescedEvents', { value: () => list });
+      (el || c).dispatchEvent(ev);
+      return { x, y, p, ts: ev.timeStamp };
     },
     /** A pen's tap on an element — a pill, a button: down, up, and the click the browser makes of them. */
     penTap(el) {
@@ -128,6 +146,10 @@ function lastStroke() {
     n: e.points ? e.points.length : null,
     withP: e.points ? e.points.filter((p) => typeof p.p === 'number' && p.p >= 0 && p.p <= 1).length : 0,
     ps: e.points ? e.points.map((p) => p.p) : null,
+    ts: e.points ? e.points.map((p) => p.t) : null,
+    xs: e.points ? e.points.map((p) => p.x) : null,
+    ys: e.points ? e.points.map((p) => p.y) : null,
+    keys: e.points ? [...new Set(e.points.flatMap((p) => Object.keys(p)))].sort() : null,
     x0: e.points ? e.points[0].x : null, y0: e.points ? e.points[0].y : null,
     x1: e.points ? e.points[e.points.length - 1].x : null, y1: e.points ? e.points[e.points.length - 1].y : null,
     reads: r ? r.label : null,
@@ -644,6 +666,61 @@ export async function runPencil(browser, servers, { freshContext, screenshot }) 
       await page.evaluate(() => window.__mm.setDraws('pen'));
       check(`P12. a tap off the open field only closes it: the pen and a finger that draws, each with 3 and 6 px of wobble — ${tries.map((x) => x.who + ' ' + x.px + ' px ' + (x.closed ? 'closed' : 'LEFT OPEN') + (x.strokes ? ', a dot' : '')).join('; ')}`,
         tries.length === 4 && tries.every((x) => x.opened && x.closed && x.strokes === 0), { tries });
+    });
+
+    // ---- P13. The pencil's coalesced samples are all recorded, in order, none twice (I3) ----
+    // iPadOS reports a pencil at 240 Hz and the browser folds the samples between two frames into one
+    // move: its getCoalescedEvents() has them all, the last the event itself. Reading only the event keeps one in four.
+    let coalesced = null;
+    await record('P13', async () => {
+      await page.evaluate(() => { window.__mm.session.load([]); window.__mm.setView(1, 0, 0); });
+      await sleep(PAST_PALM_MS);
+      const pts = boxPath(BOX, 6); // 25 points: the press and 24 more, in six moves of four samples
+      const made = await page.evaluate(async ({ pts }) => {
+        const h = window.__hand, wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const ps = [0.5];
+        h.penDown(pts[0].x, pts[0].y, 0.5);
+        let prev = null;
+        for (let g = 0; g < 6; g++) {
+          await wait(12);
+          const grp = pts.slice(1 + g * 4, 5 + g * 4);
+          const samples = grp.map((q, i) => ({ x: q.x, y: q.y, p: +(0.3 + 0.01 * (g * 4 + i)).toFixed(3), ago: 9 - 3 * i }));
+          for (const q of samples) ps.push(q.p);
+          const last = samples[samples.length - 1];
+          prev = h.penMoveCoalesced(last.x, last.y, last.p, samples, prev);
+        }
+        await wait(12);
+        h.penUp(pts[pts.length - 1].x, pts[pts.length - 1].y);
+        return { ps };
+      }, { pts });
+      await sleep(80);
+      coalesced = await page.evaluate(lastStroke);
+      const c = coalesced;
+      const same = (a, b) => !!a && a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) < 0.002);
+      check(`P13. every sample the pencil folded into a move is recorded, in order, and none twice: six moves of four samples (one list repeating the sample before it) give ${c && c.n} points, at the places the samples were and with each sample's own pressure`,
+        !!c && c.n === pts.length && same(c.xs, pts.map((q) => q.x)) && same(c.ys, pts.map((q) => q.y)) && same(c.ps, made.ps) && c.reads === 'rectangle',
+        { n: c && c.n, want: pts.length, ps: c && (c.ps || []).slice(0, 8), made: made.ps.slice(0, 8), reads: c && c.reads });
+    });
+
+    // ---- P13b. Every point has a time: whole milliseconds since the stroke began, rising ----
+    await record('P13b', async () => {
+      const c = coalesced;
+      const ts = (c && c.ts) || [];
+      const whole = ts.length > 0 && ts.every((t) => Number.isInteger(t) && t >= 0);
+      const rising = ts.length > 1 && ts.every((t, i) => i === 0 || t > ts[i - 1]);
+      // The mouse's points carry a time too (and, as ever, no pressure); nothing but x, y, p and t is in a point.
+      await sleep(40);
+      await page.mouse.move(600, 740);
+      await page.mouse.down();
+      for (let i = 1; i <= 12; i++) { await page.mouse.move(600 + i * 12, 740); await sleep(4); }
+      await page.mouse.up();
+      await sleep(60);
+      const m = await page.evaluate(lastStroke);
+      const mts = (m && m.ts) || [];
+      const mouseOk = mts.length === 13 && mts.every((t) => Number.isInteger(t)) && mts[0] === 0 && mts.every((t, i) => i === 0 || t >= mts[i - 1]) && mts[12] >= 40 && m.withP === 0;
+      check(`P13b. every point has a time t — whole ms since the press: the pencil's ${ts.length} points run ${ts[0]} to ${ts[ts.length - 1]} ms, rising${rising ? '' : ' (NOT rising)'}; the mouse's ${mts.length} run ${mts[0]} to ${mts[mts.length - 1]} with no pressure; a point holds only ${c && (c.keys || []).join(', ')}`,
+        whole && rising && ts[0] === 0 && ts[ts.length - 1] >= 60 && mouseOk && !!c && JSON.stringify(c.keys) === '["p","t","x","y"]' && JSON.stringify(m.keys) === '["t","x","y"]',
+        { ts, mts, keys: c && c.keys, mouseKeys: m && m.keys });
     });
   } catch (err) {
     check(`the scenario itself fell over: ${String(err && err.message ? err.message : err).split('\n')[0]}`, false, { stack: String(err && err.stack) });

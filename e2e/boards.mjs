@@ -22,6 +22,9 @@
 //     back per board; folders, repositories and sites are recent entries of
 //     their kind; switching flushes the board being left; one tab writes a
 //     board (R3's rule, per board);
+//   - kept on an iPad (PLAN-IPAD-NOTES I3): the app asks the browser to keep the device's
+//     storage once a board holds something — once per device, never on ?fresh=1 — and the
+//     pane says at its foot how much this browser holds and whether it may clear it;
 //   - and a library pack the board uses is kept with it: the `use` and the
 //     `unuse` are its log's, so its journal carries them through a reload
 //     (V1-PLAN §2.3, B3).
@@ -700,6 +703,112 @@ export async function logFormatTest(browser, servers, ctx) {
   return guards;
 }
 
+/**
+ * Kept on the iPad (PLAN-IPAD-NOTES I3). Safari clears a site's storage after seven days without a visit unless
+ * the site is installed or the browser has agreed to keep it, so the app asks `navigator.storage.persist()` once
+ * a board holds something — once per device, remembered, never for `?fresh=1` — and the boards pane says, at its
+ * foot, how much the browser holds and how much room it has, and whether it may clear it. The browser's storage API
+ * is stood in for (an init script, its asks counted in localStorage so they outlive a reload): this build's own
+ * Chromium would answer with a figure of its own, and says nothing of what Safari does.
+ */
+export async function storageTest(browser, servers, ctx) {
+  const { freshContext, steps } = ctx;
+  const check = (name, ok, detail) => steps.push({ name, ok: !!ok, detail });
+  const origin = servers.staticOrigin;
+  const url = `${origin}/Demos/session-engine.html?nosw=1`;
+  const standIn = () => {
+    const K = 'e2e-persist';
+    const get = () => { try { return JSON.parse(localStorage.getItem(K) || '{}'); } catch (err) { return {}; } };
+    const put = (v) => { try { localStorage.setItem(K, JSON.stringify(v)); } catch (err) { /* nothing */ } };
+    const st = {
+      persist: async () => { const v = get(); v.calls = (v.calls || 0) + 1; if (v.grant !== false) v.persisted = true; put(v); return v.grant !== false; },
+      persisted: async () => !!get().persisted,
+      estimate: async () => ({ usage: 12.4 * 1048576, quota: 40 * 1073741824 }),
+    };
+    try { Object.defineProperty(navigator, 'storage', { configurable: true, get: () => st }); } catch (err) { /* nothing */ }
+    if (get().standalone) { try { Object.defineProperty(navigator, 'standalone', { configurable: true, get: () => true }); } catch (err) { /* nothing */ } }
+  };
+  const calls = (pg) => pg.evaluate(() => (JSON.parse(localStorage.getItem('e2e-persist') || '{}').calls) || 0);
+  const setIn = (pg, o) => pg.evaluate((v) => localStorage.setItem('e2e-persist', JSON.stringify(Object.assign(JSON.parse(localStorage.getItem('e2e-persist') || '{}'), v))), o);
+  const footOf = async (pg) => {
+    await openBoardsPane(pg);
+    await pg.waitForFunction(() => { const e = document.querySelector('#boardsPanel .bdStorage'); return !!e && e.textContent.trim() && !/reading/.test(e.textContent); }, null, { timeout: 10000, polling: 50 }).catch(() => {});
+    const t = await pg.evaluate(() => { const e = document.querySelector('#boardsPanel .bdStorage'); return e ? e.textContent.replace(/\s+/g, ' ').trim() : null; });
+    await closeBoardsPane(pg);
+    return t;
+  };
+  const guards = await freshContext(browser, { origins: [origin], label: 'storage' });
+  await guards.context.addInitScript(standIn);
+  const page = await guards.context.newPage();
+  const rand = rng(20);
+  try {
+    // ---- N20. Asked once a board holds something -------------------------------------------------------
+    await page.goto(url, { waitUntil: 'load', timeout: 60000 });
+    await waitReady(page);
+    await sleep(400);
+    const empty = await calls(page);
+    await drawPath(page, boxPath(cellBox(0, rand)));
+    await page.evaluate(() => window.__mm.boardIdle());
+    await page.waitForFunction(() => (JSON.parse(localStorage.getItem('e2e-persist') || '{}').calls || 0) >= 1, null, { timeout: 5000, polling: 50 }).catch(() => {});
+    const once = await calls(page);
+    check(`N20. the app asks the browser to keep the device's storage when a board first holds something — ${empty} asks while the board was empty, ${once} once a box was drawn`,
+      empty === 0 && once === 1, { empty, once });
+
+    // ---- N20b. …once per device: a reload and another box do not ask again ------------------------------
+    await page.reload({ waitUntil: 'load' });
+    await waitReady(page);
+    await drawPath(page, boxPath(cellBox(1, rand)));
+    await page.evaluate(() => window.__mm.boardIdle());
+    await sleep(500);
+    const again = await calls(page);
+    check(`N20b. it is asked once per device — after a reload and a second box, still ${again} ask`, again === 1, { again });
+
+    // ---- N20c. The pane's foot says how much is kept, in words ------------------------------------------
+    const kept = await footOf(page);
+    check(`N20c. the boards pane says at its foot that this browser keeps it, and how much room — “${kept}”`,
+      kept === 'kept on this device — 12 MB of about 40 GB', { kept });
+
+    // ---- N20d. A browser that did not agree says it may clear it, and the way out ---------------------
+    await setIn(page, { persisted: false, grant: false });
+    await page.reload({ waitUntil: 'load' });
+    await waitReady(page);
+    const may = await footOf(page);
+    check(`N20d. a browser that has not agreed to keep it says so — “${may}”`,
+      /^this browser may clear it after a week unused — add to Home Screen/.test(may || '') && /12 MB of about 40 GB/.test(may || ''), { may });
+
+    // ---- N20e. Installed to the Home Screen, the warning goes ------------------------------------------
+    await setIn(page, { standalone: true });
+    await page.reload({ waitUntil: 'load' });
+    await waitReady(page);
+    const app = await footOf(page);
+    check(`N20e. installed to the Home Screen, the pane says the app keeps it, with no warning — “${app}”`,
+      /^kept with the app on this device — 12 MB of about 40 GB/.test(app || '') && !/clear/.test(app || ''), { app });
+  } catch (err) {
+    check('N20. the storage records ran to their end', false, { error: String(err && err.stack ? err.stack : err) });
+    await ctx.screenshot(page, 'boards-storage');
+  }
+  await page.close().catch(() => {});
+
+  // ---- N20f. Never for ?fresh=1: a test's page is not the device's board ---------------------------------
+  const other = await freshContext(browser, { origins: [origin], label: 'storage-fresh' });
+  await other.context.addInitScript(standIn);
+  const p2 = await other.context.newPage();
+  try {
+    await p2.goto(url + '&fresh=1', { waitUntil: 'load', timeout: 60000 });
+    await waitReady(p2);
+    await drawPath(p2, boxPath(cellBox(0, rng(21))));
+    await p2.evaluate(() => window.__mm.boardIdle());
+    await sleep(600);
+    const n = await calls(p2);
+    check(`N20f. ?fresh=1 never asks — a box drawn on a fresh page: ${n} asks`, n === 0, { n });
+  } catch (err) {
+    check('N20f. the fresh page ran to its end', false, { error: String(err && err.stack ? err.stack : err) });
+    await ctx.screenshot(p2, 'boards-storage-fresh');
+  }
+  await p2.close().catch(() => {});
+  return [guards, other];
+}
+
 /** The scenario the gate runs. */
 export async function runBoards(browser, servers, ctx) {
   const steps = [];
@@ -713,5 +822,8 @@ export async function runBoards(browser, servers, ctx) {
   const t3 = Date.now();
   const format = await logFormatTest(browser, servers, { ...ctx, steps });
   measured['log format s'] = +((Date.now() - t3) / 1000).toFixed(1);
-  return { steps, guards: [guards, ...first, format], measured };
+  const t4 = Date.now();
+  const storage = await storageTest(browser, servers, { ...ctx, steps });
+  measured['storage s'] = +((Date.now() - t4) / 1000).toFixed(1);
+  return { steps, guards: [guards, ...first, format, ...storage], measured };
 }
