@@ -60,6 +60,8 @@
       models: agents.map((a) => ({ name: a.name, sees: readers().includes(a) })),
       decider: deciderHost(),
       isRead: (id) => { const n = session.getState().nodes.get(id); return !!n && isRead(n); },
+      // The board's lines of writing and how many are unread (I8): *Read the board* stands only where there is some.
+      writing: () => boardWriting(),
       isFlipped: (id) => flipped.has(id),
       nameOf: nameOfParticipant,
       textNear: (b) => textNear(session.getState(), b),
@@ -231,7 +233,7 @@
     // model that sees, Claude's seat, or the ask kept for one), never by naming it "writing".
     // Read the writing and What is this? stay typeable and leave the row. Once the words land
     // the reading names again, and the words lead, as they always did.
-    const readOffer = allWriting ? offers.find((i) => i.key === 'read') : null;
+    const readOffer = allWriting ? offers.find((i) => (i.key === 'read' || i.key === 'read-lines') && i.group !== 'hidden') : null;
     if (readOffer) {
       const at = conceived.findIndex((i) => i.key === 'concept:writing');
       const concept = at >= 0 ? conceived[at] : null;
@@ -242,11 +244,11 @@
         label: 'writing' + (conf ? ' ' + conf.toFixed(2) : ''), name: 'writing',
         why: readOffer.why + ' — read it',
         tier: 2, asks: 'model', tool: 'read', verbs: ['writing'], act: true,
-        enter: 'read it' + (need ? ' — ' + need + ': it is kept, and runs when one joins' : ''),
+        enter: (readOffer.key === 'read-lines' ? 'read these' : 'read it') + (need ? ' — ' + need + ': it is kept, and runs when one joins' : ''),
         run: () => readOffer.run(),
       });
       if (concept) conceived.splice(at, 1, reads); else conceived.unshift(reads);
-      for (const i of offers) if (i.key === 'read' || i.key === 'what') i.group = 'hidden';
+      for (const i of offers) if (i.key === 'read' || i.key === 'read-lines' || i.key === 'what') i.group = 'hidden';
     }
     const items = known.concat(lined, lead, worded, proposed, notated, conceived, offers.filter((i) => !i.certain));
     // A pill that asks a model none here can answer says what it needs, inline, while it is pointed at (J5).
@@ -290,6 +292,10 @@
       d.single.forEach((id) => { any = readOne(s.nodes.get(id), true) || any; });
       if (!any) say('nothing there to read — the marks held have no ink an image can be made of');
     },
+    // Reading my notes (I8, 06-handwriting.js): every line of the marks held, or of the board, in one batch; a picture's text beside it.
+    'read-lines': (o) => { readLines(o.data.ids.slice(), { force: !!o.data.force }); },
+    'read-board': (o) => { readLines(boardWritingIds(), { force: !!o.data.force }); },
+    'read-picture': (o) => { readPictureFrom(o.data.artifact, o.data.asset, o.data.name); },
     what: (o) => askModelsAbout(o.data.ids.slice()),
     // *Which is it?* asks the decider — only by this tap (I7; 04-seatpane.js), never on a hold.
     which: (o) => askDecider(o.data),

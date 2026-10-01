@@ -156,6 +156,14 @@ async function holdIds(page, ids) {
   await sleep(120);
 }
 
+/**
+ * Take what reads the lines held. Held writing nobody has read is ONE option, its reading (W2, "writing 0.75" —
+ * Enter's "read these" too); where the marks held are not all writing, the offer stands as its own pill.
+ */
+async function takeReadThese(page) {
+  return (await takePill(page, 'Read these')) || (await takePill(page, 'writing'));
+}
+
 /** The first transcript a mark holds, or null. */
 const saidOn = (page, id) => page.evaluate((nid) => { const mm = window.__mm, n = mm.session.getState().nodes.get(nid); const t = n && mm.MM.transcriptsOf(n)[0]; return t ? t.text : null; }, id);
 
@@ -1002,13 +1010,14 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       await sleep(200);
       const drawn = chats().length - before;
       await holdIds(p6, A.flat());
-      const took = await takePill(p6, 'Read these');
+      const took = await takeReadThese(p6);
       await sleep(300);
       const said = await statusLine(p6);
       const kept = await p6.evaluate(() => { const k = window.__mm.keptAsk && window.__mm.keptAsk(); return k ? { needs: k.needs, what: k.what } : null; });
       const pane = await paneOpen(p6);
       const calls0 = chats().length - before;
       const joined = await joinCustom(p6, stub.baseUrl, 'z-ai/glm-4.5v', STUB_KEY, false, 'reader');
+      await closeModels(p6);
       const got = await stubbed(chats, before, 1, 10000);
       const texts = await until(p6, (ids) => { const mm = window.__mm, s = mm.session.getState(); const one = (id) => { const n = s.nodes.get(id), t = n && mm.MM.transcriptsOf(n)[0]; return t ? t.text : null; }; const out = ids.map(one); return out.every((x) => x) ? out : null; }, [A[0][0], A[0][1], A[1][0], A[2][0]], 10000);
       check(`M24. Read these with no model that sees is kept — "${said.slice(0, 90)}" — no pane, no call (${calls0}); drawing the lines asked nothing (${drawn} calls); the reader joins (${joined.slice(0, 40)}) and it runs: ONE call, to it alone, one image, a sheet of 3 lines — each line's reading lands where it was written: ${JSON.stringify(texts)}`,
@@ -1024,7 +1033,7 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       const B = await p6.evaluate(writePage, { t0: 400000, lines: [[[560, 480, 200, 44, 7]], [[560, 560, 220, 44, 6]], [[560, 640, 160, 44, 5]]] });
       await holdIds(p6, B.flat());
       const before = chats().length;
-      const took = await takePill(p6, 'Read these');
+      const took = await takeReadThese(p6);
       await sleep(350);
       const mid = await p6.evaluate(() => ({ working: window.__mm.working().length, status: (document.getElementById('status').textContent || '').trim() }));
       const got = await stubbed(chats, before, 1, 8000);
@@ -1051,15 +1060,15 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
 
     await record('M25', async () => {
       stub.readSkip(2);
-      const C = await p6.evaluate(writePage, { t0: 700000, lines: [[[960, 140, 200, 44, 7]], [[960, 220, 220, 44, 6]], [[960, 300, 160, 44, 5]]] });
+      const C = await p6.evaluate(writePage, { t0: 700000, lines: [[[1180, 140, 200, 44, 7]], [[1180, 220, 200, 44, 6]], [[1180, 300, 160, 44, 5]]] });
       await holdIds(p6, C.flat());
       const before = chats().length;
-      const took = await takePill(p6, 'Read these');
+      const took = await takeReadThese(p6);
       await stubbed(chats, before, 1, 8000);
       await until(p6, (id) => { const mm = window.__mm, n = mm.session.getState().nodes.get(id); return n && mm.MM.transcriptsOf(n).length ? true : null; }, C[2][0], 8000);
       await sleep(250);
       const said = await statusLine(p6);
-      const per = await p6.evaluate(() => window.__mm.lastReads().slice(-1)[0].lines_said);
+      const per = await p6.evaluate(() => window.__mm.lastReads().slice(-1)[0].said);
       const have = [await saidOn(p6, C[0][0]), await saidOn(p6, C[1][0]), await saidOn(p6, C[2][0])];
       stub.readSkip(0);
       check(`M25. a line the reply left out fails by itself and says why — "${said.slice(0, 140)}" — and the others are held: ${JSON.stringify(have)}`,
@@ -1075,7 +1084,7 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       const every = A.concat(C).flat();
       await holdIds(p6, every.concat([]));
       const before = chats().length;
-      const took = await takePill(p6, 'Read these');
+      const took = await takeReadThese(p6);
       const got = await stubbed(chats, before, 1, 8000);
       await sleep(300);
       const second = await saidOn(p6, C[1][0]);
@@ -1106,7 +1115,7 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       await holdIds(p6, D.flat());
       stub.readDelay(1200);
       const before = chats().length;
-      const took = await takePill(p6, 'Read these');
+      const took = await takeReadThese(p6);
       await stubbed(chats, before, 1, 8000);
       await sleep(150);
       await letGo(p6);

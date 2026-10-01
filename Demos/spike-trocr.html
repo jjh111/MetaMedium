@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TrOCR spike</title>
+<!--
+  A SPIKE (PLAN-IPAD-NOTES I8, step 5) — NOT part of the product, and loaded by nothing but `?spike=trocr`.
+
+  Question: can TrOCR-small-handwritten run in a browser tab on John's iPad, how fast, in how much memory,
+  and how does it read HIS hand beside the reader seat's reading? One line a call, English only.
+
+  What it does: loads transformers.js lazily from jsDelivr when the button is tapped (nothing loads at open),
+  builds the image-to-text pipeline for `Xenova/trocr-small-handwritten` (WebGPU where the browser has it, else
+  WASM — one thread, since GitHub Pages cannot send the headers that give WASM threads), and reads a line you
+  write below with the Pencil or take from a photo — measuring the load, the memory where the browser says,
+  the milliseconds a line, the text, and (if you type what you wrote) the character error rate.
+
+  UNRUN WHERE IT WAS WRITTEN: the container this was written in cannot reach jsDelivr or Hugging Face (the proxy
+  answers 403), so neither the CDN path, the model's id, nor the numbers have been seen. The loader tells you
+  plainly what failed. Whether WebGPU in Safari on iPadOS 26 runs this model without a reload loop is exactly
+  what the spike is for (PLAN-IPAD-NOTES §6).
+-->
+<style>
+  :root { --paper: #f6f2ea; --ink: #1f2a33; --faint: #8a8f94; --line: #d9d3c6; --sig: #1f7a73; --bad: #a2402b; }
+  @media (prefers-color-scheme: dark) { :root { --paper: #24272b; --ink: #e8e6e0; --faint: #9a9da1; --line: #3a3e43; --sig: #6cc3ba; --bad: #e08a72; } }
+  html, body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.45 ui-monospace, 'IBM Plex Mono', Menlo, monospace; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; padding-bottom: 80px; }
+  h1 { font-size: 18px; margin: 4px 0 2px; } p { margin: 6px 0; color: var(--faint); }
+  button, select, input[type=text] { font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; min-height: 40px; }
+  button { cursor: pointer; } button.go { border-color: var(--sig); color: var(--sig); } button[disabled] { opacity: .45; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+  #pad { width: 100%; height: 190px; border: 1px solid var(--line); border-radius: 8px; background: #fff; touch-action: none; display: block; }
+  #status { margin: 8px 0; min-height: 1.4em; } #status.bad { color: var(--bad); }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; } th, td { text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .k { color: var(--faint); } output { color: var(--sig); }
+  #photo { max-width: 100%; max-height: 120px; display: none; border-radius: 6px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>TrOCR in the browser — a spike</h1>
+  <p>Not part of the app. Tap <b>load the model</b>, write one line below with the Pencil (or take a photo of a line), tap <b>read it</b>.</p>
+
+  <div class="row">
+    <select id="device" aria-label="where it runs"><option value="auto">device: auto</option><option value="webgpu">WebGPU</option><option value="wasm">WASM (one thread)</option></select>
+    <select id="model" aria-label="which model"><option value="Xenova/trocr-small-handwritten">TrOCR small handwritten (62M)</option><option value="Xenova/trocr-base-handwritten">TrOCR base handwritten (334M)</option></select>
+    <button id="load" class="go">load the model</button>
+  </div>
+  <div id="status" role="status">nothing loaded — nothing is fetched until you tap.</div>
+
+  <canvas id="pad" aria-label="write one line here"></canvas>
+  <div class="row">
+    <button id="read" class="go" disabled>read it</button>
+    <button id="clear">clear</button>
+    <label class="k">or a photo of a line <input id="file" type="file" accept="image/*"></label>
+    <img id="photo" alt="the photo chosen">
+  </div>
+  <div class="row"><input id="truth" type="text" placeholder="what you wrote (optional — for the error rate)" style="flex:1; min-width: 220px"></div>
+
+  <table id="facts">
+    <tr><td class="k">device</td><td><output id="o-device">—</output></td></tr>
+    <tr><td class="k">load</td><td><output id="o-load">—</output></td></tr>
+    <tr><td class="k">memory</td><td><output id="o-mem">—</output> <span class="k" id="o-devmem"></span></td></tr>
+  </table>
+  <h1 style="margin-top:18px">lines read</h1>
+  <table id="rows"><tr><th>#</th><th>ms</th><th>it read</th><th>CER</th></tr></table>
+  <div class="row"><button id="copy">copy the numbers</button></div>
+</main>
+<script>
+(function () {
+  'use strict';
+  // The one place the CDN and the model are named. Change them here.
+  var TRANSFORMERS = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3/+esm';
+  var $ = function (id) { return document.getElementById(id); };
+  var status = function (t, bad) { $('status').textContent = t; $('status').className = bad ? 'bad' : ''; };
+  var pipe = null, results = [], loaded = null;
+
+  // ---- the pad: a pen line, pressure ignored, one stroke width ----
+  var pad = $('pad'), ctx = pad.getContext('2d'), drawing = false, last = null, inked = false;
+  function fit() { var r = pad.getBoundingClientRect(), d = window.devicePixelRatio || 1; pad.width = Math.round(r.width * d); pad.height = Math.round(r.height * d); ctx.setTransform(d, 0, 0, d, 0, 0); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, r.width, r.height); ctx.lineWidth = 3; ctx.lineCap = ctx.lineJoin = 'round'; ctx.strokeStyle = '#111'; inked = false; }
+  function at(e) { var r = pad.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  pad.addEventListener('pointerdown', function (e) { if (e.pointerType === 'touch' && window.__penSeen) return; if (e.pointerType === 'pen') window.__penSeen = true; drawing = true; last = at(e); pad.setPointerCapture(e.pointerId); });
+  pad.addEventListener('pointermove', function (e) { if (!drawing) return; var p = at(e); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p; inked = true; });
+  ['pointerup', 'pointercancel'].forEach(function (t) { pad.addEventListener(t, function () { drawing = false; }); });
+  $('clear').onclick = function () { fit(); $('photo').style.display = 'none'; $('file').value = ''; photo = null; };
+  window.addEventListener('resize', function () { if (!inked) fit(); }); fit();
+  var photo = null;
+  $('file').onchange = function () {
+    var f = $('file').files[0]; if (!f) return;
+    var url = URL.createObjectURL(f); $('photo').src = url; $('photo').style.display = 'block'; photo = url;
+  };
+
+  // ---- the ink as a tight line image: cropped, padded, white ground ----
+  function lineImage() {
+    if (photo) return photo;
+    var d = window.devicePixelRatio || 1, w = pad.width, h = pad.height, data = ctx.getImageData(0, 0, w, h).data;
+    var x0 = w, y0 = h, x1 = 0, y1 = 0;
+    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) { if (data[(y * w + x) * 4] < 128) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
+    if (x1 <= x0 || y1 <= y0) return null;
+    var pad_ = Math.round(14 * d), cw = x1 - x0 + pad_ * 2, ch = y1 - y0 + pad_ * 2, off = document.createElement('canvas');
+    off.width = cw; off.height = ch; var c = off.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0, 0, cw, ch); c.drawImage(pad, x0 - pad_, y0 - pad_, cw, ch, 0, 0, cw, ch);
+    return off.toDataURL('image/png');
+  }
+
+  // ---- character error rate: Levenshtein over the characters, over what was written ----
+  function cer(a, b) {
+    a = a.toLowerCase().trim(); b = b.toLowerCase().trim(); if (!a) return null;
+    var prev = []; for (var j = 0; j <= b.length; j++) prev[j] = j;
+    for (var i = 1; i <= a.length; i++) { var cur = [i]; for (var k = 1; k <= b.length; k++) cur[k] = Math.min(prev[k] + 1, cur[k - 1] + 1, prev[k - 1] + (a[i - 1] === b[k - 1] ? 0 : 1)); prev = cur; }
+    return prev[b.length] / a.length;
+  }
+  function memory() {
+    var m = performance && performance.memory;
+    $('o-mem').textContent = m ? Math.round(m.usedJSHeapSize / 1048576) + ' MB JS heap (Chrome reports it; Safari does not)' : 'the browser does not say';
+    $('o-devmem').textContent = navigator.deviceMemory ? '· device memory ≥ ' + navigator.deviceMemory + ' GB' : '';
+  }
+
+  // ---- load: lazy, on a tap, and every failure said in words ----
+  $('load').onclick = async function () {
+    var btn = $('load'); btn.disabled = true;
+    var want = $('device').value, device = want === 'auto' ? (navigator.gpu ? 'webgpu' : 'wasm') : want, id = $('model').value;
+    var t0 = performance.now();
+    try {
+      status('fetching transformers.js from jsDelivr…');
+      var lib;
+      try { lib = await import(TRANSFORMERS); } catch (e) { throw new Error('could not fetch the library from ' + TRANSFORMERS + ' — ' + (e && e.message || e)); }
+      status('loading ' + id + ' on ' + device + ' — the first time downloads the model…');
+      var opts = { device: device };
+      if (device === 'wasm') opts.dtype = 'q8';
+      try { pipe = await lib.pipeline('image-to-text', id, opts); }
+      catch (e) { throw new Error('the model would not load (' + id + ', ' + device + ') — ' + (e && e.message || e)); }
+      loaded = { id: id, device: device, ms: Math.round(performance.now() - t0) };
+      $('o-device').textContent = device + ' · ' + id; $('o-load').textContent = (loaded.ms / 1000).toFixed(1) + ' s'; memory();
+      status('loaded — write a line and tap read it.'); $('read').disabled = false;
+    } catch (e) { status(String(e.message || e), true); btn.disabled = false; }
+  };
+
+  $('read').onclick = async function () {
+    if (!pipe) return;
+    var img = lineImage(); if (!img) { status('nothing written yet', true); return; }
+    status('reading…'); $('read').disabled = true;
+    try {
+      var t0 = performance.now(), out = await pipe(img), ms = Math.round(performance.now() - t0);
+      var text = (out && out[0] && out[0].generated_text) || '', truth = $('truth').value, e = truth ? cer(truth, text) : null;
+      results.push({ n: results.length + 1, ms: ms, text: text, truth: truth || null, cer: e });
+      var tr = document.createElement('tr');
+      [results.length, ms, text, e === null ? '—' : (e * 100).toFixed(0) + '%'].forEach(function (v) { var td = document.createElement('td'); td.textContent = v; tr.appendChild(td); });
+      $('rows').appendChild(tr); memory(); status('read in ' + ms + ' ms.');
+    } catch (e) { status('the read failed — ' + (e && e.message || e), true); }
+    $('read').disabled = false;
+  };
+  $('copy').onclick = function () {
+    var text = JSON.stringify({ loaded: loaded, userAgent: navigator.userAgent, webgpu: !!navigator.gpu, results: results }, null, 2);
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(function () { status('copied.'); }, function () { status(text); });
+  };
+})();
+</script>
+</body>
+</html>

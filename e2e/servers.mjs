@@ -186,6 +186,9 @@ const ANSWERS = {
 
 /** Which job a request is, by the system prompt the canvas sends for it (metamedium-core/src/participants/agent.ts). */
 function jobOf(system) {
+  // Reading my notes (I8): a numbered sheet of lines, and a photographed page — told from a single mark's read.
+  if (/sheet of numbered lines/.test(system)) return 'read-lines';
+  if (/photograph or a scan of a page/.test(system)) return 'read-picture';
   if (/reading handwriting/.test(system)) return 'read';
   if (/offer INTERPRETATIONS/.test(system)) return 'what';
   if (/connection check/i.test(system)) return 'try';
@@ -242,6 +245,7 @@ function readBody(req) {
 export async function startModelStub({ key = STUB_KEY } = {}) {
   const LIST = JSON.parse(readFileSync(join(FIXTURES, 'openrouter-models.json'), 'utf8'));
   const REPLIES = JSON.parse(readFileSync(join(FIXTURES, 'replies.json'), 'utf8'));
+  const NOTES = JSON.parse(readFileSync(join(FIXTURES, 'read-lines.json'), 'utf8'));
   const own = {
     id: REASONING_ONLY,
     canonical_slug: REASONING_ONLY,
@@ -270,6 +274,9 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
   const calls = [];
   const decisions = [];
   let decideP = 0.995;
+  // The reader of notes (I8): how long it takes to answer a sheet, and a line it leaves out of its reply (0: none).
+  let readDelayMs = 0;
+  let readSkipLine = 0;
   const cors = {
     'access-control-allow-origin': '*',
     'access-control-allow-headers': 'authorization, content-type, http-referer, x-title',
@@ -293,9 +300,14 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
       const messages = Array.isArray(body.messages) ? body.messages : [];
       const system = messages.filter((m) => m.role === 'system').map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n');
       const image = messages.some((m) => Array.isArray(m.content) && m.content.some((p) => p && p.type === 'image_url' && /^data:image\//.test((p.image_url || {}).url || '')));
+      const user = messages.filter((m) => m.role === 'user').flatMap((m) => (typeof m.content === 'string' ? [m.content] : (m.content || []).filter((p) => p && p.type === 'text').map((p) => p.text))).join('\n');
+      const imageUrl = messages.flatMap((m) => (Array.isArray(m.content) ? m.content : [])).filter((p) => p && p.type === 'image_url').map((p) => (p.image_url || {}).url || '')[0] || '';
       const call = {
         at: Date.now(), path: url.pathname, model: body.model, job: jobOf(system), image, key: keyWas,
         max_tokens: body.max_tokens ?? null, reasoning: body.reasoning ?? null,
+        // A sheet asks for N lines (the user message says so); the picture's size is the length of its data URL.
+        lines: ((/sheet of (\d+) numbered line/.exec(user)) || [])[1] ? Number(/sheet of (\d+) numbered line/.exec(user)[1]) : null,
+        imageChars: imageUrl.length,
       };
       calls.push(call);
       if (keyWas === 'none') { send(401, REPLIES['error-401-no-key'].body); return; }
@@ -311,6 +323,18 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
         r.choices[0].message.content = d.content;
         delete r.choices[0].message.reasoning;
         delete r.choices[0].message.reasoning_details;
+        send(200, r);
+        return;
+      }
+      if (call.job === 'read-lines' || call.job === 'read-picture') {
+        if (readDelayMs) await new Promise((r) => setTimeout(r, readDelayMs));
+        const r = JSON.parse(JSON.stringify(REPLIES['openrouter-glm'].body));
+        r.model = body.model;
+        delete r.choices[0].message.reasoning;
+        delete r.choices[0].message.reasoning_details;
+        r.choices[0].message.content = call.job === 'read-picture'
+          ? JSON.stringify({ lines: NOTES.picture })
+          : JSON.stringify(Array.from({ length: call.lines || 0 }, (_, i) => ({ line: i + 1, ...NOTES.lines[i % NOTES.lines.length] })).filter((x) => x.line !== readSkipLine));
         send(200, r);
         return;
       }
@@ -345,6 +369,10 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
     decisions: () => decisions.map((d) => ({ ...d })),
     /** How surely the stub's decision model leads from now on: 0.995 (sure, the default) or 0.97 (under the floor). */
     decideAt: (p) => { decideP = p; },
+    /** How long the stub's reader takes to answer a sheet or a picture from now on, in ms (0: at once). */
+    readDelay: (ms) => { readDelayMs = ms; },
+    /** The line the stub's reader leaves out of its reply to a sheet from now on (1-based; 0: none). */
+    readSkip: (n) => { readSkipLine = n; },
     stop: () => new Promise((ok) => { server.closeAllConnections?.(); server.close(ok); }),
   };
 }

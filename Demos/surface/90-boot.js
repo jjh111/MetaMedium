@@ -12,6 +12,7 @@
     screenToWorld: screenToWorld, worldToScreen: worldToScreen,
     fitAll: fitAll, regionsUnderInk: regionsUnderInk,
     snapMode: () => snapMode, setSnapMode: setSnapMode, snapOffers: () => snapOffers,
+    readLines: readLines, readPictureFrom: readPictureFrom, lastReads: () => readStats.map((r) => Object.assign({}, r)), readScopeHooks: readScopeHooks,
     inkImage: inkImage, readOne: readOne, readWriting: readWriting, askModelsAbout: askModelsAbout,
     // A hosted model asked, and why when it cannot be (V1-PLAN J5), for tests: the ask kept for a model, and each model's last call.
     keptAsk: () => (keptAsk ? { what: keptAsk.what, needs: keptAsk.needs } : null),
@@ -187,3 +188,6 @@
   }
   resize();
   afterViewChange();
+  // A spike, not the product (PLAN-IPAD-NOTES I8 step 5): `?spike=trocr` opens the page that tries TrOCR in the browser — a page of
+  // its own beside this script, loading nothing until a tap on it. Only that query does anything.
+  if (params.get('spike') === 'trocr') location.replace(new URL('spike-trocr.html', (document.currentScript && document.currentScript.src) || location.href).href);
