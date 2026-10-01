@@ -251,7 +251,7 @@ const be32 = (n) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 25
 const le24 = (n) => [n & 255, (n >> 8) & 255, (n >> 16) & 255];
 const le32 = (n) => [n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255];
 const ascii = (s) => [...s].map((c) => c.charCodeAt(0));
-const bytesOf = (...parts) => Uint8Array.from(parts.flat());
+const bytesOf = (...parts) => Uint8Array.from(parts.flatMap((p) => [...p]));
 const jpegWith = (w, h, sof = 0xc0) => bytesOf([0xff, 0xd8], [0xff, 0xe0, 0, 16], ascii('JFIF'), [0, 1, 1, 0, 0, 1, 0, 1, 0, 0], [0xff, 0xdb, 0, 5, 0, 1, 2, 3], [0xff, sof, 0, 11, 8], [h >> 8, h & 255, w >> 8, w & 255], [1, 1, 0x11, 0]);
 
 test('sniffImage reads a PNG\'s size from its IHDR, and refuses what is not one', () => {
