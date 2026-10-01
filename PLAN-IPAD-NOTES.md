@@ -223,6 +223,15 @@ the decider is `llm/decide-openrouter.ts` over a chat completion with *Which is
 it?* as its first job, asked only by that tap. Open: the exact ids John wants
 per seat, and whether `typesafe/jev-1.13` is what OpenRouter lists.
 
+*1 Oct 2026, a finding of I7's, fixed on `unit/fix-rejoin`: a board loaded in place
+takes every participant's `join` with it (joins are events in the old log), so a model
+joined earlier answered "that participant is not in this session" on the next board;
+I7 had patched only the decider. Now every seat is seated on the board it is asked on,
+**lazily** — loading a board writes nothing (R5's "a board the hand only looked at is
+never written"), the first ask finds the join the board holds or writes one, once
+(`participants/seated.ts`; `agent.seat`; the decider's special case in `askDecider` is
+gone). Core test `participants/seated.test.ts` (8), e2e `models` M20–M23.*
+
 **I8 — read my notes.** *Read this region* / *Read the board*: every line of
 handwriting rendered from its own strokes and sent to the reader seat in a
 batch, with progress on the marks and Esc to stop; transcripts held, searchable

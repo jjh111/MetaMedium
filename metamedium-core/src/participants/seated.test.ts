@@ -10,6 +10,7 @@ import { createSession } from '../session/session';
 import { createAgentParticipant, type Transport } from './agent';
 import { createDecideParticipant, createStubDecideTransport, choice } from './decide';
 import { createBridgeParticipant } from './bridge';
+import { createSeatParticipant } from './seat';
 import { wordOf } from '../session/nodes';
 import { PRESETS } from '../llm/provider';
 import { circleStroke } from '../test/strokes';
@@ -136,5 +137,19 @@ describe('the decision seat is seated the same way', () => {
     expect(a.getState().participants).toContain(seat.id);
     await seat.ask([q], 2200);
     expect(joins(a)).toHaveLength(1);
+  });
+});
+
+describe('the canvas\'s own seat (Claude Code) is seated the same way', () => {
+  it('keeps the live id through the spread, and is joined again by `seat` after a load', () => {
+    const { s } = boardWithMark();
+    const seat = createSeatParticipant(s, 1100, { baseUrl: 'http://127.0.0.1:8020' });
+    expect(s.getState().participants).toContain(seat.id);
+    s.load([]);
+    expect(s.getState().participants).not.toContain(seat.id);
+    const now = seat.seat(2000);
+    expect(seat.id).toBe(now);
+    expect(s.getState().participants).toContain(now);
+    expect(joins(s)).toHaveLength(1);
   });
 });
