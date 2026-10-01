@@ -51,10 +51,20 @@
 //   M18  a device where the key was not remembered: the seats come back, no key in any store; the key
 //        entered once again serves every seat that waits for it
 //   M19  an old remembered pick and key become the writer seat (and the reader, for a model that sees)
+//
+// A model joined stays joined across boards (V1-PLAN I7's finding, 1 Oct 2026), in a context of its own:
+//   M20  a board loaded in place takes every join with it — and the model joined before is asked on the
+//        next: What is this? on a new board made through the boards pane answers (the stub asked once),
+//        joins there once and nowhere it was not asked
+//   M21  back on the first board, whose log already holds the join, it answers too — no second join —
+//        and again on the second, which now holds its own
+//   M22  a board only looked at is never written: switching through boards and back leaves a board with
+//        no event, and not one join is added to a board that was not asked on
+//   M23  Reset and an example opened are loads in place too: the model answers on each
 
 import { startModelStub, STUB_KEY, REASONING_ONLY, JEV } from './servers.mjs';
 import { isModelRequest } from './guards.mjs';
-import { sleep, waitReady } from './keep.mjs';
+import { sleep, waitReady, newBoardVia, switchTo } from './keep.mjs';
 
 const WRONG_KEY = 'e2e-wrong-key-not-a-real-key';
 
@@ -811,6 +821,118 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
         !!seats && seats.writer.model === 'z-ai/glm-5.3-flash' && seats.reader.model === 'z-ai/glm-5.3-flash' && !('mm-model-pick' in ls) && !('mm-model-key' in ls) &&
           JSON.parse(ls['mm-model-keys'] || '{}')[KEYS_AT(stub.baseUrl)] === STUB_KEY && !!tried && /^ok · /.test(tried.call) && asked.length === 1 && asked[0].key === 'the stub\'s',
         { seats, keys: Object.keys(ls), tried, asked });
+    });
+
+    // =====================================================================================================
+    // A model joined stays joined across boards (V1-PLAN I7's finding). A clean device, one writer.
+    // =====================================================================================================
+    const guards5 = await freshContext(browser, { origins: [servers.staticOrigin, stub.origin], label: 'models-boards' });
+    guardsAll.push(guards5);
+    await guards5.context.addInitScript(localStandIn);
+    const p5 = await guards5.context.newPage();
+    await p5.goto(url, { waitUntil: 'load', timeout: 60000 });
+    await waitReady(p5);
+    await p5.evaluate(installDraw);
+    const A5 = { x: 560, y: 130 };
+    const joinsHere = () => p5.evaluate(() => window.__mm.session.getEvents().filter((e) => e.type === 'join').length);
+    const eventsHere = () => p5.evaluate(() => window.__mm.session.getEvents().length);
+    /** What is this? on the molecule drawn at A5 with the real pointer; the stub's calls it made and the readings that landed. */
+    const askWhat = async (ids) => {
+      const before = chats().length;
+      await letGo(p5);
+      const held = await holdAt(p5, A5.x, A5.y);
+      const took = held && await takePill(p5, 'What is this?');
+      const calls = await stubbed(chats, before, 1);
+      const got = await until(p5, (list) => {
+        const s = window.__mm.session.getState();
+        return list.some((id) => { const n = s.nodes.get(id); return n && window.__mm.MM.interpretationsOf(n, s.nodes).some((r) => r.tier === 2); }) ? true : null;
+      }, ids, 8000);
+      await sleep(200);
+      const said = await statusLine(p5);
+      await letGo(p5);
+      return { held, took, calls: chats(before), got: !!got, said, asked: calls.length };
+    };
+    let board5a = null, board5b = null, ink5a = null, ink5b = null;
+
+    await record('M20', async () => {
+      const joined = await joinCustom(p5, stub.baseUrl, 'z-ai/glm-5.3-flash', STUB_KEY, false, 'writer');
+      await closeModels(p5);
+      board5a = (await p5.evaluate(() => window.__mm.boards())).current;
+      ink5a = await p5.evaluate(drawMolecule, A5);
+      const joinsA = await joinsHere();
+      board5b = await newBoardVia(p5);
+      await sleep(300);
+      const empty = await eventsHere();
+      ink5b = await p5.evaluate(drawMolecule, A5);
+      const r = await askWhat(ink5b);
+      const joinsB = await joinsHere();
+      const names = await p5.evaluate(() => window.__mm.session.getEvents().filter((e) => e.type === 'join').map((e) => e.name));
+      check(`M20. the model joined on the first board is asked on a new one made through the boards pane (${joined.slice(0, 40)}): a new board holds ${empty} events, What is this? answers there — ${r.calls.map((c) => c.model + ' ' + c.job).join(', ')}, its reading lands ("${r.said.slice(0, 80)}") — and the new board holds one join, for it (${names.join(', ')}), where the first held ${joinsA}`,
+        /^GLM 5\.3 Flash joined/.test(joined) && joinsA === 1 && !!board5b && board5b !== board5a && empty === 0 && r.held && r.took && r.calls.length === 1 && r.calls[0].model === 'z-ai/glm-5.3-flash' && r.calls[0].job === 'what' && r.got && !/not in this session/.test(r.said) && joinsB === 1,
+        { joined, joinsA, empty, r, joinsB, names });
+    });
+
+    // ---- M21. Back where it joined, and on again ----
+    await record('M21', async () => {
+      await switchTo(p5, board5a);
+      const joinsA = await joinsHere();
+      const r = await askWhat(ink5a);
+      const joinsA2 = await joinsHere();
+      await switchTo(p5, board5b);
+      const joinsB = await joinsHere();
+      const r2 = await askWhat(ink5b);
+      const joinsB2 = await joinsHere();
+      check(`M21. back on the first board (its log already holds the join) it answers — ${r.calls.map((c) => c.model).join(', ')} — and takes no second; on the second, which now holds its own, again: joins ${joinsA}→${joinsA2} and ${joinsB}→${joinsB2}`,
+        joinsA === 1 && r.held && r.took && r.calls.length === 1 && r.got && joinsA2 === 1 && joinsB === 1 && r2.held && r2.took && r2.calls.length === 1 && r2.got && joinsB2 === 1 && !/not in this session/.test(r.said + r2.said),
+        { joinsA, r, joinsA2, joinsB, r2, joinsB2 });
+    });
+
+    // ---- M22. A board only looked at is never written ----
+    await record('M22', async () => {
+      const calls = chats().length;
+      const looked = await newBoardVia(p5);
+      await sleep(200);
+      await switchTo(p5, board5a);
+      await switchTo(p5, looked);
+      await sleep(300);
+      const events = await eventsHere();
+      // What the browser's store holds of it, not only what the page shows: nothing was kept for a board nobody drew on.
+      const entry = await p5.evaluate(async (id) => { const st = await window.__mm.boardsStore(id); return { events: st.log.length, records: st.records }; }, looked);
+      await switchTo(p5, board5b);
+      const joinsB = await joinsHere();
+      check(`M22. a board only looked at — made, left, come back to, with the model joined throughout — holds ${events} events and its store ${entry ? entry.events : '?'} events; the model asked nothing (${chats().length - calls} calls) and the board it was asked on still holds ${joinsB} join`,
+        events === 0 && !!entry && entry.events === 0 && entry.records === 0 && chats().length === calls && joinsB === 1,
+        { events, entry, joinsB, calls: chats().length - calls });
+    });
+
+    // ---- M23. Reset and an example are loads in place too ----
+    await record('M23', async () => {
+      await p5.click('#ccBtn');
+      await p5.click('#resetBtn');
+      const fresh = await until(p5, (b) => { const x = window.__mm.boards(); return x.ready && !x.switching && !x.busy && x.current !== b && window.__mm.session.getEvents().length === 0 ? x.current : null; }, board5b, 15000);
+      await p5.evaluate(() => window.__mm.setView(1, 0, 0));
+      const ink = await p5.evaluate(drawMolecule, A5);
+      const r = await askWhat(ink);
+      const joins = await joinsHere();
+      // An example: one tap on the empty panel's "start from an example", a board of its own.
+      await newBoardVia(p5);
+      await sleep(200);
+      await p5.waitForSelector('#inspector button[data-example-start]', { timeout: 8000 }).catch(() => {});
+      const startedFrom = (await p5.evaluate(() => window.__mm.boards())).current;
+      await p5.click('#inspector button[data-example-start]');
+      const example = await until(p5, (b) => { const x = window.__mm.boards(); return x.ready && !x.switching && x.current !== b && window.__mm.session.getState().contentIds.length > 0 ? x.current : null; }, startedFrom, 20000);
+      await p5.evaluate(() => window.__mm.setView(1, 0, 0));
+      const ids = await p5.evaluate(() => window.__mm.session.getState().contentIds.slice());
+      const before = chats().length;
+      const asked = await p5.evaluate(async (list) => {
+        const mm = window.__mm, a = mm.agents[0];
+        const res = await a.ask('what is on this board?', list.slice(0, 3), Date.now());
+        return { ok: !!res.ok, error: res.error || null };
+      }, ids);
+      const joinsEx = await joinsHere();
+      check(`M23. Reset (a fresh board, ${fresh ? 'opened' : 'not opened'}) and an example opened (${example ? 'opened' : 'not opened'}) are loads in place: the model answers on each — What is this? on the fresh board (${r.calls.length} call, ${joins} join), a question on the example (${asked.ok ? 'answered' : asked.error}, ${chats().length - before} call, ${joinsEx} join in its log)`,
+        !!fresh && r.held && r.took && r.calls.length === 1 && r.got && joins === 1 && !!example && asked.ok && chats().length - before === 1 && joinsEx === 1,
+        { fresh, r, joins, example, asked, joinsEx });
     });
   } catch (err) {
     check(`the scenario threw: ${String(err && err.message ? err.message : err).split('\n')[0]}`, false, { stack: String(err && err.stack) });
