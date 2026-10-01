@@ -814,8 +814,8 @@ export function tracedStrokes({ seed = 1, count = 1000, bounds = { minX: 0, minY
 
 /**
  * A board of pictures: `svgs` SVG figures and `pictures` pictures, each brought in as the
- * surface brings it — one `import` event, a picture's carrying `strokes` traced
- * into ink — laid out in a grid of cells, each `strokesEach` strokes in a cell
+ * surface brings it (`importBitmap`, 18-images.js) — an `import` carrying the `strokes`
+ * traced into ink, then the picture itself, an artifact parked beside the ink — laid out in a grid of cells, each `strokesEach` strokes in a cell
  * of its own. The log is made on a session of its own and returned; `marks` is
  * the strokes it holds. `onImport(kind, ms, strokes)` hears what each import cost.
  */
@@ -839,6 +839,9 @@ export function importedBoard(core, { pictures = 5, strokesEach = 1000, svgs = 1
     const strokes = tracedStrokes({ seed: seed * 1000 + k, count: strokesEach, bounds });
     const t = performance.now();
     s.import({ kind: 'png', path: `imports/picture-${k}.jpg`, bounds, strokes, at: (at += 3000) });
+    // The raster, kept beside the ink, parked to the right of it (`importBitmap`, 18-images.js).
+    const rb = { minX: bounds.maxX + 40, minY: bounds.minY, maxX: bounds.maxX + 40 + (bounds.maxX - bounds.minX), maxY: bounds.maxY };
+    s.import({ kind: 'jpg', path: `imports/picture-${k}.jpg`, name: `picture-${k}.jpg`, bounds: rb, code: '', at: (at += 1) });
     if (onImport) onImport('picture', performance.now() - t, strokes.length);
     marks += strokes.length;
   }

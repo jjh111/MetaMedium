@@ -4,9 +4,11 @@
 //
 //     node --expose-gc metamedium-core/bench/imports.mjs --pictures=1 --strokes=2000 --svgs=1
 //     node --expose-gc metamedium-core/bench/imports.mjs --pictures=5 --strokes=1000 --svgs=5
+//     MM_CORE_BUNDLE=/path/to/older.node.mjs node --expose-gc metamedium-core/bench/imports.mjs --core=bundle   # an older engine, `git show <ref>:Demos/metamedium-core.node.mjs`
 //
 // A board of `--svgs` SVG figures and `--pictures` traced pictures (`bench/board.mjs`,
-// `importedBoard`), each brought in as one `import` event as the surface brings it.
+// `importedBoard`), each brought in as the surface brings it: the traced ink in one
+// `import`, the picture itself, an artifact beside it, in another.
 // Measured: what each import cost to apply, the cold replay of the log
 // (`load`, the first in the process), the warm replays that follow on fresh
 // sessions, one more stroke drawn in the middle of the last picture's ink (a
