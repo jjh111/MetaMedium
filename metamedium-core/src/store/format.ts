@@ -41,16 +41,25 @@ export interface LogHeader {
   version: number;
   /** The MetaMedium that wrote it (`VERSION`), when the writer knew. */
   app?: string;
+  /**
+   * How many pictures sit beside this log, in a board bundle (PLAN-IPAD-NOTES I4: a zip holding the log and
+   * `assets/<hash>.<ext>`). The assets are never in the log — the `import` events name them — so this is
+   * what a reader may say about a file whose pictures it was not given. A header without it is as it was.
+   */
+  assets?: number;
 }
 
 export interface LogWriteOptions {
   /** `VERSION` of the app writing, for whoever reads the file later. Left out where a file is generated and drift-checked. */
   app?: string;
+  /** The pictures carried beside the log (a board bundle); left out when there are none. */
+  assets?: number;
 }
 
 export function logHeader(opts: LogWriteOptions = {}): LogHeader {
   const h: LogHeader = { type: 'format', format: LOG_FORMAT, version: LOG_VERSION };
   if (opts.app) h.app = opts.app;
+  if (typeof opts.assets === 'number' && Number.isInteger(opts.assets) && opts.assets > 0) h.assets = opts.assets;
   return h;
 }
 
@@ -94,9 +103,11 @@ export interface DecodedLog {
   /** 0 for a file with no header. */
   version: number;
   app?: string;
+  /** The header's count of pictures carried beside the log, when it says one (read, not trusted: a whole number above nothing). */
+  assets?: number;
 }
 
-function isHeader(v: unknown): v is { format: string; version?: unknown; app?: unknown } {
+function isHeader(v: unknown): v is { format: string; version?: unknown; app?: unknown; assets?: unknown } {
   return !!v && typeof v === 'object' && (v as { format?: unknown }).format === LOG_FORMAT;
 }
 
@@ -110,6 +121,7 @@ export function decodeLog(text: string, opts: { source?: string } = {}): Decoded
   let skipped = 0;
   let version = 0;
   let app: string | undefined;
+  let assets: number | undefined;
   let seen = false;
   for (const line of text.split('\n')) {
     const l = line.trim();
@@ -121,12 +133,18 @@ export function decodeLog(text: string, opts: { source?: string } = {}): Decoded
       const theirApp = typeof v.app === 'string' ? v.app : undefined;
       if (typeof n !== 'number' || !Number.isInteger(n) || n < 1) throw new LogFormatError(null, n, theirApp, opts.source);
       if (n > LOG_VERSION) throw new LogFormatError(n, n, theirApp, opts.source);
-      if (!seen) { version = n; app = theirApp; seen = true; }
+      if (!seen) {
+        version = n; app = theirApp; seen = true;
+        if (typeof v.assets === 'number' && Number.isInteger(v.assets) && v.assets > 0) assets = v.assets;
+      }
       continue;
     }
     events.push(v as SessionEvent);
   }
-  return app === undefined ? { events, skipped, version } : { events, skipped, version, app };
+  const out: DecodedLog = { events, skipped, version };
+  if (app !== undefined) out.app = app;
+  if (assets !== undefined) out.assets = assets;
+  return out;
 }
 
 /**

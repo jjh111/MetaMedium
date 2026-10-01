@@ -118,7 +118,7 @@ test('a zip that was compressed on the way (the Files app deflates what it zips)
   const bytes = zipDeflated(entries);
   const r = await B.zipRead(bytes, { inflate });
   assert.equal(r.ok, true);
-  assert.deepEqual(r.entries.map((e) => dec(e.data).length || 0), entries.map((e) => e.data.length));
+  assert.deepEqual(r.entries.map((e) => e.data.length), entries.map((e) => e.data.length));
   assert.deepEqual(Array.from(r.entries[1].data), Array.from(entries[1].data));
   const none = await B.zipRead(bytes, {});
   assert.equal(none.ok, false);
@@ -214,7 +214,7 @@ test('a picture whose bytes do not match their name is not kept and is said — 
   assert.match(r.damaged[0].why, /fingerprint|match/);
   // …and a picture whose own checksum is off is the same: damaged, left out.
   const flipped = zipBytes([{ name: 'board.jsonl', data: enc('{"type":"x"}\n') }, { name: B.assetEntryName(a.ref, a.mime), data: a.bytes }]);
-  flipped[flipped.indexOf(a.bytes[0], 40)] ^= 0x01;
+  flipped[Buffer.from(flipped).indexOf(Buffer.from('picture a bytes')) + 3] ^= 0x01;
   const r2 = await B.bundleRead(flipped, { digest, inflate });
   assert.equal(r2.ok, true);
   assert.equal(r2.assets.length, 0);
@@ -227,7 +227,7 @@ test('a bundle with no log, with a damaged log, or that is no zip at all is refu
   assert.equal(noLog.ok, false);
   assert.match(noLog.words, /board\.jsonl/);
   const flipped = zipBytes([{ name: 'board.jsonl', data: enc('{"type":"x"}\n{"type":"y"}\n') }]);
-  flipped[flipped.indexOf(0x78, 30)] ^= 0x01;
+  flipped[Buffer.from(flipped).indexOf(Buffer.from('"x"')) + 1] ^= 0x01;
   const bad = await B.bundleRead(flipped, { digest, inflate });
   assert.equal(bad.ok, false);
   assert.match(bad.words, /board\.jsonl|log/);
