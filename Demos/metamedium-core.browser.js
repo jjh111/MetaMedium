@@ -10165,6 +10165,16 @@ var MetaMediumCore = (() => {
   var SAME = 0.999;
   var SHAPE_WEIGHT = 0.6;
   var LINK_WEIGHT = 0.4;
+  function mayMatchBySize(n2, m) {
+    if (n2 <= 0 || m <= 0) return false;
+    const least = (MATCH_FLOOR - LINK_WEIGHT) / SHAPE_WEIGHT;
+    return Math.min(n2, m) / Math.max(n2, m) >= least - 1e-9;
+  }
+  function shapeCount(sig2) {
+    let n2 = 0;
+    for (const k in sig2.shapes) n2 += sig2.shapes[k];
+    return n2;
+  }
   function structuralSignature(ids, nodes, typeOf) {
     const members = new Set(ids);
     const shapes = {};
@@ -10838,6 +10848,7 @@ var MetaMediumCore = (() => {
     let contentIds = [];
     let artifacts = [];
     let clusterCandidates = [];
+    let candidatesStale = false;
     let participants = [];
     let explanations = [];
     let live = [];
@@ -10903,6 +10914,7 @@ var MetaMediumCore = (() => {
         unsettled: new Set(d.unsettled),
         definitionsSeen: new Map(d.definitionsSeen),
         definitionsChanged: d.definitionsChanged,
+        definitionSizes: d.definitionSizes,
         holding: new Set([...d.holding].map(cp)),
         holdingInOrder: d.holdingInOrder.map(cp),
         holdingMoved: d.holdingMoved,
@@ -10911,6 +10923,7 @@ var MetaMediumCore = (() => {
     }
     const nodeCopy = (n2) => ({ ...n2, reps: n2.reps.slice(), edges: n2.edges.slice() });
     function snapshot() {
+      settledCandidates();
       const copied = /* @__PURE__ */ new Map();
       for (const [id, n2] of nodes) copied.set(id, nodeCopy(n2));
       return {
@@ -10941,6 +10954,7 @@ var MetaMediumCore = (() => {
           unsettled,
           definitionsSeen,
           definitionsChanged,
+          definitionSizes,
           holding: holding2,
           holdingInOrder,
           holdingMoved,
@@ -10954,6 +10968,7 @@ var MetaMediumCore = (() => {
       contentIds = s.contentIds.slice();
       artifacts = s.artifacts.slice();
       clusterCandidates = s.clusterCandidates.slice();
+      candidatesStale = false;
       participants = s.participants.slice();
       explanations = s.explanations.slice();
       live = s.live.slice();
@@ -10981,6 +10996,7 @@ var MetaMediumCore = (() => {
       unsettled = d.unsettled;
       definitionsSeen = d.definitionsSeen;
       definitionsChanged = d.definitionsChanged;
+      definitionSizes = d.definitionSizes;
       holding2 = d.holding;
       holdingInOrder = d.holdingInOrder;
       holdingMoved = d.holdingMoved;
@@ -11019,6 +11035,7 @@ var MetaMediumCore = (() => {
     let unsettled = /* @__PURE__ */ new Set();
     let definitionsSeen = /* @__PURE__ */ new Map();
     let definitionsChanged = true;
+    let definitionSizes = [];
     let holding2 = /* @__PURE__ */ new Set();
     let holdingInOrder = [];
     let holdingMoved = false;
@@ -11035,6 +11052,7 @@ var MetaMediumCore = (() => {
       unsettled = /* @__PURE__ */ new Set();
       definitionsSeen = /* @__PURE__ */ new Map();
       definitionsChanged = true;
+      definitionSizes = [];
       holding2 = /* @__PURE__ */ new Set();
       holdingInOrder = [];
       holdingMoved = false;
@@ -11067,6 +11085,7 @@ var MetaMediumCore = (() => {
       contentIds = [];
       artifacts = [];
       clusterCandidates = [];
+      candidatesStale = false;
       participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
       explanations = [];
       live = [];
@@ -11127,9 +11146,14 @@ var MetaMediumCore = (() => {
       return out.sort(byScoreOwnFirst);
     }
     function recomputeClusterCandidates() {
+      candidatesStale = true;
+    }
+    function settledCandidates() {
+      if (!candidatesStale) return clusterCandidates;
+      candidatesStale = false;
       if (artifacts.length === 0 && library.length === 0 || contentIds.length === 0) {
         clusterCandidates = [];
-        return;
+        return clusterCandidates;
       }
       refreshDefinitions();
       settle();
@@ -11138,6 +11162,7 @@ var MetaMediumCore = (() => {
         holdingMoved = false;
       }
       clusterCandidates = holdingInOrder.map((c) => c.candidate);
+      return clusterCandidates;
     }
     function contentPush(id) {
       contentIds.push(id);
@@ -11201,10 +11226,30 @@ var MetaMediumCore = (() => {
         if (o === id || !withinReach(b, reach.boundsOf(o))) continue;
         mine.add(o);
         linked.get(o).add(id);
-        unsettle(o);
       }
       linked.set(id, mine);
+      if (joinsBigGroup(id, mine)) return;
+      for (const o of mine) unsettle(o);
       unsettle(id);
+    }
+    function joinsBigGroup(id, mine) {
+      if (mine.size === 0 || definitionsChanged) return false;
+      let group2;
+      for (const o of mine) {
+        const c = componentOf.get(o);
+        if (!c || c.retired || group2 && c !== group2) return false;
+        group2 = c;
+      }
+      if (!group2 || !group2.strokeIds || group2.ordered || group2.signature || group2.scores.size) return false;
+      const isArtifact = artifacts.includes(id);
+      const n2 = group2.strokeIds.length + (isArtifact ? 0 : 1);
+      if (definitionSizes.some((m) => mayMatchBySize(n2, m))) return false;
+      if (definitionSizes.some((m) => m >= group2.strokeIds.length)) return false;
+      group2.members = [...group2.members, id];
+      if (!isArtifact) group2.strokeIds = [...group2.strokeIds, id];
+      if (order2.get(id) < order2.get(group2.first)) group2.first = id;
+      componentOf.set(id, group2);
+      return true;
     }
     function unfileContent(id) {
       const mine = linked.get(id);
@@ -11261,8 +11306,7 @@ var MetaMediumCore = (() => {
       for (const c of fresh) {
         if (c.strokeIds) {
           matchable.add(c);
-          c.signature = signatureOf(c.strokeIds);
-          for (const aid of defs) scoreAgainst(c, aid);
+          if (signedComponent(c)) for (const aid of defs) scoreAgainst(c, aid);
         }
         assemble(c);
       }
@@ -11280,12 +11324,24 @@ var MetaMediumCore = (() => {
           stack.push(o);
         }
       }
-      const members = walkFrom(first);
-      const strokeIds = members.filter((id) => !artifacts.includes(id));
+      const own = artifacts.length ? new Set(artifacts) : null;
+      const strokesOf2 = (ids) => {
+        const out = [];
+        for (const id of ids) if (!own || !own.has(id)) out.push(id);
+        return out;
+      };
+      let members = [...seen];
+      let strokeIds = strokesOf2(members);
+      const ordered2 = definitionSizes.some((m) => mayMatchBySize(strokeIds.length, m));
+      if (ordered2) {
+        members = walkFrom(first);
+        strokeIds = strokesOf2(members);
+      }
       const c = {
         first,
         members,
         strokeIds: strokeIds.length >= 2 ? strokeIds : null,
+        ordered: ordered2,
         signature: null,
         scores: /* @__PURE__ */ new Map(),
         candidate: null,
@@ -11312,13 +11368,28 @@ var MetaMediumCore = (() => {
       const code = [...a.reps].reverse().find((r) => r.modality === "code")?.data;
       return { signature: getRep(a, "signature"), examples: getRep(a, "examples"), text: code?.kind === "text" };
     }
+    function signedComponent(c) {
+      if (c.signature) return c.signature;
+      if (!c.strokeIds) return null;
+      const n2 = c.strokeIds.length;
+      if (!definitionSizes.some((m) => mayMatchBySize(n2, m))) return null;
+      if (!c.ordered) {
+        c.members = walkFrom(c.first);
+        c.strokeIds = c.members.filter((id) => !artifacts.includes(id));
+        c.ordered = true;
+      }
+      c.signature = signatureOf(c.strokeIds);
+      return c.signature;
+    }
     function scoreAgainst(c, aid) {
       c.scores.delete(aid);
       const k = definitionsSeen.get(aid) ?? definitionKeyOf(aid);
       if (k.text) return;
       const aSig = k.signature?.data;
       if (!aSig) return;
-      const m = matchDefinition(c.signature, aSig, k.examples?.data);
+      const signature2 = signedComponent(c);
+      if (!signature2) return;
+      const m = matchDefinition(signature2, aSig, k.examples?.data);
       if (m.vetoed || m.score < MATCH_FLOOR) return;
       c.scores.set(aid, { score: m.score, reasoning: m.reasoning });
     }
@@ -11335,6 +11406,14 @@ var MetaMediumCore = (() => {
       const gone = [...definitionsSeen.keys()].filter((aid) => !now.has(aid));
       definitionsSeen = now;
       if (changed2.length === 0 && gone.length === 0) return;
+      const sizes = /* @__PURE__ */ new Set();
+      for (const k of now.values()) {
+        if (k.text) continue;
+        const sig2 = k.signature?.data;
+        if (sig2) sizes.add(shapeCount(sig2));
+        for (const x of k.examples?.data?.accepted ?? []) sizes.add(shapeCount(x));
+      }
+      definitionSizes = [...sizes];
       for (const c of matchable) {
         for (const aid of gone) c.scores.delete(aid);
         for (const aid of changed2) scoreAgainst(c, aid);
@@ -13104,7 +13183,7 @@ var MetaMediumCore = (() => {
         summon: reader.summon ? { ...reader.summon, enclosedIds: [...reader.summon.enclosedIds] } : null,
         // A group's candidate is kept while the group stands, so what is handed
         // out is a copy all the way down to its lists.
-        clusterCandidates: clusterCandidates.map((c) => ({ ...c, nodeIds: c.nodeIds.slice(), matches: c.matches.slice() })),
+        clusterCandidates: settledCandidates().map((c) => ({ ...c, nodeIds: c.nodeIds.slice(), matches: c.matches.slice() })),
         artifacts: [...artifacts],
         participants: [...participants],
         explanations: [...explanations],
