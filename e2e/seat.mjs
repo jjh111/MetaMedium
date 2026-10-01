@@ -299,7 +299,7 @@ export async function runSeat(browser, servers, { freshContext, screenshot }) {
       let listed = '';
       await until(async () => { listed = textOf(await hand.call('canvas_pending', {})); return !!k1 && listed.includes(k1); }, 5000);
       check(`J4.2. What is this? on two boxes parks one brief about them — "${(now.status || '').slice(0, 90)}" — shown working beside them; the watcher prints one line; canvas_pending lists it by the brief's own id, with what was asked, the two marks and the contract`,
-        took && parked && !!k1 && now.pending[0].ask === 'what' && now.pending[0].about.join() === ids.join() && now.working.some((w) => w.startsWith('read:' + seatId))
+        took && parked && !!k1 && now.pending[0].ask === 'what' && now.pending[0].about.join() === ids.join() && now.working.some((w) => w.startsWith('read:') && w.endsWith(':' + ids.join('+')))
           && heard && watch.lines.length === 1 && watch.lines[0].includes(k1) && /what is this/.test(watch.lines[0])
           && keysIn(listed)[0] === k1 && /what is this/.test(listed) && listed.includes(boxA) && listed.includes(boxB) && /Reply with ONLY a JSON array/.test(listed),
         { took, parked, now, watch: watch.lines, listed: listed.slice(0, 700) });
