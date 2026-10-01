@@ -40,6 +40,16 @@ with no events does no work; and a newcomer's hello brings each log once —
 6.5 MB to it in a room of six, not 32.6 MB. The "after R4d" columns of the
 two room tables, and of the budgets' table, say the rest (hotspot 3).*
 
+*After I2 (1 October 2026, on `unit/i2-speed`): pictures traced into ink beside
+artifacts. A board with any artifact on it settled its groups against the
+definitions at every stroke, and the strokes of one photograph traced are one
+connected group of thousands, gathered, walked and signed again whole each time:
+2,000 traced strokes beside one SVG took 82 s to apply and 86 s to replay, 5,000
+beside ten artifacts 266 s and 258 s, and the browser took 96 s to open them. They
+apply in 0.7 s and replay in 0.45 s (5,000: 1.2 s and 0.8 s), and the browser opens
+the board in 1.6–2.1 s. The section "After I2" below has the numbers, the commands
+and what is still the surface's.*
+
 ---
 
 ## The answer
@@ -612,6 +622,94 @@ Two notes on the table:
   is the next step if a real window needs it.
 - The replay budget and the open budget are not the same machine: Chromium
   replayed the 2,000 board in 100 s where Node took 167 s.
+
+---
+
+## After I2 — pictures traced into ink beside artifacts (1 October 2026)
+
+*PLAN-IPAD-NOTES §1 item 4, `V1-PLAN.md` §9 (The iPad), I2. A probe on `/app/`
+with real pictures found: with one SVG on the board, an `import` of 250, 500,
+1,000 and 2,000 traced strokes took 0.42, 1.5, 5.9 and 27.6 s (0.16–0.43 s with no
+artifact); one 12 MP camera photo (3,923 traced strokes) beside one SVG took 125 s
+to import and 120 s to open; 50 photographed sketches (~5,000 marks) took 134 s to
+open. Read, then profiled.*
+
+**The profile** (`node --cpu-prof` on a core session — one SVG, then an import of
+1,000 traced strokes, then a replay of that log — read back with
+`bench/profile.mjs`): `structuralSignature` (`signature.ts:68`) 63% of the time
+by itself, the collector 9%, then `signatureOf`, `byOrder`, `gather` and
+`walkFrom` (`session.ts`): all of it `settle`, run by `recomputeClusterCandidates`
+once per stroke of the import, on the one group the picture's strokes make — a
+group of n marks gathered, walked in `clusters`' order and signed again for each of
+the n strokes, an artifact on the board to make the candidates run at all
+(`recomputeClusterCandidates` returns early only with no artifact and no pack).
+Quadratic in the picture, and in a replay the same, since the import is the one
+event. After the first fix a second profile: a stroke drawn on the picture's ink
+still gathered and walked the whole group (`gather` 47% of that profile, `walkFrom`
+36%); and holding a picture's group read a scope of a thousand strokes, 5.3 s for
+the notations (`readEnd`, `heads.ts:504`, 29% self: every connector's end walked
+the whole content plane) and 2.3 s for `session.read` (`roles.ts`, every mark
+filtering every relation).
+
+**The fixes** (`CLAUDE.md`, *Relations and concepts*, has the rules): the groups
+are settled when something reads them, not at every change (`settledCandidates`);
+a group is signed and walked in order only when a definition could match it by
+size (`mayMatchBySize`, `signedComponent`); a mark that lands in a group too big
+for every definition joins it where it stands (`joinsBigGroup`); a scope is read
+through tables made once (`roles.ts`) and the content plane filed once for a
+reading (`withBoardIndex`, `heads.ts`). Nothing reads differently
+(`bench/equivalence.mjs --ref=f503e04`).
+
+| Board (this container, 4 cores, Node 22) | Apply | Replay (warm) | A stroke on the picture's ink | Before: apply · replay · stroke |
+|---|---|---|---|---|
+| 1 SVG + 1 picture of 1,000 traced strokes | 0.33 s | 0.18 s | 0.49 ms | 8.3 s · 6.8 s · 23 ms |
+| 1 SVG + 1 picture of 2,000 | 0.72 s | 0.45 s | 0.83 ms | **81.5 s · 85.7 s** · 155 ms |
+| 5 SVGs + 5 pictures of 1,000 (5,000 strokes, 10 artifacts) | 1.17 s | 0.82 s | 1.4 ms | **266 s · 258 s** · 154 ms |
+| 50 pictures of 110 (5,500 strokes, 50 artifacts) | 1.07 s | 0.52 s | 1.2 ms | 46.8 s · 45.7 s · 31 ms |
+| the probe's own photo, 3,923 strokes beside an SVG (scratch data, not in the repo) | 1.3 s | 1.2 s (load 6) | 1.4 ms | 125 s · 120 s (the probe, in a browser) |
+
+A held group of 1,000 strokes (`bench/scope.mjs`): `session.read` 2.3 s → 0.37 s,
+`notationsOf` 5.3 s → 1.2 s. In the browser (Chromium, the gate's viewport; a board
+of 3 pictures of 1,667 traced strokes and 2 SVGs, opened as a folder): **95.8 s,
+one task of 95 s → 1.6–2.1 s**; 50 pictures of 110 (5,500 strokes, 50 artifacts)
+1.9 s. The generated boards R4b holds replay no slower — 829 and 856 ms before,
+555 and 721 ms after, the same machine in the same minutes — and take a stroke in
+the same time. (This container is not the machine the budgets were set on: its
+calibration is 59 ms against 41, and the R4b test's 0.5 s replay budget fails on
+it with the old engine as it does with the new.)
+
+**Budgets** (`bench/budgets.test.mjs`, `node --test`, this machine's; red first,
+`6433deb`): an import of 2,000 traced strokes beside an SVG applies in ≤ 4 ms a
+stroke on average (R4b's) and replays in ≤ 0.25 ms a mark (R4b's rate: 0.5 s at
+2,000), a stroke drawn on its ink takes ≤ 4 ms median and ≤ 16 ms at p95; 5
+pictures of 1,000 beside 5 SVGs the same, replay ≤ 1.25 s. They failed at 48 ms a
+stroke, 91 s, 137 ms (the first board) and pass at 0.31 ms, 0.43 s, 0.7 ms and
+0.22 ms, 0.79 s, 1.5 ms. The gate's `budgets` scenario holds the board of five
+artifacts and 5,000 traced strokes opening whole and within PERF.md's 3 s at that
+size (`e2e/run.mjs`, skipped by name on a machine too loaded to measure, like the
+rest).
+
+**What is still the surface's.** On that board a pan frame costs 150–180 ms and a
+release 190–440 ms, where the 2,000-mark board met its frame: the paint itself
+is 22 ms of JavaScript, and the rest is the browser rasterising some five thousand
+overlapping fragments, each its own `stroke()` (the profile's `(program)` is 73%
+of a pan; headless Chromium paints on the CPU, so an iPad's GPU may well differ — to
+measure on the iPad, not here). Drawing the strokes of one colour as one path, or
+a picture's traced ink as the picture it came from, would take it; it is
+`08-render.js`'s, not this unit's. And what the engine still does for a held group
+is a second or so a thousand strokes (`notationsOf`), flat in the profile now.
+
+```
+node --expose-gc metamedium-core/bench/imports.mjs --pictures=1 --strokes=2000 --svgs=1      # apply, replay, a stroke on the ink
+node --expose-gc metamedium-core/bench/imports.mjs --pictures=5 --strokes=1000 --svgs=5
+node --expose-gc metamedium-core/bench/imports.mjs --pictures=50 --strokes=110 --svgs=0
+MM_CORE_BUNDLE=<git show f503e04:Demos/metamedium-core.node.mjs> node --expose-gc metamedium-core/bench/imports.mjs --core=bundle …   # the engine before I2
+node metamedium-core/bench/scope.mjs --strokes=1000                                          # a held group's read
+node --test metamedium-core/bench/budgets.test.mjs                                          # the budgets, R4b's and I2's
+node metamedium-core/bench/equivalence.mjs --ref=f503e04                                     # nothing reads differently
+node e2e/run.mjs budgets                                                                     # the gate's record of the board opening
+node --cpu-prof --cpu-prof-dir=metamedium-core/dist/bench/prof …; node metamedium-core/bench/profile.mjs <file>.cpuprofile   # the profile
+```
 
 ---
 

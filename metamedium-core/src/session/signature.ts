@@ -60,6 +60,32 @@ const SHAPE_WEIGHT = 0.6;
 const LINK_WEIGHT = 0.4;
 
 /**
+ * Whether a group of `n` marks can be as like a signature of `m` marks as the
+ * floor asks, judged by their sizes alone (V1-PLAN I2). The score is at most
+ * `SHAPE_WEIGHT` of the shapes' likeness plus all of `LINK_WEIGHT`, so the
+ * floor needs the shapes at least `(MATCH_FLOOR − LINK_WEIGHT) / SHAPE_WEIGHT`
+ * alike, and two bags of `n` and `m` shapes share at most the lesser of the two
+ * and span at least the greater: a group more than that much larger (or smaller)
+ * than a definition is not it, and no signature of it need be read to say so.
+ * The same bound, nearer one, is also what a correction's veto asks (it needs
+ * `SAME`), so a group out of reach of a definition by size is out of reach of
+ * everything the definition has been taught. Never says no to a group that could
+ * match: the edge is taken a hair wide.
+ */
+export function mayMatchBySize(n: number, m: number): boolean {
+  if (n <= 0 || m <= 0) return false;
+  const least = (MATCH_FLOOR - LINK_WEIGHT) / SHAPE_WEIGHT;
+  return Math.min(n, m) / Math.max(n, m) >= least - 1e-9;
+}
+
+/** How many marks a signature stands for: its shapes' counts. */
+export function shapeCount(sig: StructuralSignature): number {
+  let n = 0;
+  for (const k in sig.shapes) n += sig.shapes[k];
+  return n;
+}
+
+/**
  * The signature of a group, read from the node graph. `typeOf` says what each
  * member reads as (its top interpretation), and the links are the engaging
  * edges between members — the same held relations the palette and the diagram

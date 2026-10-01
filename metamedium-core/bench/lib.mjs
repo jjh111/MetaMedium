@@ -36,7 +36,9 @@ const NODE_BANNER = '/* metamedium-core node bundle — built from metamedium-co
 export async function loadCore(which = 'bundle', { patch = [], tag = '' } = {}) {
   if (which === 'bundle') {
     if (patch.length) throw new Error('patches apply to the source build only');
-    return { core: await import(pathToFileURL(BUNDLE_PATH).href), path: BUNDLE_PATH, which };
+    // `MM_CORE_BUNDLE`: another Node bundle as "the committed one" — an older engine, `git show <ref>:Demos/metamedium-core.node.mjs` (I2's before columns).
+    const at = process.env.MM_CORE_BUNDLE ? resolve(process.env.MM_CORE_BUNDLE) : BUNDLE_PATH;
+    return { core: await import(pathToFileURL(at).href), path: at, which };
   }
   if (which !== 'source') throw new Error(`unknown core "${which}" — bundle or source`);
   const { build } = await import('esbuild');

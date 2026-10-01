@@ -570,3 +570,30 @@ export function handPrint(text: string, x: number, baseline: number, options: Pr
   }
   return { strokes, letters, end: pen };
 }
+
+/**
+ * What `trace` leaves of a photograph, without the photograph (V1-PLAN I2):
+ * `count` short fragments — a point every 1.4 px, a median of about nine points
+ * — that run into one another, so the strokes of one picture are one connected
+ * group. The same walk as `tracedStrokes` in bench/board.mjs, which the budgets
+ * measure with (a bench is plain JS and cannot import this).
+ */
+export function tracedFragments(seed: number, count: number, box: { minX: number; minY: number; maxX: number; maxY: number }): Point[][] {
+  const rand = rng(seed);
+  const w = box.maxX - box.minX, h = box.maxY - box.minY;
+  const out: Point[][] = [];
+  for (let i = 0; i < count; i++) {
+    const n = Math.max(2, Math.min(200, 1 + Math.round(Math.exp(rand() * 4.3))));
+    let x = box.minX + rand() * w, y = box.minY + rand() * h;
+    let heading = rand() * Math.PI * 2;
+    const points: Point[] = [];
+    for (let k = 0; k < n; k++) {
+      points.push({ x: +x.toFixed(3), y: +y.toFixed(3) });
+      heading += (rand() - 0.5) * 0.5;
+      x = Math.min(box.maxX, Math.max(box.minX, x + Math.cos(heading) * 1.4));
+      y = Math.min(box.maxY, Math.max(box.minY, y + Math.sin(heading) * 1.4));
+    }
+    out.push(points);
+  }
+  return out;
+}

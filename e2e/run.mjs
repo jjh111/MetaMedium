@@ -11,7 +11,7 @@
 //     node e2e/run.mjs boards                 # several named boards: the list, the trash, the switch
 //     node e2e/run.mjs big                    # a 2,000-mark board saved and opened again (minutes)
 //     node e2e/run.mjs app                    # one app address: /app/ installs, opens offline, is versioned per release
-//     node e2e/run.mjs budgets                # the surface's budgets on 2,000 marks; the 500-mark board painted both ways
+//     node e2e/run.mjs budgets                # the surface's budgets on 2,000 marks; the 500-mark board painted both ways; a board of 5 artifacts and 5,000 traced strokes opened (I2)
 //     node e2e/run.mjs pencil                 # pencil and tablet: pen, finger, palm, hover, the keyboard (also --browser webkit)
 //     node e2e/run.mjs models                 # a hosted model is asked, and says why when it cannot be — against a stub provider
 //     node e2e/run.mjs seat                   # the canvas's seat: Claude Code over MCP as a model the field asks (a relay and the hand of its own)
@@ -377,6 +377,9 @@ async function runKeepScenario(browser, servers, engineName, which = 'keep') {
   return out;
 }
 
+/** PERF.md's open budget at 5,000 marks, 3 s, as a rate: what a board of traced pictures is held to (I2). */
+const OPEN_MS_PER_MARK = 0.6;
+
 /**
  * The surface's budgets and the equivalence check (V1-PLAN.md §9 R4c;
  * `budgets.mjs`). First the 500-mark board of the bench, painted both ways
@@ -386,7 +389,9 @@ async function runKeepScenario(browser, servers, engineName, which = 'keep') {
  * panned and drawn on, each budget a step with its number. A machine too
  * loaded to measure, or much slower than the one the budgets were set on
  * (the calibration, budgets.mjs), says so in each budget's name and skips it
- * — never a silent pass.
+ * — never a silent pass. Last, a board of five artifacts and 5,000 strokes
+ * traced from pictures opened, held to PERF.md's open budget at that size
+ * (V1-PLAN I2).
  */
 async function runBudgets(browser, servers, engineName) {
   const out = { name: 'budgets', url: `${servers.staticOrigin}/Demos/session-engine.html?folder=…` };
@@ -455,6 +460,45 @@ async function runBudgets(browser, servers, engineName) {
       }
       page = null;
       await guards.context.close();
+    }
+
+    // 3. Pictures traced into ink beside artifacts (V1-PLAN I2): 2 SVG figures
+    //    and 3 pictures of 1,667 traced strokes — 5 artifacts, 5,000 marks, the
+    //    strokes of each picture one connected group — opened as a folder. It
+    //    took 96 s (one task of 95 s) before the groups were settled once an
+    //    event instead of once a stroke; the budget is PERF.md's for 5,000
+    //    marks, 3 s (`OPEN_MS_PER_MARK`).
+    {
+      const { importedBoard } = await import('../metamedium-core/bench/board.mjs');
+      const label = 'I2 budget, 5 artifacts and 5,000 traced strokes — open: navigation → the board drawn';
+      if (engineName !== 'chromium') check(`${label} — skipped: the budgets were set in Chromium`, true, { why: 'the budgets were set in Chromium' });
+      else if (tooLoaded(NaN)) check(`${label} — skipped: ${tooLoaded(NaN)}`, true, { why: tooLoaded(NaN) });
+      else {
+        const made = importedBoard(core, { pictures: 3, strokesEach: 1667, svgs: 2 });
+        const board = { marks: made.marks, events: made.events.length, json: JSON.stringify(made.events), jsonl: core.encodeLog(made.events) };
+        const guards = await freshContext(browser, { origins: [servers.staticOrigin], label: 'budgets-pictures' });
+        guardsList.push(guards);
+        await serveBoard(guards.context, servers.staticOrigin, board);
+        const opened = await openBoard(guards.context, servers.staticOrigin, { capMs: 5 * 60000 });
+        page = opened.page;
+        if (!page) check(`${label}: the board did not open — ${opened.out.why}`, false, opened.out);
+        else {
+          const calibration = await page.evaluate(calibrateInPage);
+          const why = tooLoaded(calibration);
+          const st = opened.out.state;
+          // Every traced stroke is a mark of its own on the board (small ones gather into words on the content plane, so count the ink).
+          const ink = await page.evaluate(() => { let n = 0; for (const node of window.__mm.session.getState().nodes.values()) if (node.reps.some((r) => r.modality === 'stroke')) n++; return n; });
+          check(`I2. the board of pictures opens whole: ${st.artifacts} artifacts and ${ink} traced strokes`,
+            st.artifacts === 5 && ink === made.marks, { state: st, ink, expected: { artifacts: 5, strokes: made.marks } });
+          const max = OPEN_MS_PER_MARK * made.marks;
+          measured.picturesOpenMs = +opened.out.drawnMs.toFixed(0);
+          if (why) check(`${label} — skipped: ${why}`, true, { why, drawnMs: opened.out.drawnMs, calibrationMs: +calibration.toFixed(1) });
+          else check(`${label}: ${fmt(opened.out.drawnMs)} ${opened.out.drawnMs <= max ? '≤' : '>'} ${fmt(max)} (${OPEN_MS_PER_MARK} ms a mark)`, opened.out.drawnMs <= max,
+            { drawnMs: opened.out.drawnMs, max, longestTaskMs: opened.out.longestTaskMs, marks: made.marks, calibrationMs: +calibration.toFixed(1) });
+        }
+        page = null;
+        await guards.context.close();
+      }
     }
   } catch (err) {
     out.harnessError = String(err && err.stack ? err.stack : err);

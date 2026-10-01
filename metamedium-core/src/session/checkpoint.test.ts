@@ -52,15 +52,29 @@ describe('checkpoints', () => {
     s.undo();
     const fromCheckpoint = performance.now() - t0;
     expect(s.getState().contentIds.length).toBe(before - 1);
-    // The same log with no checkpoints, from zero, for the comparison.
-    const fresh = createSession();
+    // The same log with no checkpoints, from zero, for the comparison — the
+    // best of three, as is the undo's below, so a machine busy for one of
+    // them does not decide it (wall clocks on a loaded runner wobble).
     const log = JSON.parse(JSON.stringify(s.getEvents()));
-    const t1 = performance.now();
-    fresh.load(log);
-    const fromZero = performance.now() - t1;
+    let fromZero = Infinity;
+    for (let k = 0; k < 3; k++) {
+      const fresh = createSession();
+      const t1 = performance.now();
+      fresh.load(JSON.parse(JSON.stringify(log)));
+      fromZero = Math.min(fromZero, performance.now() - t1);
+    }
+    let undoBest = fromCheckpoint;
+    for (let k = 0; k < 2; k++) {
+      const again = createSession();
+      again.load(JSON.parse(JSON.stringify(log)));
+      again.addStroke(lineStroke({ x: 0, y: 5000 }, { x: 400, y: 5003 }), (t += 100));
+      const t2 = performance.now();
+      again.undo();
+      undoBest = Math.min(undoBest, performance.now() - t2);
+    }
     // 20 events from the checkpoint against 420 from zero; the snapshot's
     // clone and the later strokes' longer relation passes eat some of the gap.
-    expect(fromCheckpoint).toBeLessThan(fromZero / 2);
+    expect(undoBest).toBeLessThan(fromZero / 2);
   }, SLOW);
 
   it('a checkpoint past a cut is never used', () => {

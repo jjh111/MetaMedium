@@ -91,7 +91,7 @@ function manipulationOf(ev: Extract<SessionEvent, { type: 'move' | 'scale' | 'ro
   return { type: 'rotate', about: ev.about, radians: ev.radians };
 }
 import { FIGURE_MEET_SHARE, LETTER_TINY_PX, WORD_WINDOW_MS, endsPairUp, isLetterLike, joinsRun, longAgainst, wordConfidence, xHeightOf } from './words';
-import { type StructuralSignature, type Examples, structuralSignature, matchDefinition, addExample, MATCH_FLOOR } from './signature';
+import { type StructuralSignature, type Examples, structuralSignature, matchDefinition, addExample, MATCH_FLOOR, mayMatchBySize, shapeCount } from './signature';
 import type { Kind } from '../kinds/kinds';
 import { isPictureKind, isAssetRef } from '../kinds/picture';
 import type { Behaviour } from '../behave/verbs';
@@ -940,6 +940,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let contentIds: string[] = [];
   let artifacts: string[] = [];
   let clusterCandidates: ClusterCandidate[] = [];
+  /** Whether a change has been made since the candidates were last settled (`settledCandidates`). */
+  let candidatesStale = false;
   let participants: string[] = [];
   let explanations: string[] = [];
   let live: string[] = [];
@@ -1052,7 +1054,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     order: Map<string, number>; nextOrder: number; inContent: Set<string>;
     reach: MarkGrid; ink: MarkGrid; linked: Map<string, Set<string>>;
     componentOf: Map<string, Component>; matchable: Set<Component>; unsettled: Set<string>;
-    definitionsSeen: Map<string, DefinitionKey>; definitionsChanged: boolean;
+    definitionsSeen: Map<string, DefinitionKey>; definitionsChanged: boolean; definitionSizes: number[];
     holding: Set<Component>; holdingInOrder: Component[]; holdingMoved: boolean;
     boundBy: Map<string, Set<string>>;
   }
@@ -1092,7 +1094,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       order: new Map(d.order), nextOrder: d.nextOrder, inContent: new Set(d.inContent),
       reach: reachCopy, ink: inkCopy, linked: linkedCopy,
       componentOf: componentOfCopy, matchable: new Set([...d.matchable].map(cp)), unsettled: new Set(d.unsettled),
-      definitionsSeen: new Map(d.definitionsSeen), definitionsChanged: d.definitionsChanged,
+      definitionsSeen: new Map(d.definitionsSeen), definitionsChanged: d.definitionsChanged, definitionSizes: d.definitionSizes,
       holding: new Set([...d.holding].map(cp)), holdingInOrder: d.holdingInOrder.map(cp), holdingMoved: d.holdingMoved,
       boundBy: boundByCopy,
     };
@@ -1102,6 +1104,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   const nodeCopy = (n: MMNode): MMNode => ({ ...n, reps: n.reps.slice(), edges: n.edges.slice() });
 
   function snapshot(): Snapshot {
+    settledCandidates();
     const copied = new Map<string, MMNode>();
     for (const [id, n] of nodes) copied.set(id, nodeCopy(n));
     return {
@@ -1112,7 +1115,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       packs: packs.slice(), library: library.slice(), packNotices: packNotices.slice(),
       derived: copyDerived({
         order, nextOrder, inContent, reach, ink, linked, componentOf, matchable, unsettled,
-        definitionsSeen, definitionsChanged, holding, holdingInOrder, holdingMoved, boundBy,
+        definitionsSeen, definitionsChanged, definitionSizes, holding, holdingInOrder, holdingMoved, boundBy,
       }),
     };
   }
@@ -1120,7 +1123,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     nodes = new Map();
     for (const [id, n] of s.nodes) nodes.set(id, nodeCopy(n));
     contentIds = s.contentIds.slice(); artifacts = s.artifacts.slice();
-    clusterCandidates = s.clusterCandidates.slice(); participants = s.participants.slice();
+    clusterCandidates = s.clusterCandidates.slice(); candidatesStale = false; participants = s.participants.slice();
     explanations = s.explanations.slice(); live = s.live.slice(); gestures = structuredClone(s.gestures);
     markHands = new Map(s.markHands);
     lastAt = s.lastAt; counter = s.counter; clocks = { ...(s.clocks ?? {}) };
@@ -1133,7 +1136,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     order = d.order; nextOrder = d.nextOrder; inContent = d.inContent;
     reach.copyFrom(s.derived.reach); ink.copyFrom(s.derived.ink); linked = d.linked;
     componentOf = d.componentOf; matchable = d.matchable; unsettled = d.unsettled;
-    definitionsSeen = d.definitionsSeen; definitionsChanged = d.definitionsChanged;
+    definitionsSeen = d.definitionsSeen; definitionsChanged = d.definitionsChanged; definitionSizes = d.definitionSizes;
     holding = d.holding; holdingInOrder = d.holdingInOrder; holdingMoved = d.holdingMoved;
     boundBy = d.boundBy;
   }
@@ -1201,10 +1204,11 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   interface Component {
     /** The member earliest on the content plane — where `clusters` begins its walk. */
     first: string;
-    /** Every member, in the order `clusters` walks them. */
+    /** Every member; in the order `clusters` walks them once `ordered` (a group too big to match anything is not walked in order until a definition it could match is made). */
     members: string[];
-    /** The members that are not artifacts, when there are two or more: what a candidate names. */
+    /** The members that are not artifacts, when there are two or more: what a candidate names. In `members`' order. */
     strokeIds: string[] | null;
+    ordered: boolean;
     signature: StructuralSignature | null;
     /** How it scores against each definition it matches (not vetoed, at or above the floor). */
     scores: Map<string, { score: number; reasoning: string }>;
@@ -1220,6 +1224,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   interface DefinitionKey { signature: Rep | undefined; examples: Rep | undefined; text: boolean }
   let definitionsSeen = new Map<string, DefinitionKey>();
   let definitionsChanged = true;
+  /** How many marks each thing a group is matched against stands for (`mayMatchBySize`), distinct and in no order. */
+  let definitionSizes: number[] = [];
   let holding = new Set<Component>();
   let holdingInOrder: Component[] = [];
   let holdingMoved = false;
@@ -1238,6 +1244,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     unsettled = new Set();
     definitionsSeen = new Map();
     definitionsChanged = true;
+    definitionSizes = [];
     holding = new Set();
     holdingInOrder = [];
     holdingMoved = false;
@@ -1275,6 +1282,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     contentIds = [];
     artifacts = [];
     clusterCandidates = [];
+    candidatesStale = false;
     participants = [LOCAL_PARTICIPANT, TIER0_PARTICIPANT];
     explanations = [];
     live = [];
@@ -1414,9 +1422,27 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
    * definition is scored against every component, and nothing else is.
    */
   function recomputeClusterCandidates() {
+    candidatesStale = true;
+  }
+
+  /**
+   * The candidates, settled when something reads them, not at every change
+   * (V1-PLAN I2). What an event changes it files at once (`fileContent`,
+   * `unsettle`: the links, and the components that must be found again), but
+   * the finding of a component and the reading of it against the definitions
+   * wait for whoever asks — `getState`, a checkpoint — so an event that makes
+   * a thousand marks (an import of a traced picture) settles once, not once a
+   * mark: a component that grows by one mark at a time was gathered and
+   * signed again whole each time, and one picture's strokes are one component.
+   * The answer is a function of the board as it stands when it is asked, as it
+   * was when it was found at every change.
+   */
+  function settledCandidates(): ClusterCandidate[] {
+    if (!candidatesStale) return clusterCandidates;
+    candidatesStale = false;
     if ((artifacts.length === 0 && library.length === 0) || contentIds.length === 0) {
       clusterCandidates = [];
-      return;
+      return clusterCandidates;
     }
     refreshDefinitions();
     settle();
@@ -1425,6 +1451,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       holdingMoved = false;
     }
     clusterCandidates = holdingInOrder.map((c) => c.candidate!);
+    return clusterCandidates;
   }
 
   // ===== The content plane, kept filed (R4b) =====
@@ -1509,10 +1536,46 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       if (o === id || !withinReach(b, reach.boundsOf(o)!)) continue;
       mine.add(o);
       linked.get(o)!.add(id);
-      unsettle(o);
     }
     linked.set(id, mine);
+    if (joinsBigGroup(id, mine)) return;
+    for (const o of mine) unsettle(o);
     unsettle(id);
+  }
+
+  /**
+   * A mark that lands in a group too big for any definition (V1-PLAN I2) joins
+   * it where it stands, instead of the group being taken apart and found again
+   * whole: the marks of one photograph traced into ink are one group of
+   * thousands, and each stroke drawn on it used to gather them all again and
+   * walk them in `clusters`' order, for a group that matches nothing. Only when
+   * every mark the new one is within reach of is in that one group and the group
+   * is still unsigned, unscored and unwalked (it matched nothing when it was
+   * found), would still be too big for every definition with this mark in it,
+   * and no definition is waiting to be read (`refreshDefinitions` would size it
+   * again). The group is replaced by one with the mark in it — its lists new
+   * arrays, since a checkpoint holds the old ones — and `first` is where the
+   * order says. Everything else takes the way it always did.
+   */
+  function joinsBigGroup(id: string, mine: ReadonlySet<string>): boolean {
+    if (mine.size === 0 || definitionsChanged) return false;
+    let group: Component | undefined;
+    for (const o of mine) {
+      const c = componentOf.get(o);
+      if (!c || c.retired || (group && c !== group)) return false;
+      group = c;
+    }
+    if (!group || !group.strokeIds || group.ordered || group.signature || group.scores.size) return false;
+    const isArtifact = artifacts.includes(id);
+    const n = group.strokeIds.length + (isArtifact ? 0 : 1);
+    if (definitionSizes.some((m) => mayMatchBySize(n, m))) return false;
+    // Too big now and, being only bigger, for good unless a definition changes — which sizes it again.
+    if (definitionSizes.some((m) => m >= group!.strokeIds!.length)) return false;
+    group.members = [...group.members, id];
+    if (!isArtifact) group.strokeIds = [...group.strokeIds, id];
+    if (order.get(id)! < order.get(group.first)!) group.first = id;
+    componentOf.set(id, group);
+    return true;
   }
 
   function unfileContent(id: string) {
@@ -1579,8 +1642,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     for (const c of fresh) {
       if (c.strokeIds) {
         matchable.add(c);
-        c.signature = signatureOf(c.strokeIds);
-        for (const aid of defs) scoreAgainst(c, aid);
+        if (signedComponent(c)) for (const aid of defs) scoreAgainst(c, aid);
       }
       assemble(c);
     }
@@ -1600,13 +1662,28 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         stack.push(o);
       }
     }
-    const members = walkFrom(first);
     // Don't offer an artifact as a match for itself.
-    const strokeIds = members.filter((id) => !artifacts.includes(id));
+    const own = artifacts.length ? new Set(artifacts) : null;
+    const strokesOf = (ids: Iterable<string>) => {
+      const out: string[] = [];
+      for (const id of ids) if (!own || !own.has(id)) out.push(id);
+      return out;
+    };
+    // The walk in `clusters`' order sorts every mark's links, and a group of
+    // thousands is gathered again whole each time a mark joins it: it is made
+    // only when a candidate could be named from it (`mayMatchBySize`).
+    let members = [...seen];
+    let strokeIds = strokesOf(members);
+    const ordered = definitionSizes.some((m) => mayMatchBySize(strokeIds.length, m));
+    if (ordered) {
+      members = walkFrom(first);
+      strokeIds = strokesOf(members);
+    }
     const c: Component = {
       first,
       members,
       strokeIds: strokeIds.length >= 2 ? strokeIds : null,
+      ordered,
       signature: null,
       scores: new Map(),
       candidate: null,
@@ -1643,6 +1720,31 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     return { signature: getRep(a, 'signature'), examples: getRep(a, 'examples'), text: code?.kind === 'text' };
   }
 
+  /**
+   * A component's signature, read when it can matter (V1-PLAN I2): reading one
+   * walks every link of the group, and a photograph's strokes are one group of
+   * thousands that each new stroke made read again whole. A group is signed
+   * only when some definition, or an example one was taught, stands for a
+   * number of marks it could be like (`mayMatchBySize`); otherwise it matches
+   * none and says so with no scores, as reading it would have. Signed later if
+   * a definition that could match it is made — and read then from the marks as
+   * they stand, which is what they stood as, since a change to a member's
+   * readings or links unsettles its component.
+   */
+  function signedComponent(c: Component): StructuralSignature | null {
+    if (c.signature) return c.signature;
+    if (!c.strokeIds) return null;
+    const n = c.strokeIds.length;
+    if (!definitionSizes.some((m) => mayMatchBySize(n, m))) return null;
+    if (!c.ordered) {
+      c.members = walkFrom(c.first);
+      c.strokeIds = c.members.filter((id) => !artifacts.includes(id));
+      c.ordered = true;
+    }
+    c.signature = signatureOf(c.strokeIds);
+    return c.signature;
+  }
+
   /** `matchesFor`'s test, for one component against one definition. */
   function scoreAgainst(c: Component, aid: string) {
     c.scores.delete(aid);
@@ -1651,7 +1753,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     if (k.text) return;
     const aSig = k.signature?.data as StructuralSignature | undefined;
     if (!aSig) return;
-    const m = matchDefinition(c.signature!, aSig, k.examples?.data as Examples | undefined);
+    const signature = signedComponent(c);
+    if (!signature) return;
+    const m = matchDefinition(signature, aSig, k.examples?.data as Examples | undefined);
     if (m.vetoed || m.score < MATCH_FLOOR) return;
     c.scores.set(aid, { score: m.score, reasoning: m.reasoning });
   }
@@ -1670,6 +1774,15 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     const gone = [...definitionsSeen.keys()].filter((aid) => !now.has(aid));
     definitionsSeen = now;
     if (changed.length === 0 && gone.length === 0) return;
+    // What a group could be like, by size: each definition's, and each example it was taught.
+    const sizes = new Set<number>();
+    for (const k of now.values()) {
+      if (k.text) continue;
+      const sig = k.signature?.data as StructuralSignature | undefined;
+      if (sig) sizes.add(shapeCount(sig));
+      for (const x of (k.examples?.data as Examples | undefined)?.accepted ?? []) sizes.add(shapeCount(x));
+    }
+    definitionSizes = [...sizes];
     for (const c of matchable) {
       for (const aid of gone) c.scores.delete(aid);
       for (const aid of changed) scoreAgainst(c, aid);
@@ -4256,7 +4369,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       summon: reader.summon ? { ...reader.summon, enclosedIds: [...reader.summon.enclosedIds] } : null,
       // A group's candidate is kept while the group stands, so what is handed
       // out is a copy all the way down to its lists.
-      clusterCandidates: clusterCandidates.map((c) => ({ ...c, nodeIds: c.nodeIds.slice(), matches: c.matches.slice() })),
+      clusterCandidates: settledCandidates().map((c) => ({ ...c, nodeIds: c.nodeIds.slice(), matches: c.matches.slice() })),
       artifacts: [...artifacts],
       participants: [...participants],
       explanations: [...explanations],

@@ -37,6 +37,7 @@ import type { SessionState } from '../session/session';
 import type { NotationPort, NotationPorts } from '../session/ports';
 import { knowPorts, registerPorts } from '../session/ports';
 import type { HeadKind } from '../diagram/heads';
+import { withBoardIndex } from '../diagram/heads';
 import type { Role } from '../diagram/roles';
 import { ROLES } from '../diagram/roles';
 import { FLOWCHART } from './flowchart';
@@ -279,17 +280,20 @@ export function notationsOf(state: SessionState, scopeIds?: readonly string[]): 
   const scope = scopeIds ? [...new Set(scopeIds)].filter((id) => state.nodes.has(id)) : boardScope(state);
   if (!scope.length) return [];
   const out: NotationReading[] = [];
-  for (const n of registry.values()) {
-    let r: NotationReading | null;
-    try {
-      r = n.read(state, scope);
-    } catch {
-      continue;
+  // The plane filed once for every notation's reading of the heads in the scope (V1-PLAN I2).
+  withBoardIndex(state, () => {
+    for (const n of registry.values()) {
+      let r: NotationReading | null;
+      try {
+        r = n.read(state, scope);
+      } catch {
+        continue;
+      }
+      if (!r || !(r.confidence > 0) || r.confidence > 1) continue;
+      if (Object.values(r.roles).some((role) => !ROLES.includes(role))) continue;
+      out.push(r);
     }
-    if (!r || !(r.confidence > 0) || r.confidence > 1) continue;
-    if (Object.values(r.roles).some((role) => !ROLES.includes(role))) continue;
-    out.push(r);
-  }
+  });
   return out.sort((a, b) => b.confidence - a.confidence);
 }
 

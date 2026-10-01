@@ -2987,6 +2987,53 @@ each with its regression. **V3** — the whitepaper's v1 figures (week 1's
 U6): the molecule in 3D, a flowchart's round trip, the pattern; only what
 the demos show. **V4** — v1.0.0 (§11).
 
+### The iPad (`PLAN-IPAD-NOTES.md`, 1 October 2026)
+**I2** — many marks stay fast: a board with an artifact on it, and a picture's
+thousands of traced strokes beside it, opens and takes a stroke as the 2,000-mark
+board does.
+*Status, 1 Oct 2026 (branch `unit/i2-speed`):* **I2 built.** Red `6433deb` (two
+boards in `bench/budgets.test.mjs`: 2,000 traced strokes beside an SVG applied at
+48 ms a stroke and replayed in 91 s), the fix `57dc380`, the scopes `d7eacac`, the
+gate's record `a719b72`. **Profiled first** (`node --cpu-prof`, `bench/profile.mjs`):
+63% in `structuralSignature` (`signature.ts:68`) — `settle`, run by
+`recomputeClusterCandidates` once per stroke of an import, on the one group a
+picture's strokes make, gathered, walked and signed again whole each time once any
+artifact stood on the board; quadratic in the picture, and in a replay the same,
+since an import is one event. **Fixed at the root, all derived:** the candidates are
+settled when something reads them (`settledCandidates`: `getState`, a checkpoint),
+so an event that makes a thousand marks settles once; a group is signed and walked
+in order only when a definition could match it by size (`mayMatchBySize`,
+`signedComponent`); a mark that lands in a group too big for every definition joins
+it where it stands (`joinsBigGroup`); and a held scope of thousands is read through
+tables made once (`roles.ts`) and the plane filed once (`withBoardIndex`,
+`heads.ts`) — profile two and three found a stroke on the ink gathering the group
+whole (138 ms) and a held picture's notations taking 5.3 s. **Numbers**
+(`PERF.md`, *After I2*): 2,000 traced strokes beside an SVG 81.5 s apply and 85.7 s
+replay → 0.72 s and 0.45 s, a stroke on the ink 155 → 0.8 ms; 5,000 beside ten
+artifacts 266 s and 258 s → 1.2 s and 0.8 s; the probe's own 3,923-stroke photo
+125 s / 120 s → 1.3 s / 1.2 s; a held group of 1,000 strokes read in 0.4 s and 1.2 s
+(was 2.3 s and 5.3 s); the browser opens 3 pictures of 1,667 and two SVGs in 1.6–2.1 s
+(was 95.8 s). `bench/equivalence.mjs --ref=f503e04`: nothing reads differently.
+**Tests:** `src/session/settle.test.ts` 10 (the kept groups equal the walk of the
+whole board through a tangle, a stroke on it, a definition as big as it, a
+correction, an undo, a group growing through a definition's size, a group taught as an
+example, and a replay settled at every 1, 3, 7 and 200 events and once; four
+mutations of the new code each fail it) and `src/diagram/index.test.ts` 5 (heads and
+notations filed or walked, roles against the walk, a head with its fill apart), core
+2,484 in all; `bench/budgets.test.mjs` two boards (apply ≤ 4 ms a stroke, replay ≤ 0.25
+ms a mark, a stroke on the ink ≤ 4 / 16 ms); the gate's `budgets` scenario two
+records (the pictures board opens whole; its open ≤ 3 s, skipped by name when the
+machine is loaded). **Found for other owners:** (1) the surface paints that board at
+150–180 ms a pan frame and 190–440 ms a release — 22 ms of JavaScript and the rest the
+browser rasterising some five thousand fragments each its own `stroke()` (headless, on
+the CPU; an iPad's GPU is unmeasured): `08-render.js`'s to batch strokes of a colour
+into one path or draw a picture's ink as the picture; (2) a traced picture is one
+group of thousands and *Press and hold* on it holds them all — a hold of a group that
+size could say so and offer *Trace into ink* away rather than read it (I1's offer);
+(3) `bench/budgets.test.mjs`'s R4b test (replay ≤ 0.5 s) fails on this 4-core container
+with the old engine and the new alike (829–856 ms and 555–721 ms): the budgets are an
+M2 Max's, as PERF.md says; the I2 boards pass here.
+
 ## 10. How the agents run
 
 `DIRECTOR-PLAN-W2.md` §6 is the protocol, with four additions learned since:
