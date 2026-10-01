@@ -19,9 +19,9 @@ const standIn = (s: Session, code: string, kind: 'mermaid' | 'text' = 'mermaid',
   s.import({ kind, path, bounds: { minX: 0, minY: 0, maxX: 320, maxY: 240 }, code, at: 1000 })!;
 
 describe('the Draw it tool', () => {
-  it('is a built-in, registered after the exporter, then routing', () => {
+  it('is a built-in, registered after the exporter, then routing, then Which is it?', () => {
     const ids = BUILTIN_TOOLS.map((t) => t.id);
-    expect(ids.slice(-3)).toEqual(['mermaid', 'mermaid-draw', 'route']);
+    expect(ids.slice(-4)).toEqual(['mermaid', 'mermaid-draw', 'route', 'which']);
     expect(getTool('mermaid-draw')).toBe(MERMAID_DRAW);
     expect(MERMAID_DRAW.describe().length).toBeGreaterThan(20);
   });

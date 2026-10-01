@@ -46,6 +46,11 @@ export interface ToolHost {
   snap: 'offer' | 'auto' | 'off';
   /** The models joined here, by name; `sees` when one can read writing. */
   models: { name: string; sees: boolean }[];
+  /**
+   * The decision model seated here, if one is (V1-PLAN I7): its name in words. Absent or null, nobody
+   * is in the decider seat and *Which is it?* is not offered.
+   */
+  decider?: { name: string } | null;
   /** Whether a mark's writing has been read — a transcript held, or read with its line (runtime). */
   isRead(id: string): boolean;
   /** Whether a text made from writing is flipped over to show its ink (runtime). */

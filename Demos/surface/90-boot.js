@@ -15,6 +15,8 @@
     inkImage: inkImage, readOne: readOne, readWriting: readWriting, askModelsAbout: askModelsAbout,
     // A hosted model asked, and why when it cannot be (V1-PLAN J5), for tests: the ask kept for a model, and each model's last call.
     keptAsk: () => (keptAsk ? { what: keptAsk.what, needs: keptAsk.needs } : null),
+    // Seats per job (V1-PLAN I7), for tests: who holds each seat, which provider's key is held (never the key), who is asked to read and to write.
+    seats: () => seatsNow(),
     lastCalls: () => agents.map((a) => ({ id: a.id, model: a.config.model, line: callLine(lastCall.get(a.id)) })),
     // Device preferences and the chrome, for tests: the theme, the hand, auto-read, the field's reader, the clip.
     themeMode: () => themeMode, setThemeMode: setThemeMode, hand: () => hand, setHand: setHand,

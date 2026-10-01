@@ -25327,6 +25327,327 @@ function modelFacts(id, catalog, where, remembered) {
   return { ok: true, facts };
 }
 
+// src/participants/decide.ts
+var NO_MATCH = "no-match";
+var DECIDER_TAKE_AT = 0.99;
+var FLAT_MARGIN = 0.05;
+function choice(id, ask, candidates, about) {
+  const has2 = candidates.some((c) => c.id === NO_MATCH);
+  return {
+    kind: "choice",
+    id,
+    ask,
+    about,
+    candidates: has2 ? candidates : [...candidates, { id: NO_MATCH, text: "none of these" }]
+  };
+}
+function score(id, ask, levels, about) {
+  return { kind: "score", id, ask, levels, about };
+}
+function noul(id, statement, about) {
+  return { kind: "noul", id, ask: statement, statement, about };
+}
+var p2 = (p) => p.toFixed(2);
+function ranked(answer) {
+  if (answer.kind === "noul") {
+    return [
+      { of: "yes", p: answer.yes },
+      { of: "no", p: 1 - answer.yes }
+    ];
+  }
+  return [...answer.distribution].sort((a, b) => b.p - a.p);
+}
+function isFlat(answer, margin = FLAT_MARGIN) {
+  if (answer.kind === "noul") {
+    const d = Math.abs(answer.yes - 0.5);
+    return {
+      flat: d < margin,
+      why: `yes ${p2(answer.yes)} \u2014 ${p2(d)} from an even chance`
+    };
+  }
+  const order2 = ranked(answer);
+  if (order2.length === 0) return { flat: true, why: "no distribution came back" };
+  if (order2.length === 1) return { flat: false, why: `only one outcome: ${order2[0].of} ${p2(order2[0].p)}` };
+  const lead = order2[0].p - order2[1].p;
+  return {
+    flat: lead < margin,
+    why: `${order2[0].of} ${p2(order2[0].p)} leads ${order2[1].of} ${p2(order2[1].p)} by ${p2(lead)}`
+  };
+}
+function reasonOf(question, answer) {
+  const dist12 = ranked(answer).map((d) => `${d.of} ${p2(d.p)}`).join(" \xB7 ");
+  if (answer.kind === "noul") return `asked \u201C${question.ask}\u201D \u2014 ${dist12}`;
+  if (answer.kind === "score") {
+    const levels = answer.levels.join(" < ");
+    return `asked \u201C${question.ask}\u201D (score over ${levels}) \u2014 ${dist12}; expectation ${answer.expectation.toFixed(2)}, confidence ${p2(answer.confidence)}`;
+  }
+  const offered2 = question.candidates.map((c) => c.id).join(", ");
+  return `asked \u201C${question.ask}\u201D (choice among ${offered2}) \u2014 ${dist12}; confidence ${p2(answer.confidence)}`;
+}
+function levelOf2(answer) {
+  const i = Math.max(0, Math.min(answer.levels.length - 1, Math.round(answer.expectation)));
+  return answer.levels[i] ?? "";
+}
+function leadOf(answer) {
+  return ranked(answer)[0]?.p ?? 0;
+}
+function createDecideParticipant(session, transport, at = 0, options = {}) {
+  const name = options.name ?? "decide";
+  const tier = options.tier ?? 1.5;
+  const margin = options.flatMargin ?? FLAT_MARGIN;
+  const takeAt = options.takeAt ?? 0;
+  const id = session.join("agent", name, at, tier, options.locality ?? "local");
+  async function ask(questions, now, signal) {
+    const snapshot = session.getState().generation;
+    const started = Date.now();
+    let result2;
+    try {
+      result2 = await transport(questions, { signal });
+    } catch (e) {
+      return {
+        ok: false,
+        error: e instanceof Error ? e.message : String(e),
+        rows: [],
+        unanswered: questions.map((q) => q.id),
+        snapshot,
+        ms: Date.now() - started
+      };
+    }
+    const ms = Date.now() - started;
+    if (!result2.ok) {
+      return { ok: false, error: result2.error, rows: [], unanswered: questions.map((q) => q.id), snapshot, ms };
+    }
+    const byId = new Map(result2.answers.map((a) => [a.questionId, a]));
+    const rows = [];
+    const unanswered = [];
+    for (const q of questions) {
+      const answer = byId.get(q.id);
+      if (!answer) {
+        unanswered.push(q.id);
+        continue;
+      }
+      if (answer.kind !== q.kind) {
+        unanswered.push(q.id);
+        continue;
+      }
+      const { flat, why } = isFlat(answer, margin);
+      const below = !flat && takeAt > 0 && leadOf(answer) < takeAt;
+      rows.push({ question: q, answer, flat, flatWhy: why, reason: reasonOf(q, answer), held: false, ...below ? { below: true } : {} });
+    }
+    const state = session.getState();
+    if (state.generation !== snapshot) {
+      return {
+        ok: true,
+        rows,
+        unanswered,
+        snapshot,
+        ms,
+        via: result2.via,
+        refused: `the board was replaced while the seat was answering (generation ${snapshot} \u2192 ${state.generation})`
+      };
+    }
+    for (const row of rows) {
+      if (row.flat) continue;
+      if (row.below) continue;
+      const targets = (row.question.about ?? []).filter((n2) => state.nodes.has(n2));
+      if (!targets.length) continue;
+      const edges = [];
+      if (row.answer.kind === "choice" && row.answer.pick && row.answer.pick !== NO_MATCH) {
+        edges.push({
+          to: `type:${row.answer.pick.toLowerCase().replace(/\s+/g, "-")}`,
+          rel: "resembles",
+          weight: leadOf(row.answer),
+          reasoning: row.reason
+        });
+      }
+      const rep = {
+        modality: "decision",
+        data: { question: row.question, answer: row.answer, snapshot },
+        confidence: leadOf(row.answer),
+        reasoning: row.reason
+      };
+      session.propose({
+        participantId: id,
+        nodeId: targets[0],
+        edges,
+        reps: [rep],
+        at: now,
+        expect: { generation: snapshot }
+      });
+      const stale = session.getState().staleResult;
+      row.held = !stale;
+      if (stale) {
+        return { ok: true, rows, unanswered, snapshot, ms, via: result2.via, refused: stale.detail };
+      }
+    }
+    return { ok: true, rows, unanswered, snapshot, ms, via: result2.via };
+  }
+  return { id, name, tier, ask };
+}
+var even = (outcomes) => outcomes.map((of) => ({ of, p: outcomes.length ? 1 / outcomes.length : 0 }));
+function spread(outcomes, lead, p) {
+  const rest = outcomes.filter((o) => o !== lead);
+  const each = rest.length ? Math.max(0, 1 - p) / rest.length : 0;
+  return outcomes.map((of) => ({ of, p: of === lead ? p : each }));
+}
+var expectationOf = (levels, dist12) => dist12.reduce((n2, d) => n2 + levels.indexOf(d.of) * d.p, 0);
+function createStubDecideTransport(book, options = {}) {
+  const unscripted = options.unscripted ?? "flat";
+  return async (questions) => {
+    const answers = [];
+    for (const q of questions) {
+      const told = book[q.id];
+      if (!told && unscripted === "unanswered") continue;
+      const entry = told ?? { flat: true };
+      if (q.kind === "noul") {
+        const yes = "yes" in entry ? entry.yes : 0.5;
+        answers.push({ kind: "noul", questionId: q.id, yes });
+        continue;
+      }
+      if (q.kind === "score") {
+        const dist13 = "level" in entry ? spread(q.levels, entry.level, entry.p) : even(q.levels);
+        answers.push({
+          kind: "score",
+          questionId: q.id,
+          levels: q.levels,
+          distribution: dist13,
+          expectation: expectationOf(q.levels, dist13),
+          confidence: "confidence" in entry && entry.confidence !== void 0 ? entry.confidence : "level" in entry ? entry.p : 0
+        });
+        continue;
+      }
+      const ids = q.candidates.map((c) => c.id);
+      const dist12 = "pick" in entry && ids.includes(entry.pick) ? spread(ids, entry.pick, entry.p) : even(ids);
+      const order2 = [...dist12].sort((a, b) => b.p - a.p);
+      const lead = order2.length > 1 && order2[0].p - order2[1].p < FLAT_MARGIN ? null : order2[0]?.of ?? null;
+      answers.push({
+        kind: "choice",
+        questionId: q.id,
+        pick: lead,
+        distribution: dist12,
+        confidence: "confidence" in entry && entry.confidence !== void 0 ? entry.confidence : "pick" in entry ? entry.p : 0
+      });
+    }
+    return { ok: true, answers, via: options.via ?? "stub" };
+  };
+}
+
+// src/llm/decide-openrouter.ts
+var DEFAULT_DECIDER_MODEL = "typesafe/jev-1.13";
+function wireQuestion(q) {
+  if (q.kind === "choice") {
+    const options = q.candidates.map((c) => ({ id: c.id, text: c.text }));
+    if (!options.some((o) => o.id === NO_MATCH)) options.push({ id: NO_MATCH, text: "none of these" });
+    return { id: q.id, kind: q.kind, ask: q.ask, options };
+  }
+  if (q.kind === "score") return { id: q.id, kind: q.kind, ask: q.ask, options: q.levels.map((l) => ({ id: l, text: l })) };
+  return { id: q.id, kind: q.kind, ask: q.statement, options: [{ id: "yes", text: "yes" }, { id: "no", text: "no" }] };
+}
+var SYSTEM = [
+  "You are a decision seat for a drawing canvas. You are not a writer: you write no prose, no code, no geometry and no names you were not offered.",
+  "You are given questions. Each has options. For each question, say how likely each option is: a probability for EVERY option of that question, summing to 1.",
+  'One option of a choice is always "no-match" \u2014 none of these. Choose it when none of the others is right; a seat that must pick will pick wrongly.',
+  "Reply with JSON only, in exactly this shape, and nothing around it:",
+  '{"answers":[{"id":"<the question id>","probabilities":{"<option id>":<0 to 1>, ...}}]}'
+].join("\n");
+var CHAT_DECIDE_WIRE = {
+  id: "chat",
+  build(questions) {
+    return [
+      { role: "system", content: SYSTEM },
+      { role: "user", content: JSON.stringify({ questions: questions.map(wireQuestion) }) }
+    ];
+  },
+  parse(text, questions) {
+    const body = jsonOf2(text);
+    if (body === void 0) return { ok: false, error: `the decision model\u2019s reply could not be read \u2014 no JSON in \u201C${clip2(text)}\u201D` };
+    const list5 = Array.isArray(body?.answers) ? body.answers : Array.isArray(body) ? body : null;
+    if (!list5) return { ok: false, error: `the decision model\u2019s reply could not be read \u2014 no \u201Canswers\u201D in \u201C${clip2(text)}\u201D` };
+    const asked = new Map(questions.map((q) => [q.id, q]));
+    const answers = [];
+    for (const raw of list5) {
+      const id = raw?.id;
+      const q = typeof id === "string" ? asked.get(id) : void 0;
+      if (!q || answers.some((a) => a.questionId === q.id)) continue;
+      const dist12 = distributionOf(wireQuestion(q), raw?.probabilities);
+      if (!dist12) continue;
+      answers.push(answerOf(q, dist12));
+    }
+    return { ok: true, answers };
+  }
+};
+function distributionOf(wq, raw) {
+  const given = /* @__PURE__ */ new Map();
+  if (Array.isArray(raw)) {
+    for (const e of raw) {
+      const k = e?.of ?? e?.id;
+      const p = e?.p;
+      if (typeof k !== "string" || typeof p !== "number") return null;
+      given.set(k, p);
+    }
+  } else if (raw && typeof raw === "object") {
+    for (const [k, p] of Object.entries(raw)) {
+      if (typeof p !== "number") return null;
+      given.set(k, p);
+    }
+  } else return null;
+  const known2 = new Set(wq.options.map((o) => o.id));
+  for (const [k, p] of given) if (!known2.has(k) || !Number.isFinite(p) || p < 0) return null;
+  const sum = [...given.values()].reduce((n2, p) => n2 + p, 0);
+  if (!(sum > 0)) return null;
+  return wq.options.map((o) => ({ of: o.id, p: (given.get(o.id) ?? 0) / sum }));
+}
+function answerOf(q, dist12) {
+  const order2 = [...dist12].sort((a, b) => b.p - a.p);
+  const confidence = order2[0]?.p ?? 0;
+  if (q.kind === "noul") return { kind: "noul", questionId: q.id, yes: dist12.find((d) => d.of === "yes")?.p ?? 0 };
+  if (q.kind === "score") {
+    return {
+      kind: "score",
+      questionId: q.id,
+      levels: q.levels,
+      distribution: dist12,
+      expectation: dist12.reduce((n2, d) => n2 + q.levels.indexOf(d.of) * d.p, 0),
+      confidence
+    };
+  }
+  const pick3 = order2.length > 1 && order2[0].p - order2[1].p < FLAT_MARGIN ? null : order2[0]?.of ?? null;
+  return { kind: "choice", questionId: q.id, pick: pick3, distribution: dist12, confidence };
+}
+function jsonOf2(text) {
+  const t = String(text ?? "").trim();
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(t);
+  const candidates = [fenced ? fenced[1] : t, t];
+  for (const c of candidates) {
+    const start = c.search(/[{[]/);
+    if (start < 0) continue;
+    const close = c[start] === "{" ? "}" : "]";
+    const end = c.lastIndexOf(close);
+    if (end <= start) continue;
+    try {
+      return JSON.parse(c.slice(start, end + 1));
+    } catch {
+    }
+  }
+  return void 0;
+}
+var clip2 = (t) => {
+  const s = String(t ?? "").replace(/\s+/g, " ").trim();
+  return s.length > 80 ? s.slice(0, 79) + "\u2026" : s;
+};
+function createChatDecideTransport(config, options = {}) {
+  const send = options.complete ?? complete;
+  const wire = options.wire ?? CHAT_DECIDE_WIRE;
+  return async (questions, { signal }) => {
+    if (!questions.length) return { ok: true, answers: [], via: config.model };
+    const res = await send(config, wire.build(questions), { signal });
+    if (!res.ok) return { ok: false, error: res.error };
+    const read2 = wire.parse(res.text, questions);
+    if (!read2.ok) return { ok: false, error: read2.error };
+    return { ok: true, answers: read2.answers, via: config.model };
+  };
+}
+
 // src/parse/plan.ts
 function connectionsOf(artifact, state, regions) {
   const byNode = new Map(regions.map((r) => [r.nodeId, r.id]));
@@ -26617,7 +26938,7 @@ function standing(scope, text) {
     return !!rep && rep.data.kind === "mermaid" && rep.data.code === text;
   });
 }
-var reasonOf = (reading7) => `${describeNotation(reading7)} \u2014 as Mermaid text beside it; the drawing stays`;
+var reasonOf2 = (reading7) => `${describeNotation(reading7)} \u2014 as Mermaid text beside it; the drawing stays`;
 var MERMAID = {
   id: "mermaid",
   name: "Mermaid",
@@ -26630,7 +26951,7 @@ var MERMAID = {
     return [{
       key: "mermaid",
       label: "Make it Mermaid",
-      reason: reasonOf(m.reading),
+      reason: reasonOf2(m.reading),
       base: 0.35,
       tool: "mermaid",
       verbs: ["mermaid", "mmd", "as mermaid"],
@@ -26705,7 +27026,7 @@ function diagramOf(state, ids) {
   }
   return null;
 }
-var reasonOf2 = (reading7) => `${describeNotation(reading7)} \u2014 connectors at right angles between their ports; your ink stays faint beneath`;
+var reasonOf3 = (reading7) => `${describeNotation(reading7)} \u2014 connectors at right angles between their ports; your ink stays faint beneath`;
 var centreOf8 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
 function tidyDiagram(session, reading7, at) {
   let ranks = 0;
@@ -26745,7 +27066,7 @@ var ROUTE = {
       out.push({
         key: "tidy-diagram",
         label: "Tidy the diagram",
-        reason: reasonOf2(d.reading),
+        reason: reasonOf3(d.reading),
         base: 0.32,
         tool: "route",
         verbs: ["tidy the diagram", "tidy diagram", "tidy up the diagram"],
@@ -26756,7 +27077,7 @@ var ROUTE = {
       out.push({
         key: "route",
         label: "Route the connectors",
-        reason: reasonOf2(d.reading),
+        reason: reasonOf3(d.reading),
         base: 0.28,
         tool: "route",
         verbs: ["route", "orthogonal", "right angles"],
@@ -26788,8 +27109,43 @@ var ROUTE = {
   }
 };
 
+// src/tools/which.ts
+var TIE_MARGIN = 0.05;
+function tiedMatches(matches, margin = TIE_MARGIN) {
+  if (!matches.length) return [];
+  const top = Math.max(...matches.map((m) => m.score));
+  return matches.filter((m) => top - m.score <= margin);
+}
+var WHICH = {
+  id: "which",
+  name: "which is it",
+  describe: () => "when two definitions match a group about equally, ask the decider which \u2014 its answer joins the readings, held, and is taken only when it is sure",
+  asks: "model",
+  offers(scope) {
+    const decider = scope.host.decider;
+    if (!decider || !scope.marks.length) return [];
+    const matches = scope.summon.suggestions.filter((s) => s.kind === "match").map((s) => ({ artifactId: s.artifactId ?? s.id, name: s.label, score: s.score ?? 0, reasoning: s.reasoning ?? "", ...s.pack ? { pack: s.pack } : {} }));
+    const tied = tiedMatches(matches);
+    if (tied.length < 2) return [];
+    const seen = /* @__PURE__ */ new Set();
+    const candidates = tied.filter((m) => !seen.has(m.name) && !!seen.add(m.name)).map((m) => ({ id: m.name, text: m.reasoning ? `${m.name} \u2014 ${m.reasoning}` : m.name }));
+    if (candidates.length < 2) return [];
+    return [{
+      key: "which",
+      label: "Which is it?",
+      reason: `${candidates.map((c) => c.id).join(" and ")} match about equally \u2014 asks ${decider.name} to choose; its answer joins the readings and the engine's ranking stands unless it is sure`,
+      base: 0.7,
+      tool: "which",
+      asks: "model",
+      verbs: ["which", "which is it", "decide"],
+      data: { ids: scope.marks.slice(), candidates }
+    }];
+  },
+  take: () => ({ host: "which" })
+};
+
 // src/tools/builtin.ts
-var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE];
+var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH];
 registerTool(CORRECT);
 registerTool(TEXT);
 registerTool(NAME2);
@@ -26811,6 +27167,7 @@ registerTool(MATHS);
 registerTool(MERMAID);
 registerTool(MERMAID_DRAW);
 registerTool(ROUTE);
+registerTool(WHICH);
 
 // src/context/context.ts
 var CONTEXT_FADE = 2.5;
@@ -28563,207 +28920,6 @@ function createSeatParticipant(session, at = 0, options = {}) {
   };
 }
 
-// src/participants/decide.ts
-var NO_MATCH = "no-match";
-var FLAT_MARGIN = 0.05;
-function choice(id, ask, candidates, about) {
-  const has2 = candidates.some((c) => c.id === NO_MATCH);
-  return {
-    kind: "choice",
-    id,
-    ask,
-    about,
-    candidates: has2 ? candidates : [...candidates, { id: NO_MATCH, text: "none of these" }]
-  };
-}
-function score(id, ask, levels, about) {
-  return { kind: "score", id, ask, levels, about };
-}
-function noul(id, statement, about) {
-  return { kind: "noul", id, ask: statement, statement, about };
-}
-var p2 = (p) => p.toFixed(2);
-function ranked(answer) {
-  if (answer.kind === "noul") {
-    return [
-      { of: "yes", p: answer.yes },
-      { of: "no", p: 1 - answer.yes }
-    ];
-  }
-  return [...answer.distribution].sort((a, b) => b.p - a.p);
-}
-function isFlat(answer, margin = FLAT_MARGIN) {
-  if (answer.kind === "noul") {
-    const d = Math.abs(answer.yes - 0.5);
-    return {
-      flat: d < margin,
-      why: `yes ${p2(answer.yes)} \u2014 ${p2(d)} from an even chance`
-    };
-  }
-  const order2 = ranked(answer);
-  if (order2.length === 0) return { flat: true, why: "no distribution came back" };
-  if (order2.length === 1) return { flat: false, why: `only one outcome: ${order2[0].of} ${p2(order2[0].p)}` };
-  const lead = order2[0].p - order2[1].p;
-  return {
-    flat: lead < margin,
-    why: `${order2[0].of} ${p2(order2[0].p)} leads ${order2[1].of} ${p2(order2[1].p)} by ${p2(lead)}`
-  };
-}
-function reasonOf3(question, answer) {
-  const dist12 = ranked(answer).map((d) => `${d.of} ${p2(d.p)}`).join(" \xB7 ");
-  if (answer.kind === "noul") return `asked \u201C${question.ask}\u201D \u2014 ${dist12}`;
-  if (answer.kind === "score") {
-    const levels = answer.levels.join(" < ");
-    return `asked \u201C${question.ask}\u201D (score over ${levels}) \u2014 ${dist12}; expectation ${answer.expectation.toFixed(2)}, confidence ${p2(answer.confidence)}`;
-  }
-  const offered2 = question.candidates.map((c) => c.id).join(", ");
-  return `asked \u201C${question.ask}\u201D (choice among ${offered2}) \u2014 ${dist12}; confidence ${p2(answer.confidence)}`;
-}
-function levelOf2(answer) {
-  const i = Math.max(0, Math.min(answer.levels.length - 1, Math.round(answer.expectation)));
-  return answer.levels[i] ?? "";
-}
-function leadOf(answer) {
-  return ranked(answer)[0]?.p ?? 0;
-}
-function createDecideParticipant(session, transport, at = 0, options = {}) {
-  const name = options.name ?? "decide";
-  const tier = options.tier ?? 1.5;
-  const margin = options.flatMargin ?? FLAT_MARGIN;
-  const id = session.join("agent", name, at, tier, options.locality ?? "local");
-  async function ask(questions, now, signal) {
-    const snapshot = session.getState().generation;
-    const started = Date.now();
-    let result2;
-    try {
-      result2 = await transport(questions, { signal });
-    } catch (e) {
-      return {
-        ok: false,
-        error: e instanceof Error ? e.message : String(e),
-        rows: [],
-        unanswered: questions.map((q) => q.id),
-        snapshot,
-        ms: Date.now() - started
-      };
-    }
-    const ms = Date.now() - started;
-    if (!result2.ok) {
-      return { ok: false, error: result2.error, rows: [], unanswered: questions.map((q) => q.id), snapshot, ms };
-    }
-    const byId = new Map(result2.answers.map((a) => [a.questionId, a]));
-    const rows = [];
-    const unanswered = [];
-    for (const q of questions) {
-      const answer = byId.get(q.id);
-      if (!answer) {
-        unanswered.push(q.id);
-        continue;
-      }
-      if (answer.kind !== q.kind) {
-        unanswered.push(q.id);
-        continue;
-      }
-      const { flat, why } = isFlat(answer, margin);
-      rows.push({ question: q, answer, flat, flatWhy: why, reason: reasonOf3(q, answer), held: false });
-    }
-    const state = session.getState();
-    if (state.generation !== snapshot) {
-      return {
-        ok: true,
-        rows,
-        unanswered,
-        snapshot,
-        ms,
-        via: result2.via,
-        refused: `the board was replaced while the seat was answering (generation ${snapshot} \u2192 ${state.generation})`
-      };
-    }
-    for (const row of rows) {
-      if (row.flat) continue;
-      const targets = (row.question.about ?? []).filter((n2) => state.nodes.has(n2));
-      if (!targets.length) continue;
-      const edges = [];
-      if (row.answer.kind === "choice" && row.answer.pick && row.answer.pick !== NO_MATCH) {
-        edges.push({
-          to: `type:${row.answer.pick.toLowerCase().replace(/\s+/g, "-")}`,
-          rel: "resembles",
-          weight: leadOf(row.answer),
-          reasoning: row.reason
-        });
-      }
-      const rep = {
-        modality: "decision",
-        data: { question: row.question, answer: row.answer, snapshot },
-        confidence: leadOf(row.answer),
-        reasoning: row.reason
-      };
-      session.propose({
-        participantId: id,
-        nodeId: targets[0],
-        edges,
-        reps: [rep],
-        at: now,
-        expect: { generation: snapshot }
-      });
-      const stale = session.getState().staleResult;
-      row.held = !stale;
-      if (stale) {
-        return { ok: true, rows, unanswered, snapshot, ms, via: result2.via, refused: stale.detail };
-      }
-    }
-    return { ok: true, rows, unanswered, snapshot, ms, via: result2.via };
-  }
-  return { id, name, tier, ask };
-}
-var even = (outcomes) => outcomes.map((of) => ({ of, p: outcomes.length ? 1 / outcomes.length : 0 }));
-function spread(outcomes, lead, p) {
-  const rest = outcomes.filter((o) => o !== lead);
-  const each = rest.length ? Math.max(0, 1 - p) / rest.length : 0;
-  return outcomes.map((of) => ({ of, p: of === lead ? p : each }));
-}
-var expectationOf = (levels, dist12) => dist12.reduce((n2, d) => n2 + levels.indexOf(d.of) * d.p, 0);
-function createStubDecideTransport(book, options = {}) {
-  const unscripted = options.unscripted ?? "flat";
-  return async (questions) => {
-    const answers = [];
-    for (const q of questions) {
-      const told = book[q.id];
-      if (!told && unscripted === "unanswered") continue;
-      const entry = told ?? { flat: true };
-      if (q.kind === "noul") {
-        const yes = "yes" in entry ? entry.yes : 0.5;
-        answers.push({ kind: "noul", questionId: q.id, yes });
-        continue;
-      }
-      if (q.kind === "score") {
-        const dist13 = "level" in entry ? spread(q.levels, entry.level, entry.p) : even(q.levels);
-        answers.push({
-          kind: "score",
-          questionId: q.id,
-          levels: q.levels,
-          distribution: dist13,
-          expectation: expectationOf(q.levels, dist13),
-          confidence: "confidence" in entry && entry.confidence !== void 0 ? entry.confidence : "level" in entry ? entry.p : 0
-        });
-        continue;
-      }
-      const ids = q.candidates.map((c) => c.id);
-      const dist12 = "pick" in entry && ids.includes(entry.pick) ? spread(ids, entry.pick, entry.p) : even(ids);
-      const order2 = [...dist12].sort((a, b) => b.p - a.p);
-      const lead = order2.length > 1 && order2[0].p - order2[1].p < FLAT_MARGIN ? null : order2[0]?.of ?? null;
-      answers.push({
-        kind: "choice",
-        questionId: q.id,
-        pick: lead,
-        distribution: dist12,
-        confidence: "confidence" in entry && entry.confidence !== void 0 ? entry.confidence : "pick" in entry ? entry.p : 0
-      });
-    }
-    return { ok: true, answers, via: options.via ?? "stub" };
-  };
-}
-
 // src/participants/router.ts
 var SETTLED_BY_TIER1 = {
   read: true,
@@ -29666,6 +29822,7 @@ export {
   BUILTIN_CONCEPTS,
   BUILTIN_TOOLS,
   BUILTIN_TYPES,
+  CHAT_DECIDE_WIRE,
   CHIP_OFFSET,
   CLASSLIKE_PENALTY,
   CLASS_DIAGRAM_READER,
@@ -29697,7 +29854,9 @@ export {
   DASH_SPREAD,
   DASH_TOUCH,
   DASH_TOUCH_PX,
+  DECIDER_TAKE_AT,
   DEFAULT_CORNER_OPTIONS,
+  DEFAULT_DECIDER_MODEL,
   DEFAULT_ERASE_CROSSINGS,
   DEFAULT_FILE_LIMIT,
   DEFAULT_GESTURE_CONFIG,
@@ -29892,6 +30051,7 @@ export {
   TARGETED,
   TIER0_PARTICIPANT,
   TIER1_LIBRARY,
+  TIE_MARGIN,
   TO_SCALE_WITHIN,
   TREMOR_OF_SIZE,
   UML_CLASS,
@@ -29993,6 +30153,7 @@ export {
   createAgentParticipant,
   createBootstrapNodes,
   createBridgeParticipant,
+  createChatDecideTransport,
   createDecideParticipant,
   createExplanationNode,
   createParticipantNode,
@@ -30271,7 +30432,7 @@ export {
   readUmlClass,
   readingsFor,
   readingsToEdges,
-  reasonOf3 as reasonOf,
+  reasonOf,
   refusalOf,
   regionAt,
   regionIdsIn,
@@ -30358,6 +30519,7 @@ export {
   theirMarks,
   thin,
   tidyPlanOf,
+  tiedMatches,
   tightBox,
   toBytes,
   toMermaid,
@@ -30386,6 +30548,7 @@ export {
   whereOf,
   whoseInk,
   whyNotResolved,
+  wireQuestion,
   withParams,
   withinReach,
   wordConfidence,

@@ -34,10 +34,10 @@ const artifactsOf = (s: Session) => s.getState().artifacts.map((id) => {
 });
 
 describe('the Mermaid tool', () => {
-  it('is a built-in, registered after the field’s own, so its existing order stands (routing follows it)', () => {
-    expect(BUILTIN_TOOLS[BUILTIN_TOOLS.length - 3]).toBe(MERMAID);
+  it('is a built-in, registered after the field’s own, so its existing order stands (routing and Which is it? follow it)', () => {
+    expect(BUILTIN_TOOLS[BUILTIN_TOOLS.length - 4]).toBe(MERMAID);
     expect(getTool('mermaid')).toBe(MERMAID);
-    expect(registeredTools().map((t) => t.id).indexOf('mermaid')).toBe(BUILTIN_TOOLS.length - 3);
+    expect(registeredTools().map((t) => t.id).indexOf('mermaid')).toBe(BUILTIN_TOOLS.length - 4);
     expect(MERMAID.describe().length).toBeGreaterThan(20);
   });
 

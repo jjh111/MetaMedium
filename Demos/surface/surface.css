@@ -297,6 +297,19 @@ html, body {
 #modelPanel .mpAdvanced[open] summary { margin-bottom: 4px; }
 #modelPanel .mpAdvanced input { margin-top: 6px; }
 #modelPanel .mpRemember input { width: auto; margin: 0; accent-color: var(--gold); }
+/* Seats (V1-PLAN I7): one row a job — who holds it, what its last call came to, what it falls back to; and the form's "for". */
+#modelPanel .mpSeats .seatKeys { text-transform: none; letter-spacing: 0; font-family: var(--mono); font-size: 10px; }
+#modelPanel .seatRow { padding: 5px 0 6px; }
+#modelPanel .seatRow + .seatRow { border-top: 1px solid var(--edge); }
+#modelPanel .seatHead { display: flex; align-items: baseline; gap: 8px; }
+#modelPanel .seatHead b { color: var(--agent); font-weight: 500; font-size: 11.5px; flex: 0 0 auto; }
+#modelPanel .seatJob { color: var(--dim); font-size: 10px; line-height: 1.4; }
+#modelPanel .seatBody { display: flex; gap: 6px; align-items: center; margin-top: 4px; }
+#modelPanel .seatBody select { flex: 1 1 auto; min-width: 0; }
+#modelPanel .seatBody button { flex: 0 0 auto; padding: 1px 7px; font-size: 10px; }
+#modelPanel .seatWho { font-size: 10.5px; color: var(--ink); margin-top: 3px; }
+#modelPanel .seatFallback { font-size: 10px; color: var(--dim); line-height: 1.4; padding: 1px 0; }
+#modelPanel #mpFor { margin-bottom: 6px; }
 
 /* ==========================================================================
    The panel: what the engine holds about the last (or hovered) mark, in rows.

@@ -26,7 +26,7 @@ describe('what the tools say of themselves', () => {
     expect(lines[0]).toMatch(/^corrections — /);
     expect(lines).toContain('clean forms — a confident, unambiguous reading redrawn from the ink\'s own measurements; the ink kept beneath');
     // A filter says a subset: the tools that need no model.
-    expect(describeTools((t) => t.asks === 'model').split('\n').map((l) => l.split(' — ')[0])).toEqual(['reading the writing', 'what is this']);
+    expect(describeTools((t) => t.asks === 'model').split('\n').map((l) => l.split(' — ')[0])).toEqual(['reading the writing', 'what is this', 'which is it']);
   });
 
   it('HERE names the canvas’s own tools — not a model’s — and a tool registered later is named when the next prompt is made', () => {

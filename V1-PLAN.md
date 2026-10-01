@@ -2417,6 +2417,48 @@ scenario refuses and counts any request to `:8020` (J4.8). Owed: the shard's sea
 (`readers()` in `06-handwriting.js`) kept both: the seat reads while it is taken,
 else the smallest joined model that sees.
 
+**I7 status, 1 Oct 2026 (PLAN-IPAD-NOTES §3–§4): built on `unit/i7-seats` — seats per
+job, one key a provider, and the decider's first job** (`87decad` red first: the
+transport's, `which`'s and the seats' rules' tests and e2e M13–M19 against a stub
+that gained the decision model's call shape; `622da4f` core; `75bd710` surface and
+help; the commit carrying this line, docs). **Core:** `llm/decide-openrouter.ts`
+puts a `DecideTransport` over a chat completion — options with *none of these*
+always among them and never a node id, the answer read as a distribution over
+exactly the options offered (an unoffered option, a negative probability or a sum
+of nothing leaves the question unanswered), a `DecideWire` as the seam for the native
+`/v1/systemone` shape; `decide.ts` gains `DECIDER_TAKE_AT` (0.99) and
+`DecideOptions.takeAt` (an answer that leads by less is `below`, returned and never
+held; unset, the seat is as it was); `tools/which.ts` is *Which is it?*, offered when
+two definitions match within `TIE_MARGIN` and a decider is seated (`ToolHost.decider`,
+optional — every other host unchanged). **Surface:** `03-seats.js` (pure, 16 Node
+tests: who reads and who writes by seat with the fallback said, one key a provider,
+the old pick and key becoming the writer seat, choices local before hosted) and
+`04-seatpane.js` (the pane's four seat rows with each last call, the form's *for*,
+keys held once and kept only when asked, the decider joined and asked, what a
+reload brings back); `readers()` and a new `writers()` ask by seat, so *Read the
+writing* goes to the reader alone and briefs, pages, programs, `ask:` and *What is
+this?* to the writer, the Claude Code seat first while seated as J4 had it. **The
+choice about the decider, stated:** it is asked only by the *Which is it?* tap, never
+on a hold or on the field opening — CLAUDE.md's rule is that a model is asked only
+by a deliberate act and opening the field is not one — and the status line says so
+when the decider is seated. Tests: core 2487 (131 files); `node --test` on the surface
+fragments and scripts 159 (17 new for the seats); `node e2e/run.mjs models` **34 records** (19 before: M0–M12
+unchanged but M12, whose assertion on where a key may be moved with the storage
+layout — `mm-model-pick`/`mm-model-key` became `mm-seats`/`mm-model-keys`, the same
+claim — and M13–M19, 15 new: one key serving three seats, routing by seat, the tie
+and the answer at 0.99 and under the floor, the reload, the key across every seat, a
+device that did not remember it, the migration). Four registration-order assertions in
+core move by one because *Which is it?* registers last (route, mermaid, mermaid-draw,
+describe). **Found for others:** a board loaded in place (`session.load`, a board
+switch) takes every participant's `join` with it, so a model joined before it is
+*not in this session* when its answer arrives (`unknown-participant`) — the decider
+is made again where it is not (`makeDeciderSeat`), as the Claude seat is, but
+ordinary models are not (a pre-existing gap J5 did not reach); `typesafe/jev-1.13` and
+what Jev returns on OpenRouter are unverified — the join is validated against
+OpenRouter's own list, which names the nearest ids when the id is wrong. Owed: the
+reader seat's own latency order is by last call only; *semantic* is a row that says
+*coming*; no seat is asked automatically on a tie (by design).
+
 ### Phase 6 — ready for use
 **R1 Boards.** A boards list in browser storage; `?board=`; the existing
 single board becomes the first entry, unchanged. *Red first:* three boards
