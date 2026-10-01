@@ -1666,6 +1666,182 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0); await wait(60);
   }
 
+  // ---- 71. Regions: a named rectangle that holds what stands inside it (PLAN-IPAD-NOTES I5) ----
+  // A big rectangle drawn round three notes and a picture, held with them, is offered Make it a region; taken,
+  // it is a region of its own name, holding what stands inside (derived, never written); its title is a
+  // handle — dragged, everything inside moves in ONE move event and one undo takes it all back; the panel
+  // says what it holds and renames it; the board's outline lists it and a tap fits the view to it.
+  {
+    const cv71 = document.getElementById('canvas');
+    const insp71 = document.getElementById('inspector');
+    // A picture, and what the canvas shows at a world point (as record 69 reads it).
+    const fileOf71 = (name, w, h, rgb) => new Promise((res) => {
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const g = c.getContext('2d'); g.fillStyle = 'rgb(' + rgb.join(',') + ')'; g.fillRect(0, 0, w, h);
+      c.toBlob((b) => res(new File([b], name, { type: 'image/png' })), 'image/png');
+    });
+    const centre71 = (id) => { const b = MM.boundsOf(mm.session.getState().nodes.get(id)); return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 }; };
+    const pixelAt71 = (wx, wy) => {
+      const p = mm.worldToScreen(wx, wy), dpr = window.devicePixelRatio || 1;
+      const d = cv71.getContext('2d').getImageData(Math.round(p.x * dpr) - 2, Math.round(p.y * dpr) - 2, 5, 5).data;
+      let r = 0, g = 0, b = 0, a = 0; const n = d.length / 4;
+      for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; a += d[i + 3]; }
+      return [Math.round(r / n), Math.round(g / n), Math.round(b / n), Math.round(a / n)];
+    };
+    const drawnAs71 = async (id, want, ms) => {
+      const end = Date.now() + (ms || 6000); let got = null;
+      while (Date.now() < end) { const c = centre71(id); got = pixelAt71(c.x, c.y); if (got && got.slice(0, 3).every((v, i) => Math.abs(v - want[i]) <= 22) && got[3] > 250) return { ok: true, got }; await wait(60); }
+      return { ok: false, got };
+    };
+    mm.session.load([]); mm.setView(1, 0, 0); await wait(80);
+    const RED71 = [200, 40, 40];
+    const pic71file = await fileOf71('pic71.png', 300, 200, RED71);
+    const imp71 = await mm.importPictures([pic71file], { view: { minX: 150, minY: 170, maxX: 450, maxY: 370 } });
+    const picId71 = imp71.ids[0];
+    const pb71 = MM.boundsOf(mm.session.getState().nodes.get(picId71));
+    const notes71 = [[pb71.maxX + 40, pb71.minY], [pb71.maxX + 200, pb71.minY], [pb71.maxX + 40, pb71.minY + 110]];
+    notes71.forEach(([x, y]) => t.stroke(t.rect(x, y, 120, 80)));
+    const noteIds71 = mm.session.getState().contentIds.filter((id) => id !== picId71);
+    const all71 = { minX: pb71.minX, minY: pb71.minY, maxX: pb71.maxX + 320, maxY: pb71.maxY };
+    const frame0 = mm.session.getState().contentIds.length;
+    t.stroke(t.rect(all71.minX - 40, all71.minY - 50, all71.maxX - all71.minX + 80, all71.maxY - all71.minY + 100));
+    await wait(60);
+    const frameId71 = mm.session.getState().contentIds[mm.session.getState().contentIds.length - 1];
+    mm.session.summonMarks([frameId71, ...noteIds71, picId71], Date.now()); await wait(120);
+    const pill71 = document.querySelector('#summon .pill.item[data-key="region"]');
+    step('71. a big rectangle drawn round three notes and a picture, held with them, is offered Make it a region — not shown for the same marks without the rectangle',
+      frame0 === 4 && !!pill71 && /Make it a region/.test(pill71.textContent), { marks: frame0, pill: pill71 && pill71.textContent });
+    const evs71 = mm.session.getEvents().length;
+    if (pill71) pill71.click();
+    await wait(120);
+    const st71 = mm.session.getState();
+    const rid71 = st71.regions[0];
+    const rep71 = rid71 && MM.regionRepOf(st71.nodes.get(rid71));
+    const d71 = rid71 && MM.describeRegion(st71, rid71);
+    const wrote71 = mm.session.getEvents().slice(evs71);
+    step('71a. taking it makes one region at the rectangle — named for now Region 1, the rectangle its frame and still ink, the field closed — holding 3 marks and 1 picture, said in the status line, stamped by its tool',
+      st71.regions.length === 1 && !!rep71 && rep71.name === 'Region 1' && rep71.from === frameId71 && !st71.summon && !!d71 && d71.holds.marks === 3 && d71.holds.pictures === 1 &&
+        wrote71.filter((e) => e.type === 'region').length === 1 && wrote71.every((e) => e.tool === 'region') && st71.contentIds.includes(frameId71) &&
+        /a region “Region 1” — holds 3 marks, 1 picture/.test(document.getElementById('status').textContent),
+      { regions: st71.regions, rep: rep71, holds: d71 && d71.holds, wrote: wrote71.map((e) => e.type + ':' + e.tool), status: document.getElementById('status').textContent });
+    // What stands under a region is still drawn: the picture's pixels over the region's quiet ground.
+    const colour71 = await drawnAs71(picId71, RED71);
+    const pc71 = mm.paintCheck();
+    step('71b. a region is drawn under the pictures and the ink: the picture is still its colour where it stands, and a hand\'s paint draws the same board as the whole-board read',
+      colour71.ok && pc71.ok && st71.regions.length === 1, { colour: colour71, diffs: pc71.diffs && pc71.diffs.slice(0, 2) });
+    // The hand on the title: a tap selects it; the panel says what it is and renames it.
+    const box71 = MM.boundsOf(st71.nodes.get(rid71));
+    const title71 = mm.worldToScreen(box71.minX + 10, box71.minY + 10);
+    const press71 = (x, y, type, buttons) => cv71.dispatchEvent(new PointerEvent(type, { pointerId: 9, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons }));
+    press71(title71.x, title71.y, 'pointerdown', 1); press71(title71.x, title71.y, 'pointerup', 0); await wait(100);
+    const sel71 = mm.session.getState().selection;
+    const panelIs71 = insp71.textContent;
+    step('71c. a tap on the title selects the region, and the panel says it: a region “Region 1” — holds 3 marks, 1 picture — with its name to change',
+      sel71.length === 1 && sel71[0] === rid71 && /a region “Region 1” — holds 3 marks, 1 picture/.test(panelIs71) && !!insp71.querySelector('input[data-region-name]'), { sel: sel71, panel: panelIs71.slice(0, 160) });
+    const nameIn71 = insp71.querySelector('input[data-region-name]');
+    const evsR71 = mm.session.getEvents().length;
+    if (nameIn71) { nameIn71.value = 'Monday'; insp71.querySelector('button[data-region-rename]').click(); }
+    await wait(100);
+    const evR71 = mm.session.getEvents().slice(evsR71);
+    step('71d. renaming from the panel is one rename event; the region is “Monday”, the panel and the board say so, and undo takes the old name back',
+      evR71.length === 1 && evR71[0].type === 'rename' && MM.regionRepOf(mm.session.getState().nodes.get(rid71)).name === 'Monday' && /a region “Monday” — holds 3 marks, 1 picture/.test(insp71.textContent), { evs: evR71.map((e) => e.type), now: MM.regionRepOf(mm.session.getState().nodes.get(rid71)).name });
+    mm.session.undo(); await wait(60);
+    const undone71 = MM.regionRepOf(mm.session.getState().nodes.get(rid71)).name === 'Region 1';
+    mm.session.renameRegion({ nodeId: rid71, name: 'Monday', at: Date.now() }); await wait(60);
+    step('71e. one undo took the name back, and it is set again', undone71 && MM.regionRepOf(mm.session.getState().nodes.get(rid71)).name === 'Monday', { undone71 });
+    // Dragging the title moves everything inside, as one act.
+    mm.session.deselect(Date.now()); await wait(60);
+    const before71 = new Map([picId71, frameId71, ...noteIds71].map((id) => [id, MM.boundsOf(mm.session.getState().nodes.get(id))]));
+    const outside71 = (() => { t.stroke(t.rect(1400, 600, 90, 60)); const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; })();
+    await wait(60);
+    const outBefore71 = MM.boundsOf(mm.session.getState().nodes.get(outside71));
+    const evsM71 = mm.session.getEvents().length;
+    const from71 = mm.worldToScreen(box71.minX + 10, box71.minY + 10);
+    press71(from71.x, from71.y, 'pointerdown', 1);
+    for (let i = 1; i <= 8; i++) press71(from71.x + 25 * i, from71.y + 12 * i, 'pointermove', 1);
+    press71(from71.x + 200, from71.y + 96, 'pointerup', 0);
+    await wait(120);
+    const wroteM71 = mm.session.getEvents().slice(evsM71);
+    const moves71 = wroteM71.filter((e) => e.type === 'move');
+    const nowB71 = (id) => MM.boundsOf(mm.session.getState().nodes.get(id));
+    const shifted71 = [picId71, frameId71, ...noteIds71].every((id) => Math.abs(nowB71(id).minX - before71.get(id).minX - 200) < 1 && Math.abs(nowB71(id).minY - before71.get(id).minY - 96) < 1);
+    const regionB71 = nowB71(rid71);
+    step('71f. dragging the title moves the region and everything inside it — the picture, the three notes and the frame\'s ink — in ONE move event, and a mark outside stays where it stood',
+      moves71.length === 1 && moves71[0].ids.length === 1 && moves71[0].ids[0] === rid71 && shifted71 && Math.abs(regionB71.minX - box71.minX - 200) < 1 && nowB71(outside71).minX === outBefore71.minX,
+      { events: wroteM71.map((e) => e.type), moves: moves71.length, ids: moves71[0] && moves71[0].ids, shifted71, region: regionB71 });
+    const moved71 = await drawnAs71(picId71, RED71);
+    const dpic71 = mm.session.getState().nodes.get(picId71);
+    const cAfter71 = centre71(picId71);
+    step('71g. the picture is drawn where the region took it, and what the region holds is still those 3 marks and the picture (derived from where they stand)',
+      moved71.ok && MM.describeRegion(mm.session.getState(), rid71).holds.marks === 3 && MM.describeRegion(mm.session.getState(), rid71).holds.pictures === 1 && !!dpic71 && cAfter71.x > pb71.maxX - 1, { moved71, holds: MM.describeRegion(mm.session.getState(), rid71).holds });
+    mm.session.undo(); await wait(80);
+    const backB71 = [picId71, frameId71, ...noteIds71].every((id) => JSON.stringify(nowB71(id)) === JSON.stringify(before71.get(id)));
+    step('71h. one undo takes the whole move back: region, picture, notes and frame where they were', backB71 && JSON.stringify(nowB71(rid71)) === JSON.stringify(box71), { backB71 });
+    // The outline: every region of the board in the panel; a tap fits the view to it.
+    mm.session.deselect(Date.now()); await wait(60);
+    mm.setView(0.2, 900, 700); await wait(60);
+    const row71 = insp71.querySelector('.outlineRow[data-region-fit]');
+    const rowText71 = row71 ? row71.textContent : '';
+    if (row71) row71.click();
+    await wait(100);
+    const rb71 = nowB71(rid71);
+    const tl71 = mm.worldToScreen(rb71.minX, rb71.minY), br71 = mm.worldToScreen(rb71.maxX, rb71.maxY);
+    step('71i. the board\'s outline lists the region with what it holds, and a tap on it fits the view to it — the whole region on screen, and larger than it was',
+      /Monday/.test(rowText71) && /3 marks, 1 picture/.test(rowText71) && tl71.x >= 0 && tl71.y >= 0 && br71.x <= innerWidth && br71.y <= innerHeight && mm.view.zoom > 0.4, { row: rowText71, zoom: mm.view.zoom, tl: tl71, br: br71 });
+    // Erasing a region keeps everything it held, and says so; undo brings it back.
+    mm.setView(1, 0, 0); await wait(40);
+    mm.session.select([rid71], Date.now()); await wait(60);
+    const heldBefore71 = mm.session.getState().contentIds.length;
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+    await wait(80);
+    const stE71 = mm.session.getState();
+    step('71j. Delete on a selected region erases the region alone — every mark and the picture it held stays — and the status line says what stays; undo brings it back',
+      stE71.regions.length === 0 && stE71.contentIds.length === heldBefore71 && /the region “Monday” — what it held stays/.test(document.getElementById('status').textContent), { regions: stE71.regions, content: [heldBefore71, stE71.contentIds.length], status: document.getElementById('status').textContent });
+    mm.session.undo(); await wait(60);
+    step('71k. undo brings the region back, named Monday, holding what it did', mm.session.getState().regions.length === 1 && MM.describeRegion(mm.session.getState(), rid71).holds.marks === 3, { regions: mm.session.getState().regions });
+    // region: Monday, typed round marks with no rectangle: a region drawn round them with a margin, one act.
+    mm.session.load([]); mm.setView(1, 0, 0); await wait(60);
+    t.stroke(t.rect(300, 300, 100, 70)); t.stroke(t.rect(460, 310, 100, 70));
+    const two71 = mm.session.getState().contentIds.slice();
+    mm.session.summonMarks(two71, Date.now()); await wait(100);
+    t.typeIn('region: Tuesday'); await wait(60);
+    const line71 = t.readingLine();
+    const evsT71 = mm.session.getEvents().length;
+    t.typeEnter('region: Tuesday'); await wait(100);
+    const stT71 = mm.session.getState();
+    const regT71 = stT71.regions[0] && MM.describeRegion(stT71, stT71.regions[0]);
+    const wroteT71 = mm.session.getEvents().slice(evsT71).map((e) => e.type);
+    step('71l. typed region: Tuesday round two marks with no rectangle says what Enter will do, then draws a region round them with a margin — a place of that name that holds both — in one act stamped by its tool',
+      /make a region “Tuesday”/.test(line71) && !!regT71 && regT71.name === 'Tuesday' && regT71.holds.marks === 2 && regT71.bounds.minX < 300 - 10 && regT71.bounds.maxX > 560 + 10 && wroteT71.includes('region') && !wroteT71.includes('stroke') && mm.session.getEvents().slice(evsT71).filter((e) => e.type === 'region').every((e) => e.tool === 'region'),
+      { line: line71, holds: regT71 && regT71.holds, bounds: regT71 && regT71.bounds, wrote: wroteT71 });
+    // A text and a figure brought in stand in a region too, and their frames travel with it — while it is dragged, not only after.
+    mm.session.load([]); mm.setView(1, 0, 0); await wait(60);
+    const txt71 = mm.session.import({ kind: 'text', path: 'n71.txt', name: 'n71', bounds: { minX: 500, minY: 300, maxX: 700, maxY: 360 }, code: 'Call Ada', at: Date.now() });
+    const svg71 = mm.session.import({ kind: 'svg', path: 'f71.svg', name: 'f71', bounds: { minX: 500, minY: 400, maxX: 700, maxY: 500 }, code: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>', at: Date.now() });
+    await wait(150);
+    mm.session.summonMarks([txt71, svg71], Date.now()); await wait(90);
+    t.typeEnter('region: Notes'); await wait(120);
+    const rid71b = mm.session.getState().regions[0];
+    const rb71b = rid71b && MM.boundsOf(mm.session.getState().nodes.get(rid71b));
+    const left71 = (id) => { const f = mm.frames.get(id); return f ? [parseFloat(f.wrap.style.left), parseFloat(f.wrap.style.top)] : null; };
+    const l0 = [left71(txt71), left71(svg71)];
+    const at0 = rb71b ? mm.worldToScreen(rb71b.minX + 10, rb71b.minY + 10) : { x: 0, y: 0 };
+    press71(at0.x, at0.y, 'pointerdown', 1);
+    for (let i = 1; i <= 4; i++) press71(at0.x + 30 * i, at0.y + 15 * i, 'pointermove', 1);
+    await wait(60);
+    const mid71 = [left71(txt71), left71(svg71)];
+    for (let i = 5; i <= 5; i++) press71(at0.x + 30 * i, at0.y + 15 * i, 'pointermove', 1);
+    press71(at0.x + 150, at0.y + 75, 'pointerup', 0);
+    await wait(120);
+    const l1 = [left71(txt71), left71(svg71)];
+    const bText71 = MM.boundsOf(mm.session.getState().nodes.get(txt71));
+    step('71m. a text and a figure brought in stand in a region: dragged by its title their frames follow while the hand drags (a part of the way, before the log has it) and land 150 across, 75 down in ONE move event',
+      !!l0[0] && !!l0[1] && mid71[0][0] > l0[0][0] + 50 && mid71[0][0] < l0[0][0] + 150 && Math.abs(l1[0][0] - l0[0][0] - 150) < 1 && Math.abs(l1[1][1] - l0[1][1] - 75) < 1 &&
+        bText71.minX === 650 && mm.session.getEvents().filter((e) => e.type === 'move').length === 1,
+      { l0, mid71, l1, bText71, moves: mm.session.getEvents().filter((e) => e.type === 'move').length });
+    mm.session.load([]); mm.setView(1, 0, 0); await wait(60);
+  }
+
   // ---- 28. A live room: another hand's log arrives live, its ink in its own colour ----
   {
     mm.session.load([]); mm.setView(1, 0, 0);

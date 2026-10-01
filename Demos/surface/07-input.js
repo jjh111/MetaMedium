@@ -255,7 +255,8 @@
     const w0 = pointOf(e);
     // A hand on a control's knob slides it: no selection needed, one move when it lets go.
     if (knobBegin(w0)) return;
-    const hit = state.selection.length ? handleAt(w0) : null;
+    // A press on a region's title takes hold of the region (12-regions.js).
+    const hit = (state.selection.length ? handleAt(w0) : null) || regionTitlePress(w0);
     // A hand on a body in a running tank is acting it out, not moving ink.
     if (hit && hit.kind === 'move' && demoBegin(state.selection, w0)) return;
     if (hit) { beginDrag(hit, w0); return; }
@@ -633,9 +634,7 @@
     else if (e.target === document.body && e.key === 'Escape' && !state.selection.length && !state.summon) cancelWork();
     if (e.target === document.body && (e.key === 'Backspace' || e.key === 'Delete') && state.selection.length) {
       e.preventDefault();
-      const ids = state.selection.slice();
-      ids.forEach((id) => session.erase(id, Date.now()));
-      flash('erased ' + ids.length + ' mark' + (ids.length === 1 ? '' : 's'));
+      eraseSelection();
     }
     if (e.key === '0' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); fitAll(); }
     if (e.target === document.body && (e.key === '=' || e.key === '+')) zoomAround(innerWidth / 2, innerHeight / 2, 1.2);

@@ -41,7 +41,7 @@
   /** The handles the selection offers now: the one selected mark's own points, when it has them and stands big enough on screen. */
   function markHandles(s) {
     s = s || state;
-    if (s.selection.length !== 1) return [];
+    if (s.selection.length !== 1 || (s.regions && s.regions.includes(s.selection[0]))) return [];
     const key = logKey() + '|' + s.selection[0] + '|' + view.zoom;
     if (s === state && handlesAt.key === key) return handlesAt.list;
     const n = s.nodes.get(s.selection[0]);
@@ -83,16 +83,18 @@
     if (!drag || !drag.moved) return null;
     if (drag.mode === 'reshape') return { ids: [], kind: 'reshape', id: drag.id, handle: drag.handle, to: drag.to, node: drag.pv ? drag.pv.node : null, shape: drag.pv ? drag.pv.clean.shape : null, end: drag.end, hold: drag.hold };
     const dx = drag.last.x - drag.start.x, dy = drag.last.y - drag.start.y;
-    if (drag.mode === 'move') return { ids: drag.ids, kind: 'move', dx, dy };
+    // What a drag acts on is what the replay will carry: a region takes what it holds (12-regions.js).
+    const acts = drag.carried || drag.ids;
+    if (drag.mode === 'move') return { ids: acts, kind: 'move', dx, dy };
     if (drag.mode === 'scale') {
       const b = drag.bounds;
       const sx = Math.max(0.05, (drag.corner.x + dx - drag.about.x) / (drag.corner.x - drag.about.x || 1e-6));
       const sy = Math.max(0.05, (drag.corner.y + dy - drag.about.y) / (drag.corner.y - drag.about.y || 1e-6));
-      return { ids: drag.ids, kind: 'scale', about: drag.about, sx: b ? sx : 1, sy: b ? sy : 1 };
+      return { ids: acts, kind: 'scale', about: drag.about, sx: b ? sx : 1, sy: b ? sy : 1 };
     }
     const a0 = Math.atan2(drag.start.y - drag.about.y, drag.start.x - drag.about.x);
     const a1 = Math.atan2(drag.last.y - drag.about.y, drag.last.x - drag.about.x);
-    return { ids: drag.ids, kind: 'rotate', about: drag.about, radians: a1 - a0 };
+    return { ids: acts, kind: 'rotate', about: drag.about, radians: a1 - a0 };
   }
 
   /** Apply the preview to the canvas transform for one mark's drawing. */
@@ -128,9 +130,13 @@
       if (d <= r && d < bestD) { best = hit; bestD = d; }
     };
     for (const k of Object.keys(h.corners)) offer({ kind: 'scale', corner: k, at: h.corners[k], bounds: b }, h.corners[k]);
-    offer({ kind: 'rotate', bounds: b }, h.knob);
+    // A region does not turn (a turned rectangle is not a rectangle): no knob while one is selected (12-regions.js).
+    const regionSelected = state.selection.some((id) => state.regions && state.regions.includes(id));
+    if (!regionSelected) offer({ kind: 'rotate', bounds: b }, h.knob);
     for (const mh of markHandles()) offer({ kind: 'reshape', id: mh.nodeId, handle: { kind: mh.kind, index: mh.index }, at: mh.point, bounds: b }, mh.point);
     if (best) return best;
+    // A selected region moves by its title and the band along its edge, not its inside: the inside is where the hand writes.
+    if (regionsOnlySelected(state)) return regionMoveZone(w) ? { kind: 'move', bounds: b } : null;
     const o = h.outline;
     if (w.x >= o.minX && w.x <= o.maxX && w.y >= o.minY && w.y <= o.maxY) return { kind: 'move', bounds: b };
     return null;
@@ -151,7 +157,8 @@
     const opposite = hit.kind === 'scale'
       ? { x: hit.corner.includes('w') ? b.maxX : b.minX, y: hit.corner.includes('n') ? b.maxY : b.minY }
       : centre;
-    drag = { ids: state.selection.slice(), mode: hit.kind, start: w, last: w, moved: false, about: opposite, corner: hit.at || null, bounds: b };
+    const ids = state.selection.slice();
+    drag = { ids: ids, carried: dragCarried(ids), mode: hit.kind, start: w, last: w, moved: false, about: opposite, corner: hit.at || null, bounds: b };
     canvas.style.cursor = hit.kind === 'move' ? 'grabbing' : hit.kind === 'scale' ? 'nwse-resize' : 'grab';
   }
 
@@ -277,8 +284,10 @@
     ctx.fillStyle = C.gold;
     const hs = HANDLE();
     for (const k of Object.keys(h.corners)) { const c = h.corners[k]; ctx.fillRect(c.x - hs / 2, c.y - hs / 2, hs, hs); }
-    ctx.beginPath(); ctx.moveTo(h.knob.x, o.minY); ctx.lineTo(h.knob.x, h.knob.y); ctx.strokeStyle = `rgba(${C.goldRGB},0.6)`; ctx.lineWidth = wpx(1); ctx.stroke();
-    ctx.beginPath(); ctx.arc(h.knob.x, h.knob.y, hs * 0.7, 0, Math.PI * 2); ctx.fill();
+    if (!(s.regions && s.selection.some((id) => s.regions.includes(id)))) {
+      ctx.beginPath(); ctx.moveTo(h.knob.x, o.minY); ctx.lineTo(h.knob.x, h.knob.y); ctx.strokeStyle = `rgba(${C.goldRGB},0.6)`; ctx.lineWidth = wpx(1); ctx.stroke();
+      ctx.beginPath(); ctx.arc(h.knob.x, h.knob.y, hs * 0.7, 0, Math.PI * 2); ctx.fill();
+    }
     // The one mark's own points, where they are — or will be, while one is dragged.
     const own = reshaping ? MM.handlesOf(pv.node, s.nodes) : markHandles(s);
     for (const mh of own) {

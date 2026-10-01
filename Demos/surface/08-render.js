@@ -1,7 +1,7 @@
 // ===== render =====
 // Provides: queries over state, the rungs cache, render(), ink, the reading under the inspected mark
 //   (readingUnder: its readings ranked by MM.rank, as the field ranks — V1-PLAN §2.2),
-//   a hand's label on its own mark (labelsDrawn), match chips,
+//   a hand's label on its own mark (labelsDrawn), a region's frame under everything (renderRegions, 12-regions.js), match chips,
 //   the working dot, the explanation plane and its layout, the status line (one sentence).
 // Uses: core, view, artifacts, snap, models, palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
 //   packs (packShort — a match chip says its pack; a pack this build lacks is said in the standing line),
@@ -785,6 +785,9 @@
     // off screen at working zoom — except while a tank moves bodies about.
     paintView = vb && !tank.place.size ? vb : null;
 
+    // The regions first of all, a quiet frame with a name: the ground the pictures and the ink stand on (12-regions.js).
+    renderRegions(s, vb, pv);
+
     // The pictures first — they are the ground the ink is drawn over: a picture kept in the asset store is
     // painted on this canvas, under every stroke, culled to the screen with the rest of the paint (and a
     // picture held and being dragged is drawn where the drag takes it).
@@ -909,6 +912,7 @@
       const running = liveSet(s).size;
       parts.push(s.artifacts.length + ' thing' + (s.artifacts.length === 1 ? '' : 's') + ' made' + (s.live.length ? ' (' + (running < s.live.length ? running + ' of ' + s.live.length + ' live, the rest parked' : s.live.length + ' live') + ')' : ''));
     }
+    if (s.regions.length) parts.push(s.regions.length + ' region' + (s.regions.length === 1 ? '' : 's'));
     const fs = folderStatus();
     if (fs) parts.push(fs);
     // A pack this board names that this build cannot give it is said, never hidden (V1-PLAN B3).

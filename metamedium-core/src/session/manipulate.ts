@@ -44,6 +44,9 @@ export function manipulableOf(nodes: ReadonlyMap<string, MMNode>, ids: readonly 
       out.push(n);
       return;
     }
+    // An artifact made of marks moves by its marks, and its own frame with them (its box was where it was
+    // blessed): a page, a text made from writing, a program over its ink.
+    if (parts.length && getRep(n, 'bounds')) out.push(n);
     for (const e of parts) visit(e.to);
   };
   ids.forEach(visit);

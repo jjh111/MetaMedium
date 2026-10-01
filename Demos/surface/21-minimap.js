@@ -28,6 +28,8 @@
     const said = s.explanations.filter((id) => { const n = s.nodes.get(id); return !!n && !MM.isSeatTraffic(n, s.nodes); });
     const arts = new Set(s.artifacts), answers = new Set(said);
     const items = [];
+    // A region stands as its outline, under the marks it holds (I5).
+    for (const r of s.regions.length ? regionsFor(s).list : []) items.push({ id: r.id, b: r.bounds, region: true });
     for (const id of s.contentIds.concat(said)) {
       const b = MM.boundsOf(s.nodes.get(id));
       if (b) items.push({ id: id, b: b, artifact: arts.has(id), answer: answers.has(id) });
@@ -60,7 +62,8 @@
       const x = ox + b.minX * scale, y = oy + b.minY * scale;
       const bw = Math.max(1.5, (b.maxX - b.minX) * scale), bh = Math.max(1.5, (b.maxY - b.minY) * scale);
       if (paintOps) recordOp({ kind: 'mini', id: it.id, box: boxOfRect(x, y, bw, bh), moved: true });
-      if (it.artifact) { g.strokeStyle = 'rgba(' + C.goldRGB + ',0.8)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, bw, bh); }
+      if (it.region) { g.strokeStyle = 'rgba(' + C.labelRGB + ',0.85)'; g.lineWidth = 1; g.setLineDash([2, 2]); g.strokeRect(x + 0.5, y + 0.5, bw, bh); g.setLineDash([]); }
+      else if (it.artifact) { g.strokeStyle = 'rgba(' + C.goldRGB + ',0.8)'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, bw, bh); }
       else { g.fillStyle = it.answer ? answerFill : C.inkFaint; g.fillRect(x, y, bw, bh); }
     }
     g.strokeStyle = C.ink; g.lineWidth = 1; g.setLineDash([]);

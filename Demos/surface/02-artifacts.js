@@ -107,9 +107,9 @@
       }
       // Where the drawing put it, plus where its own behaviour has taken it
       // (runtime only — never in the log).
-      const o = runtimeOffset(id);
-      f.wrap.style.left = (fr.x + o.dx) + 'px';
-      f.wrap.style.top = (fr.y + o.dy) + 'px';
+      const o = runtimeOffset(id), dd = dragFrameOffset(id);
+      f.wrap.style.left = (fr.x + o.dx + dd.dx) + 'px';
+      f.wrap.style.top = (fr.y + o.dy + dd.dy) + 'px';
       f.wrap.style.width = fr.w + 'px';
       f.wrap.style.height = fr.h + 'px';
       f.wrap.classList.toggle('broken', !!runtimeBroken(id));

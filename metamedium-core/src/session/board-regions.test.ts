@@ -12,6 +12,7 @@ import { boundsOf, getRep } from './nodes';
 import { connectorEnds } from './follow';
 import { activeBindingsOf } from './magnets';
 import { rectStroke, lineStroke } from '../test/strokes';
+import { frameOf } from './regions';
 import {
   REGION_HOLDS, regionRepOf, regionMembers, regionCarries, describeRegion, regionSaid, regionsOfBoard, regionOutline,
 } from './board-regions';
@@ -291,5 +292,24 @@ describe('regions — a named rectangle holds what stands inside it', () => {
     expect([mon, tue, later]).toHaveLength(3);
     s.erase(week, 1005);
     expect(regionOutline(s.getState()).map((e) => [e.name, e.depth])).toEqual([['Monday', 0], ['Tuesday', 0], ['Later', 0]]);
+  });
+
+  it('a text, a figure and a page made of marks carry their own frames when the region moves — not only the marks inside them', () => {
+    const s = createSession();
+    const t = note(s, 300, 220, 1000);
+    const fig = s.import({ kind: 'svg', path: 'f.svg', bounds: R(400, 40, 120, 90), code: '<svg xmlns="http://www.w3.org/2000/svg"/>', at: 1001 })!;
+    const a = box(s, 50, 50, 100, 80, 1002);
+    const b = box(s, 200, 50, 100, 80, 1003);
+    s.summonMarks([a, b], 1004);
+    const page = s.bless({ summonId: s.getState().summon!.id, name: 'page', at: 1005 })!;
+    const id = s.region({ name: 'Monday', bounds: R(0, 0, 600, 400), at: 1006 })!;
+    expect(describeRegion(s.getState(), id)!.holds).toMatchObject({ texts: 1, figures: 1, things: 1 });
+    const frames = () => [t, fig, page].map((x) => JSON.stringify(frameOf(s.getState().nodes.get(x)!)));
+    const before = frames();
+    s.move({ ids: [id], dx: 700, dy: 20, at: 1007 });
+    const after = [t, fig, page].map((x) => frameOf(s.getState().nodes.get(x)!)!);
+    expect(after.map((f) => [f.x, f.y])).toEqual([[1000, 240], [1100, 60], [750, 70]]);
+    s.undo();
+    expect(frames()).toEqual(before);
   });
 });

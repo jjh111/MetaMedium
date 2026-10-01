@@ -61,7 +61,8 @@ const insideOf = (outer: Rect, inner: Rect): boolean =>
 
 /** The artifact's own frame in world pixels — the origin regions are local to. */
 export function frameOf(artifact: MMNode): Rect | null {
-  const b = (getRep(artifact, 'bounds')?.data as Bounds | undefined) ?? boundsOf(artifact);
+  // Where the artifact stands now: moved, its transform; else the box it was made at.
+  const b = (getRep(artifact, 'transform')?.data as Bounds | undefined) ?? (getRep(artifact, 'bounds')?.data as Bounds | undefined) ?? boundsOf(artifact);
   return b ? rectOf(b) : null;
 }
 

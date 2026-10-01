@@ -7897,7 +7897,7 @@ var rectOf = (b) => ({
 });
 var insideOf = (outer, inner) => inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.w <= outer.x + outer.w && inner.y + inner.h <= outer.y + outer.h && !(inner.x === outer.x && inner.y === outer.y && inner.w === outer.w && inner.h === outer.h);
 function frameOf(artifact) {
-  const b = getRep(artifact, "bounds")?.data ?? boundsOf(artifact);
+  const b = getRep(artifact, "transform")?.data ?? getRep(artifact, "bounds")?.data ?? boundsOf(artifact);
   return b ? rectOf(b) : null;
 }
 function regionsOf(artifact, nodes) {
@@ -8749,6 +8749,7 @@ function manipulableOf(nodes, ids) {
       out.push(n2);
       return;
     }
+    if (parts.length && getRep(n2, "bounds")) out.push(n2);
     for (const e of parts) visit(e.to);
   };
   ids.forEach(visit);
