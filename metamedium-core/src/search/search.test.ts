@@ -87,6 +87,18 @@ describe('what a board says', () => {
     expect(entries.map((e) => e.text)).toEqual(['newer']);
   });
 
+  it('a region\'s name is found (I5): the region, said as one, at its own box — renamed, the new name; erased, gone; and the index format moved on', () => {
+    const s = createSession();
+    const id = s.region({ name: 'Monday', bounds: { minX: 0, minY: 0, maxX: 600, maxY: 400 }, at: 1000 })!;
+    const one = searchEntriesOf(s.getState()).filter((e) => e.kind === 'region');
+    expect(one).toEqual([{ id, kind: 'region', text: 'Monday', what: 'a region', box: { minX: 0, minY: 0, maxX: 600, maxY: 400 } }]);
+    s.renameRegion({ nodeId: id, name: 'Pricing', at: 1100 });
+    expect(searchEntriesOf(s.getState()).filter((e) => e.kind === 'region').map((e) => e.text)).toEqual(['Pricing']);
+    s.erase(id, 1200);
+    expect(searchEntriesOf(s.getState()).filter((e) => e.kind === 'region')).toEqual([]);
+    expect(SEARCH_VERSION).toBeGreaterThanOrEqual(2);
+  });
+
   it('a hook for sources the core does not know yet (regions): registered, read with the state, and part of the key', () => {
     const s = createSession();
     const before = searchKeyOf({ changed: 1, events: 1, chars: 1 });

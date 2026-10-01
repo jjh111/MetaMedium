@@ -30942,6 +30942,10 @@ function searchEntriesOf(state) {
       }
     }
   }
+  for (const r of regionsOfBoard(state)) {
+    if (out.length >= MAX_ENTRIES) break;
+    out.push({ id: r.id, kind: "region", text: r.name, what: "a region", box: r.bounds });
+  }
   for (const src of sources.values()) {
     if (out.length >= MAX_ENTRIES) break;
     try {
@@ -31051,7 +31055,7 @@ function describeHit(h2) {
 }
 
 // src/search/plan.ts
-var SEARCH_VERSION = 1;
+var SEARCH_VERSION = 2;
 function searchKeyOf(stat) {
   if (!stat) return "";
   return [SEARCH_VERSION, sourceIds().join(","), stat.changed || 0, stat.events || 0, stat.chars || 0].join("|");

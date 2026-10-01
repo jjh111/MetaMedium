@@ -5,7 +5,7 @@ import type { Bounds } from '../types';
 import { sourceIds } from './extract';
 
 /** The format an index is kept in: a new version makes every kept index stale, so every board is read again. */
-export const SEARCH_VERSION = 1;
+export const SEARCH_VERSION = 2; // 2: regions' names (I5)
 
 /**
  * The key an index (and a board's thumbnail) is kept under: the board's own record of its change — when it last

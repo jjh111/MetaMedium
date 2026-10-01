@@ -13,6 +13,7 @@ import type { Bounds } from '../types';
 import type { SessionState } from '../session/session';
 import { type MMNode, boundsOf, getRep, labelOf, transcriptsOf, topInterpretation, isWord, wordOf } from '../session/nodes';
 import { pictureOf } from '../kinds/picture';
+import { regionsOfBoard } from '../session/board-regions';
 
 export type SearchKind = 'label' | 'name' | 'text' | 'transcript' | 'figure' | 'mermaid' | 'picture' | 'page' | 'region' | 'board';
 
@@ -162,6 +163,11 @@ export function searchEntriesOf(state: SessionState): SearchEntry[] {
         out.push({ id: node.id, kind: 'transcript', text: t.text, what: 'read writing', ...(box ? { box } : {}) });
       }
     }
+  }
+  // A region's name (I5): the place, at its own box. Not in the loop above — a region is no content and has no ink.
+  for (const r of regionsOfBoard(state)) {
+    if (out.length >= MAX_ENTRIES) break;
+    out.push({ id: r.id, kind: 'region', text: r.name, what: 'a region', box: r.bounds });
   }
   for (const src of sources.values()) {
     if (out.length >= MAX_ENTRIES) break;

@@ -221,7 +221,7 @@ is core's (`metamedium-core/src/search/`: words folded and cut, what a board say
 boards to read again — 17 tests) and the surface keeps it in its own IndexedDB, `mm-find`, beside the journals
 (`17-find.js`; the pane is `26-find.js`): *find* in the bar, `/`, ⌘K; a hit opens its board in place at the mark,
 ringed; thumbnails in the boards rows, made when a board is left and for any board that has none. e2e boards N23–N23i.
-**Open:** a hit inside a region waits for I5 (`registerSearchSource` is the hook); a vector joins at
+**Merged with I5 (1 Oct 2026):** a region's name is found as *a region* at its own box (`SEARCH_VERSION` 2). **Open:** a vector joins at
 `searchBoards(…, { semantic })` (I9); the MCP hand does not search yet (`canvas_find` is `mcp.mjs`'s owner's).
 
 **I7 — seats per job.** The models pane becomes seats: *reader*, *writer*,

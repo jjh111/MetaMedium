@@ -202,8 +202,8 @@ board reads as a diagram, as Mermaid text — and **folder** makes a folder on y
 
 **find** in the bar — or **/** , or **⌘K** / **Ctrl+K** — looks for a word on **every
 board you keep here**, as you type: the labels on your marks, the names of what you
-made, typed text, the words in a figure, Mermaid text, picture names, and what was
-read from your writing. A board is listed with what it says, each hit as the words
+made, the names of your regions, typed text, the words in a figure, Mermaid text,
+picture names, and what was read from your writing. A board is listed with what it says, each hit as the words
 in context (*“Pricing” — label on a box*); the first few words you type are enough
 (*pric* finds *Pricing*). A tap on one opens that board and takes you to the place,
 ringed for a moment — looking never changes a board. **↑ ↓** choose and **Enter**

@@ -3101,8 +3101,9 @@ or stale is read from its own records, replayed in a **scratch session** and ind
 at a time with a pause, a few seconds after the page opens and when the find or boards pane opens
 (`findSync`). A board emptied from the trash lets its index go (`findDrop`); a trashed one
 is not searched. Works offline: the query is asked of memory. **Hooks for what comes
-next:** `registerSearchSource({ id, entries(state) })` adds entries for what core does not
-know (regions, I5's — its id is part of the key, a source that throws is left out);
+next:** a region's name is found as itself (*a region*, at its own box; `SEARCH_VERSION` 2
+read every board again), and `registerSearchSource({ id, entries(state) })` adds entries for
+what core does not know yet (its id is part of the key, a source that throws is left out);
 `searchBoards(boards, query, { semantic })` takes a seat's score for an entry (0..1, added
 to the lexical score, and what no word matched is let in at `SEMANTIC_FLOOR`) — the place
 a vector joins (I9); and the logic is core's, so the MCP hand can search too (a
