@@ -12,7 +12,11 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startRelay } from './relay.mjs';
 import { relayTransport } from './live-node.mjs';
-import { inkPNG } from './ink-png.mjs';
+import { inkPNG, encodePNG, decodePNG } from './ink-png.mjs';
+import { createServer } from 'node:http';
+import { createHash } from 'node:crypto';
+import { writeFileSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const MM = await import(pathToFileURL(path.join(here, 'metamedium-core.node.mjs')).href);
@@ -74,7 +78,8 @@ try {
   const names = (list.result && list.result.tools || []).map((t) => t.name);
   check('eight tools, each a verb a hand has', ['canvas_look', 'canvas_see', 'canvas_draw', 'canvas_say', 'canvas_propose', 'canvas_label', 'canvas_transcribe', 'canvas_write'].every((n) => names.includes(n)), names);
   // …and the seat's two (V1-PLAN J4): the briefs parked for Claude Code, and the answer to one.
-  check('ten tools: the hand\'s eight and the seat\'s two — canvas_pending and canvas_answer', names.length === 10 && ['canvas_pending', 'canvas_answer'].every((n) => names.includes(n)), names);
+  // …and a ninth verb of a hand's (PLAN-IPAD-NOTES A1): putting a picture on the board.
+  check('eleven tools: the hand\'s nine — canvas_import among them — and the seat\'s two, canvas_pending and canvas_answer', names.length === 11 && ['canvas_import', 'canvas_pending', 'canvas_answer'].every((n) => names.includes(n)), names);
 
   // The tab draws first: a box, in its own log.
   const box = MM.strokeFor({ shape: 'rectangle', x: 100, y: 100, w: 200, h: 120 });
@@ -528,6 +533,106 @@ async function seatCases() {
     watch.kill();
   }
 }
+
+// ===== Pictures in a room (PLAN-IPAD-NOTES A1): the hand puts one on the board, and sees one =====
+{
+  const sha = (b) => createHash('sha256').update(b).digest('hex');
+  const solid = (n, rgba) => { const px = new Uint8Array(n * n * 4); for (let i = 0; i < n * n; i++) px.set(rgba, i * 4); return new Uint8Array(encodePNG(n, n, px)); };
+  const RED = [200, 40, 40, 255], BLUE = [50, 70, 210, 255];
+  const red = solid(16, RED), blue = solid(20, BLUE);
+  const assetUrl = (hash) => `${RELAY}/rooms/${ROOM}/assets/${hash}`;
+  const picNode = (st, id) => { const n = st.nodes.get(id); return n && MM.pictureOf(n); };
+  const tabState = async () => { tabSession.load(MM.mergeLogs(await tab.readLogs(), { me: tabMe })); return tabSession.getState(); };
+  const idOf = (t) => (t.match(/^(\S+) placed/) || [])[1];
+
+  // A PNG as base64: the bytes go to the room's relay by their hash FIRST, then the event, in the hand's own log.
+  const imp = await call('canvas_import', { base64: Buffer.from(red).toString('base64'), name: 'swatch.png', at: { x: 900, y: 500, w: 160 } });
+  const redId = idOf(textOf(imp));
+  check('canvas_import puts a PNG on the board — placed, its size read from the header, where it stands', !!redId && /16×16/.test(textOf(imp)) && /placed at 900,500 160×160/.test(textOf(imp)), textOf(imp));
+  const held = await fetch(assetUrl(sha(red)));
+  check('the relay holds the bytes by their hash — what the hand sent, byte for byte, as a PNG', held.status === 200 && held.headers.get('content-type') === 'image/png' && Buffer.compare(Buffer.from(await held.arrayBuffer()), Buffer.from(red)) === 0, held.status);
+  let st9 = await tabState();
+  for (let i = 0; i < 25 && !picNode(st9, redId); i++) { await wait(100); st9 = await tabState(); }
+  const p9 = picNode(st9, redId);
+  check('the tab merges it as a picture of the hand\'s: swatch.png, 16×16, the asset the SHA-256 of the bytes, image/png, standing at 900,500',
+    !!p9 && p9.name === 'swatch.png' && p9.w === 16 && p9.h === 16 && p9.asset === 'sha256:' + sha(red) && p9.mime === 'image/png' && Math.round(MM.boundsOf(st9.nodes.get(redId)).minX) === 900 && Math.round(MM.boundsOf(st9.nodes.get(redId)).minY) === 500, p9);
+  const author = st9.nodes.get(redId).edges.find((e) => e.rel === 'made-by');
+  check('and it is the hand\'s own act: made by the hand "smoke", not the tab', !!author && /smoke/.test(author.to), author);
+
+  // A path, and a URL.
+  const dir = mkdtempSync(path.join(tmpdir(), 'mm-import-'));
+  const file = path.join(dir, 'sky blue.png');
+  writeFileSync(file, blue);
+  const byPath = await call('canvas_import', { path: file, place: { right: redId, w: 120 } });
+  const blueId = idOf(textOf(byPath));
+  check('canvas_import takes a path, named for the file, and places it by a mark the way canvas_write does — right of the swatch', !!blueId && /20×20/.test(textOf(byPath)) && /right of /.test(textOf(byPath)) && textOf(byPath).includes(redId), textOf(byPath));
+  const web = createServer((req, res) => { if (req.url === '/pic.png') res.writeHead(200, { 'content-type': 'image/png' }).end(Buffer.from(blue)); else if (req.url === '/page.html') res.writeHead(200, { 'content-type': 'text/html' }).end('<html>no</html>'); else res.writeHead(404).end(); });
+  await new Promise((ok) => web.listen(0, '127.0.0.1', ok));
+  const webUrl = (p) => 'http://127.0.0.1:' + web.address().port + p;
+  const byUrl = await call('canvas_import', { url: webUrl('/pic.png'), name: 'from-the-web.png', at: { x: 900, y: 700 } });
+  check('canvas_import takes a URL — fetched here, kept in the room by its hash (the same bytes as the path\'s: one asset)', /placed/.test(textOf(byUrl)) && /from-the-web\.png/.test(textOf(byUrl)), textOf(byUrl));
+  const html = await call('canvas_import', { url: webUrl('/page.html') });
+  check('a URL that is not a picture is said, and nothing is placed', /not a picture/.test(textOf(html)) && !/placed/.test(textOf(html)), textOf(html));
+
+  // A JPEG: its size from the header by hand, kept by its hash like any picture.
+  const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 74, 70, 73, 70, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0xff, 0xc0, 0, 11, 8, 0x03, 0xe8, 0x07, 0xd0, 1, 1, 0x11, 0, 0xff, 0xd9]);
+  const jp = await call('canvas_import', { base64: Buffer.from(jpeg).toString('base64'), name: 'holiday.jpeg', at: { x: 1200, y: 500, w: 200 } });
+  const jpId = idOf(textOf(jp));
+  check('a JPEG\'s size is read from its header — 2000×1000 — and it stands 200 wide, 100 high', !!jpId && /2000×1000/.test(textOf(jp)) && /200×100/.test(textOf(jp)), textOf(jp));
+  st9 = await tabState();
+  for (let i = 0; i < 25 && !picNode(st9, jpId); i++) { await wait(100); st9 = await tabState(); }
+  check('as a jpg artifact whose mime is image/jpeg', !!picNode(st9, jpId) && picNode(st9, jpId).kind === 'jpg' && picNode(st9, jpId).mime === 'image/jpeg', picNode(st9, jpId));
+
+  // An SVG is a thing the page already draws: an svg artifact, with its text — no asset, no relay.
+  const svgText = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="red"/></svg>';
+  const sv = await call('canvas_import', { base64: Buffer.from(svgText).toString('base64'), name: 'dot.svg', at: { x: 900, y: 900, w: 100, h: 100 } });
+  const svId = idOf(textOf(sv));
+  st9 = await tabState();
+  for (let i = 0; i < 25 && !(svId && st9.nodes.get(svId)); i++) { await wait(100); st9 = await tabState(); }
+  const svNode = svId && st9.nodes.get(svId);
+  const svRep = svNode && svNode.reps.filter((x) => x.modality === 'code').pop();
+  check('an SVG file becomes an svg artifact holding its text, with no asset', !!svRep && svRep.data.kind === 'svg' && svRep.data.code === svgText && !svRep.data.asset && !picNode(st9, svId), svRep && svRep.data);
+
+  // What cannot be a picture is said in a sentence.
+  const notPic = await call('canvas_import', { base64: Buffer.from('just words').toString('base64'), name: 'words.png' });
+  check('bytes that are no picture are refused in words, whatever the name says', /not a picture/.test(textOf(notPic)) && /PNG, JPEG, WebP/.test(textOf(notPic)) && !/placed/.test(textOf(notPic)), textOf(notPic));
+  const huge = await call('canvas_import', { base64: Buffer.concat([Buffer.from(red), Buffer.alloc(12 * 1024 * 1024)]).toString('base64'), name: 'huge.png' });
+  check('a picture past 12 MB is said too large before anything is sent', /12 MB/.test(textOf(huge)) && !/placed/.test(textOf(huge)), textOf(huge).slice(0, 200));
+  const none = await call('canvas_import', { name: 'nothing.png' });
+  check('canvas_import with no path, url or base64 says what it needs', /path, a url or base64/.test(textOf(none)), textOf(none));
+  const missing = await call('canvas_import', { path: path.join(dir, 'not-there.png') });
+  check('a path that does not exist is said, not thrown', /not-there\.png/.test(textOf(missing)) && !/placed/.test(textOf(missing)), textOf(missing));
+
+  // The hand's look says a picture whose bytes the room holds can be seen; the tab's picture with no bytes anywhere still says it has none.
+  const look9 = textOf(await call('canvas_look', {}));
+  const line = (id) => look9.split('\n').find((l) => l.startsWith(id + ' ')) || '';
+  check('canvas_look lists the swatch as a picture the room holds — canvas_see draws it',
+    /a picture swatch\.png 16×16/.test(line(redId)) && /in the room/.test(line(redId)) && !/this hand has none to see/.test(line(redId)) && !/sha256/.test(line(redId)), line(redId));
+  check('and the picture whose bytes no one put there still says this hand has none to see', /this hand has none to see/.test(picLine(look9)), picLine(look9));
+
+  // Seeing: the picture is under the ink in the PNG the hand gets.
+  const seen9 = await call('canvas_see', { ids: [redId], size: 200 });
+  const img9 = (seen9.content || []).find((c) => c.type === 'image');
+  const dec = img9 && decodePNG(Buffer.from(img9.data, 'base64'));
+  const mid = dec && [...dec.rgba.slice(((dec.height >> 1) * dec.width + (dec.width >> 1)) * 4, ((dec.height >> 1) * dec.width + (dec.width >> 1)) * 4 + 3)];
+  check('canvas_see of the swatch returns its pixels where it stands — the red of the bytes, not a frame', !!mid && mid.every((v, i) => Math.abs(v - RED[i]) < 6) && /swatch\.png/.test(textOf(seen9)), { mid, text: textOf(seen9) });
+  const seenJpeg = await call('canvas_see', { ids: [jpId], size: 200 });
+  check('a JPEG is drawn as its frame and its name, and the hand is told it could not decode it', /holiday\.jpeg/.test(textOf(seenJpeg)) && /could not decode|frame/.test(textOf(seenJpeg)) && (seenJpeg.content || []).some((c) => c.type === 'image'), textOf(seenJpeg));
+
+  // A picture the TAB put in the room: the tab PUTs its bytes by hash, names them in an event, and the hand sees it.
+  const tabPic = solid(24, [30, 160, 70, 255]);
+  const put = await fetch(assetUrl(sha(tabPic)), { method: 'PUT', body: tabPic });
+  tabSession.import({ kind: 'png', path: 'imports/leaf.png', name: 'leaf.png', bounds: { minX: 1500, minY: 100, maxX: 1700, maxY: 300 }, asset: 'sha256:' + sha(tabPic), mime: 'image/png', w: 24, h: 24, at: Date.now() + 50 });
+  await tab.publish(tabSession.getEvents().filter((e) => !e.by));
+  const leafId = tabSession.getState().artifacts.find((id) => { const p = picNode(tabSession.getState(), id); return p && p.name === 'leaf.png'; });
+  let seenLeaf = null;
+  for (let i = 0; i < 25 && !seenLeaf; i++) { const r = await call('canvas_see', { ids: [leafId], size: 160 }); if ((r.content || []).some((c) => c.type === 'image')) seenLeaf = r; else await wait(100); }
+  const leaf = seenLeaf && decodePNG(Buffer.from(seenLeaf.content.find((c) => c.type === 'image').data, 'base64'));
+  const lm = leaf && [...leaf.rgba.slice(((leaf.height >> 1) * leaf.width + (leaf.width >> 1)) * 4, ((leaf.height >> 1) * leaf.width + (leaf.width >> 1)) * 4 + 3)];
+  check('a picture the tab put in the room by its hash is seen by the hand, drawn where it stands', put.status === 204 && !!lm && lm[1] > 140 && lm[0] < 60, { put: put.status, lm });
+  web.close();
+}
+
 child.stdin.end();
 await wait(200);
 child.kill();
