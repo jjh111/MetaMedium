@@ -36,7 +36,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { relayTransport, ensureRelay } from './live-node.mjs';
+import { relayTransport, ensureRelay, checkRelay } from './live-node.mjs';
 import { inkPNG } from './ink-png.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -47,6 +47,9 @@ const argv = process.argv.slice(2);
 const flag = (name) => { const i = argv.indexOf('--' + name); return i >= 0 ? argv[i + 1] : undefined; };
 const ROOM = flag('room') || process.env.MM_ROOM || 'claude';
 const RELAY = (flag('relay') || process.env.MM_RELAY || 'http://127.0.0.1:8020').replace(/\/+$/, '');
+// A relay on the internet (cloudflare/relay) wants a key for the room: MM_RELAY_KEY, or --key
+// (an argument is in the process list; the environment, or .mcp.json's env, is better).
+const KEY = flag('key') || process.env.MM_RELAY_KEY || '';
 const NAME = (flag('name') || process.env.MM_NAME || 'claude').replace(/~.*$/, '');
 
 // ----- The engine, built --------------------------------------------------
@@ -72,7 +75,13 @@ const ME = MM.sittingName(NAME);
 let relayServer = null;
 try { relayServer = await ensureRelay(RELAY); } catch (err) { log(err.message); process.exit(1); }
 if (relayServer) log(`relay started on ${RELAY} (none was answering)`);
-const transport = relayTransport(RELAY, ROOM);
+// Ask once whether the relay lets this hand into the room, and say why not: a relay that wants a
+// key and is given none or a wrong one would otherwise be a room that is silently empty.
+{
+  const verdict = await checkRelay(RELAY, ROOM, { key: KEY });
+  if (!verdict.ok) { log('metamedium mcp: ' + verdict.words); process.exit(1); }
+}
+const transport = relayTransport(RELAY, ROOM, { key: KEY });
 // A hand that answers at the seat says so on every line of its own (V1-PLAN
 // J4), so a page in the room can offer Claude Code as the model it asks.
 const store = new MM.LiveStore(transport, ME, ROOM, { seat: true });

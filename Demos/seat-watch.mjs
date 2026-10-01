@@ -5,6 +5,7 @@
 //   node Demos/seat-watch.mjs                                  # room "claude", relay http://127.0.0.1:8020
 //   MM_ROOM=table MM_RELAY=http://127.0.0.1:8020 node Demos/seat-watch.mjs
 //   node Demos/seat-watch.mjs --room claude --relay http://127.0.0.1:8020
+//   MM_RELAY=https://relay.dyna.ink MM_RELAY_KEY=… node Demos/seat-watch.mjs   # a relay that wants a key (cloudflare/relay)
 //
 // A page that seats *Claude Code (MCP hand)* parks every question it asks —
 // What is this?, Read the writing, a question — in the room as a brief
@@ -25,13 +26,16 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { relayTransport } from './live-node.mjs';
+import { relayTransport, checkRelay } from './live-node.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
 const flag = (name) => { const i = argv.indexOf('--' + name); return i >= 0 ? argv[i + 1] : undefined; };
 const ROOM = flag('room') || process.env.MM_ROOM || 'claude';
 const RELAY = (flag('relay') || process.env.MM_RELAY || 'http://127.0.0.1:8020').replace(/\/+$/, '');
+
+// A relay that wants a key for the room: MM_RELAY_KEY, or --key (an argument is in the process list).
+const KEY = flag('key') || process.env.MM_RELAY_KEY || '';
 
 const distPath = path.join(here, 'metamedium-core.node.mjs');
 if (!existsSync(distPath)) {
@@ -42,7 +46,14 @@ const MM = await import(pathToFileURL(distPath).href);
 
 // The relay's stream in; nothing out. A store answers hellos and hands copies
 // on — here every line it would send goes nowhere.
-const wire = relayTransport(RELAY, ROOM);
+// A relay that is up and refuses this hand is said once and ends the watch — the
+// one case where silence would be wrong, since no brief could ever be printed. A
+// relay that is not up yet is waited for, as ever.
+{
+  const verdict = await checkRelay(RELAY, ROOM, { key: KEY });
+  if ([401, 403, 503].includes(verdict.status)) { process.stderr.write('seat-watch: ' + verdict.words + '\n'); process.exit(1); }
+}
+const wire = relayTransport(RELAY, ROOM, { key: KEY });
 const silent = { send: () => undefined, onMessage: (cb) => wire.onMessage(cb), close: () => wire.close() };
 const NAME = 'seat-watch';
 const store = new MM.LiveStore(silent, NAME, ROOM);
