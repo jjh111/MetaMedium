@@ -5,7 +5,8 @@
 //   pictureSrc), tracing a held picture into ink (traceFrom). The board out — SVG, PNG, PDF, the bundle, the
 //   log, downloadText/downloadBlob — is 18-out.js's.
 // Uses: core, view (viewportWorld), folder (folder, boards, boardDB, journalFold, isKept, session), render, 17-assets.js
-//   (the rules: what a picture is kept as, where a pick stands, which assets are unused, what the decoded cost).
+//   (the rules: what a picture is kept as, where a pick stands, which assets are unused, what the decoded cost),
+//   and, in a live room, roomAssetFetch / folder.roomAssets (17-folder.js: the bytes of a picture another hand imported).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -389,7 +390,8 @@
 
   /** One decode: the asset's bytes into a bitmap at a tier — a thumbnail's long side, or whole. */
   async function decodeAsset(asset, tier) {
-    const rec = await assetGet(asset);
+    // Bytes this browser holds not at all — a picture another hand imported in a room — are asked of the room (17-folder.js).
+    const rec = (await assetGet(asset)) || (await roomAssetFetch(asset));
     if (!rec) return null;
     const blob = new Blob([rec.bytes], { type: rec.mime || 'image/jpeg' });
     if (tier === 'thumb' && rec.w && rec.h) {
@@ -420,7 +422,7 @@
         picturesLoading--;
         const cur = pictures.get(asset);
         if (!cur) { if (got) got.bmp.close(); return; }
-        if (!got) { cur.state = 'missing'; viewChanged(); return; }
+        if (!got) { cur.state = 'missing'; askAgainLater(asset); viewChanged(); return; }
         if (cur.bmp) cur.bmp.close();
         cur.bmp = got.bmp; cur.tier = got.tier; cur.size = got.size; cur.state = 'ready';
         cur.cost = decodedCost(got.size, got.tier);
@@ -428,6 +430,16 @@
       }, () => { picturesLoading--; const cur = pictures.get(asset); if (cur) { cur.state = cur.bmp ? 'ready' : 'missing'; cur.want = null; } });
     }
     return e.bmp ? { bmp: e.bmp, tier: e.tier } : null;
+  }
+  // A picture the room did not hold yet (a hand's line can beat its bytes, or the relay was busy) is asked for again,
+  // a few times, later each time (17-assets.js `roomAssetRetryMs`) — only in a room, and only while it stays missing.
+  const askedAgain = new Map();
+  function askAgainLater(asset) {
+    if (!folder.roomAssets) return;
+    const n = askedAgain.get(asset) || 0, ms = roomAssetRetryMs(n);
+    if (ms === null) return;
+    askedAgain.set(asset, n + 1);
+    setTimeout(() => { const e = pictures.get(asset); if (e && e.state === 'missing') { pictures.delete(asset); viewChanged(); } }, ms);
   }
   /** What the paint just made has cost: let go of what the budget cannot hold and what has not been drawn for a while. */
   function picturesPainted() {

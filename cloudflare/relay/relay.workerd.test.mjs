@@ -138,3 +138,52 @@ test('in workerd: keys, the stream, Last-Event-ID, the cap and the truncation wo
     rmSync(state, { recursive: true, force: true });
   }
 });
+
+test('in workerd: a picture is put by its hash under the room\'s key, comes back byte for byte from SQLite-backed storage, survives a restart, and is refused past the cap', { skip, timeout: 180000 }, async () => {
+  const { createHash } = await import('node:crypto');
+  const { encodePNG } = await import('../../Demos/ink-png.mjs');
+  const state = mkdtempSync(path.join(tmpdir(), 'dyna-relay-assets-'));
+  let server = await startWorkerd(state);
+  const room = 'wda-' + Math.random().toString(36).slice(2, 7);
+  const key = await keyForRoom(SECRET, room);
+  const auth = { authorization: 'Bearer ' + key };
+  // Noise does not compress: the PNG is about as large as its pixels, so it is several pieces in storage.
+  const n = 700, px = new Uint8Array(n * n * 4);
+  let x = 7; for (let i = 0; i < px.length; i++) { x = (x * 1664525 + 1013904223) >>> 0; px[i] = x >>> 24; }
+  const png = new Uint8Array(encodePNG(n, n, px));
+  const hash = createHash('sha256').update(png).digest('hex');
+  const at = (r, h) => `${server.url}/rooms/${r}/assets/${h}`;
+  try {
+    assert.ok(png.length > 1.5e6, 'a picture of ' + png.length + ' bytes');
+    assert.equal((await fetch(at(room, hash), { method: 'PUT', body: png })).status, 401);
+    assert.equal((await fetch(at(room, hash), { method: 'PUT', headers: { authorization: 'Bearer ' + await keyForRoom(SECRET, 'another') }, body: png })).status, 403);
+    assert.equal((await fetch(at(room, hash), { method: 'PUT', headers: { ...auth, origin: 'https://dyna.ink' }, body: png })).status, 204);
+    const pre = await fetch(at(room, hash), { method: 'OPTIONS', headers: { origin: 'https://dyna.ink', 'access-control-request-method': 'PUT' } });
+    assert.match(pre.headers.get('access-control-allow-methods'), /PUT/);
+    const back = async () => { const r = await fetch(at(room, hash), { headers: auth }); return { r, bytes: new Uint8Array(await r.arrayBuffer()) }; };
+    let got = await back();
+    assert.equal(got.r.status, 200);
+    assert.equal(got.r.headers.get('content-type'), 'image/png');
+    assert.match(got.r.headers.get('cache-control'), /immutable/);
+    assert.deepEqual(got.bytes, png);
+    const head = await fetch(at(room, hash), { method: 'HEAD', headers: auth });
+    assert.equal(head.status, 200);
+    assert.equal(head.headers.get('content-length'), String(png.length));
+    // Another room's key finds none of it; a picture over 12 MB is said too large.
+    const otherKey = await keyForRoom(SECRET, 'wda-other');
+    assert.equal((await fetch(at('wda-other', hash), { headers: { authorization: 'Bearer ' + otherKey } })).status, 404);
+    const huge = new Uint8Array(12 * 1024 * 1024 + 1); huge.set(png.subarray(0, 64));
+    const refused = await fetch(at(room, createHash('sha256').update(huge).digest('hex')), { method: 'PUT', headers: auth, body: huge });
+    assert.equal(refused.status, 413);
+    assert.match(await refused.text(), /12 MB/);
+    // A restart keeps the room's pictures: they are in the Durable Object's storage on disk.
+    await server.stop();
+    server = await startWorkerd(state);
+    got = await back();
+    assert.equal(got.r.status, 200);
+    assert.deepEqual(got.bytes, png);
+  } finally {
+    await server.stop();
+    rmSync(state, { recursive: true, force: true });
+  }
+});

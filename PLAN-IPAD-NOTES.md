@@ -295,6 +295,32 @@ seats unit: `24-seat.js`'s *with Claude* should default on dyna.ink to
 `https://relay.dyna.ink`, room `claude`, the key from the page's `?key=`; and a seat joined
 through an https relay is `hosted` to `providerLocality`, not `local`.
 
+**A1 — pictures in a room, and the agent's hand on them (1 Oct 2026, branch `unit/a1-agent-assets`).**
+John's direction was that the flow must work from the person's side and an adjacent agent's. The gap: a picture's bytes
+never left the tab that imported it, so in a room (the iPad, a Mac tab, an agent) another hand drew only the picture's
+name, and an agent could neither put a picture on the board nor see one. Now **both relays keep a room's pictures by
+their hash** (`PUT|GET|HEAD /rooms/<room>/assets/<sha256>`, under the room's key; verified on arrival, a picture by its
+own header, up to 12 MB, a room capped — one set of rules in `Demos/relay-protocol.mjs`, one set of cases in
+`Demos/relay-assets.conformance.mjs` run against the Node relay and the Worker; the Worker keeps them in the Durable
+Object's storage in 96 KiB pieces, *not R2*: a second product to enable, a second binding, a second place data could
+outlive a room); **the tab puts a picture on the relay before it names it** and **fetches** the bytes of an `import` it
+holds none of when it first draws it (verified against the hash, kept in `mm-assets`, asked again later if the room did
+not hold them yet); **the MCP hand has `canvas_import`** (PNG, JPEG, WebP by their headers read by hand, or an SVG as an
+artifact; a path, a url or base64; `at` or `place`) and **`canvas_see` draws the pictures under the ink** — a PNG
+decoded in by a by-hand decoder (`ink-png.mjs`), a JPEG or WebP, which would take a decoder this repository does not
+carry, as a frame in the composite *and the photo itself as an image of its own* (the bytes, with their mime), so the
+agent really sees what an iPad kept. Tests (red first, `3c681d7`): relay 27 (14 new: the 8 shared asset cases, the preflight, the directory, the header reader and the verdicts) + 8 PNG-reader + 5 new
+asset-rule cases in Node, the Worker 47 in all (the shared asset cases over a socket, and the key, CORS, eviction and chunk
+sizes) with one new real-runtime case in workerd (a 1.5 MB picture put, got back whole, kept across a restart; the 413
+sentence), the MCP smoke 21 new checks (a PNG, a path, a url, a JPEG, an SVG, the refusals, `canvas_see` of a PNG, a JPEG and a tab's picture), and the
+gate's `hand` H1.22–25 (the tab draws the hand's picture, a second tab in a context of its own draws the first's, the
+hand sees it, and the same on the Worker's logic with a key by Bearer after a CORS preflight). Gate, run on `ed0f66d` before a container restart: canvas 439 + 2 skips, keep 38, boards 40, app 18, pencil 18, models 38, seat 12, hand 29 + 5 skips, budgets 1 + 5 skips (a loaded machine); the shard's three scenarios were cut off by the restart (core and `shard-3d` untouched). What John does: nothing
+new (`cloudflare/README.md`, *What an agent does there*). Found: workerd lost the sentence of an early 413 to a client
+still sending, so the Worker drains an over-large body (to four times the cap) before it answers; a tab's photos are
+JPEG or WebP, so the agent sees them as images of their own, not in the composite. Not done: a JPEG/WebP decoder (the
+composite shows a frame for them); EXIF orientation on a picture the hand imports; garbage-collecting a room's pictures
+(a room that fills is refused, never pruned); the free-plan Durable Object storage and row limits are unverified.
+
 Cut order if time runs short: I9, then I8's spike, then I5's outline. Never cut
 I1–I4.
 

@@ -20,6 +20,7 @@ const NAMES = [
   'ASSET_LONG_SIDE', 'ASSET_GRACE_MS', 'sha256Hex', 'assetRef', 'isAssetRef', 'fitLongSide', 'pictureFormat', 'pictureExt',
   'safePictureName', 'uniquePicturePath', 'assetsOfEvents', 'assetGcPlan', 'pictureGrid', 'pictureCells', 'fitInCell', 'clearShift', 'pickWords',
   'pictureTier', 'decodedCost', 'evictPlan', 'PICTURE_THUMB_PX', 'DECODED_BUDGET_PX',
+  'roomAssetHashes', 'roomAssetUrl', 'roomAssetRetryMs', 'ROOM_ASSET_MAX_BYTES', 'roomAssetWords',
 ];
 const file = join(dirname(fileURLToPath(import.meta.url)), '17-assets.js');
 const A = (() => {
@@ -204,4 +205,51 @@ test('a pick stands clear of what is on the board: where the view says if that i
   // Marks above or below the band the cells stand in are not in the way.
   assert.deepEqual(A.clearShift(cells, [{ minX: 0, minY: 5000, maxX: 9999, maxY: 5100 }], 20).moved, false);
   assert.deepEqual(A.clearShift([], [{ minX: 0, minY: 0, maxX: 1, maxY: 1 }], 20), { dx: 0, dy: 0, moved: false });
+});
+
+// ----- pictures in a room (PLAN-IPAD-NOTES A1) -----------------------------------------------------
+
+test('the assets a line of a room names: the hashes of its pictures, bare, each once — nothing else', () => {
+  const line = { participant: 'john~1', at: 1, events: [
+    { type: 'stroke', id: 's1' },
+    { type: 'import', kind: 'jpg', path: 'imports/a.jpg', asset: 'sha256:' + hex('a'), mime: 'image/jpeg' },
+    { type: 'import', kind: 'png', path: 'imports/b.png', asset: 'sha256:' + hex('b') },
+    { type: 'import', kind: 'png', path: 'imports/a2.png', asset: 'sha256:' + hex('a') },
+    { type: 'import', kind: 'html', path: 'page.html', code: '<p>x</p>' },
+    { type: 'import', kind: 'png', path: 'x.png', asset: 'sha256:nothex' },
+  ] };
+  assert.deepEqual(A.roomAssetHashes(line), [hex('a'), hex('b')]);
+  assert.deepEqual(A.roomAssetHashes({ participant: 'x', events: [] }), []);
+  assert.deepEqual(A.roomAssetHashes({ hello: true, participant: 'x', events: [] }), []);
+  assert.deepEqual(A.roomAssetHashes(null), []);
+  assert.deepEqual(A.roomAssetHashes({ events: 'not a list' }), []);
+});
+
+test('the address of a picture in a room: the relay, the room as text, the bare hash — a ref or a hash alike', () => {
+  assert.equal(A.roomAssetUrl('https://relay.dyna.ink/', 'my room', 'sha256:' + hex('c')), 'https://relay.dyna.ink/rooms/my%20room/assets/' + hex('c'));
+  assert.equal(A.roomAssetUrl('http://127.0.0.1:8020', 'claude', hex('d')), 'http://127.0.0.1:8020/rooms/claude/assets/' + hex('d'));
+  assert.equal(A.roomAssetUrl('http://127.0.0.1:8020', 'claude', 'nope'), null);
+});
+
+test('a picture missing from the room is asked for again, a few times, later each time — then left', () => {
+  const waits = [];
+  for (let n = 0; n < 10; n++) { const w = A.roomAssetRetryMs(n); if (w === null) break; waits.push(w); }
+  assert.ok(waits.length >= 3 && waits.length <= 6, JSON.stringify(waits));
+  assert.deepEqual(waits, [...waits].sort((a, b) => a - b), 'each wait no shorter than the last');
+  assert.ok(waits[0] >= 500 && waits[waits.length - 1] <= 30000);
+  assert.equal(A.roomAssetRetryMs(waits.length), null);
+});
+
+test('a room takes a picture up to what the relay takes — the surface says no itself before sending more', () => {
+  assert.equal(A.ROOM_ASSET_MAX_BYTES, 12 * 1024 * 1024);
+});
+
+test('what a refusal from the room says, in the person\'s words', () => {
+  assert.match(A.roomAssetWords(413, 'that picture is 13 MB'), /too large|13 MB/);
+  assert.match(A.roomAssetWords(401, ''), /key/);
+  assert.match(A.roomAssetWords(403, ''), /key/);
+  assert.match(A.roomAssetWords(507, 'this room holds all the pictures it keeps'), /holds all the pictures/);
+  assert.match(A.roomAssetWords(0, ''), /reach/);
+  assert.match(A.roomAssetWords(500, ''), /500/);
+  assert.ok(!/sha256|[0-9a-f]{64}/.test(A.roomAssetWords(422, 'not the bytes')));
 });

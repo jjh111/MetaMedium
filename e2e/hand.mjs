@@ -42,6 +42,15 @@
 //          up while the call is out; the reading lands held and the hand's look says who read it
 //   H1.20-21 QA-v10 §7 — the minimap and a tap on it; three circles and two lines, Show it in 3D,
 //          the hand's look says one run artifact, playing
+//   H1.22-24 A1, pictures in a room (PLAN-IPAD-NOTES): the hand imports a PNG (canvas_import — its bytes
+//          put on the relay by their hash, then the event) and the tab, which holds none of it, fetches the
+//          bytes into its own asset store and DRAWS it — the red of the bytes at the picture's centre; a
+//          picture the tab imports is put on the relay and fetched, stored and drawn by a SECOND tab (a
+//          context of its own: its own IndexedDB) and seen by the hand — canvas_see returns its pixels;
+//          a picture whose bytes the room never got stays a named plate, and says so
+//   H1.25  the same on the Worker's logic (cloudflare/relay, in Node) with a room key: a tab joins with ?key=,
+//          its picture goes by Authorization: Bearer after a CORS preflight, and another tab, a context of
+//          its own, fetches and draws it — the path relay.dyna.ink takes, in the gate
 //   H1.S1-4 the rows only John's own hand can walk: skips, by name
 //   H1.Y   the invariant: Tier 1 before a model — the model was asked once, by H1.19, and no brief,
 //          no seat, no real model
@@ -52,6 +61,10 @@ import { createServer } from 'node:http';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startRelay } from '../Demos/relay.mjs';
+import { startDevRelay } from '../cloudflare/relay/dev-server.mjs';
+import { keyForRoom } from '../cloudflare/relay/src/auth.mjs';
+import { encodePNG, decodePNG } from '../Demos/ink-png.mjs';
+import { createHash } from 'node:crypto';
 import { sleep } from './keep.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -620,6 +633,151 @@ export async function runHand(browser, servers, { freshContext, screenshot }) {
         held && took && made && !!three && /\brun\b/.test(markLine(shortLook, three) || '') && /playing|live/.test(markLine(shortLook, three) || ''), { held, took, made, three, line: markLine(shortLook, three), full: look.slice(0, 1500) });
     });
 
+
+    // ---- A1. Pictures in a room (PLAN-IPAD-NOTES): the bytes go by their hash, and every hand draws what it is shown ----
+    const sha = (b) => createHash('sha256').update(b).digest('hex');
+    const solidPng = (n, rgba) => { const px = new Uint8Array(n * n * 4); for (let i = 0; i < n * n; i++) px.set(rgba, i * 4); return new Uint8Array(encodePNG(n, n, px)); };
+    const RED = [200, 40, 40], BLUE = [50, 70, 210];
+    const close3 = (got, want, tol = 30) => !!got && want.every((v, i) => Math.abs(got[i] - v) <= tol);
+    /** What a tab's canvas shows at a world point (a 5×5 average), once the tab's view is set so the point is on screen. */
+    const pixelOf = (pg, wx, wy) => pg.evaluate(([x, y]) => {
+      const mm = window.__mm, p = mm.worldToScreen(x, y), cv = document.getElementById('canvas');
+      const d = cv.getContext('2d').getImageData(Math.round(p.x) - 2, Math.round(p.y) - 2, 5, 5).data;
+      let r = 0, g = 0, b = 0; const n = d.length / 4;
+      for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+      return [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
+    }, [wx, wy]);
+    const showsColour = async (pg, wx, wy, want, ms = 9000) => { let got = null; const ok = await until(async () => { got = await pixelOf(pg, wx, wy); return close3(got, want); }, ms); return { ok, got }; };
+    const boundsOfIn = (pg, id) => pg.evaluate((i) => { const mm = window.__mm, n = mm.session.getState().nodes.get(i); const b = n && mm.MM.boundsOf(n); return b ? { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY } : null; }, id);
+    let handPic = null, handHash = null;
+    await record('H1.22', async () => {
+      const png = solidPng(16, [...RED, 255]);
+      handHash = sha(png);
+      // What the first tab asks of the relay's assets, counted: it must GET the hand's picture, and put nothing it was only shown.
+      const asked1 = [];
+      await guards.context.route((url) => url.pathname.includes('/assets/'), async (route) => { asked1.push(route.request().method() + ' ' + route.request().url().split('/assets/')[1]); await route.continue(); });
+      const out = textOf(await hand.call('canvas_import', { base64: Buffer.from(png).toString('base64'), name: 'swatch.png', at: { x: 3000, y: 3000, w: 200 } }));
+      handPic = (out.match(/^(\S+) placed/) || [])[1] || null;
+      const onRelay = await fetch(`${RELAY}/rooms/${ROOM}/assets/${handHash}`);
+      await page.evaluate(() => window.__mm.setView(1, -2900, -2900));
+      const arrived = handPic && await waitFor(page, (id) => !!window.__mm.session.getState().nodes.get(id), handPic, 8000);
+      const shows = await showsColour(page, 3100, 3100, RED);
+      const held1 = await page.evaluate((h) => window.__mm.assets().then((l) => l.some((a) => a.hash === 'sha256:' + h)), handHash);
+      const st = await page.evaluate(tabNow);
+      const gets1 = asked1.filter((a) => a === 'GET ' + handHash).length, puts1 = asked1.filter((a) => a.startsWith('PUT')).length;
+      check(`H1.22. A1: the hand imports a PNG (${(out || '').slice(0, 70)}) — the relay holds its bytes by their hash (${onRelay.status}), and the tab, which had none of them, asks the relay for them by that hash (${gets1} GET), keeps them in its own asset store (${held1 ? 'held now' : 'not held'}) and DRAWS it: the canvas at its centre is ${JSON.stringify(shows.got)}, the red of the bytes — it put nothing on the relay (${puts1} PUT) and the model was not asked (${asked()} calls)`,
+        !!handPic && onRelay.status === 200 && arrived && gets1 >= 1 && puts1 === 0 && held1 && shows.ok && asked() === 1 && st.working.length === 0, { out, onRelay: onRelay.status, arrived, held1, gets1, puts1, asked1, shows, calls: model.calls.length });
+    });
+
+    let tabPicId = null, tabPicHash = null;
+    let page2 = null;
+    await record('H1.23', async () => {
+      // The tab imports a picture of its own, in its view, by the surface's own door.
+      await page.evaluate(() => window.__mm.setView(1, -5000, -5000));
+      const imported = await page.evaluate(async () => {
+        const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+        const g = c.getContext('2d'); g.fillStyle = 'rgb(50,70,210)'; g.fillRect(0, 0, 64, 64);
+        const file = await new Promise((ok) => c.toBlob((b) => ok(new File([b], 'sky.png', { type: 'image/png' })), 'image/png'));
+        const r = await window.__mm.importPictures([file], { view: { minX: 5000, minY: 5000, maxX: 5400, maxY: 5300 } });
+        const ev = window.__mm.session.getEvents().filter((e) => e.type === 'import' && e.asset).pop();
+        return { ids: r.ids, asset: ev && ev.asset };
+      });
+      tabPicId = imported.ids[0] || null;
+      tabPicHash = imported.asset ? imported.asset.replace(/^sha256:/, '') : null;
+      const putOnRelay = await until(async () => tabPicHash && (await fetch(`${RELAY}/rooms/${ROOM}/assets/${tabPicHash}`, { method: 'HEAD' })).status === 200, 8000);
+      // A second tab: its own context, so its own IndexedDB and nothing of the first's asset store.
+      const guards2 = await freshContext(browser, { origins: [servers.staticOrigin, model.origin], label: 'hand-2' });
+      guardsList.push(guards2);
+      await guards2.context.addInitScript(johnsTab, 'maria');
+      await guards2.context.route((url) => url.port === '8020', async (route) => { toJohnsRelay.push(route.request().method() + ' ' + route.request().url()); await route.abort('blockedbyclient'); });
+      // What the second tab asks of the relay's assets, counted: it must GET what it draws and never PUT what it was only shown.
+      const asked2 = [];
+      await guards2.context.route((url) => url.pathname.includes('/assets/'), async (route) => { asked2.push(route.request().method() + ' ' + route.request().url().split('/assets/')[1]); await route.continue(); });
+      page2 = await guards2.context.newPage();
+      await page2.goto(address, { waitUntil: 'load', timeout: 60000 });
+      await page2.waitForFunction(() => window.__mm && window.__mm.folder && window.__mm.folder().how === 'live', null, { timeout: 20000 });
+      const has = await waitFor(page2, (id) => !!window.__mm.session.getState().nodes.get(id), tabPicId, 12000);
+      const b = await boundsOfIn(page, tabPicId);
+      await page2.evaluate(([x, y]) => window.__mm.setView(1, -(x - 100), -(y - 100)), [b.minX, b.minY]);
+      const centre = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
+      const shows = await showsColour(page2, centre.x, centre.y, BLUE);
+      const after = await page2.evaluate((h) => window.__mm.assets().then((l) => l.some((a) => a.hash === 'sha256:' + h)), tabPicHash);
+      // …and the hand's swatch, which the second tab never saw imported either.
+      const hb = await boundsOfIn(page2, handPic);
+      await page2.evaluate(([x, y]) => window.__mm.setView(1, -(x - 100), -(y - 100)), [hb.minX, hb.minY]);
+      const hs = await showsColour(page2, (hb.minX + hb.maxX) / 2, (hb.minY + hb.maxY) / 2, RED);
+      const gets = (h) => asked2.filter((a) => a === 'GET ' + h).length;
+      const puts = asked2.filter((a) => a.startsWith('PUT')).length;
+      check(`H1.23. A1: a picture the first tab imports (${tabPicId}) is put on the relay by its hash (${putOnRelay}), and a SECOND tab — a context of its own, so none of its bytes — asks the relay for it by that hash (${gets(tabPicHash)} GET), keeps it in its own asset store (${after ? 'held now' : 'not held'}) and draws it — ${JSON.stringify(shows.got)}, the blue of the bytes — and the hand's swatch the same way (${gets(handHash)} GET, ${JSON.stringify(hs.got)}); it put nothing on the relay itself (${puts} PUT)`,
+        !!tabPicId && putOnRelay && has && gets(tabPicHash) >= 1 && gets(handHash) >= 1 && puts === 0 && after && shows.ok && hs.ok, { tabPicId, tabPicHash, putOnRelay, has, after, shows, hs, asked2 });
+    });
+
+    await record('H1.24', async () => {
+      // The hand's look says the room holds the pictures; canvas_see draws the hand's PNG in, and gives the tab's photo — a WebP,
+      // which the hand has no decoder for — as its own image, the very bytes the tab kept, after a frame in the composite.
+      const look = await lookUntil((l) => /in the room/.test(markLine(l, tabPicId) || ''), 8000);
+      const seenTab = await hand.call('canvas_see', { ids: [tabPicId], size: 220 });
+      const imgs = (seenTab.content || []).filter((c) => c.type === 'image');
+      const own = imgs.find((c) => c.mimeType !== 'image/png');
+      const ownHash = own && sha(Buffer.from(own.data, 'base64'));
+      const seenHand = await hand.call('canvas_see', { ids: [handPic], size: 200 });
+      const handImg = (seenHand.content || []).find((c) => c.type === 'image');
+      const dec = handImg && decodePNG(Buffer.from(handImg.data, 'base64'));
+      const mid = dec && [...dec.rgba.slice(((dec.height >> 1) * dec.width + (dec.width >> 1)) * 4, ((dec.height >> 1) * dec.width + (dec.width >> 1)) * 4 + 3)];
+      check(`H1.24. A1: the hand's look says the first tab's picture is one the room holds ("${(markLine(look, tabPicId) || '').slice(0, 130)}"); canvas_see of it hands back the bytes the tab kept as an image of their own (${own ? own.mimeType : 'none'}, hash ${ownHash === tabPicHash ? 'the asset\'s' : ownHash}); and canvas_see of the hand's own PNG draws its pixels where it stands (${JSON.stringify(mid)})`,
+        /a picture sky\.png/.test(markLine(look, tabPicId) || '') && /in the room/.test(markLine(look, tabPicId) || '') && !!own && ownHash === tabPicHash && !!mid && close3(mid, RED, 6), { line: markLine(look, tabPicId), mimes: imgs.map((c) => c.mimeType), ownHash, tabPicHash, mid, text: textOf(seenTab) });
+      if (page2) await page2.close().catch(() => {});
+    });
+
+    await record('H1.25', async () => {
+      // The Worker's logic in Node with a key per room: what relay.dyna.ink does, in the gate.
+      const SECRET = 'the-gate-secret';
+      const worker = await startDevRelay({ MM_RELAY_SECRET: SECRET });
+      const room = 'keyed-room';
+      const roomKey = await keyForRoom(SECRET, room);
+      const asked3 = [];
+      const addr = `${servers.staticOrigin}/Demos/session-engine.html?live=${room}&relay=${encodeURIComponent(worker.url)}&key=${encodeURIComponent(roomKey)}&nosw=1`;
+      let page3 = null, page4 = null;
+      try {
+        const g3 = await freshContext(browser, { origins: [servers.staticOrigin, model.origin], label: 'hand-3' });
+        guardsList.push(g3);
+        await g3.context.addInitScript(johnsTab, 'nell');
+        await g3.context.route((url) => url.pathname.includes('/assets/'), async (route) => { const r = route.request(); asked3.push(r.method() + ' ' + (r.headers().authorization ? 'bearer' : 'open') + (r.url().includes('key=') ? '+query' : '')); await route.continue(); });
+        page3 = await g3.context.newPage();
+        await page3.goto(addr, { waitUntil: 'load', timeout: 60000 });
+        await page3.waitForFunction(() => window.__mm && window.__mm.folder && window.__mm.folder().how === 'live', null, { timeout: 20000 });
+        await page3.evaluate(() => window.__mm.setView(1, -7000, -7000));
+        const done = await page3.evaluate(async () => {
+          const c = document.createElement('canvas'); c.width = 48; c.height = 48;
+          const g = c.getContext('2d'); g.fillStyle = 'rgb(200,150,20)'; g.fillRect(0, 0, 48, 48);
+          const file = await new Promise((ok) => c.toBlob((b) => ok(new File([b], 'gold.png', { type: 'image/png' })), 'image/png'));
+          const r = await window.__mm.importPictures([file], { view: { minX: 7000, minY: 7000, maxX: 7400, maxY: 7300 } });
+          const ev = window.__mm.session.getEvents().filter((e) => e.type === 'import' && e.asset).pop();
+          return { id: r.ids[0], asset: ev && ev.asset };
+        });
+        const hash = done.asset && done.asset.replace(/^sha256:/, '');
+        const held = await until(async () => hash && (await fetch(`${worker.url}/rooms/${room}/assets/${hash}`, { method: 'HEAD', headers: { authorization: 'Bearer ' + roomKey } })).status === 200, 8000);
+        const refused = hash ? (await fetch(`${worker.url}/rooms/${room}/assets/${hash}`, { method: 'HEAD' })).status : 0;
+        // Another tab, a context of its own, with the same key.
+        const g4 = await freshContext(browser, { origins: [servers.staticOrigin, model.origin], label: 'hand-4' });
+        guardsList.push(g4);
+        await g4.context.addInitScript(johnsTab, 'omar');
+        page4 = await g4.context.newPage();
+        await page4.goto(addr, { waitUntil: 'load', timeout: 60000 });
+        await page4.waitForFunction(() => window.__mm && window.__mm.folder && window.__mm.folder().how === 'live', null, { timeout: 20000 });
+        const has = await waitFor(page4, (id) => !!window.__mm.session.getState().nodes.get(id), done.id, 12000);
+        const b = await boundsOfIn(page3, done.id);
+        await page4.evaluate(([x, y]) => window.__mm.setView(1, -(x - 100), -(y - 100)), [b.minX, b.minY]);
+        const shows = await showsColour(page4, (b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2, [200, 150, 20], 12000);
+        const bearer = asked3.filter((a) => a.startsWith('PUT bearer')).length;
+        check(`H1.25. A1, a keyed Worker relay: a tab joined with ?key= puts its picture by Authorization: Bearer (${JSON.stringify(asked3)}) and the key is in no asset address; the Worker holds it for that key (${held}) and refuses it without one (${refused}); a second tab, a context of its own, with the same key, draws it — ${JSON.stringify(shows.got)}`,
+          !!hash && held && refused === 401 && bearer === 1 && !asked3.some((a) => a.includes('+query')) && has && shows.ok, { done, held, refused, asked3, has, shows });
+      } finally {
+        if (page3) await page3.close().catch(() => {});
+        if (page4) await page4.close().catch(() => {});
+        await worker.close().catch(() => {});
+      }
+    });
 
     // ---- The rows of QA-v10 that only John's own hand can walk ----
     check('H1.S1. QA-v10 §1 — letters at any size, words, a line: hello and world written big in his own hand, a tall l with a flick apart, three bubbles and two lines quickly; the panel says a word of 5 strokes, no arrow above 0.3, five marks and not a word — skipped: needs John\'s hand (his x-height 31–40 px, ascenders 72–88 px)', true);

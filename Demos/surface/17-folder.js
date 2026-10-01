@@ -2,7 +2,9 @@
 // Provides: the folder as the canvas — openFolder/openStatic/openStore (discovery into artifacts,
 //   per-participant logs merged), autosave (to the folder), the live budget (liveSet), the grid and
 //   focus views (setViewMode, focusOn), imageUrlFor, folderStatus; a live room (openLive: logs
-//   arriving live over a BroadcastChannel or a relay, merged as they land); and the boards this
+//   arriving live over a BroadcastChannel or a relay, merged as they land, and — over a relay — the bytes of
+//   the pictures they name: put on it before a line names them, fetched by hash when one is missing,
+//   roomAssetFetch; PLAN-IPAD-NOTES A1); and the boards this
 //   browser keeps when there is no folder (V1-PLAN R3, R1) — the adapter over 17-board.js's journal
 //   and 17-boards.js's list: IndexedDB (openBoard, persistBoard, flushBoard, forgetLocalLog; the list:
 //   switchBoard, newBoard, renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash,
@@ -133,6 +135,8 @@
       close: () => ch.close(),
     };
   }
+  /** How long a line waits for the pictures it names to reach the room — under core's own wait on a send. */
+  const ROOM_ASSET_WAIT_MS = 8000;
   function relayTransport(url, room, key) {
     // A relay that asks for a key (cloudflare/relay) takes it as `?key=`: an EventSource cannot set a
     // header. The key is the page's own — from the address or a typed field — and goes nowhere but
@@ -167,14 +171,74 @@
       es.addEventListener('message', onLine);
       es.addEventListener('error', () => { if (es.readyState === 2 && !closed) refusedOr(); });
     };
+    // ----- pictures in the room (PLAN-IPAD-NOTES A1; the rules are 17-assets.js's) -----
+    // A header, not `?key=`: a fetch can send one, and an address is kept by logs and caches.
+    const assetAuth = key ? { authorization: 'Bearer ' + key } : {};
+    const held = new Set();     // pictures the room is known to hold
+    const owed = new Set();     // pictures this tab kept that the room could not be given yet: tried again with the next line
+    const said = new Set();     // pictures whose trouble was already said
+    const sayOnce = (ref, words) => { if (said.has(ref)) return; said.add(ref); say(words); };
+    /** Put one picture this tab kept on the relay: once (a HEAD first), never more than the room takes. */
+    async function putAsset(ref) {
+      if (held.has(ref)) return true;
+      const rec = await assetGet(ref).catch(() => null);
+      if (!rec) return false;   // not kept here: another hand's, whose writer put it
+      const at = roomAssetUrl(url, room, ref);
+      try {
+        const head = await fetch(at, { method: 'HEAD', headers: assetAuth, cache: 'no-store' });
+        if (head.status === 200) { held.add(ref); owed.delete(ref); return true; }
+        const bytes = rec.bytes instanceof Uint8Array ? rec.bytes : new Uint8Array(rec.bytes);
+        if (bytes.length > ROOM_ASSET_MAX_BYTES) { sayOnce(ref, 'a picture could not go to the room — it is larger than the 12 MB a room takes'); return false; }
+        const res = await fetch(at, { method: 'PUT', headers: Object.assign({ 'content-type': rec.mime || 'application/octet-stream' }, assetAuth), body: bytes });
+        if (res.status === 204) { held.add(ref); owed.delete(ref); return true; }
+        // A refusal that will not change (too large, no key, not a picture) is said and let go; a relay in trouble is tried again.
+        if (res.status >= 500) owed.add(ref); else owed.delete(ref);
+        sayOnce(ref, roomAssetWords(res.status, await res.text()));
+        return false;
+      } catch (err) { owed.add(ref); sayOnce(ref, roomAssetWords(0, '')); return false; }
+    }
+    /** Several pictures, three at a time. */
+    async function putAssets(refs) {
+      let i = 0;
+      const lane = async () => { while (i < refs.length) await putAsset(refs[i++]); };
+      await Promise.all([lane(), lane(), lane()]);
+    }
+    /** A picture the room holds, asked for by its hash: verified against it (the relay is not trusted with what a hash names), kept in this browser's asset store, and returned as the store holds it — or null. */
+    async function getAsset(ref, dims) {
+      const at = roomAssetUrl(url, room, ref);
+      if (!at) return null;
+      try {
+        const res = await fetch(at, { headers: assetAuth });
+        if (res.status !== 200) return null;
+        const bytes = new Uint8Array(await res.arrayBuffer());
+        if (assetRef(await digestHex(bytes)) !== ref) return null;
+        const mime = (res.headers.get('content-type') || '').split(';')[0] || 'image/jpeg';
+        await assetPut({ hash: ref, bytes: bytes, mime: mime, w: dims && dims.w, h: dims && dims.h });
+        assets.pending.delete(ref);   // stored under an event already in the log: never "in flight"
+        held.add(ref);
+        return await assetGet(ref);
+      } catch (err) { return null; }
+    }
     open();
     return {
       // The POST's promise goes back to the store, which sends the next line
       // only when this one has gone — two POSTs in flight can land the wrong
       // way round.
-      send: (line) => fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(line) }).then(() => undefined, () => undefined),
+      send: (line) => {
+        // A picture's bytes go first (PLAN-IPAD-NOTES A1): a line that names a picture this tab kept goes only once the
+        // room holds the bytes — or after ROOM_ASSET_WAIT_MS, so a slow link never wedges the room (a hand that
+        // merges the event before the bytes asks again, `roomAssetRetryMs`). A line handed on for another hand (`via`)
+        // names what its writer put; one with no pictures waits for nothing.
+        const refs = line && !line.via ? roomAssetHashes(line).map((h) => 'sha256:' + h) : [];
+        for (const r of owed) if (refs.indexOf(r) < 0) refs.push(r);
+        const todo = refs.filter((r) => !held.has(r));
+        const ready = todo.length ? Promise.race([putAssets(todo), new Promise((ok) => setTimeout(ok, ROOM_ASSET_WAIT_MS))]) : Promise.resolve();
+        return ready.catch(() => undefined).then(() => fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(line) })).then(() => undefined, () => undefined);
+      },
       onMessage: (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
       close: () => { closed = true; clearTimeout(retry); if (es) es.close(); },
+      // The room's pictures: `get` is what 18-images.js asks for a picture this browser holds no bytes for.
+      assets: { get: getAsset },
     };
   }
   // The merge runs on a microtask, not a timer: a hidden tab throttles timers
@@ -218,6 +282,8 @@
     const store = new MM.LiveStore(transport, me, room, { sitting: PAGE_SITTING });
     // Which relay carries the room: the seat parks its questions only through one on this machine (V1-PLAN J4).
     folder.relay = opts.relay || '';
+    // The room's pictures, when its relay keeps them (PLAN-IPAD-NOTES A1): between tabs on one machine the asset store is shared already.
+    folder.roomAssets = (transport && transport.assets) || null;
     // What this hand already drew is its opening log in the room — sent whole,
     // as a store's first send always is, so joining the same room again in
     // this sitting replaces what the room holds of it instead of doubling it.
@@ -241,6 +307,18 @@
   /** A name for this hand in a room: the person's name (a preference), and this page load's suffix. */
   function handName() {
     return MM.sittingName(prefs.get('hand-name', '') || 'hand', PAGE_SUFFIX);
+  }
+  /**
+   * A picture this browser holds no bytes for, asked of the room's relay by its hash (PLAN-IPAD-NOTES A1): an
+   * `import` another hand wrote names the bytes and carries none. Null when there is no room that keeps pictures
+   * or it does not hold them (yet); 18-images.js draws a plate and asks again later (`roomAssetRetryMs`).
+   */
+  async function roomAssetFetch(ref) {
+    const ra = folder.roomAssets;
+    if (!ra || folder.how !== 'live') return null;
+    let dims = {};
+    for (const ev of session.getEvents()) if (ev && ev.type === 'import' && ev.asset === ref) { dims = { w: ev.w, h: ev.h }; break; }
+    return ra.get(ref, dims);
   }
   /** A hand's name as shown: the person's, without the sitting's suffix (core's one rule). */
   function handLabel(name) { return MM.handLabel(name); }
@@ -302,6 +380,7 @@
     // browser keeps stays as it was (where the hand left it too), and is not written again from this page.
     leaveBoard();
     folder.store = store; folder.how = how || 'store'; folder.name = name || ''; folder.error = ''; folder.saveTrouble = null;
+    if (folder.how !== 'live') folder.roomAssets = null;
     // A room's merge stands for that room only; `openLive` makes the next one.
     folder.merge = null;
     // A folder is written under the device's own stable name, whatever a live

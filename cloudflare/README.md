@@ -127,13 +127,57 @@ claude mcp add metamedium --scope user \
 commit a key there. Whether Claude Code expands `${VAR}` in `.mcp.json` is unverified here.)
 Run `seat-watch.mjs` under the session's Monitor tool as `CLAUDE.md` (*The canvas's seat*) says.
 
+### What an agent does there: look, import a picture, say
+
+An agent with a room key — Claude Code with the `metamedium` MCP server above, or any MCP client that can
+run `node Demos/mcp.mjs` with `MM_RELAY=https://relay.dyna.ink MM_RELAY_KEY=<key> MM_ROOM=claude` — is **a hand in John's room**: what it
+draws, writes and says arrives in his tab as that hand's own ink, in its own colour, and what he draws arrives for it.
+Eleven tools; the ones for this flow, in the order a session uses them:
+
+1. **`canvas_look`** — the board in words, with ids: every mark and what the engine reads it as, the pictures
+   (*a picture sky.png 64×64 · its pixels are in the room — canvas_see draws it*), who else is in the room.
+2. **`canvas_see`** — the ink as an image, **with the board's pictures under it**: a PNG is drawn in where it stands; a
+   JPEG or WebP (what an iPad's photos are kept as) is a frame in that image and then arrives **as an image of its own,
+   the very bytes the tab kept**, so the agent sees the photo. Handwriting is read the same way.
+3. **`canvas_import { path | url | base64, name?, at?: {x, y, w?, h?} | place?: {right: "<id>", …} }`** — puts a picture on the
+   board: a PNG, JPEG or WebP (its size read from its header), or an SVG (an `svg` artifact drawn from its text). The
+   bytes go to the relay first, then the `import` event in the agent's log names them; John's iPad fetches them by
+   their SHA-256 the next moment it draws the picture. Up to 12 MB; a refusal is a sentence and places nothing.
+4. **`canvas_say { text, about: [ids] }`**, `canvas_propose`, `canvas_label` (only its own ink), `canvas_write`, `canvas_draw` —
+   a sentence beside marks, a reading offered (never blessed), a caption, a program or a page, shapes.
+
+The other direction: a picture John brings in on the iPad (photos, camera, a drop) is kept on the iPad and, **the moment it
+is named in a room**, put on the relay by its hash — so the agent's `canvas_see` can look at it. And what John asks of
+*Claude Code — in this room* (*What is this?*, *Read the writing*) is parked for the agent as a brief: `seat-watch.mjs`
+wakes the session, `canvas_pending` reads it, `canvas_answer` answers it (`CLAUDE.md`, *The canvas's seat*).
+
+```sh
+# the whole thing from a shell, no MCP client: one process kept alive across turns
+touch /tmp/hand.in; MM_RELAY=https://relay.dyna.ink MM_RELAY_KEY=<key> node Demos/mcp.mjs < <(tail -f /tmp/hand.in) > /tmp/hand.out &
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"canvas_import","arguments":{"path":"/path/to/sketch.png","at":{"x":0,"y":0,"w":400}}}}' > /tmp/hand.in
+```
+
+**Pictures in a room, as the relay keeps them.** `PUT|GET|HEAD https://relay.dyna.ink/rooms/<room>/assets/<sha256>` — the same room
+key (`Authorization: Bearer`, or `?key=` from a browser that cannot set one), the bytes as the body, **verified against the hash**
+on arrival, **a picture only** (a PNG, JPEG, WebP or GIF by its own header, never by what the sender calls it), **up to 12 MB**, and a
+room's pictures capped (`MM_RELAY_ASSET_BYTES`, 64 MiB by default; past it a put is refused in a sentence and no picture is ever
+dropped, because an event may still name one). A get is immutable and cached for a year (its address is its content). They are kept
+in the room's **Durable Object storage**, not R2: R2 is a second product to enable (it asks for a payment method even on its free
+tier), a second binding and a second place a room's data could outlive the room; a picture here is a few hundred KB to a few MB in
+pieces of 96 KiB, and the cap bounds a room. **Free-plan limits to check before you rely on this** (all unverified here — Cloudflare
+changes them): the SQLite storage a Durable Object may hold in total, the rows written a day (a 2 MB picture is about 22 rows), and
+the request and duration allowances. A room full of photographs is the case that meets them first; `MM_RELAY_ASSET_BYTES` is the knob.
+The Node relay (`node Demos/relay.mjs`) keeps pictures in memory, or as files under `MM_RELAY_ASSET_DIR`, with the same rules.
+
 **What *with Claude* should default to on dyna.ink** (`Demos/surface/24-seat.js`, another unit's): the relay
 `https://relay.dyna.ink`, room `claude`, and the key from the page's own `?key=` (the transport reads it
 already: `openLive` takes `opts.key`, else `?key=`). On a local page the default stays `http://127.0.0.1:8020`.
 
 ## What it holds, and what it costs
 
-- **The relay sees every line** — a hand's log is its ink, in clear — and keeps the newest of each room in
+- **The relay sees every picture a room's hands put on the board** — the bytes, in clear, by their hash — and keeps them for as
+  long as the room's object lives (up to `MM_RELAY_ASSET_BYTES` a room); a tab keeps its own copies in the browser, so a relay
+  that forgets a room loses no one's pictures but a hand that never kept them (an agent's). **The relay sees every line** — a hand's log is its ink, in clear — and keeps the newest of each room in
   Durable Object storage on Cloudflare: 5,000 lines or 32 MB a room, the oldest dropped, and a hand
   that joins later is told the room is older than the relay remembers (`MM_RELAY_MAX_LINES`,
   `MM_RELAY_MAX_BYTES`). It is carriage, not safekeeping: boards live in each browser (and in an export).
@@ -177,9 +221,11 @@ node cloudflare/build-site.mjs && cd /somewhere/else && npx wrangler pages dev /
                                                                # (from a folder with no wrangler.toml, or wrangler reads the relay's)
 
 node --test cloudflare/site.test.mjs                           # the file list, the headers, the policy against the source
-cd cloudflare/relay && npm test                                # 24 protocol cases on the Worker (Node + a fake Durable Object storage),
+cd cloudflare/relay && npm test                                # the protocol cases on the Worker (Node + a fake Durable Object storage),
                                                                # the socket and hand cases (live-node, mcp.mjs, seat-watch.mjs), and workerd
+                                                               # (a picture put and got back in the real runtime, kept across a restart)
 ```
 
 The relay shares its protocol with the Node relay — `Demos/relay-protocol.mjs` (what a client is replayed, the
-truncation word, the cap) is one file read by both, so they cannot drift; `Demos/relay.test.mjs` still tests the Node one.
+truncation word, the cap, and a room's pictures) is one file read by both, so they cannot drift; `Demos/relay.test.mjs` still tests the Node one,
+and the picture cases are one file (`Demos/relay-assets.conformance.mjs`) run against both.

@@ -34,10 +34,13 @@
 // carries the protocol and nothing else.
 
 import { existsSync } from 'node:fs';
+import { readFile, stat } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { relayTransport, ensureRelay, checkRelay } from './live-node.mjs';
-import { inkPNG } from './ink-png.mjs';
+import { relayTransport, ensureRelay, checkRelay, roomAssets } from './live-node.mjs';
+import { inkPNG, decodePNG } from './ink-png.mjs';
+import { sniffImage, MAX_ASSET_BYTES, tooLargeWords } from './relay-protocol.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const log = (...a) => process.stderr.write(a.join(' ') + '\n');
@@ -52,6 +55,8 @@ const RELAY = (flag('relay') || process.env.MM_RELAY || 'http://127.0.0.1:8020')
 const KEY = flag('key') || process.env.MM_RELAY_KEY || '';
 const NAME = (flag('name') || process.env.MM_NAME || 'claude').replace(/~.*$/, '');
 
+// A picture's bytes are not in the log: an `import` event names them by their SHA-256 and the room's relay keeps
+// them (PLAN-IPAD-NOTES A1) — this hand puts them there before it names them, and fetches them to see them.
 // ----- The engine, built --------------------------------------------------
 const distPath = path.join(here, 'metamedium-core.node.mjs');
 if (!existsSync(distPath)) {
@@ -82,6 +87,7 @@ if (relayServer) log(`relay started on ${RELAY} (none was answering)`);
   if (!verdict.ok) { log('metamedium mcp: ' + verdict.words); process.exit(1); }
 }
 const transport = relayTransport(RELAY, ROOM, { key: KEY });
+const assets = roomAssets(RELAY, ROOM, { key: KEY });
 // A hand that answers at the seat says so on every line of its own (V1-PLAN
 // J4), so a page in the room can offer Claude Code as the model it asks.
 const store = new MM.LiveStore(transport, ME, ROOM, { seat: true });
@@ -174,6 +180,25 @@ function readBy(x) {
   const who = x.source === MM.LOCAL_PARTICIPANT ? label(ME) : x.sourceName;
   return x.tier || (who && who !== 'engine') ? ' · ' + who : '';
 }
+/** The pictures the room is known to hold the bytes of (once put, they stay): what a look may say without asking. */
+const roomHolds = new Set();
+/** The pictures among some marks, with where each stands — erased ones left out. */
+function picturesAmong(s, ids) {
+  const out = [];
+  for (const id of ids) {
+    const n = s.nodes.get(id);
+    if (!n || n.reps.some((x) => x.modality === 'erased')) continue;
+    const pic = MM.pictureOf(n), b = pic && MM.boundsOf(n);
+    if (pic && b) out.push({ id, pic, bounds: b });
+  }
+  return out;
+}
+/** Ask the room which of these pictures it holds, so a look can say it (one HEAD each, in parallel, the held remembered). */
+async function checkPictures(s, ids) {
+  const want = new Set();
+  for (const p of picturesAmong(s, ids)) if (p.pic.asset && !roomHolds.has(p.pic.asset)) want.add(p.pic.asset);
+  await Promise.all([...want].slice(0, 40).map(async (a) => { if (await assets.has(a.slice('sha256:'.length))) roomHolds.add(a); }));
+}
 function describeMark(node, s) {
   const b = MM.boundsOf(node);
   // Readings are what the engine and the models read; a label is its maker's
@@ -187,9 +212,11 @@ function describeMark(node, s) {
   const rep = codeRepOf(node);
   const who = authorOf(node, s);
   const parts = [node.id + (name ? ' “' + name + '”' : '')];
-  // A picture: its name and size. Its pixels are kept by the page that imported it (the browser's asset store) — this hand has none, and says so.
+  // A picture: its name and size. Its bytes are not in the log: the hand that imported it put them in the room by
+  // their hash, and where the room holds them canvas_see draws it; where it does not, the page that imported it
+  // kept them (the browser's asset store) — this hand has none, and says so.
   const pic = MM.pictureOf(node);
-  if (pic) parts.push('a picture ' + pic.name + (pic.w && pic.h ? ' ' + pic.w + '×' + pic.h : '') + (pic.asset ? ' · its pixels are kept in the tab that imported it — this hand has none to see' : ' · no pixels were kept for it'));
+  if (pic) parts.push('a picture ' + pic.name + (pic.w && pic.h ? ' ' + pic.w + '×' + pic.h : '') + (pic.asset && roomHolds.has(pic.asset) ? ' · its pixels are in the room — canvas_see draws it' : pic.asset ? ' · its pixels are kept in the tab that imported it — this hand has none to see' : ' · no pixels were kept for it'));
   else if (rep) parts.push((rep.data.kind || 'html') + (rep.data.path ? ' ' + rep.data.path : ''));
   if (MM.isWord(node)) parts.push('a word of ' + MM.lettersOf(node).length + ' strokes');
   parts.push(reads.join(', ') || 'unread');
@@ -200,8 +227,9 @@ function describeMark(node, s) {
   if (who && who !== 'me') parts.push('by ' + who);
   return parts.join(' · ');
 }
-function look(args) {
+async function look(args) {
   const s = session.getState();
+  await checkPictures(s, args.ids && args.ids.length ? args.ids : s.contentIds);
   const t = Date.now();
   const here = store.presence().filter((p) => t - p.at < 60000).map((p) => label(p.participant));
   const lines = ['room ' + ROOM + ' · you are ' + label(ME) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far')];
@@ -264,21 +292,55 @@ function inkOf(s, ids) {
   ids.forEach(add);
   return strokes;
 }
-function see(args) {
+/** What a picture's bytes are, for drawing: fetched from the room once, decoded where this hand can (a PNG) — or null when the room holds none. */
+const seenBytes = new Map();
+async function pictureBytes(asset) {
+  if (seenBytes.has(asset)) return seenBytes.get(asset);
+  const got = await assets.get(asset.slice('sha256:'.length));
+  if (!got) return null;
+  const info = sniffImage(got.bytes);
+  const rec = { bytes: got.bytes, mime: info ? info.mime : got.mime, image: info && info.mime === 'image/png' ? decodePNG(got.bytes) : null };
+  if (seenBytes.size >= 12) seenBytes.delete(seenBytes.keys().next().value);
+  seenBytes.set(asset, rec);
+  return rec;
+}
+/** The most a picture shown as itself may weigh, in bytes: an image a model is handed is kept to a size it takes. */
+const SEE_PICTURE_MAX = 4 * 1024 * 1024;
+const FORMAT_NAMES = { 'image/png': 'a PNG', 'image/jpeg': 'a JPEG', 'image/webp': 'a WebP', 'image/gif': 'a GIF' };
+async function see(args) {
   const s = session.getState();
   const ids = args.ids && args.ids.length ? args.ids : s.contentIds;
   let strokes = inkOf(s, ids);
+  let pics = picturesAmong(s, ids);
   if (args.region) {
     const q = args.region;
-    strokes = strokes.filter((st) => { const b = MM.getBounds(st.points); return b.maxX >= q.x && b.minX <= q.x + q.w && b.maxY >= q.y && b.minY <= q.y + q.h; });
+    const meets = (b) => b.maxX >= q.x && b.minX <= q.x + q.w && b.maxY >= q.y && b.minY <= q.y + q.h;
+    strokes = strokes.filter((st) => meets(MM.getBounds(st.points)));
+    pics = pics.filter((p) => meets(p.bounds));
   }
-  if (!strokes.length) return { text: 'no ink ' + (args.region ? 'in that region' : args.ids ? 'on those marks' : 'on the canvas') };
-  const out = inkPNG(strokes.map((st) => st.points), { size: Math.min(1600, Math.max(64, args.size || 800)) });
-  const b = MM.getBounds(strokes.flatMap((st) => st.points));
-  return {
-    text: strokes.length + ' stroke' + (strokes.length === 1 ? '' : 's') + ' from ' + r(b.minX) + ',' + r(b.minY) + ' to ' + r(b.maxX) + ',' + r(b.maxY) + ' (canvas units), ' + out.width + '×' + out.height + ' px: ' + strokes.map((st) => st.id).join(', '),
-    image: out.png.toString('base64'),
-  };
+  if (!strokes.length && !pics.length) return { text: 'no ink ' + (args.region ? 'in that region' : args.ids ? 'on those marks' : 'on the canvas') };
+  // The pictures stand UNDER the ink, as a person sees the board: the bytes fetched from the room by their hash.
+  const found = [];
+  for (const p of pics.slice(0, 12)) found.push({ ...p, rec: p.pic.asset ? await pictureBytes(p.pic.asset) : null });
+  const out = inkPNG(strokes.map((st) => st.points), { size: Math.min(1600, Math.max(64, args.size || 800)), pictures: found.map((f) => ({ name: f.pic.name, bounds: f.bounds, image: f.rec && f.rec.image })) });
+  const all = strokes.flatMap((st) => st.points).concat(found.flatMap((f) => [{ x: f.bounds.minX, y: f.bounds.minY }, { x: f.bounds.maxX, y: f.bounds.maxY }]));
+  const b = MM.getBounds(all);
+  const lines = [
+    (strokes.length ? strokes.length + ' stroke' + (strokes.length === 1 ? '' : 's') : '') + (strokes.length && found.length ? ' and ' : '') + (found.length ? found.length + ' picture' + (found.length === 1 ? '' : 's') : '') +
+      ' from ' + r(b.minX) + ',' + r(b.minY) + ' to ' + r(b.maxX) + ',' + r(b.maxY) + ' (canvas units), ' + out.width + '×' + out.height + ' px: ' + strokes.map((st) => st.id).concat(found.map((f) => f.id + ' (' + f.pic.name + ')')).join(', '),
+  ];
+  const content = [];
+  const extra = [];
+  for (const f of found) {
+    if (f.rec && f.rec.image) continue;
+    if (!f.rec) { lines.push(f.pic.name + ' (' + f.id + '): the room holds no bytes for it — its frame is all that can be drawn; the tab that imported it keeps them'); continue; }
+    const fmt = FORMAT_NAMES[f.rec.mime] || 'a picture';
+    const sent = f.rec.bytes.length <= SEE_PICTURE_MAX && extra.length < 4;
+    lines.push(f.pic.name + ' (' + f.id + '): ' + fmt + ' — this hand could not decode it into the picture above, so that shows its frame only' + (sent ? '; the picture itself follows as its own image' : '; it is too large to send as well'));
+    if (sent) extra.push({ type: 'image', data: Buffer.from(f.rec.bytes).toString('base64'), mimeType: f.rec.mime });
+  }
+  content.push({ type: 'text', text: lines.join('\n') }, { type: 'image', data: out.png.toString('base64'), mimeType: 'image/png' }, ...extra);
+  return { content };
 }
 
 // ----- Acting on the board --------------------------------------------------
@@ -431,6 +493,128 @@ function placeBy(place, s) {
   return { bounds: { minX: x, minY: y, maxX: x + w, maxY: y + h }, said: (how === 'in' ? 'inside ' : how === 'right' || how === 'left' ? how + ' of ' : how + ' ') + id };
 }
 
+// ----- A picture on the board (PLAN-IPAD-NOTES A1) -------------------------------------------
+// A picture is its bytes and an `import` event that names them. The event goes in this hand's log as any
+// hand's does; the bytes go to the room's relay by their SHA-256 FIRST, so no hand ever holds an event naming
+// bytes the room does not — and a hand that has none (a tab opened later, in another browser) fetches them
+// by that hash. PNG, JPEG and WebP are pictures, their size read from their own header by hand; an SVG is a
+// thing the board already draws, an `svg` artifact holding its text, so it never touches the relay.
+const PICTURE_KINDS = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
+const SVG_MAX_CHARS = 1e6;
+const PICTURE_WAIT_MS = 20000;
+/** The bytes the arguments name — a file, a web address or base64 — or a sentence saying why not. */
+async function pictureSource(args) {
+  if (typeof args.path === 'string' && args.path) {
+    const file = path.resolve(args.path);
+    let st;
+    try { st = await stat(file); } catch { return { error: 'no file at ' + file }; }
+    if (!st.isFile()) return { error: file + ' is not a file' };
+    if (st.size > MAX_ASSET_BYTES * 4) return { error: file + ' is ' + Math.round(st.size / 1048576) + ' MB — a picture on the board is up to 12 MB' };
+    try { return { bytes: new Uint8Array(await readFile(file)), name: path.basename(file) }; } catch (err) { return { error: 'could not read ' + file + ' — ' + (err && err.message || err) }; }
+  }
+  if (typeof args.url === 'string' && args.url) {
+    let u;
+    try { u = new URL(args.url); } catch { return { error: args.url + ' is not an address' }; }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return { error: 'only an http or https address can be fetched, not ' + u.protocol };
+    try {
+      const res = await fetch(u, { signal: AbortSignal.timeout(PICTURE_WAIT_MS), redirect: 'follow' });
+      if (!res.ok) return { error: u.host + ' answered HTTP ' + res.status };
+      const parts = [];
+      let size = 0;
+      const reader = res.body.getReader();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.length;
+        if (size > MAX_ASSET_BYTES * 4) { await reader.cancel().catch(() => undefined); return { error: u.host + ' sent more than a picture on the board may be (12 MB)' }; }
+        parts.push(value);
+      }
+      return { bytes: new Uint8Array(Buffer.concat(parts)), name: decodeURIComponent(u.pathname.split('/').pop() || '') };
+    } catch (err) { return { error: 'could not fetch ' + args.url + ' — ' + (err && err.message || err) }; }
+  }
+  if (typeof args.base64 === 'string' && args.base64) {
+    const text = args.base64.replace(/^data:[^,]*,/, '').replace(/\s+/g, '');
+    if (!/^[A-Za-z0-9+/_-]*={0,2}$/.test(text)) return { error: 'that is not base64' };
+    return { bytes: new Uint8Array(Buffer.from(text, 'base64')), name: '' };
+  }
+  return { error: 'a picture is named by a path, a url or base64 — pass one of them' };
+}
+/** The box a picture stands in: the box given (`at`, or `place` relative to a mark), else beside everything on the board; the picture fitted inside it, its own proportions, from its top left. */
+function pictureBounds(args, s, w, h) {
+  const ratio = w > 0 && h > 0 ? w / h : 1;
+  const fit = (x, y, bw, bh) => {
+    const k = Math.min(bw / ratio, bh);
+    return { minX: x, minY: y, maxX: x + k * ratio, maxY: y + k };
+  };
+  const want = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : 0);
+  if (args.place && !args.at) {
+    const placed = placeBy(args.place, s);
+    if (placed.error) return { error: placed.error };
+    const b = placed.bounds;
+    return { bounds: fit(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY), said: ' — ' + placed.said };
+  }
+  if (args.at) {
+    const x = Number(args.at.x ?? 0), y = Number(args.at.y ?? 0);
+    let bw = want(args.at.w), bh = want(args.at.h);
+    if (!bw && !bh) bw = Math.min(360, w || 360);
+    if (!bw) bw = bh * ratio;
+    if (!bh) bh = bw / ratio;
+    return { bounds: fit(x, y, bw, bh), said: '' };
+  }
+  // Nowhere said: beside what is on the board, as the page lays a picture clear of the marks.
+  let right = -Infinity, top = Infinity;
+  for (const id of s.contentIds) { const n = s.nodes.get(id), b = n && !n.reps.some((x) => x.modality === 'erased') && MM.boundsOf(n); if (b) { right = Math.max(right, b.maxX); top = Math.min(top, b.minY); } }
+  const x = Number.isFinite(right) ? right + 40 : 0, y = Number.isFinite(top) ? top : 0;
+  const bw = Math.min(360, w || 360);
+  return { bounds: fit(x, y, bw, bw / ratio), said: Number.isFinite(right) ? ' — beside what is on the board' : '' };
+}
+async function importPicture(args) {
+  const src = await pictureSource(args);
+  if (src.error) return { text: 'nothing placed: ' + src.error };
+  const bytes = src.bytes;
+  const s = session.getState();
+  const stem = (name) => String(name || '').replace(/\.[A-Za-z0-9]{1,5}$/, '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'picture';
+  const given = args.name ? String(args.name) : src.name;
+  // An SVG is a figure the board draws from its text.
+  const head = Buffer.from(bytes.subarray(0, 512)).toString('utf8').replace(/^﻿/, '').trimStart();
+  const isSvg = /\.svg$/i.test(given || '') || (!sniffImage(bytes) && /^(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<svg[\s>]/i.test(head));
+  if (isSvg) {
+    const code = Buffer.from(bytes).toString('utf8');
+    if (!/<svg[\s>]/i.test(code)) return { text: 'nothing placed: that is not an SVG — it has no <svg> in it' };
+    if (code.length > SVG_MAX_CHARS) return { text: 'nothing placed: that SVG is ' + code.length + ' characters — the board takes up to ' + SVG_MAX_CHARS };
+    const vb = /viewBox\s*=\s*"[\s,]*[-\d.eE]+[\s,]+[-\d.eE]+[\s,]+([\d.eE]+)[\s,]+([\d.eE]+)/i.exec(code);
+    const placed = pictureBounds(args, s, vb ? Number(vb[1]) : 0, vb ? Number(vb[2]) : 0);
+    if (placed.error) return { text: placed.error };
+    const file = stem(given) + '.svg';
+    const id = session.import({ kind: 'svg', path: label(ME) + '/' + file, name: file, bounds: placed.bounds, code, at: now() });
+    if (!id) return { text: 'could not place it' };
+    await flush();
+    const b = placed.bounds;
+    return { text: id + ' placed at ' + r(b.minX) + ',' + r(b.minY) + ' ' + r(b.maxX - b.minX) + '×' + r(b.maxY - b.minY) + ' (svg ' + file + ', ' + code.length + ' characters — drawn from its text, so the room carries it in the log, not as bytes)' + placed.said };
+  }
+  if (bytes.length > MAX_ASSET_BYTES) return { text: 'nothing placed: ' + tooLargeWords(bytes.length) };
+  const info = sniffImage(bytes);
+  if (!info) return { text: 'nothing placed: those bytes are not a picture — the board takes a PNG, JPEG or WebP (or an SVG), whatever the file is called' };
+  const kind = PICTURE_KINDS[info.mime];
+  if (!kind) return { text: 'nothing placed: ' + (info.mime === 'image/gif' ? 'a GIF' : info.mime) + ' is not a picture the board draws — a PNG, JPEG or WebP is' };
+  if (!(info.w > 0 && info.h > 0)) return { text: 'nothing placed: could not read the size of that ' + FORMAT_NAMES[info.mime].slice(2) + ' from its header' };
+  const hash = createHash('sha256').update(bytes).digest('hex');
+  // The bytes first: the room holds them (already, or now) before any event names them.
+  if (!(await assets.has(hash))) {
+    const put = await assets.put(hash, bytes);
+    if (!put.ok) return { text: 'nothing placed: the room would not take the picture — ' + put.words };
+  }
+  roomHolds.add('sha256:' + hash);
+  const placed = pictureBounds(args, s, info.w, info.h);
+  if (placed.error) return { text: placed.error };
+  const file = stem(given) + '.' + kind;
+  const id = session.import({ kind, path: 'imports/' + file, name: file, bounds: placed.bounds, asset: 'sha256:' + hash, mime: info.mime, w: info.w, h: info.h, at: now() });
+  if (!id) return { text: 'could not place it' };
+  await flush();
+  const b = placed.bounds;
+  return { text: id + ' placed at ' + r(b.minX) + ',' + r(b.minY) + ' ' + r(b.maxX - b.minX) + '×' + r(b.maxY - b.minY) + ' (' + FORMAT_NAMES[info.mime].slice(2) + ' ' + file + ', ' + info.w + '×' + info.h + ', ' + (bytes.length < 10240 ? bytes.length + ' bytes' : Math.round(bytes.length / 1024) + ' KB') + ') — its bytes are in the room under their hash, so every hand draws it' + placed.said };
+}
+
 // ----- The seat (V1-PLAN J4) ------------------------------------------------
 // A page that seats Claude Code parks every question in the room as a brief —
 // an answer on the explanation plane whose question is `brief` — and waits for
@@ -528,7 +712,7 @@ const TOOLS = [
   },
   {
     name: 'canvas_see',
-    description: 'The ink as a picture (PNG): all of it, some marks by id, or a region in canvas units. This is how to read handwriting or look at a sketch — the engine sends no pixels to anyone otherwise.',
+    description: 'The ink as a picture (PNG): all of it, some marks by id, or a region in canvas units, with the board\'s pictures under it where the room holds their bytes (a PNG is drawn in; a JPEG or WebP is a frame in the PNG and comes as its own image after it). This is how to read handwriting or look at a sketch — the engine sends no pixels to anyone otherwise.',
     inputSchema: { type: 'object', properties: { ids: { type: 'array', items: { type: 'string' } }, region: { type: 'object', properties: { x: num, y: num, w: num, h: num } }, size: num } },
     run: see,
   },
@@ -569,6 +753,12 @@ const TOOLS = [
     run: write,
   },
   {
+    name: 'canvas_import',
+    description: 'Put a picture on the board: a file (path), a web address (url) or base64, a PNG, JPEG or WebP (its size is read from its header) — or an SVG, which becomes an svg artifact drawn from its text. The bytes go to the room by their SHA-256 first, then an import event in your log names them, so every hand in the room draws it (a tab fetches the bytes by that hash) — up to 12 MB. Where: at {x, y, w?, h?} in canvas units (the picture is fitted in its own proportions), or place: {in|under|above|right|left: id, w?, h?} relative to a mark as canvas_write places; neither puts it beside what is on the board. canvas_see draws it under the ink.',
+    inputSchema: { type: 'object', properties: { path: { type: 'string' }, url: { type: 'string' }, base64: { type: 'string' }, name: { type: 'string' }, at: { type: 'object', properties: { x: num, y: num, w: num, h: num } }, place: { type: 'object', properties: { in: { type: 'string' }, under: { type: 'string' }, above: { type: 'string' }, right: { type: 'string' }, left: { type: 'string' }, w: num, h: num } } } },
+    run: importPicture,
+  },
+  {
     name: 'canvas_pending',
     description: 'The briefs a person has parked at the *Claude Code (MCP hand)* seat and nobody has answered: What is this? on some marks, Read the writing, a question, or a brief at a loop. Each comes with its key (the brief\'s own id), what was asked, the marks it is about with their ids, the CONTRACT a model would have been given — answer in exactly that — and the brief itself; for a read, the ink of those marks as a PNG. This is the seat: you are the model. Answer with canvas_answer.',
     inputSchema: { type: 'object', properties: {} },
@@ -604,7 +794,7 @@ async function handle(line) {
           protocolVersion: (msg.params && msg.params.protocolVersion) || '2025-06-18',
           capabilities: { tools: {} },
           serverInfo: { name: 'metamedium', version: '0.1.0' },
-          instructions: 'You are a hand on a MetaMedium canvas, in room "' + ROOM + '" as "' + label(ME) + '". The human draws; the engine reads every mark (shape, role, concept) and the human names and builds from those readings. Look first (canvas_look), see the ink when it matters (canvas_see), then act with the same verbs a hand has: draw in the shape vocabulary, say a sentence beside marks, propose a reading, label your own marks, transcribe writing, write code. Everything you do is held and attributed to you; the human blesses or ignores it. Never claim a reading is settled — offer it with a confidence and a reason. You are also the SEAT: when the human asks *Claude Code (MCP hand)* — What is this?, Read the writing, a question — the brief is parked here; canvas_pending gives you it, the marks and the contract (and for a read, the ink as a picture), and canvas_answer returns your answer in that contract, which the page takes exactly as it takes a model\'s.',
+          instructions: 'You are a hand on a MetaMedium canvas, in room "' + ROOM + '" as "' + label(ME) + '". The human draws; the engine reads every mark (shape, role, concept) and the human names and builds from those readings. Look first (canvas_look), see the ink when it matters (canvas_see), then act with the same verbs a hand has: draw in the shape vocabulary, say a sentence beside marks, propose a reading, label your own marks, transcribe writing, write code, put a picture on the board (canvas_import). Everything you do is held and attributed to you; the human blesses or ignores it. Never claim a reading is settled — offer it with a confidence and a reason. You are also the SEAT: when the human asks *Claude Code (MCP hand)* — What is this?, Read the writing, a question — the brief is parked here; canvas_pending gives you it, the marks and the contract (and for a read, the ink as a picture), and canvas_answer returns your answer in that contract, which the page takes exactly as it takes a model\'s.',
         });
         break;
       case 'notifications/initialized':

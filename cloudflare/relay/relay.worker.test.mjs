@@ -262,3 +262,78 @@ test('a room name that is too long or will not decode is refused', async () => {
   assert.equal((await post(env, 'x'.repeat(300), { participant: 'a' })).status, 400);
   assert.equal((await post(env, '%E0%A4%A', { participant: 'a' })).status, 400);
 });
+
+// ----- Pictures in a room (PLAN-IPAD-NOTES A1) --------------------------------------
+// The protocol cases are the ones the Node relay answers (Demos/relay-assets.conformance.mjs, run in
+// relay.parity.test.mjs); what is here is what a relay on the internet adds: the room's key, the origin,
+// bytes kept in a Durable Object's storage in pieces it accepts, and a room that comes back from eviction.
+
+import { pngOf, sha } from '../../Demos/relay-assets.conformance.mjs';
+
+const assetUrl = (room, hash, query = '') => `${ORIGIN}/rooms/${room}/assets/${hash}${query}`;
+const putAsset = (env, room, bytes, init = {}) => worker.fetch(new Request(assetUrl(room, sha(bytes), init.query || ''), { method: 'PUT', headers: init.headers || {}, body: bytes }), env);
+const getAsset = (env, room, hash, init = {}) => worker.fetch(new Request(assetUrl(room, hash, init.query || ''), { method: init.method || 'GET', headers: init.headers || {} }), env);
+
+test('a picture needs the room\'s key, to put and to get — as ?key= or as a Bearer — and one room\'s key opens no other room\'s pictures', async () => {
+  const env = fakeEnv({ MM_RELAY_SECRET: SECRET });
+  const key = await keyForRoom(SECRET, 'claude');
+  const png = pngOf(6);
+  assert.equal((await putAsset(env, 'claude', png)).status, 401);
+  assert.equal((await putAsset(env, 'claude', png, { query: '?key=wrong' })).status, 403);
+  assert.equal((await putAsset(env, 'table', png, { query: '?key=' + key })).status, 403);
+  assert.equal((await putAsset(env, 'claude', png, { headers: { authorization: 'Bearer ' + key } })).status, 204);
+  assert.equal((await getAsset(env, 'claude', sha(png))).status, 401);
+  assert.equal((await getAsset(env, 'claude', sha(png), { query: '?key=' + key })).status, 200);
+  assert.equal((await getAsset(env, 'claude', sha(png), { headers: { authorization: 'Bearer ' + key } })).status, 200);
+  assert.equal((await getAsset(env, 'claude', sha(png), { method: 'HEAD', headers: { authorization: 'Bearer ' + key } })).status, 200);
+  const res = await putAsset(env, 'claude', png, { query: '?key=secret-ish-value-123' });
+  assert.ok(!((await res.text()) + JSON.stringify([...res.headers])).includes('secret-ish-value-123'), 'the key was echoed');
+});
+
+test('a browser from the app\'s origin may put and get a picture, and is told it may; another origin is refused', async () => {
+  const env = openEnv();
+  const png = pngOf(5);
+  const pre = await worker.fetch(new Request(assetUrl('r', sha(png)), { method: 'OPTIONS', headers: { origin: 'https://dyna.ink', 'access-control-request-method': 'PUT', 'access-control-request-headers': 'content-type, authorization' } }), env);
+  assert.equal(pre.status, 204);
+  assert.equal(pre.headers.get('access-control-allow-origin'), 'https://dyna.ink');
+  assert.match(pre.headers.get('access-control-allow-methods'), /PUT/);
+  assert.match(pre.headers.get('access-control-allow-methods'), /HEAD/);
+  const put = await putAsset(env, 'r', png, { headers: { origin: 'https://dyna.ink', 'content-type': 'image/png' } });
+  assert.equal(put.status, 204);
+  assert.equal(put.headers.get('access-control-allow-origin'), 'https://dyna.ink');
+  const got = await getAsset(env, 'r', sha(png), { headers: { origin: 'https://dyna.ink' } });
+  assert.equal(got.headers.get('access-control-allow-origin'), 'https://dyna.ink');
+  assert.equal((await putAsset(env, 'r', pngOf(9), { headers: { origin: 'https://evil.example' } })).status, 403);
+});
+
+test('a picture is kept in storage in pieces a Durable Object accepts, and an evicted object comes back holding it', async () => {
+  const env = openEnv();
+  // A big one: noise does not compress, so the PNG is about as large as its pixels.
+  const n = 600, px = new Uint8Array(n * n * 4);
+  let x = 99; for (let i = 0; i < px.length; i++) { x = (x * 1664525 + 1013904223) >>> 0; px[i] = x >>> 24; }
+  const { encodePNG } = await import('../../Demos/ink-png.mjs');
+  const png = new Uint8Array(encodePNG(n, n, px));
+  assert.ok(png.length > 1.4e6);
+  assert.equal((await putAsset(env, 'r', png)).status, 204);
+  for (const [k, v] of env.ROOMS.storages.get('r').map) if (k.startsWith('ac:')) assert.ok((v.byteLength ?? v.length) <= 120 * 1024, k + ' is too big for a value');
+  env.ROOMS.evict('r');
+  const got = await getAsset(env, 'r', sha(png));
+  assert.equal(got.status, 200);
+  assert.deepEqual(new Uint8Array(await got.arrayBuffer()), png);
+  // …and what it holds still counts against the room: after eviction a second put of it is no new cost.
+  assert.equal((await putAsset(env, 'r', png)).status, 204);
+});
+
+test('the room\'s pictures and its lines are separate: lines dropped past the cap never take a picture with them', async () => {
+  const env = openEnv({ MM_RELAY_MAX_LINES: '2' });
+  const png = pngOf(11);
+  await putAsset(env, 'r', png);
+  for (let i = 0; i < 6; i++) await post(env, 'r', { participant: 'alice', events: [{ type: 'n' + i }] });
+  assert.equal((await getAsset(env, 'r', sha(png))).status, 200);
+});
+
+test('the Worker\'s own address for an asset is the room\'s, and a path that is neither is a 404', async () => {
+  const env = openEnv();
+  assert.equal((await worker.fetch(new Request(`${ORIGIN}/assets/${'ab'.repeat(32)}`), env)).status, 404);
+  assert.equal((await worker.fetch(new Request(`${ORIGIN}/rooms/r/assets/${'ab'.repeat(32)}`, { method: 'DELETE' }), env)).status, 405);
+});

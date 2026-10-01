@@ -203,3 +203,94 @@ test('three hands over a real relay, one departed: the one that joins after hold
     server.close();
   }
 });
+
+// ===== Pictures in a room (PLAN-IPAD-NOTES A1) =======================================
+// The bytes of a picture, kept by the SHA-256 of them, per room. One definition of the cases for both
+// servers (relay-assets.conformance.mjs); the Worker's run is cloudflare/relay/relay.parity.test.mjs.
+
+import { assetConformance, pngOf, sha } from './relay-assets.conformance.mjs';
+import { sniffImage, MAX_ASSET_BYTES, assetPathOf, assetCheck } from './relay-protocol.mjs';
+
+assetConformance(test, async (vars = {}) => {
+  const server = await startRelay(0, { assetRoomBytes: vars.assetRoomBytes });
+  return { url: `http://127.0.0.1:${server.address().port}`, close: () => { server.closeAllConnections?.(); return new Promise((r) => server.close(() => r())); } };
+});
+
+test('the Node relay answers a browser\'s preflight for a put of a picture', async () => {
+  const server = await startRelay(0);
+  try {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/rooms/r/assets/${'ab'.repeat(32)}`, { method: 'OPTIONS' });
+    assert.equal(res.status, 204);
+    assert.match(res.headers.get('access-control-allow-methods'), /PUT/);
+    assert.match(res.headers.get('access-control-allow-methods'), /HEAD/);
+    assert.match(res.headers.get('access-control-allow-headers'), /content-type/);
+  } finally { server.closeAllConnections?.(); server.close(); }
+});
+
+test('a Node relay with a directory keeps its pictures there, and a restarted relay still has them', async () => {
+  const { mkdtempSync, readdirSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const dir = mkdtempSync(path.join(tmpdir(), 'mm-relay-assets-'));
+  const png = pngOf(14, [9, 9, 200, 255]);
+  const base = (server) => `http://127.0.0.1:${server.address().port}/rooms/r/assets/${sha(png)}`;
+  let server = await startRelay(0, { assetDir: dir });
+  try {
+    assert.equal((await fetch(base(server), { method: 'PUT', body: png })).status, 204);
+    assert.ok(readdirSync(dir, { recursive: true }).length > 0, 'nothing was written to the directory');
+  } finally { server.closeAllConnections?.(); server.close(); }
+  server = await startRelay(0, { assetDir: dir });
+  try {
+    const got = await fetch(base(server));
+    assert.equal(got.status, 200);
+    assert.deepEqual(new Uint8Array(await got.arrayBuffer()), png);
+  } finally { server.closeAllConnections?.(); server.close(); }
+});
+
+// ----- what a picture's header says: the same reading in both servers and in the MCP hand -----
+const be32 = (n) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+const le24 = (n) => [n & 255, (n >> 8) & 255, (n >> 16) & 255];
+const le32 = (n) => [n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255];
+const ascii = (s) => [...s].map((c) => c.charCodeAt(0));
+const bytesOf = (...parts) => Uint8Array.from(parts.flatMap((p) => [...p]));
+const jpegWith = (w, h, sof = 0xc0) => bytesOf([0xff, 0xd8], [0xff, 0xe0, 0, 16], ascii('JFIF'), [0, 1, 1, 0, 0, 1, 0, 1, 0, 0], [0xff, 0xdb, 0, 5, 0, 1, 2, 3], [0xff, sof, 0, 11, 8], [h >> 8, h & 255, w >> 8, w & 255], [1, 1, 0x11, 0]);
+
+test('sniffImage reads a PNG\'s size from its IHDR, and refuses what is not one', () => {
+  const p = sniffImage(pngOf(7));
+  assert.deepEqual(p, { mime: 'image/png', w: 7, h: 7 });
+  assert.equal(sniffImage(new TextEncoder().encode('hello')), null);
+  assert.equal(sniffImage(new Uint8Array(0)), null);
+  assert.equal(sniffImage(Uint8Array.from([0x89, 0x50, 0x4e, 0x47])), null, 'a signature with no header is no picture');
+});
+
+test('sniffImage reads a JPEG\'s size past its other segments, in a baseline and a progressive file alike', () => {
+  assert.deepEqual(sniffImage(jpegWith(640, 480)), { mime: 'image/jpeg', w: 640, h: 480 });
+  assert.deepEqual(sniffImage(jpegWith(3000, 2000, 0xc2)), { mime: 'image/jpeg', w: 3000, h: 2000 });
+  // 0xc4 (a Huffman table) is not a frame: it must be walked past, not read as a size.
+  const noFrame = bytesOf([0xff, 0xd8], [0xff, 0xc4, 0, 4, 0, 0], [0xff, 0xd9]);
+  assert.deepEqual(sniffImage(noFrame), { mime: 'image/jpeg', w: 0, h: 0 }, 'a JPEG with no frame is a JPEG of no known size');
+});
+
+test('sniffImage reads a WebP\'s size in each of its three forms, and a GIF\'s', () => {
+  const riff = (chunk) => bytesOf(ascii('RIFF'), le32(chunk.length + 4), ascii('WEBP'), chunk);
+  const vp8x = riff(bytesOf(ascii('VP8X'), le32(10), [0, 0, 0, 0], le24(799), le24(599)));
+  assert.deepEqual(sniffImage(vp8x), { mime: 'image/webp', w: 800, h: 600 });
+  const vp8l = riff(bytesOf(ascii('VP8L'), le32(5), [0x2f], le32(((300 - 1) & 0x3fff) | (((200 - 1) & 0x3fff) << 14))));
+  assert.deepEqual(sniffImage(vp8l), { mime: 'image/webp', w: 300, h: 200 });
+  const vp8 = riff(bytesOf(ascii('VP8 '), le32(10), [0, 0, 0], [0x9d, 0x01, 0x2a], [320 & 255, 320 >> 8, 240 & 255, 240 >> 8]));
+  assert.deepEqual(sniffImage(vp8), { mime: 'image/webp', w: 320, h: 240 });
+  const gif = bytesOf(ascii('GIF89a'), [100, 0, 50, 0], [0, 0, 0]);
+  assert.deepEqual(sniffImage(gif), { mime: 'image/gif', w: 100, h: 50 });
+});
+
+test('the protocol\'s asset address and verdicts: a hash is 64 lower-case hex digits, and each refusal is a status and a sentence', async () => {
+  assert.equal(MAX_ASSET_BYTES, 12 * 1024 * 1024);
+  assert.deepEqual(assetPathOf('/rooms/r%20x/assets/' + 'ab'.repeat(32)), { room: 'r x', hash: 'ab'.repeat(32) });
+  assert.equal(assetPathOf('/rooms/r/events'), null);
+  assert.equal(assetPathOf('/rooms/r/assets/nope').hash, null, 'a bad hash is carried so it can be refused in words');
+  const png = pngOf(3);
+  assert.equal(await assetCheck(png, sha(png), { held: 0, cap: 1e6 }), null);
+  assert.equal((await assetCheck(png, sha(pngOf(4)), { held: 0, cap: 1e6 })).status, 422);
+  assert.equal((await assetCheck(new Uint8Array(0), 'ab'.repeat(32), { held: 0, cap: 1e6 })).status, 400);
+  assert.equal((await assetCheck(Uint8Array.from([1, 2, 3]), sha(Uint8Array.from([1, 2, 3])), { held: 0, cap: 1e6 })).status, 415);
+  assert.equal((await assetCheck(png, sha(png), { held: 1e6, cap: 1e6 })).status, 507);
+});

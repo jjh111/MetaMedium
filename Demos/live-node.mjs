@@ -69,6 +69,44 @@ export function relayTransport(url, room, opts = {}) {
 }
 
 /**
+ * A room's pictures over the relay (PLAN-IPAD-NOTES A1): `PUT|GET|HEAD /rooms/<room>/assets/<sha256>`, the
+ * bytes of a picture an `import` event names and carries none of. Under the room's key like its lines.
+ * Nothing here throws: a refusal is `{ ok: false, status, words }` — the relay's own sentence, or why none
+ * answered — so a hand says it, and a picture the room does not hold is null.
+ */
+export function roomAssets(url, room, opts = {}) {
+  const base = url.replace(/\/+$/, '') + '/rooms/' + encodeURIComponent(room) + '/assets/';
+  const headers = keyHeaders(opts.key);
+  const unreachable = (err) => ({ ok: false, status: 0, words: 'no relay answers at ' + url + ' — ' + (err && err.message || err) });
+  return {
+    /** Whether the room holds these bytes. */
+    async has(hash) {
+      try { return (await fetch(base + hash, { method: 'HEAD', headers })).status === 200; } catch { return false; }
+    },
+    /** Put the bytes under their hash; { ok: true } when the room holds them (already, or now). */
+    async put(hash, bytes) {
+      try {
+        const res = await fetch(base + hash, { method: 'PUT', headers, body: bytes });
+        if (res.status === 204) return { ok: true };
+        const words = (await res.text()).trim();
+        const said = res.status === 401 ? 'this relay needs a key — set MM_RELAY_KEY'
+          : res.status === 403 ? 'the relay does not take this hand\'s key for room “' + room + '”'
+          : words || 'the relay answered HTTP ' + res.status;
+        return { ok: false, status: res.status, words: said };
+      } catch (err) { return unreachable(err); }
+    },
+    /** The bytes and what they are, or null when the room holds none under this hash. */
+    async get(hash) {
+      try {
+        const res = await fetch(base + hash, { headers });
+        if (res.status !== 200) return null;
+        return { bytes: new Uint8Array(await res.arrayBuffer()), mime: res.headers.get('content-type') || 'application/octet-stream' };
+      } catch { return null; }
+    },
+  };
+}
+
+/**
  * Whether a relay lets this hand into this room, and if not, why in words: the
  * stream opened and shut again, so nothing is read and nothing written. The key
  * is never part of the sentence.

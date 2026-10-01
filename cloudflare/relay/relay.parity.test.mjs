@@ -126,3 +126,11 @@ test('three hands, one departed, a key on all of them: the hand that joins after
     assert.deepEqual(c.collisions(), []);
   } finally { for (const s of stores) s.close(); await close(); }
 });
+
+// ----- Pictures in a room (PLAN-IPAD-NOTES A1): the same cases as the Node relay's, over a socket -----
+import { assetConformance } from '../../Demos/relay-assets.conformance.mjs';
+
+assetConformance(test, async (vars = {}) => {
+  const { url, close } = await startDevRelay({ MM_RELAY_OPEN: '1', ...(vars.assetRoomBytes ? { MM_RELAY_ASSET_BYTES: String(vars.assetRoomBytes) } : {}) });
+  return { url, close };
+});

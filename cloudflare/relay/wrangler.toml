@@ -27,3 +27,4 @@ new_sqlite_classes = ["Room"]
 # MM_RELAY_ORIGINS = "https://preview.dyna.ink"
 # MM_RELAY_MAX_LINES = "5000"
 # MM_RELAY_MAX_BYTES = "32000000"
+# MM_RELAY_ASSET_BYTES = "67108864"   # bytes of pictures a room keeps (A1); past it a put is refused
