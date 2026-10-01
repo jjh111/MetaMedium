@@ -80,29 +80,35 @@
   /** The joined models as the rules read them. */
   function seatModels() {
     return agents.map((a) => ({
-      id: a.id, vision: !!(a.config && a.config.vision), seats: [...(seatsOfAgent.get(a.id) || [])], size: sizeOf(a),
+      id: agentKey(a), vision: !!(a.config && a.config.vision), seats: [...(seatsOfAgent.get(agentKey(a)) || [])], size: sizeOf(a),
       claude: isSeatAgent(a), local: !!a.config && a.config.kind !== 'mcp' && MM.providerLocality(a.config) === 'local',
     }));
   }
-  const agentById = (id) => agents.find((a) => a.id === id) || null;
+  const agentById = (key) => agents.find((a) => agentKey(a) === key) || null;
   /** Who is asked a brief, a page, a program, a question, *What is this?* — Claude Code first while it is seated. */
   function writers() { return resolveWriters(seatModels()).who.map(agentById).filter(Boolean); }
+  /**
+   * The writers, seated on this board before an act that blesses a loop for them. A board loaded in place took
+   * their joins with it, and core's ask joins one again — which, after the bless, would stand between the bless
+   * and what takes a failed brief back (`dropFailedBless`: the bless must still be this hand's last act).
+   */
+  function seatWriters(at) { for (const a of writers()) if (a.seat) a.seat(at); }
   /** The seat a model holds, if any: the first agent that holds it. */
-  const holderOf = (seat) => agents.find((a) => (seatsOfAgent.get(a.id) || new Set()).has(seat)) || null;
+  const holderOf = (seat) => agents.find((a) => (seatsOfAgent.get(agentKey(a)) || new Set()).has(seat)) || null;
 
   /** Put a model in a seat — one holder a seat — and keep what is needed to bring it back. `any` is a model with no seat: remembered as the one last joined, as the single pick always was. */
   function assignSeat(seat, agent) {
     if (!agent || !isModel(agent)) return;
-    const pick = pickOf(agent.config, metaOfAgent.get(agent.id));
+    const pick = pickOf(agent.config, metaOfAgent.get(agentKey(agent)));
     if (seat === 'reader' || seat === 'writer') {
       const was = holderOf(seat);
       if (was && was !== agent) letGoOf(was, seat);
-      const set = seatsOfAgent.get(agent.id) || new Set();
+      const set = seatsOfAgent.get(agentKey(agent)) || new Set();
       set.add(seat);
-      seatsOfAgent.set(agent.id, set);
+      seatsOfAgent.set(agentKey(agent), set);
       seatPicks[seat] = pick;
       if (samePick(seatPicks.any, agent.config)) delete seatPicks.any; // it has a seat now: kept under it
-    } else if (!(seatsOfAgent.get(agent.id) || new Set()).size) {
+    } else if (!(seatsOfAgent.get(agentKey(agent)) || new Set()).size) {
       seatPicks.any = pick;
     }
     saveSeats();
@@ -110,10 +116,10 @@
   }
   /** A model lets go of a seat (another took it, or the hand chose nothing): with no seat left it is "any job" again, and kept so. */
   function letGoOf(agent, seat) {
-    const set = seatsOfAgent.get(agent.id);
-    if (set) { set.delete(seat); if (!set.size) seatsOfAgent.delete(agent.id); }
+    const set = seatsOfAgent.get(agentKey(agent));
+    if (set) { set.delete(seat); if (!set.size) seatsOfAgent.delete(agentKey(agent)); }
     if (samePick(seatPicks[seat], agent.config)) delete seatPicks[seat];
-    if (!(seatsOfAgent.get(agent.id) || new Set()).size && !seatPicks.any) seatPicks.any = pickOf(agent.config, metaOfAgent.get(agent.id));
+    if (!(seatsOfAgent.get(agentKey(agent)) || new Set()).size && !seatPicks.any) seatPicks.any = pickOf(agent.config, metaOfAgent.get(agentKey(agent)));
   }
   /** The hand chose nothing for a seat: whoever held it is "any job" again. */
   function unseat(seat) {
@@ -126,9 +132,9 @@
   }
   /** A model left: its seats, its kept picks and, if none joined uses its provider, its key. */
   function forgetSeats(agent) {
-    const held = seatsOfAgent.get(agent.id) || new Set();
-    seatsOfAgent.delete(agent.id);
-    metaOfAgent.delete(agent.id);
+    const held = seatsOfAgent.get(agentKey(agent)) || new Set();
+    seatsOfAgent.delete(agentKey(agent));
+    metaOfAgent.delete(agentKey(agent));
     for (const s of held) if (samePick(seatPicks[s], agent.config)) delete seatPicks[s];
     if (samePick(seatPicks.any, agent.config)) delete seatPicks.any;
     saveSeats();
@@ -152,7 +158,7 @@
   // only by a deliberate act, and opening the field is not one — so the tie is offered and the hand decides to ask.
   // Its answer is one more held, attributed reading beside the engine's (`jev 0.99`, never evicting) and is taken
   // only where it leads by DECIDER_TAKE_AT; under that, the status line says what it said and why it was not used.
-  /** The seat as a participant of THIS board: a board loaded in place takes every join with it, so the seat is made again where it is not. */
+  /** The seat as a participant: core seats it on whichever board it is asked on (`participants/seated.ts`), so a board loaded in place needs nothing here. */
   function makeDeciderSeat(transport, name, config) {
     return MM.createDecideParticipant(session, transport, Date.now(), { name: name, locality: MM.providerLocality(config), takeAt: MM.DECIDER_TAKE_AT });
   }
@@ -177,13 +183,13 @@
       const name = MM.modelWords(config);
       const seat = makeDeciderSeat(transport, name, config);
       decider = { config: config, seat: seat, pseudo: pseudo, name: name, meta: meta || {}, transport: transport };
-      factsOf.set(pseudo.id, got.first.facts);
+      factsOf.set(agentKey(pseudo), got.first.facts);
       seatPicks.decider = pickOf(config, meta ? { provider: meta.provider, endpoint: meta.endpoint } : undefined);
       saveSeats();
       mpStatus.textContent = name + ' joined as the decider — ' + got.first.facts.said + '.';
       // The choice the unit asked to be said: why the decider is never asked on its own.
       say(name + ' is the decider — asked only when you tap “Which is it?” on a tie between two definitions, never on its own; its answer is taken only when it is ' + MM.DECIDER_TAKE_AT + ' sure');
-      if (got.later) got.later.then((catalog) => { if (decider && decider.seat === seat && catalog && catalog.ok) { const f = MM.modelFacts(config.model, catalog, got.where); if (f.ok) { applyFacts(config, f.facts); factsOf.set(pseudo.id, f.facts); refreshPicks(config); renderSeats(); } } });
+      if (got.later) got.later.then((catalog) => { if (decider && decider.seat === seat && catalog && catalog.ok) { const f = MM.modelFacts(config.model, catalog, got.where); if (f.ok) { applyFacts(config, f.facts); factsOf.set(agentKey(pseudo), f.facts); refreshPicks(config); renderSeats(); } } });
       renderSeats();
       syncTiles();
       refreshPalette();
@@ -196,7 +202,7 @@
     if (!decider) return;
     const d = decider;
     decider = null;
-    factsOf.delete(d.pseudo.id); lastCall.delete(d.pseudo.id); asking.delete(d.pseudo.id);
+    factsOf.delete(agentKey(d.pseudo)); lastCall.delete(agentKey(d.pseudo)); asking.delete(agentKey(d.pseudo));
     delete seatPicks.decider;
     saveSeats();
     forgetKeyIfUnused(d.config.baseUrl);
@@ -211,11 +217,10 @@
   function askDecider(data) {
     if (!decider) { say('no decider is seated — choose one under models'); return false; }
     const d = decider;
-    if (!session.getState().participants.includes(d.seat.id)) d.seat = makeDeciderSeat(d.transport, d.name, d.config);
     const ids = (data.ids || []).filter((id) => session.getState().nodes.has(id));
     if (!ids.length || !data.candidates || data.candidates.length < 2) { say('nothing to decide'); return false; }
     const q = MM.choice('which:' + ids[0], 'which of these is the group of marks?', data.candidates.map((c) => ({ id: c.id, text: c.text })), ids);
-    const key = 'decide:' + d.pseudo.id + ':' + ids.join('+');
+    const key = 'decide:' + agentKey(d.pseudo) + ':' + ids.join('+');
     const ctl = new AbortController();
     workControllers.set(key, ctl);
     say(d.name + ' is choosing between ' + data.candidates.map((c) => c.id).join(' and ') + '…');
@@ -365,17 +370,17 @@
         if (decider) {
           who = decider.name + ' · ' + MM.providerLocality(decider.config) + ' · taken only at ' + MM.DECIDER_TAKE_AT;
           body = '<button class="ghost" data-seat-try="decider" title="one tiny question: is it there, and does it answer in the shape asked?">try it</button><button class="ghost" data-seat-leave="decider">leave</button>';
-          call = callOf(decider.pseudo.id);
+          call = callOf(agentKey(decider.pseudo));
         } else { who = 'nothing chosen'; note = fallbackWords('decider'); body = '<button class="ghost" data-seat-set="decider">choose a model</button>'; }
       } else {
         const held = holderOf(seat);
         const pool = agents.filter((a) => isModel(a) && !isSeatAgent(a) && (seat === 'writer' || a.config.vision));
         const rows = orderedPool(pool);
         body = '<select class="seatPick" data-seat-pick="' + seat + '"><option value="">' + (held ? '— nothing (let go of it)' : '— nothing chosen') + '</option>' +
-          rows.map((r) => '<option value="' + esc(r.id) + '"' + (held && held.id === r.id ? ' selected' : '') + '>' + esc(r.name) + (r.local ? ' · local' : ' · hosted') + '</option>').join('') + '</select>' +
+          rows.map((r) => '<option value="' + esc(r.id) + '"' + (held && agentKey(held) === r.id ? ' selected' : '') + '>' + esc(r.name) + (r.local ? ' · local' : ' · hosted') + '</option>').join('') + '</select>' +
           '<button class="ghost" data-seat-set="' + seat + '" title="join a model for this seat — the key already entered is used">another…</button>' +
           (held ? '<button class="ghost" data-seat-try="' + seat + '">try it</button>' : '');
-        if (held) { who = agentWords(held); call = callOf(held.id); }
+        if (held) { who = agentWords(held); call = callOf(agentKey(held)); }
         else { who = 'nothing chosen'; note = fallbackWords(seat) + (names(seat === 'reader' ? readerNow : writerNow) ? ' — now: ' + names(seat === 'reader' ? readerNow : writerNow) : ''); }
       }
       html += '<div class="seatRow" data-seat="' + seat + '"><div class="seatHead"><b>' + seat + '</b><span class="seatJob">' + esc(w.job) + '</span></div>' +
@@ -404,7 +409,7 @@
   }
   /** Choices for a seat's select: local before hosted, the quickest last call first (03-seats.js). */
   function orderedPool(pool) {
-    return orderChoices(pool.map((a) => { const c = lastCall.get(a.id); return { id: a.id, name: modelWords(a), local: MM.providerLocality(a.config) === 'local', ms: c && c.ok ? c.ms : null }; }));
+    return orderChoices(pool.map((a) => { const c = lastCall.get(agentKey(a)); return { id: agentKey(a), name: modelWords(a), local: MM.providerLocality(a.config) === 'local', ms: c && c.ok ? c.ms : null }; }));
   }
   // The pane opens on the seats as they are now.
   new MutationObserver(() => { if (!panel.hasAttribute('hidden')) renderSeats(); }).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
@@ -417,7 +422,7 @@
       reader: who(holderOf('reader')),
       writer: who(holderOf('writer')),
       decider: decider ? { model: decider.config.model, name: decider.name, local: MM.providerLocality(decider.config) === 'local' } : null,
-      any: agents.filter((a) => isModel(a) && !isSeatAgent(a) && !(seatsOfAgent.get(a.id) || new Set()).size).map(who),
+      any: agents.filter((a) => isModel(a) && !isSeatAgent(a) && !(seatsOfAgent.get(agentKey(a)) || new Set()).size).map(who),
       keys: [...heldKeys.keys()],
       remembered: [...rememberedKeys],
       pending: pendingPicks.map((p) => ({ model: p.pick.model, seats: p.seats.slice() })),

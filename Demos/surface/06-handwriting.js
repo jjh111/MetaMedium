@@ -22,7 +22,7 @@
    * seconds. The order is 03-seats.js's `resolveReaders`, tested in Node.
    */
   function readers() {
-    return resolveReaders(seatModels()).who.map((id) => agents.find((a) => a.id === id)).filter(Boolean);
+    return resolveReaders(seatModels()).who.map((key) => agents.find((a) => agentKey(a) === key)).filter(Boolean);
   }
   /** The models that read now — for the panel's *read it* and the like: who can answer a read, by seat. */
   const seeing = () => readers();
@@ -82,7 +82,7 @@
     const image = inkImage(node);
     if (!image) return false;
     who.forEach((agent) => {
-      withWork('write:' + agent.id + ':' + node.id, [node.id], modelWords(agent) + ' · reading the writing', agent.read({ nodeId: node.id, image: image, at: Date.now() })).then((res) => {
+      withWork('write:' + agentKey(agent) + ':' + node.id, [node.id], modelWords(agent) + ' · reading the writing', agent.read({ nodeId: node.id, image: image, at: Date.now() })).then((res) => {
         // The row keeps what the read came to; the status line says it once (J5).
         noteOutcome(agent, res.ok, res.ok ? 'read “' + res.transcripts[0].text + '”' : res.error);
         say(res.ok
@@ -115,7 +115,7 @@
     if (!image) return false;
     const first = nodes[0];
     who.forEach((agent) => {
-      withWork('write:' + agent.id + ':' + first.id, ids, modelWords(agent) + ' · reading the line', agent.read({ nodeId: first.id, about: nodes.map((n) => n.id), image: image, at: Date.now(), hold: false })).then((res) => {
+      withWork('write:' + agentKey(agent) + ':' + first.id, ids, modelWords(agent) + ' · reading the line', agent.read({ nodeId: first.id, about: nodes.map((n) => n.id), image: image, at: Date.now(), hold: false })).then((res) => {
         noteOutcome(agent, res.ok, res.ok ? 'read “' + res.transcripts[0].text + '”' : res.error);
         if (res.ok) {
           const top = res.transcripts[0];
@@ -161,7 +161,7 @@
     const models = agents.filter((a) => a.config && (a.config.kind === 'openai-compatible' || a.config.kind === 'anthropic'));
     const others = agents.filter((a) => !models.includes(a));
     if (!agents.length) return 'Read the writing needs a model that can see — none is joined';
-    const said = models.map((a) => { const f = factsOf.get(a.id); return modelWords(a) + ' reads text only' + (f && f.because ? ' (' + f.because + ')' : ''); })
+    const said = models.map((a) => { const f = factsOf.get(agentKey(a)); return modelWords(a) + ' reads text only' + (f && f.because ? ' (' + f.because + ')' : ''); })
       .concat(others.map((a) => modelWords(a) + ' is not asked to read writing'));
     return 'Read the writing needs a model that can see — ' + said.join('; ');
   }

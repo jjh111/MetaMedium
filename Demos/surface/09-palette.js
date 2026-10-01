@@ -299,7 +299,7 @@
     duplicate: (o, scope) => duplicateMarks(scope.summon, o.data.ids),
     // A Mermaid text drawn as ink, at this zoom and beside everything (25-mermaid.js).
     'mermaid-draw': (o) => drawMermaidFrom(o.data.artifact),
-    'behave-model': (o) => { const d = o.data; writers().forEach((a) => withWork('behave:' + a.id + ':' + d.nodeId, [d.nodeId], modelWords(a) + ' · reading the words', a.behave({ nodeId: d.nodeId, words: d.words, at: Date.now() })).then(() => render(session.getState()))); },
+    'behave-model': (o) => { const d = o.data; writers().forEach((a) => withWork('behave:' + agentKey(a) + ':' + d.nodeId, [d.nodeId], modelWords(a) + ' · reading the words', a.behave({ nodeId: d.nodeId, words: d.words, at: Date.now() })).then(() => render(session.getState()))); },
   };
   /** What the surface does around a tool's act: before it (the field rebuilt from what it leaves), and after (what to say). */
   const TOOL_ACTS = {
@@ -585,7 +585,7 @@
     }
     if (cmd.do === 'behave') {
       session.behave({ nodeId: cmd.definitionId, behaviour: cmd.behaviour, participantId: MM.LOCAL_PARTICIPANT, at: at });
-      if (cmd.ask) writers().forEach((a) => withWork('behave:' + a.id + ':' + cmd.definitionId, [cmd.definitionId], modelWords(a) + ' · reading the words', a.behave({ nodeId: cmd.definitionId, words: cmd.words, at: Date.now() })).then(() => render(session.getState())));
+      if (cmd.ask) writers().forEach((a) => withWork('behave:' + agentKey(a) + ':' + cmd.definitionId, [cmd.definitionId], modelWords(a) + ' · reading the words', a.behave({ nodeId: cmd.definitionId, words: cmd.words, at: Date.now() })).then(() => render(session.getState())));
       return;
     }
     // With no model here, what was typed is kept, said once, and run when one joins — never the pane popped over the field (J5).
@@ -1197,6 +1197,7 @@
       // frame its origin. The name is the brief, so the artifact says what it
       // was asked to be.
       const name = brief.length > 30 ? brief.slice(0, 30) + '…' : brief;
+      seatWriters(at);
       artifactId = session.bless({ summonId: sum.id, name: name, at: at });
       addressed = undefined;
       if (!artifactId) { releasePrompted(); say('could not hold that group'); return; }
@@ -1236,6 +1237,7 @@
   function runProgram(sum, brief) {
     const at = Date.now();
     const name = brief.length > 30 ? brief.slice(0, 30) + '…' : brief;
+    seatWriters(at);
     const artifactId = session.bless({ summonId: sum.id, name: name, at: at });
     if (!artifactId) { releasePrompted(); say('could not hold that group'); return; }
     cancelReading();
@@ -1271,7 +1273,7 @@
     session.dismiss(sum.id, Date.now());
     cancelReading();
     writers().forEach((agent) => {
-      withWork('draw:' + agent.id, ids, modelWords(agent) + ' · drawing', agent.draw({ prompt: q, nodeIds: ids, at: Date.now() })).then((res) => {
+      withWork('draw:' + agentKey(agent), ids, modelWords(agent) + ' · drawing', agent.draw({ prompt: q, nodeIds: ids, at: Date.now() })).then((res) => {
         noteOutcome(agent, res.ok, res.ok ? 'drew ' + res.ids.length + ' mark' + (res.ids.length === 1 ? '' : 's') : res.error);
         if (res.ok) say(modelWords(agent) + ' drew ' + res.ids.length + ' mark' + (res.ids.length === 1 ? '' : 's') + ': ' + res.shapes.map((x) => x.shape).join(', '));
         else { say(modelWords(agent) + ' drew nothing (' + res.error + ')'); if (res.raw) window.__mm.lastRaw = res.raw; }
@@ -1285,7 +1287,7 @@
     const ids = sum.enclosedIds.slice();
     cancelReading();
     writers().forEach((agent) => {
-      withWork('ask:' + agent.id, ids, modelWords(agent) + ' · answering', agent.ask(q, ids, Date.now())).then((res) => {
+      withWork('ask:' + agentKey(agent), ids, modelWords(agent) + ' · answering', agent.ask(q, ids, Date.now())).then((res) => {
         noteOutcome(agent, res.ok, res.ok ? 'answered beside the marks' : res.error);
         if (!res.ok) say(modelWords(agent) + ' could not answer (' + res.error + ')');
         render(session.getState());
