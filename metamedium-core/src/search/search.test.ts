@@ -1,6 +1,6 @@
 // Find (PLAN-IPAD-NOTES I6): words normalised, what a board says extracted from its state, an index of every
 // board ranked by one query, which boards to index again, and the thumbnail's fit. Derived, never in a log.
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createSession } from '../session/session';
 import { rectStroke, circleStroke } from '../test/strokes';
 import {
@@ -49,7 +49,8 @@ describe('what a board says', () => {
     s.import({ kind: 'png', path: 'photos/whiteboard.png', name: 'Whiteboard Monday', bounds: at, asset: 'a'.repeat(64), mime: 'image/jpeg', w: 100, h: 80, at: 1400 });
     s.import({ kind: 'html', path: 'p.html', name: 'p.html', bounds: at, code: '<html><style>.x{color:red}</style><body><h1>Welcome home</h1><script>var secret = 1</script><p>Dolphins &amp; whales</p></body></html>', at: 1500 });
     const word = s.addStroke(circleStroke(500, 500, 30), 1600, undefined, 1, { content: true })!;
-    s.propose({ participantId: 'claude', nodeId: word, edges: [], reps: [{ modality: 'transcript', data: { text: 'budget meeting' }, confidence: 0.8 }], at: 1601 });
+    const reader = s.join('agent', 'claude', 1550, 2)!;
+    s.propose({ participantId: reader, nodeId: word, edges: [], reps: [{ modality: 'transcript', data: { text: 'budget meeting' }, confidence: 0.8 }], at: 1601 });
 
     const entries = searchEntriesOf(s.getState());
     const by = (kind: string) => entries.filter((e) => e.kind === kind);
@@ -122,11 +123,11 @@ describe('a query across boards', () => {
 
   it('exact words rank above prefixes, a short saying above a long one, then the recent board', () => {
     const boards = [
-      boardOf('p', 'A', 100, [entry('x', 'label', 'Pricing')]),
+      boardOf('p', 'A', 100, [entry('x', 'label', 'Priceless')]),
       boardOf('e', 'B', 50, [entry('y', 'label', 'Price')]),
       boardOf('long', 'C', 300, [entry('z', 'text', 'The price of things we sell in the autumn at the market', 'typed text')]),
     ];
-    // "price" is exact in e and long, a prefix of pricing in p.
+    // "price" is exact in e and long, only the start of a word in p.
     expect(searchBoards(boards, 'price').map((g) => g.board)).toEqual(['e', 'long', 'p']);
     // Equal saying, equal words: the more recent board first.
     const twins = [boardOf('old', 'Old', 10, [entry('a', 'label', 'Pump')]), boardOf('new', 'New', 20, [entry('a', 'label', 'Pump')])];

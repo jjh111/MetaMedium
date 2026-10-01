@@ -232,11 +232,14 @@ var MetaMediumCore = (() => {
     ROUND_ENOUGH: () => ROUND_ENOUGH,
     ROUTE_MAX_TURNS: () => ROUTE_MAX_TURNS,
     ReadOnlyError: () => ReadOnlyError,
+    SEARCH_MAX_ENTRIES: () => MAX_ENTRIES,
+    SEARCH_VERSION: () => SEARCH_VERSION,
     SEAT_NAME: () => SEAT_NAME,
     SEAT_PICTURE: () => SEAT_PICTURE,
     SEAT_QUESTION: () => SEAT_QUESTION,
     SEAT_RULE: () => SEAT_RULE,
     SEAT_WAIT_MS: () => SEAT_WAIT_MS,
+    SEMANTIC_FLOOR: () => SEMANTIC_FLOOR,
     SEND_WAIT_MS: () => SEND_WAIT_MS,
     SEQUENCE: () => SEQUENCE,
     SEQUENCE_READER: () => SEQUENCE_READER,
@@ -396,6 +399,7 @@ var MetaMediumCore = (() => {
     describeFrame: () => describeFrame,
     describeGraph: () => describeGraph,
     describeHeads: () => describeHeads,
+    describeHit: () => describeHit,
     describeLayout: () => describeLayout,
     describeMagnet: () => describeMagnet,
     describeMaths: () => describeMaths,
@@ -432,6 +436,7 @@ var MetaMediumCore = (() => {
     evaluateChain: () => evaluateChain,
     evaluateExpr: () => evaluateExpr,
     evaluateTyped: () => evaluateTyped,
+    excerptOf: () => excerptOf,
     explanationOf: () => explanationOf,
     exportFrame: () => exportFrame,
     figureOfMark: () => figureOfMark,
@@ -661,6 +666,7 @@ var MetaMediumCore = (() => {
     registerMermaidWriter: () => registerMermaidWriter,
     registerNotation: () => registerNotation,
     registerPorts: () => registerPorts,
+    registerSearchSource: () => registerSearchSource,
     registerTool: () => registerTool,
     registeredNotations: () => registeredNotations,
     registeredPorts: () => registeredPorts,
@@ -689,6 +695,11 @@ var MetaMediumCore = (() => {
     scopeOf: () => scopeOf,
     score: () => score,
     scratchedOut: () => scratchedOut,
+    searchBoards: () => searchBoards,
+    searchEntriesOf: () => searchEntriesOf,
+    searchKeyOf: () => searchKeyOf,
+    searchNormalise: () => normalise,
+    searchTokenize: () => tokenize,
     seatBriefs: () => seatBriefs,
     seatOn: () => seatOn,
     seatReplyText: () => seatReplyText,
@@ -719,6 +730,7 @@ var MetaMediumCore = (() => {
     solveBoard: () => solveBoard,
     solveFigure: () => solveFigure,
     sourcesOf: () => sourcesOf,
+    stalePlan: () => stalePlan,
     stanceOf: () => stanceOf,
     standStructure: () => standStructure,
     standingPointsOf: () => standingPointsOf,
@@ -738,6 +750,7 @@ var MetaMediumCore = (() => {
     textOf: () => textOf3,
     theirMarks: () => theirMarks,
     thin: () => thin,
+    thumbFit: () => thumbFit,
     tidyPlanOf: () => tidyPlanOf,
     tiedMatches: () => tiedMatches,
     tightBox: () => tightBox,
@@ -760,6 +773,7 @@ var MetaMediumCore = (() => {
     unplaced: () => unplaced,
     unregisterNotation: () => unregisterNotation,
     unregisterPorts: () => unregisterPorts,
+    unregisterSearchSource: () => unregisterSearchSource,
     unregisterTool: () => unregisterTool,
     useLift: () => useLift,
     validatePack: () => validatePack,
@@ -4433,10 +4447,10 @@ var MetaMediumCore = (() => {
     return out;
   }
   function readSheet(input, options = {}) {
-    const sources = input.map(
+    const sources2 = input.map(
       (x) => typeof x === "string" ? { text: x } : { text: x.text, ...x.at ? { at: x.at } : {}, ...x.bounds ? { bounds: x.bounds } : {}, ...x.ids ? { ids: [...x.ids] } : {}, ...x.maths ? { maths: true } : {} }
     );
-    const drafts = sources.map((src, line) => classify(src, line));
+    const drafts = sources2.map((src, line) => classify(src, line));
     proseToNotes(drafts);
     const { unit: unit6, reason: unitReason } = options.unit !== void 0 ? { unit: options.unit, reason: options.unit ? `${UNIT_NAMES[options.unit]}, as given` : "no unit, as given" } : inferUnit(drafts.map((d) => d.parse));
     const withUnit = (q) => isBare(q) && unit6 ? { ...q, unit: unit6, dim: 1 } : q;
@@ -30727,5 +30741,297 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
     draw: drawMindMapRead
   };
   registerMermaidReader("mindmap", MINDMAP_READER);
+
+  // src/search/tokens.ts
+  var SPECIAL = { "\xDF": "ss", "\xE6": "ae", "\u0153": "oe", "\xF8": "o", "\u0111": "d", "\u0142": "l", "\u0131": "i" };
+  function foldChar(ch) {
+    const low = ch.toLowerCase();
+    const sp = SPECIAL[low];
+    if (sp) return sp;
+    return low.normalize("NFD").replace(/\p{M}/gu, "");
+  }
+  var WORD = /^[\p{L}\p{N}]+$/u;
+  function tokenize(s) {
+    const out = [];
+    let cur = null;
+    const text = typeof s === "string" ? s : "";
+    for (let i = 0; i < text.length; ) {
+      const cp = text.codePointAt(i);
+      const ch = String.fromCodePoint(cp);
+      const next = i + ch.length;
+      const f = foldChar(ch);
+      if (f === "") {
+        if (cur) cur.end = next;
+      } else if (WORD.test(f)) {
+        if (cur) {
+          cur.text += f;
+          cur.end = next;
+        } else {
+          cur = { text: f, start: i, end: next };
+          out.push(cur);
+        }
+      } else cur = null;
+      i = next;
+    }
+    return out;
+  }
+  function normalise(s) {
+    return tokenize(s).map((t) => t.text).join(" ");
+  }
+
+  // src/search/extract.ts
+  var sources = /* @__PURE__ */ new Map();
+  function registerSearchSource(src) {
+    sources.set(src.id, src);
+  }
+  function unregisterSearchSource(id) {
+    sources.delete(id);
+  }
+  function sourceIds() {
+    return [...sources.keys()].sort();
+  }
+  var MAX_ENTRIES = 800;
+  var CHUNK_CHARS = 600;
+  var MAX_CHUNKS = 40;
+  var MAX_SVG_TEXTS = 60;
+  var NOUN = {
+    rectangle: "a box",
+    circle: "a circle",
+    line: "a line",
+    arrow: "an arrow",
+    triangle: "a triangle",
+    arc: "a curve",
+    dot: "a dot",
+    text: "writing"
+  };
+  var ARTIFACT_NOUN = {
+    text: "a text",
+    md: "a text",
+    svg: "a figure",
+    mermaid: "a Mermaid diagram",
+    html: "a page",
+    png: "a picture",
+    jpg: "a picture",
+    webp: "a picture",
+    run: "a program",
+    js: "a script",
+    json: "data",
+    control: "a control"
+  };
+  function nounOf(node) {
+    if (isWord(node)) return "a word";
+    const top = topInterpretation(node);
+    if (!top) return "a mark";
+    const t = top.replace(/^type:/, "");
+    return NOUN[t] || "a " + t;
+  }
+  var ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+  function decodeEntities(s) {
+    return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
+      if (e[0] === "#") {
+        const n2 = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+        return n2 > 0 && n2 < 1114112 ? String.fromCodePoint(n2) : m;
+      }
+      const r = ENTITIES[e.toLowerCase()];
+      return r === void 0 ? m : r;
+    });
+  }
+  var squash = (s) => s.replace(/\s+/g, " ").trim();
+  function pageWords(html) {
+    return squash(decodeEntities(html.replace(/<!--[\s\S]*?-->/g, " ").replace(/<(script|style|template)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(/<[^>]*>/g, " ")));
+  }
+  function svgWords(svg) {
+    const out = [];
+    const re = /<(text|title|desc)\b[^>]*>([\s\S]*?)<\/\1\s*>/gi;
+    let m;
+    while ((m = re.exec(svg)) && out.length < MAX_SVG_TEXTS) {
+      const t = squash(decodeEntities(m[2].replace(/<[^>]*>/g, "")));
+      if (t) out.push(t);
+    }
+    return out;
+  }
+  function chunksOf(text, size2 = CHUNK_CHARS) {
+    const out = [];
+    const t = text.replace(/\r\n?/g, "\n").trim();
+    let i = 0;
+    while (i < t.length && out.length < MAX_CHUNKS) {
+      let end = Math.min(t.length, i + size2);
+      if (end < t.length) {
+        const cut = Math.max(t.lastIndexOf("\n", end), t.lastIndexOf(" ", end));
+        if (cut > i + size2 / 2) end = cut;
+      }
+      const piece = squash(t.slice(i, end));
+      if (piece) out.push(piece);
+      i = end;
+    }
+    return out;
+  }
+  function codeOf(node) {
+    for (let i = node.reps.length - 1; i >= 0; i--) {
+      if (node.reps[i].modality === "code") {
+        const d = node.reps[i].data;
+        return { code: typeof d.code === "string" ? d.code : "", kind: typeof d.kind === "string" ? d.kind : void 0 };
+      }
+    }
+    return null;
+  }
+  function artifactEntries(node, box, out) {
+    const code = codeOf(node);
+    const kind = code && code.kind;
+    const name = wordOf(node);
+    const noun = kind && ARTIFACT_NOUN[kind] || "a thing";
+    const pic = pictureOf(node);
+    const push = (k, text, what) => {
+      if (text) out.push({ id: node.id, kind: k, text, what, ...box ? { box } : {} });
+    };
+    if (pic) push("picture", pic.name, "picture name");
+    else if (name && !/^text \d+$/.test(name)) push("name", name, "name of " + noun);
+    if (!code || pic) return;
+    if (kind === "text" || kind === "md") for (const c of chunksOf(code.code)) push("text", c, "typed text");
+    else if (kind === "svg") for (const t of svgWords(code.code)) push("figure", t, "text in a figure");
+    else if (kind === "mermaid") for (const c of chunksOf(code.code)) push("mermaid", c, "Mermaid text");
+    else if (kind === "html") for (const c of chunksOf(pageWords(code.code))) push("page", c, "words on a page");
+  }
+  function searchEntriesOf(state) {
+    const out = [];
+    const artifacts = new Set(state.artifacts);
+    const answers = new Set(state.explanations);
+    for (const node of state.nodes.values()) {
+      if (out.length >= MAX_ENTRIES) break;
+      if (answers.has(node.id) || getRep(node, "participant") || getRep(node, "erased")) continue;
+      const box = boundsOf(node);
+      const isArtifact = artifacts.has(node.id);
+      if (isArtifact) artifactEntries(node, box, out);
+      const lab = labelOf(node);
+      if (lab) out.push({ id: node.id, kind: "label", text: lab.text, what: "label on " + (isArtifact ? ARTIFACT_NOUN[codeOf(node)?.kind || ""] || "a thing" : nounOf(node)), ...box ? { box } : {} });
+      if (!isArtifact) {
+        const seen = /* @__PURE__ */ new Set();
+        for (const t of transcriptsOf(node)) {
+          if (seen.has(t.text)) continue;
+          seen.add(t.text);
+          out.push({ id: node.id, kind: "transcript", text: t.text, what: "read writing", ...box ? { box } : {} });
+        }
+      }
+    }
+    for (const src of sources.values()) {
+      if (out.length >= MAX_ENTRIES) break;
+      try {
+        for (const e of src.entries(state) || []) {
+          if (e && typeof e.text === "string" && e.text && typeof e.kind === "string" && typeof e.what === "string") out.push(e);
+        }
+      } catch (err) {
+      }
+    }
+    return out.slice(0, MAX_ENTRIES);
+  }
+
+  // src/search/query.ts
+  var EXACT = 3;
+  var PREFIX = 1.5;
+  var SEMANTIC_FLOOR = 0.5;
+  var SEMANTIC_WEIGHT = 3;
+  var FOLLOWS = 0.3;
+  var KIND_WEIGHT = { label: 1.15, name: 1.1, board: 1.1, region: 1.1, picture: 1, text: 1, figure: 1, mermaid: 1, page: 0.95, transcript: 0.95 };
+  var EXCERPT_CHARS = 80;
+  function lexical(q, words) {
+    if (!q.length || !words.length) return null;
+    let total = 0, follows = true, last = -1;
+    const spans = [];
+    for (const t of q) {
+      let best = 0, at = -1, span = null;
+      for (let i = 0; i < words.length; i++) {
+        const w2 = words[i];
+        let s = 0;
+        if (w2.text === t.text) s = EXACT;
+        else if (w2.text.startsWith(t.text)) s = PREFIX;
+        if (s > best) {
+          best = s;
+          at = i;
+          span = s === EXACT ? [w2.start, w2.end] : [w2.start, Math.min(w2.end, w2.start + t.text.length)];
+          if (s === EXACT) break;
+        }
+      }
+      if (!best || !span) return null;
+      total += best;
+      if (last >= 0 && at !== last + 1) follows = false;
+      last = at;
+      spans.push(span);
+    }
+    let score2 = total / q.length;
+    if (q.length > 1 && follows) score2 += FOLLOWS;
+    score2 *= 1 - Math.min(0.3, 0.02 * (words.length - q.length));
+    return { score: score2, spans };
+  }
+  function excerptOf(text, spans, width = EXCERPT_CHARS) {
+    if (text.length <= width) return { text, spans: spans.map((s) => [s[0], s[1]]) };
+    const first = spans.length ? spans[0][0] : 0;
+    let start = Math.max(0, first - Math.floor(width / 3));
+    if (start > 0) {
+      const sp = text.indexOf(" ", start);
+      if (sp >= 0 && sp < first) start = sp + 1;
+    }
+    let end = Math.min(text.length, start + width);
+    if (end < text.length) {
+      const sp = text.lastIndexOf(" ", end);
+      if (sp > Math.max(first + 1, start + width / 2)) end = sp;
+    }
+    const head = start > 0 ? "\u2026" : "", tail = end < text.length ? "\u2026" : "";
+    const shift = head.length - start;
+    const kept2 = spans.filter((s) => s[0] >= start && s[1] <= end).map((s) => [s[0] + shift, s[1] + shift]);
+    return { text: head + text.slice(start, end) + tail, spans: kept2 };
+  }
+  function searchBoards(boards, query, options = {}) {
+    const q = tokenize(query);
+    if (!q.length) return [];
+    const perBoard = Math.max(1, options.hitsPerBoard ?? 5);
+    const groups = [];
+    for (const b of boards) {
+      const hits = [];
+      const add7 = (e, lex, sem) => {
+        if (!lex && sem < SEMANTIC_FLOOR) return;
+        const score2 = (lex ? lex.score : 0) * KIND_WEIGHT[e.kind] + sem * SEMANTIC_WEIGHT;
+        const ex = excerptOf(e.text, lex ? lex.spans : []);
+        hits.push({ board: b.id, boardName: b.name, id: e.id, kind: e.kind, what: e.what, text: ex.text, spans: ex.spans, ...e.box ? { box: e.box } : {}, score: score2 });
+      };
+      const nameLex = lexical(q, tokenize(b.name));
+      if (nameLex) add7({ id: null, kind: "board", text: b.name, what: "board name" }, nameLex, 0);
+      for (const e of b.entries) {
+        const lex = lexical(q, tokenize(e.text));
+        const sem = options.semantic ? Math.max(0, Math.min(1, options.semantic(query, e, b) || 0)) : 0;
+        add7(e, lex, sem);
+      }
+      if (!hits.length) continue;
+      hits.sort((x, y) => y.score - x.score);
+      groups.push({ board: b.id, name: b.name, recency: b.recency, score: hits[0].score, hits: hits.slice(0, perBoard), more: Math.max(0, hits.length - perBoard) });
+    }
+    groups.sort((x, y) => y.score - x.score || y.recency - x.recency || (x.board < y.board ? -1 : x.board > y.board ? 1 : 0));
+    return groups.slice(0, options.boards ?? 40);
+  }
+  function describeHit(h2) {
+    if (h2.kind === "board") return "Board \u201C" + h2.boardName + "\u201D";
+    return "\u201C" + h2.text + "\u201D \u2014 " + h2.what + " \xB7 Board \u201C" + h2.boardName + "\u201D";
+  }
+
+  // src/search/plan.ts
+  var SEARCH_VERSION = 1;
+  function searchKeyOf(stat) {
+    if (!stat) return "";
+    return [SEARCH_VERSION, sourceIds().join(","), stat.changed || 0, stat.events || 0, stat.chars || 0].join("|");
+  }
+  function stalePlan(wanted, held2) {
+    const get = (id) => held2 instanceof Map ? held2.get(id) : held2[id];
+    const keys = held2 instanceof Map ? [...held2.keys()] : Object.keys(held2);
+    const want = new Set(wanted.map((w2) => w2.id));
+    return {
+      build: wanted.filter((w2) => !w2.key || get(w2.id) !== w2.key).map((w2) => w2.id),
+      drop: keys.filter((k) => !want.has(k))
+    };
+  }
+  function thumbFit(box, w2, h2, pad = 8) {
+    if (!box || !isFinite(box.minX + box.minY + box.maxX + box.maxY)) return { scale: 1, x: 0, y: 0 };
+    const bw = Math.max(1, box.maxX - box.minX), bh = Math.max(1, box.maxY - box.minY);
+    const scale = Math.min(Math.max(1, w2 - 2 * pad) / bw, Math.max(1, h2 - 2 * pad) / bh, 1);
+    return { scale, x: w2 / 2 - (box.minX + box.maxX) / 2 * scale, y: h2 / 2 - (box.minY + box.maxY) / 2 * scale };
+  }
   return __toCommonJS(index_exports);
 })();
