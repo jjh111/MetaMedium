@@ -195,6 +195,8 @@ and a PDF of a region or the whole board, pictures included. The log format
 (R2) gains the asset reference without breaking a version 1 reader (a reader
 that does not know an asset draws its name, as today).
 
+*Status, 1 Oct 2026: built on `unit/i4-export` (`V1-PLAN.md` §9, *The iPad*, has the line).* The bundle is a zip, `<board>.dyna.zip` — Files, Mail and AirDrop know a zip, one tap shows its contents, anything can unzip it, and a JSONL with base64 pictures is a third larger and opens in nothing — holding `board.jsonl` and `assets/<hash>.<ext>`; the log stays version 1, its header optionally saying `assets: n`. `board.svg`, `board.png` and a one-page PDF draw the held marks or the whole board with pictures and figures; the PNG is held to 8,192 a side and 16 M pixels.
+
 **I5 — regions.** A region is a named rectangle the hand draws or takes from the
 field (*Make it a region*), holding whatever stands inside it — ink, pictures,
 texts, figures. Moving or scaling it moves what it holds, one act. It has a

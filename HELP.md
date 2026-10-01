@@ -165,9 +165,12 @@ whole. **reset** is a fresh board — the old one goes to the trash. Under
 *examples*, a flowchart (with its Mermaid beside it), a class diagram, a
 molecule and a pattern page: opening one makes a new board of your own from
 it — the example itself never changes, so draw on it freely. Every
-board is kept in this browser as you draw — its pictures too; **export** writes it out as SVG, PNG
-or its log — and, when what you hold or the board reads as a diagram, as Mermaid
-text — and **folder** makes a folder on your computer the canvas.
+board is kept in this browser as you draw — its pictures too; **export** writes it out —
+**board + pictures** as one `.dyna.zip` that **boards › from a file…** opens whole, pictures
+and all; **board.svg**, **board.png** and **board.pdf** (one page of Letter or A4) of what you
+hold, or of the whole board, with its pictures and figures in them; or its log
+(`canvas.jsonl`, which names its pictures but does not carry them) — and, when what you hold or the
+board reads as a diagram, as Mermaid text — and **folder** makes a folder on your computer the canvas.
 
 ## Packs
 
@@ -211,7 +214,8 @@ unused — add to Home Screen*.
 
 **An installed app does not see the boards you kept in a Safari tab** — they
 are two separate places on the iPad. To move a board, open it in the tab,
-**export** its log, then in the app open **boards › from a file…** and pick it.
+**export › board + pictures**, then in the app open **boards › from a file…** and pick the
+`.dyna.zip` (a log alone moves the marks and leaves the pictures behind).
 Do this once, before you rely on the app.
 
 **The pencil draws, a finger pans, two fingers pinch, and a palm on the glass
