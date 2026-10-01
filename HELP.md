@@ -170,6 +170,31 @@ the check.
 stroke, or everything one choice in the field did. Another hand's work in a
 live room stays.
 
+## On an iPad
+
+**Add it to the Home Screen** (Safari's share button › *Add to Home Screen*).
+Safari clears what a website keeps — the boards, here — after seven days
+without a visit, unless the site is on the Home Screen; an installed app is
+not cleared that way. The canvas also asks the browser to keep its storage, once,
+the first time a board holds something, and the foot of
+**controls › Board › boards** says where that stands: *kept on this device* with
+how much room it takes and has, or *this browser may clear it after a week
+unused — add to Home Screen*.
+
+**An installed app does not see the boards you kept in a Safari tab** — they
+are two separate places on the iPad. To move a board, open it in the tab,
+**export** its log, then in the app open **boards › from a file…** and pick it.
+Do this once, before you rely on the app.
+
+**The pencil draws, a finger pans, two fingers pinch, and a palm on the glass
+is ignored.** The canvas keeps how hard you pressed and when, at every point the
+pencil reports, so a quick stroke stays as smooth as you drew it. The *hand*
+tile gives a finger its ink back, and says left or right for your hand.
+
+**Pictures come in two ways**: **Import a photo** (from your photo library or
+Files, several at a time) and **Take a photo** (the camera). Each lands on the
+board and is kept with it.
+
 ## Shortcuts
 
 - **⌘Z / Ctrl+Z** — undo your last act
