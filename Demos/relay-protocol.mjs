@@ -160,9 +160,13 @@ export function sniffImage(bytes) {
 
 const mb = (n) => { const v = n / (1024 * 1024); return (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10) + ' MB'; };
 
+/** What is said of a picture over the cap, its size in words (a few bytes over is said so, not as "12 MB — up to 12 MB"). */
+export function tooLargeWords(n) {
+  return 'that picture is ' + (n < MAX_ASSET_BYTES * 1.05 ? 'a little over 12 MB' : mb(n)) + ' — a room takes pictures up to 12 MB';
+}
 /** The verdict on a size alone, before a body is read: null, or `{ status, words }`. */
 export function assetSizeVerdict(n) {
-  if (n > MAX_ASSET_BYTES) return { status: 413, words: 'that picture is ' + mb(n) + ' — a room takes pictures up to 12 MB' };
+  if (n > MAX_ASSET_BYTES) return { status: 413, words: tooLargeWords(n) };
   return null;
 }
 
