@@ -322,6 +322,16 @@ describe('live logs', () => {
       w.deliver({ relay: 'truncated', room: 'r', dropped: 12, kept: 10 });
       expect(store.notices()).toEqual(['the room is older than the relay remembers — 12 earlier lines are gone']);
     });
+
+    it('a relay that refused the hand’s key is a notice, in words and never with the key', async () => {
+      const w = wire();
+      const store = new LiveStore(w.transport as any, 'me~1');
+      w.deliver({ relay: 'refused', room: 'r', status: 401 });
+      expect(store.notices()).toEqual(['the relay wants a key for this room and none was given — the room is not reached']);
+      w.deliver({ relay: 'refused', room: 'r', status: 403 });
+      expect(store.refusal()).toBe('the relay does not take this key for this room — the room is not reached');
+      expect(store.notices()).toHaveLength(1);
+    });
   });
 
   // ===== One event, applied once (V1-PLAN phase 0, L1b) ======================

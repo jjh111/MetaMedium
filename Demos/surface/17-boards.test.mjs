@@ -272,6 +272,8 @@ test('the page says which board it is: the title carries the name, the address t
   assert.equal(B.boardSearch('?fresh=1&nosw=1&folder=%2Fsite%2F&git=a%2Fb&live=r&relay=http%3A%2F%2Fx&replay=r.json&embed=1', 'default'), '?nosw=1&board=default',
     'a board opened by name is kept: a fresh start would wipe it at its first change, and a folder, a room or a figure is not a board');
   assert.equal(B.boardSearch('', 'default'), '?board=default');
+  assert.equal(B.boardSearch('?live=claude&relay=https%3A%2F%2Frelay.dyna.ink&key=SECRET&nosw=1', 'b-1'), '?nosw=1&board=b-1',
+    'a room\'s key belongs to the room: it is never carried into the address of a board');
 });
 
 test('at random: new, rename, copy, trash, restore and empty — ids stay unique, a rename never moves an id, and a board is only ever gone by emptying the trash', () => {

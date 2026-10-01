@@ -244,19 +244,20 @@ async function appTest(browser, servers, ctx) {
     if (sw.controlled) {
       keyed = await page.evaluate(async (name) => {
         const probe = (q) => new URL('../VERSION?probe=' + q + '-' + Date.now(), location.href).href;
-        const withKey = probe('key'), stream = probe('stream'), plain = probe('plain');
+        const withKey = probe('key'), stream = probe('stream'), plain = probe('plain'), inAddress = probe('qk') + '&key=e2e-probe-not-a-key';
         await fetch(withKey, { headers: { Authorization: 'Bearer e2e-probe-not-a-key' } });
         await fetch(stream, { headers: { Accept: 'text/event-stream' } });
+        await fetch(inAddress);
         await fetch(plain);
         const c = await caches.open(name);
         // The worker keeps a response once it has answered with it: wait for the plain one, then look for the others.
         for (let i = 0; i < 60 && !(await c.match(plain)); i++) await new Promise((r) => setTimeout(r, 50));
         const all = await c.keys();
-        return { key: !!(await c.match(withKey)), stream: !!(await c.match(stream)), plain: !!(await c.match(plain)), withAuthorization: all.filter((q) => q.headers.has('authorization')).length };
+        return { key: !!(await c.match(withKey)), stream: !!(await c.match(stream)), inAddress: !!(await c.match(inAddress)), plain: !!(await c.match(plain)), withAuthorization: all.filter((q) => q.headers.has('authorization')).length };
       }, cacheName);
     }
-    check('A8. a request that carries a key is never kept by the worker, nor a stream — the same request without one is',
-      !!keyed && !keyed.key && !keyed.stream && keyed.plain && keyed.withAuthorization === 0, keyed);
+    check('A8. a request that carries a key — in a header or in its address — is never kept by the worker, nor a stream — the same request without one is',
+      !!keyed && !keyed.key && !keyed.stream && !keyed.inAddress && keyed.plain && keyed.withAuthorization === 0, keyed);
 
     // ---- A9. The old address opens exactly as before --------------------------------------------
     await page.close();

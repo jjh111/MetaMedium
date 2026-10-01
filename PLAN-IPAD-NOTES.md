@@ -239,6 +239,25 @@ field and in search. Lazy, under 32 MB.
 hand in the room checking each step — `QA-v1.md` §A11 — and the faults written
 up, the V1 review's pattern.
 
+**CF1 — dyna.ink on Cloudflare, the site and a room relay (1 Oct 2026, branch `unit/cf-relay`).**
+Built, not deployed (nothing here can log in): `cloudflare/` makes the site Cloudflare Pages
+publishes from what git tracks (`build-site.mjs`, 733 files, 30 MB) with `_headers` — the app's
+CSP held by test to the hosts its source loads, `'unsafe-eval'` and `'unsafe-inline'` kept on
+purpose (a program's frame inherits the policy and runs `new Function`; tried without eval
+against the real build, every `run` and `js` artifact threw), no COOP/COEP and why — and a
+`_redirects`; and **the relay as a Worker + Durable Object** (`cloudflare/relay/`, the protocol
+of `Demos/relay.mjs` through the new shared `Demos/relay-protocol.mjs`) with **a key per room**
+(the HMAC of the room's name under one secret; `room-key.mjs`; `*` for John's own), CORS for the
+app's origins, lines kept in SQLite-backed storage, bounded, fail closed with no secret.
+`mcp.mjs`, `seat-watch.mjs` and `live-node.mjs` take `MM_RELAY_KEY` and say a refusal in words;
+a tab takes `?key=`. Tests: relay protocol 24 on a fake storage + 5 over a socket + 3 hands +
+1 in workerd (`wrangler dev --local`, which caught an entry module exporting constants),
+site 8, core 22 live-store cases (1 new). A browser tab on a keyed relay drew and a Node hand saw the stroke;
+wrong and missing keys read as sentences. What John does: `cloudflare/README.md`. Open for the
+seats unit: `24-seat.js`'s *with Claude* should default on dyna.ink to
+`https://relay.dyna.ink`, room `claude`, the key from the page's `?key=`; and a seat joined
+through an https relay is `hosted` to `providerLocality`, not `local`.
+
 Cut order if time runs short: I9, then I8's spike, then I5's outline. Never cut
 I1–I4.
 

@@ -133,27 +133,48 @@
       close: () => ch.close(),
     };
   }
-  function relayTransport(url, room) {
-    const base = url.replace(/\/+$/, '') + '/rooms/' + encodeURIComponent(room) + '/events';
-    const es = new EventSource(base);
+  function relayTransport(url, room, key) {
+    // A relay that asks for a key (cloudflare/relay) takes it as `?key=`: an EventSource cannot set a
+    // header. The key is the page's own — from the address or a typed field — and goes nowhere but
+    // this address: never the log, the board, an export, or a cache (`sw.js` does not keep a request with one).
+    const base = url.replace(/\/+$/, '') + '/rooms/' + encodeURIComponent(room) + '/events' + (key ? '?key=' + encodeURIComponent(key) : '');
+    const listeners = new Set();
+    let es = null;
+    let closed = false;
+    let retry = null;
+    const deliver = (line) => { for (const cb of listeners) cb(line); };
+    // Every line goes to the store — the relay's own word that the room has outlived its buffer
+    // included: the store says it (`notices`), and so does every other hand's.
+    const onLine = (e) => {
+      let line;
+      try { line = JSON.parse(e.data); } catch (err) { return; /* not a line */ }
+      deliver(line);
+    };
+    // An EventSource that is closed for good was refused, and cannot say by what: ask once with a plain
+    // request. A key the relay will not take is said to the store (`{ relay: 'refused' }`) and not asked
+    // again, as Node's transport does; anything else is a hiccup, and the stream is opened again.
+    const refusedOr = () => {
+      fetch(base, { headers: { accept: 'text/event-stream' }, cache: 'no-store' }).then((res) => {
+        const status = res.status;
+        if (res.body) res.body.cancel().catch(() => undefined);
+        if ([401, 403, 503].includes(status)) { closed = true; deliver({ relay: 'refused', room: room, status: status }); return; }
+        if (!closed) retry = setTimeout(open, 3000);
+      }, () => { if (!closed) retry = setTimeout(open, 3000); });
+    };
+    const open = () => {
+      if (closed) return;
+      es = new EventSource(base);
+      es.addEventListener('message', onLine);
+      es.addEventListener('error', () => { if (es.readyState === 2 && !closed) refusedOr(); });
+    };
+    open();
     return {
       // The POST's promise goes back to the store, which sends the next line
       // only when this one has gone — two POSTs in flight can land the wrong
       // way round.
       send: (line) => fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(line) }).then(() => undefined, () => undefined),
-      onMessage: (cb) => {
-        // Every line goes to the store — the relay's own word that the room
-        // has outlived its buffer included: the store says it (`notices`),
-        // and so does every other hand's.
-        const h = (e) => {
-          let line;
-          try { line = JSON.parse(e.data); } catch (err) { return; /* not a line */ }
-          cb(line);
-        };
-        es.addEventListener('message', h);
-        return () => es.removeEventListener('message', h);
-      },
-      close: () => es.close(),
+      onMessage: (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
+      close: () => { closed = true; clearTimeout(retry); if (es) es.close(); },
     };
   }
   // The merge runs on a microtask, not a timer: a hidden tab throttles timers
@@ -193,7 +214,7 @@
     // What is already drawn keeps the ids it was drawn with: the name applies
     // to what is written next, and the two forms cannot collide.
     session.setLogName(me);
-    const transport = opts.transport || (opts.relay ? relayTransport(opts.relay, room) : broadcastTransport(room));
+    const transport = opts.transport || (opts.relay ? relayTransport(opts.relay, room, opts.key || params.get('key') || '') : broadcastTransport(room));
     const store = new MM.LiveStore(transport, me, room, { sitting: PAGE_SITTING });
     // Which relay carries the room: the seat parks its questions only through one on this machine (V1-PLAN J4).
     folder.relay = opts.relay || '';

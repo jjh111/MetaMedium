@@ -370,10 +370,11 @@
   /**
    * The page's address on board `id`: `board=` set (in the place it had, or last), everything else
    * kept — except what would make the board not this board on a reload: `fresh` (a fresh start
-   * replaces the board at its first change), and a folder, a repository, a room or a figure.
+   * replaces the board at its first change), and a folder, a repository, a room (and its `key`, which is the
+   * room's and never a board's) or a figure.
    */
   function boardSearch(search, id) {
-    const drop = { fresh: 1, folder: 1, git: 1, live: 1, relay: 1, replay: 1, embed: 1 };
+    const drop = { fresh: 1, folder: 1, git: 1, live: 1, relay: 1, key: 1, replay: 1, embed: 1 };
     const out = [];
     let said = false;
     for (const p of String(search || '').replace(/^\?/, '').split('&')) {

@@ -19904,6 +19904,8 @@ ${p.svg}</section>`),
       this.closed = false;
       /** The relay's word that this room is older than its buffer. */
       this.truncated = null;
+      /** The relay's refusal of this hand's key (the transport's word). */
+      this.refused = null;
       /** Whether this store has put MY log on the wire yet, in any form. */
       this.published = false;
       this.lastAt = 0;
@@ -20040,6 +20042,15 @@ ${p.svg}</section>`),
       if (!n2) return null;
       return `the room is older than the relay remembers \u2014 ${n2.dropped} earlier line${n2.dropped === 1 ? " is" : "s are"} gone`;
     }
+    /** A relay that refused this hand — no key, a wrong one — as a sentence, or null. The key is never in it. */
+    refusal() {
+      const r = this.refused;
+      if (!r) return null;
+      if (r.status === 401) return "the relay wants a key for this room and none was given \u2014 the room is not reached";
+      if (r.status === 403) return "the relay does not take this key for this room \u2014 the room is not reached";
+      if (r.status === 503) return "the relay has no keys set up yet \u2014 the room is not reached";
+      return `the relay refused this room (HTTP ${r.status}) \u2014 the room is not reached`;
+    }
     /**
      * Log names two DIFFERENT events were both numbered under, in the logs held
      * here — one sentence per name. The same event heard in two logs is one
@@ -20058,6 +20069,8 @@ ${p.svg}</section>`),
      */
     notices() {
       const out = this.collisions().concat(this.misnumberings());
+      const f = this.refusal();
+      if (f) out.push(f);
       const t = this.truncation();
       if (t) out.push(t);
       return out;
@@ -20191,6 +20204,12 @@ ${p.svg}</section>`),
     }
     receive(raw) {
       if (this.closed || !raw || typeof raw !== "object") return;
+      if (raw.relay === "refused") {
+        const r = raw;
+        this.refused = { relay: "refused", room: r.room, status: Number(r.status) || 0 };
+        this.notify("", []);
+        return;
+      }
       if (raw.relay === "truncated") {
         const n2 = raw;
         this.truncated = { relay: "truncated", room: n2.room, dropped: Math.max(0, Number(n2.dropped) || 0), kept: n2.kept };
