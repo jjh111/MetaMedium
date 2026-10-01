@@ -778,6 +778,73 @@ export function extendBoard(core, session, { marks, seed = 99, onStroke } = {}) 
   return drawn;
 }
 
+// ===== Pictures traced into ink (V1-PLAN I2, PLAN-IPAD-NOTES §1 item 4) ====
+//
+// What `trace` leaves of a photograph, without the photograph: a skeleton cut
+// into many short fragments that run into one another, a few long runs among
+// them — measured on one 12 MP camera photo (3,923 strokes, 50,607 points, a
+// median of 8 points a stroke, the longest 199) and on a photographed paper
+// sketch (~110 strokes). The fragments are walks with a slowly turning
+// heading and a point every 1.4 px, started anywhere in the picture's box, so
+// at that density they cross and touch and the strokes of one picture are one
+// connected group — the case that made a board with an artifact on it take
+// minutes to open. Generated from a seed, never kept.
+
+/** `count` traced fragments inside `bounds` ({minX, minY, maxX, maxY}). */
+export function tracedStrokes({ seed = 1, count = 1000, bounds = { minX: 0, minY: 0, maxX: 450, maxY: 600 } } = {}) {
+  const rand = rng(seed);
+  const w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY;
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    // Mostly a handful of points, now and then a long run: median about 9, tail to ~75.
+    const n = Math.max(2, Math.min(200, 1 + Math.round(Math.exp(rand() * 4.3))));
+    let x = bounds.minX + rand() * w, y = bounds.minY + rand() * h;
+    let heading = rand() * Math.PI * 2;
+    const points = [];
+    for (let k = 0; k < n; k++) {
+      points.push({ x: +x.toFixed(3), y: +y.toFixed(3) });
+      heading += (rand() - 0.5) * 0.5;
+      x = Math.min(bounds.maxX, Math.max(bounds.minX, x + Math.cos(heading) * 1.4));
+      y = Math.min(bounds.maxY, Math.max(bounds.minY, y + Math.sin(heading) * 1.4));
+    }
+    out.push(points);
+  }
+  return out;
+}
+
+/**
+ * A board of pictures: `svgs` SVG figures and `pictures` pictures, each brought in as the
+ * surface brings it — one `import` event, a picture's carrying `strokes` traced
+ * into ink — laid out in a grid of cells, each `strokesEach` strokes in a cell
+ * of its own. The log is made on a session of its own and returned; `marks` is
+ * the strokes it holds. `onImport(kind, ms, strokes)` hears what each import cost.
+ */
+export function importedBoard(core, { pictures = 5, strokesEach = 1000, svgs = 1, seed = 1, cell = 520, onImport } = {}) {
+  const s = core.createSession();
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="black"/></svg>';
+  let at = T0;
+  const cols = Math.max(1, Math.ceil(Math.sqrt(pictures + svgs)));
+  const place = (i) => ({ minX: (i % cols) * (cell + 80), minY: Math.floor(i / cols) * (cell + 80) });
+  let i = 0;
+  for (let k = 0; k < svgs; k++, i++) {
+    const o = place(i);
+    const t = performance.now();
+    s.import({ kind: 'svg', path: `imports/figure-${k}.svg`, bounds: { minX: o.minX, minY: o.minY, maxX: o.minX + 300, maxY: o.minY + 220 }, code: svg, at: (at += 3000) });
+    if (onImport) onImport('svg', performance.now() - t, 0);
+  }
+  let marks = 0;
+  for (let k = 0; k < pictures; k++, i++) {
+    const o = place(i);
+    const bounds = { minX: o.minX, minY: o.minY + 230, maxX: o.minX + cell * 0.86, maxY: o.minY + 230 + cell };
+    const strokes = tracedStrokes({ seed: seed * 1000 + k, count: strokesEach, bounds });
+    const t = performance.now();
+    s.import({ kind: 'png', path: `imports/picture-${k}.jpg`, bounds, strokes, at: (at += 3000) });
+    if (onImport) onImport('picture', performance.now() - t, strokes.length);
+    marks += strokes.length;
+  }
+  return { events: s.getEvents(), marks, session: s };
+}
+
 // ===== CLI ==================================================================
 
 if (process.argv[1] && import.meta.url === (await import('node:url')).pathToFileURL(process.argv[1]).href) {

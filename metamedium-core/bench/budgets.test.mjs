@@ -12,6 +12,10 @@
 // basics@1 and flowchart@1 used at the head of the 2,000-mark board's log, so
 // every group is matched against their definitions too.
 //
+// Pictures traced into ink (V1-PLAN I2, PLAN-IPAD-NOTES §1 item 4): an `import`
+// of 2,000 traced strokes beside an SVG artifact must apply, and replay,
+// within R4b's budgets — and so must 5 pictures of 1,000 beside 5 SVGs.
+//
 // Each size runs in a process of its own (`budgets.mjs`): a clean heap, the
 // collector exposed, and a process that can be killed when a replay does not
 // finish — a replay is synchronous, so nothing inside the process could stop
@@ -41,10 +45,24 @@ export const BUDGETS = {
   followMoveP95Ms: 16,
 };
 
+/**
+ * Pictures traced into ink beside artifacts (I2). A stroke the import applies
+ * is held to a stroke's budget, on average (R4b's ≤ 4 ms; an import is one event
+ * but its strokes are marks, each as much as a hand's); a replay to R4b's rate,
+ * a quarter of a millisecond a mark (≤ 0.5 s for 2,000 marks, ≤ 1.25 s for
+ * 5,000); and a stroke drawn on the ink of a traced picture to a stroke's own.
+ */
+export const IMPORT_BUDGETS = {
+  applyStrokeMs: 4,
+  replayMsPerMark: 0.25,
+  strokeOnPictureMedianMs: 4,
+  strokeOnPictureP95Ms: 16,
+};
+
 /** Run `budgets.mjs` for one size; resolve with its numbers, or say why there are none. */
-function measure(size, { limitMs, extra = [], flags = [] }) {
+function measure(size, { limitMs, extra = [], flags = [], script = 'budgets.mjs' }) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, ['--expose-gc', ...extra, join(here, 'budgets.mjs'), `--size=${size}`, ...flags], {
+    const child = spawn(process.execPath, ['--expose-gc', ...extra, join(here, script), ...(size === null ? [] : [`--size=${size}`]), ...flags], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '', stderr = '';
@@ -138,4 +156,64 @@ test('2,000 marks with two library packs in use (basics@1, flowchart@1): the sam
   if (!(n.stroke.p95 <= BUDGETS.strokeP95Ms)) over.push(`stroke p95 ${ms(n.stroke.p95)} > ${BUDGETS.strokeP95Ms} ms`);
   if (!(n.memory.heldMB <= BUDGETS.heldMB)) over.push(`held ${n.memory.heldMB} MB > ${BUDGETS.heldMB} MB`);
   assert.deepEqual(over, [], `over budget on the 2,000-mark board with packs: ${said}`);
+});
+
+function recordImports(name, run) {
+  mkdirSync(OUT_DIR, { recursive: true });
+  const n = run.numbers;
+  const line = {
+    at: new Date().toISOString(),
+    board: name,
+    finished: !!n,
+    wallMs: run.wallMs,
+    ...(n
+      ? {
+          marks: n.board.marks,
+          applyTotalMs: Math.round(n.apply.totalMs),
+          applyStrokeMs: +n.apply.perStrokeMs.toFixed(3),
+          replayColdMs: +n.replay.coldMs.toFixed(1),
+          replayWarmMs: +n.replay.warm.median.toFixed(1),
+          strokeMedianMs: +n.stroke.median.toFixed(2),
+          strokeP95Ms: +n.stroke.p95.toFixed(2),
+          heldMB: n.memory.heldMB,
+          loadavg: n.loadavg,
+        }
+      : { killed: run.signal, exit: run.code }),
+  };
+  appendFileSync(join(OUT_DIR, 'budgets-history.jsonl'), JSON.stringify(line) + '\n');
+  return line;
+}
+
+function holdImports(n) {
+  const over = [];
+  if (!(n.apply.perStrokeMs <= IMPORT_BUDGETS.applyStrokeMs)) over.push(`applying a traced stroke took ${ms(n.apply.perStrokeMs)} on average > ${IMPORT_BUDGETS.applyStrokeMs} ms`);
+  const replayBudget = IMPORT_BUDGETS.replayMsPerMark * n.board.marks;
+  if (!(n.replay.warm.median <= replayBudget)) over.push(`replay ${ms(n.replay.warm.median)} > ${ms(replayBudget)} (${IMPORT_BUDGETS.replayMsPerMark} ms a mark)`);
+  if (!(n.stroke.median <= IMPORT_BUDGETS.strokeOnPictureMedianMs)) over.push(`a stroke on a picture's ink, median ${ms(n.stroke.median)} > ${IMPORT_BUDGETS.strokeOnPictureMedianMs} ms`);
+  if (!(n.stroke.p95 <= IMPORT_BUDGETS.strokeOnPictureP95Ms)) over.push(`a stroke on a picture's ink, p95 ${ms(n.stroke.p95)} > ${IMPORT_BUDGETS.strokeOnPictureP95Ms} ms`);
+  return over;
+}
+
+const IMPORT_LIMIT_MS = 10 * 60 * 1000;
+
+test('an import of 2,000 traced strokes beside an SVG: each stroke applies in ≤ 4 ms on average, the log replays in ≤ 0.5 s, a stroke on the picture ≤ 4 ms median and ≤ 16 ms p95', { timeout: IMPORT_LIMIT_MS + 60_000 }, async (t) => {
+  const run = await measure(null, { limitMs: IMPORT_LIMIT_MS, script: 'imports.mjs', flags: ['--pictures=1', '--strokes=2000', '--svgs=1'] });
+  const line = recordImports('1 picture of 2,000 strokes, 1 SVG', run);
+  t.diagnostic(JSON.stringify(line));
+  assert.ok(run.numbers, `the board did not finish in ${ms(run.wallMs)} (${run.signal ? 'killed at the limit' : 'exit ' + run.code})`);
+  const n = run.numbers;
+  const said = `applied in ${ms(n.apply.totalMs)} (${ms(n.apply.perStrokeMs)} a stroke) · replay ${ms(n.replay.warm.median)} (cold ${ms(n.replay.coldMs)}) · a stroke on the picture ${ms(n.stroke.median)} / p95 ${ms(n.stroke.p95)} · held ${n.memory.heldMB} MB`;
+  t.diagnostic(said);
+  assert.deepEqual(holdImports(n), [], `over budget: ${said}`);
+});
+
+test('5 pictures of 1,000 traced strokes beside 5 SVGs (5,000 marks, 10 artifacts): the same budgets, replay ≤ 1.25 s', { timeout: IMPORT_LIMIT_MS + 60_000 }, async (t) => {
+  const run = await measure(null, { limitMs: IMPORT_LIMIT_MS, script: 'imports.mjs', extra: ['--max-old-space-size=8192'], flags: ['--pictures=5', '--strokes=1000', '--svgs=5'] });
+  const line = recordImports('5 pictures of 1,000 strokes, 5 SVGs', run);
+  t.diagnostic(JSON.stringify(line));
+  assert.ok(run.numbers, `the board did not finish in ${ms(run.wallMs)} (${run.signal ? 'killed at the limit' : 'exit ' + run.code})`);
+  const n = run.numbers;
+  const said = `applied in ${ms(n.apply.totalMs)} (${ms(n.apply.perStrokeMs)} a stroke) · replay ${ms(n.replay.warm.median)} (cold ${ms(n.replay.coldMs)}) · a stroke on the last picture ${ms(n.stroke.median)} / p95 ${ms(n.stroke.p95)} · held ${n.memory.heldMB} MB`;
+  t.diagnostic(said);
+  assert.deepEqual(holdImports(n), [], `over budget: ${said}`);
 });
