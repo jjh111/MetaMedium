@@ -1,8 +1,8 @@
 // The seats' rules — who reads, who writes, whose key is whose — on their own (V1-PLAN I7).
 //
-//   node --test Demos/surface/04-seats.test.mjs
+//   node --test Demos/surface/03-seats.test.mjs
 //
-// 04-seats.js is a fragment of the surface's one closure that names nothing outside itself, so it is
+// 03-seats.js is a fragment of the surface's one closure that names nothing outside itself, so it is
 // loaded here as the browser loads it (as source, inside a function body) and asked questions directly,
 // as 07-hand.test.mjs asks the hand's rules. What the adapter does with the answers — the pane, the
 // joins, the asking — is the gate's `models` scenario (e2e/models.mjs, M13 on).
@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '04-seats.js'), 'utf8');
+const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '03-seats.js'), 'utf8');
 const S = new Function(
   src + '\n  return { SEATS, SEAT_WORDS, resolveReaders, resolveWriters, fallbackWords, keyId, keysToKeep, migrateStored, orderChoices, seatsOfPick, pickOf };'
 )();

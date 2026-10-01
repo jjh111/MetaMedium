@@ -52,6 +52,15 @@ import type { Capability, Locality } from '../session/nodes';
 export const NO_MATCH = 'no-match';
 
 /**
+ * How surely a decision model must lead before the surface takes its answer at all (V1-PLAN I7,
+ * PLAN-IPAD-NOTES §3: *taken only at 0.99, else the engine's ranking stands*). A seat is asked with
+ * this as `DecideOptions.takeAt`; a seat made without one holds every answer that is not flat, as
+ * it always did. It is a floor on what the seat is TRUSTED with, never on what it may say: an
+ * answer under it is still returned in the run — question and distribution — and never held.
+ */
+export const DECIDER_TAKE_AT = 0.99;
+
+/**
  * How far the top of a distribution must lead the next before the seat is
  * taken to have picked anything out at all.
  *
@@ -274,6 +283,12 @@ export interface DecideOptions {
   locality?: Locality;
   /** The caller's own flatness margin, when `FLAT_MARGIN` is not the right one here. */
   flatMargin?: number;
+  /**
+   * The least a distribution's lead may be for its answer to be held (`DECIDER_TAKE_AT` is the
+   * surface's). Under it the answer is `below`: returned, not held, and the engine's ranking stands.
+   * Unset, nothing is held back but a flat answer.
+   */
+  takeAt?: number;
 }
 
 /** One question, its answer, and what became of it. */
@@ -287,6 +302,8 @@ export interface DecisionRow {
   reason: string;
   /** True when this answer was proposed onto the board. A flat one never is. */
   held: boolean;
+  /** True when the seat was asked with a floor (`takeAt`) and the answer led by less: not held, the engine's ranking stands. */
+  below?: boolean;
 }
 
 export interface DecideRun {
@@ -336,6 +353,7 @@ export function createDecideParticipant(
   const name = options.name ?? 'decide';
   const tier: Capability = options.tier ?? 1.5;
   const margin = options.flatMargin ?? FLAT_MARGIN;
+  const takeAt = options.takeAt ?? 0;
   const id = session.join('agent', name, at, tier, options.locality ?? 'local');
 
   async function ask(
@@ -379,7 +397,8 @@ export function createDecideParticipant(
         continue;
       }
       const { flat, why } = isFlat(answer, margin);
-      rows.push({ question: q, answer, flat, flatWhy: why, reason: reasonOf(q, answer), held: false });
+      const below = !flat && takeAt > 0 && leadOf(answer) < takeAt;
+      rows.push({ question: q, answer, flat, flatWhy: why, reason: reasonOf(q, answer), held: false, ...(below ? { below: true } : {}) });
     }
 
     // The snapshot check. A board that has been replaced under the batch takes
@@ -400,6 +419,7 @@ export function createDecideParticipant(
 
     for (const row of rows) {
       if (row.flat) continue; // nothing was picked out: this one is the human's.
+      if (row.below) continue; // led, but not by enough to be trusted: the engine's ranking stands.
       const targets = (row.question.about ?? []).filter((n) => state.nodes.has(n));
       if (!targets.length) continue;
 

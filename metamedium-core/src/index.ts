@@ -703,6 +703,9 @@ export {
   DEFAULT_MAX_TOKENS, MIN_REPLY_TOKENS, OPENROUTER_REASONING, OPENROUTER_APP, MODEL_LIST_TIMEOUT_MS,
 } from './llm/provider';
 export type { ProviderConfig, ProviderKind, ChatMessage, ContentPart, CompletionResult, ModelList, Locality, FailureReason, ModelInfo, ModelCatalog, ModelFacts } from './llm/provider';
+// The decision seat's transport over a chat completion (V1-PLAN I7): the wire is the seam a native shape swaps in.
+export { createChatDecideTransport, CHAT_DECIDE_WIRE, DEFAULT_DECIDER_MODEL, wireQuestion } from './llm/decide-openrouter';
+export type { DecideWire, ChatDecideOptions, WireOption, WireQuestion } from './llm/decide-openrouter';
 
 // Tier 1 — the engine's instant library: what answers with no model and no
 // wait, as a registry a surface and the router read; and the structure of a
@@ -749,6 +752,8 @@ export { isWritingMark, definitionOf, definitionsIn, artifactsIn, writingLine } 
 export type { WritingLine } from './tools/board';
 export { bestWiring, frameTemplatesFor } from './tools/frames';
 export { mermaidFor } from './tools/mermaid';
+export { tiedMatches, TIE_MARGIN } from './tools/which';
+export type { TiedMatch } from './tools/which';
 
 // Context (V1-PLAN §2.2, B2) — what stands beside the hand: the notations and
 // concepts read over what a scope sits beside, weighted by nearness relative to
@@ -860,6 +865,7 @@ export {
   levelOf,
   NO_MATCH,
   FLAT_MARGIN,
+  DECIDER_TAKE_AT,
 } from './participants/decide';
 export type {
   DecideSeat,
