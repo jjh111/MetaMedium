@@ -82,6 +82,10 @@ jobs:
       # written by hand.
       - name: The board bundle, the SVG and the PDF, on their own
         run: node --test ../Demos/surface/17-bundle.test.mjs
+      # Where "with Claude" looks for the room's relay (PLAN-IPAD-NOTES A2): the
+      # hosted relay on dyna.ink, this machine's anywhere else.
+      - name: The relay "with Claude" defaults to, on its own
+        run: node --test ../Demos/surface/24-relay.test.mjs
       # The app at /app/ (V1-PLAN R7): its page, its worker and its manifest
       # are made from the old address's, and VERSION is stamped into the page
       # and into both workers' caches — what is committed must be that build.

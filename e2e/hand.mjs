@@ -51,6 +51,12 @@
 //   H1.25  the same on the Worker's logic (cloudflare/relay, in Node) with a room key: a tab joins with ?key=,
 //          its picture goes by Authorization: Bearer after a CORS preflight, and another tab, a context of
 //          its own, fetches and draws it — the path relay.dyna.ink takes, in the gate
+//   H1.26-28 A2, the hand organises notes (PLAN-IPAD-NOTES): a region the hand makes round his box and his word
+//          (canvas_region) is in the tab's board outline with what it holds, made by the hand, and moved nothing of
+//          his; the hand finds his words (canvas_find: the label, the transcript, the region's name) and the tab's
+//          own Find on the same board finds the region; a move of his box, his word or the region that would carry
+//          them is refused with whose they are and nothing moves in the tab, while the hand's own circle moves and
+//          the tab shows it moved
 //   H1.S1-4 the rows only John's own hand can walk: skips, by name
 //   H1.Y   the invariant: Tier 1 before a model — the model was asked once, by H1.19, and no brief,
 //          no seat, no real model
@@ -777,6 +783,69 @@ export async function runHand(browser, servers, { freshContext, screenshot }) {
         if (page4) await page4.close().catch(() => {});
         await worker.close().catch(() => {});
       }
+    });
+
+    // ---- A2. The hand organises notes (PLAN-IPAD-NOTES): a region round his marks, a find, a move it may not make ----
+    // The hand makes a region round his box and his word — a region holds by where things stand and moves nothing — and the
+    // tab shows it in the board's outline with what it holds; the hand finds his words; and it is refused when it asks to
+    // move what is his, while what it made itself moves and is seen to.
+    const eventsOf = (pg, type) => pg.evaluate((t) => window.__mm.session.getEvents().filter((e) => e.type === t).length, type);
+    let notesRegion = null, boxBefore = null, wordBefore = null;
+    await record('H1.26', async () => {
+      await page.evaluate((x) => window.__mm.setView(1, -x, 0), WX);
+      boxBefore = await boundsOfIn(page, boxB);
+      wordBefore = await boundsOfIn(page, word);
+      const movesBefore = await eventsOf(page, 'move');
+      const out = textOf(await hand.call('canvas_region', { name: 'Windows', around: [boxB, word] }));
+      notesRegion = (out.match(/^(\S+) · a region “Windows”/) || [])[1] || null;
+      const there = notesRegion && await waitFor(page, (id) => window.__mm.session.getState().regions.includes(id), notesRegion, 8000);
+      // The tab's panel lists it in the board's outline, with what it holds — nothing is held, so the panel is the board's.
+      await letGo(page);
+      await page.evaluate(() => { const s = window.__mm.session; s.deselect(Date.now()); });
+      const row = await waitFor(page, () => !![...document.querySelectorAll('#inspector .outlineRow')].find((r) => /Windows/.test(r.textContent)), null, 6000);
+      const rowText = await page.evaluate(() => { const r = [...document.querySelectorAll('#inspector .outlineRow')].find((x) => /Windows/.test(x.textContent)); return r ? r.textContent.replace(/\s+/g, ' ').trim() : ''; });
+      const info = await page.evaluate((id) => { const mm = window.__mm, s = mm.session.getState(), n = s.nodes.get(id); if (!n) return null; const a = mm.MM.authorOf(n); const d = mm.MM.describeRegion(s, id); return { by: mm.MM.wordOf(s.nodes.get(a)), holds: d.holds, things: d.things }; }, notesRegion);
+      const now = await Promise.all([boundsOfIn(page, boxB), boundsOfIn(page, word)]);
+      const movesAfter = await eventsOf(page, 'move');
+      check(`H1.26. A2: the hand makes a region “Windows” round his box and his word (${(out || '').slice(0, 70)}) — the tab has it, made by ${info && info.by}, in the board's outline ("${rowText}"), holding ${info && info.things.length} (his box and his word among them: ${!!info && info.things.includes(boxB) && info.things.includes(word)}); making it moved nothing of his (${JSON.stringify(now[0]) === JSON.stringify(boxBefore) && JSON.stringify(now[1]) === JSON.stringify(wordBefore) ? 'both marks where they were' : 'MOVED'}, ${movesAfter - movesBefore} move events)`,
+        !!notesRegion && there && row && /Windows \d+ marks/.test(rowText) && !!info && info.by === HAND && info.things.includes(boxB) && info.things.includes(word) && /holds .*stroke:john/.test(out)
+          && JSON.stringify(now[0]) === JSON.stringify(boxBefore) && JSON.stringify(now[1]) === JSON.stringify(wordBefore) && movesAfter === movesBefore, { out, there, rowText, info, now, boxBefore, wordBefore });
+    });
+
+    await record('H1.27', async () => {
+      // A find, answered: his words — the label he typed, what the hand read from his writing, the region's own name — each with the id and the place.
+      const byLabel = textOf(await hand.call('canvas_find', { query: 'outlet' }));
+      const byRead = textOf(await hand.call('canvas_find', { query: 'window' }));
+      const byRegion = textOf(await hand.call('canvas_find', { query: 'windows' }));
+      const none = textOf(await hand.call('canvas_find', { query: 'zzyzx' }));
+      // The tab asks core the same question of the same board, and finds the hand's region by its name.
+      const tabFinds = await page.evaluate(() => {
+        const mm = window.__mm, MM = mm.MM, s = mm.session.getState();
+        const groups = MM.searchBoards([{ id: 'room', name: 'room', recency: 1, entries: MM.searchEntriesOf(s) }], 'windows');
+        return (groups[0] ? groups[0].hits : []).map((h) => ({ id: h.id, kind: h.kind, what: h.what }));
+      });
+      check(`H1.27. A2: the hand finds his words — “outlet” is the label on his box (${(byLabel.split('\n').find((l) => l.includes(boxB)) || '').slice(0, 90)}), “window” the transcript on his word and the region's name (${(byRead.split('\n').find((l) => l.includes(word)) || '').slice(0, 60)}), “windows” the region it made (${(byRegion.split('\n').find((l) => l.includes(notesRegion)) || '').slice(0, 60)}) — and nothing says “zzyzx”; the tab's own Find on the same board finds that region too (${JSON.stringify(tabFinds.map((h) => h.kind))})`,
+        byLabel.includes(boxB) && /label on a box/.test(byLabel) && byRead.includes(word) && /read writing/.test(byRead) && byRegion.includes(notesRegion) && /a region/.test(byRegion) && /nothing says “zzyzx”/.test(none)
+          && tabFinds.some((h) => h.id === notesRegion && h.kind === 'region'), { byLabel, byRead, byRegion, none, tabFinds });
+    });
+
+    await record('H1.28', async () => {
+      // A move the hand may not make: his box, his word, the region that would carry them. What it made, it moves.
+      const movesBefore = await eventsOf(page, 'move');
+      const asBox = textOf(await hand.call('canvas_move', { ids: [boxB], dx: 300, dy: 300 }));
+      const asWord = textOf(await hand.call('canvas_move', { ids: [word], to: { x: 0, y: 0 } }));
+      const asRegion = textOf(await hand.call('canvas_move', { ids: [notesRegion], dx: 40, dy: 40 }));
+      await sleep(500);
+      const now = await Promise.all([boundsOfIn(page, boxB), boundsOfIn(page, word)]);
+      const movesAfter = await eventsOf(page, 'move');
+      const sunBefore = await boundsOfIn(page, sun);
+      const own = textOf(await hand.call('canvas_move', { ids: [sun], dx: 0, dy: 120 }));
+      const moved = await waitFor(page, ([id, y]) => { const n = window.__mm.session.getState().nodes.get(id), b = n && window.__mm.MM.boundsOf(n); return !!b && Math.abs(b.minY - y) < 1; }, [sun, sunBefore.minY + 120], 8000);
+      const refusedAll = [asBox, asWord, asRegion].every((t) => !/^moved/m.test(t));
+      check(`H1.28. A2: the hand asks to move his box, his word and the region round them — refused, each naming whose it is ("${asBox.split('\n')[0].slice(0, 90)}" … "${asRegion.split('\n')[0].slice(0, 100)}") — and in the tab nothing of his has moved (${movesAfter - movesBefore} move events, both marks where they stood); its own circle moves, and the tab shows it moved by 120 (${own.split('\n')[0].slice(0, 50)})`,
+        refusedAll && /was made by john/.test(asBox) && /was made by john/.test(asWord) && /would carry/.test(asRegion) && /made by john/.test(asRegion)
+          && movesAfter === movesBefore && JSON.stringify(now[0]) === JSON.stringify(boxBefore) && JSON.stringify(now[1]) === JSON.stringify(wordBefore) && /^moved/m.test(own) && moved,
+        { asBox, asWord, asRegion, own, now, movesBefore, movesAfter, moved });
     });
 
     // ---- The rows of QA-v10 that only John's own hand can walk ----

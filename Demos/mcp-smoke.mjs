@@ -79,7 +79,8 @@ try {
   check('eight tools, each a verb a hand has', ['canvas_look', 'canvas_see', 'canvas_draw', 'canvas_say', 'canvas_propose', 'canvas_label', 'canvas_transcribe', 'canvas_write'].every((n) => names.includes(n)), names);
   // …and the seat's two (V1-PLAN J4): the briefs parked for Claude Code, and the answer to one.
   // …and a ninth verb of a hand's (PLAN-IPAD-NOTES A1): putting a picture on the board.
-  check('eleven tools: the hand\'s nine — canvas_import among them — and the seat\'s two, canvas_pending and canvas_answer', names.length === 11 && ['canvas_import', 'canvas_pending', 'canvas_answer'].every((n) => names.includes(n)), names);
+  // …and three more for organising notes (PLAN-IPAD-NOTES A2): finding words, making a region, moving what is its own.
+  check('fourteen tools: the hand\'s twelve — canvas_import, canvas_find, canvas_region and canvas_move among them — and the seat\'s two, canvas_pending and canvas_answer', names.length === 14 && ['canvas_import', 'canvas_find', 'canvas_region', 'canvas_move', 'canvas_pending', 'canvas_answer'].every((n) => names.includes(n)), names);
 
   // The tab draws first: a box, in its own log.
   const box = MM.strokeFor({ shape: 'rectangle', x: 100, y: 100, w: 200, h: 120 });
@@ -251,6 +252,133 @@ try {
   for (let i = 0; i < 25 && !regLine(t9); i++) { t9 = textOf(await call('canvas_look', {})); if (!regLine(t9)) await wait(100); }
   check('canvas_look lists the tab\'s region by name with what it holds — a region “Monday” — holds 1 picture, at where it stands, holding the picture\'s id — and counts it in the header',
     !!regId && /a region “Monday” — holds 1 picture/.test(regLine(t9)) && /at 880,80 440×340/.test(regLine(t9)) && regLine(t9).includes(picId) && /· 1 region\b/.test(t9), { regId, line: regLine(t9) });
+
+  // ===== Organising notes (PLAN-IPAD-NOTES A2) ==============================
+  // Find, regions and moves, from the hand's side. The rule being tested is the label's, carried to moving: a hand moves
+  // only what it made, and a region it moved carries what it holds; but a region holds by geometry and moves nothing, so
+  // a hand may make one round anyone's marks. A block of its own: the names below are this section's.
+  {
+  const refresh = async () => { tabSession.load(MM.mergeLogs(await tab.readLogs(), { me: tabMe })); return tabSession.getState(); };
+  const refreshUntil = async (pred) => { for (let i = 0; i < 30; i++) { await refresh(); if (pred()) return true; await wait(100); } return pred(); };
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const lineOf = (text, id) => text.split('\n').find((l) => l.startsWith(id + ' ')) || '';
+  const nMoves = () => tabSession.getEvents().filter((e) => e.type === 'move').length;
+
+  // ---- canvas_find: the words the room says, with the id and the place to go to ----
+  const f1 = textOf(await call('canvas_find', { query: 'bubble' }));
+  check('canvas_find names a word the hand put on its own mark: the label, what it stands on, the mark\'s id and where it stands',
+    f1.includes(mineId) && /“bubble” — label on a circle/.test(f1) && /\bat \d+,\d+ \d+×\d+/.test(f1), f1);
+  const f2 = textOf(await call('canvas_find', { query: 'monday' }));
+  const f2b = textOf(await call('canvas_find', { query: 'holiday' }));
+  check('canvas_find finds a region by its name (the tab\'s), and a picture by its file\'s name', f2.includes(regId) && /a region/.test(f2) && /at 880,80 440×340/.test(f2) && f2b.includes(picId), { f2, f2b });
+  const f3 = textOf(await call('canvas_find', { query: 'hello' }));
+  check('canvas_find finds what a hand read from writing, on the mark it was held on', f3.includes(boxId) && /read writing/.test(f3), f3);
+  const f4 = textOf(await call('canvas_find', { query: 'zzyzx' }));
+  check('canvas_find says when nothing says the words, and does not make a hit up', /nothing says “zzyzx”/.test(f4) && !/ at \d+,/.test(f4), f4);
+  const f4b = textOf(await call('canvas_find', { query: '  ' }));
+  check('canvas_find with no words is said, not an empty list', /needs words/.test(f4b), f4b);
+  const f5 = textOf(await call('canvas_find', { query: 'mon' }));
+  check('canvas_find takes the word being typed, as Find does: a prefix finds the region', f5.includes(regId), f5);
+
+  // ---- canvas_look for notes: writing in reading order with what it says ----
+  let lw = '';
+  for (let i = 0; i < 25 && !/^writing · /m.test(lw); i++) { lw = textOf(await call('canvas_look', {})); if (!/^writing · /m.test(lw)) await wait(100); }
+  // The letters the tab printed at y 900 stand in the hand's board as the hand's merge gathered them; the line is found by where it stands, never by an id that merge may have remade.
+  const wLine = lw.split('\n').find((l) => /^writing · /.test(l) && / · at \d+,9\d\d /.test(l)) || '';
+  const wId = (wLine.match(/^writing · (\S+)/) || [])[1] || '';
+  check('canvas_look lists a line of writing — its marks\' ids, unread, with what to do about it — and where it stands', !!wLine && /unread/.test(wLine) && /canvas_transcribe/.test(wLine) && / · at \d+,9\d\d \d+×\d+/.test(wLine) && !!wId, { wLine, words: lw.split("\n").filter((l) => /word:/.test(l)) });
+  await call('canvas_transcribe', { id: wId, text: 'navigate', confidence: 0.8 });
+  let lw2 = '';
+  for (let i = 0; i < 25 && !/reads “navigate”/.test(lw2); i++) { lw2 = textOf(await call('canvas_look', {})); if (!/reads “navigate”/.test(lw2)) await wait(100); }
+  check('…and once a hand has read it, the line says what it reads', /^writing · .*reads “navigate”/m.test(lw2), lw2.split('\n').filter((l) => /^writing/.test(l)));
+
+  // ---- canvas_region: a region round anyone's marks moves nothing ----
+  await refresh();
+  const movesBefore = nMoves();
+  const boxBox = MM.boundsOf(tabSession.getState().nodes.get(boxId));
+  const made = textOf(await call('canvas_region', { name: 'Shapes', around: [boxId, mineId] }));
+  const shapesId = (made.match(/^(\S+) · a region “Shapes”/) || [])[1] || null;
+  check('canvas_region makes a region round the tab\'s box and the hand\'s own circle, and says what it holds', !!shapesId && /a region “Shapes” — holds 2 marks/.test(made), made);
+  await refreshUntil(() => !!shapesId && tabSession.getState().regions.includes(shapesId));
+  const ts = tabSession.getState();
+  const shapesNode = shapesId && ts.nodes.get(shapesId);
+  const holdsTab = shapesId && MM.describeRegion(ts, shapesId);
+  check('in the tab: the region is there, the hand\'s, named Shapes, and holds both marks by where they stand', !!shapesNode && MM.regionRepOf(shapesNode).name === 'Shapes' && !!holdsTab && holdsTab.things.includes(boxId) && holdsTab.things.includes(mineId)
+    && shapesNode.edges.some((e) => e.rel === 'made-by' && e.to === handId), { shapesId, holds: holdsTab && holdsTab.things });
+  check('making it moved nothing: the tab\'s box is where it was drawn and no move was written', JSON.stringify(MM.boundsOf(ts.nodes.get(boxId))) === JSON.stringify(boxBox) && nMoves() === movesBefore, { was: boxBox, now: MM.boundsOf(ts.nodes.get(boxId)) });
+  const lr = textOf(await call('canvas_look', {}));
+  check('canvas_look says which region each mark stands in, and the region\'s own line is kept', new RegExp(esc(boxId) + '[^\\n]* · in “Shapes”').test(lr) && new RegExp(esc(picId) + '[^\\n]* · in “Monday”').test(lr) && /a region “Shapes” — holds 2 marks/.test(lineOf(lr, shapesId)), lr.split('\n').filter((l) => /in “/.test(l) || /a region/.test(l)));
+  const far = textOf(await call('canvas_region', { name: 'Far off', bounds: { x: 3000, y: 3000, w: 300, h: 200 } }));
+  const farId = (far.match(/^(\S+) · a region “Far off”/) || [])[1] || null;
+  check('canvas_region by bounds makes an empty place, said to hold nothing yet', !!farId && /holds nothing yet/.test(far) && /at 3000,3000 300×200/.test(far), far);
+  const noWhere = textOf(await call('canvas_region', { name: 'Nowhere' }));
+  check('canvas_region says it needs marks to go round or a box', /around|bounds/.test(noWhere) && !/ · a region/.test(noWhere), noWhere);
+  const noName = textOf(await call('canvas_region', { around: [boxId] }));
+  check('canvas_region says it needs a name', /needs a name/.test(noName), noName);
+  const gone = textOf(await call('canvas_region', { name: 'Ghosts', around: ['stroke:nobody:1'] }));
+  check('canvas_region says when none of the marks is on the board, and makes none', /none of/.test(gone) && !/ · a region/.test(gone), gone);
+  const ren = textOf(await call('canvas_region', { id: shapesId, name: 'Shapes and more' }));
+  await refreshUntil(() => MM.regionRepOf(tabSession.getState().nodes.get(shapesId)).name === 'Shapes and more');
+  check('canvas_region renames a region the hand made — the tab sees the new name', /renamed/.test(ren) && MM.regionRepOf(tabSession.getState().nodes.get(shapesId)).name === 'Shapes and more', ren);
+  const renHis = textOf(await call('canvas_region', { id: regId, name: 'Tuesday' }));
+  await wait(250);
+  await refresh();
+  check('canvas_region refuses to rename the tab\'s region, saying whose it is — and the name stands', /was made by tab/.test(renHis) && /renames only/.test(renHis) && MM.regionRepOf(tabSession.getState().nodes.get(regId)).name === 'Monday', renHis);
+
+  // ---- canvas_move: only what the hand made ----
+  const circleBox = () => MM.boundsOf(tabSession.getState().nodes.get(mineId));
+  const c0 = circleBox();
+  const mv1 = textOf(await call('canvas_move', { ids: [mineId], dx: 60, dy: 25 }));
+  const movedOne = await refreshUntil(() => Math.abs(circleBox().minX - (c0.minX + 60)) < 1);
+  check('canvas_move moves the hand\'s own mark by dx, dy — the tab sees it there', /^moved/m.test(mv1) && mv1.includes(mineId) && movedOne && Math.abs(circleBox().minY - (c0.minY + 25)) < 1, { mv1, c0, now: circleBox() });
+  const tabBoxBefore = JSON.stringify(MM.boundsOf(tabSession.getState().nodes.get(boxId)));
+  const mv2 = textOf(await call('canvas_move', { ids: [boxId], dx: 500, dy: 500 }));
+  await wait(250);
+  await refresh();
+  check('canvas_move refuses the tab\'s box, saying who made it and what to do instead — and the box has not moved',
+    new RegExp(esc(boxId) + '[^\\n]*was made by tab').test(mv2) && /moves only what it made/.test(mv2) && /canvas_region/.test(mv2) && !/^moved/m.test(mv2) && JSON.stringify(MM.boundsOf(tabSession.getState().nodes.get(boxId))) === tabBoxBefore, mv2);
+  const m0 = nMoves();
+  const c1 = circleBox();
+  const mv3 = textOf(await call('canvas_move', { ids: [boxId, mineId], dx: -20, dy: 0 }));
+  await refreshUntil(() => nMoves() === m0 + 1);
+  const lastMove = tabSession.getEvents().filter((e) => e.type === 'move').pop();
+  check('a mixed list moves what it may in ONE event and refuses the rest by name', /^moved/m.test(mv3) && new RegExp(esc(boxId) + '[^\\n]*not moved').test(mv3) && nMoves() === m0 + 1 && lastMove.ids.length === 1 && lastMove.ids[0] === mineId && Math.abs(circleBox().minX - (c1.minX - 20)) < 1, { mv3, ids: lastMove && lastMove.ids });
+  const mvRegion = textOf(await call('canvas_move', { ids: [shapesId], dx: 10, dy: 10 }));
+  await wait(250);
+  await refresh();
+  check('canvas_move refuses a region of the hand\'s that holds the tab\'s box: it would carry it — and says to make a new region round its own marks',
+    new RegExp(esc(shapesId) + '[^\\n]*would carry ' + esc(boxId) + '[^\\n]*made by tab').test(mvRegion) && !/^moved/m.test(mvRegion) && nMoves() === m0 + 1, mvRegion);
+  const mvPic = textOf(await call('canvas_move', { ids: [picId], dx: 5, dy: 5 }));
+  check('…and the tab\'s picture the same', new RegExp(esc(picId) + '[^\\n]*was made by tab').test(mvPic), mvPic);
+
+  // A place of its own: a region round only the hand's circle, moved, takes the circle with it in one event.
+  const mine = textOf(await call('canvas_region', { name: 'Mine', around: [mineId] }));
+  const mineRegion = (mine.match(/^(\S+) · a region “Mine”/) || [])[1] || null;
+  await refreshUntil(() => !!mineRegion && tabSession.getState().regions.includes(mineRegion));
+  const c2 = circleBox();
+  const m1 = nMoves();
+  const mv4 = textOf(await call('canvas_move', { ids: [mineRegion], dx: 0, dy: 300 }));
+  await refreshUntil(() => nMoves() === m1 + 1);
+  check('a region of the hand\'s round only its own mark moves, and takes the mark — one move event naming the region',
+    /^moved/m.test(mv4) && nMoves() === m1 + 1 && tabSession.getEvents().filter((e) => e.type === 'move').pop().ids.join() === mineRegion && Math.abs(circleBox().minY - (c2.minY + 300)) < 1, { mv4, mineRegion });
+
+  // Where: to a place, and into a region.
+  const mv5 = textOf(await call('canvas_move', { ids: [mineId], to: { x: 700, y: 700 } }));
+  await refreshUntil(() => Math.abs(circleBox().minX - 700) < 1);
+  check('canvas_move to {x, y} puts the marks\' top left there', /^moved/m.test(mv5) && Math.abs(circleBox().minX - 700) < 1 && Math.abs(circleBox().minY - 700) < 1, { mv5, now: circleBox() });
+  const mv6 = textOf(await call('canvas_move', { ids: [mineId], into: farId }));
+  await refreshUntil(() => circleBox().minX > 2900);
+  const farB = { minX: 3000, minY: 3000, maxX: 3300, maxY: 3200 }, cb = circleBox();
+  check('canvas_move into a region puts the marks inside it, centred', /^moved/m.test(mv6) && cb.minX >= farB.minX && cb.maxX <= farB.maxX && cb.minY >= farB.minY && cb.maxY <= farB.maxY && Math.abs((cb.minX + cb.maxX) / 2 - 3150) < 1 && Math.abs((cb.minY + cb.maxY) / 2 - 3100) < 1, { mv6, cb });
+  const lf = textOf(await call('canvas_look', {}));
+  check('…and the look then says it stands in that region', new RegExp(esc(mineId) + '[^\\n]* · in “Far off”').test(lf), lineOf(lf, mineId));
+  const mvNo = textOf(await call('canvas_move', { ids: [mineId] }));
+  check('canvas_move says where to when it is not told', /dx, dy|to|into/.test(mvNo) && !/^moved/m.test(mvNo), mvNo);
+  const mvStay = textOf(await call('canvas_move', { ids: [mineId], dx: 0, dy: 0 }));
+  check('a move that would change nothing writes nothing and says so', /already|nothing/.test(mvStay) && !/^moved/m.test(mvStay), mvStay);
+  const mvMissing = textOf(await call('canvas_move', { ids: ['stroke:nobody:9'], dx: 5, dy: 5 }));
+  check('canvas_move says a mark that is not on the board is not', /no mark stroke:nobody:9|not on the board/.test(mvMissing), mvMissing);
+  }
 
   // ===== Two hands in one room: an id crosses the boundary (T8) =============
   // The defect: a node id used to be a counter over the MERGED replay, and no

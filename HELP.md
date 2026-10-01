@@ -162,7 +162,13 @@ asked only when you ask — never while you draw.
   LM Studio, found by itself, one suggested per job), or a hosted one by its
   key. A key stays on this device, and only if you tick *remember*.
 - **Claude**: *controls › Helpers › live › with Claude* joins the room Claude Code is in
-  and makes Claude the one who reads for you.
+  and makes Claude the one who reads for you. On dyna.ink it joins through the hosted
+  relay (the room's key goes on the page's address as `&key=`); anywhere else, through
+  the relay on this machine, or the one you type there.
+- **Claude and your notes.** Claude's hand can find a word on the board, put a region round
+  your notes — a region holds what stands in it and moves nothing — and move what it drew or
+  brought in itself. It never moves your marks: your undo cannot take back what another
+  hand moved, so it names a region round them instead.
 - **Seats.** The pane is four seats, one job each. **Reader** reads handwriting
   into text — a model that can see, the quickest you have. **Writer** writes
   briefs, pages and programs and says what a group is. **Decider** is a

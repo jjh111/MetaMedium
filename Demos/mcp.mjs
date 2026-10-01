@@ -13,7 +13,9 @@
 //
 // It is a hand in a room, nothing more. It keeps a session from the merged
 // logs exactly as a tab does, and every tool is a verb a hand already has —
-// look, see, draw, say, propose, label, transcribe, write. It proposes and never
+// look, see, draw, say, propose, label, transcribe, write, import — and, to organise
+// a page of notes (PLAN-IPAD-NOTES A2), find, region and move. It moves only what it
+// made: the label's rule, carried to moving (core's `handMoves`). It proposes and never
 // blesses; it can write a program and cannot play it; it holds no keys and
 // no truth of its own. Its events reach the tab as its own log, stamped
 // `by` on arrival like any other hand's, and draw in its own colour.
@@ -199,6 +201,21 @@ async function checkPictures(s, ids) {
   for (const p of picturesAmong(s, ids)) if (p.pic.asset && !roomHolds.has(p.pic.asset)) want.add(p.pic.asset);
   await Promise.all([...want].slice(0, 40).map(async (a) => { if (await assets.has(a.slice('sha256:'.length))) roomHolds.add(a); }));
 }
+/** The innermost region each mark stands in, by name, for the look in progress (PLAN-IPAD-NOTES A2): set by `look`, read by `describeMark`. */
+let regionOf = null;
+/** Which region each mark stands in — the smallest one that holds it by the one rule (`regionMembers`) — as a Map from id to the region's name. */
+function regionsHolding(s) {
+  const out = new Map();
+  if (!s.regions.length) return out;
+  const area = new Map();
+  for (const reg of MM.regionsOfBoard(s)) {
+    const a = (reg.bounds.maxX - reg.bounds.minX) * (reg.bounds.maxY - reg.bounds.minY);
+    for (const id of MM.regionMembers(s, reg.id)) {
+      if (!(area.has(id) && area.get(id) <= a)) { area.set(id, a); out.set(id, reg.name); }
+    }
+  }
+  return out;
+}
 function describeMark(node, s) {
   const b = MM.boundsOf(node);
   // Readings are what the engine and the models read; a label is its maker's
@@ -224,12 +241,16 @@ function describeMark(node, s) {
   if (said) parts.push('says “' + said + '”');
   if (b) parts.push('at ' + r(b.minX) + ',' + r(b.minY) + ' ' + r(b.maxX - b.minX) + '×' + r(b.maxY - b.minY));
   if (s.live.includes(node.id)) parts.push(s.clocks[node.id] && s.clocks[node.id].playing ? 'playing' : 'live');
+  const inside = regionOf && regionOf.get(node.id);
+  if (inside) parts.push('in “' + inside + '”');
   if (who && who !== 'me') parts.push('by ' + who);
   return parts.join(' · ');
 }
 async function look(args) {
   const s = session.getState();
   await checkPictures(s, args.ids && args.ids.length ? args.ids : s.contentIds);
+  // From here to the return nothing awaits, so the table of which region each mark stands in is this look's alone.
+  regionOf = regionsHolding(s);
   const t = Date.now();
   const here = store.presence().filter((p) => t - p.at < 60000).map((p) => label(p.participant));
   const lines = ['room ' + ROOM + ' · you are ' + label(ME) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far')];
@@ -250,14 +271,33 @@ async function look(args) {
     for (const id of ids) { const n = s.nodes.get(id); if (n) lines.push(describeMark(n, s)); }
     if (!ids.length) lines.push('(nothing on the canvas)');
   }
-  // The regions (PLAN-IPAD-NOTES I5): named places on the board, each with what stands inside it now. Read only —
-  // a hand does not make one yet; what a region holds is derived from where things stand, never written.
-  for (const reg of MM.regionsOfBoard(s)) {
-    const d = MM.describeRegion(s, reg.id);
+  // The regions (PLAN-IPAD-NOTES I5, A2): named places on the board, in the outline's reading order — top to bottom, left to right,
+  // a region under the smaller one that holds it — each with what stands inside it now. What a region holds is derived from where
+  // things stand, never written; canvas_region makes one and canvas_move moves what is the hand's own.
+  const outline = MM.regionOutline(s);
+  for (const o of outline) {
+    const d = MM.describeRegion(s, o.id);
     if (!d) continue;
-    lines.push(reg.id + ' · ' + MM.regionSaid(d) + ' · at ' + r(d.bounds.minX) + ',' + r(d.bounds.minY) + ' ' + r(d.bounds.maxX - d.bounds.minX) + '×' + r(d.bounds.maxY - d.bounds.minY) +
+    const parent = o.parent && outline.find((x) => x.id === o.parent);
+    lines.push(o.id + ' · ' + MM.regionSaid(d) + ' · at ' + r(d.bounds.minX) + ',' + r(d.bounds.minY) + ' ' + r(d.bounds.maxX - d.bounds.minX) + '×' + r(d.bounds.maxY - d.bounds.minY) +
+      (parent ? ' · inside “' + parent.name + '”' : '') +
       (d.things.length ? ' · holds ' + d.things.slice(0, 12).join(', ') + (d.things.length > 12 ? ' and ' + (d.things.length - 12) + ' more' : '') : ''));
   }
+  if (outline.length) {
+    const loose = s.contentIds.filter((id) => !regionOf.has(id) && !s.nodes.get(id).reps.some((x) => x.modality === 'erased'));
+    lines.push(loose.length ? loose.length + ' thing' + (loose.length === 1 ? '' : 's') + ' stand in no region: ' + loose.slice(0, 12).join(', ') + (loose.length > 12 ? ' and ' + (loose.length - 12) + ' more' : '') : 'every thing stands in a region');
+  }
+  // Handwriting, a line at a time in reading order, with what a hand has read it as — so a page of notes can be organised by what it says.
+  const writing = MM.writingLinesIn(s, args.ids && args.ids.length ? args.ids : s.contentIds);
+  for (const w of writing.slice(0, 60)) {
+    const said = w.ids.map((id) => MM.transcriptOf(s.nodes.get(id))).filter(Boolean);
+    const reads = said.length
+      ? 'reads “' + said.join(' ') + '”' + (said.length < w.ids.length ? ' (' + said.length + ' of ' + w.ids.length + ' marks read)' : '')
+      : 'unread — canvas_see these marks, then canvas_transcribe each';
+    const at = w.ids.map((id) => regionOf.get(id)).find(Boolean);
+    lines.push('writing · ' + w.ids.join(', ') + ' · ' + reads + ' · at ' + r(w.box.minX) + ',' + r(w.box.minY) + ' ' + r(w.box.maxX - w.box.minX) + '×' + r(w.box.maxY - w.box.minY) + (at ? ' · in “' + at + '”' : ''));
+  }
+  if (writing.length > 60) lines.push('and ' + (writing.length - 60) + ' more lines of writing');
   for (const id of s.explanations) {
     const n = s.nodes.get(id);
     if (!n || n.reps.some((x) => x.modality === 'erased')) continue;
@@ -273,6 +313,7 @@ async function look(args) {
   }
   const answered = briefs.filter((x) => x.reply).length;
   if (answered) lines.push(answered + ' brief' + (answered === 1 ? '' : 's') + ' at the seat answered');
+  regionOf = null;
   return { text: lines.join('\n') };
 }
 
@@ -493,6 +534,134 @@ function placeBy(place, s) {
   return { bounds: { minX: x, minY: y, maxX: x + w, maxY: y + h }, said: (how === 'in' ? 'inside ' : how === 'right' || how === 'left' ? how + ' of ' : how + ' ') + id };
 }
 
+// ----- Organising notes: find, regions, moves (PLAN-IPAD-NOTES A2) ----------------------------------------
+// An agent that tidies a page of notes needs three more verbs of a hand's. Find asks core's search (the one Find on a tab
+// asks) of this room's board. A region is made round marks by where they stand and writes nothing about them, so it may
+// go round anyone's. A move is another matter: it is the label's rule carried to moving — a hand moves only what it made
+// (core's `handMoves`), because undo is each hand's own and a person cannot take back what another hand moved of theirs.
+// A region of the hand's own is moved only while it carries nothing but the hand's own marks; the way round, for a page of
+// somebody's notes, is a new region round the marks it made itself.
+const FIND_MAX = 50;
+async function find(args) {
+  const q = String(args.query ?? '').trim();
+  if (!q) return { text: 'find needs words — say what to look for (a label, a name, something a hand wrote or read, a region)' };
+  const s = session.getState();
+  const limit = Math.max(1, Math.min(FIND_MAX, Math.floor(Number(args.limit)) || 10));
+  // This hand has one board, the room's; it asks as a tab asks every board it keeps.
+  const groups = MM.searchBoards([{ id: ROOM, name: ROOM, recency: Date.now(), entries: MM.searchEntriesOf(s) }], q, { hitsPerBoard: FIND_MAX + 1 });
+  const hits = groups.flatMap((g) => g.hits).filter((h) => h.kind !== 'board');
+  if (!hits.length) return { text: 'nothing says “' + q + '” on this board — canvas_look lists what is on it' };
+  const lines = ['find “' + q + '” — ' + hits.length + ' hit' + (hits.length === 1 ? '' : 's')];
+  for (const h of hits.slice(0, limit)) {
+    const b = h.box;
+    lines.push(h.id + ' · ' + MM.describeHit(h) + (b ? ' · at ' + r(b.minX) + ',' + r(b.minY) + ' ' + r(b.maxX - b.minX) + '×' + r(b.maxY - b.minY) : ''));
+  }
+  if (hits.length > limit) lines.push('and ' + (hits.length - limit) + ' more — ask with more words, or a larger limit');
+  return { text: lines.join('\n') };
+}
+
+/** Who made a thing, for a sentence: the name its hand goes by. */
+function makerOf(id, s) {
+  const n = s.nodes.get(id);
+  return (n && authorOf(n, s)) || 'another hand';
+}
+async function regionTool(args) {
+  const name = String(args.name ?? '').trim();
+  if (!name) return { text: 'a region needs a name (name: “Monday”)' };
+  const s = session.getState();
+  // Rename: only a region this hand made — a person's place is theirs to name, as their ink is theirs to label.
+  if (args.id !== undefined) {
+    const id = String(args.id);
+    const node = s.nodes.get(id);
+    if (!node || node.reps.some((x) => x.modality === 'erased') || !MM.regionRepOf(node)) return { text: 'no region ' + id + ' on the board' };
+    if (!session.isMine(id)) return { text: id + ': not renamed — it was made by ' + makerOf(id, s) + '; a hand renames only the regions it made (canvas_region with around: makes a place of its own round their marks)' };
+    if (!session.renameRegion({ nodeId: id, name, at: now() })) return { text: id + ': not renamed' };
+    await flush();
+    return { text: id + ' renamed “' + name + '”' };
+  }
+  const at = now();
+  let made = null;
+  const around = Array.isArray(args.around) ? args.around.map(String) : [];
+  if (around.length) {
+    const here = around.filter((id) => { const n = s.nodes.get(id); return n && !n.reps.some((x) => x.modality === 'erased'); });
+    if (!here.length) return { text: 'no region made: none of ' + around.join(', ') + ' is on the board' };
+    made = MM.makeRegion(session, { ids: here, name, at });
+    if (!made) return { text: 'no region made: nothing among ' + here.join(', ') + ' stands anywhere to go round' };
+  } else if (args.bounds && typeof args.bounds === 'object') {
+    const q = args.bounds;
+    const x = Number(q.x), y = Number(q.y), w = Number(q.w), h = Number(q.h);
+    if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) return { text: 'bounds are {x, y, w, h} in canvas units, with a width and a height over zero' };
+    const box = { minX: x, minY: y, maxX: x + w, maxY: y + h };
+    const id = session.withTool('region', () => session.region({ name, bounds: box, at }), 'region');
+    if (id) made = { id, name, around: 'marks', bounds: box };
+  } else {
+    return { text: 'a region goes round marks (around: their ids) or stands where a box says (bounds: {x, y, w, h}) — it needs one of them' };
+  }
+  if (!made) return { text: 'no region made' };
+  await flush();
+  const d = MM.describeRegion(session.getState(), made.id);
+  if (!d) return { text: made.id + ' made, but it is not on the board' };
+  const extra = d.things.filter((id) => !around.includes(id));
+  return { text: made.id + ' · ' + MM.regionSaid(d) + ' · at ' + r(d.bounds.minX) + ',' + r(d.bounds.minY) + ' ' + r(d.bounds.maxX - d.bounds.minX) + '×' + r(d.bounds.maxY - d.bounds.minY) +
+    (d.things.length ? ' · holds ' + d.things.slice(0, 12).join(', ') + (d.things.length > 12 ? ' and ' + (d.things.length - 12) + ' more' : '') : '') +
+    (around.length && extra.length ? ' — also holds ' + extra.length + ' other thing' + (extra.length === 1 ? '' : 's') + ' that stand in that box' : '') +
+    ' — it holds by where things stand and moved nothing' + (made.around === 'frame' ? '; taken from the rectangle drawn round them' : '') };
+}
+
+/** The box a group of marks stands in, as the board reads where they stand: what a move to a place is measured from. */
+function boxOfMarks(s, ids) {
+  let box = null;
+  for (const id of ids) {
+    const n = s.nodes.get(id);
+    const b = n && MM.standingBoxOf(s.nodes, n);
+    if (!b) continue;
+    box = box ? { minX: Math.min(box.minX, b.minX), minY: Math.min(box.minY, b.minY), maxX: Math.max(box.maxX, b.maxX), maxY: Math.max(box.maxY, b.maxY) } : { ...b };
+  }
+  return box;
+}
+async function moveTool(args) {
+  const ids = Array.isArray(args.ids) ? args.ids.map(String) : args.id ? [String(args.id)] : [];
+  if (!ids.length) return { text: 'a move needs marks (ids)' };
+  const s = session.getState();
+  const verdict = MM.handMoves(s, ids, (id) => session.isMine(id));
+  const refusals = verdict.refused.map((x) => {
+    if (x.why === 'missing') return x.id + ': not moved — no mark ' + x.id + ' on the board';
+    if (x.why === 'not-yours') return x.id + ': not moved — it was made by ' + makerOf(x.id, s) + '; a hand moves only what it made, and undo is each hand\'s own, so they could not take a move back. canvas_region puts a place round it without moving it';
+    return x.id + ': not moved — it would carry ' + x.of + ', which was made by ' + makerOf(x.of, s) + '; a hand moves only what it made. Make a new region round your own marks (canvas_region) and move that';
+  });
+  const say = (head) => ({ text: [head, ...refusals].filter(Boolean).join('\n') });
+  if (!verdict.allowed.length) return say('');
+  // Where to: a step, a place for the marks' top left, or a region to stand them in.
+  let dx = 0, dy = 0, how = '';
+  const own = boxOfMarks(s, verdict.allowed);
+  if (!own) return say('nothing moved: none of ' + verdict.allowed.join(', ') + ' stands anywhere');
+  if (args.into !== undefined) {
+    const reg = MM.regionsOfBoard(s).find((x) => x.id === String(args.into));
+    if (!reg) return say('nothing moved: no region ' + args.into + ' on the board');
+    const gw = own.maxX - own.minX, gh = own.maxY - own.minY, rw = reg.bounds.maxX - reg.bounds.minX, rh = reg.bounds.maxY - reg.bounds.minY;
+    // Centred in it; a group larger than the place is stood from its top left.
+    dx = gw > rw ? reg.bounds.minX - own.minX : (reg.bounds.minX + rw / 2) - (own.minX + gw / 2);
+    dy = gh > rh ? reg.bounds.minY - own.minY : (reg.bounds.minY + rh / 2) - (own.minY + gh / 2);
+    how = ' into “' + reg.name + '”';
+  } else if (args.to && typeof args.to === 'object') {
+    const x = Number(args.to.x), y = Number(args.to.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return say('nothing moved: to is {x, y} in canvas units');
+    dx = x - own.minX; dy = y - own.minY;
+    how = ' to ' + r(x) + ',' + r(y);
+  } else if (args.dx !== undefined || args.dy !== undefined) {
+    dx = Number(args.dx ?? 0); dy = Number(args.dy ?? 0);
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return say('nothing moved: dx and dy are numbers in canvas units');
+    how = ' by ' + r(dx) + ',' + r(dy);
+  } else {
+    return say('nothing moved: say where — dx, dy (a step), to {x, y} (the marks\' top left) or into (a region\'s id)');
+  }
+  if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return say('nothing moved: already there');
+  session.move({ ids: verdict.allowed, dx, dy, at: now() });
+  await flush();
+  const regions = new Set(session.getState().regions);
+  return say('moved ' + verdict.allowed.join(', ') + how + (verdict.allowed.some((id) => regions.has(id)) ? ' — with what the region holds' : ''));
+}
+
 // ----- A picture on the board (PLAN-IPAD-NOTES A1) -------------------------------------------
 // A picture is its bytes and an `import` event that names them. The event goes in this hand's log as any
 // hand's does; the bytes go to the room's relay by their SHA-256 FIRST, so no hand ever holds an event naming
@@ -706,7 +875,7 @@ const num = { type: 'number' };
 const TOOLS = [
   {
     name: 'canvas_look',
-    description: 'What is on the MetaMedium canvas, in words: every mark with what the engine reads it as (shape and confidence), names, transcripts, artifacts and their kinds, the regions (named places, with what each holds), what is playing, the selection, who else is in the room. Use ids from here in the other tools. detail "full" is the brief a model gets (relations included).',
+    description: 'What is on the MetaMedium canvas, in words: every mark with what the engine reads it as (shape and confidence), names, transcripts, artifacts and their kinds, the regions (named places in the board\'s outline — reading order, nested ones under the one that holds them — with what each holds, and which things stand in none), each mark with the region it stands in, handwriting a line at a time in reading order with what a hand has read it as (or that it is unread), what is playing, the selection, who else is in the room. Use ids from here in the other tools. detail "full" is the brief a model gets (relations included).',
     inputSchema: { type: 'object', properties: { detail: { type: 'string', enum: ['brief', 'full'] }, ids: { type: 'array', items: { type: 'string' } } } },
     run: look,
   },
@@ -759,6 +928,24 @@ const TOOLS = [
     run: importPicture,
   },
   {
+    name: 'canvas_find',
+    description: 'Find words on this board, as Find does on a tab: the labels on marks, the names of what was made, typed texts, the words in a figure or a page, what a hand read from handwriting (transcripts), a picture\'s file name and a region\'s name. Words typed are all looked for, an exact word before one that only begins with what was typed (so a half-typed word finds). Each hit comes with the id of the mark or region that holds it, what it stands on in plain words, and where it stands (canvas units) — go there with canvas_see, or put a region round it.',
+    inputSchema: { type: 'object', required: ['query'], properties: { query: { type: 'string' }, limit: { type: 'number', description: 'Most hits to list (default 10, at most 50).' } } },
+    run: find,
+  },
+  {
+    name: 'canvas_region',
+    description: 'Make a region — a named rectangle that holds whatever stands inside it, so Monday and Pricing are places on the board — or rename one you made. Make it round marks (around: their ids, anyone\'s: a region holds by where things stand and moves nothing, so it may go round another hand\'s notes) or at a box (bounds: {x, y, w, h}, canvas units). The reply says what it holds. Rename: id + name — only a region you made; a person\'s region is theirs to name. A region you made moves with canvas_move only while it holds nothing but your own marks.',
+    inputSchema: { type: 'object', required: ['name'], properties: { name: { type: 'string' }, around: { type: 'array', items: { type: 'string' } }, bounds: { type: 'object', properties: { x: num, y: num, w: num, h: num } }, id: { type: 'string', description: 'A region of yours to rename.' } } },
+    run: regionTool,
+  },
+  {
+    name: 'canvas_move',
+    description: 'Move marks you made, or a region you made, in one act: by dx, dy; or to {x, y} (the marks\' top left); or into a region (its id — centred in it). You move only what YOU made — a person\'s undo cannot take back another hand\'s move of their marks, as your label goes on your own ink only — so a mark someone else made is refused, with whose it is; a region you made that holds their marks is refused too, because moving a region carries what it holds. To organise their notes put a region round them (canvas_region) instead, and move your own pictures, texts and drawings into place. A list may be half allowed: the marks you may move move in one event and each refusal is said.',
+    inputSchema: { type: 'object', required: ['ids'], properties: { ids: { type: 'array', items: { type: 'string' } }, dx: num, dy: num, to: { type: 'object', properties: { x: num, y: num } }, into: { type: 'string' } } },
+    run: moveTool,
+  },
+  {
     name: 'canvas_pending',
     description: 'The briefs a person has parked at the *Claude Code (MCP hand)* seat and nobody has answered: What is this? on some marks, Read the writing, a question, or a brief at a loop. Each comes with its key (the brief\'s own id), what was asked, the marks it is about with their ids, the CONTRACT a model would have been given — answer in exactly that — and the brief itself; for a read, the ink of those marks as a PNG. This is the seat: you are the model. Answer with canvas_answer.',
     inputSchema: { type: 'object', properties: {} },
@@ -794,7 +981,7 @@ async function handle(line) {
           protocolVersion: (msg.params && msg.params.protocolVersion) || '2025-06-18',
           capabilities: { tools: {} },
           serverInfo: { name: 'metamedium', version: '0.1.0' },
-          instructions: 'You are a hand on a MetaMedium canvas, in room "' + ROOM + '" as "' + label(ME) + '". The human draws; the engine reads every mark (shape, role, concept) and the human names and builds from those readings. Look first (canvas_look), see the ink when it matters (canvas_see), then act with the same verbs a hand has: draw in the shape vocabulary, say a sentence beside marks, propose a reading, label your own marks, transcribe writing, write code, put a picture on the board (canvas_import). Everything you do is held and attributed to you; the human blesses or ignores it. Never claim a reading is settled — offer it with a confidence and a reason. You are also the SEAT: when the human asks *Claude Code (MCP hand)* — What is this?, Read the writing, a question — the brief is parked here; canvas_pending gives you it, the marks and the contract (and for a read, the ink as a picture), and canvas_answer returns your answer in that contract, which the page takes exactly as it takes a model\'s.',
+          instructions: 'You are a hand on a MetaMedium canvas, in room "' + ROOM + '" as "' + label(ME) + '". The human draws; the engine reads every mark (shape, role, concept) and the human names and builds from those readings. Look first (canvas_look), see the ink when it matters (canvas_see), then act with the same verbs a hand has: draw in the shape vocabulary, say a sentence beside marks, propose a reading, label your own marks, transcribe writing, write code, put a picture on the board (canvas_import), find words (canvas_find), make a region round marks (canvas_region) and move what you made into place (canvas_move — only what you made; round someone else\'s marks put a region, never a move). Everything you do is held and attributed to you; the human blesses or ignores it. Never claim a reading is settled — offer it with a confidence and a reason. You are also the SEAT: when the human asks *Claude Code (MCP hand)* — What is this?, Read the writing, a question — the brief is parked here; canvas_pending gives you it, the marks and the contract (and for a read, the ink as a picture), and canvas_answer returns your answer in that contract, which the page takes exactly as it takes a model\'s.',
         });
         break;
       case 'notifications/initialized':
