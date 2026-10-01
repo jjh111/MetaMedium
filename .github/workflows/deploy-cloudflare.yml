@@ -1,0 +1,87 @@
+name: Deploy to Cloudflare
+
+# dyna.ink: the site (Cloudflare Pages) and the room relay (a Worker with a Durable Object).
+# cloudflare/README.md is what John sets up once; this does the rest on every push to master.
+# GitHub Pages keeps publishing as before — this is a second home, not a move.
+#
+# Secrets: CLOUDFLARE_API_TOKEN (Pages: Edit, Workers Scripts: Edit) and CLOUDFLARE_ACCOUNT_ID.
+# With either absent — a fork, a repository not yet set up — every deploy step is skipped and
+# the run is green: the first step says whether there is anything to deploy with.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-cloudflare
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  site:
+    name: dyna.ink — the site (Pages)
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Is there a Cloudflare account to deploy to?
+        id: have
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "yes=true" >> "$GITHUB_OUTPUT"; else echo "yes=false" >> "$GITHUB_OUTPUT"; echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set — nothing to deploy, which is fine."; fi
+      - uses: actions/checkout@v4
+        if: steps.have.outputs.yes == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.have.outputs.yes == 'true'
+        with:
+          node-version: 22
+      - name: The site's own checks
+        if: steps.have.outputs.yes == 'true'
+        run: node --test cloudflare/site.test.mjs
+      - name: Build the site
+        if: steps.have.outputs.yes == 'true'
+        run: node cloudflare/build-site.mjs
+      - name: Deploy to Pages
+        if: steps.have.outputs.yes == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy cloudflare/dist --project-name=dyna-ink --branch=master --commit-dirty=true
+
+  relay:
+    name: dyna.ink — the room relay (Worker)
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Is there a Cloudflare account to deploy to?
+        id: have
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "yes=true" >> "$GITHUB_OUTPUT"; else echo "yes=false" >> "$GITHUB_OUTPUT"; echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set — nothing to deploy, which is fine."; fi
+      - uses: actions/checkout@v4
+        if: steps.have.outputs.yes == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.have.outputs.yes == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: cloudflare/relay/package-lock.json
+      - name: The relay's tests, in Node and in workerd
+        if: steps.have.outputs.yes == 'true'
+        working-directory: cloudflare/relay
+        run: |
+          npm ci
+          npm test
+      - name: Deploy the Worker
+        if: steps.have.outputs.yes == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: cloudflare/relay
+          command: deploy

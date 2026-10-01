@@ -1,0 +1,3 @@
+# Cloudflare Pages redirects (copied into the published site by cloudflare/build-site.mjs).
+# GitHub Pages sends /app?x to /app/?x with its query; the app is a folder, so its address ends in a slash.
+/app /app/ 301

@@ -1,0 +1,54 @@
+# Cloudflare Pages headers for dyna.ink. Made into `_headers` by cloudflare/build-site.mjs,
+# which puts the app's policy, csp.txt (one line, one home), in each rule that carries the
+# double-brace APP_CSP marker; rules are
+# additive, a page gets every block that matches. Pages allows 100 rules and 2,000 characters a
+# line; cloudflare/site.test.mjs holds both, and holds csp.txt to what the app's source loads.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), payment=(), usb=(), interest-cohort=()
+
+# The app, at its address and at its old one (the whitepaper embeds the old one).
+# What each source is for:
+#   script-src   the page's own bundle and fragments; the run, mermaid and js frames carry inline
+#                scripts, a program's code is run with `new Function` (13-kinds.js) in a frame whose
+#                origin is opaque — that frame INHERITS this policy, so 'unsafe-inline' and
+#                'unsafe-eval' stand; what contains it is the iframe sandbox (allow-scripts, never
+#                allow-same-origin), not this policy. blob: is the worker a blessed js artifact
+#                runs in. three.js and mermaid load from cdnjs, mermaid then jsdelivr (13-kinds.js).
+#   style-src    the stylesheet, and inline styles (a page's, a figure's, mermaid's).
+#   img/font     blob: for a picture brought in; data: for the face carried in surface.css.
+#   connect-src  this origin; the relay (rooms: relay.dyna.ink); the hosted model hosts the models
+#                pane joins (OpenRouter, Anthropic); GitHub's API (a repository opened as a canvas);
+#                and a model on this machine — Ollama :11434, LM Studio :1234, any local port.
+#                A model or an MCP server at another address (the custom endpoint, a LAN host,
+#                a relay somewhere else, a workers.dev address) is refused until it is named
+#                here: that is the policy working, and README.md says where to add one.
+#   frame-ancestors  this origin only — the app is framed by the whitepaper on the same site.
+# NOT sent: Cross-Origin-Opener-Policy and Cross-Origin-Embedder-Policy. require-corp would
+# refuse the CDN scripts above unless each sends Cross-Origin-Resource-Policy (unverified for
+# cdnjs and jsdelivr) and every sandboxed frame; `credentialless`, which would not, is not in
+# Safari, and the iPad is the first target. Nothing the app does needs cross-origin isolation:
+# a browser model runs on WebGPU or one thread (PLAN-IPAD-NOTES §3), and wasm threads wait on this.
+/app
+  Content-Security-Policy: {{APP_CSP}}
+  Referrer-Policy: no-referrer
+/app/*
+  Content-Security-Policy: {{APP_CSP}}
+  Referrer-Policy: no-referrer
+/Demos/session-engine.html
+  Content-Security-Policy: {{APP_CSP}}
+  Referrer-Policy: no-referrer
+
+# Pages serves a page without its .html (the old address redirects, query kept, to
+# /Demos/session-engine), so the policy stands on both.
+/Demos/session-engine
+  Content-Security-Policy: {{APP_CSP}}
+  Referrer-Policy: no-referrer
+
+# The worker is how a new release reaches an installed app: never keep it past a visit.
+/app/sw.js
+  Cache-Control: no-cache
+/Demos/sw.js
+  Cache-Control: no-cache
