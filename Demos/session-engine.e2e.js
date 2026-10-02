@@ -5630,7 +5630,7 @@ window.__FIELD_GOLDEN = {
   },
   "row of three boxes, \"nav\" typed": {
     core: ["name", "copy", "paste", "erase"],
-    line: "↵ a word — tap what it is for: a name, or words on the marks",
+    line: "↵ a word — tap one: a name, or words on them",
     certain: [],
     afford: [
       {"key": "name-word", "label": "Name it “nav”", "title": "“nav” as the name — naming makes one thing of them, a definition the library keeps and the next drawing like it is offered as; it writes no word on the ink", "dot": false},
