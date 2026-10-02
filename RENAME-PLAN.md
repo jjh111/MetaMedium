@@ -88,6 +88,9 @@ trademark attorney, not legal advice.
 - the `mm-*` storage keys, the `mm-boards` database, the `mm-` channels, and
   the service worker's `mm-app-` and `mm-shell-` cache names. They are
   invisible, and changing them would strand what people kept.
+- the environment variables the hands read: `MM_RELAY`, `MM_RELAY_KEY`, `MM_ROOM`, `MM_NAME`,
+  `MM_RELAY_SECRET`, `MM_RELAY_MAX_LINES`; the wire id `shard-3d/proposal v1` written into logs; and the 3D
+  surface's `shard3d.*` storage keys.
 - the `mm` contract programs are written against (`mm.onPointer` and the rest).
   Programs that models have already written call it.
 - the `.metamedium/` folder format: logs, the manifest, `?folder=` sites. It is
@@ -417,6 +420,11 @@ a tool by id changes with them, and the director says so to John at the merge.
   `boards/examples/README.md`, `Assets/recognition-strategy.md`, `Assets/point-primitive-design.md`,
   `core/src/store/fixtures/README.md`, `dynaink-3d/fixtures/README.md`,
   `dynaink-3d/fixtures/decisions/README.md`, and `dynaink-3d/README.md`'s `dist/shard-3d.html`.
+- **The last strings a person sees outside the pages**, found by N3d: the commit messages the repository
+  backend writes into a person's own GitHub repository (`core/src/store/git.ts`: `metamedium: <path>`,
+  `metamedium: <participant>, N events` → `dyna.ink: …`, with its tests), and the example program
+  `Demos/programs/metamedium-explained.run.js` (its drawn title scene says MetaMedium; the file becomes
+  `dynaink-explained.run.js` and every reference to it follows). `scripts/name.test.mjs` reads both.
 - `e2e/package.json`'s name (`metamedium-e2e` → `dynaink-e2e`). `Web App Skeleton/` keeps its name: it is
   a legacy prototype on its way to `archive/` (GUIDE-2026-10-02 §6.4, decision 27).
 - The README's remaining links and their words (its *Start Here* still names the old whitepaper title), and
