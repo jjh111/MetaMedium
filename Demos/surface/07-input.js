@@ -507,6 +507,16 @@
     const g = made && MM.getRep(made, 'gesture');
     // Content, not a gesture: what the stroke touched, it is now tied to. The
     // bind is an edge in the log — it replays, merges, and one undo lets it go.
+    // An arrow's tip is where its ink points, not where the pen lifted: a hand
+    // draws the shaft into a box, then the barb back out, and lets go at a wing
+    // a head's length off — past the magnet, which let go (PLAN-FIELD-PAR FP3).
+    // So once the stroke reads as an arrow, the end its ink points with is
+    // offered the magnet at that ink, as a release there would have been.
+    const tipHold = !g && made ? arrowTipMagnet(made, after, id, points) : null;
+    if (tipHold) {
+      if (tipHold.end === 'end') magnetHold = tipHold.hit;
+      else if (!magnetStart) magnetStart = tipHold.hit;
+    }
     if (!g && (magnetStart || magnetHold)) {
       const at = Date.now();
       if (magnetStart) session.bind({ strokeId: id, nodeId: magnetStart.site.nodeId, site: { kind: magnetStart.site.kind, index: magnetStart.site.index }, end: 'start', at: at });
@@ -553,6 +563,25 @@
    * a dot — the pen's or the mouse's stroke too short to be one, or a finger's that never
    * moved while the pen is what draws.
    */
+  /**
+   * The magnet at the end of a just-drawn ARROW its ink points with, or null:
+   * `{ end, hit }`. Only an arrow (its tail read apart from its tip), never the
+   * command mark, never writing — the guards the release's own magnet keeps —
+   * and only an end that is not tied already (PLAN-FIELD-PAR FP3).
+   */
+  function arrowTipMagnet(node, s, id, pts) {
+    const ends = MM.inkEndsOf(node, s.nodes);
+    if (!ends || !Array.isArray(pts) || pts.length < 3) return null;
+    const analysis = MM.analyzeStroke(pts, 1 / view.zoom);
+    const top = analysis.results[0];
+    if (!top || top.type !== 'arrow') return null;
+    const activeMark = state.commandMark || MM.BUILTIN_COMMAND_MARK;
+    if (activeMark && MM.matchesCommandMark(analysis.fingerprint, activeMark).match) return null;
+    if (MM.isLetterLike(MM.getBounds(pts), 1 / view.zoom)) return null;
+    const end = ends.tail === 'start' ? 'end' : 'start';
+    const hit = magnetQuery(ends[end], id);
+    return hit ? { end: end, hit: hit } : null;
+  }
   function tapAt(e) {
     const s0 = session.getState();
     const now = Date.now();

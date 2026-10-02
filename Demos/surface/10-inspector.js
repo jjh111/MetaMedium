@@ -476,12 +476,14 @@
       return {
         here: words[0].name,
         is: words[0].is + (words.length > 1 ? ' · or ' + words.slice(1).map((x) => x.label).join(', ') : ''),
-        next: (offered('mermaid') ? 'Make it Mermaid · ' : '') + (offered('snap') ? 'draw them clean · ' : '') + 'a name',
+        next: (offered('mermaid') ? 'Make it Mermaid · ' : '') + (offered('tidy-diagram') ? 'tidy it · ' : '') + (offered('snap') ? 'draw them clean · ' : '') + 'a name',
       };
     }
     // Show it in 3D only when the field offers it: circles joined by lines (U1d).
-    if (genre === 'graph' || genre === 'mixed') return { here: 'a structure, a graph' + (concept ? ' (' + concept.concept + ')' : ''), next: (paletteItems.some((i) => i.key === '3d') ? 'Show it in 3D · ' : '') + 'a brief builds the diagram, then a model writes the words' };
-    if (genre === 'layout') return { here: 'a structure, a layout' + (concept ? ' (' + concept.concept + ')' : ''), next: 'a brief builds the page at once, then a model writes the words' };
+    // The acts the field offers, in its words (FP6): never "a brief", "a structure" or a tier.
+    const offeredHere = (key) => paletteItems.some((i) => i.key === key);
+    if (genre === 'graph' || genre === 'mixed') return { here: 'marks joined by lines' + (concept ? ' (' + concept.concept + ')' : ''), next: [offeredHere('mermaid') && 'Make it Mermaid', offeredHere('tidy-diagram') && 'tidy it', offeredHere('3d') && 'Show it in 3D', 'a name', 'a page or a program — say what in a sentence'].filter(Boolean).join(' · ') };
+    if (genre === 'layout') return { here: 'boxes laid out like a page' + (concept ? ' (' + concept.concept + ')' : ''), next: 'a page — say what in a sentence; its boxes stand at once, and a model writes the words' };
     if (concept) return { here: 'a concept, ' + concept.concept + ' ' + concept.confidence.toFixed(2), next: concept.conversions.filter((c) => c.effect.kind !== 'name' && c.effect.kind !== 'prompt').map((c) => c.label).concat(['a name']).join(' · ') };
     const shapes = ids.map((id) => MM.topInterpretation(s.nodes.get(id))).filter(Boolean);
     if (shapes.length && shapes.every((x) => x === 'text')) return { here: 'writing', next: 'Read the writing · a name · text' };

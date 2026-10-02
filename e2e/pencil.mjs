@@ -465,7 +465,7 @@ export async function runPencil(browser, servers, { freshContext, screenshot }) 
       const typed = await page.evaluate(fieldGeometry);
       // The pill that labels the person's own ink with the word, taken by the pen.
       const took = await page.evaluate(() => {
-        const pill = [...document.querySelectorAll('#summon .list .pill')].find((b) => /^Label it/.test(b.textContent.trim()));
+        const pill = [...document.querySelectorAll('#summon .list .pill')].find((b) => /^Write “/.test(b.textContent.trim()));
         if (!pill) return null;
         const r = pill.getBoundingClientRect(), vv = window.visualViewport;
         const inView = r.top >= vv.offsetTop - 0.5 && r.bottom <= vv.offsetTop + vv.height + 0.5;

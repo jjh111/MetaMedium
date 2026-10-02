@@ -69,9 +69,13 @@ export type StructureResult =
 const tagFor = (role: string | undefined): string =>
   role === 'container' ? 'section' : role === 'label' ? 'header' : 'div';
 
+/** What a region plays, in the person's words, for its empty slot — never its id (PLAN-FIELD-PAR FP6: *r1 · node*). */
+const SLOT_WORDS: Record<string, string> = { container: 'an area', node: 'a box', label: 'a heading', edge: 'a line', annotation: 'a note' };
+
 /**
  * The structure of a drawing as a page or a diagram, with no words in it:
- * every region in its place, labelled with its id and what it plays. It is
+ * every region in its place, saying what it plays in words (its id is its `data-region`,
+ * which ink addresses; the slot never prints it). It is
  * what the engine knows and nothing it does not — the honest thing to show
  * with no model joined, and the thing that stands at once while a model
  * writes the words. Attribute it to the engine when attaching it.
@@ -86,7 +90,7 @@ export function buildStructure(session: Session, artifactId: string): StructureR
     const role = regionRole.get(id) ?? 'region';
     content[id] = {
       tag: tagFor(role),
-      html: `<span class="mm-slot">${id} · ${role}</span>`,
+      html: `<span class="mm-slot">${SLOT_WORDS[role] ?? ''}</span>`,
       style: 'display:flex;align-items:center;justify-content:center;border:1px dashed rgba(0,0,0,0.22);color:rgba(0,0,0,0.5);font:12px system-ui,sans-serif;min-height:0;',
     };
   }

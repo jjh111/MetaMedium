@@ -2,8 +2,12 @@
 //
 // A word the hand wrote, once read, or a word it typed at the field, is
 // offered two ways side by side — *Name it* (the name tool: one thing, a
-// definition) and *Label it* (this tool: the word on each held mark the
-// person made, and nothing made). Labelling blesses nothing, makes no
+// definition) and *Write “…” on it* (this tool: the word on each held mark the
+// person made, and nothing made). John, 2 Oct 2026: *label and name don't make
+// sense to a user — if they are the same, show one; if they differ, signal
+// how.* So the pill says what it does in its own words, two stand together
+// only where both would act and differ (`wordActs`), and each then carries a
+// note saying how. Labelling blesses nothing, makes no
 // definition and no file, and never asks a model; it goes on the person's
 // own marks only, and says whose marks it will not go on before it is taken.
 //
@@ -72,15 +76,32 @@ function labelOffer(scope: ToolScope, targets: string[], word: string, o: { key:
     : 'no label here — ' + madeThese(ink.others) + ', and a label is a word on your own ink; taking it says so';
   return {
     key: o.key,
-    label: 'Label it ' + q,
+    label: 'Write ' + q + ' on ' + (o.where === 'itself' ? 'the writing' : 'it'),
     reason,
     base: o.grounds ? baseOn(o.grounds) : 0.4,
     tool: 'label',
     ...(o.grounds ? { grounds: o.grounds } : {}),
     verbs: o.verbs,
-    line: ink.mine ? '↵ label it ' + q + ' — on your ink; makes nothing' : '↵ no label — ' + madeThese(ink.others) + '; a label goes on your own ink',
+    line: ink.mine ? '↵ write ' + q + ' on your ink — only the words; nothing is made' : '↵ no words written — ' + madeThese(ink.others) + '; words go on your own ink',
     data: { word, targets },
   };
+}
+
+/**
+ * Which of the two acts a typed word has at these marks, and whether they differ (PLAN-FIELD-PAR):
+ *   - writing it on them only where the person made some of them and not all already say it;
+ *   - naming them only where it makes a thing — not on ONE thing already named, held alone,
+ *     where naming it again would wrap it in a definition of one, and the word on it is what
+ *     a person means;
+ *   - both, they differ: a name is learnt and found again, words are only words.
+ */
+export function wordActs(scope: ToolScope, word: string): { name: boolean; label: boolean; differ: boolean } {
+  const ink = whoseInk(scope, scope.marks);
+  const saying = scope.marks.filter((id) => { const n = scope.state.nodes.get(id); const l = n && scope.session.isMine(id) ? labelOf(n) : null; return !!l && l.text === word; }).length;
+  const label = ink.mine > 0 && saying < ink.mine;
+  const oneThing = scope.marks.length === 1 && scope.state.artifacts.includes(scope.marks[0]);
+  const name = !oneThing || !label;
+  return { name, label, differ: name && label };
 }
 
 /** A label refused, and why: another hand's ink, or the reason the door gave. */
@@ -157,7 +178,9 @@ export const LABEL: Tool = {
   /** A word typed at marks: Label it, beside the name tool's Name it, at the head of what the field affords. */
   completes(scope) {
     if (!scope.word) return [];
-    return [{ ...labelOffer(scope, scope.marks.slice(), scope.word, { key: 'label-word', verbs: [] }), place: 'head' as const }];
+    const acts = wordActs(scope, scope.word);
+    if (!acts.label) return [];
+    return [{ ...labelOffer(scope, scope.marks.slice(), scope.word, { key: 'label-word', verbs: [] }), place: 'head' as const, ...(acts.differ ? { note: 'only the words' } : {}) }];
   },
   take(offer, scope, session, at) {
     const { word, targets } = offer.data as { word: string; targets: string[] };

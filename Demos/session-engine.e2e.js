@@ -258,7 +258,7 @@ window.__scenario = async function(){
   const sum = t.summary().summon;
   step('5. crossing with the taught mark summons', sum && sum.enclosed === 3,
     {enclosed: sum && sum.enclosed, chips: t.chips()});
-  step('5b. the field opens with its four core slots, and a brief typed there reads as a build', t.coreSlots().join(',') === 'name,copy,paste,erase' && mm.readField('website with the copy in the squares').kind === 'brief' && /structure at once \(tier 1\), then .* writes the words/.test(mm.readField('website with the copy in the squares').line), { core: t.coreSlots(), line: mm.readField('website with the copy in the squares').line });
+  step('5b. the field opens with its four core slots, and a brief typed there reads as a build', t.coreSlots().join(',') === 'name,copy,paste,erase' && mm.readField('website with the copy in the squares').kind === 'brief' && /^↵ the page’s boxes at once, then .* writes the words$/.test(mm.readField('website with the copy in the squares').line), { core: t.coreSlots(), line: mm.readField('website with the copy in the squares').line });
   {
     const st0 = mm.session.getState();
     step('5c. a held lasso is never offered for snapping — it is a gesture in waiting', ![...mm.snapOffers().keys()].some(id => st0.summon && st0.summon.gestureIds.includes(id)));
@@ -280,7 +280,7 @@ window.__scenario = async function(){
   const line6 = t.readingLine();
   t.typeEnter('website with the copy in the squares');
   await wait(350);
-  step('6a. the reading line said what Enter would do before it was pressed: the structure first, the words after', /structure at once/.test(line6) && /writes the words/.test(line6), { line: line6 });
+  step('6a. the reading line said what Enter would do before it was pressed: the page’s boxes first, the words after', /boxes at once/.test(line6) && /writes the words/.test(line6), { line: line6 });
 
   const st1 = mm.session.getState();
   const artId = st1.artifacts[0];
@@ -2315,7 +2315,7 @@ window.__scenario = async function(){
     t.stroke(t.circle(400, 370, 190)); t.takeLoop(400, 370, 190); await wait(60);
     const pill32 = [...document.querySelectorAll('#summon .item')].find(b => /Show it in 3D/.test(b.textContent));
     step('32. circles joined by lines offer to stand in 3D with no model, and the pill says where it leads', !!pill32 && !pill32.querySelector('.dot') && /then: What is this/.test(pill32.title), { chips: t.chips(), title: pill32 && pill32.title });
-    step('32z. the panel says where the selection stands on the map of becoming, and the rung after it', /becomes\s*a structure, a graph.*Show it in 3D/.test(document.getElementById('inspector').textContent), document.getElementById('inspector').textContent.slice(0, 200));
+    step('32z. the panel says where the selection stands on the map of becoming, and the rung after it', /becomes\s*marks joined by lines.*Show it in 3D/.test(document.getElementById('inspector').textContent), document.getElementById('inspector').textContent.slice(0, 200));
     const calls32 = window.__calls.length;
     if (pill32) pill32.click();
     await wait(100);
@@ -2970,8 +2970,8 @@ window.__scenario = async function(){
     const node42 = mm.session.getState().nodes.get(box42);
     const lab42 = node42 && MM.labelOf(node42);
     const at42 = drawn42().find((l) => l.id === box42);
-    step('42. with a mark held, the field reads “label: inlet” — the line says ↵ label it “inlet” before Enter',
-      !!held42 && held42.enclosedIds.includes(box42) && line42 === '↵ label it “inlet”',
+    step('42. with a mark held, the field reads “label: inlet” — the line says ↵ write “inlet” on it before Enter',
+      !!held42 && held42.enclosedIds.includes(box42) && line42 === '↵ write “inlet” on it',
       { held: held42 && held42.enclosedIds, line: line42 });
     step('42a. Enter puts the word on the mark — one label event, in your name, drawn beside it — and asks no model',
       labels42.length === 1 && labels42[0].nodeId === box42 && !!lab42 && lab42.text === 'inlet' && lab42.source === MM.LOCAL_PARTICIPANT
@@ -3039,7 +3039,9 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0);
   }
 
-  // ---- 42f–m. One word, two acts: Name it and Label it, side by side (V1-PLAN L2e) ----
+  // ---- 42f–m. One word, two acts: Name it and Write it on it, side by side (V1-PLAN L2e) ----
+  // (PLAN-FIELD-PAR, 2 Oct 2026: *Label it* is now *Write “…” on it*, in the person's words, and
+  // a pill of the pair carries a note saying how it differs.)
   // The row offers the word two ways — when the writing has been read, and when a
   // word is typed — and the two must not read as one thing twice. The difference is
   // said in words the field already has: each pill's tooltip says what it does and
@@ -3071,7 +3073,7 @@ window.__scenario = async function(){
     const namePill = certainF.find((b) => /^“Pricing” 0\.92/.test(said(b)));
     const labelPill = affordF[0];
     step('42f. writing read beside a shape: the reading takes the word as the name, and Label it “Pricing” leads what it affords, right under it — the four core buttons still four',
-      !!namePill && !!labelPill && said(labelPill) === 'Label it “Pricing”' && t.coreSlots().join(',') === 'name,copy,paste,erase' && window.__calls.length === calls + 1,
+      !!namePill && !!labelPill && said(labelPill) === 'Write “Pricing” on it' && t.coreSlots().join(',') === 'name,copy,paste,erase' && window.__calls.length === calls + 1,
       { certain: certainF.map(said), afford: affordF.map(said), core: t.coreSlots(), calls: window.__calls.length - calls });
     step('42g. each says what it does and what it does not: naming makes one thing, a definition, and writes no word on the ink; labelling puts the word on your ink and makes nothing',
       !!namePill && !!labelPill && /one thing/.test(namePill.title) && /definition/.test(namePill.title) && /writes no word on the ink/.test(namePill.title)
@@ -3084,7 +3086,7 @@ window.__scenario = async function(){
     if (labelPill) labelPill.dispatchEvent(new MouseEvent('mouseleave'));
     const after = t.readingLine();
     step('42h. pointed at, Label it says in the reading line what it will do — no badge, no new row — and the line is Enter\'s again when the pointer leaves',
-      pointed === '↵ label it “Pricing” — on your ink; makes nothing' && after === before && before !== pointed && before === mm.readField('').line,
+      pointed === '↵ write “Pricing” on your ink — only the words; nothing is made' && after === before && before !== pointed && before === mm.readField('').line,
       { before, pointed, after });
     const arts = mm.session.getState().artifacts.length, lib = mm.libraryEntries().length, evs = mm.session.getEvents().length;
     if (labelPill) labelPill.click();
@@ -3108,7 +3110,8 @@ window.__scenario = async function(){
     const affordT = pills('afford');
     const lineT = t.readingLine();
     step('42j. a typed word is offered two ways, side by side — Name it “inlet”, then Label it “inlet” — as plain pills in the rows the field has, and Enter still does what the line says',
-      affordT.map(said).join(' | ') === 'Name it “inlet” | Label it “inlet”' && !!lineT && !/label/i.test(lineT)
+      affordT.map(said).join(' | ') === 'Name it “inlet” | Write “inlet” on it' && !!lineT && !/label/i.test(lineT)
+        && affordT.map((b) => (b.querySelector('.note') || {}).textContent).join(' | ') === 'finds more like it | only the words'
         && affordT.every((b) => b.className === 'pill item') && document.querySelectorAll('#summon .row').length === 3
         && t.coreSlots().join(',') === 'name,copy,paste,erase',
       { afford: affordT.map(said), line: lineT, classes: affordT.map((b) => b.className), rows: document.querySelectorAll('#summon .row').length, core: t.coreSlots() });
@@ -3123,8 +3126,8 @@ window.__scenario = async function(){
     t.typeIn('name: inlet');
     const selN = pills('afford').map((b) => said(b) + '=' + b.getAttribute('aria-selected')), lineN = t.readingLine();
     step('42l. “label: inlet” marks Label it as what Enter will do, “name: inlet” marks Name it — the line and the pill agree',
-      selL.join(' | ') === 'Name it “inlet”=false | Label it “inlet”=true' && lineL === '↵ label it “inlet”'
-        && selN.join(' | ') === 'Name it “inlet”=true | Label it “inlet”=false' && lineN === '↵ name it “inlet”',
+      selL.join(' | ') === 'Name it “inlet”=false | Write “inlet” on it=true' && lineL === '↵ write “inlet” on it'
+        && selN.join(' | ') === 'Name it “inlet”=true | Write “inlet” on it=false' && lineN === '↵ name it “inlet”',
       { label: selL, lineL, name: selN, lineN });
     // Taken, they stay two acts: Name it blesses one thing; Label it makes nothing.
     t.typeIn('inlet');
@@ -3138,7 +3141,7 @@ window.__scenario = async function(){
     mm.session.undo(); await wait(60);
     t.typeIn('inlet');
     const evsT2 = mm.session.getEvents().length;
-    const l1 = pills('afford').find((b) => said(b) === 'Label it “inlet”');
+    const l1 = pills('afford').find((b) => said(b) === 'Write “inlet” on it');
     if (l1) l1.click();
     await wait(30);
     const sL = mm.session.getState();
@@ -3185,12 +3188,12 @@ window.__scenario = async function(){
     const statusM = document.getElementById('status').textContent;
     step('42n. held with marks fern and a model made, the line names them before Enter: the word goes on yours, not on theirs',
       !!held && [kite, model, mine].every((id) => held.enclosedIds.includes(id))
-        && theirs.length === 2 && lineM === '↵ label it “inlet” — on yours, not the 2 marks ' + theirs.join(' and ') + ' made',
+        && theirs.length === 2 && lineM === '↵ write “inlet” on it — on yours, not the 2 marks ' + theirs.join(' and ') + ' made',
       { held: held && held.enclosedIds, line: lineM, model: modelName });
     step('42o. Enter labels your mark alone — one label event — and says in the status line whose marks it left, and why: never passed over in silence, and no model asked',
       labM.length === 1 && labM[0].nodeId === mine && (MM.labelOf(sM.nodes.get(mine)) || {}).text === 'inlet'
         && !MM.labelOf(sM.nodes.get(kite)) && !MM.labelOf(sM.nodes.get(model))
-        && /labelled it “inlet”/.test(statusM) && /fern/.test(statusM) && statusM.includes(modelName) && /your own ink/.test(statusM) && window.__calls.length === calls,
+        && /wrote “inlet” on it/.test(statusM) && /fern/.test(statusM) && statusM.includes(modelName) && /your own ink/.test(statusM) && window.__calls.length === calls,
       { events: mm.session.getEvents().slice(evsM).map((e) => e.type), status: statusM, calls: window.__calls.length - calls });
     // Fern's mark held alone: nothing of yours to label.
     const k = S(760, 320);
@@ -3203,9 +3206,9 @@ window.__scenario = async function(){
     t.typeEnter('label: kite'); await wait(60);
     const statusK = document.getElementById('status').textContent;
     step('42p. held alone, fern\'s mark is not yours to label: the line says so quietly before Enter, and Enter writes nothing and says so in the status line',
-      !!heldK && heldK.enclosedIds.length === 1 && heldK.enclosedIds[0] === kite && quietK && lineK === '↵ no label — fern made this mark; a label goes on your own ink'
+      !!heldK && heldK.enclosedIds.length === 1 && heldK.enclosedIds[0] === kite && quietK && lineK === '↵ no words written — fern made this mark; words go on your own ink'
         && !mm.session.getEvents().slice(evsK).some((e) => e.type === 'label') && !MM.labelOf(mm.session.getState().nodes.get(kite))
-        && /no label on the mark fern made/.test(statusK) && /your own ink/.test(statusK),
+        && /no words written on the mark fern made/.test(statusK) && /your own ink/.test(statusK),
       { held: heldK && heldK.enclosedIds, line: lineK, quiet: quietK, status: statusK, events: mm.session.getEvents().slice(evsK).map((e) => e.type) });
     mm.session.load([]); mm.setView(1, 0, 0);
   }
@@ -3258,9 +3261,9 @@ window.__scenario = async function(){
     t.typeEnter('label: mine'); await wait(60);
     const status43 = document.getElementById('status').textContent;
     step('43c. held, fern\'s thing is not this hand\'s to label — though it drew one of its marks: the line says so before Enter, and Enter writes nothing',
-      !!held43 && held43.enclosedIds.length === 1 && held43.enclosedIds[0] === pair43 && line43 === '↵ no label — fern made this mark; a label goes on your own ink'
+      !!held43 && held43.enclosedIds.length === 1 && held43.enclosedIds[0] === pair43 && line43 === '↵ no words written — fern made this mark; words go on your own ink'
         && !mm.session.getEvents().slice(evs43).some((e) => e.type === 'label') && (MM.labelOf(mm.session.getState().nodes.get(pair43)) || {}).text === 'kite and box'
-        && /no label on the mark fern made/.test(status43),
+        && /no words written on the mark fern made/.test(status43),
       { held: held43 && held43.enclosedIds, line: line43, status: status43, events: mm.session.getEvents().slice(evs43).map((e) => e.type) });
     mm.session.load([]); mm.setView(1, 0, 0);
   }
@@ -3322,9 +3325,9 @@ window.__scenario = async function(){
     t.typeEnter('label: mine'); await wait(60);
     const status44 = document.getElementById('status').textContent;
     step('44b. held, fern\'s word is not this hand\'s to label: the line says so before Enter, and Enter writes nothing',
-      !!held44 && held44.enclosedIds.length === 1 && held44.enclosedIds[0] === word44 && line44 === '↵ no label — fern made this mark; a label goes on your own ink'
+      !!held44 && held44.enclosedIds.length === 1 && held44.enclosedIds[0] === word44 && line44 === '↵ no words written — fern made this mark; words go on your own ink'
         && !mm.session.getEvents().slice(evs44).some((e) => e.type === 'label') && (MM.labelOf(mm.session.getState().nodes.get(word44)) || {}).text === 'nav'
-        && /no label on the mark fern made/.test(status44),
+        && /no words written on the mark fern made/.test(status44),
       { held: held44 && held44.enclosedIds, line: line44, status: status44, events: mm.session.getEvents().slice(evs44).map((e) => e.type) });
     // Live: fern has just printed a word, and this hand prints a letter beside it — on her
     // line, a letter's gap from her V, within the moment a word is written. It stays this hand's.
@@ -3572,12 +3575,12 @@ window.__scenario = async function(){
     const lab47 = mm.session.getEvents().slice(evs47).filter((e) => e.type === 'label');
     const status47 = document.getElementById('status').textContent;
     step('47a. held after the reload, the box drawn before it is this person\'s to label: the line says the word goes on it, before Enter',
-      !!held47 && held47.enclosedIds.length === 1 && held47.enclosedIds[0] === box47 && line47 === '↵ label it “inlet”' && !quiet47,
+      !!held47 && held47.enclosedIds.length === 1 && held47.enclosedIds[0] === box47 && line47 === '↵ write “inlet” on it' && !quiet47,
       { held: held47 && held47.enclosedIds, line: line47, quiet: quiet47 });
     step('47b. Enter puts the word on it — one label event, this sitting\'s — and the box is still the earlier sitting\'s mark: the rule changed, not whose it is',
       lab47.length === 1 && lab47[0].nodeId === box47 && !lab47[0].by && (MM.labelOf(s47.nodes.get(box47)) || {}).text === 'inlet'
         && MM.labelOf(s47.nodes.get(box47)).source === MM.LOCAL_PARTICIPANT && MM.authorOf(s47.nodes.get(box47)) === handIdOf47(prev47)
-        && /labelled it “inlet”/.test(status47),
+        && /wrote “inlet” on it/.test(status47),
       { labels: lab47, label: MM.labelOf(s47.nodes.get(box47)) || null, maker: MM.authorOf(s47.nodes.get(box47)), status: status47, stale: s47.staleResult });
     // The word reaches the room: every board holds it on the box.
     await mm.saveNow(); await wait(150);
@@ -3608,9 +3611,9 @@ window.__scenario = async function(){
     const statusBoth47 = document.getElementById('status').textContent;
     step('47d. held with fern\'s circle, the word goes on this person\'s box and not on hers — another person is refused as before, said before Enter and after it',
       !!heldBoth47 && heldBoth47.enclosedIds.length === 2 && [box47, kite47].every((id) => heldBoth47.enclosedIds.includes(id))
-        && lineBoth47 === '↵ label it “outlet” — on yours, not the mark fern made'
+        && lineBoth47 === '↵ write “outlet” on it — on yours, not the mark fern made'
         && labBoth47.length === 1 && labBoth47[0].nodeId === box47 && (MM.labelOf(sBoth47.nodes.get(box47)) || {}).text === 'outlet' && !MM.labelOf(sBoth47.nodes.get(kite47))
-        && /labelled it “outlet”/.test(statusBoth47) && /not on the mark fern made/.test(statusBoth47),
+        && /wrote “outlet” on it/.test(statusBoth47) && /not on the mark fern made/.test(statusBoth47),
       { held: heldBoth47 && heldBoth47.enclosedIds, line: lineBoth47, labels: labBoth47.map((e) => e.nodeId), status: statusBoth47 });
     // And the other way round: this tab draws in the room, and its next sitting — as
     // after the next reload — puts a word on what it drew; the word lands here.
@@ -4206,14 +4209,13 @@ window.__scenario = async function(){
     const tipSites53 = [{ kind: 'middle', index: 3 }, { kind: 'corner', index: 0 }];
     const arrows53 = [];
     // Each tip three pixels short of its site, outside B: a two-wing head whose tip lands ON
-    // an outline visits it three times, and three crossings would rub B out. Tied, the tip is
-    // carried onto its site.
+    // an outline visits it three times, and three crossings would rub B out. The pen ties the
+    // tip where its ink points, though it lifts at a wing (PLAN-FIELD-PAR FP3) — this test used
+    // to tie it by hand because the surface did not — and the tip is carried onto its site.
     const short53 = (from, to) => { const l = Math.hypot(to.x - from.x, to.y - from.y); return { x: to.x - (3 * (to.x - from.x)) / l, y: to.y - (3 * (to.y - from.y)) / l }; };
     for (let i = 0; i < 2; i++) {
       t.stroke(arrow53(tails53[i], short53(tails53[i], site53(b53, tipSites53[i].kind, tipSites53[i].index)))); await wait(40);
-      const id = last53();
-      arrows53.push(id);
-      mm.session.bind({ strokeId: id, nodeId: b53, site: tipSites53[i], end: 'end', at: Date.now() });
+      arrows53.push(last53());
     }
     const tied53 = arrows53.map((id) => mm.session.getEvents().filter((e) => e.type === 'bind' && e.strokeId === id).map((e) => e.end + '→' + (e.nodeId === a53 ? 'A' : e.nodeId === b53 ? 'B' : e.nodeId)).sort().join(' '));
     const standing53 = [a53, b53].concat(arrows53).every((id) => mm.session.getState().contentIds.includes(id));
@@ -4247,7 +4249,7 @@ window.__scenario = async function(){
       const role = read53.roles.find((r) => r.id === id) || {};
       return to === b53 && gap53(id, b53) < 0.5 && role.role === 'edge' && !!role.direction && role.direction.to === b53;
     });
-    step('53. two arrows tied to box B follow it when the pointer drags it: each tip stands on its site where B now stands, each tail where it was on A, and each still reads as pointing at B — an edge to B, its ink touching the outline of B — the drag is one move event, the following derived',
+    step('53. two arrows the pen tied to box B — tail and tip — follow it when the pointer drags it: each tip stands on its site where B now stands, each tail where it was on A, and each still reads as pointing at B — an edge to B, its ink touching the outline of B — the drag is one move event, the following derived',
       standing53 && tied53.every((x) => x === 'end→B start→A') && JSON.stringify(evs53) === '["move"]' && followed53.every(Boolean) && points53.every(Boolean),
       { standing: standing53, tied: tied53, events: evs53, followed: followed53, pointsAtB: points53, tips: arrows53.map((id) => round53(ends53(id) && ends53(id).end)), sites: tipSites53.map((x) => round53(site53(b53, x.kind, x.index))) });
     mm.session.undo(); await wait(30);
@@ -4380,7 +4382,7 @@ window.__scenario = async function(){
         && window.__calls.length === calls55b + 1 && said55(words55).join(' ') === 'hello wide world' && !mm.session.getState().artifacts.length,
       { pills: pills55b, line: line55b, calls: window.__calls.length - calls55b, said: said55(words55), artifacts: mm.session.getState().artifacts.length });
     const chips55c = t.chips();
-    step('55c. when the words land they lead as before: the line as a name, Make it text, Label it', chips55c.some((c) => /^“hello wide world” 0\.90/.test(c)) && chips55c.some((c) => /Make it text/.test(c)) && chips55c.some((c) => /^Label it/.test(c)), chips55c);
+    step('55c. when the words land they lead as before: the line as a name, Make it text, and writing it on (Write “…” on, PLAN-FIELD-PAR)', chips55c.some((c) => /^“hello wide world” 0\.90/.test(c)) && chips55c.some((c) => /Make it text/.test(c)) && chips55c.some((c) => /^Write “hello wide world” on/.test(c)), chips55c);
     // With no model that can see: the line says what would read it, in the field, and Enter keeps the ask.
     mm.session.load([]); mm.setView(1, 0, 0);
     t.stroke(t.word(200, 300, 90, 28, 6)); const word55d = last55();

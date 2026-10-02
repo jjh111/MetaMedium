@@ -448,6 +448,7 @@ body.panelHidden #inspector { display: none; }
 }
 .pill:hover, .pill[aria-selected="true"] { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 0 3px rgba(var(--gold-rgb), 0.18), var(--shadow); }
 .pill:disabled { opacity: 0.45; cursor: default; }
+.pill .note { color: var(--dim); font-size: 10.5px; margin-left: 6px; white-space: nowrap; }
 /* The core verbs are round: a circle with a mark in it, the same four in the same slots. */
 .pill.core { width: 34px; height: 34px; padding: 0; border-radius: 50%; justify-content: center; color: var(--gold); border-color: rgba(var(--gold-rgb), 0.5); }
 .pill.core svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }

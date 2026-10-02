@@ -72,11 +72,22 @@
    *           not. A thunk too — the reader names nothing outside itself, and reads a sum only
    *           on the branch that needs one (M5).
    *
+   * @property {function(string): ({host:({act:string,label:string,rest:string}|null),missing:({label:string,why:string}|null)})} [intent]
+   *           what typed words name that no offer here answers to (PLAN-FIELD-PAR FP1, FP8): one of
+   *           the board's own acts (export, find, print, examples, help), or an act these marks
+   *           are not offered and what it is missing. Read by core's intent table; a thunk, asked
+   *           only once the verbs, the library and the verb table have said nothing.
+   *
+   * @property {function(string): ({key:string,score:number}|null)} [meaning]
+   *           the act these marks are offered that typed words are nearest in MEANING, when a semantic
+   *           seat is held and has read them (PLAN-FIELD-PAR D1): only what was already worked out off
+   *           the field's thread, never a call — the reader asks nobody anything.
+   *
    * @typedef {Object} FieldCommand  what Enter will do, named rather than closed over
-   * @property {'take'|'name'|'label'|'region'|'ask-what'|'ask'|'draw'|'build'|'library'|'behave'|'need-model'|'maths'} do
+   * @property {'take'|'name'|'label'|'region'|'ask-what'|'ask'|'draw'|'build'|'library'|'behave'|'need-model'|'maths'|'host'} do
    *
    * @typedef {Object} FieldReading  the reader's whole answer
-   * @property {string} kind        empty|default|name|label|what|ask|draw|brief|structure|verb|library|behaviour|blocked|page|run|program|new
+   * @property {string} kind        empty|default|name|label|what|ask|draw|brief|structure|verb|library|behaviour|blocked|page|run|program|new|intents|host|missing|meaning|word
    * @property {string} line        the sentence under the field: what Enter will do
    * @property {boolean} [quiet]    said, but not as a promise — Enter does nothing
    * @property {boolean} [model]    Enter asks a model: the line carries the dot
@@ -208,6 +219,9 @@
       return { kind: 'empty', line: '', quiet: true, command: null };
     }
 
+    // `?`: everything these marks can do, every offer shown, the typed-only ones too (PLAN-FIELD-PAR FP1).
+    if (text === '?') return { kind: 'intents', line: '↵ all these marks can do — tap one, or type its name', quiet: true, command: null };
+
     // A sum: `=` says the rest is arithmetic, read by core against the page — no model, and
     // nothing to guess. The line says the result before Enter; Enter stands it on the board.
     const sum = SUM.exec(text);
@@ -259,13 +273,36 @@
       };
     }
 
+    // Words that name an act no offer here answers to (PLAN-FIELD-PAR FP1, FP8): one of the
+    // board's own acts, opened from the field; or an act these marks are not offered, said
+    // with what it is missing — quietly, so Enter does nothing a hand did not mean.
+    const want = !revising && c.intent ? c.intent(text) : null;
+    if (want && want.host) {
+      const h = want.host;
+      return { kind: 'host', line: '↵ ' + h.label + (h.rest ? ' — ' + h.rest : ''), command: { do: 'host', act: h.act, rest: h.rest } };
+    }
+    if (want && want.missing) return { kind: 'missing', line: '↵ ' + want.missing.label + ' — ' + want.missing.why, quiet: true, command: null };
+
+    // A word or two that names nothing here waits for the hand to pick what it is for
+    // (FP4, John's decision of 2 Oct 2026): the row offers it as a name, or as words on
+    // the marks, and Enter takes neither until one is chosen. A brief is a sentence — three
+    // words or more — or a prefix that says what to make (`page:`, `run:`).
+    // …unless the semantic seat, on this device, read it as near an act these marks are offered
+    // (D1): said with its number, and Enter takes it — the line says so before Enter.
+    const near = !revising && c.meaning ? c.meaning(text) : null;
+    const nearItem = near ? items.find((i) => i.key === near.key && !i.disabled) : null;
+    if (nearItem) return { kind: 'meaning', line: '↵ ' + nearItem.label + ' — by meaning ' + near.score.toFixed(2), command: take(nearItem) };
+    if (!revising && text.split(/\s+/).length <= 2) {
+      return { kind: 'word', line: '↵ a word — tap what it is for: a name, or words on the marks', quiet: true, command: null };
+    }
+
     // The brief. Tier 1 builds the structure of a page or a diagram at once, with no
     // words; tier 2 — a model — writes the words, and a program.
     if (revising) return models.length ? { kind: 'brief', line: '↵ ' + who + ' changes what the loop covers', command: build(text, true) } : needsModel('changing a page');
     if ((c.target ? c.target() : 'program') === 'page') {
       return models.length
-        ? { kind: 'brief', line: '↵ the structure at once (tier 1), then ' + who + ' writes the words', command: build(text, false) }
-        : { kind: 'structure', line: '↵ the structure, at once (tier 1) — join a model for the words', command: build(text, false) };
+        ? { kind: 'brief', line: '↵ the page’s boxes at once, then ' + who + ' writes the words', command: build(text, false) }
+        : { kind: 'structure', line: '↵ the page’s boxes at once — a model writes the words when one joins', command: build(text, false) };
     }
     if (!models.length) return needsModel('writing a program');
     return { kind: 'brief', line: '↵ ' + who + ' writes a program', command: build(text, false) };
@@ -273,7 +310,7 @@
     function take(item) { return { do: 'take', key: item.key, index: items.indexOf(item) }; }
     function build(t, rev) { return { do: 'build', text: t, revising: !!rev }; }
     function needsModel(what) {
-      return { kind: 'blocked', line: '↵ ' + what + ' needs a model — controls › models', quiet: true, command: { do: 'need-model', what: what } };
+      return { kind: 'blocked', line: '↵ ' + what + ' needs a model — choose one in the models pane', quiet: true, command: { do: 'need-model', what: what } };
     }
   }
 
@@ -311,14 +348,14 @@
   function readLabel(word, marks) {
     const ink = marks || {};
     const mine = ink.mine || 0, others = ink.others || [];
-    if (!word) return { kind: 'label', line: '↵ label it… (type the word)', quiet: true, command: null };
-    if (!mine && !others.length) return { kind: 'label', line: '↵ label… — nothing held to put it on', quiet: true, command: null };
+    if (!word) return { kind: 'label', line: '↵ write… (type the words)', quiet: true, command: null };
+    if (!mine && !others.length) return { kind: 'label', line: '↵ write… — nothing held to write on', quiet: true, command: null };
     const command = { do: 'label', text: word };
-    if (!mine) return { kind: 'label', quiet: true, command: command, line: '↵ no label — ' + madeThese(others) + '; a label goes on your own ink' };
+    if (!mine) return { kind: 'label', quiet: true, command: command, line: '↵ no words written — ' + madeThese(others) + '; words go on your own ink' };
     const tail = others.length
       ? ' — on ' + (mine === 1 ? 'yours' : 'your ' + mine) + ', not ' + theirMarks(others)
       : mine > 1 ? ' — on each of your ' + mine + ' marks' : '';
-    return { kind: 'label', line: '↵ label it “' + word + '”' + tail, command: command };
+    return { kind: 'label', line: '↵ write “' + word + '” on ' + (mine > 1 ? 'them' : 'it') + tail, command: command };
   }
 
   /**

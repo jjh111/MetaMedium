@@ -114,9 +114,9 @@ describe('the built-in tools', () => {
     const offers = ranked(s);
     expect(keys(offers)).toEqual(['label:hello wide world', 'line-text:' + words.join(','), 'what', 'duplicate', 'keep']);
     expect(offers[0]).toMatchObject({
-      label: 'Label it “hello wide world”',
+      label: 'Write “hello wide world” on the writing',
       grounds: { on: 'written', confidence: 0.9, why: 'read from your handwriting by e2e-stub' },
-      line: '↵ label it “hello wide world” — on your ink; makes nothing',
+      line: '↵ write “hello wide world” on your ink — only the words; nothing is made',
     });
     expect(offers[0].reason).toMatch(/^“hello wide world” on the writing itself, as a caption, in your ink/);
     expect(offers[1]).toMatchObject({ label: 'Make it text “hello wide world”', reason: 'text where the line is, fitted to the ink; flip it to see the writing' });
@@ -136,15 +136,21 @@ describe('the built-in tools', () => {
     expect(ranked(s, { ...HOST, isFlipped: (x) => x === id }).find((o) => o.key === 'flip:' + id)!.label).toBe('Show the text');
   });
 
-  it('what is typed completes: Name it and Label it for a word, each placed at the head of what the field affords', () => {
+  it('what is typed completes: Name it and Write it on them for a word, each placed at the head of what the field affords, each saying how it differs', () => {
     const s = createSession();
     const row = [[200, 200], [360, 204], [520, 200]].map(([x, y]) => draw(s, rect(x, y, 120, 80)));
     hold(s, row);
     const done = completionsFor(toolScope(s, { text: 'nav', word: 'nav', host: HOST }));
-    expect(done.map((o) => [o.key, o.label, o.place])).toEqual([['name-word', 'Name it “nav”', 'head'], ['label-word', 'Label it “nav”', 'head']]);
+    expect(done.map((o) => [o.key, o.label, o.place, o.note])).toEqual([['name-word', 'Name it “nav”', 'head', 'finds more like it'], ['label-word', 'Write “nav” on it', 'head', 'only the words']]);
     expect(done[1].reason).toMatch(/^“nav” on each of the 3 marks you made, in your ink/);
     // No word, nothing completes.
     expect(completionsFor(toolScope(s, { text: 'website about dolphins', host: HOST }))).toEqual([]);
+    // Held alone, a thing already named: naming it again would wrap it in a definition of one — the word on it is what is meant, and it is the one pill.
+    const thing = s.bless({ summonId: s.getState().summon!.id, name: 'menu', at: (clock += 100) })!;
+    s.deselect((clock += 1));
+    hold(s, [thing]);
+    const one = completionsFor(toolScope(s, { text: 'nav', word: 'nav', host: HOST }));
+    expect(one.map((o) => [o.key, o.label, o.note])).toEqual([['label-word', 'Write “nav” on it', undefined]]);
   });
 });
 

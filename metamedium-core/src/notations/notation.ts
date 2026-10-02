@@ -47,6 +47,7 @@ import { STATE } from './state';
 import { ER } from './er';
 import { MINDMAP } from './mindmap';
 import { GARMENT } from './garment';
+import { DIAGRAM } from './diagram';
 
 /** A symbol a notation knows, and which of the six roles it plays. */
 export interface NotationSymbolDef {
@@ -187,6 +188,11 @@ export interface Notation {
   read(state: SessionState, scopeIds: readonly string[]): NotationReading | null;
   /** Its side of E3's hook (session/ports.ts), offered to the pen by `offerPorts`. */
   ports?: NotationPorts;
+  /**
+   * Read last and said only when no other notation clears `NOTATION_FLOOR`: a
+   * class a drawing falls into when nothing says more (*a diagram*, diagram.ts).
+   */
+  fallback?: boolean;
 }
 
 /** Below this a reading is held but not said as what the drawing IS: the surface says "reads as" only above it. */
@@ -294,7 +300,18 @@ export function notationsOf(state: SessionState, scopeIds?: readonly string[]): 
       out.push(r);
     }
   });
-  return out.sort((a, b) => b.confidence - a.confidence);
+  return sayable(out);
+}
+
+/**
+ * The readings that are said, ranked: a fallback notation's (*a diagram*) is
+ * what a drawing is when nothing says more, so once another notation clears
+ * `NOTATION_FLOOR` it is not said (PLAN-FIELD-PAR FP2). One home for the rule.
+ */
+export function sayable(readings: readonly NotationReading[]): NotationReading[] {
+  const fallbacks = new Set([...registry.values()].filter((n) => n.fallback).map((n) => n.id));
+  const said = readings.some((r) => !fallbacks.has(r.notation) && r.confidence >= NOTATION_FLOOR) ? readings.filter((r) => !fallbacks.has(r.notation)) : readings.slice();
+  return said.sort((a, b) => b.confidence - a.confidence);
 }
 
 /**
@@ -320,3 +337,5 @@ registerNotation(STATE);
 registerNotation(ER);
 registerNotation(MINDMAP);
 registerNotation(GARMENT);
+// Last: the class a drawing falls into when nothing above says more (PLAN-FIELD-PAR FP2).
+registerNotation(DIAGRAM);

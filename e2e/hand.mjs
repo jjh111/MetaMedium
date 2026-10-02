@@ -457,7 +457,7 @@ export async function runHand(browser, servers, { freshContext, screenshot }) {
       const labels = await page.evaluate(([a, b]) => { const mm = window.__mm, s = mm.session.getState(); const t = (id) => { const l = mm.MM.labelOf(s.nodes.get(id)); return l ? l.text : null; }; return { box: t(a), sun: t(b) }; }, [boxB, sun]);
       const look = await lookUntil((l) => /labelled “inlet”/.test(markLine(l, boxB) || ''));
       check(`H1.13. §6 (synthetic strokes): his box and the hand's circle held, \`label: inlet\` — the line says "${line}" before Enter, and Enter puts inlet on his box alone (box ${labels.box}, circle ${labels.sun}); the hand's look: "${(markLine(look, boxB) || '').slice(0, 90)}"`,
-        held && line === '↵ label it “inlet” — on yours, not the mark claude made' && labels.box === 'inlet' && labels.sun === 'sun' && /labelled “inlet”/.test(markLine(look, boxB) || '') && /labelled “sun”/.test(markLine(look, sun) || ''),
+        held && line === '↵ write “inlet” on it — on yours, not the mark claude made' && labels.box === 'inlet' && labels.sun === 'sun' && /labelled “inlet”/.test(markLine(look, boxB) || '') && /labelled “sun”/.test(markLine(look, sun) || ''),
         { held, line, labels, look: markLine(look, boxB) });
       await letGo(page);
     });
@@ -554,7 +554,7 @@ export async function runHand(browser, servers, { freshContext, screenshot }) {
       const look = await lookUntil((l) => /labelled “outlet”/.test(markLine(l, boxB) || ''));
       const refused = textOf(await hand.call('canvas_label', { id: boxB, text: 'mine now' }));
       check(`H1.17. §6 (synthetic strokes): after the reload, a mark drawn before it labels — "${line1}" before Enter, and it says ${first}; held with the hand's circle, "${line2}"; the hand's look: "${(markLine(look, boxB) || '').slice(0, 100)}", the circle still “${labels.sun}”; the hand's own label on his mark is refused (${refused.slice(-60)})`,
-        opened && /^↵ label it “gate” — on (yours|your \d+)/.test(line1) && first === 'gate' && held && /^↵ label it “outlet” — on (yours|your \d+), not the (mark|\d+ marks) claude made$/.test(line2) && labels.box === 'outlet' && labels.sun === 'sun'
+        opened && /^↵ write “gate” on (it|them) — on (yours|your \d+)/.test(line1) && first === 'gate' && held && /^↵ write “outlet” on (it|them) — on (yours|your \d+), not the (mark|\d+ marks) claude made$/.test(line2) && labels.box === 'outlet' && labels.sun === 'sun'
           && /labelled “outlet”/.test(markLine(look, boxB) || '') && /by john/.test(markLine(look, boxB) || '') && !/“mine now” on/.test(refused) && /john/.test(refused),
         { line1, first, line2, labels, look: markLine(look, boxB), refused });
       await letGo(page);

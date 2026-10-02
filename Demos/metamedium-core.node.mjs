@@ -13898,6 +13898,7 @@ function writeFlowchart(reading7, opts = {}) {
   };
 }
 registerMermaidWriter(FLOWCHART_TABLE.notation, writeFlowchart);
+registerMermaidWriter("diagram", writeFlowchart);
 
 // src/notations/uml-class.ts
 var UML_CLASS_TABLE = {
@@ -17775,6 +17776,49 @@ var GARMENT = {
   read: (state, scopeIds) => readGarment(state, scopeIds)
 };
 
+// src/notations/diagram.ts
+var TIED_LIFT = 0.2;
+var DIAGRAM_NOTATION = "diagram";
+function readsAsCircle(state, ids) {
+  if (ids.length !== 1) return false;
+  const node = state.nodes.get(ids[0]);
+  if (!node || !getRep(node, "stroke")) return false;
+  const pts = inkOf(node);
+  if (pts.length < 3) return false;
+  const top = analyzeStroke(pts, scaleOf2(node)).results[0];
+  return !!top && top.type === "circle";
+}
+function readDiagram(state, scopeIds) {
+  const r = readFlowchart(state, scopeIds);
+  if (!r || r.symbols.length < 2 || !r.connectors.length) return null;
+  const joined = r.connectors.filter((c) => c.from && c.to && c.from !== c.to);
+  if (!joined.length) return null;
+  if (r.symbols.every((s) => readsAsCircle(state, s.ids))) return null;
+  const tied = joined.filter((c) => c.ends.from.bound && c.ends.to.bound);
+  if (!tied.length) return null;
+  const share = tied.length / r.connectors.length;
+  const confidence = Math.min(MAX_TIER0_CONFIDENCE, NOTATION_FLOOR + TIED_LIFT * share);
+  const nodes = r.symbols.length, links = r.connectors.length;
+  const summary = `${countWord(nodes)} ${nodes === 1 ? "node" : "nodes"}, ${countWord(links)} ${links === 1 ? "connector" : "connectors"}`;
+  return {
+    ...r,
+    notation: DIAGRAM_NOTATION,
+    name: "Diagram",
+    confidence,
+    summary,
+    reason: `${tied.length} of ${links} connectors tied at both ends to the nodes they join \u2014 no notation says more (as a flowchart: ${r.confidence.toFixed(2)})`
+  };
+}
+var DIAGRAM = {
+  id: DIAGRAM_NOTATION,
+  name: "Diagram",
+  describes: "nodes joined by connectors tied at both ends, when no notation says more",
+  symbols: [],
+  connectors: [],
+  fallback: true,
+  read: (state, scopeIds) => readDiagram(state, scopeIds)
+};
+
 // src/notations/notation.ts
 var NOTATION_FLOOR = 0.5;
 var registry2 = /* @__PURE__ */ new Map();
@@ -17846,7 +17890,12 @@ function notationsOf(state, scopeIds) {
       out.push(r);
     }
   });
-  return out.sort((a, b) => b.confidence - a.confidence);
+  return sayable(out);
+}
+function sayable(readings2) {
+  const fallbacks = new Set([...registry2.values()].filter((n2) => n2.fallback).map((n2) => n2.id));
+  const said3 = readings2.some((r) => !fallbacks.has(r.notation) && r.confidence >= NOTATION_FLOOR) ? readings2.filter((r) => !fallbacks.has(r.notation)) : readings2.slice();
+  return said3.sort((a, b) => b.confidence - a.confidence);
 }
 function describeNotation(r) {
   const acronym = /^[A-Z]{2,}\b/.test(r.name);
@@ -17861,6 +17910,7 @@ registerNotation(STATE);
 registerNotation(ER);
 registerNotation(MINDMAP);
 registerNotation(GARMENT);
+registerNotation(DIAGRAM);
 
 // src/maths/garment.ts
 var INK_AGREES = 0.1;
@@ -26306,6 +26356,7 @@ function describeTier1() {
   return TIER1_LIBRARY.map((m) => `${m.name} \u2014 ${m.does}`).join("\n");
 }
 var tagFor = (role) => role === "container" ? "section" : role === "label" ? "header" : "div";
+var SLOT_WORDS = { container: "an area", node: "a box", label: "a heading", edge: "a line", annotation: "a note" };
 function buildStructure(session, artifactId) {
   const plan = planFor(session, artifactId);
   if ("error" in plan) return { ok: false, error: plan.error };
@@ -26316,7 +26367,7 @@ function buildStructure(session, artifactId) {
     const role = regionRole.get(id) ?? "region";
     content[id] = {
       tag: tagFor(role),
-      html: `<span class="mm-slot">${id} \xB7 ${role}</span>`,
+      html: `<span class="mm-slot">${SLOT_WORDS[role] ?? ""}</span>`,
       style: "display:flex;align-items:center;justify-content:center;border:1px dashed rgba(0,0,0,0.22);color:rgba(0,0,0,0.5);font:12px system-ui,sans-serif;min-height:0;"
     };
   }
@@ -26720,38 +26771,6 @@ var TEXT = {
   }
 };
 
-// src/tools/name.ts
-var NAMING_IS = "naming makes one thing of them, a definition the library keeps and the next drawing like it is offered as; it writes no word on the ink";
-function nameMarks(session, summonId, name, at) {
-  return session.withTool(NAME2.id, () => session.bless({ summonId, name, at }), "name-word");
-}
-var NAME2 = {
-  id: "name",
-  name: "naming",
-  describe: () => "a word typed at marks becomes their name: one thing, a definition the next drawing like it is offered as",
-  offers: () => [],
-  completes(scope) {
-    if (!scope.word) return [];
-    const q = "\u201C" + scope.word + "\u201D";
-    return [{
-      key: "name-word",
-      label: "Name it " + q,
-      reason: q + " as the name \u2014 " + NAMING_IS,
-      base: 0.4,
-      tool: "name",
-      verbs: [],
-      place: "head",
-      name: scope.word,
-      line: "\u21B5 name it " + q + " \u2014 one thing, a definition",
-      data: { word: scope.word }
-    }];
-  },
-  take(offer, scope, session, at) {
-    const { word } = offer.data;
-    return { made: nameMarks(session, scope.summon.id, word, at) };
-  }
-};
-
 // src/tools/label.ts
 var LABELLING_IS = "it makes nothing: no definition, no name the library learns, no file; undo takes it off";
 function makersOf(others) {
@@ -26785,15 +26804,27 @@ function labelOffer(scope, targets, word, o) {
   const reason = ink.mine ? q + " on " + onto + ", in your ink at the board's scale" + (ink.others.length ? " \u2014 not on " + theirMarks(ink.others) + ", which is theirs to label" : "") + " \u2014 " + LABELLING_IS : "no label here \u2014 " + madeThese(ink.others) + ", and a label is a word on your own ink; taking it says so";
   return {
     key: o.key,
-    label: "Label it " + q,
+    label: "Write " + q + " on " + (o.where === "itself" ? "the writing" : "it"),
     reason,
     base: o.grounds ? baseOn(o.grounds) : 0.4,
     tool: "label",
     ...o.grounds ? { grounds: o.grounds } : {},
     verbs: o.verbs,
-    line: ink.mine ? "\u21B5 label it " + q + " \u2014 on your ink; makes nothing" : "\u21B5 no label \u2014 " + madeThese(ink.others) + "; a label goes on your own ink",
+    line: ink.mine ? "\u21B5 write " + q + " on your ink \u2014 only the words; nothing is made" : "\u21B5 no words written \u2014 " + madeThese(ink.others) + "; words go on your own ink",
     data: { word, targets }
   };
+}
+function wordActs(scope, word) {
+  const ink = whoseInk(scope, scope.marks);
+  const saying = scope.marks.filter((id) => {
+    const n2 = scope.state.nodes.get(id);
+    const l = n2 && scope.session.isMine(id) ? labelOf(n2) : null;
+    return !!l && l.text === word;
+  }).length;
+  const label = ink.mine > 0 && saying < ink.mine;
+  const oneThing = scope.marks.length === 1 && scope.state.artifacts.includes(scope.marks[0]);
+  const name = !oneThing || !label;
+  return { name, label, differ: name && label };
 }
 function labelInk(session, args) {
   const text = String(args.word || "").trim();
@@ -26864,11 +26895,48 @@ var LABEL = {
   /** A word typed at marks: Label it, beside the name tool's Name it, at the head of what the field affords. */
   completes(scope) {
     if (!scope.word) return [];
-    return [{ ...labelOffer(scope, scope.marks.slice(), scope.word, { key: "label-word", verbs: [] }), place: "head" }];
+    const acts = wordActs(scope, scope.word);
+    if (!acts.label) return [];
+    return [{ ...labelOffer(scope, scope.marks.slice(), scope.word, { key: "label-word", verbs: [] }), place: "head", ...acts.differ ? { note: "only the words" } : {} }];
   },
   take(offer, scope, session, at) {
     const { word, targets } = offer.data;
     return { detail: labelInk(session, { summonId: scope.summon.id, ids: targets, word, at, nameOf: scope.host.nameOf, offer: offer.key }) };
+  }
+};
+
+// src/tools/name.ts
+var NAMING_IS = "naming makes one thing of them, a definition the library keeps and the next drawing like it is offered as; it writes no word on the ink";
+function nameMarks(session, summonId, name, at) {
+  return session.withTool(NAME2.id, () => session.bless({ summonId, name, at }), "name-word");
+}
+var NAME2 = {
+  id: "name",
+  name: "naming",
+  describe: () => "a word typed at marks becomes their name: one thing, a definition the next drawing like it is offered as",
+  offers: () => [],
+  completes(scope) {
+    if (!scope.word) return [];
+    const acts = wordActs(scope, scope.word);
+    if (!acts.name) return [];
+    const q = "\u201C" + scope.word + "\u201D";
+    return [{
+      ...acts.differ ? { note: "finds more like it" } : {},
+      key: "name-word",
+      label: "Name it " + q,
+      reason: q + " as the name \u2014 " + NAMING_IS,
+      base: 0.4,
+      tool: "name",
+      verbs: [],
+      place: "head",
+      name: scope.word,
+      line: "\u21B5 name it " + q + " \u2014 one thing, a definition",
+      data: { word: scope.word }
+    }];
+  },
+  take(offer, scope, session, at) {
+    const { word } = offer.data;
+    return { made: nameMarks(session, scope.summon.id, word, at) };
   }
 };
 
@@ -27553,9 +27621,11 @@ var READ = {
       const n2 = s.nodes.get(id);
       return !!n2 && !s.artifacts.includes(id) && (!!strokePointsOf(n2) || isWord(n2)) && !scope.host.isRead(id);
     });
+    const held2 = scope.marks.map((id) => s.nodes.get(id)).filter((n2) => !!n2);
+    const aHead = (n2) => held2.some((c) => c !== n2 && headApartAt(c, n2, s.nodes) !== null);
     if (!ink.some((id) => {
       const n2 = s.nodes.get(id);
-      return isWord(n2) || !snapReading(n2, s.nodes).ok;
+      return isWord(n2) || !snapReading(n2, s.nodes).ok && !aHead(n2);
     })) return out;
     return [...out, {
       key: "read-any",
@@ -28314,6 +28384,428 @@ registerTool(WHICH);
 registerTool(TRACE);
 registerTool(REGION);
 registerTool(LIKE);
+
+// src/search/tokens.ts
+var SPECIAL = { "\xDF": "ss", "\xE6": "ae", "\u0153": "oe", "\xF8": "o", "\u0111": "d", "\u0142": "l", "\u0131": "i" };
+function foldChar(ch) {
+  const low = ch.toLowerCase();
+  const sp = SPECIAL[low];
+  if (sp) return sp;
+  return low.normalize("NFD").replace(/\p{M}/gu, "");
+}
+var WORD = /^[\p{L}\p{N}]+$/u;
+function tokenize(s) {
+  const out = [];
+  let cur = null;
+  const text = typeof s === "string" ? s : "";
+  for (let i = 0; i < text.length; ) {
+    const cp = text.codePointAt(i);
+    const ch = String.fromCodePoint(cp);
+    const next = i + ch.length;
+    const f = foldChar(ch);
+    if (f === "") {
+      if (cur) cur.end = next;
+    } else if (WORD.test(f)) {
+      if (cur) {
+        cur.text += f;
+        cur.end = next;
+      } else {
+        cur = { text: f, start: i, end: next };
+        out.push(cur);
+      }
+    } else cur = null;
+    i = next;
+  }
+  return out;
+}
+function normalise(s) {
+  return tokenize(s).map((t) => t.text).join(" ");
+}
+
+// src/semantic/embed.ts
+var EmbedError = class extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "EmbedError";
+  }
+};
+function cosine(a, b) {
+  if (a.length !== b.length || !a.length) return 0;
+  let dot8 = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot8 += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  if (!na || !nb) return 0;
+  return dot8 / Math.sqrt(na * nb);
+}
+function unit6(v) {
+  const out = new Float32Array(v.length);
+  let n2 = 0;
+  for (let i = 0; i < v.length; i++) n2 += v[i] * v[i];
+  if (!n2) return out;
+  const k = 1 / Math.sqrt(n2);
+  for (let i = 0; i < v.length; i++) out[i] = v[i] * k;
+  return out;
+}
+function createEmbedCache(max = 2e4) {
+  const m = /* @__PURE__ */ new Map();
+  const key2 = (t, x) => t + "\0" + x;
+  return {
+    get: (t, x) => m.get(key2(t, x)),
+    set(t, x, v) {
+      const k = key2(t, x);
+      m.delete(k);
+      m.set(k, v);
+      while (m.size > max) m.delete(m.keys().next().value);
+    },
+    get size() {
+      return m.size;
+    }
+  };
+}
+var EMBED_BATCH = 128;
+async function embedAll(transport, texts, cache, opts = {}) {
+  const out = /* @__PURE__ */ new Map();
+  const need = [];
+  for (const t of texts) {
+    if (out.has(t)) continue;
+    const held2 = cache.get(transport.name, t);
+    if (held2) out.set(t, held2);
+    else if (!need.includes(t)) need.push(t);
+  }
+  const size2 = Math.max(1, opts.batch ?? EMBED_BATCH);
+  for (let i = 0; i < need.length; i += size2) {
+    if (opts.signal?.aborted) throw new Error("cancelled");
+    const part = need.slice(i, i + size2);
+    const got = await transport.embed(part, opts.signal ? { signal: opts.signal } : void 0);
+    if (!Array.isArray(got) || got.length !== part.length) {
+      throw new EmbedError(`${transport.name} answered ${Array.isArray(got) ? got.length : "no"} vectors for ${part.length} texts`);
+    }
+    const vecs = got.map((v) => v instanceof Float32Array ? v : Float32Array.from(v));
+    for (const v of vecs) {
+      if (v.length !== transport.dimension) throw new EmbedError(`${transport.name} promised a dimension of ${transport.dimension} and answered a vector of ${v.length}`);
+    }
+    part.forEach((t, j) => {
+      cache.set(transport.name, t, vecs[j]);
+      out.set(t, vecs[j]);
+    });
+  }
+  return out;
+}
+var fnv = (s) => {
+  let h2 = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h2 ^= s.charCodeAt(i);
+    h2 = Math.imul(h2, 16777619) >>> 0;
+  }
+  return h2 >>> 0;
+};
+function createStubEmbedTransport(opts = {}) {
+  const dimension = opts.dimension ?? 256;
+  const where = /* @__PURE__ */ new Map();
+  (opts.groups ?? []).forEach((g, i) => g.forEach((w2) => where.set(tokenize(w2).map((t) => t.text).join(""), "g:" + i)));
+  const placeOf2 = (w2) => {
+    if (where.has(w2)) return where.get(w2);
+    if (w2.length > 3 && w2.endsWith("s") && where.has(w2.slice(0, -1))) return where.get(w2.slice(0, -1));
+    return "w:" + w2;
+  };
+  return {
+    name: opts.name ?? "stub-embed",
+    dimension,
+    async embed(texts) {
+      return texts.map((text) => {
+        const v = new Float32Array(dimension);
+        for (const t of tokenize(text)) v[fnv(placeOf2(t.text)) % dimension] += 1;
+        return unit6(v);
+      });
+    }
+  };
+}
+
+// src/search/query.ts
+var EXACT = 3;
+var PREFIX = 1.5;
+var SEMANTIC_FLOOR = 0.5;
+var SEMANTIC_WEIGHT = 3;
+var FOLLOWS = 0.3;
+var KIND_WEIGHT = { label: 1.15, name: 1.1, board: 1.1, region: 1.1, picture: 1, text: 1, figure: 1, mermaid: 1, page: 0.95, transcript: 0.95 };
+var EXCERPT_CHARS = 80;
+var wordsOfEntry = /* @__PURE__ */ new WeakMap();
+var wordsOf2 = (e) => {
+  let w2 = wordsOfEntry.get(e);
+  if (!w2) {
+    w2 = tokenize(e.text);
+    wordsOfEntry.set(e, w2);
+  }
+  return w2;
+};
+function lexical(q, words) {
+  if (!q.length || !words.length) return null;
+  let total = 0, follows = true, last = -1;
+  const spans = [];
+  for (const t of q) {
+    let best = 0, at = -1, span = null;
+    for (let i = 0; i < words.length; i++) {
+      const w2 = words[i];
+      let s = 0;
+      if (w2.text === t.text) s = EXACT;
+      else if (w2.text.startsWith(t.text)) s = PREFIX;
+      if (s > best) {
+        best = s;
+        at = i;
+        span = s === EXACT ? [w2.start, w2.end] : [w2.start, Math.min(w2.end, w2.start + t.text.length)];
+        if (s === EXACT) break;
+      }
+    }
+    if (!best || !span) return null;
+    total += best;
+    if (last >= 0 && at !== last + 1) follows = false;
+    last = at;
+    spans.push(span);
+  }
+  let score2 = total / q.length;
+  if (q.length > 1 && follows) score2 += FOLLOWS;
+  score2 *= 1 - Math.min(0.3, 0.02 * (words.length - q.length));
+  return { score: score2, spans };
+}
+function excerptOf(text, spans, width = EXCERPT_CHARS) {
+  if (text.length <= width) return { text, spans: spans.map((s) => [s[0], s[1]]) };
+  const first = spans.length ? spans[0][0] : 0;
+  let start = Math.max(0, first - Math.floor(width / 3));
+  if (start > 0) {
+    const sp = text.indexOf(" ", start);
+    if (sp >= 0 && sp < first) start = sp + 1;
+  }
+  let end = Math.min(text.length, start + width);
+  if (end < text.length) {
+    const sp = text.lastIndexOf(" ", end);
+    if (sp > Math.max(first + 1, start + width / 2)) end = sp;
+  }
+  const head = start > 0 ? "\u2026" : "", tail = end < text.length ? "\u2026" : "";
+  const shift = head.length - start;
+  const kept2 = spans.filter((s) => s[0] >= start && s[1] <= end).map((s) => [s[0] + shift, s[1] + shift]);
+  return { text: head + text.slice(start, end) + tail, spans: kept2 };
+}
+function searchBoards(boards, query, options = {}) {
+  const q = tokenize(query);
+  if (!q.length) return [];
+  const perBoard = Math.max(1, options.hitsPerBoard ?? 5);
+  const groups = [];
+  for (const b of boards) {
+    const hits = [];
+    const add7 = (e, lex, sem) => {
+      if (!lex && sem < SEMANTIC_FLOOR) return;
+      const score2 = (lex ? lex.score : 0) * KIND_WEIGHT[e.kind] + sem * SEMANTIC_WEIGHT;
+      const ex = excerptOf(e.text, lex ? lex.spans : []);
+      hits.push({ board: b.id, boardName: b.name, id: e.id, kind: e.kind, what: e.what, text: ex.text, spans: ex.spans, ...e.box ? { box: e.box } : {}, score: score2, ...sem > 0 ? { meaning: sem } : {} });
+    };
+    const nameLex = lexical(q, tokenize(b.name));
+    if (nameLex) add7({ id: null, kind: "board", text: b.name, what: "board name" }, nameLex, 0);
+    for (const e of b.entries) {
+      const lex = lexical(q, wordsOf2(e));
+      const sem = options.semantic ? Math.max(0, Math.min(1, options.semantic(query, e, b) || 0)) : 0;
+      add7(e, lex, sem);
+    }
+    if (!hits.length) continue;
+    hits.sort((x, y) => y.score - x.score);
+    groups.push({ board: b.id, name: b.name, recency: b.recency, score: hits[0].score, hits: hits.slice(0, perBoard), more: Math.max(0, hits.length - perBoard) });
+  }
+  groups.sort((x, y) => y.score - x.score || y.recency - x.recency || (x.board < y.board ? -1 : x.board > y.board ? 1 : 0));
+  return groups.slice(0, options.boards ?? 40);
+}
+function describeHit(h2) {
+  if (h2.kind === "board") return "Board \u201C" + h2.boardName + "\u201D";
+  return "\u201C" + h2.text + "\u201D \u2014 " + h2.what + " \xB7 Board \u201C" + h2.boardName + "\u201D";
+}
+
+// src/tools/intents.ts
+var NO_DIAGRAM = "these read as no diagram yet \u2014 join boxes with lines tied at both ends: draw each line from one box onto the other";
+function whyNoDiagram(scope) {
+  if (scope.marks.length < 2) return "hold the boxes and the lines between them \u2014 one mark is no diagram";
+  const rs = notationsOf(scope.state, scope.marks).filter((r) => r.confidence >= NOTATION_FLOOR);
+  if (rs.some((r) => r.notation === "sequence")) return "a sequence diagram is left as drawn \u2014 its messages run level between their lifelines";
+  if (rs.some((r) => r.connectors.length)) return "a line or an arrow is not tied at both ends \u2014 draw its ends onto the boxes it joins";
+  return NO_DIAGRAM;
+}
+var INTENTS = [
+  {
+    id: "mermaid",
+    is: (k) => k === "mermaid",
+    label: "Make it Mermaid",
+    words: ["diagram", "mermaid", "flowchart", "flow chart", "chart", "as a diagram", "diagram code", "mermaid code", "mmd", "as text"],
+    missing: (scope) => mermaidFor(scope.state, scope.marks, scope.host.isRead) ? null : scope.marks.length < 2 ? "hold two marks or more \u2014 one mark is no diagram" : NO_DIAGRAM
+  },
+  {
+    id: "tidy-diagram",
+    is: (k) => k === "tidy-diagram",
+    label: "Tidy the diagram",
+    words: ["tidy", "tidy up", "tidy it", "neaten", "line up", "align", "arrange", "lay out", "layout", "straighten", "clean up", "diagram", "organise", "organize"],
+    missing: (scope) => diagramOf(scope.state, scope.marks) ? null : whyNoDiagram(scope)
+  },
+  {
+    id: "route",
+    is: (k) => k === "route",
+    label: "Route the connectors",
+    words: ["route", "connect", "connectors", "connections", "wires", "elbows", "right angles", "orthogonal", "square the lines"],
+    missing: (scope) => diagramOf(scope.state, scope.marks) ? null : whyNoDiagram(scope)
+  },
+  {
+    id: "line-up",
+    is: (k) => /:tidy-/.test(k),
+    label: "Line up",
+    words: ["line up", "align", "line them up", "even out", "space evenly", "arrange", "tidy"],
+    missing: () => "line up needs a row or a column of like marks, side by side"
+  },
+  {
+    id: "equalize",
+    is: (k) => /:equalize$/.test(k),
+    label: "Match sizes",
+    words: ["same size", "match sizes", "equal", "equalize", "resize"],
+    missing: () => "matching sizes needs a row or a column of like marks"
+  },
+  {
+    id: "clean",
+    is: (k) => k === "snap",
+    label: "Draw them clean",
+    words: ["clean", "neat", "neaten", "snap", "redraw", "straighten", "tidy shapes", "perfect"],
+    missing: () => "nothing held reads clearly enough as one shape to redraw it"
+  },
+  {
+    id: "3d",
+    is: (k) => k === "3d",
+    label: "Show it in 3D",
+    words: ["3d", "3 d", "three d", "spheres", "in 3d", "molecule model", "spin"],
+    missing: () => "only circles joined by lines stand in 3D"
+  },
+  {
+    id: "region",
+    is: (k) => k === "region",
+    label: "Make it a region",
+    words: ["region", "make a region", "place", "section", "area", "group them"],
+    missing: () => "type region: and a name to put a named place round what is held"
+  },
+  {
+    id: "sizes",
+    is: (k) => k === "maths:sizes",
+    label: "Show the sizes",
+    words: ["sizes", "measure", "measurements", "dimensions", "solve", "size"],
+    missing: () => "write a number beside a side first \u2014 the sizes follow from what is written"
+  },
+  {
+    id: "read",
+    is: (k) => k === "read" || k === "read-lines" || k === "read-any" || k === "read-picture",
+    label: "Read the writing",
+    words: ["read", "transcribe", "what does it say", "ocr", "handwriting"],
+    missing: () => "nothing held reads as writing"
+  },
+  {
+    id: "what",
+    is: (k) => k === "what",
+    label: "What is this?",
+    words: ["what", "what is this", "what is it", "explain", "identify", "why"]
+  },
+  {
+    id: "duplicate",
+    is: (k) => k === "duplicate",
+    label: "Duplicate these",
+    words: ["duplicate", "clone", "another", "again", "repeat"]
+  },
+  {
+    id: "trace",
+    is: (k) => k === "trace",
+    label: "Trace into ink",
+    words: ["trace", "trace it", "vectorise", "vectorize"],
+    missing: () => "tracing is for a picture held alone"
+  },
+  {
+    id: "frame",
+    is: (k) => k === "frame",
+    label: "Frame these",
+    words: ["frame", "wire", "wire up"]
+  }
+];
+var HOST_INTENTS = [
+  { act: "export", label: "export the board", words: ["export", "save as", "download", "svg", "png", "pdf", "zip", "save a file"] },
+  { act: "find", label: "find on every board", words: ["find", "search", "look for"] },
+  { act: "print", label: "print at true size", words: ["print", "true size", "full size"] },
+  { act: "examples", label: "open the examples", words: ["examples", "example", "sample boards"] },
+  { act: "help", label: "open the help", words: ["help", "how do i", "shortcuts", "guide"] }
+];
+function intentText(text) {
+  return String(text || "").toLowerCase().replace(/[^\p{L}\p{N}?\s]/gu, " ").replace(/\s+/g, " ").trim();
+}
+function wordScore(text, word) {
+  const t = intentText(text);
+  if (!t || !word) return 0;
+  if (t === word) return 3;
+  if (t.startsWith(word + " ")) return 2.5;
+  if (t.length >= 3 && word.startsWith(t)) return 2;
+  if ((" " + t + " ").includes(" " + word + " ")) return 1.5;
+  return 0;
+}
+function intentsMatching(text) {
+  const out = [];
+  INTENTS.forEach((intent, i) => {
+    const score2 = Math.max(0, ...intent.words.map((w2) => wordScore(text, w2)), wordScore(text, intent.label.toLowerCase()));
+    if (score2 > 0) out.push({ intent, score: score2, i });
+  });
+  return out.sort((a, b) => b.score - a.score || a.i - b.i).map(({ intent, score: score2 }) => ({ intent, score: score2 }));
+}
+function intentWordsFor(key2) {
+  const out = [];
+  for (const intent of INTENTS) if (intent.is(key2)) {
+    for (const w2 of intent.words) if (!out.includes(w2)) out.push(w2);
+  }
+  return out;
+}
+var INTENT_MAX_WORDS = 3;
+var wordsIn = (text) => intentText(text).split(" ").filter(Boolean).length;
+function missingFor(text, scope, offered2) {
+  if (wordsIn(text) > INTENT_MAX_WORDS) return null;
+  for (const { intent, score: score2 } of intentsMatching(text)) {
+    if (score2 < 2) continue;
+    if (offered2.some((k) => intent.is(k))) return null;
+    const why = intent.missing ? intent.missing(scope) : null;
+    if (why) return { id: intent.id, label: intent.label, why };
+  }
+  return null;
+}
+function hostIntentOf(text) {
+  const t = intentText(text);
+  if (!t || wordsIn(t) > INTENT_MAX_WORDS) return null;
+  let best = null;
+  for (const h2 of HOST_INTENTS) {
+    for (const w2 of h2.words) {
+      const exact = t === w2, lead = t.startsWith(w2 + " ");
+      if (!exact && !lead) continue;
+      const score2 = exact ? 3 : 2;
+      if (!best || score2 > best.score) best = { act: h2.act, label: h2.label, rest: lead ? t.slice(w2.length + 1) : "", score: score2 };
+    }
+  }
+  return best ? { act: best.act, label: best.label, rest: best.rest } : null;
+}
+var intentGloss = (i) => i.label + " \u2014 " + i.words.join(", ");
+function intentTexts() {
+  const out = [];
+  for (const i of INTENTS) for (const t of [...i.words, i.label.toLowerCase()]) if (!out.includes(t)) out.push(t);
+  return out;
+}
+function nearestIntent(vecOf, query, allow = () => true, floor = SEMANTIC_FLOOR) {
+  if (!query) return null;
+  let best = null;
+  for (const intent of INTENTS) {
+    if (!allow(intent)) continue;
+    let score2 = -1;
+    for (const t of [...intent.words, intent.label.toLowerCase()]) {
+      const v = vecOf(t);
+      if (v) score2 = Math.max(score2, cosine(query, v));
+    }
+    if (score2 >= floor && (!best || score2 > best.score)) best = { intent, score: score2 };
+  }
+  return best;
+}
 
 // src/context/context.ts
 var CONTEXT_FADE = 2.5;
@@ -31029,139 +31521,6 @@ var MINDMAP_READER = {
 };
 registerMermaidReader("mindmap", MINDMAP_READER);
 
-// src/search/tokens.ts
-var SPECIAL = { "\xDF": "ss", "\xE6": "ae", "\u0153": "oe", "\xF8": "o", "\u0111": "d", "\u0142": "l", "\u0131": "i" };
-function foldChar(ch) {
-  const low = ch.toLowerCase();
-  const sp = SPECIAL[low];
-  if (sp) return sp;
-  return low.normalize("NFD").replace(/\p{M}/gu, "");
-}
-var WORD = /^[\p{L}\p{N}]+$/u;
-function tokenize(s) {
-  const out = [];
-  let cur = null;
-  const text = typeof s === "string" ? s : "";
-  for (let i = 0; i < text.length; ) {
-    const cp = text.codePointAt(i);
-    const ch = String.fromCodePoint(cp);
-    const next = i + ch.length;
-    const f = foldChar(ch);
-    if (f === "") {
-      if (cur) cur.end = next;
-    } else if (WORD.test(f)) {
-      if (cur) {
-        cur.text += f;
-        cur.end = next;
-      } else {
-        cur = { text: f, start: i, end: next };
-        out.push(cur);
-      }
-    } else cur = null;
-    i = next;
-  }
-  return out;
-}
-function normalise(s) {
-  return tokenize(s).map((t) => t.text).join(" ");
-}
-
-// src/search/query.ts
-var EXACT = 3;
-var PREFIX = 1.5;
-var SEMANTIC_FLOOR = 0.5;
-var SEMANTIC_WEIGHT = 3;
-var FOLLOWS = 0.3;
-var KIND_WEIGHT = { label: 1.15, name: 1.1, board: 1.1, region: 1.1, picture: 1, text: 1, figure: 1, mermaid: 1, page: 0.95, transcript: 0.95 };
-var EXCERPT_CHARS = 80;
-var wordsOfEntry = /* @__PURE__ */ new WeakMap();
-var wordsOf2 = (e) => {
-  let w2 = wordsOfEntry.get(e);
-  if (!w2) {
-    w2 = tokenize(e.text);
-    wordsOfEntry.set(e, w2);
-  }
-  return w2;
-};
-function lexical(q, words) {
-  if (!q.length || !words.length) return null;
-  let total = 0, follows = true, last = -1;
-  const spans = [];
-  for (const t of q) {
-    let best = 0, at = -1, span = null;
-    for (let i = 0; i < words.length; i++) {
-      const w2 = words[i];
-      let s = 0;
-      if (w2.text === t.text) s = EXACT;
-      else if (w2.text.startsWith(t.text)) s = PREFIX;
-      if (s > best) {
-        best = s;
-        at = i;
-        span = s === EXACT ? [w2.start, w2.end] : [w2.start, Math.min(w2.end, w2.start + t.text.length)];
-        if (s === EXACT) break;
-      }
-    }
-    if (!best || !span) return null;
-    total += best;
-    if (last >= 0 && at !== last + 1) follows = false;
-    last = at;
-    spans.push(span);
-  }
-  let score2 = total / q.length;
-  if (q.length > 1 && follows) score2 += FOLLOWS;
-  score2 *= 1 - Math.min(0.3, 0.02 * (words.length - q.length));
-  return { score: score2, spans };
-}
-function excerptOf(text, spans, width = EXCERPT_CHARS) {
-  if (text.length <= width) return { text, spans: spans.map((s) => [s[0], s[1]]) };
-  const first = spans.length ? spans[0][0] : 0;
-  let start = Math.max(0, first - Math.floor(width / 3));
-  if (start > 0) {
-    const sp = text.indexOf(" ", start);
-    if (sp >= 0 && sp < first) start = sp + 1;
-  }
-  let end = Math.min(text.length, start + width);
-  if (end < text.length) {
-    const sp = text.lastIndexOf(" ", end);
-    if (sp > Math.max(first + 1, start + width / 2)) end = sp;
-  }
-  const head = start > 0 ? "\u2026" : "", tail = end < text.length ? "\u2026" : "";
-  const shift = head.length - start;
-  const kept2 = spans.filter((s) => s[0] >= start && s[1] <= end).map((s) => [s[0] + shift, s[1] + shift]);
-  return { text: head + text.slice(start, end) + tail, spans: kept2 };
-}
-function searchBoards(boards, query, options = {}) {
-  const q = tokenize(query);
-  if (!q.length) return [];
-  const perBoard = Math.max(1, options.hitsPerBoard ?? 5);
-  const groups = [];
-  for (const b of boards) {
-    const hits = [];
-    const add7 = (e, lex, sem) => {
-      if (!lex && sem < SEMANTIC_FLOOR) return;
-      const score2 = (lex ? lex.score : 0) * KIND_WEIGHT[e.kind] + sem * SEMANTIC_WEIGHT;
-      const ex = excerptOf(e.text, lex ? lex.spans : []);
-      hits.push({ board: b.id, boardName: b.name, id: e.id, kind: e.kind, what: e.what, text: ex.text, spans: ex.spans, ...e.box ? { box: e.box } : {}, score: score2, ...sem > 0 ? { meaning: sem } : {} });
-    };
-    const nameLex = lexical(q, tokenize(b.name));
-    if (nameLex) add7({ id: null, kind: "board", text: b.name, what: "board name" }, nameLex, 0);
-    for (const e of b.entries) {
-      const lex = lexical(q, wordsOf2(e));
-      const sem = options.semantic ? Math.max(0, Math.min(1, options.semantic(query, e, b) || 0)) : 0;
-      add7(e, lex, sem);
-    }
-    if (!hits.length) continue;
-    hits.sort((x, y) => y.score - x.score);
-    groups.push({ board: b.id, name: b.name, recency: b.recency, score: hits[0].score, hits: hits.slice(0, perBoard), more: Math.max(0, hits.length - perBoard) });
-  }
-  groups.sort((x, y) => y.score - x.score || y.recency - x.recency || (x.board < y.board ? -1 : x.board > y.board ? 1 : 0));
-  return groups.slice(0, options.boards ?? 40);
-}
-function describeHit(h2) {
-  if (h2.kind === "board") return "Board \u201C" + h2.boardName + "\u201D";
-  return "\u201C" + h2.text + "\u201D \u2014 " + h2.what + " \xB7 Board \u201C" + h2.boardName + "\u201D";
-}
-
 // src/search/plan.ts
 var SEARCH_VERSION = 2;
 function searchKeyOf(stat) {
@@ -31182,108 +31541,6 @@ function thumbFit(box, w2, h2, pad = 8) {
   const bw = Math.max(1, box.maxX - box.minX), bh = Math.max(1, box.maxY - box.minY);
   const scale = Math.min(Math.max(1, w2 - 2 * pad) / bw, Math.max(1, h2 - 2 * pad) / bh, 1);
   return { scale, x: w2 / 2 - (box.minX + box.maxX) / 2 * scale, y: h2 / 2 - (box.minY + box.maxY) / 2 * scale };
-}
-
-// src/semantic/embed.ts
-var EmbedError = class extends Error {
-  constructor(message) {
-    super(message);
-    this.name = "EmbedError";
-  }
-};
-function cosine(a, b) {
-  if (a.length !== b.length || !a.length) return 0;
-  let dot8 = 0, na = 0, nb = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot8 += a[i] * b[i];
-    na += a[i] * a[i];
-    nb += b[i] * b[i];
-  }
-  if (!na || !nb) return 0;
-  return dot8 / Math.sqrt(na * nb);
-}
-function unit6(v) {
-  const out = new Float32Array(v.length);
-  let n2 = 0;
-  for (let i = 0; i < v.length; i++) n2 += v[i] * v[i];
-  if (!n2) return out;
-  const k = 1 / Math.sqrt(n2);
-  for (let i = 0; i < v.length; i++) out[i] = v[i] * k;
-  return out;
-}
-function createEmbedCache(max = 2e4) {
-  const m = /* @__PURE__ */ new Map();
-  const key2 = (t, x) => t + "\0" + x;
-  return {
-    get: (t, x) => m.get(key2(t, x)),
-    set(t, x, v) {
-      const k = key2(t, x);
-      m.delete(k);
-      m.set(k, v);
-      while (m.size > max) m.delete(m.keys().next().value);
-    },
-    get size() {
-      return m.size;
-    }
-  };
-}
-var EMBED_BATCH = 128;
-async function embedAll(transport, texts, cache, opts = {}) {
-  const out = /* @__PURE__ */ new Map();
-  const need = [];
-  for (const t of texts) {
-    if (out.has(t)) continue;
-    const held2 = cache.get(transport.name, t);
-    if (held2) out.set(t, held2);
-    else if (!need.includes(t)) need.push(t);
-  }
-  const size2 = Math.max(1, opts.batch ?? EMBED_BATCH);
-  for (let i = 0; i < need.length; i += size2) {
-    if (opts.signal?.aborted) throw new Error("cancelled");
-    const part = need.slice(i, i + size2);
-    const got = await transport.embed(part, opts.signal ? { signal: opts.signal } : void 0);
-    if (!Array.isArray(got) || got.length !== part.length) {
-      throw new EmbedError(`${transport.name} answered ${Array.isArray(got) ? got.length : "no"} vectors for ${part.length} texts`);
-    }
-    const vecs = got.map((v) => v instanceof Float32Array ? v : Float32Array.from(v));
-    for (const v of vecs) {
-      if (v.length !== transport.dimension) throw new EmbedError(`${transport.name} promised a dimension of ${transport.dimension} and answered a vector of ${v.length}`);
-    }
-    part.forEach((t, j) => {
-      cache.set(transport.name, t, vecs[j]);
-      out.set(t, vecs[j]);
-    });
-  }
-  return out;
-}
-var fnv = (s) => {
-  let h2 = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h2 ^= s.charCodeAt(i);
-    h2 = Math.imul(h2, 16777619) >>> 0;
-  }
-  return h2 >>> 0;
-};
-function createStubEmbedTransport(opts = {}) {
-  const dimension = opts.dimension ?? 256;
-  const where = /* @__PURE__ */ new Map();
-  (opts.groups ?? []).forEach((g, i) => g.forEach((w2) => where.set(tokenize(w2).map((t) => t.text).join(""), "g:" + i)));
-  const placeOf2 = (w2) => {
-    if (where.has(w2)) return where.get(w2);
-    if (w2.length > 3 && w2.endsWith("s") && where.has(w2.slice(0, -1))) return where.get(w2.slice(0, -1));
-    return "w:" + w2;
-  };
-  return {
-    name: opts.name ?? "stub-embed",
-    dimension,
-    async embed(texts) {
-      return texts.map((text) => {
-        const v = new Float32Array(dimension);
-        for (const t of tokenize(text)) v[fnv(placeOf2(t.text)) % dimension] += 1;
-        return unit6(v);
-      });
-    }
-  };
 }
 
 // src/semantic/scorer.ts
@@ -31706,6 +31963,8 @@ export {
   DEFAULT_SIMPLIFY_PX,
   DEFAULT_SPEED,
   DEFAULT_TIMEOUT_MS,
+  DIAGRAM,
+  DIAGRAM_NOTATION,
   DIAMOND_SLACK,
   DIRECTED_LINKS,
   DOT_FILLED,
@@ -31755,9 +32014,11 @@ export {
   HEAD_SPREAD,
   HELD_ARROW,
   HERE,
+  HOST_INTENTS,
   INITIAL_ID,
   INNER_CENTRED,
   INNER_SHARE,
+  INTENTS,
   KEEP_DIRECTION,
   KINDS,
   LABELLING_IS,
@@ -31906,6 +32167,7 @@ export {
   StaticModelError,
   StaticStore,
   TARGETED,
+  TIED_LIFT,
   TIER0_PARTICIPANT,
   TIER1_LIBRARY,
   TIE_MARGIN,
@@ -32132,11 +32394,18 @@ export {
   holdReach,
   holds,
   holdsSaid,
+  hostIntentOf,
   idealize,
+  inkEndsOf,
   inkMeasure,
   insideFigure,
   instantFor,
+  intentGloss,
+  intentText,
+  intentTexts,
+  intentWordsFor,
   intents,
+  intentsMatching,
   interfacesOf,
   interpretationsOf,
   isAssetRef,
@@ -32218,6 +32487,7 @@ export {
   mermaidString,
   mermaidWriters,
   mindMapPortsOf,
+  missingFor,
   modelFacts,
   modelWords,
   movedSaid,
@@ -32225,6 +32495,7 @@ export {
   movesWhole,
   nameMarks,
   nearLimitOf,
+  nearestIntent,
   nearestMagnet,
   nearestModelIds,
   nearnessOf,
@@ -32297,6 +32568,7 @@ export {
   reachAround,
   readBriefText,
   readClassDiagramText,
+  readDiagram,
   readDrawing,
   readEr,
   readErText,
@@ -32360,6 +32632,7 @@ export {
   runsOf,
   safetensorsNames,
   sameExpr,
+  sayable,
   saysOf,
   scopeOf,
   score,
@@ -32464,6 +32737,7 @@ export {
   wordConfidence,
   wordOf,
   wordPieceOf,
+  wordScore,
   wordsOfMarks,
   worldOf,
   writeEr,

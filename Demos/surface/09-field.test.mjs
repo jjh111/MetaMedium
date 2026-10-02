@@ -99,11 +99,11 @@ test('a verb by an alias', () => {
 });
 
 test('an alias must be two characters before it matches by prefix', () => {
-  // "c" is the start of clean, copy and cp; one letter is not a choice, so it
-  // falls through to the brief rather than picking a verb for the hand.
+  // "c" is the start of clean, copy and cp; one letter is not a choice, so it picks no
+  // verb for the hand — it is a word, and waits for the hand to say what it is for (FP4).
   const one = readFieldCommand(ctx({ text: 'c', models: ['qwen3'] }));
-  assert.equal(one.kind, 'brief');
-  assert.equal(one.command.do, 'build');
+  assert.equal(one.kind, 'word');
+  assert.equal(one.command, null);
   assert.equal(readFieldCommand(ctx({ text: 'cp', models: ['qwen3'] })).command.key, 'copy');
 });
 
@@ -172,7 +172,7 @@ test('a prefix that needs a model, with none joined, says so and opens the pane'
     assert.equal(r.kind, 'blocked', text);
     assert.equal(r.quiet, true, text);
     assert.deepEqual(r.command, { do: 'need-model', what }, text);
-    assert.match(r.line, /needs a model — controls › models/, text);
+    assert.match(r.line, /needs a model — choose one in the models pane/, text);
   }
   // `name:` never needs one — the engine holds the name itself.
   assert.equal(readFieldCommand(ctx({ text: 'name: bubble' })).kind, 'name');
@@ -188,7 +188,7 @@ test('a prefix that needs a model, with none joined, says so and opens the pane'
 test('label: a word for the selection\'s own ink, and the line says so before Enter', () => {
   const r = readFieldCommand(ctx({ text: 'label: inlet' }));
   assert.equal(r.kind, 'label');
-  assert.equal(r.line, '↵ label it “inlet”');
+  assert.equal(r.line, '↵ write “inlet” on it');
   assert.deepEqual(r.command, { do: 'label', text: 'inlet' });
   assert.equal(r.quiet, undefined);
 });
@@ -200,18 +200,18 @@ test('label: needs no model, and the prefix outranks a verb of the same word', (
   assert.deepEqual(r.command, { do: 'label', text: 'clean' });
   const spaced = readFieldCommand(ctx({ text: 'Label :  inlet valve ' }));
   assert.deepEqual(spaced.command, { do: 'label', text: 'inlet valve' });
-  assert.equal(spaced.line, '↵ label it “inlet valve”');
+  assert.equal(spaced.line, '↵ write “inlet valve” on it');
 });
 
 test('label: on several marks says the word goes on each of them', () => {
   const r = readFieldCommand(ctx({ text: 'label: inlet', marks: { mine: 3, others: [] } }));
-  assert.equal(r.line, '↵ label it “inlet” — on each of your 3 marks');
+  assert.equal(r.line, '↵ write “inlet” on them — on each of your 3 marks');
   assert.deepEqual(r.command, { do: 'label', text: 'inlet' });
 });
 
 test('label: names another hand\'s marks before Enter, and still labels yours', () => {
   const some = readFieldCommand(ctx({ text: 'label: inlet', marks: { mine: 2, others: ['fern'] } }));
-  assert.equal(some.line, '↵ label it “inlet” — on your 2, not the mark fern made');
+  assert.equal(some.line, '↵ write “inlet” on them — on your 2, not the mark fern made');
   assert.equal(some.quiet, undefined);
   assert.deepEqual(some.command, { do: 'label', text: 'inlet' });
 });
@@ -220,11 +220,11 @@ test('label: on nothing of yours is said quietly, and Enter still says why in th
   const none = readFieldCommand(ctx({ text: 'label: inlet', marks: { mine: 0, others: ['fern', 'fern', 'qwen3'] } }));
   assert.equal(none.kind, 'label');
   assert.equal(none.quiet, true);
-  assert.equal(none.line, '↵ no label — fern and qwen3 made these 3 marks; a label goes on your own ink');
+  assert.equal(none.line, '↵ no words written — fern and qwen3 made these 3 marks; words go on your own ink');
   // Quiet is not silent: Enter runs the command, and the adapter says the refusal.
   assert.deepEqual(none.command, { do: 'label', text: 'inlet' });
   const one = readFieldCommand(ctx({ text: 'label: inlet', marks: { mine: 0, others: ['fern'] } }));
-  assert.equal(one.line, '↵ no label — fern made this mark; a label goes on your own ink');
+  assert.equal(one.line, '↵ no words written — fern made this mark; words go on your own ink');
 });
 
 test('label: with nothing after it, or nothing held to put it on, asks quietly', () => {
@@ -232,7 +232,7 @@ test('label: with nothing after it, or nothing held to put it on, asks quietly',
   assert.equal(empty.kind, 'label');
   assert.equal(empty.quiet, true);
   assert.equal(empty.command, null);
-  assert.equal(empty.line, '↵ label it… (type the word)');
+  assert.equal(empty.line, '↵ write… (type the words)');
   const nothing = readFieldCommand(ctx({ text: 'label: inlet', marks: { mine: 0, others: [] } }));
   assert.equal(nothing.kind, 'label');
   assert.equal(nothing.quiet, true);
@@ -274,10 +274,10 @@ test('label: after a reload the line counts the marks drawn before it as the per
     return out;
   };
   const line = (ids) => readFieldCommand(ctx({ text: 'label: inlet', marks: marksOf(ids) })).line;
-  assert.equal(line([before[0]]), '↵ label it “inlet”');
-  assert.equal(line([...before, after]), '↵ label it “inlet” — on each of your 3 marks');
-  assert.equal(line([...before, hers]), '↵ label it “inlet” — on your 2, not the mark fern made');
-  assert.equal(line([hers]), '↵ no label — fern made this mark; a label goes on your own ink');
+  assert.equal(line([before[0]]), '↵ write “inlet” on it');
+  assert.equal(line([...before, after]), '↵ write “inlet” on them — on each of your 3 marks');
+  assert.equal(line([...before, hers]), '↵ write “inlet” on them — on your 2, not the mark fern made');
+  assert.equal(line([hers]), '↵ no words written — fern made this mark; words go on your own ink');
 });
 
 // The row offers a typed word two ways, side by side: Name it (one thing, a
@@ -290,8 +290,13 @@ test('typedWord: a bare word or two is offered to name the marks or to label the
   assert.deepEqual(typedWord(ctx({ text: ' inlet valve ' })), { word: 'inlet valve', act: null });
   // A single letter is a label a diagram uses all the time: point A, node x.
   assert.deepEqual(typedWord(ctx({ text: 'A' })), { word: 'A', act: null });
-  // …and Enter on it is still what the reader says, not a label.
-  assert.equal(readFieldCommand(ctx({ text: 'inlet', models: ['qwen3'] })).command.do, 'build');
+  // …and Enter on it takes neither: a word waits until the hand picks what it is for (FP4,
+  // John's decision of 2 Oct 2026) — it is no longer a brief.
+  const wait = readFieldCommand(ctx({ text: 'inlet', models: ['qwen3'] }));
+  assert.equal(wait.kind, 'word');
+  assert.equal(wait.command, null);
+  assert.equal(wait.quiet, true);
+  assert.equal(readFieldCommand(ctx({ text: 'inlet valve', models: ['qwen3'] })).kind, 'word');
 });
 
 test('typedWord: the prefixes say what the word is for, and nothing else is a word', () => {
@@ -320,7 +325,7 @@ test('a brief with no model joined: a page is still built, a program is not', ()
   const page = readFieldCommand(ctx({ text: 'website with the copy in the squares', target: () => 'page' }));
   assert.equal(page.kind, 'structure');
   assert.deepEqual(page.command, { do: 'build', text: 'website with the copy in the squares', revising: false });
-  assert.match(page.line, /the structure, at once \(tier 1\) — join a model for the words/);
+  assert.equal(page.line, '↵ the page’s boxes at once — a model writes the words when one joins');
 
   const program = readFieldCommand(ctx({ text: 'a bouncing ball', target: () => 'program' }));
   assert.equal(program.kind, 'blocked');
@@ -330,7 +335,7 @@ test('a brief with no model joined: a page is still built, a program is not', ()
 test('a brief with a model joined: tier 1 first for a page, the model for a program', () => {
   const page = readFieldCommand(ctx({ text: 'website with the copy in the squares', models: ['qwen3'], target: () => 'page' }));
   assert.equal(page.kind, 'brief');
-  assert.match(page.line, /structure at once \(tier 1\), then qwen3 writes the words/);
+  assert.equal(page.line, '↵ the page’s boxes at once, then qwen3 writes the words');
 
   const program = readFieldCommand(ctx({ text: 'a bouncing ball', models: ['qwen3'], target: () => 'program' }));
   assert.equal(program.kind, 'brief');
@@ -526,4 +531,49 @@ test('region: is no word to name or label with — typed, bare or with its colon
   assert.equal(typedWord(ctx({ text: 'region: Monday' })), null);
   assert.equal(typedWord(ctx({ text: 'region' })), null);
   assert.ok(typedWord(ctx({ text: 'Monday' })));
+});
+
+// PLAN-FIELD-PAR FP1, FP4, FP8: `?` lists what the marks can do; a board act typed is opened from
+// the field; an act these marks are not offered says what it is missing; a word or two waits for a
+// pick, and three or more are a brief.
+test('? lists everything the held marks can do, and Enter does nothing', () => {
+  const r = readFieldCommand(ctx({ text: '?' }));
+  assert.equal(r.kind, 'intents');
+  assert.equal(r.command, null);
+  assert.equal(r.quiet, true);
+});
+
+test('a board act typed at the field is opened from it — export, find with its words', () => {
+  const intent = (t) => ({ host: t.startsWith('export') ? { act: 'export', label: 'export the board', rest: t.slice(7) } : t.startsWith('find ') ? { act: 'find', label: 'find on every board', rest: t.slice(5) } : null, missing: null });
+  const ex = readFieldCommand(ctx({ text: 'export', intent }));
+  assert.equal(ex.kind, 'host');
+  assert.deepEqual(ex.command, { do: 'host', act: 'export', rest: '' });
+  assert.equal(ex.line, '↵ export the board');
+  const fd = readFieldCommand(ctx({ text: 'find pricing', intent }));
+  assert.deepEqual(fd.command, { do: 'host', act: 'find', rest: 'pricing' });
+  assert.equal(fd.line, '↵ find on every board — pricing');
+});
+
+test('an act these marks are not offered says what it is missing, quietly — Enter does nothing', () => {
+  const intent = () => ({ host: null, missing: { label: 'Tidy the diagram', why: 'one mark is no diagram' } });
+  const r = readFieldCommand(ctx({ text: 'tidy', intent }));
+  assert.equal(r.kind, 'missing');
+  assert.equal(r.command, null);
+  assert.equal(r.quiet, true);
+  assert.equal(r.line, '↵ Tidy the diagram — one mark is no diagram');
+});
+
+test('a verb the marks have is found before the intent table is asked', () => {
+  let asked = 0;
+  const intent = () => { asked++; return { host: null, missing: null }; };
+  assert.equal(readFieldCommand(ctx({ text: 'clean', intent })).kind, 'verb');
+  assert.equal(asked, 0);
+});
+
+test('a word or two that names nothing waits; three words or more are a brief', () => {
+  assert.equal(readFieldCommand(ctx({ text: 'banana', models: ['q'] })).kind, 'word');
+  assert.equal(readFieldCommand(ctx({ text: 'banana split', models: ['q'] })).kind, 'word');
+  assert.equal(readFieldCommand(ctx({ text: 'a banana split', models: ['q'], target: () => 'program' })).kind, 'brief');
+  // A prefix still says what to make, whatever its length.
+  assert.equal(readFieldCommand(ctx({ text: 'page: menu', models: ['q'] })).command.do, 'build');
 });

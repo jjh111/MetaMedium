@@ -83,7 +83,8 @@
   /** An offer as a pill: its reason the tooltip, what it stands on after that, a dot when it asks a model. */
   function offerItem(o) {
     const item = {
-      key: o.key, label: o.label, why: o.reason, verbs: o.verbs || [], tier: o.asks === 'model' ? 2 : 1,
+      // Its verbs, and the words a person says for its act (core's intent table, PLAN-FIELD-PAR FP1): *tidy*, *line up* and *connect* find Tidy the diagram.
+      key: o.key, label: o.label, why: o.reason, verbs: (o.verbs || []).concat(MM.intentWordsFor(o.key).filter((w) => !(o.verbs || []).includes(w))), tier: o.asks === 'model' ? 2 : 1,
       group: o.hidden ? 'hidden' : o.grounds ? o.grounds.on : 'always',
       groupConf: o.grounds ? o.grounds.confidence : 0, groupWhy: o.grounds ? o.grounds.why : '',
       base: o.base, grounds: o.grounds, asks: o.asks, tool: o.tool, offer: o,
@@ -94,6 +95,7 @@
     if (!o.hidden) item.act = true;
     if (o.name !== undefined) item.name = o.name;
     if (o.line !== undefined) item.line = o.line;
+    if (o.note !== undefined) item.note = o.note;
     return item;
   }
 
@@ -323,7 +325,7 @@
     control: { after: (o, scope, t) => { if (t.made) flash('a slider — drag the knob to set it'); } },
     // Drawing them clean leaves the summon open, and the next offer is taken from the cleaned marks.
     clean: { before: () => { shownSummonId = null; }, after: (o, scope, t) => { if (t.detail.ids.length) flash('drew ' + t.detail.ids.length + ' clean' + (t.detail.summary ? ' — ' + t.detail.summary : '')); } },
-    graph3d: { after: (o, scope, t) => say(!t.made ? 'could not hold that group' : t.detail.ok ? 'in 3D (tier 1): ' + t.detail.reasoning : 'could not stand it in 3D: ' + t.detail.error) },
+    graph3d: { after: (o, scope, t) => say(!t.made ? 'could not hold that group' : t.detail.ok ? 'in 3D: ' + t.detail.reasoning : 'could not stand it in 3D: ' + t.detail.error) },
     frames: { after: (o, scope, t) => { if (o.data.act !== 'frame' || !t.made) return; const st = session.getState(); flash('framed ' + t.detail.members + ' — ' + MM.describeFrame(MM.frameOfNode(st.nodes.get(t.made)), st.nodes)); } },
     // The drawing said as Mermaid stands beside it: say so, remember which marks it was written from, and keep the field.
     mermaid: { after: (o, scope, t) => { if (!t.made) { say(t.detail.error); return; } mermaidMadeFrom.set(t.made, scope.marks.slice()); flash('the drawing as Mermaid, beside it — ' + t.detail.reading + '; Draw it puts it back as marks'); refreshPalette(); } },
@@ -527,10 +529,10 @@
   function labelSentence(text, done, saying, refused) {
     const q = '“' + text + '”';
     const parts = [];
-    if (done.length) parts.push(done.length === 1 ? 'labelled it ' + q : 'labelled ' + done.length + ' marks ' + q);
+    if (done.length) parts.push(done.length === 1 ? 'wrote ' + q + ' on it' : 'wrote ' + q + ' on ' + done.length + ' marks');
     if (saying.length) parts.push(done.length ? saying.length + ' already said it' : saying.length === 1 ? 'it already says ' + q : 'these ' + saying.length + ' already say ' + q);
     const theirs = refused.filter((r) => r.reason === 'not-your-ink');
-    if (theirs.length) parts.push((parts.length ? 'not on ' : 'no label on ') + theirMarks(theirs.map((r) => r.maker)) + ' — a label goes on your own ink');
+    if (theirs.length) parts.push((parts.length ? 'not on ' : 'no words written on ') + theirMarks(theirs.map((r) => r.maker)) + ' — words go on your own ink');
     for (const r of refused) if (r.reason !== 'not-your-ink') parts.push(r.detail || 'not labelled');
     return parts.join(' · ');
   }
@@ -556,7 +558,8 @@
       open: !!sum,
       revising: revising,
       items: items,
-      models: agents.map((a) => a.name),
+      // The models as the board says them: what their provider calls them, never an `llm:` id (FP6).
+      models: agents.map((a) => modelWords(a)),
       library: revising ? [] : libraryEntries(s),
       definition: defId ? { id: defId, name: MM.wordOf(s.nodes.get(defId)) || defId } : null,
       // Whose ink is held: a label goes on the person's own marks only (V1-PLAN L2e).
@@ -569,6 +572,13 @@
       target: () => targetOf(sum, text).target,
       // A thunk too: `= 24 ÷ 3` is read by core against the board's own page (M5), and only when a sum is typed.
       maths: (body) => MM.evaluateTyped(body, mathsFor(s).board),
+      // A thunk as well: what typed words name that no offer here answers to — a board act, or an act these marks lack and what it lacks (FP1, FP8).
+      // Already worked out, never asked here: the act nearest the typed words in meaning (D1).
+      meaning: (t) => meaningFor(t),
+      intent: (t) => ({
+        host: MM.hostIntentOf(t),
+        missing: sum && !revising ? MM.missingFor(t, fieldScope(s, t, null), items.filter((i) => i.offer).map((i) => i.key)) : null,
+      }),
     };
   }
 
@@ -604,6 +614,8 @@
       if (cmd.ask) writers().forEach((a) => withWork('behave:' + agentKey(a) + ':' + cmd.definitionId, [cmd.definitionId], modelWords(a) + ' · reading the words', a.behave({ nodeId: cmd.definitionId, words: cmd.words, at: Date.now() })).then(() => render(session.getState())));
       return;
     }
+    // The board's own acts, from the field (PLAN-FIELD-PAR FP8): the pane that does it, opened where the hand is.
+    if (cmd.do === 'host') { hostAct(cmd.act, cmd.rest || ''); return; }
     // With no model here, what was typed is kept, said once, and run when one joins — never the pane popped over the field (J5).
     if (cmd.do === 'need-model') {
       const f = fieldInput(), text = f ? f.value : '', sumId = sum.id;
@@ -618,6 +630,67 @@
         } });
       return;
     }
+  }
+
+  // ===== Typed words by meaning: the semantic seat, while typing (PLAN-FIELD-PAR D1) =====
+  // John, 2 Oct 2026: *match while typing, but careful to rate limit so it doesn't get spammy.* So: only
+  // with a seat held (nothing loads for this); only once the typing has rested (`MEANING_REST_MS`), never
+  // a key at a time; only for words the field's own reading could not place (it said *a word*); every
+  // text an act is known by embedded once and kept (the seat's own cache, which Find shares); the typed
+  // text once per rest; nothing sent anywhere — the seat runs here. The field is drawn again only when
+  // what the words are nearest changed. The decider, a network call, is never asked while typing.
+  const MEANING_REST_MS = 240;
+  let meaningKept = { text: null, seat: null, result: null };
+  let meaningTimer = 0;
+  /** The act typed words are nearest, if that was worked out for exactly these words with the seat held now. */
+  function meaningFor(text) {
+    if (!semanticSeat) return null;
+    const t = MM.intentText(text);
+    return meaningKept.seat === semanticSeat.name && meaningKept.text === t ? meaningKept.result : null;
+  }
+  /** Called on every keystroke; asks the seat at most once the typing rests, and only when it is worth asking. */
+  function meaningSoon(text) {
+    clearTimeout(meaningTimer);
+    if (!semanticSeat) return;
+    const t = MM.intentText(text);
+    if (t.length < 3 || (meaningKept.seat === semanticSeat.name && meaningKept.text === t)) return;
+    meaningTimer = setTimeout(() => { if (readField(text).kind === 'word') meaningNow(t); }, MEANING_REST_MS);
+  }
+  async function meaningNow(t) {
+    const seat = semanticSeat;
+    if (!seat) return;
+    let result = null;
+    try {
+      const texts = [t].concat(MM.intentTexts());
+      const vecs = await MM.embedAll(seat.transport, texts, semanticVectors, { batch: 512 });
+      const offered = paletteItems.filter((i) => i.offer && !i.disabled).map((i) => i.key);
+      const best = MM.nearestIntent((x) => vecs.get(x), vecs.get(t), (intent) => offered.some((k) => intent.is(k)));
+      if (best) result = { key: offered.find((k) => best.intent.is(k)), score: best.score };
+    } catch (_) { result = null; }
+    if (semanticSeat !== seat) return;
+    const changed = !meaningKept.result !== !result || (result && meaningKept.result && result.key !== meaningKept.result.key);
+    meaningKept = { text: t, seat: seat.name, result: result };
+    const f = fieldInput();
+    if (f && MM.intentText(f.value) === t && (changed || result)) paintField(f.value);
+  }
+
+  /**
+   * A board act typed at the field (FP8): export opens the export pane — on its true-size row
+   * for *print* — *find …* opens Find with the words, *examples* the boards pane at its
+   * examples, *help* the help. Nothing is written to the board, and the field stays: what
+   * is held is what the export pane writes.
+   */
+  function hostAct(act, rest) {
+    if (act === 'export' || act === 'print') {
+      if (exportPanel.hasAttribute('hidden')) togglePanel(exportPanel, exportBtn);
+      const row = act === 'print' ? exportPanel.querySelector('.exMaths') : null;
+      if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+      say(act === 'print' ? 'the export pane — a figure at its true size is its last row' : 'the export pane' + (rest ? ' — ' + rest + ' is one of its rows' : ''));
+      return;
+    }
+    if (act === 'find') { openFind(); if (rest) { findInput.value = rest; findInput.dispatchEvent(new Event('input', { bubbles: true })); } return; }
+    if (act === 'examples') { openBoardsList(); return; }
+    if (act === 'help') { if (tiles.help) tiles.help.click(); return; }
   }
 
   /**
@@ -829,7 +902,7 @@
     const onArt = sum.onArtifact ? (MM.wordOf(s.nodes.get(sum.onArtifact.artifactId)) || 'artifact') : null;
     filter.placeholder = onArt ? 'on ' + onArt + ' — type what to change…' : sum.enclosedIds.length + ' mark' + (sum.enclosedIds.length === 1 ? '' : 's') + ' — a verb, a name, or what to make…';
     filter.onkeydown = onPaletteKey;
-    filter.oninput = () => { paletteNavigated = false; paletteIndex = -1; paintField(filter.value); };
+    filter.oninput = () => { paletteNavigated = false; paletteIndex = -1; paintField(filter.value); meaningSoon(filter.value); };
     top.appendChild(filter);
     const reading = document.createElement('div');
     reading.className = 'reading';
@@ -887,7 +960,13 @@
     const certain = paletteItems.filter((i) => i.certain);
     const afford = paletteItems.filter(afforded);
     const hit = (i) => !q || (i.label + ' ' + (i.verbs || []).join(' ') + ' ' + i.group).toLowerCase().includes(q);
+    // `?`: everything these marks can do, the typed-only offers too (PLAN-FIELD-PAR FP1).
+    if (q === '?') return certain.concat(paletteItems.filter((i) => !i.certain));
     let shown = certain.filter(hit).concat(afford.filter(hit));
+    // The act the words are nearest in meaning stands first among what they afford (D1).
+    const near = q ? meaningFor(q) : null;
+    const nearItem = near ? paletteItems.find((i) => i.key === near.key) : null;
+    if (nearItem && !shown.includes(nearItem)) { const at = shown.findIndex((i) => !i.certain); shown.splice(at < 0 ? shown.length : at, 0, nearItem); }
     // Typing the name of something the library holds completes to it: Enter
     // reuses the entry on this loop, and no model is asked.
     if (sum && q.length >= 2 && !sum.onArtifact) {
@@ -920,6 +999,8 @@
       const at = shown.findIndex((i) => !i.certain);
       shown.splice(at < 0 ? shown.length : at, 0, ...pair);
     }
+    // What the words are nearest in meaning leads what they afford: it is what Enter takes (D1).
+    if (nearItem) { shown = shown.filter((i) => i !== nearItem); const at = shown.findIndex((i) => !i.certain); shown.splice(at < 0 ? shown.length : at, 0, nearItem); }
     return shown;
   }
 
@@ -934,7 +1015,7 @@
 
   function pillFor(item, i, selected, leads) {
     const because = becauseOf(item, leads);
-    const b = ui.pill(item.label, { cls: (item.certain ? 'certain ' : '') + 'item', why: item.why + (item.groupWhy ? ' — ' + item.groupWhy : '') + (because ? ' — ' + because : ''), model: item.tier === 2, onclick: () => { noteUse(item); item.run(); } });
+    const b = ui.pill(item.label, { note: item.note, cls: (item.certain ? 'certain ' : '') + 'item', why: item.why + (item.groupWhy ? ' — ' + item.groupWhy : '') + (because ? ' — ' + because : ''), model: item.tier === 2, onclick: () => { noteUse(item); item.run(); } });
     b.setAttribute('aria-selected', String(selected));
     b.dataset.index = String(i);
     b.dataset.key = item.key; // what the reader and learned use call it: for tests, and for B2's context
@@ -1083,7 +1164,7 @@
       if (!built.ok) { say('could not stand it in 3D: ' + built.error); return; }
       session.attachCode({ participantId: built.participantId, nodeId: artifactId, kind: 'run', code: built.code, prompt: 'show it in 3D', from: entry.id, at: at });
       session.clock({ nodeId: artifactId, op: 'play', at: at + 1 });
-      say('in 3D again, from this drawing (tier 1) — ' + built.reasoning);
+      say('in 3D again, from this drawing — ' + built.reasoning);
       return;
     }
     session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: artifactId, kind: 'run', code: entry.code, prompt: 'reused from ' + entry.name, from: entry.id, at: at });
@@ -1223,7 +1304,7 @@
       // (The structure tool's act, `MM.standStructure`: stamped with its id.)
       const structure = MM.standStructure(session, artifactId, brief, at + 1);
       if (structure.ok) {
-        if (!writers().length) { say('the structure (tier 1): ' + structure.ids.join(', ') + ' — join a model for the words'); return; }
+        if (!writers().length) { say('the page’s ' + structure.ids.length + ' box' + (structure.ids.length === 1 ? '' : 'es') + ' stand — a model writes the words when one joins'); return; }
       } else if (!writers().length) { say('could not build the structure: ' + structure.error); return; }
     }
 

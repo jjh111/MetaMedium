@@ -437,3 +437,5 @@ export function writeFlowchart(reading: NotationReading, opts: MermaidOptions = 
 
 // The flowchart is said from the start; D4–D6 register theirs beside it.
 registerMermaidWriter(FLOWCHART_TABLE.notation, writeFlowchart);
+// A diagram (notations/diagram.ts) is said as the flowchart it is read as: each node in its own brackets, `---` for a line with no head.
+registerMermaidWriter('diagram', writeFlowchart);

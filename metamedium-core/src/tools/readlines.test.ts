@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { createSession, type Session } from '../session/session';
-import { handText, circleStroke } from '../test/strokes';
+import { handText, circleStroke, lineStroke as fp7Line, rectStroke as fp7Rect } from '../test/strokes';
 import type { ToolHost } from './tool';
 import { offersFor, toolScope, takeOffer } from './registry';
 import './builtin';
@@ -116,5 +116,20 @@ describe('Read the picture', () => {
     const b = two.import({ kind: 'jpg', path: 'b.jpg', bounds: BOX, asset: 'sha256:' + '01'.repeat(32), at: 2 })!;
     hold(two, [a, b]);
     expect(offers(two).some((o) => o.key === 'read-picture')).toBe(false);
+  });
+});
+
+// PLAN-FIELD-PAR FP7: a head drawn apart from its connector is that connector's head, not
+// writing the rung missed — two boxes, a line and a chevron at its end are not offered *Read as writing*.
+describe('read as writing is not offered on a head drawn apart', () => {
+  it('two boxes, a line between them and a chevron at its end: no Read as writing', () => {
+    const s = createSession();
+    const a = s.addStroke(fp7Rect(100, 100, 160, 110), 1000);
+    const b = s.addStroke(fp7Rect(460, 100, 160, 110), 2000);
+    const l = s.addStroke(fp7Line({ x: 262, y: 155 }, { x: 458, y: 155 }), 3000);
+    const h = s.addStroke([...fp7Line({ x: 438, y: 143 }, { x: 458, y: 155 }, 12), ...fp7Line({ x: 458, y: 155 }, { x: 438, y: 167 }, 12).slice(1)], 3400);
+    s.summonMarks([a, b, l, h], 900_000);
+    const keys = offersFor(toolScope(s, { host: { models: [{ name: 'm', sees: true }] } as never })).map((o) => o.key);
+    expect(keys).not.toContain('read-any');
   });
 });

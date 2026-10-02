@@ -10,6 +10,7 @@
 
 import type { Session } from '../session/session';
 import type { Tool } from './tool';
+import { wordActs } from './label';
 
 /** What naming is, said wherever it stands beside labelling — and in the readings that take a word as a name. */
 export const NAMING_IS = 'naming makes one thing of them, a definition the library keeps and the next drawing like it is offered as; it writes no word on the ink';
@@ -26,8 +27,12 @@ export const NAME: Tool = {
   offers: () => [],
   completes(scope) {
     if (!scope.word) return [];
+    // One of the pair, or both with how they differ (label.ts's `wordActs`, PLAN-FIELD-PAR).
+    const acts = wordActs(scope, scope.word);
+    if (!acts.name) return [];
     const q = '“' + scope.word + '”';
     return [{
+      ...(acts.differ ? { note: 'finds more like it' } : {}),
       key: 'name-word',
       label: 'Name it ' + q,
       reason: q + ' as the name — ' + NAMING_IS,

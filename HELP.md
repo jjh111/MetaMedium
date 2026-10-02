@@ -36,9 +36,27 @@ flowchart, a class diagram and a pattern page wait too.
 - **What it can become** — the acts: *Draw them clean*, *Line up across*,
   *Match sizes*, *Show it in 3D*, *Frame these*, … A pill with a dot asks a
   model.
-- **Type** a verb (*clean*, *erase*, *line up*), a name the canvas knows, or
-  what to make (*a pricing page*). `name:` names, `label:` puts a word on your
-  own ink, `ask:` asks a question, `draw:` asks a model to draw.
+- **Type** what you want in your own words — *clean*, *tidy*, *line up*,
+  *connect*, *diagram*, *mermaid*, *erase* — and the act is found. If the held
+  marks cannot do it yet, the line says what is missing (*Make it Mermaid — hold
+  two marks or more*), and Enter does nothing. Type **?** to see everything the
+  held marks can do. The board's own acts work here too: *export*, *find
+  pricing*, *print*, *examples*, *help*.
+- **A word or two** that names nothing is offered two ways, and Enter waits for
+  you to tap one: **Name it “…”** (*finds more like it*: the marks become one
+  thing the canvas learns and offers again) or **Write “…” on it** (*only the
+  words*, on your own ink; nothing is made). Where the two would do the same —
+  a thing you already named, held alone — there is only one.
+- **A sentence** is what to make (*a pricing page for the shop*). `name:`
+  names, `label:` writes a word on your own ink, `ask:` asks a question, `draw:`
+  asks a model to draw, `page:` and `run:` say what to make.
+- **Two boxes and a line** tied at both ends are **a diagram**: *Make it
+  Mermaid*, *Tidy the diagram* and *Route the connectors* are offered. Draw each
+  line or arrow from one box onto the other so it ties — an arrow ties where its
+  head points. Circles joined by lines are a molecule, not a diagram.
+- With **the semantic seat** loaded (models → seats), words no list holds are
+  matched by meaning on this device once you stop typing (*schematic* finds
+  *Make it Mermaid*), and the line says *by meaning*.
 
 ## Handling marks
 

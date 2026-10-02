@@ -41,6 +41,7 @@ import { runPencil } from './pencil.mjs';
 import { runModels } from './models.mjs';
 import { runSeat } from './seat.mjs';
 import { runHand } from './hand.mjs';
+import { runWalk } from './walk.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -349,8 +350,8 @@ async function runSmoke(browser, servers) {
  * the MCP hand that answers, and reloads its page. So does the hand (H1;
  * `hand.mjs`): a relay, the MCP hand and a counting model of its own.
  */
-const OWN_PAGES = { keep: runKeep, big: runBig, boards: runBoards, app: runApp, pencil: runPencil, models: runModels, seat: runSeat, hand: runHand };
-const OWN_URL = { app: 'app/', models: 'app/', seat: 'Demos/session-engine.html?live=claude&relay=…', hand: 'Demos/session-engine.html?live=mcp-test&relay=…' };
+const OWN_PAGES = { keep: runKeep, big: runBig, boards: runBoards, app: runApp, pencil: runPencil, models: runModels, seat: runSeat, hand: runHand, walk: runWalk };
+const OWN_URL = { walk: 'app/?fresh=1&nosw=1', app: 'app/', models: 'app/', seat: 'Demos/session-engine.html?live=claude&relay=…', hand: 'Demos/session-engine.html?live=mcp-test&relay=…' };
 async function runKeepScenario(browser, servers, engineName, which = 'keep') {
   const out = { name: which, url: `${servers.staticOrigin}/${OWN_URL[which] || 'Demos/session-engine.html?nosw=1'}` };
   let guards = [];
@@ -598,8 +599,8 @@ async function main() {
   // own scenarios, and naming it in the default list would run it twice on Chromium.
   // `pencil` is in the default list (Chromium) and CI's `webkit` job runs it again on WebKit.
   // `big` is opt-in too: a 2,000-mark board saved and opened again, minutes of replay.
-  const all = ['canvas', 'keep', 'boards', 'app', 'pencil', 'models', 'seat', 'hand', 'budgets', 'shard', 'demo', 'demo2', 'smoke', 'big'];
-  const byDefault = ['canvas', 'keep', 'boards', 'app', 'pencil', 'models', 'seat', 'hand', 'budgets', 'shard', 'demo', 'demo2'];
+  const all = ['canvas', 'keep', 'boards', 'app', 'pencil', 'models', 'seat', 'hand', 'walk', 'budgets', 'shard', 'demo', 'demo2', 'smoke', 'big'];
+  const byDefault = ['canvas', 'keep', 'boards', 'app', 'pencil', 'models', 'seat', 'hand', 'walk', 'budgets', 'shard', 'demo', 'demo2'];
   const picked = wanted.length ? all.filter((n) => wanted.includes(n)) : byDefault;
   if (!picked.length) {
     console.error(`nothing to run — pick from: ${all.join(', ')}`);
@@ -609,7 +610,7 @@ async function main() {
   rmSync(RESULTS, { recursive: true, force: true });
   mkdirSync(RESULTS, { recursive: true });
 
-  const needCanvas = picked.includes('canvas') || picked.includes('smoke') || picked.includes('keep') || picked.includes('boards') || picked.includes('big') || picked.includes('app') || picked.includes('pencil') || picked.includes('models') || picked.includes('seat') || picked.includes('hand') || picked.includes('budgets');
+  const needCanvas = picked.includes('canvas') || picked.includes('smoke') || picked.includes('keep') || picked.includes('boards') || picked.includes('big') || picked.includes('app') || picked.includes('pencil') || picked.includes('models') || picked.includes('seat') || picked.includes('hand') || picked.includes('walk') || picked.includes('budgets');
   const needShard = picked.includes('shard') || picked.includes('demo') || picked.includes('demo2');
 
   const started = Date.now();

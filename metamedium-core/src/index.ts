@@ -462,6 +462,7 @@ export type { Role, RoleReading, RoleScope, Wire, Genre, GenreReading } from './
 export {
   headsOf,
   connectorHeads,
+  inkEndsOf,
   describeHeads,
   HEAD_MAX_SHARE,
   HEAD_AXIS_SHARE,
@@ -765,6 +766,9 @@ export { isWritingMark, definitionOf, definitionsIn, artifactsIn, writingLine } 
 export type { WritingLine } from './tools/board';
 export { bestWiring, frameTemplatesFor } from './tools/frames';
 export { mermaidFor } from './tools/mermaid';
+// Intent words (PLAN-FIELD-PAR FP1, FP8): what a person says for each act, what an act not offered is missing, the board's own acts from the field.
+export { INTENTS, HOST_INTENTS, intentText, wordScore, intentsMatching, intentWordsFor, missingFor, hostIntentOf, intentGloss, intentTexts, nearestIntent } from './tools/intents';
+export type { Intent as FieldIntent, HostIntent, HostAct } from './tools/intents';
 export { tiedMatches, TIE_MARGIN } from './tools/which';
 export type { TiedMatch } from './tools/which';
 
@@ -994,6 +998,9 @@ export {
   PIECE_MIN_PX as GARMENT_PIECE_MIN_PX,
 } from './notations/garment';
 export type { GarmentReading, GarmentMark, GarmentSymbolName, OnEdge as GarmentOnEdge } from './notations/garment';
+// A diagram: nodes joined by connectors tied at both ends, read last, said only when no notation clears its floor (PLAN-FIELD-PAR FP2).
+export { DIAGRAM, DIAGRAM_NOTATION, TIED_LIFT, readDiagram } from './notations/diagram';
+export { sayable } from './notations/notation';
 
 // Find (I6, PLAN-IPAD-NOTES): words across every board — folded and cut into words, what a board says
 // extracted from its state with the place it stands, a query ranked across boards (a hook for the meaning

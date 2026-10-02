@@ -7,8 +7,11 @@
 > affordance the canvas already has, and say what is left that a decision
 > model could fix and how to set one up. This is that map and the next push.
 
-**Status: decided 2 Oct 2026, not yet built.** John's answers are §7; the units
-below are amended to match.
+**Status: built 2 Oct 2026** — FP1–FP4 and FP6–FP9, D1, and John's ask that
+*Name* and *Label* be one pill where they do the same and say how where they
+differ. FP5 is deferred (§7e); D2 and D3 wait on the Jev details (§7c). The gate's
+`walk` scenario holds every unit (`node e2e/run.mjs walk`, records W1–W8). John's
+answers are §7.
 
 ## 1. How it was walked
 
@@ -116,7 +119,9 @@ Each unit starts red, as every unit has: a record in the gate that fails on
 golden changes only where a unit says it does, in a commit of its own.
 
 **FP1 — Intent words, one home** (core `tools/intents.ts`; the field reader;
-the filter).
+the filter). *Built: W3, W3b, W3d.* An act's word inside a sentence (*a torus in
+3d*) stays a brief: a missing act or a board act is read only from three words
+or fewer that are, or lead with, the act's word (`INTENT_MAX_WORDS`).
 
 - Every tool says the words a person uses for each act it can do. Some are its
   `verbs` today, but the table goes wider:
@@ -137,8 +142,9 @@ the filter).
 - Hidden offers stay hidden as pills, so e2e 49's golden is unchanged.
 - **Red first:** the walk's *tidy*, *line up* and *export* rows.
 
-**FP2 — A graph is a diagram** (core: a registered notation `graph`, read last,
-from the roles and the ties).
+**FP2 — A graph is a diagram** (core `notations/diagram.ts`: the `diagram`
+notation, `fallback`, read last and said only when no notation clears its floor —
+`sayable` in `notation.ts`; its Mermaid is the flowchart's). *Built: W2, W2b, W2c.*
 
 - Nodes joined by connectors tied at both ends read as *a diagram* when no
   other notation clears its floor.
@@ -154,8 +160,9 @@ from the roles and the ties).
   is not, so a later class can claim its own drawings the same way.
 - **Red first:** john-line-lasso offers *Make it Mermaid*.
 
-**FP3 — An arrow's tip binds where its ink points** (surface `07-input.js`,
-with core's `inkTipIndex`).
+**FP3 — An arrow's tip binds where its ink points** (surface `07-input.js`'s
+`arrowTipMagnet`, with core's `inkEndsOf`). *Built: W1; e2e 53 no longer ties
+the tip by hand.*
 
 - After release, for a stroke the rung reads as an arrow, the end binds to the
   magnet at the ink tip, the point the engine already treats as where the arrow
@@ -164,7 +171,7 @@ with core's `inkTipIndex`).
 - **Red first:** a one-stroke arrow into a box binds `end`, and *Tidy the
   diagram* is offered on john-arrow-lasso.
 
-**FP4 — A word is not a brief** (`09-field.js`).
+**FP4 — A word is not a brief** (`09-field.js`). *Built: W4.*
 
 - One or two words that match no intent, no name in the library and no verb
   say what they could be: *Name it*, *Label it*, quietly, last.
@@ -184,7 +191,8 @@ with core's `inkTipIndex`).
 - **This changes e2e 49's golden** (the molecule's readings row), by design and
   in its own commit.
 
-**FP6 — The person's words** (`09-field.js`, `10-inspector.js`).
+**FP6 — The person's words** (`09-field.js`, `10-inspector.js`, the structure's
+slots in `tier1/library.ts`). *Built: W7.*
 
 - G6's sentences are rewritten in the voice of PLAN-USER-SURFACE U1a and U1b:
   - *makes the boxes at once — a model can write the words*;
@@ -192,12 +200,12 @@ with core's `inkTipIndex`).
   - the panel's *becomes — Make it Mermaid · tidy it · a page*, the acts named
     only when the field offers them, as N1's rows already do.
 
-**FP7 — Read as writing is not offered on a head** (`tools/read.ts`).
+**FP7 — Read as writing is not offered on a head** (`tools/read.ts`). *Built: W6.*
 
 - Ink that `headApartAt` reads as a connector's head, or a connector, is not
   unplaced writing.
 
-**FP8 — The field reaches the board.** FP1's host intents:
+**FP8 — The field reaches the board.** FP1's host intents (*built: W3c*):
 
 - *export svg* opens the export pane on that row;
 - *find pricing* opens Find with the word;
@@ -207,7 +215,7 @@ with core's `inkTipIndex`).
 None is a pill.
 
 **FP9 — The walk in the gate** (`e2e/walk.mjs` grows a `walk` scenario of
-records, in the default run). The records:
+records, in the default run). *Built: W1–W8.* The records:
 
 - John's drawing offers Mermaid and tidy;
 - a one-stroke arrow binds both ends;
@@ -218,7 +226,17 @@ records, in the default run). The records:
 The prose report stays as the opt-in map.
 
 **Order:** FP3 → FP2 → FP1 → FP4 → FP7 → FP6 → FP8 → FP9, each red first
-(FP5 deferred). FP3 and FP2 alone give John his drawing back. FP1 is the largest.
+(FP5 deferred).
+
+**Name and Label, folded** (John, 2 Oct 2026: *label and name options don't make
+sense to a user — if they are the same just show one, if different signal how*;
+core `wordActs` in `tools/label.ts`; *built: W5, W5b*). *Label it* is now **Write
+“…” on it**, in the words of what it does. Two pills stand together only where
+both would act and differ, and each then carries a note: *Name it “…” · finds
+more like it*, *Write “…” on it · only the words*. One stands alone where only
+one acts — no ink of yours held (only Name), or one thing already named held
+alone, where naming it again would wrap it in a definition of one and the word
+on it is what is meant (only Write). FP3 and FP2 alone give John his drawing back. FP1 is the largest.
 
 ## 6. What a decision model can fix after that
 
@@ -232,7 +250,7 @@ jobs it would add, in order of value:
 
 | | the question | candidates the engine holds | asked when | the answer |
 |---|---|---|---|---|
-| **D1** | **What did the person mean by these words?** For example *make it a process diagram*, *turn into an ER*, *org chart*, *straighten*. | every intent the scope has (FP1), offered or not, plus *name it*, *label it*, *a brief*, and `no-match` | **live while typing by the semantic seat, on the device** (§7d, below), and the decider on **Enter**, a deliberate act, when neither found a clear match | shown as the top pill with its reason (*Make it Mermaid 0.93 · Jev*); a second Enter takes it. A choice never acts on its own |
+| **D1** *(built, the semantic half: W8)* | **What did the person mean by these words?** For example *make it a process diagram*, *turn into an ER*, *org chart*, *straighten*. | every intent the scope has (FP1), offered or not, plus *name it*, *label it*, *a brief*, and `no-match` | **live while typing by the semantic seat, on the device** (§7d, below), and the decider on **Enter**, a deliberate act, when neither found a clear match | shown as the top pill with its reason (*Make it Mermaid 0.93 · Jev*); a second Enter takes it. A choice never acts on its own |
 | **D2** | **Which diagram is this?** It reads under every floor, or as two notations near each other. | the notations read (*a flowchart 0.36*, *an ER diagram 0.16*, *a plain diagram*) and `no-match` | a tap on *Which is it?*, generalised from definitions to notations | one held reading in the decider's name. Above `DECIDER_TAKE_AT` that notation's Mermaid and routing are offered |
 | **D3** | **What should this brief make?** | a page, a program, a diagram, an answer | Enter on a brief, before any writer is asked | picks the writer's prompt, or *Draw it* from Mermaid. Saves a wrong page |
 | D4 | **Which definition?** | the field's top two matches | the tap (built: `tools/which.ts`) | built |

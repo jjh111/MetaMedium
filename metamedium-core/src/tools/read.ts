@@ -17,6 +17,7 @@
 
 import { isWord, strokePointsOf } from '../session/nodes';
 import { snapReading } from '../session/clean';
+import { headApartAt } from '../diagram/heads';
 import { pictureOf } from '../kinds/picture';
 import { lineIsRead, writingLinesIn } from '../participants/readlines';
 import type { Offer, Tool } from './tool';
@@ -121,7 +122,12 @@ export const READ: Tool = {
       return !!n && !s.artifacts.includes(id) && (!!strokePointsOf(n) || isWord(n)) && !scope.host.isRead(id);
     });
     // Offered only when some of it the rung could not place for sure; the image is still all of it.
-    if (!ink.some((id) => { const n = s.nodes.get(id)!; return isWord(n) || !snapReading(n, s.nodes).ok; })) return out;
+    // A head drawn apart from its connector is placed — it is that connector's head, not
+    // writing the rung missed (PLAN-FIELD-PAR FP7: two boxes, a line and a chevron at its end
+    // were offered *Read as writing*).
+    const held = scope.marks.map((id) => s.nodes.get(id)).filter((n): n is NonNullable<typeof n> => !!n);
+    const aHead = (n: NonNullable<ReturnType<typeof s.nodes.get>>) => held.some((c) => c !== n && headApartAt(c, n, s.nodes) !== null);
+    if (!ink.some((id) => { const n = s.nodes.get(id)!; return isWord(n) || (!snapReading(n, s.nodes).ok && !aHead(n)); })) return out;
     return [...out, {
       key: 'read-any',
       label: 'Read as writing',

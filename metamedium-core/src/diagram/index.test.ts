@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { createSession } from '../session/session';
 import { headsOf, connectorHeads, withBoardIndex } from './heads';
-import { notationsOf, registeredNotations, notationById, type NotationReading } from '../notations/notation';
+import { notationsOf, registeredNotations, notationById, sayable, type NotationReading } from '../notations/notation';
 import { drawMermaid } from '../notations/mermaid-in';
 import { assignRoles, type RoleScope } from './roles';
 import { relate, type Mark } from '../relate/relations';
@@ -58,10 +58,9 @@ describe('the heads read through a filed plane are the heads the walk reads', ()
     const state = s.getState();
     const scope = state.contentIds.filter((id) => !state.artifacts.includes(id));
     // Each notation asked directly reads its heads by walking the plane; `notationsOf` files it once for all of them.
-    const walked = registeredNotations()
+    const walked = sayable(registeredNotations()
       .map((id) => notationById(id)!.read(state, scope))
-      .filter((r): r is NotationReading => !!r && r.confidence > 0 && r.confidence <= 1)
-      .sort((p, q) => q.confidence - p.confidence);
+      .filter((r): r is NotationReading => !!r && r.confidence > 0 && r.confidence <= 1));
     const filed = notationsOf(state, scope);
     expect(filed[0].name).toMatch(/flowchart/i);
     expect(filed).toEqual(walked);

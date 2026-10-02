@@ -189,6 +189,8 @@ export interface Offer {
   name?: string;
   /** What the line under the field says while this pill is pointed at: for one whose act must be told from its twin's (Name it, Label it). */
   line?: string;
+  /** A few words after its label saying how it differs from the pill beside it (*finds more like it*; PLAN-FIELD-PAR). */
+  note?: string;
   /** What taking it needs, opaque to everyone but its tool. */
   data?: unknown;
 }

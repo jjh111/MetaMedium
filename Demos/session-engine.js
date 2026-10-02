@@ -137,7 +137,8 @@
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'pill' + (o.cls ? ' ' + o.cls : '');
-      b.innerHTML = '<span>' + esc(label) + '</span>' + (o.model ? '<i class="dot" title="asks a model"></i>' : '');
+      // A note says how this pill differs from the one beside it (Name it · finds more like it; PLAN-FIELD-PAR).
+      b.innerHTML = '<span>' + esc(label) + '</span>' + (o.note ? '<small class="note">' + esc(o.note) + '</small>' : '') + (o.model ? '<i class="dot" title="asks a model"></i>' : '');
       if (o.why) b.title = o.why;
       if (o.disabled) b.disabled = true;
       if (o.onclick) b.onclick = o.onclick;
@@ -4196,6 +4197,16 @@
     const g = made && MM.getRep(made, 'gesture');
     // Content, not a gesture: what the stroke touched, it is now tied to. The
     // bind is an edge in the log — it replays, merges, and one undo lets it go.
+    // An arrow's tip is where its ink points, not where the pen lifted: a hand
+    // draws the shaft into a box, then the barb back out, and lets go at a wing
+    // a head's length off — past the magnet, which let go (PLAN-FIELD-PAR FP3).
+    // So once the stroke reads as an arrow, the end its ink points with is
+    // offered the magnet at that ink, as a release there would have been.
+    const tipHold = !g && made ? arrowTipMagnet(made, after, id, points) : null;
+    if (tipHold) {
+      if (tipHold.end === 'end') magnetHold = tipHold.hit;
+      else if (!magnetStart) magnetStart = tipHold.hit;
+    }
     if (!g && (magnetStart || magnetHold)) {
       const at = Date.now();
       if (magnetStart) session.bind({ strokeId: id, nodeId: magnetStart.site.nodeId, site: { kind: magnetStart.site.kind, index: magnetStart.site.index }, end: 'start', at: at });
@@ -4242,6 +4253,25 @@
    * a dot — the pen's or the mouse's stroke too short to be one, or a finger's that never
    * moved while the pen is what draws.
    */
+  /**
+   * The magnet at the end of a just-drawn ARROW its ink points with, or null:
+   * `{ end, hit }`. Only an arrow (its tail read apart from its tip), never the
+   * command mark, never writing — the guards the release's own magnet keeps —
+   * and only an end that is not tied already (PLAN-FIELD-PAR FP3).
+   */
+  function arrowTipMagnet(node, s, id, pts) {
+    const ends = MM.inkEndsOf(node, s.nodes);
+    if (!ends || !Array.isArray(pts) || pts.length < 3) return null;
+    const analysis = MM.analyzeStroke(pts, 1 / view.zoom);
+    const top = analysis.results[0];
+    if (!top || top.type !== 'arrow') return null;
+    const activeMark = state.commandMark || MM.BUILTIN_COMMAND_MARK;
+    if (activeMark && MM.matchesCommandMark(analysis.fingerprint, activeMark).match) return null;
+    if (MM.isLetterLike(MM.getBounds(pts), 1 / view.zoom)) return null;
+    const end = ends.tail === 'start' ? 'end' : 'start';
+    const hit = magnetQuery(ends[end], id);
+    return hit ? { end: end, hit: hit } : null;
+  }
   function tapAt(e) {
     const s0 = session.getState();
     const now = Date.now();
@@ -6153,11 +6183,22 @@
    *           not. A thunk too — the reader names nothing outside itself, and reads a sum only
    *           on the branch that needs one (M5).
    *
+   * @property {function(string): ({host:({act:string,label:string,rest:string}|null),missing:({label:string,why:string}|null)})} [intent]
+   *           what typed words name that no offer here answers to (PLAN-FIELD-PAR FP1, FP8): one of
+   *           the board's own acts (export, find, print, examples, help), or an act these marks
+   *           are not offered and what it is missing. Read by core's intent table; a thunk, asked
+   *           only once the verbs, the library and the verb table have said nothing.
+   *
+   * @property {function(string): ({key:string,score:number}|null)} [meaning]
+   *           the act these marks are offered that typed words are nearest in MEANING, when a semantic
+   *           seat is held and has read them (PLAN-FIELD-PAR D1): only what was already worked out off
+   *           the field's thread, never a call — the reader asks nobody anything.
+   *
    * @typedef {Object} FieldCommand  what Enter will do, named rather than closed over
-   * @property {'take'|'name'|'label'|'region'|'ask-what'|'ask'|'draw'|'build'|'library'|'behave'|'need-model'|'maths'} do
+   * @property {'take'|'name'|'label'|'region'|'ask-what'|'ask'|'draw'|'build'|'library'|'behave'|'need-model'|'maths'|'host'} do
    *
    * @typedef {Object} FieldReading  the reader's whole answer
-   * @property {string} kind        empty|default|name|label|what|ask|draw|brief|structure|verb|library|behaviour|blocked|page|run|program|new
+   * @property {string} kind        empty|default|name|label|what|ask|draw|brief|structure|verb|library|behaviour|blocked|page|run|program|new|intents|host|missing|meaning|word
    * @property {string} line        the sentence under the field: what Enter will do
    * @property {boolean} [quiet]    said, but not as a promise — Enter does nothing
    * @property {boolean} [model]    Enter asks a model: the line carries the dot
@@ -6289,6 +6330,9 @@
       return { kind: 'empty', line: '', quiet: true, command: null };
     }
 
+    // `?`: everything these marks can do, every offer shown, the typed-only ones too (PLAN-FIELD-PAR FP1).
+    if (text === '?') return { kind: 'intents', line: '↵ all these marks can do — tap one, or type its name', quiet: true, command: null };
+
     // A sum: `=` says the rest is arithmetic, read by core against the page — no model, and
     // nothing to guess. The line says the result before Enter; Enter stands it on the board.
     const sum = SUM.exec(text);
@@ -6340,13 +6384,36 @@
       };
     }
 
+    // Words that name an act no offer here answers to (PLAN-FIELD-PAR FP1, FP8): one of the
+    // board's own acts, opened from the field; or an act these marks are not offered, said
+    // with what it is missing — quietly, so Enter does nothing a hand did not mean.
+    const want = !revising && c.intent ? c.intent(text) : null;
+    if (want && want.host) {
+      const h = want.host;
+      return { kind: 'host', line: '↵ ' + h.label + (h.rest ? ' — ' + h.rest : ''), command: { do: 'host', act: h.act, rest: h.rest } };
+    }
+    if (want && want.missing) return { kind: 'missing', line: '↵ ' + want.missing.label + ' — ' + want.missing.why, quiet: true, command: null };
+
+    // A word or two that names nothing here waits for the hand to pick what it is for
+    // (FP4, John's decision of 2 Oct 2026): the row offers it as a name, or as words on
+    // the marks, and Enter takes neither until one is chosen. A brief is a sentence — three
+    // words or more — or a prefix that says what to make (`page:`, `run:`).
+    // …unless the semantic seat, on this device, read it as near an act these marks are offered
+    // (D1): said with its number, and Enter takes it — the line says so before Enter.
+    const near = !revising && c.meaning ? c.meaning(text) : null;
+    const nearItem = near ? items.find((i) => i.key === near.key && !i.disabled) : null;
+    if (nearItem) return { kind: 'meaning', line: '↵ ' + nearItem.label + ' — by meaning ' + near.score.toFixed(2), command: take(nearItem) };
+    if (!revising && text.split(/\s+/).length <= 2) {
+      return { kind: 'word', line: '↵ a word — tap what it is for: a name, or words on the marks', quiet: true, command: null };
+    }
+
     // The brief. Tier 1 builds the structure of a page or a diagram at once, with no
     // words; tier 2 — a model — writes the words, and a program.
     if (revising) return models.length ? { kind: 'brief', line: '↵ ' + who + ' changes what the loop covers', command: build(text, true) } : needsModel('changing a page');
     if ((c.target ? c.target() : 'program') === 'page') {
       return models.length
-        ? { kind: 'brief', line: '↵ the structure at once (tier 1), then ' + who + ' writes the words', command: build(text, false) }
-        : { kind: 'structure', line: '↵ the structure, at once (tier 1) — join a model for the words', command: build(text, false) };
+        ? { kind: 'brief', line: '↵ the page’s boxes at once, then ' + who + ' writes the words', command: build(text, false) }
+        : { kind: 'structure', line: '↵ the page’s boxes at once — a model writes the words when one joins', command: build(text, false) };
     }
     if (!models.length) return needsModel('writing a program');
     return { kind: 'brief', line: '↵ ' + who + ' writes a program', command: build(text, false) };
@@ -6354,7 +6421,7 @@
     function take(item) { return { do: 'take', key: item.key, index: items.indexOf(item) }; }
     function build(t, rev) { return { do: 'build', text: t, revising: !!rev }; }
     function needsModel(what) {
-      return { kind: 'blocked', line: '↵ ' + what + ' needs a model — controls › models', quiet: true, command: { do: 'need-model', what: what } };
+      return { kind: 'blocked', line: '↵ ' + what + ' needs a model — choose one in the models pane', quiet: true, command: { do: 'need-model', what: what } };
     }
   }
 
@@ -6392,14 +6459,14 @@
   function readLabel(word, marks) {
     const ink = marks || {};
     const mine = ink.mine || 0, others = ink.others || [];
-    if (!word) return { kind: 'label', line: '↵ label it… (type the word)', quiet: true, command: null };
-    if (!mine && !others.length) return { kind: 'label', line: '↵ label… — nothing held to put it on', quiet: true, command: null };
+    if (!word) return { kind: 'label', line: '↵ write… (type the words)', quiet: true, command: null };
+    if (!mine && !others.length) return { kind: 'label', line: '↵ write… — nothing held to write on', quiet: true, command: null };
     const command = { do: 'label', text: word };
-    if (!mine) return { kind: 'label', quiet: true, command: command, line: '↵ no label — ' + madeThese(others) + '; a label goes on your own ink' };
+    if (!mine) return { kind: 'label', quiet: true, command: command, line: '↵ no words written — ' + madeThese(others) + '; words go on your own ink' };
     const tail = others.length
       ? ' — on ' + (mine === 1 ? 'yours' : 'your ' + mine) + ', not ' + theirMarks(others)
       : mine > 1 ? ' — on each of your ' + mine + ' marks' : '';
-    return { kind: 'label', line: '↵ label it “' + word + '”' + tail, command: command };
+    return { kind: 'label', line: '↵ write “' + word + '” on ' + (mine > 1 ? 'them' : 'it') + tail, command: command };
   }
 
   /**
@@ -6534,7 +6601,8 @@
   /** An offer as a pill: its reason the tooltip, what it stands on after that, a dot when it asks a model. */
   function offerItem(o) {
     const item = {
-      key: o.key, label: o.label, why: o.reason, verbs: o.verbs || [], tier: o.asks === 'model' ? 2 : 1,
+      // Its verbs, and the words a person says for its act (core's intent table, PLAN-FIELD-PAR FP1): *tidy*, *line up* and *connect* find Tidy the diagram.
+      key: o.key, label: o.label, why: o.reason, verbs: (o.verbs || []).concat(MM.intentWordsFor(o.key).filter((w) => !(o.verbs || []).includes(w))), tier: o.asks === 'model' ? 2 : 1,
       group: o.hidden ? 'hidden' : o.grounds ? o.grounds.on : 'always',
       groupConf: o.grounds ? o.grounds.confidence : 0, groupWhy: o.grounds ? o.grounds.why : '',
       base: o.base, grounds: o.grounds, asks: o.asks, tool: o.tool, offer: o,
@@ -6545,6 +6613,7 @@
     if (!o.hidden) item.act = true;
     if (o.name !== undefined) item.name = o.name;
     if (o.line !== undefined) item.line = o.line;
+    if (o.note !== undefined) item.note = o.note;
     return item;
   }
 
@@ -6774,7 +6843,7 @@
     control: { after: (o, scope, t) => { if (t.made) flash('a slider — drag the knob to set it'); } },
     // Drawing them clean leaves the summon open, and the next offer is taken from the cleaned marks.
     clean: { before: () => { shownSummonId = null; }, after: (o, scope, t) => { if (t.detail.ids.length) flash('drew ' + t.detail.ids.length + ' clean' + (t.detail.summary ? ' — ' + t.detail.summary : '')); } },
-    graph3d: { after: (o, scope, t) => say(!t.made ? 'could not hold that group' : t.detail.ok ? 'in 3D (tier 1): ' + t.detail.reasoning : 'could not stand it in 3D: ' + t.detail.error) },
+    graph3d: { after: (o, scope, t) => say(!t.made ? 'could not hold that group' : t.detail.ok ? 'in 3D: ' + t.detail.reasoning : 'could not stand it in 3D: ' + t.detail.error) },
     frames: { after: (o, scope, t) => { if (o.data.act !== 'frame' || !t.made) return; const st = session.getState(); flash('framed ' + t.detail.members + ' — ' + MM.describeFrame(MM.frameOfNode(st.nodes.get(t.made)), st.nodes)); } },
     // The drawing said as Mermaid stands beside it: say so, remember which marks it was written from, and keep the field.
     mermaid: { after: (o, scope, t) => { if (!t.made) { say(t.detail.error); return; } mermaidMadeFrom.set(t.made, scope.marks.slice()); flash('the drawing as Mermaid, beside it — ' + t.detail.reading + '; Draw it puts it back as marks'); refreshPalette(); } },
@@ -6978,10 +7047,10 @@
   function labelSentence(text, done, saying, refused) {
     const q = '“' + text + '”';
     const parts = [];
-    if (done.length) parts.push(done.length === 1 ? 'labelled it ' + q : 'labelled ' + done.length + ' marks ' + q);
+    if (done.length) parts.push(done.length === 1 ? 'wrote ' + q + ' on it' : 'wrote ' + q + ' on ' + done.length + ' marks');
     if (saying.length) parts.push(done.length ? saying.length + ' already said it' : saying.length === 1 ? 'it already says ' + q : 'these ' + saying.length + ' already say ' + q);
     const theirs = refused.filter((r) => r.reason === 'not-your-ink');
-    if (theirs.length) parts.push((parts.length ? 'not on ' : 'no label on ') + theirMarks(theirs.map((r) => r.maker)) + ' — a label goes on your own ink');
+    if (theirs.length) parts.push((parts.length ? 'not on ' : 'no words written on ') + theirMarks(theirs.map((r) => r.maker)) + ' — words go on your own ink');
     for (const r of refused) if (r.reason !== 'not-your-ink') parts.push(r.detail || 'not labelled');
     return parts.join(' · ');
   }
@@ -7007,7 +7076,8 @@
       open: !!sum,
       revising: revising,
       items: items,
-      models: agents.map((a) => a.name),
+      // The models as the board says them: what their provider calls them, never an `llm:` id (FP6).
+      models: agents.map((a) => modelWords(a)),
       library: revising ? [] : libraryEntries(s),
       definition: defId ? { id: defId, name: MM.wordOf(s.nodes.get(defId)) || defId } : null,
       // Whose ink is held: a label goes on the person's own marks only (V1-PLAN L2e).
@@ -7020,6 +7090,13 @@
       target: () => targetOf(sum, text).target,
       // A thunk too: `= 24 ÷ 3` is read by core against the board's own page (M5), and only when a sum is typed.
       maths: (body) => MM.evaluateTyped(body, mathsFor(s).board),
+      // A thunk as well: what typed words name that no offer here answers to — a board act, or an act these marks lack and what it lacks (FP1, FP8).
+      // Already worked out, never asked here: the act nearest the typed words in meaning (D1).
+      meaning: (t) => meaningFor(t),
+      intent: (t) => ({
+        host: MM.hostIntentOf(t),
+        missing: sum && !revising ? MM.missingFor(t, fieldScope(s, t, null), items.filter((i) => i.offer).map((i) => i.key)) : null,
+      }),
     };
   }
 
@@ -7055,6 +7132,8 @@
       if (cmd.ask) writers().forEach((a) => withWork('behave:' + agentKey(a) + ':' + cmd.definitionId, [cmd.definitionId], modelWords(a) + ' · reading the words', a.behave({ nodeId: cmd.definitionId, words: cmd.words, at: Date.now() })).then(() => render(session.getState())));
       return;
     }
+    // The board's own acts, from the field (PLAN-FIELD-PAR FP8): the pane that does it, opened where the hand is.
+    if (cmd.do === 'host') { hostAct(cmd.act, cmd.rest || ''); return; }
     // With no model here, what was typed is kept, said once, and run when one joins — never the pane popped over the field (J5).
     if (cmd.do === 'need-model') {
       const f = fieldInput(), text = f ? f.value : '', sumId = sum.id;
@@ -7069,6 +7148,67 @@
         } });
       return;
     }
+  }
+
+  // ===== Typed words by meaning: the semantic seat, while typing (PLAN-FIELD-PAR D1) =====
+  // John, 2 Oct 2026: *match while typing, but careful to rate limit so it doesn't get spammy.* So: only
+  // with a seat held (nothing loads for this); only once the typing has rested (`MEANING_REST_MS`), never
+  // a key at a time; only for words the field's own reading could not place (it said *a word*); every
+  // text an act is known by embedded once and kept (the seat's own cache, which Find shares); the typed
+  // text once per rest; nothing sent anywhere — the seat runs here. The field is drawn again only when
+  // what the words are nearest changed. The decider, a network call, is never asked while typing.
+  const MEANING_REST_MS = 240;
+  let meaningKept = { text: null, seat: null, result: null };
+  let meaningTimer = 0;
+  /** The act typed words are nearest, if that was worked out for exactly these words with the seat held now. */
+  function meaningFor(text) {
+    if (!semanticSeat) return null;
+    const t = MM.intentText(text);
+    return meaningKept.seat === semanticSeat.name && meaningKept.text === t ? meaningKept.result : null;
+  }
+  /** Called on every keystroke; asks the seat at most once the typing rests, and only when it is worth asking. */
+  function meaningSoon(text) {
+    clearTimeout(meaningTimer);
+    if (!semanticSeat) return;
+    const t = MM.intentText(text);
+    if (t.length < 3 || (meaningKept.seat === semanticSeat.name && meaningKept.text === t)) return;
+    meaningTimer = setTimeout(() => { if (readField(text).kind === 'word') meaningNow(t); }, MEANING_REST_MS);
+  }
+  async function meaningNow(t) {
+    const seat = semanticSeat;
+    if (!seat) return;
+    let result = null;
+    try {
+      const texts = [t].concat(MM.intentTexts());
+      const vecs = await MM.embedAll(seat.transport, texts, semanticVectors, { batch: 512 });
+      const offered = paletteItems.filter((i) => i.offer && !i.disabled).map((i) => i.key);
+      const best = MM.nearestIntent((x) => vecs.get(x), vecs.get(t), (intent) => offered.some((k) => intent.is(k)));
+      if (best) result = { key: offered.find((k) => best.intent.is(k)), score: best.score };
+    } catch (_) { result = null; }
+    if (semanticSeat !== seat) return;
+    const changed = !meaningKept.result !== !result || (result && meaningKept.result && result.key !== meaningKept.result.key);
+    meaningKept = { text: t, seat: seat.name, result: result };
+    const f = fieldInput();
+    if (f && MM.intentText(f.value) === t && (changed || result)) paintField(f.value);
+  }
+
+  /**
+   * A board act typed at the field (FP8): export opens the export pane — on its true-size row
+   * for *print* — *find …* opens Find with the words, *examples* the boards pane at its
+   * examples, *help* the help. Nothing is written to the board, and the field stays: what
+   * is held is what the export pane writes.
+   */
+  function hostAct(act, rest) {
+    if (act === 'export' || act === 'print') {
+      if (exportPanel.hasAttribute('hidden')) togglePanel(exportPanel, exportBtn);
+      const row = act === 'print' ? exportPanel.querySelector('.exMaths') : null;
+      if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
+      say(act === 'print' ? 'the export pane — a figure at its true size is its last row' : 'the export pane' + (rest ? ' — ' + rest + ' is one of its rows' : ''));
+      return;
+    }
+    if (act === 'find') { openFind(); if (rest) { findInput.value = rest; findInput.dispatchEvent(new Event('input', { bubbles: true })); } return; }
+    if (act === 'examples') { openBoardsList(); return; }
+    if (act === 'help') { if (tiles.help) tiles.help.click(); return; }
   }
 
   /**
@@ -7280,7 +7420,7 @@
     const onArt = sum.onArtifact ? (MM.wordOf(s.nodes.get(sum.onArtifact.artifactId)) || 'artifact') : null;
     filter.placeholder = onArt ? 'on ' + onArt + ' — type what to change…' : sum.enclosedIds.length + ' mark' + (sum.enclosedIds.length === 1 ? '' : 's') + ' — a verb, a name, or what to make…';
     filter.onkeydown = onPaletteKey;
-    filter.oninput = () => { paletteNavigated = false; paletteIndex = -1; paintField(filter.value); };
+    filter.oninput = () => { paletteNavigated = false; paletteIndex = -1; paintField(filter.value); meaningSoon(filter.value); };
     top.appendChild(filter);
     const reading = document.createElement('div');
     reading.className = 'reading';
@@ -7338,7 +7478,13 @@
     const certain = paletteItems.filter((i) => i.certain);
     const afford = paletteItems.filter(afforded);
     const hit = (i) => !q || (i.label + ' ' + (i.verbs || []).join(' ') + ' ' + i.group).toLowerCase().includes(q);
+    // `?`: everything these marks can do, the typed-only offers too (PLAN-FIELD-PAR FP1).
+    if (q === '?') return certain.concat(paletteItems.filter((i) => !i.certain));
     let shown = certain.filter(hit).concat(afford.filter(hit));
+    // The act the words are nearest in meaning stands first among what they afford (D1).
+    const near = q ? meaningFor(q) : null;
+    const nearItem = near ? paletteItems.find((i) => i.key === near.key) : null;
+    if (nearItem && !shown.includes(nearItem)) { const at = shown.findIndex((i) => !i.certain); shown.splice(at < 0 ? shown.length : at, 0, nearItem); }
     // Typing the name of something the library holds completes to it: Enter
     // reuses the entry on this loop, and no model is asked.
     if (sum && q.length >= 2 && !sum.onArtifact) {
@@ -7371,6 +7517,8 @@
       const at = shown.findIndex((i) => !i.certain);
       shown.splice(at < 0 ? shown.length : at, 0, ...pair);
     }
+    // What the words are nearest in meaning leads what they afford: it is what Enter takes (D1).
+    if (nearItem) { shown = shown.filter((i) => i !== nearItem); const at = shown.findIndex((i) => !i.certain); shown.splice(at < 0 ? shown.length : at, 0, nearItem); }
     return shown;
   }
 
@@ -7385,7 +7533,7 @@
 
   function pillFor(item, i, selected, leads) {
     const because = becauseOf(item, leads);
-    const b = ui.pill(item.label, { cls: (item.certain ? 'certain ' : '') + 'item', why: item.why + (item.groupWhy ? ' — ' + item.groupWhy : '') + (because ? ' — ' + because : ''), model: item.tier === 2, onclick: () => { noteUse(item); item.run(); } });
+    const b = ui.pill(item.label, { note: item.note, cls: (item.certain ? 'certain ' : '') + 'item', why: item.why + (item.groupWhy ? ' — ' + item.groupWhy : '') + (because ? ' — ' + because : ''), model: item.tier === 2, onclick: () => { noteUse(item); item.run(); } });
     b.setAttribute('aria-selected', String(selected));
     b.dataset.index = String(i);
     b.dataset.key = item.key; // what the reader and learned use call it: for tests, and for B2's context
@@ -7534,7 +7682,7 @@
       if (!built.ok) { say('could not stand it in 3D: ' + built.error); return; }
       session.attachCode({ participantId: built.participantId, nodeId: artifactId, kind: 'run', code: built.code, prompt: 'show it in 3D', from: entry.id, at: at });
       session.clock({ nodeId: artifactId, op: 'play', at: at + 1 });
-      say('in 3D again, from this drawing (tier 1) — ' + built.reasoning);
+      say('in 3D again, from this drawing — ' + built.reasoning);
       return;
     }
     session.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: artifactId, kind: 'run', code: entry.code, prompt: 'reused from ' + entry.name, from: entry.id, at: at });
@@ -7674,7 +7822,7 @@
       // (The structure tool's act, `MM.standStructure`: stamped with its id.)
       const structure = MM.standStructure(session, artifactId, brief, at + 1);
       if (structure.ok) {
-        if (!writers().length) { say('the structure (tier 1): ' + structure.ids.join(', ') + ' — join a model for the words'); return; }
+        if (!writers().length) { say('the page’s ' + structure.ids.length + ' box' + (structure.ids.length === 1 ? '' : 'es') + ' stand — a model writes the words when one joins'); return; }
       } else if (!writers().length) { say('could not build the structure: ' + structure.error); return; }
     }
 
@@ -8240,12 +8388,14 @@
       return {
         here: words[0].name,
         is: words[0].is + (words.length > 1 ? ' · or ' + words.slice(1).map((x) => x.label).join(', ') : ''),
-        next: (offered('mermaid') ? 'Make it Mermaid · ' : '') + (offered('snap') ? 'draw them clean · ' : '') + 'a name',
+        next: (offered('mermaid') ? 'Make it Mermaid · ' : '') + (offered('tidy-diagram') ? 'tidy it · ' : '') + (offered('snap') ? 'draw them clean · ' : '') + 'a name',
       };
     }
     // Show it in 3D only when the field offers it: circles joined by lines (U1d).
-    if (genre === 'graph' || genre === 'mixed') return { here: 'a structure, a graph' + (concept ? ' (' + concept.concept + ')' : ''), next: (paletteItems.some((i) => i.key === '3d') ? 'Show it in 3D · ' : '') + 'a brief builds the diagram, then a model writes the words' };
-    if (genre === 'layout') return { here: 'a structure, a layout' + (concept ? ' (' + concept.concept + ')' : ''), next: 'a brief builds the page at once, then a model writes the words' };
+    // The acts the field offers, in its words (FP6): never "a brief", "a structure" or a tier.
+    const offeredHere = (key) => paletteItems.some((i) => i.key === key);
+    if (genre === 'graph' || genre === 'mixed') return { here: 'marks joined by lines' + (concept ? ' (' + concept.concept + ')' : ''), next: [offeredHere('mermaid') && 'Make it Mermaid', offeredHere('tidy-diagram') && 'tidy it', offeredHere('3d') && 'Show it in 3D', 'a name', 'a page or a program — say what in a sentence'].filter(Boolean).join(' · ') };
+    if (genre === 'layout') return { here: 'boxes laid out like a page' + (concept ? ' (' + concept.concept + ')' : ''), next: 'a page — say what in a sentence; its boxes stand at once, and a model writes the words' };
     if (concept) return { here: 'a concept, ' + concept.concept + ' ' + concept.confidence.toFixed(2), next: concept.conversions.filter((c) => c.effect.kind !== 'name' && c.effect.kind !== 'prompt').map((c) => c.label).concat(['a name']).join(' · ') };
     const shapes = ids.map((id) => MM.topInterpretation(s.nodes.get(id))).filter(Boolean);
     if (shapes.length && shapes.every((x) => x === 'text')) return { here: 'writing', next: 'Read the writing · a name · text' };
