@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dyna.ink — Colour space</title>
+<meta name="description" content="A specimen of the dyna.ink colour space: hue is the kind and its kin, lightness is depth, chroma is how sure — on both grounds, and for colour-blind eyes.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%230b6f7d' stroke-width='2.5'/%3E%3Cpath d='M9 20 L14 25 L24 9' fill='none' stroke='%231c5fb8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="tokens.css">
+<style>
+/* ==========================================================================
+   dyna.ink — the colour space's specimen (V1-SPEC KN3, 2 October 2026).
+   Every shared value comes from tokens.css, the grounds and signal colours
+   the colour space uses included (read at load). The page adds layout, and
+   the colour space's own lightness bands, which KN3 moves into the tokens.
+   Nothing below branches on theme.
+   ========================================================================== */
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 var(--t-body)/1.6 var(--mono); }
+.page { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: var(--s4) var(--s5); }
+@media (min-width: 720px) { .page { padding-inline: 28px; } }
+h1, h2, h3 { font-weight: 500; text-wrap: balance; margin: 0; }
+h1 { font-size: var(--t-h1); line-height: 1.12; letter-spacing: -0.01em; }
+h2 { font-size: 1.02rem; letter-spacing: 0.01em; }
+p { margin: 0; }
+.kicker, .label { font-size: var(--t-meta); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.kicker b { color: var(--teal); font-weight: 500; }
+.meta { font-size: var(--t-meta); color: var(--ink-3); }
+.num { font-variant-numeric: tabular-nums; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/* ---- the head: the claim, and the three axes ------------------------------ */
+.head { display: grid; gap: var(--s4); grid-template-columns: 1fr; align-items: start; padding-bottom: var(--s4); border-bottom: 1px solid var(--rule); }
+@media (min-width: 980px) { .head { grid-template-columns: 1.05fr 1fr; } }
+.head .lead { display: grid; gap: var(--s3); min-width: 0; }
+.kickrow { display: flex; justify-content: space-between; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.themes { display: inline-flex; border: 1px solid var(--rule); border-radius: var(--radius-sm); overflow: hidden; }
+.themes button { border: 0; background: var(--paper-lt); padding: 0.22rem 0.55rem; font-size: var(--t-meta); cursor: pointer; color: var(--ink-2); }
+.themes button + button { border-left: 1px solid var(--rule); }
+.themes button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.head .lead p { color: var(--ink-2); max-width: 60ch; }
+.axes { display: grid; gap: 0; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--paper-lt); min-width: 0; }
+.axis { display: grid; grid-template-columns: 6.6rem 1fr auto; gap: var(--s2) var(--s3); align-items: center; padding: var(--s2) var(--s3); }
+.axis + .axis { border-top: 1px solid var(--rule-soft); }
+.axis dt { font-weight: 500; }
+.axis dt small { display: block; font-weight: 400; font-size: var(--t-meta); color: var(--ink-3); }
+.axis dd { margin: 0; font-size: var(--t-small); color: var(--ink-2); min-width: 0; }
+.axis svg { display: block; width: 92px; height: 30px; }
+@media (max-width: 520px) { .axis { grid-template-columns: 1fr auto; } .axis dd { grid-column: 1 / -1; grid-row: 2; } }
+
+/* ---- the field ------------------------------------------------------------- */
+.bench { display: grid; gap: var(--s2); padding-block: var(--s4) var(--s3); }
+.fieldrow { display: grid; gap: var(--s2) var(--s3); grid-template-columns: 1fr; align-items: center; }
+@media (min-width: 860px) { .fieldrow { grid-template-columns: 1fr auto; } }
+.field { display: flex; align-items: center; gap: var(--s2); border: 1px solid var(--ink-3); border-radius: var(--radius); background: var(--paper-lt); padding: 0.15rem 0.2rem 0.15rem var(--s2); min-width: 0; }
+.field:focus-within { border-color: var(--teal); box-shadow: 0 0 0 3px var(--wash); }
+.field .pen { color: var(--teal); font-weight: 600; }
+.field input { flex: 1; min-width: 0; border: 0; background: transparent; padding: 0.55rem 0; outline: none; }
+.field input::placeholder { color: var(--ink-4); }
+.btn { border: 1px solid var(--rule); background: var(--paper-lt); border-radius: var(--radius-sm); padding: 0.32rem 0.6rem; cursor: pointer; font-size: var(--t-small); white-space: nowrap; }
+.btn:hover { border-color: var(--ink-3); }
+.btn.go { background: var(--teal); border-color: var(--teal); color: var(--paper-lt); }
+.reading { min-height: 1.6em; font-size: var(--t-small); color: var(--ink-2); }
+.reading .no { color: var(--sig-low); }
+.examples { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s2); align-items: center; }
+.examples .label { margin-right: var(--s1); }
+.chip { border: 1px dashed var(--ink-4); background: transparent; border-radius: 99px; padding: 0.12rem 0.62rem; font-size: var(--t-meta); cursor: pointer; color: var(--ink-2); }
+.chip:hover { border-style: solid; border-color: var(--teal); color: var(--ink); }
+.seeing { display: flex; flex-wrap: wrap; gap: var(--s1); align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: var(--radius-sm); overflow: hidden; }
+.seg button { border: 0; background: var(--paper-lt); padding: 0.3rem 0.55rem; font-size: var(--t-meta); cursor: pointer; color: var(--ink-2); white-space: nowrap; }
+.seg .short { display: none; }
+@media (max-width: 560px) { .seg .long { display: none; } .seg .short { display: inline; } }
+.seg button + button { border-left: 1px solid var(--rule); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+/* ---- the grounds --------------------------------------------------------- */
+.grounds { display: grid; gap: var(--s3); grid-template-columns: 1fr; }
+@media (min-width: 900px) { .grounds { grid-template-columns: 1fr 1fr; } }
+.ground { display: grid; gap: var(--s1); min-width: 0; }
+.ground header { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s2); flex-wrap: wrap; }
+.board { border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; line-height: 0; }
+.board svg { width: 100%; height: auto; display: block; }
+.note { font-size: var(--t-meta); color: var(--ink-3); }
+
+/* ---- the reading: the wheel, what the colours mean, the acts -------------- */
+.read { display: grid; gap: var(--s4); grid-template-columns: 1fr; padding-top: var(--s4); }
+@media (min-width: 980px) { .read { grid-template-columns: minmax(0, 440px) 1fr; } }
+.wheel svg { width: 100%; max-width: 480px; height: auto; display: block; margin-inline: auto; }
+.wheel figcaption { font-size: var(--t-meta); color: var(--ink-3); text-align: center; margin-top: var(--s1); }
+.says { display: grid; gap: var(--s4); align-content: start; min-width: 0; }
+.says ul, .says ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.45rem; }
+.meaning li { padding-left: 1.1rem; position: relative; color: var(--ink-2); font-size: var(--t-small); }
+.meaning li::before { content: '·'; position: absolute; left: 0.25rem; color: var(--ink-4); }
+.k { font-weight: 600; }
+.acts li { display: grid; grid-template-columns: 1.6rem 1fr auto; gap: 0 var(--s2); align-items: baseline; font-size: var(--t-small); }
+.acts .n { color: var(--ink-4); font-variant-numeric: tabular-nums; }
+.acts .said { color: var(--ink); }
+.acts .ans { grid-column: 2; color: var(--ink-3); font-size: var(--t-meta); }
+.acts .x { border: 0; background: none; color: var(--ink-4); cursor: pointer; padding: 0 0.3rem; font-size: var(--t-small); }
+.acts .x:hover { color: var(--sig-low); }
+.acts .bad .said { color: var(--sig-low); text-decoration: line-through; }
+.tools { display: flex; gap: var(--s2); flex-wrap: wrap; }
+
+/* ---- the ledger ------------------------------------------------------------ */
+.ledger { padding-top: var(--s4); display: grid; gap: var(--s2); }
+.scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--paper-lt); }
+table { border-collapse: collapse; width: 100%; min-width: 880px; font-size: var(--t-small); }
+th, td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--rule-soft); vertical-align: middle; }
+th { font-weight: 500; font-size: var(--t-meta); color: var(--ink-3); letter-spacing: 0.04em; }
+tr:last-child td { border-bottom: 0; }
+td.sw svg { display: block; width: 108px; height: 30px; border-radius: var(--radius-sm); }
+td .hex { font-size: var(--t-meta); color: var(--ink-3); }
+.ok { color: var(--teal); }
+.warn { color: var(--sig-low); }
+
+.foot { margin-top: var(--s5); padding-top: var(--s3); border-top: 1px solid var(--rule); display: grid; gap: var(--s3); grid-template-columns: 1fr; color: var(--ink-2); font-size: var(--t-small); }
+@media (min-width: 900px) { .foot { grid-template-columns: 1fr 1fr; } }
+.foot code { font-family: var(--mono); font-size: 0.92em; color: var(--ink); background: var(--wash); padding: 0 0.25rem; border-radius: 2px; }
+.board text, .wheel text { font-family: var(--mono); }
+.board .lbl { font-size: 13px; font-weight: 600; }
+.board .sub { font-size: 10.5px; }
+.wheel .wl { font-size: 12.5px; font-weight: 600; paint-order: stroke; stroke: var(--paper); stroke-width: 3px; stroke-linejoin: round; }
+.wheel .wl.in { font-size: 11px; }
+.wheel .centre { font-size: 11px; fill: var(--ink-3); letter-spacing: 0.06em; }
+.wheel .tick { stroke: var(--ink-3); stroke-width: 2; }
+.wheel .rel { fill: none; stroke: var(--ink-3); stroke-width: 1.3; }
+.wheel .opp { stroke-dasharray: 5 4; }
+.wheel .dot { stroke: var(--paper); stroke-width: 2.5; }
+.defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+.sim-protan { filter: url(#sim-protan); }
+.sim-deutan { filter: url(#sim-deutan); }
+.sim-tritan { filter: url(#sim-tritan); }
+@media (prefers-reduced-motion: no-preference) { .fresh { animation: settle 420ms ease-out; } @keyframes settle { from { opacity: 0.35; } to { opacity: 1; } } }
+</style>
+</head>
+<body>
+<svg class="defs" aria-hidden="true" focusable="false">
+  <!-- Machado, Oliveira & Fernandes (2009), severity 1, applied in linear RGB -->
+  <filter id="sim-protan" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="0.152286 1.052583 -0.204868 0 0  0.114503 0.786281 0.099216 0 0  -0.003882 -0.048116 1.051998 0 0  0 0 0 1 0"/></filter>
+  <filter id="sim-deutan" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="0.367322 0.860646 -0.227968 0 0  0.280085 0.672501 0.047413 0 0  -0.011820 0.042940 0.968881 0 0  0 0 0 1 0"/></filter>
+  <filter id="sim-tritan" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="1.255528 -0.076749 -0.178779 0 0  -0.078411 0.930809 0.147602 0 0  0.004733 0.691367 0.303900 0 0  0 0 0 1 0"/></filter>
+</svg>
+
+<div class="page">
+  <section class="head" aria-labelledby="title">
+    <div class="lead">
+      <div class="kickrow"><p class="kicker"><b>dyna.ink</b> · v1 spec · KN3 · a specimen, 2 October 2026</p><span class="themes" role="group" aria-label="Ground"><button type="button" data-theme-set="light" aria-pressed="true">Paper</button><button type="button" data-theme-set="dark" aria-pressed="false">Canvas</button></span></div>
+      <h1 id="title">A colour space with meaning</h1>
+      <p>Nobody picks a pen colour here. You say what a thing is, and its colour follows from that kind and how it relates to your other kinds. Each axis of the colour space carries one meaning, so the colours on a board can be read back as words.</p>
+      <p class="meta">The example starts with the kinds you named on 2 October (ideas, tasks and notes) and adds the spec's examples of a family, kin and opposites. Add your own in the field. Every colour is computed in OKLCH and drawn as sRGB on both of the canvas's grounds.</p>
+    </div>
+    <dl class="axes" id="axes"></dl>
+  </section>
+
+  <section class="bench" aria-label="Say what things are">
+    <div class="fieldrow">
+      <form class="field" id="form" autocomplete="off">
+        <span class="pen" aria-hidden="true">›</span>
+        <label class="label" for="say" style="position:absolute;left:-9999px">Say what a thing is</label>
+        <input id="say" name="say" placeholder="it's a quote · teal   —   risk opposes opportunity" spellcheck="false">
+        <button class="btn go" type="submit">Say it</button>
+      </form>
+      <div class="seeing" role="group" aria-label="Seeing as">
+        <span class="label">Seeing as</span>
+        <span class="seg" id="seeing">
+          <button type="button" data-v="typical" aria-pressed="true">most eyes</button>
+          <button type="button" data-v="protan" aria-pressed="false" title="protanopia"><span class="long">protanopia</span><span class="short">protan</span></button>
+          <button type="button" data-v="deutan" aria-pressed="false" title="deuteranopia"><span class="long">deuteranopia</span><span class="short">deutan</span></button>
+          <button type="button" data-v="tritan" aria-pressed="false" title="tritanopia"><span class="long">tritanopia</span><span class="short">tritan</span></button>
+        </span>
+      </div>
+    </div>
+    <p class="reading" id="reading" aria-live="polite"></p>
+    <div class="examples" id="examples"><span class="label">Try</span></div>
+  </section>
+
+  <div id="specimen">
+    <section class="grounds" aria-label="The two grounds">
+      <div class="ground">
+        <header><h2>On paper</h2><span class="meta num" id="meta-paper">ground #f8f5ef · ink #0c1a24</span></header>
+        <div class="board" id="board-paper"></div>
+      </div>
+      <div class="ground">
+        <header><h2>In the dark room</h2><span class="meta num" id="meta-dark">ground #131315 · ink #e3edf1</span></header>
+        <div class="board" id="board-dark"></div>
+      </div>
+    </section>
+    <p class="note" style="margin-top:var(--s2)">Each cluster is ink of one kind, in its colour. An arrow between two things of the same family takes that family's colour, and one between different kinds stays ink. Patterns on the shapes are the second channel, given to kinds that someone could not tell apart by colour alone. Switching ground moves lightness and chroma; the hue never changes.</p>
+
+    <section class="read" aria-label="Why each colour is where it is">
+      <figure class="wheel" style="margin:0">
+        <div id="wheel"></div>
+        <figcaption id="wheel-cap"></figcaption>
+      </figure>
+      <div class="says">
+        <div>
+          <h2 style="margin-bottom:var(--s2)">What the colours say</h2>
+          <ul class="meaning" id="meaning"></ul>
+        </div>
+        <div>
+          <h2 style="margin-bottom:var(--s2)">The acts, in order</h2>
+          <ol class="acts" id="acts"></ol>
+          <div class="tools" style="margin-top:var(--s3)">
+            <button class="btn" type="button" id="undo">Undo last</button>
+            <button class="btn" type="button" id="reset">Back to the example</button>
+            <button class="btn" type="button" id="clear">Start with no kinds</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="ledger" aria-label="Every kind's colour">
+      <h2>The ledger</h2>
+      <p class="note">On each ground, the top line is a kind you said, at full chroma. The line under it is the same kind offered, muted. Contrast is measured against the ground: words need 4.5:1 and marks 3:1.</p>
+      <div class="scroll"><table id="ledger"></table></div>
+    </section>
+  </div>
+
+  <footer class="foot">
+    <div>
+      <h2 style="margin-bottom:var(--s2)">How this becomes KN3</h2>
+      <p>These functions move into <code>core/src/colour/</code> with tests:</p>
+      <ul style="margin:var(--s1) 0 0;padding-left:1.1rem">
+        <li><code>oklch.ts</code>: the colour conversions, and fitting a colour inside sRGB by lowering its chroma.</li>
+        <li><code>scale.ts</code>: lightness and chroma for each ground, depth and certainty.</li>
+        <li><code>harmony.ts</code>: where a hue is placed.</li>
+        <li><code>access.ts</code>: contrast, colour-blindness simulation and second channels.</li>
+        <li><code>names.ts</code>: colour words.</li>
+      </ul>
+      <p style="margin-top:var(--s2)">A kind's hue is chosen in the act that makes it or relates it, and that act keeps it. A kind added later never moves an older one. Lightness and chroma are worked out fresh for whichever ground is showing.</p>
+      <p style="margin-top:var(--s2)">The two grounds, their inks and the chrome's signal colours are <code>brand/tokens.css</code>'s. The lightness bands are this page's until KN3 moves them into the tokens.</p>
+    </div>
+    <div>
+      <h2 style="margin-bottom:var(--s2)">What it found</h2>
+      <p>Spacing hues by angle is not enough. At a single lightness, someone with deuteranopia can lose two hues set 180° apart. So the space places each new hue where it is easiest to tell apart from the others. It checks typical sight first and colour-blind sight a close second, on both grounds.</p>
+      <p style="margin-top:var(--s2)">Past about eight kinds, the second channel does the rest. Your purple sits 9° from the violet the chrome uses to mark a model's work. That is fine, because the chrome's colours never go on the ink.</p>
+    </div>
+  </footer>
+</div>
+<script>
+(function () {
+  // Paper is the default, always; the canvas is the reader's choice, kept under the
+  // brand pages' one preference (the styleguide's and the whitepaper's key, RENAME-PLAN §2).
+  var root = document.documentElement;
+  var btns = document.querySelectorAll('[data-theme-set]');
+  var KEY = 'metamedium-brand-theme';
+  function apply(theme) {
+    if (theme === 'dark') root.setAttribute('data-theme', 'dark');
+    else root.removeAttribute('data-theme');
+    btns.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.themeSet === theme)); });
+    try { localStorage.setItem(KEY, theme); } catch (e) {}
+  }
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) {}
+  apply(saved === 'dark' ? 'dark' : 'light');
+  btns.forEach(function (b) { b.addEventListener('click', function () { apply(b.dataset.themeSet); }); });
+})();
+</script>
+<script>
+window.DYNAINK_PAPER_FIRST = true;
+// A colour space with meaning — the specimen of V1-SPEC KN3, pure and
+// dependency-free so the same text runs in Node (the test) and in the page.
+//
+// Hue is the kind and its kin. Lightness is depth: each step down the tree is
+// a step toward the ground. Chroma is how sure: a said kind full, an offered
+// one muted. Hues are chosen when a kind is made or related and kept in that
+// act; lightness and chroma are derived for each ground.
+
+const Space = (() => {
+  // ---- OKLab / OKLCH / sRGB (Björn Ottosson, 2020) ----------------------
+  const toLinear = c => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const toGamma = c => (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
+  const clamp01 = v => Math.min(1, Math.max(0, v));
+
+  function hexToLinear(hex) {
+    let h = hex.replace('#', '');
+    if (h.length === 3) h = h.split('').map(x => x + x).join('');
+    const n = parseInt(h, 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => toLinear(v / 255));
+  }
+  const linearToHex = rgb =>
+    '#' + rgb.map(c => Math.round(clamp01(toGamma(clamp01(c))) * 255).toString(16).padStart(2, '0')).join('');
+
+  function linearToOklab([r, g, b]) {
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    return [
+      0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+      1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+      0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+    ];
+  }
+  function oklabToLinear([L, a, b]) {
+    const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+    const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+    const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+    return [
+      4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+      -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+      -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+    ];
+  }
+  const norm = h => ((h % 360) + 360) % 360;
+  const toLch = ([L, a, b]) => [L, Math.hypot(a, b), norm((Math.atan2(b, a) * 180) / Math.PI)];
+  const fromLch = (L, C, h) => [L, C * Math.cos((h * Math.PI) / 180), C * Math.sin((h * Math.PI) / 180)];
+  const hdist = (a, b) => {
+    const d = Math.abs(norm(a) - norm(b));
+    return d > 180 ? 360 - d : d;
+  };
+
+  const EPS = 1e-7;
+  const inGamut = rgb => rgb.every(c => c >= -EPS && c <= 1 + EPS);
+  function maxChroma(L, h) {
+    let lo = 0, hi = 0.4;
+    for (let i = 0; i < 28; i++) {
+      const mid = (lo + hi) / 2;
+      if (inGamut(oklabToLinear(fromLch(L, mid, h)))) lo = mid; else hi = mid;
+    }
+    return lo;
+  }
+  // Gamut mapping by reducing chroma: the hue and the lightness are kept.
+  function inSrgb(L, C, h) {
+    const c = Math.min(C, maxChroma(L, h));
+    return { L, C: c, h, rgb: oklabToLinear(fromLch(L, c, h)).map(clamp01) };
+  }
+
+  // ---- what an eye can tell apart ----------------------------------------
+  const luminance = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const contrast = (y1, y2) => (Math.max(y1, y2) + 0.05) / (Math.min(y1, y2) + 0.05);
+  // Machado, Oliveira & Fernandes (2009), severity 1, in linear RGB.
+  const VISIONS = {
+    typical: null,
+    protan: [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-0.003882, -0.048116, 1.051998]],
+    deutan: [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.01182, 0.04294, 0.968881]],
+    tritan: [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [0.004733, 0.691367, 0.3039]],
+  };
+  const simulate = (rgb, m) => (m ? m.map(r => clamp01(r[0] * rgb[0] + r[1] * rgb[1] + r[2] * rgb[2])) : rgb);
+  const deltaE = (p, q) => {
+    const A = linearToOklab(p), B = linearToOklab(q);
+    return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]);
+  };
+
+  // ---- the grounds, and the bands each allows ------------------------------
+  // The grounds and inks are brand/tokens.css's (--paper and --stroke-hand, light and
+  // dark); a page that can read the tokens hands them in with configure(). The bands
+  // are this specimen's until KN3 moves them into the tokens.
+  // toward: the sign of a step toward the ground (paper is light, the room dark).
+  const GROUNDS = {
+    paper: { ground: '#f8f5ef', ink: '#0c1a24', L: [0.44, 0.505, 0.57], C: 0.15, toward: +1 },
+    dark: { ground: '#131315', ink: '#e3edf1', L: [0.8, 0.735, 0.67], C: 0.13, toward: -1 },
+  };
+  const OFFERED = 0.38;        // an offered kind's chroma, as a share of a said one's
+  const FLOOR = 4.5;           // words, against their ground (marks need only 3)
+  const APART = 0.06;          // OKLab distance under which two kinds read as one
+  const DEPTHS = 2;            // steps drawn; deeper kinds share the last and add a channel
+
+  // The brand's signal hues (tokens.css's --sig-*): the chrome's, never the ink's.
+  const signal = s => ({ ...s, hue: toLch(linearToOklab(hexToLinear(s.hex)))[2] });
+  const SIGNALS = [
+    { name: 'read', hex: '#1c5fb8' }, { name: 'confident', hex: '#0b6f7d' },
+    { name: 'unsure', hex: '#a3761c' }, { name: 'broken', hex: '#a8493c' },
+    { name: 'a model', hex: '#6b4fa8' },
+  ].map(signal);
+
+  // A colour word means a hue. The band decides how light and how strong.
+  const WORDS = {
+    red: 29, scarlet: 33, crimson: 20, rose: 5, pink: 355, magenta: 330, fuchsia: 335,
+    purple: 305, violet: 298, lavender: 300, plum: 320, indigo: 280, blue: 264, navy: 264,
+    cobalt: 262, azure: 245, sky: 240, cyan: 215, teal: 195, turquoise: 185, aqua: 190,
+    green: 145, emerald: 160, forest: 145, mint: 165, lime: 130, chartreuse: 125, olive: 110,
+    yellow: 105, gold: 92, mustard: 95, amber: 80, ochre: 75, orange: 62, tangerine: 58,
+    coral: 40, salmon: 35, peach: 50, brown: 55, rust: 40, copper: 48, tan: 70,
+  };
+  function hueOfWord(word) {
+    const w = (word || '').trim().toLowerCase();
+    if (/^#?[0-9a-f]{6}$|^#?[0-9a-f]{3}$/.test(w)) {
+      const [, C, h] = toLch(linearToOklab(hexToLinear(w.startsWith('#') ? w : '#' + w)));
+      return C < 0.02 ? null : { hue: h, word: w.startsWith('#') ? w : '#' + w };
+    }
+    return w in WORDS ? { hue: WORDS[w], word: w } : null;
+  }
+
+  // ---- placing a hue -------------------------------------------------------
+  // A new hue is placed where it is easiest to tell apart from every kind
+  // already held — for every way of seeing, on both grounds — not merely where
+  // the wheel has the widest gap: at one lightness a deuteranope can lose two
+  // hues 180° apart, so the angle alone is no promise.
+  const nameHue = name => { // a stable lean for ties, so the same name leans the same way
+    let x = 2166136261;
+    for (const ch of name) { x ^= ch.charCodeAt(0); x = Math.imul(x, 16777619); }
+    return (x >>> 0) % 360;
+  };
+  const signalPenalty = h => SIGNALS.reduce((p, s) => p + Math.max(0, 12 - hdist(h, s.hue)) / 12 * 0.02, 0);
+  const seenCache = new Map();
+  function seen(hue, depth) { // the said colour on each ground
+    const key = Math.round(hue * 10) + ':' + depth;
+    if (!seenCache.has(key)) seenCache.set(key, Object.keys(GROUNDS).map(g => colourOf({ hue, depth }, g).rgb));
+    return seenCache.get(key);
+  }
+  // At one lightness a dichromat's colours fall near one line, so no placement
+  // keeps a dozen kinds apart for every eye; the score puts typical eyes first
+  // and colour-blind eyes a strong second, and a second channel does the rest.
+  const WEIGHT = { typical: 1, protan: 0.35, deutan: 0.35, tritan: 0.15 };
+  function apartness(A, B, v) { // the least distance this eye sees, on either ground
+    let min = Infinity;
+    for (let gi = 0; gi < A.length; gi++) min = Math.min(min, deltaE(simulate(A[gi], VISIONS[v]), simulate(B[gi], VISIONS[v])));
+    return min;
+  }
+  function bestHue(candidates, others, prefer, depth = 0) {
+    let best = null;
+    for (const c of candidates) {
+      const mine = seen(c.hue, depth);
+      let room = 0;
+      for (const v of Object.keys(VISIONS)) room += WEIGHT[v] * (others.length ? Math.min(...others.map(o => apartness(mine, seen(o.hue, o.depth), v))) : 1);
+      const score = room - signalPenalty(c.hue) - (c.cost || 0);
+      if (!best || score > best.score + 0.002 ||
+        (Math.abs(score - best.score) <= 0.002 && hdist(c.hue, prefer) < hdist(best.hue, prefer))) best = { ...c, score, room };
+    }
+    return best;
+  }
+
+  // ---- the lens: kinds and the acts that made them ------------------------
+  function emptyLens() { return { kinds: new Map(), rels: [], order: 0 }; }
+
+  function resolveHue(lens, k, seen = new Set()) {
+    if (k.source !== 'relative') return k.hue;
+    if (seen.has(k.name)) return k.hue;
+    seen.add(k.name);
+    const a = lens.kinds.get(k.anchor);
+    return a ? norm(resolveHue(lens, a, seen) + k.offset) : k.hue;
+  }
+  function refresh(lens) {
+    for (const k of lens.kinds.values()) k.hue = resolveHue(lens, k);
+    for (const k of lens.kinds.values()) {
+      let d = 0, p = k.parent;
+      const seen = new Set([k.name]);
+      while (p && !seen.has(p)) { seen.add(p); d++; p = lens.kinds.get(p)?.parent; }
+      k.depth = d;
+    }
+  }
+  const dependsOn = (lens, k, target) => { // does k's hue follow target's?
+    const seen = new Set();
+    while (k && k.source === 'relative' && !seen.has(k.name)) {
+      if (k.anchor === target) return true;
+      seen.add(k.name);
+      k = lens.kinds.get(k.anchor);
+    }
+    return false;
+  };
+  const familyOf = (lens, name) => [...lens.kinds.values()].filter(k => k.name === name || dependsOn(lens, k, name));
+  const othersThan = (lens, names) => [...lens.kinds.values()].filter(k => !names.has(k.name));
+
+  function make(lens, name) {
+    let k = lens.kinds.get(name);
+    if (k) return { k, made: false };
+    k = { name, hue: 0, source: 'placed', depth: 0, order: lens.order++, parent: null, anchor: null, offset: 0, rel: null };
+    const others = othersThan(lens, new Set());
+    const cands = [];
+    for (let h = 0; h < 360; h += 1) cands.push({ hue: h });
+    const best = bestHue(cands, others, nameHue(name));
+    k.hue = best.hue;
+    lens.kinds.set(name, k);
+    const near = others.length ? others.reduce((a, o) => (hdist(o.hue, best.hue) < hdist(a.hue, best.hue) ? o : a)) : null;
+    const gap = near ? `the most distinct place left (${Math.round(hdist(near.hue, best.hue))}° from ${near.name})` : 'the first kind; its name leans it there';
+    return { k, made: true, why: `${name} → ${Math.round(k.hue)}°, ${gap}` };
+  }
+
+  function say(lens, name, word) {
+    const named = hueOfWord(word);
+    const { k, made, why } = make(lens, name);
+    if (!word) return made ? why : `${name} is already a kind`;
+    if (!named) return `${made ? why + '; ' : ''}“${word}” is no colour this space knows${/gr[ae]y|black|white/.test(word) ? ' — a kind takes a hue, and grey, black and white have none' : ''}`;
+    k.source = 'said'; k.hue = named.hue; k.word = named.word; k.anchor = null; k.offset = 0;
+    refresh(lens);
+    const sig = SIGNALS.find(s => hdist(s.hue, named.hue) < 14);
+    const light = named.hue > 80 && named.hue < 135;
+    return `${name} → ${Math.round(named.hue)}°, your ${named.word}` +
+      (light ? '; on paper a yellow is drawn as dark as words need, ochre or olive, and on the dark ground it is yellow' : '') +
+      (sig ? `; it stands by the chrome's colour for ${sig.name} (${Math.round(hdist(sig.hue, named.hue))}° away) — on ink it means ${name}` : '');
+  }
+
+  function relate(lens, a, b, rel) {
+    const A = make(lens, a), B = make(lens, b);
+    const ka = A.k, kb = B.k;
+    if (a === b) return `${a} cannot be related to itself`;
+    if (rel === 'sub') { // a is a kind of b
+      if (dependsOn(lens, kb, a) || kb.parent === a) return `${b} already hangs from ${a}`;
+      ka.parent = b;
+      if (ka.source === 'said') { refresh(lens); return `${a} keeps your ${ka.word}; as a kind of ${b} it is drawn a step toward the ground`; }
+      const siblings = [...lens.kinds.values()].filter(k => k.parent === b && k !== ka && k.anchor === b && k.rel === 'sub');
+      const used = new Set(siblings.map(s => Math.round(s.offset)));
+      const offset = [0, 28, -28, 56, -56, 84, -84].find(o => !used.has(o)) ?? 0;
+      Object.assign(ka, { source: 'relative', anchor: b, offset, rel: 'sub' });
+      refresh(lens);
+      return `${a} is a kind of ${b}: ${b}'s hue${offset ? ` ${offset > 0 ? '+' : '−'}${Math.abs(offset)}°` : ''}, a step toward the ground`;
+    }
+    // kin or opposed: who moves? Never a hue the person said; else the later kind.
+    lens.rels = lens.rels.filter(r => !((r.a === a && r.b === b) || (r.a === b && r.b === a)));
+    lens.rels.push({ a, b, rel });
+    let mover = kb, anchor = ka;
+    if (kb.source === 'said' && ka.source !== 'said') { mover = ka; anchor = kb; }
+    else if (ka.source !== 'said' && kb.source !== 'said' && ka.order > kb.order) { mover = ka; anchor = kb; }
+    const apart = Math.round(hdist(ka.hue, kb.hue));
+    if (mover.source === 'said') {
+      return `you gave ${a} and ${b} their colours; they stand ${apart}° apart, so they read as ${apart >= 150 ? 'opposites' : apart <= 45 ? 'kin' : 'neither kin nor opposites'}`;
+    }
+    if (dependsOn(lens, anchor, mover.name)) return `${anchor.name}'s hue already follows ${mover.name}'s; nothing moved`;
+    const fam = new Set(familyOf(lens, mover.name).map(k => k.name));
+    fam.add(anchor.name);
+    for (const k of familyOf(lens, anchor.name)) fam.add(k.name);
+    const others = othersThan(lens, fam);
+    if (A.made && B.made) { // both new: place the pair together, where both stand most apart
+      const offs = rel === 'kin' ? [-40, -32, -26, 26, 32, 40] : [164, 172, 180, 188, 196];
+      let best = null;
+      for (let h = 0; h < 360; h += 2) for (const off of offs) {
+        const one = bestHue([{ hue: h }], others, nameHue(anchor.name)), two = bestHue([{ hue: norm(h + off) }], others, nameHue(mover.name));
+        const score = Math.min(one.score, two.score) - Math.abs(Math.abs(off) - (rel === 'kin' ? 32 : 180)) * 0.0015;
+        if (!best || score > best.score + 1e-9) best = { h, off, score };
+      }
+      anchor.hue = best.h;
+      Object.assign(mover, { source: 'relative', anchor: anchor.name, offset: best.off, rel });
+      refresh(lens);
+      return rel === 'kin'
+        ? `${a} is kin to ${b}: placed together, ${Math.abs(best.off)}° apart, where both stand most distinct`
+        : `${a} opposes ${b}: placed together across the wheel, ${Math.round(hdist(mover.hue, anchor.hue))}° apart`;
+    }
+    const cands = [];
+    if (rel === 'kin') {
+      for (let d = 26; d <= 45; d++) for (const s of [1, -1]) cands.push({ hue: norm(anchor.hue + s * d), off: s * d, cost: Math.abs(d - 32) * 0.001 });
+    } else {
+      for (let e = -20; e <= 20; e++) cands.push({ hue: norm(anchor.hue + 180 + e), off: 180 + e, cost: Math.abs(e) * 0.0015 });
+    }
+    const best = bestHue(cands, [...others, anchor], nameHue(mover.name), mover.depth);
+    Object.assign(mover, { source: 'relative', anchor: anchor.name, offset: best.off, rel });
+    refresh(lens);
+    return rel === 'kin'
+      ? `${a} is kin to ${b}: ${mover.name} ${Math.abs(Math.round(best.off))}° beside ${anchor.name}, on the side that stays most distinct`
+      : `${a} opposes ${b}: ${mover.name} across the wheel from ${anchor.name}, ${Math.round(hdist(mover.hue, anchor.hue))}° apart`;
+  }
+
+  // The few sentences a person says to make and relate kinds.
+  function read(text) {
+    let t = text.trim().toLowerCase().replace(/[“”"']/g, m => (m === "'" ? "'" : '')).replace(/\s+/g, ' ').replace(/[.!]+$/, '');
+    let m;
+    const kind = w => {
+      const x = w.trim().replace(/^(an?|the) /, '');
+      if (/ies$/.test(x)) return x.replace(/ies$/, 'y');
+      if (/(ss|x|ch|sh)es$/.test(x)) return x.replace(/es$/, '');
+      return /(ss|us|is)$/.test(x) ? x : x.replace(/s$/, '');
+    };
+    if ((m = t.match(/^(?:it's|it is|this is|that's|these are|those are) (an? |the )?([a-z][a-z -]*?)(?:(?:\s*[·,;—–]\s*|\s+-\s+|\s+(?:in|and it's|coloured|colored)\s+)(#?[0-9a-z]+))?$/))) return { act: 'say', a: kind(m[2]), word: m[3] };
+    if ((m = t.match(/^([a-z][a-z -]*?) (?:is|are) (?:a |an )?(?:kind|sort|type) of (?:an? )?([a-z][a-z -]*)$/))) return { act: 'sub', a: kind(m[1]), b: kind(m[2]) };
+    if ((m = t.match(/^([a-z][a-z -]*?) (?:opposes|oppose|is opposed to|contradicts|against|vs\.?|versus) (?:an? )?([a-z][a-z -]*)$/))) return { act: 'opposes', a: kind(m[1]), b: kind(m[2]) };
+    if ((m = t.match(/^([a-z][a-z -]*?) (?:is|are) (?:kin to|like|related to|near|akin to) (?:an? )?([a-z][a-z -]*)$/))) return { act: 'kin', a: kind(m[1]), b: kind(m[2]) };
+    if ((m = t.match(/^([a-z][a-z -]*?) (?:relates? to|goes with) (?:an? )?([a-z][a-z -]*)$/))) return { act: 'kin', a: kind(m[1]), b: kind(m[2]) };
+    if ((m = t.match(/^(?:make |colou?r )?([a-z][a-z -]*?) (?:is |are |)(#[0-9a-f]{3,6}|[a-z]+)$/)) && hueOfWord(m[2])) return { act: 'say', a: kind(m[1]), word: m[2] };
+    if ((m = t.match(/^(?:new kind|kind:?) ([a-z][a-z -]*?)(?:\s*[·,]\s*(#?[0-9a-z]+))?$/))) return { act: 'say', a: kind(m[1]), word: m[2] };
+    return null;
+  }
+
+  function apply(lens, act) {
+    if (act.act === 'say') return say(lens, act.a, act.word);
+    return relate(lens, act.a, act.b, act.act);
+  }
+
+  // ---- colour, for a ground and a certainty --------------------------------
+  function colourOf(kind, groundName, certainty = 'said') {
+    const g = GROUNDS[groundName];
+    const depth = Math.min(kind.depth, DEPTHS);
+    const gy = luminance(hexToLinear(g.ground));
+    let L = g.L[depth], moved = 0;
+    let said = inSrgb(L, g.C, kind.hue);
+    while (contrast(luminance(said.rgb), gy) < FLOOR && moved < 0.3) {
+      L -= 0.005 * g.toward; moved += 0.005; said = inSrgb(L, g.C, kind.hue);
+    }
+    let c = certainty === 'said' ? said : inSrgb(L, said.C * OFFERED, kind.hue);
+    while (contrast(luminance(c.rgb), gy) < FLOOR && moved < 0.3) {
+      L -= 0.005 * g.toward; moved += 0.005; c = inSrgb(L, said.C * (certainty === 'said' ? 1 : OFFERED), kind.hue);
+    }
+    return { ...c, hex: linearToHex(c.rgb), contrast: contrast(luminance(c.rgb), gy), moved: Math.round(moved * 1000) / 1000, depth };
+  }
+
+  // Which kinds read as one, for each way of seeing, on either ground.
+  function distinctness(lens) {
+    const ks = [...lens.kinds.values()].sort((x, y) => x.order - y.order);
+    const pairs = [];
+    for (let i = 0; i < ks.length; i++) for (let j = i + 1; j < ks.length; j++) {
+      const by = {};
+      for (const v of Object.keys(VISIONS)) {
+        let min = Infinity;
+        for (const g of Object.keys(GROUNDS)) {
+          const p = simulate(colourOf(ks[i], g).rgb, VISIONS[v]), q = simulate(colourOf(ks[j], g).rgb, VISIONS[v]);
+          min = Math.min(min, deltaE(p, q));
+        }
+        by[v] = min;
+      }
+      pairs.push({ a: ks[i].name, b: ks[j].name, by, min: Math.min(...Object.values(by)) });
+    }
+    return pairs;
+  }
+  // A second channel, for kinds some eye cannot tell apart: the later kind
+  // takes the first pattern none of its look-alikes holds.
+  const CHANNELS = ['solid', 'dashed', 'dotted', 'dash-dot', 'long'];
+  const WHO = { typical: 'everyone', protan: 'protanopes', deutan: 'deuteranopes', tritan: 'tritanopes' };
+  function channels(lens, pairs = distinctness(lens)) {
+    const out = new Map();
+    const ks = [...lens.kinds.values()].sort((x, y) => x.order - y.order);
+    for (const k of ks) {
+      const alike = pairs.filter(p => p.min < APART && (p.a === k.name || p.b === k.name))
+        .map(p => ({ other: p.a === k.name ? p.b : p.a, p })).filter(x => out.has(x.other));
+      const taken = new Set(alike.map(x => out.get(x.other).channel));
+      const channel = CHANNELS.find(c => !taken.has(c)) || CHANNELS[CHANNELS.length - 1];
+      const worst = alike.sort((x, y) => x.p.min - y.p.min)[0];
+      out.set(k.name, {
+        channel,
+        alike: worst ? worst.other : null,
+        who: worst ? Object.entries(worst.p.by).filter(([, d]) => d < APART).map(([v]) => WHO[v]) : [],
+      });
+    }
+    return out;
+  }
+
+  const list = xs => xs.join(', ').replace(/, ([^,]*)$/, ' and $1');
+
+  // What the colours on a board mean, in words.
+  function meaning(lens, pairs = distinctness(lens)) {
+    const ks = [...lens.kinds.values()].sort((x, y) => x.order - y.order);
+    const lines = [];
+    const rootOf = k => { const seen = new Set(); while (k.parent && !seen.has(k.name)) { seen.add(k.name); k = lens.kinds.get(k.parent) || k; } return k.name; };
+    for (const root of ks.filter(k => !k.parent)) {
+      const fam = ks.filter(k => k.parent && rootOf(k) === root.name).sort((x, y) => x.depth - y.depth || x.order - y.order);
+      if (!fam.length) continue;
+      const own = fam.filter(k => k.source === 'said').map(k => `${k.name} keeps your ${k.word}`);
+      lines.push(`${list([root.name, ...fam.map(k => k.name)])} are one family: ${root.name}'s hue, each kind below it a step toward the ground` + (own.length ? ` (${list(own)})` : ''));
+    }
+    for (const r of lens.rels) {
+      const A = lens.kinds.get(r.a), B = lens.kinds.get(r.b);
+      if (!A || !B) continue;
+      const d = Math.round(hdist(A.hue, B.hue));
+      if (r.rel === 'kin') lines.push(d <= 50 ? `${r.a} stands beside ${r.b}, ${d}° along the wheel: kin` : `${r.a} and ${r.b} are said to be kin, but your colours stand ${d}° apart`);
+      else lines.push(d >= 140 ? `${r.a} and ${r.b} are drawn as opposites, ${d}° apart` : `${r.a} and ${r.b} are said to oppose, but your colours stand ${d}° apart`);
+    }
+    const tied = new Set();
+    for (const k of ks) if (k.parent) { tied.add(k.name); tied.add(k.parent); }
+    for (const r of lens.rels) { tied.add(r.a); tied.add(r.b); }
+    const alone = ks.filter(k => !tied.has(k.name));
+    if (alone.length && ks.length > 1) lines.push(`${list(alone.map(k => k.name))} ${alone.length > 1 ? 'stand' : 'stands'} apart from the rest`);
+    for (const k of ks) {
+      const s = SIGNALS.find(s => hdist(s.hue, k.hue) < 14);
+      if (s && k.source === 'said') lines.push(`${k.name}'s ${k.word} stands near the chrome's colour for ${s.name}: on the ink it means ${k.name}, and the chrome's colours never touch the ink`);
+    }
+    const ch = channels(lens, pairs);
+    for (const k of ks) {
+      const c = ch.get(k.name);
+      if (c.channel !== 'solid') lines.push(`${k.name} is drawn ${c.channel}: beside ${c.alike} it looks alike to ${list(c.who)}`);
+    }
+    return lines;
+  }
+
+  // Hand in the grounds, inks and signal colours a page read from the tokens.
+  const HEX = /^#[0-9a-f]{6}$/i;
+  function configure({ grounds = {}, signals = null } = {}) {
+    for (const [name, g] of Object.entries(grounds)) {
+      if (!GROUNDS[name] || !g) continue;
+      if (HEX.test(g.ground || '')) GROUNDS[name].ground = g.ground;
+      if (HEX.test(g.ink || '')) GROUNDS[name].ink = g.ink;
+    }
+    const ok = (signals || []).filter(x => x && HEX.test(x.hex || ''));
+    if (ok.length) SIGNALS.splice(0, SIGNALS.length, ...ok.map(signal));
+    seenCache.clear();
+  }
+
+  return {
+    configure,
+    toLinear, toGamma, hexToLinear, linearToHex, linearToOklab, oklabToLinear, toLch, fromLch, norm, hdist,
+    maxChroma, inSrgb, luminance, contrast, VISIONS, simulate, deltaE,
+    GROUNDS, OFFERED, FLOOR, APART, DEPTHS, SIGNALS, WORDS, hueOfWord,
+    emptyLens, read, apply, colourOf, distinctness, channels, meaning, CHANNELS, WHO,
+  };
+})();
+
+</script>
+<script>
+(() => {
+  const S = Space;
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const f = v => (Math.round(v * 10) / 10).toString();
+
+  // The kinds John named on 2 October, and the relations the spec uses as examples.
+  const SEED = ["it's an idea · purple", "it's a task", "it's a note", 'insight is a kind of idea', 'hunch is a kind of idea', 'question is kin to idea', 'assumption opposes evidence'];
+  const EXAMPLES = ["it's a quote · teal", 'risk opposes opportunity', 'todo is a kind of task', 'method is kin to note', 'make idea yellow', "it's a feeling"];
+  const STORE = 'dynaink-colour-space-acts';
+  const DASH = { solid: '', dashed: '7 5', dotted: '0.1 4.6', 'dash-dot': '9 4 0.1 4', long: '16 6' };
+  const QUIET = { paper: '#66737c', dark: '#86847e' };   // --ink-3, light and dark
+  const GRID = { paper: 'rgba(90,72,44,0.10)', dark: 'rgba(231,229,224,0.08)' };
+  const HOW = { typical: 'most eyes', protan: 'protanopia', deutan: 'deuteranopia', tritan: 'tritanopia' };
+
+  let acts = load() || SEED.slice();
+  let vision = 'typical';
+
+  function load() {
+    try { const v = JSON.parse(localStorage.getItem(STORE)); return Array.isArray(v) && v.every(x => typeof x === 'string') ? v : null; } catch { return null; }
+  }
+  function save() { try { localStorage.setItem(STORE, JSON.stringify(acts)); } catch { /* a private window keeps nothing */ } }
+
+  // Paper first (brand/README.md): in brand/ the page is paper unless the reader chose
+  // the canvas; as an artifact it follows the viewer's theme.
+  const PAPER_FIRST = !!window.DYNAINK_PAPER_FIRST;
+  function pageGround() {
+    const t = document.documentElement.getAttribute('data-theme');
+    if (t === 'dark') return 'dark';
+    if (t === 'light' || PAPER_FIRST) return 'paper';
+    return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'paper';
+  }
+
+  // The grounds, inks and signal colours, read from brand/tokens.css where the page
+  // links it: --paper and --stroke-hand on each ground, --sig-* for the chrome's hues.
+  function readTokens() {
+    const root = document.documentElement, was = root.getAttribute('data-theme');
+    const read = names => { const cs = getComputedStyle(root); return Object.fromEntries(names.map(n => [n, cs.getPropertyValue(n).trim().toLowerCase()])); };
+    root.removeAttribute('data-theme');
+    const light = read(['--paper', '--stroke-hand', '--ink-3', '--sig-read', '--sig-high', '--sig-mid', '--sig-low', '--sig-model']);
+    root.setAttribute('data-theme', 'dark');
+    const dark = read(['--paper', '--stroke-hand', '--ink-3']);
+    if (was) root.setAttribute('data-theme', was); else root.removeAttribute('data-theme');
+    if (!/^#[0-9a-f]{6}$/.test(light['--paper'] || '')) return false;   // no tokens here: keep the defaults
+    S.configure({
+      grounds: { paper: { ground: light['--paper'], ink: light['--stroke-hand'] }, dark: { ground: dark['--paper'], ink: dark['--stroke-hand'] } },
+      signals: [['read', '--sig-read'], ['confident', '--sig-high'], ['unsure', '--sig-mid'], ['broken', '--sig-low'], ['a model', '--sig-model']].map(([name, t]) => ({ name, hex: light[t] })),
+    });
+    if (/^#[0-9a-f]{6}$/.test(light['--ink-3'] || '')) QUIET.paper = light['--ink-3'];
+    if (/^#[0-9a-f]{6}$/.test(dark['--ink-3'] || '')) QUIET.dark = dark['--ink-3'];
+    return true;
+  }
+
+  // ---- the lens, replayed from the acts --------------------------------------
+  function build() {
+    const lens = S.emptyLens();
+    const answers = acts.map(text => {
+      const act = S.read(text);
+      return { text, ok: !!act, answer: act ? S.apply(lens, act) : null };
+    });
+    const kinds = [...lens.kinds.values()].sort((a, b) => a.order - b.order);
+    const col = new Map();
+    for (const k of kinds) col.set(k.name, {
+      paper: { said: S.colourOf(k, 'paper'), offered: S.colourOf(k, 'paper', 'offered') },
+      dark: { said: S.colourOf(k, 'dark'), offered: S.colourOf(k, 'dark', 'offered') },
+    });
+    const pairs = S.distinctness(lens);
+    return { lens, answers, kinds, col, pairs, ch: S.channels(lens, pairs), meaning: S.meaning(lens, pairs) };
+  }
+
+  // ---- ink, drawn by a steady hand -------------------------------------------
+  function rng(seed) {
+    let x = (seed >>> 0) || 0x9e3779b9;
+    return () => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
+  }
+  function hash(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+
+  // Cursive as a trochoid: loops, an ascender now and then, a descender rarely.
+  function writing(r, x0, y0, w, xh = 8) {
+    const out = [];
+    let x = x0;
+    const end = x0 + w;
+    while (x < end - xh * 1.6) {
+      const n = 2 + Math.floor(r() * 5);
+      const a = xh * (0.19 + r() * 0.04), b = xh * 0.36;
+      let d = '';
+      for (let i = 0; i < n && x + a * 2 * Math.PI <= end; i++) {
+        const v = r(), up = v < 0.2 ? 2.3 : 1, down = v > 0.9;
+        for (let s = i ? 1 : 0; s <= 18; s++) {
+          const t = (s / 18) * 2 * Math.PI;
+          const lx = x + a * t - b * Math.sin(t);
+          const h = (1 - Math.cos(t)) / 2;
+          const ly = down ? y0 + xh * 0.95 * h : y0 - xh * up * h;
+          d += (d ? ' L' : 'M') + f(lx + (y0 - ly) * 0.24) + ' ' + f(ly + (r() - 0.5) * 0.35);
+        }
+        x += a * 2 * Math.PI;
+      }
+      if (d) out.push(d);
+      x += xh * (0.7 + r() * 0.7);
+    }
+    return out;
+  }
+  const jit = (r, k = 3) => (r() - 0.5) * k;
+  function box(r, x, y, w, h) {
+    const p = [[x + jit(r), y + jit(r)], [x + w + jit(r), y + jit(r)], [x + w + jit(r), y + h + jit(r)], [x + jit(r), y + h + jit(r)], [x + jit(r), y + jit(r) - 2], [x + 9 + jit(r), y + jit(r, 2)]];
+    return 'M' + p.map(q => f(q[0]) + ' ' + f(q[1])).join(' L');
+  }
+  function loop(r, cx, cy, rx, ry) {
+    const a0 = r() * Math.PI * 2, w = r() * 0.07, ph = r() * 6;
+    let d = '';
+    for (let i = 0; i <= 46; i++) {
+      const t = a0 + (i / 42) * Math.PI * 2, k = 1 + w * Math.sin(t * 2 + ph);
+      d += (i ? ' L' : 'M') + f(cx + rx * k * Math.cos(t)) + ' ' + f(cy + ry * k * Math.sin(t));
+    }
+    return d;
+  }
+  function tri(r, x, y, w, h) {
+    const p = [[x + w / 2 + jit(r), y + jit(r)], [x + w + jit(r), y + h + jit(r)], [x + jit(r), y + h + jit(r)], [x + w / 2 + jit(r), y + jit(r) + 1]];
+    return 'M' + p.map(q => f(q[0]) + ' ' + f(q[1])).join(' L');
+  }
+  function arrow(x1, y1, x2, y2, bend = 0) {
+    const mx = (x1 + x2) / 2 - (y2 - y1) * bend, my = (y1 + y2) / 2 + (x2 - x1) * bend;
+    const a = Math.atan2(y2 - my, x2 - mx), L = 8;
+    const h1 = [x2 - L * Math.cos(a - 0.45), y2 - L * Math.sin(a - 0.45)], h2 = [x2 - L * Math.cos(a + 0.45), y2 - L * Math.sin(a + 0.45)];
+    return `M${f(x1)} ${f(y1)} Q${f(mx)} ${f(my)} ${f(x2)} ${f(y2)} M${f(h1[0])} ${f(h1[1])} L${f(x2)} ${f(y2)} L${f(h2[0])} ${f(h2[1])}`;
+  }
+  const stroke = (d, c, w = 1.9, dash = '') => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"${dash ? ` stroke-dasharray="${dash}"` : ''}/>`;
+
+  // ---- a board: each kind's ink on one ground --------------------------------
+  function familyOrder(m) {
+    const order = [], seen = new Set();
+    const visit = k => {
+      if (seen.has(k.name)) return;
+      seen.add(k.name); order.push(k);
+      for (const c of m.kinds.filter(c => c.parent === k.name)) visit(c);
+    };
+    for (const k of m.kinds.filter(k => !k.parent || !m.lens.kinds.has(k.parent))) visit(k);
+    for (const k of m.kinds) visit(k);
+    return order;
+  }
+
+  function board(m, g, cols = 3) {
+    const ink = S.GROUNDS[g].ink, ground = S.GROUNDS[g].ground, quiet = QUIET[g];
+    const cw = 196, chh = 112, pad = 12;
+    const order = familyOrder(m);
+    // A family stays on one row when it fits, so its arrows run along the gap under it.
+    const fams = [];
+    for (const k of order) {
+      if (!k.parent || !m.lens.kinds.has(k.parent) || !fams.length) fams.push([k]);
+      else fams[fams.length - 1].push(k);
+    }
+    const cells = [];
+    let col = 0, row = 0;
+    const put = c => { cells.push({ ...c, col, row }); col++; if (col >= cols) { col = 0; row++; } };
+    for (const fam of fams) {
+      if (fam.length <= cols && col + fam.length > cols) { col = 0; row++; }
+      for (const k of fam) put({ type: 'kind', k });
+    }
+    if (order.length) put({ type: 'offered', k: order[0] });
+    put({ type: 'ink' });
+    const rows = Math.max(...cells.map(c => c.row)) + 1;
+    const W = pad * 2 + cols * cw, H = pad * 2 + rows * chh;
+    const at = new Map();
+    for (const c of cells) { c.x = pad + c.col * cw; c.y = pad + c.row * chh; if (c.type === 'kind') at.set(c.k.name, c); }
+    const said = k => m.col.get(k.name)[g].said.hex;
+    const dashOf = k => DASH[m.ch.get(k.name).channel];
+    const under = (a, b, i = 0) => { // along the gap below a row, from one cell to another
+      const x1 = a.x + 52 + i * 12, y1 = a.y + 100, x2 = b.x + 38, y2 = b.y + 100;
+      if (a.row === b.row) return arrow(x1, y1, x2, y2, 24 / Math.max(40, x2 - x1));
+      return arrow(a.x + 60, a.y + 102, b.x + 26, b.y + 8, 0.1);
+    };
+    let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ink of each kind ${g === 'paper' ? 'on paper' : 'in the dark room'}">`;
+    s += `<defs><pattern id="grid-${g}" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="${GRID[g]}"/></pattern></defs>`;
+    s += `<rect width="${W}" height="${H}" fill="${ground}"/><rect width="${W}" height="${H}" fill="url(#grid-${g})"/>`;
+
+    // Arrows first, under the ink they join. Within a family, the family's colour.
+    const childIndex = new Map();
+    for (const c of cells) {
+      if (c.type !== 'kind' || !c.k.parent || !at.has(c.k.parent)) continue;
+      const p = at.get(c.k.parent), par = m.lens.kinds.get(c.k.parent);
+      const i = childIndex.get(par.name) || 0;
+      childIndex.set(par.name, i + 1);
+      s += `<g><title>${esc(c.k.parent)} → ${esc(c.k.name)}: both are ${esc(c.k.parent)}s, so the arrow takes ${esc(c.k.parent)}'s colour</title>`;
+      s += stroke(under(p, c, i), said(par), 1.6, dashOf(par)) + '</g>';
+    }
+    // One arrow between neighbours of different kinds: it stays ink.
+    const kindCells = cells.filter(c => c.type === 'kind');
+    for (let i = 0; i + 1 < kindCells.length; i++) {
+      const a = kindCells[i], b = kindCells[i + 1];
+      if (a.row !== b.row || a.k.parent || b.k.parent || b.col !== a.col + 1) continue;
+      s += `<g><title>${esc(a.k.name)} → ${esc(b.k.name)}: different kinds, so the arrow stays ink</title>`;
+      s += stroke(under(a, b), ink, 1.5) + '</g>';
+      break;
+    }
+
+    for (const c of cells) {
+      const r = rng(hash((c.k ? c.k.name : 'ink') + ':' + c.type));
+      const { x, y } = c;
+      if (c.type === 'kind') {
+        const k = c.k, col = said(k), dash = dashOf(k);
+        s += `<g><title>${esc(k.name)} · said · ${m.col.get(k.name)[g].said.hex}</title>`;
+        s += `<text x="${x + 10}" y="${y + 20}" fill="${col}" class="lbl">${esc(k.name)}</text>`;
+        if (k.parent) s += `<text x="${x + 10}" y="${y + 33}" fill="${quiet}" class="sub">a kind of ${esc(k.parent)}</text>`;
+        for (const d of writing(r, x + 12, y + 58, 104 + r() * 16)) s += stroke(d, col);
+        for (const d of writing(r, x + 12, y + 84, 62 + r() * 40)) s += stroke(d, col);
+        const shape = (c.col + c.row) % 3;
+        if (shape === 0) s += stroke(loop(r, x + 160, y + 64, 21, 18), col, 1.9, dash);
+        else if (shape === 1) s += stroke(box(r, x + 136, y + 44, 44, 40), col, 1.9, dash);
+        else s += stroke(tri(r, x + 138, y + 44, 42, 38), col, 1.9, dash);
+        s += '</g>';
+      } else if (c.type === 'offered') {
+        const k = c.k, off = m.col.get(k.name)[g].offered.hex, chip = `${k.name}? · keep · not this`;
+        s += `<g><title>Written among the ${esc(k.name)}s: ${esc(k.name)} is offered, muted, until you keep it or say not this</title>`;
+        s += `<text x="${x + 10}" y="${y + 20}" fill="${quiet}" class="sub">offered by nearness</text>`;
+        for (const d of writing(r, x + 12, y + 50, 112)) s += stroke(d, off);
+        for (const d of writing(r, x + 12, y + 74, 80)) s += stroke(d, off);
+        s += `<rect x="${x + 10}" y="${y + 86}" width="${f(16 + chip.length * 6.4)}" height="18" rx="9" fill="none" stroke="${quiet}" stroke-width="1"/>`;
+        s += `<text x="${x + 18}" y="${y + 99}" fill="${quiet}" class="sub">${esc(chip)}</text></g>`;
+      } else {
+        s += `<g><title>No kind yet: the ink of this ground</title>`;
+        s += `<text x="${x + 10}" y="${y + 20}" fill="${quiet}" class="sub">no kind yet: ink</text>`;
+        for (const d of writing(r, x + 12, y + 52, 118)) s += stroke(d, ink);
+        for (const d of writing(r, x + 12, y + 78, 72)) s += stroke(d, ink);
+        s += stroke(loop(r, x + 162, y + 68, 16, 14), ink) + '</g>';
+      }
+    }
+    return s + '</svg>';
+  }
+
+  // ---- the wheel ---------------------------------------------------------------
+  function wheel(m, g) {
+    const cx = 260, cy = 206, R = 124, T = 20;
+    const rad = h => ((h - 90) * Math.PI) / 180;
+    const P = (r, h) => [cx + r * Math.cos(rad(h)), cy + r * Math.sin(rad(h))];
+    const sector = (r0, r1, h0, h1, fill) => {
+      const a = P(r1, h0), b = P(r1, h1), c = P(r0, h1), d = P(r0, h0);
+      return `<path d="M${f(a[0])} ${f(a[1])} A${r1} ${r1} 0 0 1 ${f(b[0])} ${f(b[1])} L${f(c[0])} ${f(c[1])} A${r0} ${r0} 0 0 0 ${f(d[0])} ${f(d[1])}Z" fill="${fill}"/>`;
+    };
+    const depthR = k => R - Math.min(k.depth, 3) * 32;
+    let s = `<svg viewBox="0 0 520 412" role="img" aria-label="The kinds on the hue wheel">`;
+    for (let h = 0; h < 360; h += 4) s += sector(R - T / 2, R + T / 2, h, h + 4.4, S.colourOf({ hue: h + 2, depth: 0 }, g).hex);
+    for (const sig of S.SIGNALS) {
+      const a = P(R + T / 2 + 2, sig.hue), b = P(R + T / 2 + 10, sig.hue);
+      s += `<line x1="${f(a[0])}" y1="${f(a[1])}" x2="${f(b[0])}" y2="${f(b[1])}" class="tick"><title>the chrome's colour for ${esc(sig.name)} (${Math.round(sig.hue)}°): never on ink</title></line>`;
+    }
+
+    // relations under the dots
+    for (const k of m.kinds) if (k.parent && m.lens.kinds.has(k.parent)) {
+      const p = m.lens.kinds.get(k.parent), a = P(depthR(p), p.hue), b = P(depthR(k), k.hue);
+      s += `<line x1="${f(a[0])}" y1="${f(a[1])}" x2="${f(b[0])}" y2="${f(b[1])}" stroke="${m.col.get(p.name)[g].said.hex}" stroke-width="1.6"/>`;
+    }
+    for (const rel of m.lens.rels) {
+      const A = m.lens.kinds.get(rel.a), B = m.lens.kinds.get(rel.b);
+      if (!A || !B) continue;
+      if (rel.rel === 'kin') {
+        const rr = R + T / 2 + 16;
+        let h0 = A.hue, h1 = B.hue;
+        if (S.norm(h1 - h0) > 180) [h0, h1] = [h1, h0];
+        const a = P(rr, h0), b = P(rr, h1);
+        s += `<path d="M${f(a[0])} ${f(a[1])} A${rr} ${rr} 0 0 1 ${f(b[0])} ${f(b[1])}" class="rel"><title>${esc(rel.a)} is kin to ${esc(rel.b)}</title></path>`;
+      } else {
+        const a = P(depthR(A), A.hue), b = P(depthR(B), B.hue);
+        s += `<line x1="${f(a[0])}" y1="${f(a[1])}" x2="${f(b[0])}" y2="${f(b[1])}" class="rel opp"><title>${esc(rel.a)} opposes ${esc(rel.b)}</title></line>`;
+      }
+    }
+    // dots, and labels pushed apart so none sits on another
+    const groups = new Map();
+    for (const k of m.kinds) {
+      const d = Math.min(k.depth, 3);
+      if (!groups.has(d)) groups.set(d, []);
+      groups.get(d).push({ k, lh: k.hue });
+    }
+    for (const [d, list] of groups) {
+      list.sort((a, b) => a.k.hue - b.k.hue);
+      const gap = d === 0 ? 15 : 22;
+      for (let pass = 0; pass < 60 && list.length > 1; pass++) {
+        let moved = false;
+        for (let i = 0; i < list.length; i++) {
+          const a = list[i], b = list[(i + 1) % list.length];
+          const diff = S.norm(b.lh - a.lh);
+          if (diff < gap) { const push = (gap - diff) / 2 + 0.1; a.lh = S.norm(a.lh - push); b.lh = S.norm(b.lh + push); moved = true; }
+        }
+        if (!moved) break;
+      }
+      for (const { k, lh } of list) {
+        const c = m.col.get(k.name)[g].said.hex, rr = depthR(k), [x, y] = P(rr, k.hue);
+        s += `<circle cx="${f(x)}" cy="${f(y)}" r="${d === 0 ? 7.5 : 6}" fill="${c}" class="dot"><title>${esc(k.name)} · ${Math.round(k.hue)}° · depth ${k.depth}</title></circle>`;
+        const lr = d === 0 ? R + T / 2 + 30 : rr - 15;
+        const [lx, ly] = P(lr, lh), cos = Math.cos(rad(lh));
+        const out = d === 0;
+        const anchor = Math.abs(cos) < 0.25 ? 'middle' : (cos > 0) === out ? 'start' : 'end';
+        s += `<text x="${f(lx)}" y="${f(ly + 4)}" text-anchor="${anchor}" fill="${c}" class="${d === 0 ? 'wl' : 'wl in'}">${esc(k.name)}</text>`;
+      }
+    }
+    return s + '</svg>';
+  }
+
+  // ---- the words, the acts, the ledger, the key ------------------------------
+  function paint(text, m, g) {
+    let h = esc(text);
+    const names = m.kinds.map(k => k.name).sort((a, b) => b.length - a.length);
+    if (!names.length) return h;
+    const re = new RegExp('\\b(' + names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')\\b', 'g');
+    return h.replace(re, n => `<span class="k" style="color:${m.col.get(n)[g].said.hex}">${n}</span>`);
+  }
+
+  function chosenBy(k) {
+    const own = k.source === 'said' ? `you said ${k.word}` : '';
+    if (k.source === 'said') return own + (k.parent ? `; a kind of ${k.parent}` : '');
+    if (k.source === 'placed') return 'the most distinct place left';
+    if (k.rel === 'sub') return `a kind of ${k.anchor}${k.offset ? `, ${k.offset > 0 ? '+' : '−'}${Math.abs(k.offset)}°` : ''}`;
+    if (k.rel === 'kin') return `kin to ${k.anchor}, ${Math.abs(Math.round(k.offset))}° beside it`;
+    if (k.rel === 'opposes') return `across from ${k.anchor}`;
+    return '';
+  }
+
+  function swatch(m, k, g) {
+    const c = m.col.get(k.name)[g], dash = DASH[m.ch.get(k.name).channel];
+    return `<svg viewBox="0 0 108 30" aria-hidden="true"><rect width="108" height="30" fill="${S.GROUNDS[g].ground}"/>` +
+      stroke('M10 10 C34 4 64 15 98 9', c.said.hex, 2.4, dash) + stroke('M10 21 C34 15 64 26 98 20', c.offered.hex, 2.4, dash) + '</svg>';
+  }
+
+  function ledger(m, g) {
+    if (!m.kinds.length) return '<tbody><tr><td class="meta">No kinds yet. Say one in the field above: <em>it\'s an idea · purple</em>.</td></tr></tbody>';
+    let s = '<thead><tr><th>Kind</th><th>Its hue, chosen by</th><th class="num">Hue</th><th class="num">Depth</th><th>On paper</th><th class="num">Contrast</th><th>In the dark room</th><th class="num">Contrast</th><th>Second channel</th></tr></thead><tbody>';
+    for (const k of familyOrder(m)) {
+      const c = m.col.get(k.name), ch = m.ch.get(k.name);
+      const con = x => `<span class="${x.contrast >= S.FLOOR ? 'ok' : 'warn'}">${x.contrast.toFixed(1)}:1</span>${x.moved ? `<br><span class="hex">lightness moved ${x.moved} to read</span>` : ''}`;
+      s += `<tr><td><span class="k" style="color:${c[g].said.hex}">${esc(k.name)}</span></td>` +
+        `<td>${esc(chosenBy(k))}</td><td class="num">${Math.round(k.hue)}°</td><td class="num">${k.depth}${k.depth > S.DEPTHS ? ' <span class="hex">(drawn as ' + S.DEPTHS + ')</span>' : ''}</td>` +
+        `<td class="sw">${swatch(m, k, 'paper')}<span class="hex num">${c.paper.said.hex} · ${c.paper.offered.hex}</span></td><td class="num">${con(c.paper.said)}</td>` +
+        `<td class="sw">${swatch(m, k, 'dark')}<span class="hex num">${c.dark.said.hex} · ${c.dark.offered.hex}</span></td><td class="num">${con(c.dark.said)}</td>` +
+        `<td>${ch.channel === 'solid' ? '<span class="hex">none needed</span>' : `${esc(ch.channel)}<br><span class="hex">beside ${esc(ch.alike)}, alike to ${esc(ch.who.join(', '))}</span>`}</td></tr>`;
+    }
+    return s + '</tbody>';
+  }
+
+  function key(m, g) {
+    const first = m.kinds[0] || { name: 'idea', hue: 305, depth: 0 };
+    const at = (hue, depth, cert = 'said') => S.colourOf({ hue, depth }, g, cert).hex;
+    const svg = inner => `<svg viewBox="0 0 92 30" aria-hidden="true">${inner}</svg>`;
+    const hues = svg([0, 1, 2, 3, 4, 5, 6, 7].map(i => stroke(`M${6 + i * 11} 22 L${12 + i * 11} 8`, at(first.hue + i * 45, 0), 3.2)).join(''));
+    const depth = svg([0, 1, 2].map(d => stroke(`M${8 + d * 28} 15 C${16 + d * 28} 6 ${22 + d * 28} 24 ${30 + d * 28} 15`, at(first.hue, d), 3.2)).join(''));
+    const sure = svg(stroke('M8 15 C18 6 28 24 40 15', at(first.hue, 0), 3.2) + stroke('M52 15 C62 6 72 24 84 15', at(first.hue, 0, 'offered'), 3.2));
+    return `<div class="axis"><dt>Hue<small>h°, the angle</small></dt><dd>Which kind, and its kin. Kin take nearby hues and opposites the hue across the wheel. Every other kind goes wherever it is easiest to tell apart from the rest.</dd>${hues}</div>` +
+      `<div class="axis"><dt>Lightness<small>L, 0 to 1</small></dt><dd>Depth. Each step down a family is a step toward the ground: lighter on paper, darker in the dark room.</dd>${depth}</div>` +
+      `<div class="axis"><dt>Chroma<small>C, how vivid</small></dt><dd>How sure. A kind you said is drawn vivid and a kind the canvas offers is drawn muted. A model's guess is only a chip and never colours the ink.</dd>${sure}</div>`;
+  }
+
+  // ---- render ------------------------------------------------------------------
+  function render(fresh) {
+    const m = build(), g = pageGround();
+    $('#axes').innerHTML = key(m, g);
+    for (const g of ['paper', 'dark']) { const el = $('#meta-' + g); if (el) el.textContent = `ground ${S.GROUNDS[g].ground} · ink ${S.GROUNDS[g].ink}`; }
+    const cols = colsNow();
+    $('#board-paper').innerHTML = board(m, 'paper', cols);
+    $('#board-dark').innerHTML = board(m, 'dark', cols);
+    laidCols = cols;
+    $('#wheel').innerHTML = wheel(m, g);
+    $('#wheel-cap').textContent = `Hue is the angle, and depth goes inward. Kin share an arc; opposites, a dashed line. Ticks mark the chrome's own colours. The ring is drawn ${g === 'paper' ? 'as on paper' : 'as in the dark room'}, at OKLCH L ${S.GROUNDS[g].L[0]} and C ${S.GROUNDS[g].C}.`;
+    $('#meaning').innerHTML = m.meaning.length ? m.meaning.map(l => `<li>${paint(l, m, g)}</li>`).join('') : '<li>No kinds yet, so the colours say nothing. Ink stays ink until you say what something is.</li>';
+    $('#acts').innerHTML = m.answers.map((a, i) =>
+      `<li class="${a.ok ? '' : 'bad'}"><span class="n num">${i + 1}</span><span class="said">${esc(a.text)}</span>` +
+      `<button class="x" type="button" data-i="${i}" aria-label="Take back act ${i + 1}" title="take this act back">×</button>` +
+      `<span class="ans">${a.ok ? paint(a.answer, m, g) : 'not read'}</span></li>`).join('') || '<li class="meta">No acts yet.</li>';
+    $('#ledger').innerHTML = ledger(m, g);
+    if (fresh) for (const el of document.querySelectorAll('.board, #wheel')) { el.classList.remove('fresh'); void el.offsetWidth; el.classList.add('fresh'); }
+    return m;
+  }
+
+  let laidCols = 3;
+  function colsNow() { const w = $('#board-paper').clientWidth || 600; return w < 520 ? 2 : 3; }
+  let resizeTimer = null;
+  addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (colsNow() !== laidCols) render(false); }, 120); });
+
+  function sayIt(text) {
+    const t = text.trim();
+    if (!t) return;
+    const act = S.read(t);
+    if (!act) {
+      $('#reading').innerHTML = `<span class="no">Not read.</span> Try <em>it's a ‹kind› · ‹colour›</em>, <em>‹a› is a kind of ‹b›</em>, <em>‹a› opposes ‹b›</em> or <em>‹a› is kin to ‹b›</em>.`;
+      return;
+    }
+    acts.push(t);
+    save();
+    const m = render(true);
+    $('#reading').innerHTML = '› ' + paint(m.answers[m.answers.length - 1].answer, m, pageGround());
+  }
+
+  $('#form').addEventListener('submit', e => { e.preventDefault(); const i = $('#say'); sayIt(i.value); i.value = ''; });
+  const ex = $('#examples');
+  for (const t of EXAMPLES) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip'; b.textContent = t;
+    b.addEventListener('click', () => sayIt(t));
+    ex.appendChild(b);
+  }
+  $('#acts').addEventListener('click', e => {
+    const b = e.target.closest('.x');
+    if (!b) return;
+    acts.splice(Number(b.dataset.i), 1); save(); render(true);
+    $('#reading').textContent = 'Taken back. Everything after it was placed again from the acts that remain.';
+  });
+  $('#undo').addEventListener('click', () => { if (!acts.length) return; acts.pop(); save(); render(true); $('#reading').textContent = 'The last act is taken back.'; });
+  $('#reset').addEventListener('click', () => { acts = SEED.slice(); save(); render(true); $('#reading').textContent = 'Back to the kinds you named.'; });
+  $('#clear').addEventListener('click', () => { acts = []; save(); render(true); $('#reading').textContent = 'No kinds: every mark is ink. Say what something is.'; });
+  $('#seeing').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    vision = b.dataset.v;
+    for (const x of $('#seeing').querySelectorAll('button')) x.setAttribute('aria-pressed', String(x === b));
+    const sp = $('#specimen');
+    sp.classList.remove('sim-protan', 'sim-deutan', 'sim-tritan');
+    if (vision !== 'typical') sp.classList.add('sim-' + vision);
+    $('#reading').textContent = vision === 'typical' ? 'Seen as most eyes see it.' : `Seen as with ${HOW[vision]}, simulated (Machado 2009). Patterns mark the kinds that would otherwise look alike.`;
+  });
+  readTokens();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => render(false));
+  new MutationObserver(() => render(false)).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  render(false);
+})();
+</script>
+</body>
+</html>
