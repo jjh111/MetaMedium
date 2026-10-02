@@ -1,4 +1,4 @@
-// The name a person sees (RENAME-PLAN.md §1, unit N3a).
+// The name a person sees (RENAME-PLAN.md §1; units N3a, N3d and N3e).
 //
 //   node --test scripts/name.test.mjs
 //
@@ -7,8 +7,10 @@
 // whitepaper and its 404, the app at both addresses and their manifests, the
 // help, the 3D surface's page, the strings of the surface's fragments, and what a
 // session connects to: the MCP servers .mcp.json registers and the strings of the
-// hands, the door and the seat's watcher (N3d) — and fails on "MetaMedium", in
-// any case, except where it is:
+// hands, the door and the seat's watcher (N3d) — and the last strings a person
+// meets outside the pages (N3e): the commit messages the repository backend
+// writes into a person's own repository, and the programs written for the canvas
+// — and fails on "MetaMedium", in any case, except where it is:
 //
 //   - inside an ADDRESS: a URL, a host and path, a path the site serves, a file
 //     name. The repository and its Pages path keep the old name until H1, and an
@@ -24,7 +26,8 @@
 // attributes — but not its comments, a style's comments, or the code of an
 // inline script, only that script's strings; in a fragment, its string
 // literals and nothing else. A wordmark split by markup (<span>Meta</span>Medium)
-// is read as the one word it shows.
+// is read as the one word it shows, and so is one a program draws in two strings
+// ('Meta', then 'Medium').
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -46,6 +49,10 @@ const HANDS = ['Demos/mcp.mjs', 'dynaink-3d/mcp.mjs', 'Demos/mcp-client.mjs', 'D
 // The servers .mcp.json registers, by the names a session lists them under (`/mcp`, mcp__<name>__<tool>), and
 // the hand each one runs.
 const SERVERS = { dynaink: 'Demos/mcp.mjs', 'dynaink-3d': 'dynaink-3d/mcp.mjs' };
+// The last strings a person meets outside the pages (N3e): the repository backend's commit messages, which land in
+// the person's own GitHub repository, and the programs written for the canvas, which draw on the board.
+const OUTSIDE = ['core/src/store/git.ts'];
+const PROGRAMS = readdirSync(join(root, 'Demos/programs')).filter((f) => /\.run\.js$/.test(f)).sort().map((f) => 'Demos/programs/' + f);
 
 /** The titles of outside works that carry the old name. They are cited, never renamed. */
 const OUTSIDE_TITLES = [/A Day with MetaMedium/i];
@@ -259,6 +266,22 @@ function hits() {
   for (const file of WHOLE) { const t = read(file); look(file, t.replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, ' ')), t); }
   for (const file of FRAGMENTS) { const t = read(file); look(file, scriptStrings(t), t); }
   for (const file of HANDS) { const t = read(file); look(file, scriptStrings(t), t, false); }
+  // A commit message and a program's words are no essay: a lowercase `metamedium` there is the old name, not Kay's idea.
+  for (const file of OUTSIDE) { const t = read(file); look(file, scriptStrings(t), t, false); }
+  for (const file of PROGRAMS) {
+    const t = read(file);
+    // Its file name is no address here: a board that opens the folder shows it on the program's frame.
+    if (/metamedium/i.test(file.split('/').pop())) found.push({ file, line: 0, text: `the file's own name, which its frame on a board shows`, split: false, address: false, idea: false, title: false });
+    look(file, scriptStrings(t), t, false);
+    // A wordmark a program draws in two strings, its halves in two colours: 'Meta' within a few strings of 'Medium'.
+    const strings = stringRanges(t).map(([a, b]) => ({ at: a, s: t.slice(a, b) }));
+    strings.forEach(({ at, s: str }, i) => {
+      if (!/^meta$/i.test(str)) return;
+      const near = strings.slice(Math.max(0, i - 3), i + 4);
+      if (!near.some((o) => /^medium$/i.test(o.s))) return;
+      found.push({ file, line: lineOf(t, at), text: lineAround(t, at).trim(), split: 'in two strings', address: false, idea: false, title: false });
+    });
+  }
   look('.mcp.json', read('.mcp.json'), read('.mcp.json'), false);
   return found;
 }
@@ -305,7 +328,7 @@ test('a person sees dyna.ink, never MetaMedium — outside an address, the idea,
   const named = all.filter((h) => !h.address && !h.idea && !h.title);
   const wrong = named.filter((h) => !allowedBy(h));
   assert.ok(all.length > 0, 'the test found no addresses or ideas at all — is it reading the files?');
-  assert.deepEqual(wrong.map((h) => `${h.file}:${h.line}${h.split ? ' (split by markup)' : ''} — ${h.text.slice(0, 160)}`), [],
+  assert.deepEqual(wrong.map((h) => `${h.file}:${h.line}${h.split ? ` (split ${h.split === true ? 'by markup' : h.split})` : ''} — ${h.text.slice(0, 160)}`), [],
     `${wrong.length} place(s) a person sees name the product MetaMedium — say dyna.ink (DynaInk3D for the 3D surface; RENAME-PLAN §1)`);
 });
 

@@ -74,6 +74,8 @@ describe('the git store', () => {
     await store.write('index.html', '<p>changed</p>');
     const put = gh.calls.find((c) => c.method === 'PUT')!;
     expect(put.url).toMatch(/\/contents\/index\.html$/);
+    // The commit lands in the person's own repository, so its message says the product's name (RENAME-PLAN §1, N3e).
+    expect((put.body as { message: string }).message).toBe('dyna.ink: index.html');
     expect((put.body as { sha: string; branch: string }).sha).toBe('sha1');
     expect((put.body as { branch: string }).branch).toBe('trunk');
     expect(gh.files['index.html']).toBe('<p>changed</p>');
@@ -86,7 +88,7 @@ describe('the git store', () => {
     expect(logText.split('\n')[0]).toContain('metamedium-log');
     const puts = gh.calls.filter((c) => c.method === 'PUT' && /jsonl/.test(c.url));
     expect(puts).toHaveLength(2);
-    expect((puts[1].body as { message: string }).message).toMatch(/me, 1 event/);
+    expect((puts[1].body as { message: string }).message).toBe('dyna.ink: me, 1 event');
     // The token travels only in the Authorization header.
     expect(gh.calls.every((c) => !/tok/.test(c.url))).toBe(true);
   });
