@@ -28,8 +28,9 @@ import { ROUTE } from './route';
 import { WHICH } from './which';
 import { TRACE } from './trace';
 import { REGION } from './region';
+import { LIKE } from './like';
 
-export const BUILTIN_TOOLS = [CORRECT, TEXT, NAME, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES, TEXT_EDIT, VERBS, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH, TRACE, REGION] as const;
+export const BUILTIN_TOOLS = [CORRECT, TEXT, NAME, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES, TEXT_EDIT, VERBS, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH, TRACE, REGION, LIKE] as const;
 
 registerTool(CORRECT);
 registerTool(TEXT);
@@ -55,3 +56,4 @@ registerTool(ROUTE);
 registerTool(WHICH);
 registerTool(TRACE);
 registerTool(REGION);
+registerTool(LIKE);

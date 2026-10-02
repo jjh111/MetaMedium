@@ -272,6 +272,21 @@ reader default on OpenRouter; Claude Code's seat cannot read a picture until the
 labelled, read), derived and cached, never in the log; *notes like this* in the
 field and in search. Lazy, under 32 MB.
 
+*Status, 1 Oct 2026: I9 built on `unit/i9-semantic` (`CLAUDE.md`, *The semantic seat*, has it whole).* The seam is
+core's and pure (`metamedium-core/src/semantic/`: an injectable `EmbedTransport`, cosine, a stub whose related words score
+higher, `semanticScorer` — the function `searchBoards` takes, each text embedded once — `notesLike` with each note's number
+and reason, and a static-embedding reader for Model2Vec's format: safetensors, a WordPiece tokenizer, the mean of the rows),
+the tool is *Notes like this* (`tools/like.ts`: typed only, offered only with a semantic seat held, so e2e 49 cannot move; a
+region's is a button in its panel), and the surface's seat row loads a model from an address by one tap — never at boot,
+never on draw — kept in the browser's cache, no key, every failure in words (`03-semantic.js`; Find asks by meaning once a
+query rests and says *by meaning 0.71*; the pane lists *notes like “…”*). Core tests 38 in three files (and two existing lists that name the tools say the new one), surface rules 5, e2e
+`boards` N24–N24l (a stand-in seated for Find, the offer and the region; the page's own loader against a model the gate
+BUILDS and serves; refusals, a reload that loads nothing, the cache, no key). **Unrun: the real `potion-base-8M`** — the
+container cannot reach its host — so its files have never passed through this reader; `scripts/check-semantic-model.mjs
+<folder|https://…>` is the command that does it. Not done: grouping, the decider or the field's readings by meaning, the MCP hand
+searching, a pinned revision for the default address. Open for John: which model and size, and whether loading it from
+huggingface.co at the user's tap is fine, or it is served from dyna.ink (`SEMANTIC_SOURCE`, `03-seats.js`).
+
 **I10 — the walk.** John's workflow (§2) on the iPad Pro, by hand, with the MCP
 hand in the room checking each step — `QA-v1.md` §A11 — and the faults written
 up, the V1 review's pattern.

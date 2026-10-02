@@ -23,6 +23,8 @@ const MODEL_HOSTS = [
   'generativelanguage.googleapis.com',
   'api.mistral.ai',
   'api.groq.com',
+  // A semantic seat's model is a file on this host (PLAN-IPAD-NOTES I9); the gate never fetches the real one — it serves its own.
+  'huggingface.co',
 ];
 
 /**

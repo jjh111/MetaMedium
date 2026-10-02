@@ -20,10 +20,12 @@ const picture = (s: Session) => s.import({ kind: 'jpg', path: 'p.jpg', bounds: {
 const keys = (s: Session) => offersFor(toolScope(s, {})).map((o) => o.key);
 
 describe('region — the tool', () => {
-  it('is registered last, and describes itself', () => {
+  it('is registered after trace (and, since I9, before notes like this), and describes itself', () => {
     const t = registeredTools();
-    expect(t[t.length - 1].id).toBe('region');
-    expect(t[t.length - 1].describe()).toMatch(/holds whatever stands inside/);
+    const at = t.findIndex((x) => x.id === 'region');
+    expect(t[at - 1].id).toBe('trace');
+    expect(t[at + 1].id).toBe('like');
+    expect(t[at].describe()).toMatch(/holds whatever stands inside/);
   });
 
   it('a rectangle drawn round three notes and a picture is offered Make it a region, once held with them', () => {

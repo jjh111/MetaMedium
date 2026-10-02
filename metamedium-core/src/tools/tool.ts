@@ -51,6 +51,12 @@ export interface ToolHost {
    * is in the decider seat and *Which is it?* is not offered.
    */
   decider?: { name: string } | null;
+  /**
+   * The semantic seat held here, if one is (PLAN-IPAD-NOTES I9): a small model that runs on this device, its name
+   * in words. Absent or null, nobody is in the seat and *Notes like this* is not offered — which is why the
+   * field's offers on a device with no seat are what they always were.
+   */
+  semantic?: { name: string } | null;
   /** Whether a mark's writing has been read — a transcript held, or read with its line (runtime). */
   isRead(id: string): boolean;
   /**

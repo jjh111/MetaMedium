@@ -655,9 +655,9 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
           seats.writer && seats.writer.model === 'z-ai/glm-5.3-flash' && seats.reader && seats.reader.model === 'z-ai/glm-4.5v' && seats.decider && seats.decider.model === JEV &&
           seats.any.length === 1 && seats.any[0].model === 'openai/gpt-4o-mini' && seats.keys.length === 1 && seats.keys[0] === KEYS_AT(base) && chats().length === before,
         { w, r, d, a, seats, keyField });
-      check(`M13b. each seat says who holds it — ${['reader', 'writer', 'decider'].map((k) => k + ': ' + (rows[k] && rows[k].who)).join(' / ')} — and the semantic seat says it is on this device and coming`,
+      check(`M13b. each seat says who holds it — ${['reader', 'writer', 'decider'].map((k) => k + ': ' + (rows[k] && rows[k].who)).join(' / ')} — and the semantic seat (I9) says nobody holds it, that what would is on this device and no key, and offers to load it — no longer that it is coming`,
         !!rows.reader && /GLM 4\.5V/.test(rows.reader.who) && /sees/.test(rows.reader.who) && /GLM 5\.3 Flash/.test(rows.writer.who) && /Jev/.test(rows.decider.who) && /local/.test(rows.decider.who) && /0\.99/.test(rows.decider.who) &&
-          !!rows.semantic && /on this device/.test(rows.semantic.who + rows.semantic.fallback) && /coming/.test(rows.semantic.who + rows.semantic.fallback) && !rows.semantic.tryable,
+          !!rows.semantic && /nothing chosen/.test(rows.semantic.who) && /on this device/.test(rows.semantic.who + rows.semantic.fallback) && !/coming/.test(rows.semantic.who + rows.semantic.fallback) && !rows.semantic.tryable,
         rows);
       const seen = [];
       for (const k of ['writer', 'reader', 'decider']) seen.push(await trySeat(p2, k));

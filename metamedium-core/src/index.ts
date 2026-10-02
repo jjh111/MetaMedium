@@ -758,6 +758,7 @@ export { LABELLING_IS, labelInk, theirMarks, madeThese, makersOf, whoseInk } fro
 export type { LabelRefusal } from './tools/label';
 export { REGION, makeRegion, regionFrameOf, regionRound, nextRegionName, REGION_MIN_HELD, REGION_MARGIN_SHARE, REGION_MARGIN_MIN } from './tools/region';
 export type { RegionMade } from './tools/region';
+export { LIKE } from './tools/like';
 export { standStructure } from './tools/structure';
 export { shapesSummary } from './tools/clean';
 export { isWritingMark, definitionOf, definitionsIn, artifactsIn, writingLine } from './tools/board';
@@ -1014,3 +1015,29 @@ export {
   MAX_ENTRIES as SEARCH_MAX_ENTRIES,
 } from './search';
 export type { SearchEntry, SearchKind, SearchSource, SearchBoard, SearchHit, SearchGroup, SearchOptions } from './search';
+
+// The semantic seat (I9, PLAN-IPAD-NOTES): an injectable transport from texts to vectors, the score function Find
+// takes, *notes like this*, and a static-embedding model (Model2Vec's format) read from its own two files. Pure;
+// the surface loads the files, lazily, behind the seat's own control. Derived, never in a log.
+export {
+  cosine as semanticCosine,
+  unit as semanticUnit,
+  createEmbedCache,
+  createStubEmbedTransport,
+  embedAll,
+  EmbedError,
+  EMBED_BATCH,
+  semanticScorer,
+  notesLike,
+  groupLikes,
+  wordsOfMarks,
+  LIKE_MAX_CHARS,
+  createStaticTransport,
+  buildStaticModel,
+  parseSafetensors,
+  safetensorsNames,
+  wordPieceOf,
+  StaticModelError,
+  MAX_TOKENS as STATIC_MAX_TOKENS,
+} from './semantic';
+export type { EmbedTransport, EmbedOptions, EmbedCache, StubEmbedOptions, SemanticFn, NoteLike, NotesSource, NotesOptions, StaticModelFiles, BuildOptions as StaticBuildOptions } from './semantic';

@@ -3,7 +3,9 @@
 //   and resolveWriters (who is asked to read and who to write, with the fallback said), fallbackWords (what a seat
 //   does when nothing is chosen for it), keyId, keysToKeep and migrateStored (one key a provider; what is kept on
 //   the device; an old pick and key become the writer seat), orderChoices (local before hosted, quickest first),
-//   seatsOfPick and pickOf (what a kept pick holds, and never a key).
+//   seatsOfPick and pickOf (what a kept pick holds, and never a key), and the semantic seat's (I9): SEMANTIC_SOURCE
+//   (where its model is asked for), semanticSourceOf (an address read, never a key), semanticNameOf, semanticWords (what
+//   its row says), semanticFailed (a load that did not work, in words).
 // Uses: NOTHING. Like 07-hand.js and 09-field.js, this fragment names no closure variable, touches no DOM and asks
 //   the session nothing; 04-models.js is the adapter that gathers the joined models, asks, and acts. So it loads on
 //   its own in Node, which is how it is tested:
@@ -15,7 +17,7 @@
 // THE RULES (PLAN-IPAD-NOTES §3; CLAUDE.md, "Tiered LLM Interpretation")
 //   - A seat is a JOB, not a kind of participant: reader (handwriting to text — a model that sees), writer (briefs,
 //     pages, programs, *What is this?*), decider (a decision model: the engine's own ranking stands unless it is
-//     sure) and semantic (on this device — coming). A model holds the seats the hand gave it; one that holds none
+//     sure) and semantic (on this device: a small model that runs here, no key — I9). A model holds the seats the hand gave it; one that holds none
 //     is "any job", asked as every model was before seats.
 //   - A seat chosen NARROWS who is asked; a seat left alone changes nothing. That is the whole of the migration:
 //     with no seat chosen every rule here returns what the surface did before.
@@ -43,7 +45,7 @@
       case 'reader': return 'nothing chosen — Claude Code reads while it is seated, else the writer if it sees, else the smallest joined model that sees';
       case 'writer': return 'nothing chosen — every joined model that holds no other seat is asked, and Claude Code first while it is seated';
       case 'decider': return 'nothing chosen — the engine’s ranking stands, and nothing offers to ask a decision model';
-      case 'semantic': return 'on this device — coming: a small model that runs here, never a key and never a call';
+      case 'semantic': return 'nothing chosen — search stays by the words typed and nothing offers notes like this; a small model that runs on this device, with no key and no call, would add both';
       default: return '';
     }
   }
@@ -75,6 +77,67 @@
     const chosen = models.filter((m) => !m.claude && m.seats.includes('writer'));
     const pool = chosen.length ? chosen : models.filter((m) => !m.claude && m.seats.length === 0);
     return { who: claude.concat(pool).map((m) => m.id), why: chosen.length ? 'the writer seat' : 'every joined model with no seat' };
+  }
+
+  // ---- the semantic seat (I9): a small model on this device, asked for by an address, no key ----
+
+  /**
+   * Where the seat's model is asked for unless the hand says otherwise: a folder holding `tokenizer.json` and
+   * `model.safetensors` — Model2Vec's `potion-base-8M` (about 30 MB, no GPU; PLAN-IPAD-NOTES §3). UNVERIFIED where this
+   * was written (the container cannot reach the host: the proxy answers 403), and on `main`, not pinned to a revision
+   * — pin it to the commit John checks (the questions at the foot of the unit's status line).
+   */
+  const SEMANTIC_SOURCE = 'https://huggingface.co/minishlab/potion-base-8M/resolve/main/';
+  /** The most a model's file may be before the seat will not take it: the plan's budget is under 32 MB, and a page holds it in memory. */
+  const SEMANTIC_MAX_BYTES = 48 * 1024 * 1024;
+
+  /**
+   * An address the hand typed (or none: the default), read: https, or plain http on this machine only; no user, no
+   * password, no query and no fragment — a key must never ride in an address, and the seat holds none. `{ ok, base }`
+   * with a trailing slash, or `{ ok: false, why }` in words.
+   */
+  function semanticSourceOf(text) {
+    const t = String(text == null ? '' : text).trim();
+    if (!t) return { ok: true, base: SEMANTIC_SOURCE };
+    let u;
+    try { u = new URL(t); } catch (e) { return { ok: false, why: 'that is not an address — give the folder that holds tokenizer.json and model.safetensors, as https://…' }; }
+    const here = u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '[::1]';
+    if (u.protocol !== 'https:' && !(u.protocol === 'http:' && here)) return { ok: false, why: 'a model is fetched over https, or from this machine — “' + u.protocol + '” is neither' };
+    if (u.username || u.password) return { ok: false, why: 'an address with a user or a password in it is refused — the seat holds no key' };
+    if (u.search || u.hash) return { ok: false, why: 'an address with a query or a fragment in it is refused — a key must never ride in an address' };
+    return { ok: true, base: u.origin + (u.pathname.endsWith('/') ? u.pathname : u.pathname + '/') };
+  }
+
+  /** A model named for its folder: the part before `resolve/main`, else the last part, else the host. */
+  function semanticNameOf(base) {
+    let u;
+    try { u = new URL(base); } catch (e) { return String(base || 'model'); }
+    const parts = u.pathname.split('/').filter(Boolean);
+    const at = parts.indexOf('resolve');
+    if (at > 0) return parts[at - 1];
+    return parts.length ? parts[parts.length - 1] : u.host;
+  }
+
+  /** What the seat's row says: who holds it, where it runs, what it came to and that it holds no key. `held` is `{ name, dimension, words?, bytes? }` or null. */
+  function semanticWords(held) {
+    if (!held) return { who: 'nothing chosen' };
+    const bits = [held.name, 'on this device', held.dimension + ' numbers a text'];
+    if (held.words) bits.push(held.words + ' words');
+    if (held.bytes) bits.push(held.bytes < 1048576 ? Math.max(1, Math.round(held.bytes / 1024)) + ' KB' : Math.round(held.bytes / 1048576) + ' MB');
+    bits.push('no key, nothing sent');
+    return { who: bits.join(' · ') };
+  }
+
+  /** A load that did not work, in the person's words. `f`: `{ status?, network?, what?, bytes?, reason? }`. */
+  function semanticFailed(f) {
+    const what = f && f.what ? f.what : 'the model';
+    if (f && f.bytes && f.bytes > SEMANTIC_MAX_BYTES) return what + ' is too big — ' + Math.round(f.bytes / 1048576) + ' MB, more than the ' + Math.round(SEMANTIC_MAX_BYTES / 1048576) + ' MB the seat takes';
+    if (f && f.status === 403) return 'could not load ' + what + ' — the host refused it (HTTP 403): it will not hand that file to this page';
+    if (f && f.status === 404) return 'could not load ' + what + ' — no such file there (HTTP 404)';
+    if (f && f.status) return 'could not load ' + what + ' — the host answered HTTP ' + f.status;
+    if (f && f.network) return 'could not reach ' + what + ' — offline, or the host does not let this page read it';
+    if (f && f.reason) return 'could not use ' + what + ' — it came, but it is not a model this device can read: ' + f.reason;
+    return 'could not load ' + what;
   }
 
   // ---- keys: one a provider ----

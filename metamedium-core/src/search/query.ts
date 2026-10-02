@@ -49,6 +49,10 @@ export interface SearchHit {
   spans: [number, number][];
   box?: Bounds;
   score: number;
+  /** What the meaning seat added (0..1), when one was seated and scored this entry above nothing — I9. Absent otherwise. */
+  meaning?: number;
+  /** Why it is a hit when the hit is *notes like this* (I9): the number and what it shares. Absent in a search. */
+  reason?: string;
 }
 export interface SearchGroup { board: string; name: string; recency: number; score: number; hits: SearchHit[]; more: number }
 
@@ -114,7 +118,7 @@ export function searchBoards(boards: readonly SearchBoard[], query: string, opti
       if (!lex && sem < SEMANTIC_FLOOR) return;
       const score = (lex ? lex.score : 0) * KIND_WEIGHT[e.kind] + sem * SEMANTIC_WEIGHT;
       const ex = excerptOf(e.text, lex ? lex.spans : []);
-      hits.push({ board: b.id, boardName: b.name, id: e.id, kind: e.kind, what: e.what, text: ex.text, spans: ex.spans, ...(e.box ? { box: e.box } : {}), score });
+      hits.push({ board: b.id, boardName: b.name, id: e.id, kind: e.kind, what: e.what, text: ex.text, spans: ex.spans, ...(e.box ? { box: e.box } : {}), score, ...(sem > 0 ? { meaning: sem } : {}) });
     };
     const nameLex = lexical(q, tokenize(b.name));
     if (nameLex) add({ id: null, kind: 'board', text: b.name, what: 'board name' }, nameLex, 0);

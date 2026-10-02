@@ -376,3 +376,57 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
     stop: () => new Promise((ok) => { server.closeAllConnections?.(); server.close(ok); }),
   };
 }
+
+// ---------------------------------------------------------------------------
+// The semantic seat's model host (PLAN-IPAD-NOTES I9): a static-embedding model BUILT for the gate by core's
+// own writer (`buildStaticModel`, from the committed Node bundle) and served from an origin of its own, as a
+// host of the real one would — a folder holding `tokenizer.json` and `model.safetensors`. It proves the page's
+// loader and core's reader end to end; it says nothing about the real `potion-base-8M` (the container cannot
+// reach that host). Beside the good model it serves what goes wrong: a refusal, a missing file, a page of HTML
+// where the weights should be, and a weights file that declares itself far too big. Every request is kept
+// with the headers a key or a cookie would ride in.
+
+/** The words the gate's model knows near each other: what the e2e's notes say, in three groups, and a few that stand alone. */
+export const EMBED_GROUPS = [['pricing', 'price', 'cost', 'budget', 'fee'], ['meeting', 'standup', 'sync', 'call'], ['garden', 'hose', 'lawn']];
+
+export async function startEmbedStub() {
+  const core = await import('../Demos/metamedium-core.node.mjs');
+  const built = core.buildStaticModel({ groups: EMBED_GROUPS, extra: ['notes', 'plans', 'the', 'review', 'schedule'], dimension: 64 });
+  const tokenizer = Buffer.from(JSON.stringify(built.tokenizer));
+  const weights = Buffer.from(built.weights);
+  const calls = [];
+  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'cache-control': 'no-store' };
+  const server = createServer((req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    calls.push({ at: Date.now(), path: url.pathname, authorization: req.headers.authorization || null, cookie: req.headers.cookie || null, referer: req.headers.referer || null });
+    if (req.method === 'OPTIONS') { res.writeHead(204, cors).end(); return; }
+    const [, folder, file] = url.pathname.split('/');
+    const send = (status, type, body, extra) => res.writeHead(status, { ...cors, 'content-type': type, ...(extra || {}) }).end(body);
+    if (folder === 'model') {
+      if (file === 'tokenizer.json') return send(200, 'application/json', tokenizer);
+      if (file === 'model.safetensors') return send(200, 'application/octet-stream', weights);
+    }
+    if (folder === 'refused') return send(403, 'text/html', '<!doctype html><title>403</title>');
+    if (folder === 'junk') return send(200, file === 'tokenizer.json' ? 'application/json' : 'text/html', file === 'tokenizer.json' ? tokenizer : '<!doctype html><title>Sign in to continue</title><p>please log in</p>');
+    if (folder === 'huge') {
+      if (file === 'tokenizer.json') return send(200, 'application/json', tokenizer);
+      res.writeHead(200, { ...cors, 'content-type': 'application/octet-stream', 'content-length': String(200 * 1048576) });
+      res.write(Buffer.alloc(1024));
+      setTimeout(() => res.destroy(), 150);
+      return;
+    }
+    send(404, 'text/plain', 'no such file');
+  });
+  await new Promise((ok, fail) => { server.once('error', fail); server.listen(0, '127.0.0.1', ok); });
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  return {
+    origin,
+    /** The folder of the good model, as the seat is given it. */
+    base: `${origin}/model/`,
+    folder: (name) => `${origin}/${name}/`,
+    calls: () => calls.map((c) => ({ ...c })),
+    /** What the model is: the table's size and its bytes, for the gate to say. */
+    model: { dimension: 64, rows: built.vocab.length, bytes: tokenizer.length + weights.length },
+    stop: () => new Promise((ok) => { server.closeAllConnections?.(); server.close(ok); }),
+  };
+}

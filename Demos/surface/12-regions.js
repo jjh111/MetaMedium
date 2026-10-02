@@ -179,10 +179,16 @@
     return '<div class="eyebrow">region</div>' +
       '<div class="row"><span class="k">is</span><span class="v">' + esc(MM.regionSaid(d)) + '</span></div>' +
       '<div class="row"><span class="k">becomes</span><span class="v">move it by its title — what it holds goes with it, in one act</span></div>' +
+      regionLikeHtml(s, id) +
       '<div class="acts"><input class="regionName" type="text" value="' + esc(d.name) + '" maxlength="60" aria-label="the region\'s name" data-region-name="' + esc(id) + '">' +
       '<button class="mini" type="button" data-region-rename="' + esc(id) + '" title="give it this name">rename</button>' +
       '<button class="mini" type="button" data-region-fit="' + esc(id) + '" title="take the view to it">show it</button></div>' +
       '<div class="why">erasing it keeps everything it holds; a mark moved out of it is let go, and one drawn in is held</div>';
+  }
+  /** *Notes like this* for a region: a region is selected, never held by the field, so its offer is a button here — only with a semantic seat held and words in it (I9). */
+  function regionLikeHtml(s, id) {
+    if (!semanticHost() || !MM.wordsOfMarks(s, [id])) return '';
+    return '<div class="acts"><button class="mini" type="button" data-region-like="' + esc(id) + '" title="lists the notes nearest what this region says, across every board — by the model on this device, nothing sent anywhere">notes like this</button></div>';
   }
   /** The board's outline, at the foot of the panel: its regions as a tree, a tap on a line takes the view there. Empty when there are none. */
   function regionOutlineHtml(s) {
@@ -207,8 +213,9 @@
     return done;
   }
   inspectorEl.addEventListener('click', (e) => {
-    const t = e.target && e.target.closest && e.target.closest('[data-region-fit],[data-region-rename]');
+    const t = e.target && e.target.closest && e.target.closest('[data-region-fit],[data-region-rename],[data-region-like]');
     if (!t) return;
+    if (t.hasAttribute('data-region-like')) { const id = t.getAttribute('data-region-like'); likeNotes({ text: MM.wordsOfMarks(session.getState(), [id]), ids: [id] }); return; }
     if (t.hasAttribute('data-region-fit')) { regionFit(t.getAttribute('data-region-fit')); return; }
     const id = t.getAttribute('data-region-rename');
     const input = inspectorEl.querySelector('input[data-region-name="' + id + '"]');

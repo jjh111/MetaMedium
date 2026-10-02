@@ -3,7 +3,7 @@
 //   who is asked (writers; readers is 06-handwriting.js's, both by 03-seats.js's rules), one key a provider (keyFor,
 //   holdKey, commitKey), the decider (joinDecider, askDecider, deciderHost), what a reload brings back
 //   (rejoinRemembered: the old pick and key become the writer seat, once), the pane's seats section (renderSeats; the
-//   form's For: forSeat) and seatsNow for tests.
+//   form's For: forSeat) and seatsNow for tests. (The semantic seat's row is 03-semantic.js's; this pane only draws it.)
 // Uses: core (MM, store), seats (03-seats.js — every rule), models (agents, join, joinHosted, factsFor, applyFacts,
 //   recording, lastCall, noteOutcome, callLine, isModel, modelWords, withWork, workSignal, factsOf, tryModel, renderAgents,
 //   probeLocal, the pane's elements), input (say), render (render), palette (refreshPalette).
@@ -364,8 +364,9 @@
       const w = SEAT_WORDS[seat];
       let who = '', body = '', call = '', note = '';
       if (seat === 'semantic') {
-        who = 'on this device — coming';
-        note = fallbackWords('semantic');
+        // The semantic seat is on this device (I9, 03-semantic.js): a model loaded by a tap, no key, nothing sent.
+        const p = semanticRowParts();
+        who = p.who; body = p.body; call = p.call; note = p.note;
       } else if (seat === 'decider') {
         if (decider) {
           who = decider.name + ' · ' + MM.providerLocality(decider.config) + ' · taken only at ' + MM.DECIDER_TAKE_AT;
@@ -388,6 +389,7 @@
         '<div class="seatWho t">' + esc(who) + '</div>' + call + (note ? '<div class="seatFallback note">' + esc(note) + '</div>' : '') + '</div>';
     }
     seatsPane.innerHTML = html;
+    bindSemanticRow(seatsPane);
     seatsPane.querySelectorAll('[data-seat-pick]').forEach((sel) => {
       sel.onchange = () => {
         const seat = sel.dataset.seatPick;
@@ -429,5 +431,6 @@
       readers: resolveReaders(seatModels()).who.map(agentById).filter(Boolean).map((a) => a.config.model),
       writers: resolveWriters(seatModels()).who.map(agentById).filter(Boolean).map((a) => a.config.model),
       kept: JSON.parse(JSON.stringify(seatPicks)),
+      semantic: semanticNow().held,
     };
   }

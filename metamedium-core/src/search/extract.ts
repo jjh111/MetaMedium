@@ -143,11 +143,13 @@ function artifactEntries(node: MMNode, box: Bounds | undefined, out: SearchEntry
  * and words of what was made, what was read from writing — and what any registered source adds. Marks erased are
  * not here; a label taken off (an empty one) is not either; a mark relabelled says its newest word.
  */
-export function searchEntriesOf(state: SessionState): SearchEntry[] {
+export function searchEntriesOf(state: SessionState, only?: ReadonlySet<string>): SearchEntry[] {
   const out: SearchEntry[] = [];
   const artifacts = new Set(state.artifacts);
   const answers = new Set(state.explanations);
-  for (const node of state.nodes.values()) {
+  // `only` (I9: the words of the marks held): read just those, found by id, in the order given — never a pass over the board.
+  const nodes: Iterable<MMNode> = only ? [...only].map((id) => state.nodes.get(id)).filter((n): n is MMNode => !!n) : state.nodes.values();
+  for (const node of nodes) {
     if (out.length >= MAX_ENTRIES) break;
     if (answers.has(node.id) || getRep(node, 'participant') || getRep(node, 'erased')) continue;
     const box = boundsOf(node);
@@ -167,9 +169,10 @@ export function searchEntriesOf(state: SessionState): SearchEntry[] {
   // A region's name (I5): the place, at its own box. Not in the loop above — a region is no content and has no ink.
   for (const r of regionsOfBoard(state)) {
     if (out.length >= MAX_ENTRIES) break;
+    if (only && !only.has(r.id)) continue;
     out.push({ id: r.id, kind: 'region', text: r.name, what: 'a region', box: r.bounds });
   }
-  for (const src of sources.values()) {
+  for (const src of only ? [] : sources.values()) {
     if (out.length >= MAX_ENTRIES) break;
     try {
       for (const e of src.entries(state) || []) {

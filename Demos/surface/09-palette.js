@@ -59,6 +59,8 @@
       // `sees`: who READS, by seat (I7) — a model that sees but sits elsewhere does not answer a read; `decider`: the decision model seated, if one is (*Which is it?*).
       models: agents.map((a) => ({ name: a.name, sees: readers().includes(a) })),
       decider: deciderHost(),
+      // The semantic seat held here, if one is (I9; 03-semantic.js): with it *Notes like this* is typed on marks that have words; without, the field offers what it always did.
+      semantic: semanticHost(),
       isRead: (id) => { const n = session.getState().nodes.get(id); return !!n && isRead(n); },
       // The board's lines of writing and how many are unread (I8): *Read the board* stands only where there is some.
       writing: () => boardWriting(),
@@ -299,6 +301,8 @@
     what: (o) => askModelsAbout(o.data.ids.slice()),
     // *Which is it?* asks the decider — only by this tap (I7; 04-seatpane.js), never on a hold.
     which: (o) => askDecider(o.data),
+    // *Notes like this* lists the notes nearest these marks' words across every board — in Find's pane, only by this tap (I9; 26-find.js).
+    like: (o) => { likeNotes(o.data); },
     // The maths tool's acts (M5): the sizes said and left showing beside their figure, the drawing printed at its real size.
     'maths-show': (o) => mathsShow(o.data),
     'maths-print': () => mathsPrint(),
