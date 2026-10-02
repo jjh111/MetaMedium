@@ -243,6 +243,11 @@ on Chromium and WebKit (`--browser webkit app`):
   control**: the same release with the worker put back as it was, so its
   cache keeps its name — and offline the new page comes back beside the
   **old** help, the stale shell a cache named for the release prevents.
+- **An old shell's tag** (A7b, RENAME-PLAN N3b): the build stamps
+  `<meta name="dynaink-version">`, and a page a worker kept before the rename
+  carries the tag as `<meta name="metamedium-version">`. The page is served
+  with the old name put back, and its help pane still says `VERSION` — not
+  *this page carries no version*.
 
 ### Pencil and tablet: `pencil`
 
