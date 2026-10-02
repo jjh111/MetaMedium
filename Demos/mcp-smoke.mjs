@@ -254,9 +254,9 @@ try {
     !!regId && /a region “Monday” — holds 1 picture/.test(regLine(t9)) && /at 880,80 440×340/.test(regLine(t9)) && regLine(t9).includes(picId) && /· 1 region\b/.test(t9), { regId, line: regLine(t9) });
 
   // ===== Organising notes (PLAN-IPAD-NOTES A2) ==============================
-  // Find, regions and moves, from the hand's side. The rule being tested is the label's, carried to moving: a hand moves
-  // only what it made, and a region it moved carries what it holds; but a region holds by geometry and moves nothing, so
-  // a hand may make one round anyone's marks. A block of its own: the names below are this section's.
+  // Find, regions and moves, from the hand's side. John's ruling (2 Oct 2026, A2b): a hand may move anything on the board,
+  // a region it made included — one that carries his marks too — and says whose marks moved; a label and a rename keep
+  // their rule (its own ink, its own region). A block of its own: the names below are this section's.
   {
   const refresh = async () => { tabSession.load(MM.mergeLogs(await tab.readLogs(), { me: tabMe })); return tabSession.getState(); };
   const refreshUntil = async (pred) => { for (let i = 0; i < 30; i++) { await refresh(); if (pred()) return true; await wait(100); } return pred(); };
@@ -325,31 +325,43 @@ try {
   await refresh();
   check('canvas_region refuses to rename the tab\'s region, saying whose it is — and the name stands', /was made by tab/.test(renHis) && /renames only/.test(renHis) && MM.regionRepOf(tabSession.getState().nodes.get(regId)).name === 'Monday', renHis);
 
-  // ---- canvas_move: only what the hand made ----
+  // ---- canvas_move: anything on the board (John, 2 Oct 2026: "ya claude can move marks"), and honest about whose ----
   const circleBox = () => MM.boundsOf(tabSession.getState().nodes.get(mineId));
+  const boxNow = () => MM.boundsOf(tabSession.getState().nodes.get(boxId));
   const c0 = circleBox();
   const mv1 = textOf(await call('canvas_move', { ids: [mineId], dx: 60, dy: 25 }));
   const movedOne = await refreshUntil(() => Math.abs(circleBox().minX - (c0.minX + 60)) < 1);
-  check('canvas_move moves the hand\'s own mark by dx, dy — the tab sees it there', /^moved/m.test(mv1) && mv1.includes(mineId) && movedOne && Math.abs(circleBox().minY - (c0.minY + 25)) < 1, { mv1, c0, now: circleBox() });
-  const tabBoxBefore = JSON.stringify(MM.boundsOf(tabSession.getState().nodes.get(boxId)));
-  const mv2 = textOf(await call('canvas_move', { ids: [boxId], dx: 500, dy: 500 }));
-  await wait(250);
-  await refresh();
-  check('canvas_move refuses the tab\'s box, saying who made it and what to do instead — and the box has not moved',
-    new RegExp(esc(boxId) + '[^\\n]*was made by tab').test(mv2) && /moves only what it made/.test(mv2) && /canvas_region/.test(mv2) && !/^moved/m.test(mv2) && JSON.stringify(MM.boundsOf(tabSession.getState().nodes.get(boxId))) === tabBoxBefore, mv2);
+  check('canvas_move moves the hand\'s own mark by dx, dy — the tab sees it there — and says it moved 1 mark, none of anyone else\'s', /^moved 1 mark\b/m.test(mv1) && !/ of tab/.test(mv1) && mv1.includes(mineId) && movedOne && Math.abs(circleBox().minY - (c0.minY + 25)) < 1, { mv1, c0, now: circleBox() });
+  const b0 = boxNow();
+  const m00 = nMoves();
+  const mv2 = textOf(await call('canvas_move', { ids: [boxId], dx: 7, dy: 3 }));
+  await refreshUntil(() => Math.abs(boxNow().minX - (b0.minX + 7)) < 1);
+  const ev2 = tabSession.getEvents().filter((e) => e.type === 'move').pop();
+  check('canvas_move moves the TAB\'s box — it is not refused for whose it is — and says whose it moved: "1 mark — 1 of tab’s"; the tab holds the hand\'s move event',
+    /^moved 1 mark — 1 of tab’s/m.test(mv2) && mv2.includes(boxId) && Math.abs(boxNow().minX - (b0.minX + 7)) < 1 && Math.abs(boxNow().minY - (b0.minY + 3)) < 1 && nMoves() === m00 + 1 && /^smoke~/.test(ev2.by || '') && ev2.ids.join() === boxId, { mv2, now: boxNow(), b0, ev2 });
   const m0 = nMoves();
   const c1 = circleBox();
-  const mv3 = textOf(await call('canvas_move', { ids: [boxId, mineId], dx: -20, dy: 0 }));
+  const mv3 = textOf(await call('canvas_move', { ids: [boxId, mineId], dx: -7, dy: -3 }));
   await refreshUntil(() => nMoves() === m0 + 1);
   const lastMove = tabSession.getEvents().filter((e) => e.type === 'move').pop();
-  check('a mixed list moves what it may in ONE event and refuses the rest by name', /^moved/m.test(mv3) && new RegExp(esc(boxId) + '[^\\n]*not moved').test(mv3) && nMoves() === m0 + 1 && lastMove.ids.length === 1 && lastMove.ids[0] === mineId && Math.abs(circleBox().minX - (c1.minX - 20)) < 1, { mv3, ids: lastMove && lastMove.ids });
+  check('a list of the tab\'s mark and its own moves in ONE event, said as "2 marks — 1 of tab’s", and the tab\'s box is back where it was drawn', /^moved 2 marks — 1 of tab’s/m.test(mv3) && nMoves() === m0 + 1 && lastMove.ids.length === 2 && lastMove.ids.includes(boxId) && lastMove.ids.includes(mineId)
+    && Math.abs(circleBox().minX - (c1.minX - 7)) < 1 && Math.abs(boxNow().minX - b0.minX) < 1 && Math.abs(boxNow().minY - b0.minY) < 1, { mv3, ids: lastMove && lastMove.ids });
   const mvRegion = textOf(await call('canvas_move', { ids: [shapesId], dx: 10, dy: 10 }));
-  await wait(250);
-  await refresh();
-  check('canvas_move refuses a region of the hand\'s that holds the tab\'s box: it would carry it — and says to make a new region round its own marks',
-    new RegExp(esc(shapesId) + '[^\\n]*would carry ' + esc(boxId) + '[^\\n]*made by tab').test(mvRegion) && !/^moved/m.test(mvRegion) && nMoves() === m0 + 1, mvRegion);
+  await refreshUntil(() => Math.abs(boxNow().minX - (b0.minX + 10)) < 1);
+  check('canvas_move moves a region of the hand\'s that holds the tab\'s box — it carries it — and says so: marks, "of tab’s", "with what the region holds"',
+    /^moved \d+ marks — 1 of tab’s/m.test(mvRegion) && /with what the region holds/.test(mvRegion) && Math.abs(boxNow().minX - (b0.minX + 10)) < 1, mvRegion);
+  await call('canvas_move', { ids: [shapesId], dx: -10, dy: -10 });
+  await refreshUntil(() => Math.abs(boxNow().minX - b0.minX) < 1);
+  const p0 = MM.boundsOf(tabSession.getState().nodes.get(picId));
   const mvPic = textOf(await call('canvas_move', { ids: [picId], dx: 5, dy: 5 }));
-  check('…and the tab\'s picture the same', new RegExp(esc(picId) + '[^\\n]*was made by tab').test(mvPic), mvPic);
+  await refreshUntil(() => Math.abs(MM.boundsOf(tabSession.getState().nodes.get(picId)).minX - (p0.minX + 5)) < 1);
+  check('…and the tab\'s picture the same — moved, and said to be the tab\'s', /^moved 1 mark — 1 of tab’s/m.test(mvPic) && Math.abs(MM.boundsOf(tabSession.getState().nodes.get(picId)).minY - (p0.minY + 5)) < 1, mvPic);
+  await call('canvas_move', { ids: [picId], dx: -5, dy: -5 });
+  await refreshUntil(() => Math.abs(MM.boundsOf(tabSession.getState().nodes.get(picId)).minX - p0.minX) < 1);
+  const mvKept = textOf(await call('canvas_label', { id: boxId, text: 'still not mine' }));
+  check('labels keep their rule: a hand labels only its own ink, whatever it may now move', /was made by tab/.test(mvKept) && /your own ink/.test(mvKept) && !/“still not mine” on/.test(mvKept), mvKept);
+  const mvKeptName = textOf(await call('canvas_region', { id: regId, name: 'Wednesday' }));
+  check('and a region is renamed only by the hand that made it', /was made by tab/.test(mvKeptName) && /renames only/.test(mvKeptName), mvKeptName);
 
   // A place of its own: a region round only the hand's circle, moved, takes the circle with it in one event.
   const mine = textOf(await call('canvas_region', { name: 'Mine', around: [mineId] }));
