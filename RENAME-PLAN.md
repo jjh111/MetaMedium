@@ -95,6 +95,13 @@ trademark attorney, not legal advice.
   folder name while reading the old one forever is a later choice, not part of
   this plan.
 - `metamedium_library_v1` and the other keys of the same kind.
+- **the log's format id, `metamedium-log`** (`LOG_FORMAT` in `core/src/store/format.ts`). Every exported log,
+  every `.dyna.zip` and every carried board carries it in its header, and `decodeLog` matches it exactly, so
+  renaming it would stop every saved board from opening. Found by N1.
+- **the carry's protocol**, from N1: the message types `mm-carry`, `mm-carry-ready`, `mm-carry-ping` and
+  `mm-carry-done`, the key `mm-home-said`, `boards.json` with `format: "dyna-boards"`, the `carried` field on
+  a board's entry, and the parameters `?carry` and `?carryTo`. The two addresses must keep speaking the same
+  protocol across a service worker's cache.
 - the dated documents (`ARCHITECTURE-*`, `DIRECTOR-*`, `SURFACE-*`, `QA-*`,
   `SHARD-3D-*`, `NOTES-*`, `GUIDE-*`, and the `PLAN-*` written before this one),
   `archive/`, and git history. They are records, and each keeps the name it had
@@ -288,7 +295,8 @@ engine. Its words change here; the bundle it loads changes in N3c.
 ### N3b: releases and the build
 
 **Owns:**
-- `scripts/build-app.mjs` (the `<meta name>` it stamps and checks) and
+- `scripts/build-app.mjs` (the `<meta name>` it stamps and checks), every reader of that tag by name
+  (`17-folder.js`'s `logWrite` and `20-controls.js`, found by N1), and
   `scripts/release.mjs` (`dynaink-<version>.html`, the release title "dyna.ink
   <version>", its first line).
 - Their tests, and the help pane's reader of the meta tag in `20-controls.js`.
