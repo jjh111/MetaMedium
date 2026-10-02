@@ -1,0 +1,175 @@
+dyna.ink (formerly MetaMedium) — Copyright © 2015–2026 John Hanacek
+
+This file is the one place that says who holds the copyright in dyna.ink.
+
+
+THE CODE
+
+Everything in this repository is licensed under the GNU Affero General
+Public License, version 3 only (SPDX: AGPL-3.0-only) — the engine (core/),
+the app and its surface (Demos/, app/), the relay and its Worker
+(Demos/relay.mjs, cloudflare/relay/), both MCP hands, the 3D surface
+(dynaink-3d/) and the experiments alike, except where this file says
+otherwise. The full text is in LICENSE.
+
+
+THE WHITEPAPER
+
+The whitepaper's prose and figures — the text of index.html and the figures
+it shows, Assets/whitepaper-figures/ among them — are licensed under the
+Creative Commons Attribution 4.0 International License (CC BY 4.0),
+https://creativecommons.org/licenses/by/4.0/. Credit it by its title, its
+author and a link to it. Words and works by others that it quotes or cites
+stay theirs.
+
+
+THE NAMES
+
+The names dyna.ink and DynaInk3D, the wordmark and the logo are not licensed
+by any of the above. As an additional term under section 7(e) of the
+AGPL-3.0, no right is granted under trademark law to use them. TRADEMARKS.md
+says how they may be used.
+
+
+THIRD-PARTY PIECES
+
+What a page loads or a build bundles that is not this project's own work,
+each with its license and where it comes from. Each remains under its own
+license, and its copyright stays with its authors. Found by searching the
+repository on 2 October 2026 (the CDN addresses in the pages and fragments,
+the Google Fonts links, every package's dependencies, the models the code
+fetches); each license was read from the package's own license file, the npm
+registry or the model's card on Hugging Face.
+
+Bundled into what this repository builds or commits
+
+  The engine, core/
+      No runtime dependencies. Its bundles (Demos/dynaink-core.browser.js,
+      Demos/dynaink-core.node.mjs) hold only its own code.
+
+  Space Grotesk (a typeface), latin subset, version 2.000
+      SIL Open Font License 1.1 (OFL-1.1).
+      Copyright 2020 The Space Grotesk Project Authors
+      (https://github.com/floriankarsten/space-grotesk).
+      Inlined as a WOFF2 in Demos/surface/surface.css, so it travels in the
+      app, its standalone file and every release file; the font's own name
+      table carries its copyright and https://scripts.sil.org/OFL.
+
+  three.js 0.186.0
+      MIT. Copyright © 2010–2026 three.js authors
+      (https://github.com/mrdoob/three.js).
+  three-bvh-csg 0.0.18
+      MIT. Copyright (c) 2022 Garrett Johnson
+      (https://github.com/gkjohnson/three-bvh-csg).
+  three-mesh-bvh 0.9.15
+      MIT. Copyright (c) 2018 Garrett Johnson
+      (https://github.com/gkjohnson/three-mesh-bvh).
+      All three from npm, bundled into DynaInk3D (dynaink-3d/) by Vite,
+      its standalone file included.
+
+  Pretext (@chenglou/pretext) 0.0.3
+      MIT. Copyright (c) 2026 Pretext contributors.
+      From npm, bundled into v2-poc/bundle.js, which is committed and
+      published. lens-canvas/ uses 0.0.4 (MIT) when it is built; its build
+      is not committed.
+
+  GLiNER2's processor
+      gliner-seat/processor.mjs is a port to JavaScript of the processor in
+      the gliner2 Python library, version 2.0.0, by Fastino
+      (https://pypi.org/project/gliner2/), Apache-2.0. A spike: in no page
+      and no build.
+
+  The relay's Worker, cloudflare/relay/
+      Bundles no package. Its one dependency, wrangler 4 (MIT OR
+      Apache-2.0, Cloudflare), is the tool that deploys it.
+
+  Web App Skeleton/
+      React and ReactDOM 18.3.1, Zustand 5.0.8 and the Anthropic TypeScript
+      SDK 0.32.1 (@anthropic-ai/sdk), each MIT, are bundled when it is built
+      with Vite; its build is not committed or published.
+
+Loaded by a page from a CDN, never committed
+
+  three.js r128
+      MIT (https://github.com/mrdoob/three.js).
+      From cdnjs.cloudflare.com, into the sandbox where a program on the
+      canvas plays (Demos/surface/13-kinds.js), so a program can draw in 3D.
+
+  Mermaid 11.4.0
+      MIT (https://github.com/mermaid-js/mermaid).
+      From cdnjs.cloudflare.com, else cdn.jsdelivr.net, to draw a Mermaid
+      diagram on the canvas (Demos/surface/13-kinds.js). Mermaid's file
+      bundles its own dependencies under their licenses; they are not listed
+      here.
+
+  IBM Plex Mono (a typeface)
+      SIL Open Font License 1.1. Copyright © 2017 IBM Corp., with Reserved
+      Font Name "Plex".
+      From Google Fonts, by the whitepaper (index.html) and brand/tokens.css
+      (the styleguide).
+
+  DM Sans, Space Grotesk, JetBrains Mono, Cinzel and Raleway (typefaces)
+      SIL Open Font License 1.1, each copyright its project's authors
+      (The DM Sans Project Authors; The Space Grotesk Project Authors;
+      The JetBrains Mono Project Authors; The Cinzel Project Authors;
+      The Raleway Project Authors, with Reserved Font Name "Raleway").
+      From Google Fonts: DM Sans and Space Grotesk by 404.html and the 2025
+      demos (doodle2-canvas.html, metadoodle1.html); JetBrains Mono by the
+      2025 demos, lens-canvas/ and playground.html; Cinzel and Raleway by
+      playground.html.
+
+  Transformers.js — @huggingface/transformers 4.0.0-next.5 and 3,
+  @xenova/transformers 2.17.2
+      Apache-2.0 (https://github.com/huggingface/transformers.js).
+      From cdn.jsdelivr.net, by the experiments and the 2025 demo that run a
+      model in the page: metadoodle1.html, test-llm.html, test-vision.html
+      and Demos/spike-trocr.html.
+
+  MiniSearch 7.1.1
+      MIT (https://github.com/lucaong/minisearch). From cdn.jsdelivr.net,
+      by test-llm.html.
+
+  React 18.2.0, ReactDOM 18.2.0, Babel standalone 7.23.5
+      MIT. From cdnjs.cloudflare.com, by Demos/sna-drawing-demo.html.
+
+Models fetched when asked for, never committed
+
+  Model2Vec potion-base-8M (minishlab/potion-base-8M)
+      MIT, per its model card on Hugging Face.
+      From huggingface.co, by the semantic seat (Demos/surface/03-seats.js),
+      only when a person asks for that seat. Read from the model's main
+      branch, not a pinned revision.
+
+  GLiNER2 — onnx-community/gliner2-multi-v1-agent-ONNX at 2d0d8e4,
+  exported from fastino/gliner2-multi-v1
+      Apache-2.0, both, per their model cards.
+      Fetched by gliner-seat/fetch.mjs, a spike: in no page and no build.
+
+  Qwen3.5 0.8B (onnx-community/Qwen3.5-0.8B-ONNX)
+      Apache-2.0, per its model card. By metadoodle1.html, test-llm.html
+      and test-vision.html.
+
+  Whisper tiny.en (Xenova/whisper-tiny.en)
+      Apache-2.0, per its model card. By metadoodle1.html.
+
+  TrOCR (Xenova/trocr-small-handwritten, Xenova/trocr-base-handwritten)
+      NOT CONFIRMED. Neither export states a license. The model the base
+      one was exported from, microsoft/trocr-base-handwritten, is MIT per
+      its card; microsoft/trocr-small-handwritten states none.
+      By Demos/spike-trocr.html, a spike.
+
+  A model a person joins — on their own machine (Ollama, LM Studio) or
+  hosted (OpenRouter, Anthropic, an endpoint of their own) — is theirs to
+  choose, under its own terms, and no part of dyna.ink.
+
+Not confirmed, in the repository
+
+  Assets/fig-dynabook.jpg
+      A reproduction of Alan Kay's Dynabook drawings (1972). It is not
+      this project's work and is covered by neither LICENSE nor CC BY 4.0;
+      where it was taken from and on what terms is not recorded. No page
+      loads it.
+
+Tools that build and test the code — esbuild, TypeScript, Vite, Vitest,
+ESLint, Playwright, wrangler, ONNX Runtime, the Hugging Face tokenizers —
+are not shipped; each is under its own license in its package.

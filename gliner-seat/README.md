@@ -17,7 +17,7 @@ a seat would be there for.**
   that already holds the weights loads in 1.9–2.4 s.
 - **It can ship.** The weights are Apache-2.0 (Fastino's `gliner2-multi-v1`),
   and so is the ONNX export (`onnx-community`). The runtimes are MIT and
-  Apache-2.0. Apache-2.0 can go into this GPL-3.0 repository.
+  Apache-2.0. Apache-2.0 can go into this AGPL-3.0 repository.
 - **It does not read our words well enough.** Across 143 hand-labelled spans,
   the kinds a seat would add are the kinds it misses:
   - **measurement names**: at most 7 of 11 found, at 35% precision;
@@ -348,7 +348,7 @@ committed here; `fetch.mjs` gets them.
 - `playwright-core`: Apache-2.0.
 
 `processor.mjs` ports `gliner2`'s processor, so shipping it means carrying
-Apache-2.0's notice. Apache-2.0 is compatible with this repository's GPL-3.0.
+Apache-2.0's notice. Apache-2.0 is compatible with this repository's AGPL-3.0.
 
 **Not shippable.** `urchade/gliner_base` and `urchade/gliner_multi` (GLiNER v1)
 are CC-BY-NC-4.0. The int8 file on the Hub states no licence at all.
