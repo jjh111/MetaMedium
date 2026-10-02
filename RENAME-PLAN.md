@@ -145,8 +145,10 @@ folders, the MCP servers, the skills, and the living documents.
     It comes with a contributor agreement, the trademark reserved, and the
     whitepaper's prose and figures under CC BY 4.0.
   - **The freeze begins**: nothing else lands from N0 to N3e.
-- **Waiting:** the IP assignment from John to JHDesign LLC. N2 waits for it to
-  be signed, so the copyright line can name the LLC.
+- **2 Oct 2026, later:** the copyright holder is **John Hanacek personally** until a new LLC for dyna.ink
+  exists and the rights are assigned to it (with JHDesign LLC releasing any rights it might hold). Development
+  is not blocked on it: N2 landed naming John, and the switch is three lines (§5 N2). The trademark is filed
+  in the LLC's name once it exists.
 
 ## 4. The ladder
 
