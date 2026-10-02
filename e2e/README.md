@@ -364,12 +364,16 @@ uploads the directory as an artifact when the job is red.
 
 ## Beside the gate
 
-Two more runners live here, on the gate's static server (`servers.mjs`), and
+More runners live here, on the gate's static server (`servers.mjs`), and
 neither is the gate — `node e2e/run.mjs` never starts them and CI does not run
 them. `perf.mjs` times the surface on generated boards, behind the gate's model
 guard, and asserts nothing; its numbers are `PERF.md`'s. `whitepaper-figures.mjs`
 audits the whitepaper's graphic plates in Chromium and WebKit at several widths
 and in both themes (`Assets/whitepaper-figures/README.md`).
+`walk.mjs` is a user's walk (`PLAN-FIELD-PAR.md` §1): eight scenes drawn with
+real pointer input, the field opened by a loop and the check or by a hold, and
+what it offers recorded with nothing typed and with ten words typed — a map,
+printed and kept in `results/walk/`, never a verdict (`node e2e/walk.mjs [name]`).
 
 ## What is not here yet
 
