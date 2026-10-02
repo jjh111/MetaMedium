@@ -210,6 +210,8 @@ holds it, and no event is rewritten on the way in or out.
 - A window opened by script needs the tap that asked for it. Open it inside the
   click handler, before anything is awaited, or the browser blocks it.
 
+**N1 status, 2 Oct 2026: done on `rename`** — `51248ca` (red), `26bdcfa`, and the docs after it: `17-carry.js` (pure, 20 Node tests in CI) and `22-carry.js` carry every board — one file, `boards.json` and each board's `.dyna.zip`, sent as transferred bytes — from `https://jjh111.github.io` to `https://dyna.ink` only (a page on 127.0.0.1 or localhost may name another local origin with `?carryTo=` / `?carry=`, nowhere else), preferences by an allowlist of names and never a key, each log in event for event, a name taken suffixed, a log held skipped; *Every board out* is the same file, and *From a file…* opens it; the notice is `NEW_HOME_NOTICE` in `17-carry.js`, off, for N4 to flip (until then `?carryTo` on the old address shows the offer); `node e2e/run.mjs carry` (18 records, three origins) passes on Chromium and WebKit and is in CI's WebKit job.
+
 ### N2: the rights
 
 **Owns:**

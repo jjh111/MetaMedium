@@ -227,6 +227,13 @@ hold, or of the whole board, with its pictures and figures in them; or its log
 (`canvas.jsonl`, which names its pictures but does not carry them) — and, when what you hold or the
 board reads as a diagram, as Mermaid text — and **folder** makes a folder on your computer the canvas.
 
+**Every board out**, at the foot of the boards pane, writes every board kept here — each with
+its pictures, its name, your mark and your settings, never a model's key — as one `.zip`.
+**boards › from a file…** opens it on any address, in any browser: each board comes in as a
+new one of yours, a name you already use gets a number, and a board you already have is not
+brought in twice. When the boards pane offers **Carry my boards to dyna.ink**, one tap opens
+dyna.ink in a window of its own and sends it the same, with nothing to save in between.
+
 ## Find
 
 **find** in the bar — or **/** , or **⌘K** / **Ctrl+K** — looks for a word on **every

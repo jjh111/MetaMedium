@@ -14,13 +14,13 @@ exits nonzero if anything in it failed.
 
 ```bash
 cd e2e && npm ci && npx playwright install chromium   # once
-node run.mjs            # from anywhere: the default twelve (canvas, keep, boards, app, pencil, models, seat, hand, budgets, shard, demo, demo2)
+node run.mjs            # from anywhere: the default fourteen (canvas, keep, boards, carry, app, pencil, models, seat, hand, walk, budgets, shard, demo, demo2)
 cd e2e && npm run e2e   # the same thing
 
 npx playwright install webkit                   # once, for WebKit
 node run.mjs --browser webkit smoke             # the WebKit smoke, ~2 s
 cd e2e && npm run smoke:webkit                  # the same thing
-node run.mjs --browser webkit smoke pencil keep # what CI's webkit job runs, ~30 s
+node run.mjs --browser webkit smoke pencil keep carry # what CI's webkit job runs, ~40 s
 cd e2e && npm run webkit                        # the same thing
 ```
 
@@ -37,6 +37,7 @@ guessing. Pick scenarios by name to run one: `node e2e/run.mjs canvas`,
 | `smoke` | four checks written in `run.mjs` itself | `Demos/session-engine.html?fresh=1&nosw=1`, usually with `--browser webkit` |
 | `keep` | no lost work — `keep.mjs`, written here, not a page harness | `Demos/session-engine.html?nosw=1`, in several contexts of its own |
 | `boards` | several named boards — `boards.mjs`, written here, the boards pane driven with the real pointer | `Demos/session-engine.html?nosw=1`, in one context, with a second and third tab |
+| `carry` | carry your boards to the new home (RENAME-PLAN N1) — `carry.mjs`, written here: two static servers of its own beside the gate's make three origins, the old address (A), dyna.ink (B) and a stranger (C) | `app/?nosw=1&carryTo=<B>` on A, the window it opens on B, a page on C, and a second context for the file |
 | `big` | a 2,000-mark board saved and opened again (opt-in, minutes) | the same page, with the board from `metamedium-core/bench/board.mjs` |
 | `app` | one app address — `app.mjs`, written here: `/app/` installs, opens with the server gone, and is versioned per release | `app/` over the static server, then a server of its own it can take away, then a copy of the site it releases again |
 | `pencil` | pencil and tablet — `pencil.mjs`, written here: the pen and fingers synthesised in the page as iPadOS delivers them, and the keyboard as it tells the page | `Demos/session-engine.html?nosw=1` at 1180 × 820, in one context, reloaded once |
@@ -47,10 +48,10 @@ guessing. Pick scenarios by name to run one: `node e2e/run.mjs canvas`,
 
 `--browser chromium` (the default) or `--browser webkit` picks the engine, and
 the run's `e2e.json` records which as `browser` / `browserVersion`. `smoke` is
-**opt-in**: a bare `node run.mjs` runs the twelve Chromium scenarios (`canvas`,
-`keep`, `boards`, `app`, `pencil`, `models`, `seat`, `hand`, `budgets`, `shard`, `demo`, `demo2`) and
+**opt-in**: a bare `node run.mjs` runs the fourteen Chromium scenarios (`canvas`,
+`keep`, `boards`, `carry`, `app`, `pencil`, `models`, `seat`, `hand`, `walk`, `budgets`, `shard`, `demo`, `demo2`) and
 nothing else, so the default gate needs no second engine installed. CI's
-`webkit` job runs `smoke`, `pencil` and `keep` on WebKit.
+`webkit` job runs `smoke`, `pencil`, `keep` and `carry` on WebKit.
 
 ### The WebKit smoke, and what it is not
 
@@ -166,6 +167,42 @@ lands; **N17** a library pack used from the packs pane with the pointer is kept
 with the board — its `use` in the journal, the board reopened after a reload
 using it — and so is its `unuse` (V1-PLAN B3). About 18 s, on Chromium and
 WebKit.
+
+### Carried to the new home: `carry`
+
+`carry.mjs` (RENAME-PLAN N1) is a person moving from the old address to dyna.ink, on
+three origins — the gate's static server is one, and the scenario starts two more of
+its own (`startStatic`, stopped at its end): **A** plays the old address (its page is
+`app/?nosw=1&carryTo=<B>`; only a page on this machine may name its target, and only a
+local one — on the real old address the target is dyna.ink whatever the address says),
+**B** plays dyna.ink (it takes boards from the old address, and from a local origin only
+when it is itself local and its own address names it — `?carry=<A>`, which A writes),
+and **C** is a stranger. One browser context, so storage per origin, as a person's is;
+every message any page hears is recorded by an init script, bytes and all (the zips are
+stored, so a key in one would read). **C0** B keeps a board of its own called "Garden"
+and its empty first board, on screen; **C1** on A, "My board" (three boxes and a red
+picture) and "Garden" (two boxes), a mark taught on the pad with the real pointer, the
+theme dark and the hand left — and, planted after the page opens, the remembered model
+keys, a token, the model picks and the semantic seat's address, with a room key in A's
+address; **C1b** A's pane offers *Carry my boards to dyna.ink* and *Every board out*, and
+no notice; **C1c** the notice as N4 will turn it on (a test's switch): it leads the pane
+with the one carry tap, and the status line says it once; **C2** one tap opens B in a
+window, which says it is ready, takes the boards and answers; **C2a–f** on B both boards
+by name ("Garden 2" under its suffix), the empty first board in the trash and the page
+on the carried board, each log exactly as A's journal held it (then only the mark taught
+again on opening it), the picture's bytes under the same hash and painted red, the mark
+learned again from its five samples, the theme and the hand, and the sentence that says
+it all; **C2g** no planted key or room key in any message either page heard, in B's
+storage, in a carried log or in an address; **C2h** B heard A alone, A heard B alone;
+**C3** a second carry brings nothing twice and both pages say so; **C5** *Every board
+out* downloads `every-board-<day>.zip` — each board's `.dyna.zip`, its name, the mark's
+samples, the preferences by name — with no key in it; **C4** C opens B naming A and sends
+it A's file: refused, said once, nothing taken, and C never told B is ready; **C5b** the
+file opens through *From a file…* on a browser that never saw the boards — both boards,
+the picture, the mark, the theme, the empty first board in the trash; **C5c** the same
+file on B doubles nothing and says so in the pane. 18 records, about 12 s, on Chromium
+and WebKit (WebKit opens the window in the gate; an iPad's Home Screen app, whose
+window may lose its opener, is by hand).
 
 ### One app address: `app`
 
@@ -378,9 +415,9 @@ printed and kept in `results/walk/`, never a verdict (`node e2e/walk.mjs [name]`
 ## What is not here yet
 
 The canvas harness and the shard's three are still Chromium only. WebKit
-gets the smoke, `pencil` and `keep` in a job of their own (`webkit` in
+gets the smoke, `pencil`, `keep` and `carry` in a job of their own (`webkit` in
 `.github/workflows/ci.yml`: `npx playwright install --with-deps webkit`, then
-`node e2e/run.mjs --browser webkit smoke pencil keep`, with `e2e/results`
+`node e2e/run.mjs --browser webkit smoke pencil keep carry`, with `e2e/results`
 uploaded as `e2e-webkit-results` when it fails); `boards` and `app` pass on
 WebKit on macOS but are not in that job. None of it is an iPad: that is
 `QA-v1.md` §A10, by hand. Real-model evaluation stays a separate opt-in lane; nothing here is
