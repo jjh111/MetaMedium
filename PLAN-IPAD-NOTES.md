@@ -349,6 +349,28 @@ of its own marks is a later unit); no `canvas_read` batch of the hand's own — 
 untested over a hand's own rectangle; nothing is said of a person's arrow tied to the hand's own box that follows it when
 the box is moved (derived, E2).
 
+**P1 — a board of traced pictures pans in a frame or two (1 Oct 2026, branch `unit/p1-paint`).** I2 made the
+engine fast on such a board and left the surface's paint: a pan frame took 150–180 ms with five thousand
+traced strokes on it, and panning a page of traced notes is the daily act on the iPad. *Status, 1 Oct 2026:
+built on `unit/p1-paint` (red `4b52572`; `V1-PLAN.md` §9 not yet written).* Profiled first: the paint's own
+JavaScript is 16–20 ms of a 117–133 ms frame; the rest is the browser rasterising the ten thousand
+`stroke()` calls (two a mark), and **drawing the same strokes as one path a colour (18 calls) took as long**
+— the raster is bound by the geometry, so call-batching, the first fix tried, was dropped. The fix is that
+the plain ink of the marks on and about the screen is **drawn once onto a raster of its own** (the screen and
+a quarter of it past each edge) and **blitted** while the view pans, a pan inside the margin stroking no ink
+(`inkCacheFor`, `08-render.js`; CLAUDE.md, *A big still group is drawn once*), held by the log, the zoom, the
+pixel ratio, the theme and what a drag moves, never blitted stale (the paint is live and a new raster is
+drawn once it has settled), and only where it pays (300 plain marks about the screen). On this container's
+software-rasterised Chromium, 5,001 traced strokes: **133 ms → 16.7 ms a pan frame** at fit-all and at zoom
+1, 10,014 → 42 `stroke()` calls a paint (`node e2e/pictures.mjs`; `PERF.md`, *After P1*). Gate: `budgets`
+record 4, structural — the raster held and blitted, the calls a paint makes, twenty pans drawing it 0
+times, the blit equal to the same strokes laid on the canvas, a zoom, a stroke, an undo and a drag never
+stale, `paintCheck` through the raster. **Open:** an iPad — whether its GPU shares this machine's bound,
+and what a raster of 1.5 screens costs there in memory (`QA-v1.md` §A10); the first paint after a stroke is
+live and the raster follows 150 ms later (incremental update of the raster for an appended stroke would
+remove that); a drag of more than `INK_CACHE_EXEMPT_MAX` marks is drawn live whole; artifacts' members,
+words and snapped marks are drawn live every frame.
+
 Cut order if time runs short: I9, then I8's spike, then I5's outline. Never cut
 I1–I4.
 

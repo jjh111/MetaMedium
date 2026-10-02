@@ -698,7 +698,8 @@ overlapping fragments, each its own `stroke()` (the profile's `(program)` is 73%
 of a pan; headless Chromium paints on the CPU, so an iPad's GPU may well differ — to
 measure on the iPad, not here). Drawing the strokes of one colour as one path, or
 a picture's traced ink as the picture it came from, would take it; it is
-`08-render.js`'s, not this unit's. And what the engine still does for a held group
+`08-render.js`'s, not this unit's (P1, *After P1* below, did it — not as one path, which the
+raster does not care about, but as one raster blitted). And what the engine still does for a held group
 is a second or so a thousand strokes (`notationsOf`), flat in the profile now.
 
 ```
@@ -711,6 +712,84 @@ node --test metamedium-core/bench/budgets.test.mjs                              
 node metamedium-core/bench/equivalence.mjs --ref=f503e04                                     # nothing reads differently
 node e2e/run.mjs budgets                                                                     # the gate's record of the board opening
 node --cpu-prof --cpu-prof-dir=metamedium-core/dist/bench/prof …; node metamedium-core/bench/profile.mjs <file>.cpuprofile   # the profile
+```
+
+## After P1 — a board of traced pictures pans in a frame (1 October 2026)
+
+*PLAN-IPAD-NOTES §4, unit P1, on `unit/p1-paint`. I2 left this to the surface: on a board of
+five artifacts and 5,000 traced strokes a pan frame took 150–180 ms. Profiled, then fixed.*
+
+**The profile.** The paint's own JavaScript is not the frame. On the board of 3 pictures of
+1,667 traced strokes and 2 SVGs (5,001 strokes; `node e2e/pictures.mjs`, this container's
+Chromium 141, the gate's viewport, ANGLE on SwiftShader, so a software raster) a paint is
+16–20 ms of JavaScript and a pan frame is 117–133 ms. Taking the main canvas's `stroke()` away
+in the page (every other call left) brings the frame to 16.7 ms and leaving it puts it back;
+the minimap's 5,000 `fillRect`s are not it (taking them away changes nothing). What the paint
+hands the canvas is `inkStroke` (`08-render.js`, two `stroke()` calls a mark, a halo and the
+ink): **10,014 `stroke()` calls a paint at fit-all, 6,352 at zoom 1.**
+
+**The first fix, and why it was not the fix.** Marks of one colour and width stroked as one
+path (a `Path2D` a run, halos then inks) took the calls to 18 — and the frame to 150–200 ms,
+slower. Capped runs of 25, 50, 100, 200 marks: 133–167 ms, no better than 10,014 calls. **The
+raster is bound by the geometry it is given, not by the number of calls**: five thousand
+overlapping strokes cost what they cost however they are batched (here; whether an iPad's GPU
+is bound the same way is for the iPad). So the fix is not to stroke them at all.
+
+**The fix** (`inkCacheFor`, `buildInkCache`, `08-render.js`; CLAUDE.md, *What the surface
+reads after a stroke, and what it paints*): the plain ink of the marks on and about the screen
+is drawn once onto a canvas of its own — the screen and a quarter of it past each edge, in
+device pixels, laid out as the main canvas lays them out — and a paint blits it, shifted by
+how far the view has panned, and strokes only what is not in it. A pan inside the margin
+strokes no ink; one out of it draws the raster again, centred. Held by the log, the zoom, the
+pixel ratio, the screen's size, the theme, the ink's colours and width and the marks a drag,
+a follow or a tank is moving (those are left out of it while they move); a raster that does not
+match is never blitted, the paint is live as before, and a new one is drawn once the paint has
+asked for the same for 150 ms (`INK_CACHE_SETTLE_MS`) — so a pinch or a stroke never pays for
+a raster the next paint would have discarded. Only where it pays: fewer than 300 plain marks
+about the screen and nothing is cached (`INK_CACHE_MIN`).
+
+| This container, same page, same run (`node e2e/pictures.mjs`) | `stroke()` a paint | Paint JS, median | Pan frame, median · p95 |
+|---|---|---|---|
+| 5,001 traced strokes, zoomed out to the whole board, every mark stroked every frame | 10,014 | 20.0 ms | 133 ms · 167 ms |
+| the same with the ink's raster | 42 | 10.5 ms | **16.7 ms · 33.4 ms** |
+| the same at zoom 1, every mark stroked | 6,352 | 14.9 ms | 133 ms · 150 ms |
+| the same at zoom 1 with the raster | 28 | 8.5 ms | **16.7 ms · 16.7 ms** |
+
+(An earlier run of the unchanged paint, 117 ms median and 133 ms p95 at fit-all, 133 and 150 at
+zoom 1: this container's frames are quantised to 16.7 ms and move a step with its load.) The
+remaining calls are what is drawn live — the brackets of the artifacts and the members of
+a figure, so they scale with the artifacts, not the strokes. Over 60 pans the raster was drawn
+once and blitted 68 times. **Not measured, and not claimed: an iPad.** The gain is the raster
+the browser no longer does, which is the larger part of a frame on this machine's software
+renderer and a smaller one wherever a GPU strokes paths faster; `QA-v1.md` §A10 is where to
+look on the real device, with the memory a raster of 1.5 screens takes (an iPad Pro's is about
+50 MB, `INK_CACHE_MAX_PX` caps it at 16 M device pixels).
+
+**What it costs, said plainly.** A raster that is stale is slow once: the paint after a stroke
+is the live paint (as before P1), and the raster is drawn again 150 ms after the last change —
+about a paint's JavaScript and a raster of 2.25 screens, off the stroke's own frame. Ink in the
+raster stands under everything drawn live, where it used to stand in the board's order: a
+word's letters, a clean form, a routed connector or an artifact's member over a plain mark's
+ink, whichever was drawn later before. At the view a raster was drawn at the canvas is the
+unrastered one's, mark for mark (the gate compares the pixels of the raster blitted against
+the same strokes laid on the canvas in the raster's order: 39 of 1,296,000 differ by more than
+a rounding of eight bits, in the densest knots of ink); after a pan of whole pixels, 48.
+
+**The gate** (`node e2e/run.mjs budgets`, record 4, structural, so it runs on a machine too
+loaded or too software to time): a board of 2 pictures of 1,000 traced strokes beside a
+figure — once the paint settles the raster holds 1,993 strokes and is blitted; a paint makes
+22 `stroke()` calls, at most `PAINT_STROKE_CALLS_MAX`, where drawing the strokes alone makes
+4,000; twenty pans inside the margin draw the raster 0 times and blit it 20; the canvas with
+the raster is the canvas without it (`BLIT_DIFF_MAX`); and never stale — a zoom, a stroke
+drawn, an undo and a drag of one mark are each painted live at once with the raster not
+blitted and the canvas the unrastered one's, the raster drawn again, once, when the paint
+settles, the dragged mark out of it while it moves and nothing left behind; and `paintCheck`
+holds the hand's paint of that board to the whole-board read.
+
+```
+node e2e/pictures.mjs                       # the table above: each view with the raster and without it (mm.setInkCache(false))
+node e2e/pictures.mjs --pictures=5 --strokes=1000 --svgs=5
+node e2e/run.mjs budgets                    # the gate's structural record of it (P1, 4)
 ```
 
 ---
