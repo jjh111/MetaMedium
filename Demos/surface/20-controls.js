@@ -6,7 +6,8 @@
 //   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
 // Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
 //   boardOnScreenName, resetBoard), models (agents, deciderHost), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude); the page's
-//   version from its <meta name="metamedium-version"> (V1-PLAN R7), said at the head of the help pane.
+//   version (folder's pageVersion: its <meta name="dynaink-version">, V1-PLAN R7, or on a page an older worker kept the
+//   tag's old name, RENAME-PLAN N3b; boards' versionWords), said at the head of the help pane.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -102,13 +103,10 @@
   const helpPanel = document.getElementById('helpPanel');
   ui.pane(helpPanel, 'help', () => closePanel(helpPanel, tiles.help));
   // It leads with the version this page is (V1-PLAN R7): the repository's VERSION, stamped into the
-  // page by scripts/build-app.mjs, so the line holds offline and in the standalone file alike.
-  const pageVersion = ((document.querySelector('meta[name="metamedium-version"]') || {}).content || '').trim();
+  // page by scripts/build-app.mjs, so the line holds offline and in the standalone file alike — and a
+  // page an older worker kept, carrying the tag under its old name, still says its own (RENAME-PLAN N3b).
   const helpVersion = document.getElementById('helpVersion');
-  if (helpVersion) {
-    helpVersion.textContent = !pageVersion ? 'dyna.ink — this page carries no version'
-      : pageVersion === '0.0.0' ? 'dyna.ink 0.0.0 — no release has been cut yet' : 'dyna.ink ' + pageVersion;
-  }
+  if (helpVersion) helpVersion.textContent = versionWords(pageVersion());
   let helpLoaded = false;
   tiles.help.onclick = () => {
     togglePanel(helpPanel, tiles.help);

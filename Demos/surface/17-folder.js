@@ -13,6 +13,7 @@
 //   RENAME-PLAN N1: carryIn, carryHeld, logHash), the log format's surface (R2:
 //   readLogText — a log's text as events or the sentence for a version this build does not read —
 //   logWrite, logFileNote; a folder whose log is of a newer version is refused before it is opened),
+//   pageVersion (the version this page says, by 17-boards.js's pageVersionOf — RENAME-PLAN N3b),
 //   the view per board, browser
 //   storage where there is no IndexedDB, the one import of browser storage's old copy, the lock one
 //   tab holds per board, what the status line says when a save fails (boardWarning, keepBoardIn), and the one
@@ -1446,9 +1447,16 @@
   }
   /** What a log written by this page says of itself in the status line: the version, and that an older app opens it. */
   function logFileNote() { return ' · log version ' + MM.LOG_VERSION + ' — an older dyna.ink opens it too'; }
+  /**
+   * The version this page is: its <meta name="dynaink-version">, or — on a page an older worker kept — the name that
+   * tag had before (17-boards.js's pageVersionOf, RENAME-PLAN N3b). '' for none.
+   */
+  function pageVersion() {
+    return pageVersionOf((name) => { const m = document.querySelector('meta[name="' + name + '"]'); return m ? m.content : null; });
+  }
   /** What every log this page writes is written with. */
   function logWrite() {
-    const app = ((document.querySelector('meta[name="metamedium-version"]') || {}).content || '').trim();
+    const app = pageVersion();
     return app ? { app } : {};
   }
   /**

@@ -1,4 +1,4 @@
-// Cut a release of MetaMedium, here. It never pushes.
+// Cut a release of dyna.ink, here. It never pushes.
 //
 //   node scripts/release.mjs <version>                 # cut it: one commit, one annotated tag
 //   node scripts/release.mjs <version> --dry-run       # print everything, change nothing
@@ -18,11 +18,16 @@
 //      page and both service workers — their caches are named for it, so a
 //      release is a new worker with a new cache — and makes app/ again;
 //   4. builds the standalone single file (Demos/build-standalone.mjs) into
-//      dist/release/metamedium-<version>.html, the file a GitHub release
+//      dist/release/dynaink-<version>.html, the file a GitHub release
 //      carries, and refuses if anything key-shaped is in it or in the section;
 //   5. commits ("Release <version>") and makes an annotated tag, v<version>,
-//      whose message is the section — and says what to push. It pushes
-//      nothing: publishing is the director's, on John's instruction.
+//      whose message is "dyna.ink <version>" and the section — and says what
+//      to push, and the GitHub release to make, titled "dyna.ink <version>".
+//      It pushes nothing: publishing is the director's, on John's instruction.
+//
+// The name is dyna.ink's from 0.2.0 (RENAME-PLAN N3b). 0.1.0, the last
+// MetaMedium, was tagged "MetaMedium 0.1.0" and shipped metamedium-0.1.0.html;
+// its changelog section and its tag stay as they were cut.
 //
 // --dry-run does all of that in memory and prints it: the checks, the
 // section, the files, the standalone file's size, the commands. It exits 1 if
@@ -35,6 +40,9 @@ import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { VERSION_PATTERN, readVersion, stampPage, make, write } from './build-app.mjs';
 import { standalone } from '../Demos/build-standalone.mjs';
+
+/** The product's name, as a release says it (RENAME-PLAN §1): the release's title and its tag's first line. */
+const NAME = 'dyna.ink';
 
 // ===== versions ======================================================================
 
@@ -287,11 +295,11 @@ function main(argv) {
   } catch (err) {
     refusals.push(`the release cannot be made: ${err.message || err}`);
   }
-  for (const [where, text] of [[`dist/release/metamedium-${version}.html`, html], ['the changelog section', section]]) {
+  const out = `dist/release/dynaink-${version}.html`;
+  for (const [where, text] of [[out, html], ['the changelog section', section]]) {
     for (const f of keyShapesIn(text)) refusals.push(`something shaped like ${f.kind} is in ${where}, line ${f.line} — a release never ships a key; find it and take it out`);
   }
 
-  const out = `dist/release/metamedium-${version}.html`;
   const remote = git(repo, ['remote', 'get-url', 'origin'], { allowFail: true });
   const pushTo = remote.status === 0 ? remote.stdout.trim() : '<remote>';
   const branch = git(repo, ['rev-parse', '--abbrev-ref', 'HEAD']);
@@ -301,13 +309,13 @@ function main(argv) {
   const publish = [
     `  git push ${pushTo} ${branch === 'HEAD' ? 'HEAD:master' : branch}`,
     `  git push ${pushTo} v${version}`,
-    `  gh release create v${version} ${out} --title "MetaMedium ${version}" --notes-from-tag`,
+    `  gh release create v${version} ${out} --title "${NAME} ${version}" --notes-from-tag`,
     ...(branch !== 'master' ? [`  (this is ${branch === 'HEAD' ? 'a detached HEAD' : branch}, not master — Pages publishes master)`] : []),
     ...(app ? [`Pages then serves it at ${app}, and its help pane says ${version}.`] : []),
   ].join('\n');
 
   if (dryRun) {
-    console.log(`MetaMedium ${version} — a dry run: nothing is written, committed, tagged or pushed\n`);
+    console.log(`${NAME} ${version} — a dry run: nothing is written, committed, tagged or pushed\n`);
     console.log(`  tree      ${status ? 'NOT clean' : 'clean'} · ${branch} at ${head}`);
     if (state) console.log(`  version   ${state.version} → ${version} (the last release: ${state.last.version}, ${state.last.from})`);
     console.log(`  section   ${base ? `since ${base.tag || base.ref}` : 'from the beginning'}: ${commits.length} commit${commits.length === 1 ? '' : 's'}, merges left out`);
@@ -359,17 +367,17 @@ function main(argv) {
   const commit = git(repo, ['rev-parse', '--short', 'HEAD']);
   const note = mkdtempSync(join(tmpdir(), 'mm-release-tag-'));
   try {
-    writeFileSync(join(note, 'message'), `MetaMedium ${version}\n\n${section.replace(/^## [^\n]*\n\n/, '')}`);
+    writeFileSync(join(note, 'message'), `${NAME} ${version}\n\n${section.replace(/^## [^\n]*\n\n/, '')}`);
     const t = git(repo, ['tag', '-a', `v${version}`, '--cleanup=whitespace', '-F', join(note, 'message')], { allowFail: true });
     if (t.status !== 0) {
       console.error(`committed ${commit} "Release ${version}", but the tag was refused: ${(t.stderr || '').trim()}\n` +
-        `tag it by hand: git tag -a v${version} -m "MetaMedium ${version}"`);
+        `tag it by hand: git tag -a v${version} -m "${NAME} ${version}"`);
       process.exit(1);
     }
   } finally {
     rmSync(note, { recursive: true, force: true });
   }
-  console.log(`Released MetaMedium ${version} here — nothing has been pushed.\n`);
+  console.log(`Released ${NAME} ${version} here — nothing has been pushed.\n`);
   console.log(`  commit  ${commit} Release ${version}`);
   console.log(`  tag     v${version} (annotated; its message is the changelog's section)`);
   console.log(`  file    ${out} (${kb(html)}), not committed\n`);

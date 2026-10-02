@@ -8,6 +8,8 @@
 //   / statsAfter (what a board holds, kept up as records land), placeEntry / placesPlan (folders,
 //   repositories and sites as recent places), leaveVerdict (whether the board on screen may be left),
 //   switchPlan (what opening an entry does), boardTitle / boardSearch (the page's title and address),
+//   VERSION_META / VERSION_META_BEFORE / pageVersionOf / versionWords (the version the page says, read from
+//   the tag the build stamps or, on a page an older worker kept, the name that tag had before — RENAME-PLAN N3b),
 //   and the examples (R5) — EXAMPLES_BASE / exampleUrl (where boards/examples stands from the page),
 //   exampleRows (the pane's Examples, read from the index and never trusted), exampleName (what a board
 //   made from one is called), starterOf (which one a first run's tap opens), and what the iPad needs kept
@@ -367,6 +369,30 @@
 
   /** The page's title: the board's name first. */
   function boardTitle(name) { return name ? name + ' — dyna.ink' : 'dyna.ink'; }
+  /**
+   * The tag scripts/build-app.mjs stamps the version into (V1-PLAN R7), and the name it had until 0.1.0
+   * (RENAME-PLAN N3b). The build writes only the new name; the old one is read because a page a service worker
+   * kept before the rename — 0.1.0, the last MetaMedium — carries it, and the surface reading it may be newer
+   * than the page (the HTTP cache, a release's first visit). Without it that page would say it carries no version.
+   */
+  const VERSION_META = 'dynaink-version';
+  const VERSION_META_BEFORE = 'metamedium-version';
+  /**
+   * The version a page says, '' for none: `content(name)` is the content of the page's meta tag of that name, or
+   * null. The new name first, then the old — one reader for the help pane and for what every log is written with
+   * (17-folder.js's pageVersion is the adapter: the document's own tags).
+   */
+  function pageVersionOf(content) {
+    for (const name of [VERSION_META, VERSION_META_BEFORE]) {
+      const v = String(content(name) || '').trim();
+      if (v) return v;
+    }
+    return '';
+  }
+  /** What the help pane leads with: the version this page is. */
+  function versionWords(v) {
+    return !v ? 'dyna.ink — this page carries no version' : v === '0.0.0' ? 'dyna.ink 0.0.0 — no release has been cut yet' : 'dyna.ink ' + v;
+  }
   /**
    * The page's address on board `id`: `board=` set (in the place it had, or last), everything else
    * kept — except what would make the board not this board on a reload: `fresh` (a fresh start

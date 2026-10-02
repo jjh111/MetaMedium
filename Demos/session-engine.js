@@ -10570,6 +10570,8 @@
 //   / statsAfter (what a board holds, kept up as records land), placeEntry / placesPlan (folders,
 //   repositories and sites as recent places), leaveVerdict (whether the board on screen may be left),
 //   switchPlan (what opening an entry does), boardTitle / boardSearch (the page's title and address),
+//   VERSION_META / VERSION_META_BEFORE / pageVersionOf / versionWords (the version the page says, read from
+//   the tag the build stamps or, on a page an older worker kept, the name that tag had before — RENAME-PLAN N3b),
 //   and the examples (R5) — EXAMPLES_BASE / exampleUrl (where boards/examples stands from the page),
 //   exampleRows (the pane's Examples, read from the index and never trusted), exampleName (what a board
 //   made from one is called), starterOf (which one a first run's tap opens), and what the iPad needs kept
@@ -10929,6 +10931,30 @@
 
   /** The page's title: the board's name first. */
   function boardTitle(name) { return name ? name + ' — dyna.ink' : 'dyna.ink'; }
+  /**
+   * The tag scripts/build-app.mjs stamps the version into (V1-PLAN R7), and the name it had until 0.1.0
+   * (RENAME-PLAN N3b). The build writes only the new name; the old one is read because a page a service worker
+   * kept before the rename — 0.1.0, the last MetaMedium — carries it, and the surface reading it may be newer
+   * than the page (the HTTP cache, a release's first visit). Without it that page would say it carries no version.
+   */
+  const VERSION_META = 'dynaink-version';
+  const VERSION_META_BEFORE = 'metamedium-version';
+  /**
+   * The version a page says, '' for none: `content(name)` is the content of the page's meta tag of that name, or
+   * null. The new name first, then the old — one reader for the help pane and for what every log is written with
+   * (17-folder.js's pageVersion is the adapter: the document's own tags).
+   */
+  function pageVersionOf(content) {
+    for (const name of [VERSION_META, VERSION_META_BEFORE]) {
+      const v = String(content(name) || '').trim();
+      if (v) return v;
+    }
+    return '';
+  }
+  /** What the help pane leads with: the version this page is. */
+  function versionWords(v) {
+    return !v ? 'dyna.ink — this page carries no version' : v === '0.0.0' ? 'dyna.ink 0.0.0 — no release has been cut yet' : 'dyna.ink ' + v;
+  }
   /**
    * The page's address on board `id`: `board=` set (in the place it had, or last), everything else
    * kept — except what would make the board not this board on a reload: `fresh` (a fresh start
@@ -12171,6 +12197,7 @@
 //   RENAME-PLAN N1: carryIn, carryHeld, logHash), the log format's surface (R2:
 //   readLogText — a log's text as events or the sentence for a version this build does not read —
 //   logWrite, logFileNote; a folder whose log is of a newer version is refused before it is opened),
+//   pageVersion (the version this page says, by 17-boards.js's pageVersionOf — RENAME-PLAN N3b),
 //   the view per board, browser
 //   storage where there is no IndexedDB, the one import of browser storage's old copy, the lock one
 //   tab holds per board, what the status line says when a save fails (boardWarning, keepBoardIn), and the one
@@ -13604,9 +13631,16 @@
   }
   /** What a log written by this page says of itself in the status line: the version, and that an older app opens it. */
   function logFileNote() { return ' · log version ' + MM.LOG_VERSION + ' — an older dyna.ink opens it too'; }
+  /**
+   * The version this page is: its <meta name="dynaink-version">, or — on a page an older worker kept — the name that
+   * tag had before (17-boards.js's pageVersionOf, RENAME-PLAN N3b). '' for none.
+   */
+  function pageVersion() {
+    return pageVersionOf((name) => { const m = document.querySelector('meta[name="' + name + '"]'); return m ? m.content : null; });
+  }
   /** What every log this page writes is written with. */
   function logWrite() {
-    const app = ((document.querySelector('meta[name="metamedium-version"]') || {}).content || '').trim();
+    const app = pageVersion();
     return app ? { app } : {};
   }
   /**
@@ -15311,7 +15345,8 @@
 //   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
 // Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
 //   boardOnScreenName, resetBoard), models (agents, deciderHost), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude); the page's
-//   version from its <meta name="metamedium-version"> (V1-PLAN R7), said at the head of the help pane.
+//   version (folder's pageVersion: its <meta name="dynaink-version">, V1-PLAN R7, or on a page an older worker kept the
+//   tag's old name, RENAME-PLAN N3b; boards' versionWords), said at the head of the help pane.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -15407,13 +15442,10 @@
   const helpPanel = document.getElementById('helpPanel');
   ui.pane(helpPanel, 'help', () => closePanel(helpPanel, tiles.help));
   // It leads with the version this page is (V1-PLAN R7): the repository's VERSION, stamped into the
-  // page by scripts/build-app.mjs, so the line holds offline and in the standalone file alike.
-  const pageVersion = ((document.querySelector('meta[name="metamedium-version"]') || {}).content || '').trim();
+  // page by scripts/build-app.mjs, so the line holds offline and in the standalone file alike — and a
+  // page an older worker kept, carrying the tag under its old name, still says its own (RENAME-PLAN N3b).
   const helpVersion = document.getElementById('helpVersion');
-  if (helpVersion) {
-    helpVersion.textContent = !pageVersion ? 'dyna.ink — this page carries no version'
-      : pageVersion === '0.0.0' ? 'dyna.ink 0.0.0 — no release has been cut yet' : 'dyna.ink ' + pageVersion;
-  }
+  if (helpVersion) helpVersion.textContent = versionWords(pageVersion());
   let helpLoaded = false;
   tiles.help.onclick = () => {
     togglePanel(helpPanel, tiles.help);

@@ -223,7 +223,8 @@ test('a dry run prints the release and changes nothing; the release is one commi
   assert.equal(existsSync(join(r.dir, 'dist', 'release', 'metamedium-0.2.0.html')), false, 'the standalone file is named the old way too');
   const html = readFileSync(file, 'utf8');
   assert.match(html, /<meta name="dynaink-version" content="0\.2\.0">/);
-  assert.ok(!html.includes('metamedium-version'), 'the standalone file carries the old tag');
+  // The page's tag, not the surface inlined beside it, which falls back to the old name for a page an older worker kept.
+  assert.ok(!/<meta name="metamedium-version"/.test(html), 'the standalone file carries the old tag');
   assert.ok(html.includes('var MetaMediumCore') && !html.includes('src="metamedium-core.browser.js"'), 'the engine is not inlined');
   assert.equal(keyShapesIn(html).length, 0);
 });

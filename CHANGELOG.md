@@ -1,11 +1,12 @@
 # Changelog
 
-Every release of MetaMedium — the app at https://jjh111.github.io/MetaMedium/app/
-— newest first: its version, the day it was cut, and the subjects of the
-commits since the release before it, grouped by the unit each commit names
-(`V1-PLAN.md` §9). `node scripts/release.mjs <version>` writes each section
-from the history; nothing here is written by hand. `VERSION` holds the
-current version, and a release's tag is `v` and that version.
+Every release of dyna.ink — MetaMedium until 0.1.0 — the app at
+https://jjh111.github.io/MetaMedium/app/ — newest first: its version, the day
+it was cut, and the subjects of the commits since the release before it,
+grouped by the unit each commit names (`V1-PLAN.md` §9).
+`node scripts/release.mjs <version>` writes each section from the history;
+nothing here is written by hand. `VERSION` holds the current version, and a
+release's tag is `v` and that version.
 
 ## 0.1.0 — 2026-10-02
 

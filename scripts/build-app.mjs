@@ -21,9 +21,13 @@
 //
 // The version is the repository's VERSION file — one line, MAJOR.MINOR.PATCH
 // with an optional pre-release — and this build stamps it where it is carried:
-// the page's <meta name="metamedium-version"> (which the help pane says) and
+// the page's <meta name="dynaink-version"> (which the help pane says) and
 // the workers' `const VERSION` (which names their caches, so a release is a new
 // worker with a new cache). `scripts/release.mjs` bumps VERSION and runs this.
+// The tag was <meta name="metamedium-version"> until 0.1.0 (RENAME-PLAN N3b):
+// this build stamps the new name only, and the surface's reader of the version
+// (pageVersionOf, Demos/surface/17-boards.js) falls back to the old one, for a
+// page an older service worker kept.
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -33,7 +37,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const IDENT = '(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)';
 export const VERSION_PATTERN = new RegExp(`^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-(${IDENT}(?:\\.${IDENT})*))?$`);
 
-const META = /<meta name="metamedium-version" content="[^"]*">/;
+const META = /<meta name="dynaink-version" content="[^"]*">/;
 const WORKER_LINE = /^const VERSION = '[^']*';$/m;
 const assertVersion = (v) => { if (!VERSION_PATTERN.test(v)) throw new Error(`"${v}" is not a version (MAJOR.MINOR.PATCH, an optional -pre-release)`); return v; };
 
@@ -47,8 +51,8 @@ export function readVersion(root) {
 /** The page, saying `version`. */
 export function stampPage(html, version) {
   assertVersion(version);
-  if (!META.test(html)) throw new Error('the page has no <meta name="metamedium-version" content="…"> to stamp');
-  return html.replace(META, `<meta name="metamedium-version" content="${version}">`);
+  if (!META.test(html)) throw new Error('the page has no <meta name="dynaink-version" content="…"> to stamp');
+  return html.replace(META, `<meta name="dynaink-version" content="${version}">`);
 }
 
 /** The worker, its caches named for `version`. */
