@@ -5487,6 +5487,8 @@ window.__scenario = async function(){
 };
 
 // ===========================================================================
+// Changed by design on 2 Oct 2026 (PLAN-FIELD-PAR): a typed word waits for a pick (FP4) — "nav" is no
+// longer a brief — and *Label it* became *Write “…” on it* (Name and Label folded, John's ask). Nothing else.
 // The field's offers, golden (V1-PLAN B1). Captured from the surface BEFORE
 // the field's affordances came from registered tools, and asserted unchanged
 // after: for each fixture scope, the four core slots, the reading line, what
@@ -5628,11 +5630,11 @@ window.__FIELD_GOLDEN = {
   },
   "row of three boxes, \"nav\" typed": {
     core: ["name", "copy", "paste", "erase"],
-    line: "↵ the structure at once (tier 1), then llm:e2e-stub writes the words",
+    line: "↵ a word — tap what it is for: a name, or words on the marks",
     certain: [],
     afford: [
       {"key": "name-word", "label": "Name it “nav”", "title": "“nav” as the name — naming makes one thing of them, a definition the library keeps and the next drawing like it is offered as; it writes no word on the ink", "dot": false},
-      {"key": "label-word", "label": "Label it “nav”", "title": "“nav” on each of the 3 marks you made, in your ink at the board's scale — it makes nothing: no definition, no name the library learns, no file; undo takes it off", "dot": false},
+      {"key": "label-word", "label": "Write “nav” on it", "title": "“nav” on each of the 3 marks you made, in your ink at the board's scale — it makes nothing: no definition, no name the library learns, no file; undo takes it off", "dot": false},
     ],
     more: "",
     ranked: ["snap", "concept:row", "row:tidy-row", "row:equalize", "what", "duplicate", "keep"],
@@ -5688,7 +5690,7 @@ window.__FIELD_GOLDEN = {
       {"key": "concept:writing", "label": "writing 0.75", "title": "3 marks of writing on one line, a word's gap apart — take it as the name — 3 marks of writing on one line, a word's gap apart", "dot": false},
     ],
     afford: [
-      {"key": "label:hello wide world", "label": "Label it “hello wide world”", "title": "“hello wide world” on the writing itself, as a caption, in your ink at the board's scale — it makes nothing: no definition, no name the library learns, no file; undo takes it off — read from your handwriting by llm:e2e-stub", "dot": false},
+      {"key": "label:hello wide world", "label": "Write “hello wide world” on the writing", "title": "“hello wide world” on the writing itself, as a caption, in your ink at the board's scale — it makes nothing: no definition, no name the library learns, no file; undo takes it off — read from your handwriting by llm:e2e-stub", "dot": false},
       {"key": "line-text:<word1>,<word2>,<word3>", "label": "Make it text “hello wide world”", "title": "text where the line is, fitted to the ink; flip it to see the writing", "dot": false},
       {"key": "what", "label": "What is this?", "title": "every joined model reads the group; its readings join the row above", "dot": true},
     ],
