@@ -19,7 +19,7 @@
 // worker keeps the new shell whole, then drops the old release's cache. It
 // drops only its own: caches belong to the origin, which every page under it
 // shares — the other address, and every project on the same github.io host.
-const VERSION = '0.0.0';
+const VERSION = '0.1.0';
 const AT_APP = /\/app\/sw\.js$/.test(self.location.pathname);
 const PREFIX = AT_APP ? 'mm-app-' : 'mm-shell-';
 const CACHE = PREFIX + VERSION;
