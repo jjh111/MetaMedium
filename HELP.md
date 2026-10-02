@@ -331,5 +331,8 @@ is ignored. The *hand* tile gives the finger its ink back.
 
 ---
 
+dyna.ink is open source under the GNU AGPL-3.0: **Source code**, at the top
+of this pane, opens its source, and **AGPL-3.0** beside it the license.
+
 *The manual test plan the builders walk is `QA-v8.md`, beside this file in
 the repository.*
