@@ -1,12 +1,12 @@
-# MetaMedium Experiments
+# dyna.ink Experiments
 
 Experiments are where platform bets get **de-risked before they land in
-`metamedium-core/`**. They are deliberately cheap, deliberately forked, and
+`core/`**. They are deliberately cheap, deliberately forked, and
 deliberately *not* the product. The platform is the whitepaper + the session
 engine + the flagship demo; everything on this page exists to feed that.
 
 **The rule:** an experiment may re-implement whatever it needs to move fast.
-When an idea proves out, it lands in `metamedium-core/` **with tests**, and the
+When an idea proves out, it lands in `core/` **with tests**, and the
 experiment either adopts the core or gets parked. Experiments never become the
 thing the project is *about*.
 
@@ -43,7 +43,7 @@ Detail lives with the experiment: [`lens-canvas/CLAUDE.md`](lens-canvas/CLAUDE.m
 (agent guide), [`DEV_LOG.md`](lens-canvas/DEV_LOG.md) (what shipped),
 [`IMPLEMENTATION_PLAN.md`](lens-canvas/IMPLEMENTATION_PLAN.md) (phase plan).
 
-> **Note:** lens-canvas uses the personal-site palette, not the MetaMedium
+> **Note:** lens-canvas uses the personal-site palette, not the dyna.ink
 > palette — see [Design Systems](#design-systems) below. It is also not yet
 > covered by CI.
 
@@ -114,19 +114,19 @@ because it is cheap to keep. Not a platform surface.
 
 ---
 
-## shard-3d/ — a bounded MetaMedium for making things in space
+## dynaink-3d/ — DynaInk3D, a bounded dyna.ink for making things in space
 
 **Status:** live · P0–P6 — the MVP line — **plus the navigation compass**
 (15 Sep 2026) · Vite + TypeScript + three.js · plan in
 [`SHARD-3D-PLAN.md`](SHARD-3D-PLAN.md), package notes in
-[`shard-3d/README.md`](shard-3d/README.md)
+[`dynaink-3d/README.md`](dynaink-3d/README.md)
 
 ```bash
-cd shard-3d && npm install
+cd dynaink-3d && npm install
 npm run dev        # vite on :5174 (?demo, =read, =view, =diff, =castle, =mug)
 npm test           # vitest — the pure rungs, headless, no WebGL
 npm run typecheck
-npm run build:standalone   # → dist/shard-3d.html, one file, 936KB
+npm run build:standalone   # → dist/dynaink-3d.html, one file, 936KB
 ```
 
 **P0 is in** (the space): the orbit / draw split, the gizmo with its three
@@ -319,7 +319,7 @@ node bench/node.mjs --ep webgpu
 **Probes** whether the middle layer's `extract` seat (MATHS-PLAN §5) can be
 GLiNER2, and asks four things of it:
 
-- does it run where MetaMedium runs;
+- does it run where dyna.ink runs;
 - is it fast enough to ask without a spinner;
 - is its licence one we can ship;
 - does it pull the right typed spans out of our own text?
@@ -372,9 +372,9 @@ Two palettes coexist **on purpose**, and the split is by brand, not by drift:
 | lens-canvas, manim-explainer, playground | `#020a12` sea-deep · `#7dd8f7` cyan · `#d4af37` gold | JetBrains Mono |
 
 The second is the personal-site (johnhanacek.com) language. The first is
-MetaMedium's current look.
+dyna.ink's current look.
 
-> 📌 **Pinned:** a deliberate MetaMedium style is still to be defined. Until
+> 📌 **Pinned:** a deliberate dyna.ink style is still to be defined. Until
 > then, treat the whitepaper palette as *current*, not as *decided*, and do not
 > converge the two — the separation is intended.
 
@@ -384,7 +384,7 @@ MetaMedium's current look.
 
 When something here has earned its place in the platform:
 
-1. Port it into `metamedium-core/` with tests (behavior-identical first, then
+1. Port it into `core/` with tests (behavior-identical first, then
    improve — reconcile by test, not by guess).
 2. Rebuild the browser bundle and re-copy it to `Demos/` — CI fails if the
    committed copy drifts.

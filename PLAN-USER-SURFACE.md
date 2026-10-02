@@ -1,5 +1,7 @@
 # dyna.ink — the user surface: a plan for the next dev agent
 
+*Paths since 2 Oct 2026 (`RENAME-PLAN.md`): `metamedium-core/` is `core/`, `shard-3d/` is `dynaink-3d/`, the bundles are `Demos/dynaink-core.*`, the MCP servers `dynaink` and `dynaink-3d`; the product is dyna.ink.*
+
 **28 September 2026.** Written by the director (a Claude Code session on John's
 machine) for a dev agent working in the cloud. It stands on its own: read it,
 then the files it names, and start. The evidence for every finding is

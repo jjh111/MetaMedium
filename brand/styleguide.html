@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MetaMedium — Style</title>
-<meta name="description" content="The MetaMedium visual system: light paper, one face, colour as signal.">
+<title>dyna.ink — Style</title>
+<meta name="description" content="The dyna.ink visual system: light paper, one face, colour as signal.">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='none' stroke='%230b6f7d' stroke-width='2.5'/%3E%3Cpath d='M9 20 L14 25 L24 9' fill='none' stroke='%231c5fb8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="tokens.css">
 <style>
 /* ==========================================================================
-   MetaMedium — styleguide page.
+   dyna.ink — styleguide page.
    Every value comes from tokens.css. If a number appears here that should be
    shared, it belongs in tokens.css instead. Nothing below branches on theme.
    ========================================================================== */
@@ -24,7 +24,7 @@ html { font-size: 17px; scroll-behavior: smooth; }
 
 body {
   background-color: var(--paper);
-  /* The faint canvas grid. MetaMedium's ground is a surface you draw on;
+  /* The faint canvas grid. dyna.ink's ground is a surface you draw on;
      the grid says so without asking for attention. */
   background-image:
     linear-gradient(to right, var(--grid) 1px, transparent 1px),
@@ -775,8 +775,8 @@ figure.fig.band { max-width: var(--fig-band); }
 
 <header class="masthead">
   <div class="wrap">
-    <div class="eyebrow">MetaMedium &middot; Visual System &middot; v1 draft</div>
-    <h1 class="wordmark"><em>Meta</em>Medium</h1>
+    <div class="eyebrow">dyna.ink &middot; Visual System &middot; v1 draft</div>
+    <h1 class="wordmark"><em>dyna</em>.ink</h1>
     <p class="tagline">A drawing is code. So the drawing and the code are set in the same face, on the same paper, and every colour on the surface is the engine saying what it knows.</p>
     <div class="meta">
       <span>IBM Plex Mono</span>
@@ -800,7 +800,7 @@ figure.fig.band { max-width: var(--fig-band); }
         <div class="n">I</div>
         <div>
           <h4>Paper first.</h4>
-          <p>MetaMedium is a surface you draw on, so the light surface <b>is</b> the design and the dark surface is that same design inverted for a canvas you stare at for an hour. Dark mode changes tokens only. <b>No rule below the token layer may branch on theme</b> — if a component needs to know which surface it is on, the token set is wrong.</p>
+          <p>dyna.ink is a surface you draw on, so the light surface <b>is</b> the design and the dark surface is that same design inverted for a canvas you stare at for an hour. Dark mode changes tokens only. <b>No rule below the token layer may branch on theme</b> — if a component needs to know which surface it is on, the token set is wrong.</p>
         </div>
       </div>
       <div class="law">
@@ -857,7 +857,7 @@ figure.fig.band { max-width: var(--fig-band); }
       <div class="swatch"><span class="chip" style="background:var(--teal-soft)"></span><div class="body"><div class="name">Teal soft</div><div class="hex">#3fa3ae</div><div class="role">Teal that has to sit on ink. The dark surface's keyword.</div></div></div>
       <div class="swatch"><span class="chip" style="background:var(--hl)"></span><div class="body"><div class="name">Marker</div><div class="hex">teal @ 15%</div><div class="role">The reader's <span class="hl">highlight</span>. Replaces the old yellow.</div></div></div>
     </div>
-    <p class="note">The gold of <code>Demos/</code> and the cyan-plus-gold of the personal site are <b>not</b> MetaMedium colours. They were adopted before the project had a palette of its own; this teal is the one that ships, on both surfaces.</p>
+    <p class="note">The gold of <code>Demos/</code> and the cyan-plus-gold of the personal site are <b>not</b> dyna.ink colours. They were adopted before the project had a palette of its own; this teal is the one that ships, on both surfaces.</p>
 
     <h3 class="sub">Signal — the load-bearing half</h3>
     <p class="lede">These are not palette choices. Each one is a claim the engine is making, and a surface that borrows one for decoration is lying about what it knows.</p>
@@ -882,7 +882,7 @@ figure.fig.band { max-width: var(--fig-band); }
     <div class="card">
       <div class="type-row">
         <div class="label">Display</div>
-        <div class="smp-display"><em>Meta</em>Medium</div>
+        <div class="smp-display"><em>dyna</em>.ink</div>
         <div class="spec">500 &middot; clamp 2.6&ndash;4.6rem<br>tracking &minus;0.035em &middot; lh 0.98</div>
       </div>
       <div class="type-row">
@@ -926,7 +926,7 @@ figure.fig.band { max-width: var(--fig-band); }
       <div class="card">
         <h3 class="sub" style="margin-top:0">Numbers are evidence</h3>
         <p class="smp-small" style="color:var(--ink-2)">Every measured value is set <span style="font-variant-numeric:tabular-nums">tabular</span> so a column of confidences can be compared down the page. Thresholds are <b>never</b> written into prose — they live in the engine and drift the moment a document restates them.</p>
-        <div class="code" style="margin-top:var(--s2)"><span class="c">// cite the source, not the number</span><br><span class="k">metamedium-core/src/</span>recognition.ts<br><span class="k">SNAP_CONFIDENCE</span> &middot; <span class="k">SNAP_MARGIN</span><br><span class="k">MAX_TIER0_CONFIDENCE</span></div>
+        <div class="code" style="margin-top:var(--s2)"><span class="c">// cite the source, not the number</span><br><span class="k">core/src/</span>recognition.ts<br><span class="k">SNAP_CONFIDENCE</span> &middot; <span class="k">SNAP_MARGIN</span><br><span class="k">MAX_TIER0_CONFIDENCE</span></div>
       </div>
     </div>
   </div>
@@ -941,7 +941,7 @@ figure.fig.band { max-width: var(--fig-band); }
 
     <div class="grid-3">
       <div class="mark-tile on-paper">
-        <svg class="signet" viewBox="0 0 100 100" aria-label="MetaMedium signet">
+        <svg class="signet" viewBox="0 0 100 100" aria-label="dyna.ink signet">
           <path d="M50 12 C74 12 89 30 89 49 C89 70 71 87 49 87 C27 87 11 69 11 49 C11 29 28 12 50 12 Z"
                 fill="none" stroke="var(--teal)" stroke-width="4" stroke-linecap="round"/>
           <path d="M27 55 L44 74 L79 22" fill="none" stroke="var(--sig-read)" stroke-width="5"
@@ -950,11 +950,11 @@ figure.fig.band { max-width: var(--fig-band); }
         <div class="tag">Signet &middot; primary</div>
       </div>
       <div class="mark-tile on-wash">
-        <div class="wm"><em>Meta</em>Medium</div>
+        <div class="wm"><em>dyna</em>.ink</div>
         <div class="tag">Wordmark &middot; on paper</div>
       </div>
       <div class="mark-tile on-ink">
-        <div class="wm"><em>Meta</em>Medium</div>
+        <div class="wm"><em>dyna</em>.ink</div>
         <div class="tag">Wordmark &middot; on ink</div>
       </div>
     </div>
@@ -963,8 +963,8 @@ figure.fig.band { max-width: var(--fig-band); }
       <div class="card">
         <h3 class="sub" style="margin-top:0">Rules for the mark</h3>
         <ul style="list-style:none">
-          <li class="smp-small" style="color:var(--ink-2);padding:0.2rem 0">&mdash; <b style="color:var(--ink)">Meta is the teal half.</b> Never colour Medium, never colour both. <em>Meta</em> is the argument the project is making &mdash; AI as meta-word &mdash; so it is the half that takes the accent.</li>
-          <li class="smp-small" style="color:var(--ink-2);padding:0.2rem 0">&mdash; One word, no space, no hyphen: <b style="color:var(--ink)">MetaMedium</b>.</li>
+          <li class="smp-small" style="color:var(--ink-2);padding:0.2rem 0">&mdash; <b style="color:var(--ink)">dyna is the teal half.</b> Never colour .ink, never colour both. <em>dyna</em> takes the accent as <em>Meta</em> did before the rename, and the dot stays in the ink.</li>
+          <li class="smp-small" style="color:var(--ink-2);padding:0.2rem 0">&mdash; Lowercase, with its dot: <b style="color:var(--ink)">dyna.ink</b>, never styled otherwise in prose. The dot never goes into an identifier: in code it is <code>dynaink</code> or <code>DynaInk</code>, and the 3D surface is <b style="color:var(--ink)">DynaInk3D</b> (the spellings have one home, <code>RENAME-PLAN.md</code> §1).</li>
           <li class="smp-small" style="color:var(--ink-2);padding:0.2rem 0">&mdash; Tracking is &minus;0.035em at display size and eases to &minus;0.02em below 1.5rem.</li>
           <li class="smp-small" style="color:var(--ink-2);padding:0.2rem 0">&mdash; The signet's clear space is the height of its own loop. It never sits inside a coloured plate.</li>
           <li class="smp-small" style="color:var(--ink-2);padding:0.2rem 0">&mdash; On ink, the loop takes <b style="color:var(--ink)">teal soft</b> and the check keeps blue. The gesture must stay legible on both surfaces.</li>
@@ -1211,7 +1211,7 @@ figure.fig.band { max-width: var(--fig-band); }
       <div class="surface light">
         <div class="s-head">Paper &middot; warm &middot; whitepaper, docs, figures</div>
         <div class="s-body">
-          <div class="demo-wm"><em>Meta</em>Medium</div>
+          <div class="demo-wm"><em>dyna</em>.ink</div>
           <div class="demo-line">A stroke is reduced to a fingerprint, and detectors read that fingerprint.</div>
           <div class="demo-btns"><span class="demo-btn a">Draw them clean</span><span class="demo-btn b">What could these be?</span></div>
         </div>
@@ -1219,7 +1219,7 @@ figure.fig.band { max-width: var(--fig-band); }
       <div class="surface dark">
         <div class="s-head">Canvas &middot; grey &middot; Demos/, the session surface</div>
         <div class="s-body">
-          <div class="demo-wm"><em>Meta</em>Medium</div>
+          <div class="demo-wm"><em>dyna</em>.ink</div>
           <div class="demo-line">A stroke is reduced to a fingerprint, and detectors read that fingerprint.</div>
           <div class="demo-btns"><span class="demo-btn a">Draw them clean</span><span class="demo-btn b">What could these be?</span></div>
         </div>
@@ -1239,7 +1239,7 @@ figure.fig.band { max-width: var(--fig-band); }
     <div class="specimen">
       <div class="sp-eyebrow">Recognition &middot; &sect;3</div>
       <h3>Extent is the strongest single <em>discriminator</em></h3>
-      <div class="sp-byline">MetaMedium &middot; Whitepaper v5.1 &middot; draft</div>
+      <div class="sp-byline">dyna.ink &middot; Whitepaper v5.1 &middot; draft</div>
 
       <p>A stroke arrives as a few hundred points and nothing else. Before anything can be said about what it <em>means</em>, something has to be measurable about what it <strong>is</strong>: how straight it runs, whether it closed, how many times it turned sharply, and what fraction of its own bounding box its outline manages to enclose.</p>
 
@@ -1265,7 +1265,7 @@ figure.fig.band { max-width: var(--fig-band); }
             </g>
           </svg>
         </div>
-        <figcaption><b>Figure 3</b> &mdash; The dashed teal box is the tightest bounding box at any angle, found by rotating calipers over the hull. Extent is the fraction of it the ink encloses. Values are indicative; the measured thresholds live in <code>metamedium-core/src/recognition.ts</code> and are deliberately not restated here.</figcaption>
+        <figcaption><b>Figure 3</b> &mdash; The dashed teal box is the tightest bounding box at any angle, found by rotating calipers over the hull. Extent is the fraction of it the ink encloses. Values are indicative; the measured thresholds live in <code>core/src/recognition.ts</code> and are deliberately not restated here.</figcaption>
       </figure>
 
       <p>Two properties matter more than any individual number. Every detector that qualifies contributes a candidate, and results come back ranked &mdash; <strong>nothing wins by silencing the others</strong>. And each detector scores continuously from the evidence it found, so confidence is measured rather than assigned. Fixed confidences with overlapping bands are how a three-corner shape used to match both triangle and rectangle and win on a constant, which is not a ranking.</p>
@@ -1279,7 +1279,7 @@ figure.fig.band { max-width: var(--fig-band); }
   <div class="wrap">
     <div class="kicker"><span class="num">10</span> Voice</div>
     <h2 class="head">Say what was measured. <em>Then say what it cost.</em></h2>
-    <p class="lede">The visual system and the writing make the same promise, so the voice belongs in the same document. MetaMedium writes in the past tense about things it actually ran: a claim arrives with the evidence, and a rule arrives with the failure that produced it.</p>
+    <p class="lede">The visual system and the writing make the same promise, so the voice belongs in the same document. dyna.ink writes in the past tense about things it actually ran: a claim arrives with the evidence, and a rule arrives with the failure that produced it.</p>
 
     <div class="grid-3">
       <div class="card voice">
@@ -1502,7 +1502,7 @@ figure.fig.band { max-width: var(--fig-band); }
       <div class="tl-entry tl-conv">
         <div class="tl-year">2026</div>
         <div>
-          <div class="tl-title">MetaMedium <span class="tl-badge conv">Convergence</span></div>
+          <div class="tl-title">dyna.ink <span class="tl-badge conv">Convergence</span></div>
           <div class="tl-author">All threads merge</div>
           <div class="tl-synthesis">
             <b>Synthesises:</b>
@@ -1524,7 +1524,7 @@ figure.fig.band { max-width: var(--fig-band); }
 <footer class="colophon">
   <div class="wrap">
     <div class="rule"></div>
-    <p><strong>MetaMedium visual system, v1 draft.</strong> Tokens live in <code>brand/tokens.css</code> &mdash; the single home. This page consumes them and adds nothing but layout; if a value here should be shared, it belongs in the token file instead.</p>
+    <p><strong>dyna.ink visual system, v1 draft.</strong> Tokens live in <code>brand/tokens.css</code> &mdash; the single home. This page consumes them and adds nothing but layout; if a value here should be shared, it belongs in the token file instead.</p>
     <p>Still open, and John's to decide: whether the wordmark keeps its two-tone split, and how far the dark canvas ground should travel into <code>Demos/</code> before the gold is retired for good.</p>
     <div class="stamp">IBM Plex Mono &middot; Paper #f8f5ef &middot; Ink #0c1a24 &middot; Teal #0b6f7d &middot; 3 Sept 2026</div>
   </div>

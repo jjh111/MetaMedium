@@ -6,7 +6,7 @@ pasting into a console, so nothing stopped a regression in either from reaching
 them without a console.
 
 It does not reimplement them. `Demos/session-engine.e2e.js` and
-`shard-3d/e2e.js` remain the tests; `run.mjs` starts servers, opens a fresh
+`dynaink-3d/e2e.js` remain the tests; `run.mjs` starts servers, opens a fresh
 browser, loads each harness, awaits the result object the harness returns, and
 exits nonzero if anything in it failed.
 
@@ -24,24 +24,24 @@ node run.mjs --browser webkit smoke pencil keep carry # what CI's webkit job run
 cd e2e && npm run webkit                        # the same thing
 ```
 
-`shard-3d` needs its own `npm ci` first — the runner says so rather than
+`dynaink-3d` needs its own `npm ci` first — the runner says so rather than
 guessing. Pick scenarios by name to run one: `node e2e/run.mjs canvas`,
 `node e2e/run.mjs shard demo`.
 
 | scenario | what runs | where |
 |---|---|---|
 | `canvas` | `__setup(); __scenario()` | `Demos/session-engine.html?fresh=1&nosw=1` over a static server on the repo root |
-| `shard` | `__scenario()` | `shard-3d/` over vite |
-| `demo` | `__demo()` | `shard-3d/` over vite, in its own context |
-| `demo2` | `__demo2()` | `shard-3d/` over vite, in its own context |
+| `shard` | `__scenario()` | `dynaink-3d/` over vite |
+| `demo` | `__demo()` | `dynaink-3d/` over vite, in its own context |
+| `demo2` | `__demo2()` | `dynaink-3d/` over vite, in its own context |
 | `smoke` | four checks written in `run.mjs` itself | `Demos/session-engine.html?fresh=1&nosw=1`, usually with `--browser webkit` |
 | `keep` | no lost work — `keep.mjs`, written here, not a page harness | `Demos/session-engine.html?nosw=1`, in several contexts of its own |
 | `boards` | several named boards — `boards.mjs`, written here, the boards pane driven with the real pointer | `Demos/session-engine.html?nosw=1`, in one context, with a second and third tab |
 | `carry` | carry your boards to the new home (RENAME-PLAN N1) — `carry.mjs`, written here: two static servers of its own beside the gate's make three origins, the old address (A), dyna.ink (B) and a stranger (C) | `app/?nosw=1&carryTo=<B>` on A, the window it opens on B, a page on C, and a second context for the file |
-| `big` | a 2,000-mark board saved and opened again (opt-in, minutes) | the same page, with the board from `metamedium-core/bench/board.mjs` |
+| `big` | a 2,000-mark board saved and opened again (opt-in, minutes) | the same page, with the board from `core/bench/board.mjs` |
 | `app` | one app address — `app.mjs`, written here: `/app/` installs, opens with the server gone, and is versioned per release | `app/` over the static server, then a server of its own it can take away, then a copy of the site it releases again |
 | `pencil` | pencil and tablet — `pencil.mjs`, written here: the pen and fingers synthesised in the page as iPadOS delivers them, and the keyboard as it tells the page | `Demos/session-engine.html?nosw=1` at 1180 × 820, in one context, reloaded once |
-| `models` | a hosted model is asked, and says why when it cannot be (V1-PLAN J5) — `models.mjs`, written here: the models pane and the field driven with the real pointer against `startModelStub` (`servers.mjs`), an OpenAI-compatible endpoint on 127.0.0.1 answering in OpenRouter's recorded shapes (`metamedium-core/src/llm/fixtures/`); nothing on this machine is probed — Ollama's list is a stand-in in the page, LM Studio does not answer | `app/`, in one context, reloaded once |
+| `models` | a hosted model is asked, and says why when it cannot be (V1-PLAN J5) — `models.mjs`, written here: the models pane and the field driven with the real pointer against `startModelStub` (`servers.mjs`), an OpenAI-compatible endpoint on 127.0.0.1 answering in OpenRouter's recorded shapes (`core/src/llm/fixtures/`); nothing on this machine is probed — Ollama's list is a stand-in in the page, LM Studio does not answer | `app/`, in one context, reloaded once |
 | `seat` | the canvas's seat — `seat.mjs`, written here: Claude Code over MCP as the model the field asks, with a relay of its own, `Demos/mcp.mjs` as the answerer over stdio and `Demos/seat-watch.mjs` beside it | `Demos/session-engine.html?live=claude&relay=…&nosw=1`, in one context, reloaded once, and a second page for *with Claude* |
 | `hand` | the hand in the gate (V1-PLAN H1) — `hand.mjs`, written here: QA-v10's machine rows with `Demos/mcp.mjs` as a hand over stdio in room `mcp-test`, a relay of its own, a tab as *john*, and a counting model of the gate's own | `Demos/session-engine.html?live=mcp-test&relay=…&nosw=1`, in one context, reloaded once |
 | `budgets` | the surface's budgets and the equivalence check — `budgets.mjs`, written here, not a page harness | `Demos/session-engine.html?folder=…`, the bench's boards served from memory, a context each |
@@ -118,7 +118,7 @@ replays the board, which at that size is R4's problem: a run takes minutes.
 
 `PERF.md`'s budgets are the 2,000-mark board's, and v1 ships when they hold
 (V1-PLAN R4c, §11.3). `budgets` opens boards from the engine benchmark's
-generator (`metamedium-core/bench/board.mjs`, the same seed, served from
+generator (`core/bench/board.mjs`, the same seed, served from
 memory as a published folder) and does two things.
 
 - **The equivalence check**, on the 500-mark board: every mark pointed at in

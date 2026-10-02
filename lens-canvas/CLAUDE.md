@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An infinite canvas that renders data objects with type-appropriate visualizations ("lenses"). Part of the MetaMedium project. The graph is the truth — everything on the canvas is a `LensNode` in a JSON graph.
+An infinite canvas that renders data objects with type-appropriate visualizations ("lenses"). Part of the dyna.ink project (formerly MetaMedium). The graph is the truth — everything on the canvas is a `LensNode` in a JSON graph.
 
 ## Quick Start
 

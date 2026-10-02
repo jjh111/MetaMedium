@@ -9,7 +9,7 @@ carry that name, and [RENAME-PLAN.md](RENAME-PLAN.md) says what changes and when
 
 ## Start Here
 
-**📄 Interactive whitepaper (v5): [MetaMedium: AI Beyond Chat](https://jjh111.github.io/MetaMedium/)**
+**📄 Interactive whitepaper (v5): [dyna.ink: AI Beyond Chat](https://jjh111.github.io/MetaMedium/)**
 
 ## Demos
 
@@ -41,7 +41,7 @@ Earlier-prototype keyboard shortcuts: `Ctrl+Z` undo, `Ctrl+Shift+Z` redo,
 **[EXPERIMENTS.md](EXPERIMENTS.md)** — the side tier: lens-canvas (infinite
 canvas + confidence-routed lenses), the drawing-responsive text PoC, vision/LLM
 probes, and the explainer video. Experiments de-risk platform bets and feed
-proven ideas back into `metamedium-core`; they aren't the product.
+proven ideas back into `core`; they aren't the product.
 
 ## Open a folder as a canvas
 
@@ -76,11 +76,11 @@ always fetched live.
 ## Development
 
 **The engine** — geometry, recognition, spatial graph, and the no-modes
-session engine — lives in [`metamedium-core/`](metamedium-core/) (TypeScript,
+session engine — lives in [`core/`](core/) (TypeScript,
 zero runtime deps):
 
 ```bash
-cd metamedium-core
+cd core
 npm install
 npm test         # 86 tests incl. the canonical-loop executable spec
 npm run build

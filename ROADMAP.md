@@ -1,4 +1,4 @@
-# MetaMedium Roadmap — Mid-2026 Refresh
+# dyna.ink Roadmap — Mid-2026 Refresh
 
 **Date:** June 2026 · last revised August 2026
 **Status:** Active plan
@@ -106,7 +106,7 @@
 > (and Brief Q's report) before it goes to master.
 
 
-MetaMedium's thesis: drawing is a language, and AI is the "meta-word" that lets
+dyna.ink's thesis: drawing is a language, and AI is the "meta-word" that lets
 marks carry meaning. The system grounds strokes geometrically (fingerprints,
 spatial graphs), lets users name what they draw (a personal visual vocabulary),
 composes those names recursively (bubble → molecule), and uses LLMs not as a
@@ -132,7 +132,7 @@ tracks only **status**. Experiments are tracked in
 
 | Artifact | Status (Aug 2026) |
 |---|---|
-| `metamedium-core/` | **Shipped and canonical.** Geometry, recognition, spatial, session engine. 86 tests, CI-enforced, browser bundle committed |
+| `core/` | **Shipped and canonical.** Geometry, recognition, spatial, session engine. 86 tests, CI-enforced, browser bundle committed |
 | `index.html` (Whitepaper v5) | Polished; "Current Development" still links only the heuristic demo — **v5.1 is the open work** |
 | `doodle2-canvas.html` | Polished; heuristics + spatial graph + library; **no LLM**. Not yet on core |
 | `metadoodle1.html` | Working prototype; diverging copy of the flagship. Not yet on core |
@@ -145,7 +145,7 @@ tracks only **status**. Experiments are tracked in
 ### Three tensions blocking progress
 
 1. **Fragmentation.** ~~Recognition logic now lives in at least four places~~
-   **Half-fixed (June 2026).** `metamedium-core` exists and is canonical, so
+   **Half-fixed (June 2026).** `core` exists and is canonical, so
    there is now one place for new logic. The diverged copies in
    doodle2-canvas, metadoodle1, Web App Skeleton and v2-poc are still there —
    fragmentation ends when Demo v3 converges them, not before.
@@ -203,7 +203,7 @@ made by a constant instead of a measurement**. Details in MVP.md §7.
 **Real models, and the parse (19 Aug 2026).** Pointed at real Ollama, generation
 failed in the way MVP.md §6.2 predicted: asked for a positioned page,
 `devstral:24b` returned good copy and no positioning at all. The fix was to stop
-asking. `metamedium-core/src/parse/` reads the drawing as a **layout** —
+asking. `core/src/parse/` reads the drawing as a **layout** —
 recursive XY-cut into `column(header, row(left,right), footer)` with the drawn
 proportions — and emits it as flexbox itself; the model is asked only for each
 region's content. Geometry became an invariant instead of a request, verified at
@@ -365,11 +365,11 @@ LLM-tier demo in one click.
 > **Status (Aug 2026): Steps 1 and 3 shipped; Step 2 is withdrawn as written.**
 > The successor plan is **[ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md](ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md)**.
 
-**Step 1 — Extract `metamedium-core`. ✅ Done (June 2026).** Driven by the
+**Step 1 — Extract `core`. ✅ Done (June 2026).** Driven by the
 no-modes user story rather than as an abstract refactor. Geometry, recognition,
 and spatial ported behavior-identically with tests, **plus the session engine**
 (lasso → check → summon → bless → artifact). The browser bundle ships at
-`Demos/metamedium-core.browser.js`, CI-checked against source. Design:
+`Demos/dynaink-core.browser.js`, CI-checked against source. Design:
 `ARCHITECTURE-v6-SESSION-ENGINE.md`.
 
 **Step 2 — Converge the two monoliths into `canvas.html`. ❌ Withdrawn.**
@@ -387,7 +387,7 @@ were verified in a browser: draw 3 circles + 2 lines → lasso → check → sum
 (*"holds 5 marks · sig 3×circle + 2×line"*) → name it → **0 loose · 1 artifact**
 → draw the same arrangement elsewhere → the canvas offers *"molecule? circle + ✓
 to confirm"* as a held candidate. The inspector shows the grounding throughout.
-The executable spec is `metamedium-core/src/session/session.scenario.test.ts`.
+The executable spec is `core/src/session/session.scenario.test.ts`.
 
 **What Step 3 did *not* deliver:** "explain why" was Tier 0 grounded reasoning,
 not an LLM. ✅ **Now delivered by v7 Stage C** — models answer questions into the
@@ -398,7 +398,7 @@ canvas, and Tier 0's reasoning still stands beside theirs.
 ## Dev-Cycle Operating Model (what this sets up)
 
 - **One core, many surfaces.** All recognition changes land in
-  `metamedium-core` with tests; demos and the React app consume builds.
+  `core` with tests; demos and the React app consume builds.
   Experiments may fork and re-implement to move fast — that is what makes them
   cheap — but a proven idea comes back into core with tests rather than living
   on in a fork (see EXPERIMENTS.md).
@@ -450,7 +450,7 @@ canvas, and Tier 0's reasoning still stands beside theirs.
   until core extraction types them properly).
 - **Vitest suite added** (41 tests: geometry, recognition, spatial) with
   synthetic stroke generators in `src/test/strokes.ts` — the seed of the
-  `metamedium-core` regression suite. CI workflow runs lint + test + build
+  `core` regression suite. CI workflow runs lint + test + build
   on every push/PR.
 - ~~⚠️ **Action needed (John):** v2-poc source was gitignored and never
   committed~~ ✅ **done (Aug 2026)** — `v2-poc/src/main.ts` recovered and
@@ -459,7 +459,7 @@ canvas, and Tier 0's reasoning still stands beside theirs.
 ## Done: June 2026 Session-Engine Push (v0.1 + v0.2)
 
 Following the cleanup pass, the no-modes user story was crystallized in
-`ARCHITECTURE-v6-SESSION-ENGINE.md` and implemented in `metamedium-core/`:
+`ARCHITECTURE-v6-SESSION-ENGINE.md` and implemented in `core/`:
 node model, gesture grammar, session engine (summon/bless/artifact),
 event-sourced undo, erase with artifact degradation, wire inference, and a
 size-relative overshoot fix. 76 tests including the canonical-loop executable
@@ -500,7 +500,7 @@ say so plainly.
 
 | | Evidence |
 |---|---|
-| Geometry, fingerprinting, recognition | `metamedium-core/src/{geometry,recognition}.ts`, 86 tests, CI-enforced |
+| Geometry, fingerprinting, recognition | `core/src/{geometry,recognition}.ts`, 86 tests, CI-enforced |
 | Spatial graph + clustering | `src/spatial.ts` |
 | **The node model** — type emerges from connections | `src/session/nodes.ts`; the schema doc is implemented, not aspirational |
 | **The session engine** — no modes, deferred commitment | `src/session/session.ts`; gesture grammar in `gesture.ts` |
@@ -512,7 +512,7 @@ say so plainly.
 | **The model draws** (v7 Stage F) | `agent.draw()`, `session/synthesize.ts`; `draw.test.ts`; e2e steps 14–14d |
 | Event-sourced undo; erase with artifact degradation | `session.undo()`, `session.erase()` |
 | **Participants as first-class citizens** | `join`, `propose`, attribution, `Capability 0–3` — v0.3a |
-| Browser bundle + reference surface | `metamedium-core.browser.js`, CI drift check |
+| Browser bundle + reference surface | `dynaink-core.browser.js`, CI drift check |
 | CI on core and the React app | `.github/workflows/ci.yml` |
 | Repo unified; docs consolidated | Aug 2026 (below) |
 
@@ -547,7 +547,7 @@ that.
 
 ## Success Criteria
 
-- [x] `metamedium-core` package: zero framework deps, tested, ESM + browser builds
+- [x] `core` package: zero framework deps, tested, ESM + browser builds
 - [x] Canonical bubble→molecule loop works in a published demo (`Demos/session-engine.html`)
 - [x] CI green on core; recognition changes land via small, tested PRs
 - [ ] **A model participates** — an LLM proposal, attributed and blessed, on the canvas (v7 Stage A)

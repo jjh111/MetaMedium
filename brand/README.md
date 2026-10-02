@@ -1,6 +1,6 @@
-# MetaMedium — the visual system
+# dyna.ink — the visual system
 
-**One definition, one home.** `tokens.css` is the only place a MetaMedium
+**One definition, one home.** `tokens.css` is the only place a dyna.ink
 colour, face, size or spacing value is defined. `styleguide.html` consumes it
 and adds nothing but layout — open it in a browser to see the whole system,
 and use the switch at the bottom right to put it on the dark canvas ground.
@@ -66,7 +66,7 @@ project had one of its own. In migration order:
 | `index.html` (whitepaper v5) | **done.** Warm paper, sea ink, teal keyword, IBM Plex Mono throughout, signal colours, `--thread-*` badges, one plate/one padding/one caption for every figure, six diagrams on the diagram roles, the hero and footer on the canvas ground | — |
 | `Demos/session-engine.html` | `#0a0a0f`, gold `#c9a84c`, Space Grotesk | the canvas ground; gold retires |
 | `Demos/` others, `doodle2-canvas.html`, `metadoodle1.html` | as above | canvas ground, last |
-| `lens-canvas/`, `playground.html`, `manim-explainer/` | the personal-site language (sea-deep, cyan, gold, JetBrains Mono) | **left alone** — these are johnhanacek.com's language, not MetaMedium's |
+| `lens-canvas/`, `playground.html`, `manim-explainer/` | the personal-site language (sea-deep, cyan, gold, JetBrains Mono) | **left alone** — these are johnhanacek.com's language, not dyna.ink's |
 
 The recognition-feedback colours the old surfaces hardcode (accepted `#0066ff`,
 pending `#666`, green/orange confidence) map onto `--sig-read`, `--sig-held`,
@@ -95,7 +95,7 @@ are now in it (§11 Figures &amp; diagrams, §12 Long-form furniture):
   for a dark board (light blues, navy fills, a `fill="7b8a9a"` typo rendering
   black) and then dropped onto light paper. Rather than pick colours per figure,
   a diagram now uses `container / node / edge / label / annotation` plus the two
-  claims a figure can make — the same vocabulary `metamedium-core/src/diagram`
+  claims a figure can make — the same vocabulary `core/src/diagram`
   reads. The CSS is the only place those colours live, so a diagram inherited
   from an older palette is re-pointed by adding classes.
 

@@ -5,8 +5,8 @@ The third kind of fixture. A **board** fixture stands a drawing up; an
 pins what a *decision-only* seat was asked and what came back — typed questions
 in, a typed value out, with no prose anywhere in it.
 
-The seat is `metamedium-core/src/participants/decide.ts`; the questions and the
-harness are `shard-3d/src/decide.ts`; `src/decide.test.ts` reads this directory
+The seat is `core/src/participants/decide.ts`; the questions and the
+harness are `dynaink-3d/src/decide.ts`; `src/decide.test.ts` reads this directory
 and holds the rendered table against the file, so neither can drift quietly.
 
 ## The shape of a file

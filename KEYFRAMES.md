@@ -1,5 +1,7 @@
 # The Three Keyframes
 
+*Paths since 2 Oct 2026 (`RENAME-PLAN.md`): `metamedium-core/` is `core/`, `shard-3d/` is `dynaink-3d/`, the bundles are `Demos/dynaink-core.*`, the MCP servers `dynaink` and `dynaink-3d`; the product is dyna.ink.*
+
 **Date:** August 2026
 **Status:** **Built** (all six stages). What each stage found is recorded under it.
 **Relationship to other docs:** `MVP.md` is the product; this is the next sprint

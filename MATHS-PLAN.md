@@ -1,5 +1,7 @@
 # The canvas does maths — a plan
 
+*Paths since 2 Oct 2026 (`RENAME-PLAN.md`): `metamedium-core/` is `core/`, `shard-3d/` is `dynaink-3d/`, the bundles are `Demos/dynaink-core.*`, the MCP servers `dynaink` and `dynaink-3d`; the product is dyna.ink.*
+
 *26 September 2026. What two pages of garment drafting and one question
 about a right triangle ask of this medium; what maths means on a canvas whose
 every reading is plural and grounded; what the engine does today and the

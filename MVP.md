@@ -1,5 +1,7 @@
 # MetaMedium MVP: Ink Over Living Artifacts
 
+*Paths since 2 Oct 2026 (`RENAME-PLAN.md`): `metamedium-core/` is `core/`, `shard-3d/` is `dynaink-3d/`, the bundles are `Demos/dynaink-core.*`, the MCP servers `dynaink` and `dynaink-3d`; the product is dyna.ink.*
+
 **Date:** August 2026
 **Status:** **Built and verified** (19 Aug 2026). The loop in §2 runs end to end
 in `Demos/session-engine.html`; §7 records what each stage actually cost and

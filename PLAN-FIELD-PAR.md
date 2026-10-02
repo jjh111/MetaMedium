@@ -1,5 +1,7 @@
 # The field, up to par — a plan (2 Oct 2026)
 
+*Paths since 2 Oct 2026 (`RENAME-PLAN.md`): `metamedium-core/` is `core/`, `shard-3d/` is `dynaink-3d/`, the bundles are `Demos/dynaink-core.*`, the MCP servers `dynaink` and `dynaink-3d`; the product is dyna.ink.*
+
 > What John met on 2 Oct, walking the app locally: *I drew two squares with a
 > connecting line, then circled the whole thing, did the command and typed
 > "diagram", which gave me only two useless options.* He asked to use the

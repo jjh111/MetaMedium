@@ -13,7 +13,7 @@ http://localhost:5174/?fixture=john-2026-09-16-massing
 ## Two kinds of file, and which one supersedes which
 
 **A log (`.mm.log`, `.log`, `.jsonl`) is the board.** One JSON event per line —
-core's own `encodeLog` (`metamedium-core/src/store/seam.ts`), the format the
+core's own `encodeLog` (`core/src/store/seam.ts`), the format the
 canvas writes too — replayed straight into the session. State is a pure function
 of the log, so a log fixture stands up *exactly* the drawing it came from,
 readings, planes, solids, names and all. **This is the kind to add**; `?fixture=`
@@ -60,7 +60,7 @@ Two boards, two doors, and the difference is honest rather than hidden:
   and the engine), the three profiles `boardFromFixture` rebuilds from the
   capture, and then `massable()` / `mass()` — the same door `tier1()` reaches
   when a hand draws the third profile. Vite's own SSR loader gives Node the
-  TypeScript and the `metamedium-core` alias, so there is no build step and no
+  TypeScript and the `@dynaink/core` alias, so there is no build step and no
   second copy of anything.
 - **The castle sketch is exported from the surface itself.** Its three ⊓ lie on
   **view planes** — planes built from where the camera stood and where the cursor
@@ -90,7 +90,7 @@ an exchange fixture pins the contract a model is asked to answer in.
 
 ## `decisions/` — what a decision seat was asked, and what it said
 
-The third kind. A **decision-only** seat (`metamedium-core/src/participants/decide.ts`)
+The third kind. A **decision-only** seat (`core/src/participants/decide.ts`)
 is asked typed questions — a Choice among candidates, a Score over ordered
 levels, a Noul's probability-of-yes — and answers with a typed value and its
 whole distribution, never prose. `decisions/` holds what was asked over a board

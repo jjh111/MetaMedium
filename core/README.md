@@ -1,6 +1,6 @@
-# metamedium-core
+# core — `@dynaink/core`
 
-The headless MetaMedium engine: geometric grounding, multi-parse recognition,
+The headless dyna.ink engine: geometric grounding, multi-parse recognition,
 spatial graph, and the **no-modes session engine** (lasso → check → summon →
 bless → artifact). No rendering, no framework, no LLM calls, zero runtime
 dependencies.
@@ -13,12 +13,12 @@ before changing engine semantics.**
 npm install           # dev deps only (typescript, vitest, esbuild)
 npm test              # full suite incl. the canonical-loop scenario
 npm run build         # ESM + .d.ts → dist/
-npm run build:browser # IIFE bundle (window.MetaMediumCore) → dist/
+npm run build:browser # IIFE bundle (window.DynaInkCore; window.MetaMediumCore the same object, for one release) → dist/
 npm run build:node    # ESM bundle for Node → dist/
 ```
 
-Both bundles are committed: `Demos/metamedium-core.browser.js` for the GitHub
-Pages demo (`Demos/session-engine.html`), and `Demos/metamedium-core.node.mjs`
+Both bundles are committed: `Demos/dynaink-core.browser.js` for the GitHub
+Pages demo (`Demos/session-engine.html`), and `Demos/dynaink-core.node.mjs`
 for what runs in Node — the MCP hands, the relay's test, the smokes. After
 engine changes, rebuild both and re-copy them — CI fails if either drifts from
 source.
@@ -29,7 +29,7 @@ The engine is a state machine: feed it input events, render its state.
 It never refuses input and never blocks the drawing loop.
 
 ```typescript
-import { createSession, strokePointsOf, topInterpretation } from 'metamedium-core';
+import { createSession, strokePointsOf, topInterpretation } from '@dynaink/core';
 
 const session = createSession();
 

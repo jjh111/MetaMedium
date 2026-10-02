@@ -1,4 +1,4 @@
-# shard-3d — a bounded MetaMedium for making things in space
+# DynaInk3D — a bounded dyna.ink for making things in space
 
 Draw on a plane; the shape rung reads the mark as it would on paper; a second
 mark stands it up as a solid, at tier 1, with no model and no wait. The solid is
@@ -11,7 +11,7 @@ drawing already settled.
 after P6) and `../SHARD-3D-PUSH-2.md` is push 2 (G0–G5, geometry from the
 drawing). The shard is an **experiment** in the repo's subordinate tier
 (`../EXPERIMENTS.md`): it may fork and re-implement to move fast, and what it
-proves lands in `metamedium-core` with tests. What it is probing is whether the
+proves lands in `core` with tests. What it is probing is whether the
 canvas's rungs — a closed shape vocabulary, a role table, concepts, the log as
 the source, tiers that propose and never commit — hold when the medium is space
 rather than a page. So far they do; §*What core would need* is the bill.
@@ -29,13 +29,13 @@ evidence needs faces to read it off.
 ## Run it
 
 ```bash
-cd shard-3d
+cd dynaink-3d
 npm install
 npm run dev                # vite on http://localhost:5174
 npm test                   # vitest — 605 tests on the pure rungs, headless, no WebGL
 npm run typecheck
 npm run build              # typecheck, then vite
-npm run build:standalone   # → dist/shard-3d.html, one file, ~1.0MB
+npm run build:standalone   # → dist/dynaink-3d.html, one file, ~1.0MB
 node fixtures/make.mjs     # regenerate the board fixtures as logs
 ```
 
@@ -45,10 +45,10 @@ node e2e/run.mjs           # the headless gate: the canvas, and the shard's thre
 node e2e/run.mjs demo2     # just the demo
 ```
 
-The engine is imported **from source** — `metamedium-core` is aliased to
-`../metamedium-core/src/index.ts` in `vite.config.ts`, `vitest.config.ts` and
+The engine is imported **from source** — `@dynaink/core` is aliased to
+`../core/src/index.ts` in `vite.config.ts`, `vitest.config.ts` and
 `tsconfig.json` — so the shard always runs against the engine as it stands and
-there is no bundle to drift. `.claude/launch.json` carries a `shard-3d`
+there is no bundle to drift. `.claude/launch.json` carries a `dynaink-3d`
 configuration on the same port.
 
 **The one dependency is the CSG library**, behind `src/csg.ts` and imported
@@ -61,12 +61,13 @@ core's patterns ported rather than forked; P6's comparison is core's
 
 ```bash
 node Demos/relay.mjs      # the room, on :8020 — sixty lines, no truth of its own
-node shard-3d/mcp.mjs     # the hand; it starts a relay itself when none answers
+node dynaink-3d/mcp.mjs     # the hand; it starts a relay itself when none answers
 ```
 
 Then open the shard at `?live=shard&relay=http://127.0.0.1:8020`, or open the
 models pane and press *Join the room, and seat the hand*. `.mcp.json` registers
-the server as `metamedium-3d` beside the canvas's `metamedium`.
+the server as `dynaink-3d` beside the canvas's `dynaink` (a session lists its tools as
+`mcp__dynaink-3d__space_*`).
 
 **URLs.** `?demo=castle` runs the whole loop below at boot;
 `?demo=castle-sketch` draws John's first board and stops there;
@@ -287,7 +288,7 @@ claim, held and attributed, that the hand takes or leaves.
 | `mcp.mjs` | **The hand, and the seat**, over MCP on stdio — newline-delimited JSON-RPC written by hand, so the repo takes no dependency, importing the committed Node bundle beside `Demos/mcp.mjs`. Six tools: `space_look`, `space_pending`, `space_answer`, `space_draw`, `space_propose`, `space_say`. Its one duplication is named where it stands: the three named planes and the `plane` rep, because this process cannot import the shard's TypeScript |
 | `mcp-smoke.mjs` | The stdio test, in CI's `shard` job: a relay on a **free port**, a second hand in Node as the tab, and the whole round trip — look, draw, park, list, answer, refuse, say |
 | `e2e.js` | The whole loop through the real pointer path: `__scenario()` (P0 → P6, the compass, the panel's toggle, trackpad and touch, the axis views, G0's five, G5's five, G1's three, G2's three, G3's three, L2c's three), `__demo()` (the mug of §9, eleven steps) and `__demo2()` (G4's nine beats, L2c's two records on John's board, and the silhouette cache measured). Every shape is stated in a plane's own units and projected by `screenFor`; `strokeScreen` dispatches real pointer events, so nothing here can pass by calling the engine directly |
-| `build-standalone.mjs` | **One file.** Runs `npm run build`, then inlines every asset Vite emitted into `dist/shard-3d.html`, and refuses to write a page that still points at anything that would not travel with it |
+| `build-standalone.mjs` | **One file.** Runs `npm run build`, then inlines every asset Vite emitted into `dist/dynaink-3d.html`, and refuses to write a page that still points at anything that would not travel with it |
 | `fixtures/` | John's own boards as logs, and `make.mjs` which writes them. `fixtures/README.md` says which door each came through |
 | `fixtures/exchanges/` | What was sent to a model about a board and what came back, verbatim and unrepaired. `fixtures/exchanges/README.md` says how to add one |
 | `src/*.test.ts` | 605 tests, vitest, no WebGL except where the CSG seam is the subject |
@@ -1146,7 +1147,7 @@ across turns.
 
 ```bash
 mkfifo /tmp/mm3d.in 2>/dev/null; : > /tmp/mm3d.cmd
-tail -f /tmp/mm3d.cmd | node shard-3d/mcp.mjs > /tmp/mm3d.out 2>/tmp/mm3d.err &
+tail -f /tmp/mm3d.cmd | node dynaink-3d/mcp.mjs > /tmp/mm3d.out 2>/tmp/mm3d.err &
 
 echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{}}}' >> /tmp/mm3d.cmd
 echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"space_pending","arguments":{}}}' >> /tmp/mm3d.cmd
@@ -1665,7 +1666,7 @@ readings and op trees; it does not compute the form rung, the hull or the parts.
 is where the hand reads them today. What it would take for `space_look` to see parts itself is not small: a part is
 `hull ∩ a run's prism` — a CSG boolean on a derived mesh — so the server would need three.js and `three-bvh-csg` in
 Node, and `solid.ts`, `parts.ts` and `form.ts` compiled rather than duplicated. Two honest ways out, neither built:
-publish a committed Node bundle of the shard's own modules the way `Demos/metamedium-core.node.mjs` is published for
+publish a committed Node bundle of the shard's own modules the way `Demos/dynaink-core.node.mjs` is published for
 the canvas, and import it; or have the **tab** put its parts into the room, since the tab has the renderer and already
 computes them — a sentence per part beside the solid, which every hand in the room then reads with no geometry at all.
 The second is cheaper and fits the rule that the log is the source; the first is what a hand needs to look at a board
@@ -1708,7 +1709,7 @@ Chromium alone (`../e2e/README.md`).
 ## What core would need
 
 Every one of these is a gap the shard worked around rather than a bug, and each is written so it could be landed in
-`metamedium-core` with tests (`SHARD-3D-PLAN.md` §11).
+`core` with tests (`SHARD-3D-PLAN.md` §11).
 
 - **`measure()` should take the stroke's scale the way `analyzeStroke` does, and name its unit.** It rounds to whole
   units (`r0 = Math.round`) and labels every length `px`, so in plane units a 1.2-unit circle comes back as "radius 1px"

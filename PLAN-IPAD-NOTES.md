@@ -1,5 +1,7 @@
 # dyna.ink on the iPad — hand notes, pictures and the seats that read them
 
+*Paths since 2 Oct 2026 (`RENAME-PLAN.md`): `metamedium-core/` is `core/`, `shard-3d/` is `dynaink-3d/`, the bundles are `Demos/dynaink-core.*`, the MCP servers `dynaink` and `dynaink-3d`; the product is dyna.ink.*
+
 **1 October 2026.** John: *I want to bring in many images, SVGs and freehand,
 and have all of it conserved well. On an iPad Pro with a Pencil I want to test a
 real workflow of organising my hand-drawn notes — the iPad is a major target for

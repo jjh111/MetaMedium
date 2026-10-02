@@ -2,11 +2,11 @@
 
 *26 September 2026. Unit J2 of `V1-PLAN.md` (specified in `DIRECTOR-PLAN-W2.md`
 §3). An experiment whose product is an answer with numbers; nothing here lands
-in `metamedium-core` or `shard-3d`.*
+in `core` or `dynaink-3d`.*
 
 ## The answer: not yet
 
-**GLiNER2 runs where MetaMedium runs, fast enough to ask without a spinner,
+**GLiNER2 runs where dyna.ink runs, fast enough to ask without a spinner,
 under a licence we can ship. But on our own text it does not pull out the spans
 a seat would be there for.**
 
@@ -234,7 +234,7 @@ downloaded.
 ## The transport
 
 `transport.mjs` is shaped like the decision seat's `DecideTransport`
-(`metamedium-core/src/participants/decide.ts`), so a later unit can plug it in
+(`core/src/participants/decide.ts`), so a later unit can plug it in
 beside it:
 
 ```js

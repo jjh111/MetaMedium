@@ -1,5 +1,7 @@
 # MetaMedium v1 — the whole platform, ready for true use
 
+*Paths since 2 Oct 2026 (`RENAME-PLAN.md`): `metamedium-core/` is `core/`, `shard-3d/` is `dynaink-3d/`, the bundles are `Demos/dynaink-core.*`, the MCP servers `dynaink` and `dynaink-3d`; the product is dyna.ink.*
+
 *26 September 2026. The plan that brings every part of the platform together
 into one product two people can use every day for real work, and the order
 the agents build it in. It absorbs `DIRECTOR-PLAN-W2.md` (whose units L, M

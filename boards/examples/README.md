@@ -15,14 +15,14 @@ at once, and the example itself is never written.
 | `index.json` | what the pane lists — name, what it shows, file, marks — and the starter |
 
 Each file is a **log**, one event per line under a version 1 header (R2,
-`metamedium-core/src/store/format.ts`), as the app's *export* writes it and
+`core/src/store/format.ts`), as the app's *export* writes it and
 *from a file…* opens it. The header names no `app`, so a release does not
 drift them.
 
 ## They are made, never drawn
 
 `node scripts/examples.mjs` writes them from the engine — the committed Node
-bundle the MCP hand runs (`Demos/metamedium-core.node.mjs`): a Mermaid text drawn
+bundle the MCP hand runs (`Demos/dynaink-core.node.mjs`): a Mermaid text drawn
 with `drawMermaid`, shapes from `strokeFor` given a seeded tremor (`handLike`),
 a pack taken by `use`, texts as the surface's `typeText` writes them. The clock
 and the seeds are fixed, so the same engine makes the same bytes.
