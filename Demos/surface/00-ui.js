@@ -16,7 +16,7 @@
       o = o || {};
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'pill' + (o.cls ? ' ' + o.cls : '');
+      b.className = 'pill' + (o.cls ? ' ' + o.cls : '') + (o.note ? ' noted' : '');
       // A note says how this pill differs from the one beside it (Name it · finds more like it; PLAN-FIELD-PAR).
       b.innerHTML = '<span>' + esc(label) + '</span>' + (o.note ? '<small class="note">' + esc(o.note) + '</small>' : '') + (o.model ? '<i class="dot" title="asks a model"></i>' : '');
       if (o.why) b.title = o.why;

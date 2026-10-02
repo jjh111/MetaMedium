@@ -293,7 +293,7 @@
     const nearItem = near ? items.find((i) => i.key === near.key && !i.disabled) : null;
     if (nearItem) return { kind: 'meaning', line: '↵ ' + nearItem.label + ' — by meaning ' + near.score.toFixed(2), command: take(nearItem) };
     if (!revising && text.split(/\s+/).length <= 2) {
-      return { kind: 'word', line: '↵ a word — tap what it is for: a name, or words on the marks', quiet: true, command: null };
+      return { kind: 'word', line: '↵ a word — tap one: a name, or words on them', quiet: true, command: null };
     }
 
     // The brief. Tier 1 builds the structure of a page or a diagram at once, with no
