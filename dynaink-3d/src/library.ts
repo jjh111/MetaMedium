@@ -24,7 +24,7 @@
 //
 // Pure: no three.js, no session, no DOM.
 
-import { describeStructure, type Fingerprint, type StructuralSignature } from 'metamedium-core';
+import { describeStructure, type Fingerprint, type StructuralSignature } from '@dynaink/core';
 import type { Plane } from './plane';
 
 /**

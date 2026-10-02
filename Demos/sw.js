@@ -29,7 +29,7 @@ const SHELL = [
   './manifest.webmanifest',
   '../Demos/session-engine.js',
   '../Demos/surface/surface.css',
-  '../Demos/metamedium-core.browser.js',
+  '../Demos/dynaink-core.browser.js',
 ];
 // The help pane's text, the icons, and the boards pane's examples (R5: the index and each log, so an example opens with no network
 // after one visit): kept for offline when they answer, never the reason a shell is not kept.

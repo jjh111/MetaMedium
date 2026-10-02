@@ -1,7 +1,7 @@
 // Shared plumbing for the performance baseline (V1-PLAN.md §9 R4a; PERF.md).
 //
 // Two ways to get the engine, because the plan asks for both: the committed
-// Node bundle (`Demos/metamedium-core.node.mjs`, what the MCP hand runs) and
+// Node bundle (`Demos/dynaink-core.node.mjs`, what the MCP hand runs) and
 // core built from source right now (esbuild, the same tool and flags as
 // `npm run build:node`, plus a source map so a CPU profile can be read back
 // to `src/…:line`). The source build is written under `dist/bench/`, which is
@@ -20,8 +20,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 export const CORE_DIR = resolve(here, '..');
 export const REPO = resolve(CORE_DIR, '..');
 export const OUT_DIR = join(CORE_DIR, 'dist', 'bench');
-export const BUNDLE_PATH = join(REPO, 'Demos', 'metamedium-core.node.mjs');
-const NODE_BANNER = '/* metamedium-core node bundle — built from metamedium-core/src via: npm run build:node. Do not edit directly. */';
+export const BUNDLE_PATH = join(REPO, 'Demos', 'dynaink-core.node.mjs');
+const NODE_BANNER = '/* dynaink-core.node.mjs — the @dynaink/core node bundle, built from core/src via: npm run build:node. Do not edit directly. */';
 
 /**
  * The engine, as a module namespace.
@@ -36,7 +36,7 @@ const NODE_BANNER = '/* metamedium-core node bundle — built from metamedium-co
 export async function loadCore(which = 'bundle', { patch = [], tag = '' } = {}) {
   if (which === 'bundle') {
     if (patch.length) throw new Error('patches apply to the source build only');
-    // `MM_CORE_BUNDLE`: another Node bundle as "the committed one" — an older engine, `git show <ref>:Demos/metamedium-core.node.mjs` (I2's before columns).
+    // `MM_CORE_BUNDLE`: another Node bundle as "the committed one" — an older engine, `git show <ref>:Demos/dynaink-core.node.mjs` (`Demos/metamedium-core.node.mjs` before RENAME-PLAN N3c; I2's before columns).
     const at = process.env.MM_CORE_BUNDLE ? resolve(process.env.MM_CORE_BUNDLE) : BUNDLE_PATH;
     return { core: await import(pathToFileURL(at).href), path: at, which };
   }
@@ -83,13 +83,15 @@ export async function loadCore(which = 'bundle', { patch = [], tag = '' } = {}) 
   return { core: await import(url), path: outfile, which };
 }
 
-const BROWSER_BANNER = '/* metamedium-core browser bundle \u2014 built from metamedium-core/src via: npm run build:browser. Do not edit directly. */';
-export const BROWSER_BUNDLE_PATH = join(REPO, 'Demos', 'metamedium-core.browser.js');
+const BROWSER_BANNER = '/* dynaink-core.browser.js \u2014 the @dynaink/core browser bundle, built from core/src via: npm run build:browser. Do not edit directly. */';
+// The old global, defined beside the new one for one release (RENAME-PLAN N3c), as `npm run build:browser`'s footer.
+const BROWSER_FOOTER = 'var MetaMediumCore = DynaInkCore; /* the old global, for one release (RENAME-PLAN N3c) */';
+export const BROWSER_BUNDLE_PATH = join(REPO, 'Demos', 'dynaink-core.browser.js');
 
 /**
  * The browser bundle built from source with a source map, the way
  * `npm run build:browser` builds it, so a browser profile of the committed
- * `Demos/metamedium-core.browser.js` reads back to `src/…:line`. Returns
+ * `Demos/dynaink-core.browser.js` reads back to `src/…:line`. Returns
  * whether the build is byte-identical to the committed copy (it must be, or
  * the map would describe a different file).
  */
@@ -101,8 +103,9 @@ export async function buildBrowserMap() {
     entryPoints: [join(CORE_DIR, 'src', 'index.ts')],
     bundle: true,
     format: 'iife',
-    globalName: 'MetaMediumCore',
+    globalName: 'DynaInkCore',
     banner: { js: BROWSER_BANNER },
+    footer: { js: BROWSER_FOOTER },
     absWorkingDir: CORE_DIR,
     sourcemap: 'linked',
     sourcesContent: false,

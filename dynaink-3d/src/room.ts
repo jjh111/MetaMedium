@@ -74,7 +74,7 @@ import {
   type LiveTransport,
   type Session,
   type SessionEvent,
-} from 'metamedium-core';
+} from '@dynaink/core';
 
 /**
  * A brief parked for the seat is an answer carrying this word as its question.
@@ -549,7 +549,7 @@ export interface OtherHand {
 
 /**
  * A hand in the room that is NOT this page: the second hand in `room.test.ts`,
- * and the e2e's stand-in for `shard-3d/mcp.mjs`.
+ * and the e2e's stand-in for `dynaink-3d/mcp.mjs`.
  *
  * It is the same loop the MCP server runs — keep a session from the merged
  * logs, read the parked briefs off the explanation plane, append the answer as

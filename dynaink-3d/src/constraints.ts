@@ -50,7 +50,7 @@
 // Pure: no session, no renderer, no three.js. The ink and the closedness come
 // in through a context, so `log.ts` passes its own and a test passes two lines.
 
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import {
   frameVectors,
   placeFrames,

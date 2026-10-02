@@ -14,7 +14,7 @@
 //
 // Pure: no DOM, no session, no three.js.
 
-import { singular } from 'metamedium-core';
+import { singular } from '@dynaink/core';
 
 /** The verbs a phrase over names may resolve to. Closed, like every vocabulary here. */
 export type PhraseVerb = 'regen' | 'drop' | 'paint';

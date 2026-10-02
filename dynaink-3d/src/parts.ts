@@ -40,7 +40,7 @@ import { featureAt, type FeatureStep, type HullStep, type PartSaying, type Profi
 import { foundation, reflectAcross, slide, toPlane, toWorld, offsetOf, type Plane, type Vec3 } from './plane';
 import { prismOn } from './solid';
 import { viewLabelOf } from './form';
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 
 /**
  * A foot reaches the ground when it sits this near it, as a fraction of the

@@ -11,7 +11,7 @@
 // zoom, and it is built from the same `chip` component the reference surface
 // uses (`ui.ts`, ported not forked).
 
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import type { Vec3 } from './plane';
 import { chip } from './ui';
 

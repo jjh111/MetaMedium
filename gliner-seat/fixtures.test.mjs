@@ -71,7 +71,7 @@ test('the pattern lines are M1\'s sample lines, verbatim — never the drafter\'
 });
 
 test('the castle\'s brief is the exchange\'s, verbatim', () => {
-  const exchange = JSON.parse(readFileSync(join(HERE, '..', 'shard-3d', 'fixtures', 'exchanges', 'castle-sketch.ideal.json'), 'utf8'));
+  const exchange = JSON.parse(readFileSync(join(HERE, '..', 'dynaink-3d', 'fixtures', 'exchanges', 'castle-sketch.ideal.json'), 'utf8'));
   assert.equal(load('castle-sketch.brief.json').items[0].text, exchange.brief);
   assert.equal(load('briefs.json').items.find((i) => i.id === 'brief/castle-words').text, exchange.words);
 });

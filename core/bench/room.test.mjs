@@ -10,7 +10,7 @@
 // (`dist/bench/room-2000-<path>.json`, and a line in
 // `dist/bench/room-history.jsonl`) and prints them, pass or fail.
 //
-//     node --test metamedium-core/bench/room.test.mjs
+//     node --test core/bench/room.test.mjs
 //
 // The measuring runs in a process of its own (`room.mjs`): a clean heap, the
 // collector exposed. Like everything in bench/, this is this machine's and not

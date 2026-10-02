@@ -16,7 +16,7 @@ import { relayTransport } from '../../Demos/live-node.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const demos = path.join(here, '../../Demos');
-const MM = await import(pathToFileURL(path.join(demos, 'metamedium-core.node.mjs')).href);
+const MM = await import(pathToFileURL(path.join(demos, 'dynaink-core.node.mjs')).href);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const until = async (fn, ms = 6000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return true; await wait(50); } return fn(); };
 

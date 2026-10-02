@@ -14,7 +14,7 @@
 // carries a polygon offset besides, so a coplanar face never fights the line.
 
 import * as THREE from 'three';
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import type { Space } from './scene';
 import type { Colours } from './theme';
 import type { Log, Solid } from './log';

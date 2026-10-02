@@ -18,7 +18,7 @@
 // The dot is `--sig-model`, the token that means *a model contributed this*.
 // Colour is signal, not decoration.
 
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import type { Vec3 } from './plane';
 
 /** When the label starts carrying the elapsed time. */

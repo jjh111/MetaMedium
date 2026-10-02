@@ -113,7 +113,7 @@
 // takes it, so the whole module is arithmetic and tests headlessly — which is
 // what §11 names first for landing back in core.
 
-import { analyzeStroke, type Point } from 'metamedium-core';
+import { analyzeStroke, type Point } from '@dynaink/core';
 import {
   cross,
   dot,

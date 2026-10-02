@@ -7,18 +7,18 @@ on:
 
 jobs:
   core:
-    name: metamedium-core — typecheck, test, build
+    name: core (@dynaink/core) — typecheck, test, build
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: metamedium-core
+        working-directory: core
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: metamedium-core/package-lock.json
+          cache-dependency-path: core/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
@@ -26,11 +26,11 @@ jobs:
       - name: Committed browser and node bundles must match source
         run: |
           npm run build:browser
-          cp dist/metamedium-core.browser.js ../Demos/metamedium-core.browser.js
-          git diff --exit-code -- ../Demos/metamedium-core.browser.js
+          cp dist/dynaink-core.browser.js ../Demos/dynaink-core.browser.js
+          git diff --exit-code -- ../Demos/dynaink-core.browser.js
           npm run build:node
-          cp dist/metamedium-core.node.mjs ../Demos/metamedium-core.node.mjs
-          git diff --exit-code -- ../Demos/metamedium-core.node.mjs
+          cp dist/dynaink-core.node.mjs ../Demos/dynaink-core.node.mjs
+          git diff --exit-code -- ../Demos/dynaink-core.node.mjs
       # …and by their names (RENAME-PLAN N3c): the browser bundle, run as a page runs it, defines
       # DynaInkCore — and, for one release, MetaMediumCore as the same object, for a page outside this
       # repository that loads the bundle and reads the old global.
@@ -123,19 +123,19 @@ jobs:
         run: node ../scripts/examples.mjs --check && node --test ../scripts/examples.test.mjs
 
   shard:
-    name: shard-3d — typecheck, test, build
+    name: dynaink-3d (DynaInk3D) — typecheck, test, build
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: shard-3d
+        working-directory: dynaink-3d
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: shard-3d/package-lock.json
-      # The shard imports metamedium-core FROM SOURCE through a vite/vitest
+          cache-dependency-path: dynaink-3d/package-lock.json
+      # The shard imports the engine (@dynaink/core, core/) FROM SOURCE through a vite/vitest
       # alias, and core is zero-dependency TypeScript — so there is nothing to
       # install over there and no bundle to drift.
       - run: npm ci
@@ -160,7 +160,7 @@ jobs:
         working-directory: e2e
         run: npm ci
       - name: The shard's own dependencies (vite serves it)
-        working-directory: shard-3d
+        working-directory: dynaink-3d
         run: npm ci
       - name: Chromium
         working-directory: e2e

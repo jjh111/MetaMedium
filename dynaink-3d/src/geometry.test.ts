@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import { convexHull, deriveTree, geometryFor } from './solid';
 import {
   bossStep,

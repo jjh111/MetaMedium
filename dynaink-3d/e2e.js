@@ -1,5 +1,5 @@
 /*
- * shard-3d — the P0 → P4 loop, driven through the real UI.
+ * dynaink-3d — the P0 → P4 loop, driven through the real UI.
  *
  * The pattern of Demos/session-engine.e2e.js: a list of steps, each asserting,
  * returning a result object. It drives the SAME pointer path a hand does
@@ -4435,7 +4435,7 @@
   demo2('9 (optional) · the MCP seat answers the same brief, and the version is the HAND’S', async () => {
     // The demo runs on the stub; this beat runs the same path with a hand at
     // the end of it. `joinHand` joins a room over an in-memory hub and seats
-    // the MCP hand in it — the same `room.ts` `shard-3d/mcp.mjs` drives, so
+    // the MCP hand in it — the same `room.ts` `dynaink-3d/mcp.mjs` drives, so
     // what is proved is the path (park, merge, answer, apply) and not a mock.
     // From a Claude Code conversation the identical round trip is
     // `space_pending` → `space_answer`; the README says how.
@@ -4592,7 +4592,7 @@
   };
 
   console.log(
-    'shard-3d e2e loaded — run: __scenario().then(r => window.__R = r), ' +
+    'dynaink-3d e2e loaded — run: __scenario().then(r => window.__R = r), ' +
       '__demo().then(r => window.__D = r), or __demo2().then(r => window.__D2 = r)'
   );
 })();

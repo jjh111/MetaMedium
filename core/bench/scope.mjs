@@ -4,8 +4,8 @@
 // concepts) and `notationsOf` (every notation, with the heads at every
 // connector's ends). Measured on `bench/board.mjs`'s `importedBoard`.
 //
-//     node metamedium-core/bench/scope.mjs --strokes=1000                       # src/ built now
-//     MM_CORE_BUNDLE=/path/to/older.node.mjs node metamedium-core/bench/scope.mjs --core=bundle --strokes=1000
+//     node core/bench/scope.mjs --strokes=1000                       # src/ built now
+//     MM_CORE_BUNDLE=/path/to/older.node.mjs node core/bench/scope.mjs --core=bundle --strokes=1000
 
 import { loadCore, ms, args } from './lib.mjs';
 import { importedBoard } from './board.mjs';

@@ -7,7 +7,7 @@
 // drawn above it* — and until this file existed the only way to look at one was
 // a screenshot and a hook dump.
 //
-// **The format is the canvas's** (`metamedium-core/src/store/format.ts`: version 1, a
+// **The format is the canvas's** (`core/src/store/format.ts`: version 1, a
 // header line and then `encodeLog` of the session's own events, one JSON event
 // per line; a log with no header is version 0 and reads as ever). That
 // is what `.metamedium/logs/*.log` holds, what the canvas's export pane writes
@@ -25,7 +25,7 @@
 //   is a reconstruction and says so. It exists because the fixture was captured
 //   before there was an export; **a real log export supersedes it**.
 
-import { decodeLog, encodeLog, type Point, type SessionEvent } from 'metamedium-core';
+import { decodeLog, encodeLog, type Point, type SessionEvent } from '@dynaink/core';
 import type { PlaneName } from './plane';
 
 /** The events as a file: one JSON event per line, core's own encoding. */

@@ -1,5 +1,5 @@
 // A pack is read, not trusted (V1-PLAN §2.3; the DATA-1 manner of the review
-// of 15 Sep 2026, `shard-3d/src/op.ts`'s `validateOpTree`).
+// of 15 Sep 2026, `dynaink-3d/src/op.ts`'s `validateOpTree`).
 //
 // A pack arrives as data — today from a module in this bundle, tomorrow from a
 // file someone hands the board — and is walked once against the types that

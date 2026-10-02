@@ -20,7 +20,7 @@ const RECORDINGS = import.meta.glob('../../../Demos/recordings/*.json', { eager:
   string,
   { events?: SessionEvent[] } | SessionEvent[]
 >;
-const BOARDS = import.meta.glob('../../../shard-3d/fixtures/*.mm.log', { eager: true, query: '?raw', import: 'default' }) as Record<
+const BOARDS = import.meta.glob('../../../dynaink-3d/fixtures/*.mm.log', { eager: true, query: '?raw', import: 'default' }) as Record<
   string,
   string
 >;
@@ -37,14 +37,14 @@ describe('held logs: every artifact is made by the hand that blessed it (V1-PLAN
     // Three recordings on the canvas, three boards in the shard: a log moved
     // or renamed is said here rather than silently checked no more.
     expect(held.filter(([p]) => p.includes('/Demos/recordings/'))).toHaveLength(3);
-    expect(held.filter(([p]) => p.includes('/shard-3d/fixtures/'))).toHaveLength(3);
+    expect(held.filter(([p]) => p.includes('/dynaink-3d/fixtures/'))).toHaveLength(3);
     const all = held.flatMap(([, log]) => blesses(log));
     expect(all).toHaveLength(6);
     expect(all.filter((e) => 'participantId' in e && e.participantId === 'participant:tier0')).toHaveLength(2);
   });
 
   for (const [path, log] of held) {
-    const name = path.replace(/^.*\/(Demos|shard-3d)\//, '$1/');
+    const name = path.replace(/^.*\/(Demos|dynaink-3d)\//, '$1/');
     const count = blesses(log).length;
 
     it(`${name}: as the reader's own log, every artifact is the reader's, and the node is what it always was`, () => {

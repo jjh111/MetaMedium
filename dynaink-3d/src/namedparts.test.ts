@@ -16,7 +16,7 @@
 
 /// <reference types="vite/client" />
 import { describe, it, expect } from 'vitest';
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import { createLog, type Log, type SpaceRead } from './log';
 import { deriveTree } from './solid';
 import { describeSpace, partIdsOf, HERE_ON_A_HULL } from './brief';

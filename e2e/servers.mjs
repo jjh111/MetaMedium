@@ -1,5 +1,5 @@
 // Disposable servers for a run: one static server over the repo root (the
-// canvas surface), one vite over shard-3d (the shard imports core from source,
+// canvas surface), one vite over dynaink-3d (the shard imports core from source,
 // so there is no bundle to go stale). Both bind 127.0.0.1 on a port the OS
 // hands out, and both are stopped when the run ends — a gate that needs a
 // server someone left running is not a gate.
@@ -110,11 +110,11 @@ function reachable(port) {
   });
 }
 
-/** Vite over shard-3d, on a free port, killed on the way out. */
+/** Vite over dynaink-3d, on a free port, killed on the way out. */
 export async function startVite(shardDir, { timeoutMs = 60000 } = {}) {
   const bin = join(shardDir, 'node_modules', '.bin', 'vite');
   if (!existsSync(bin)) {
-    throw new Error(`shard-3d has no vite — run \`npm ci\` in ${shardDir} first`);
+    throw new Error(`dynaink-3d has no vite — run \`npm ci\` in ${shardDir} first`);
   }
   const port = await freePort();
   const log = [];
@@ -157,7 +157,7 @@ export async function startVite(shardDir, { timeoutMs = 60000 } = {}) {
 // A model provider that is not one (V1-PLAN J5).
 // ---------------------------------------------------------------------------
 
-const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), '..', 'metamedium-core', 'src', 'llm', 'fixtures');
+const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), '..', 'core', 'src', 'llm', 'fixtures');
 
 /** The stub's key: a test value, nothing like a real one. */
 export const STUB_KEY = 'e2e-stub-key-not-a-real-key';
@@ -184,7 +184,7 @@ const ANSWERS = {
   other: 'ok',
 };
 
-/** Which job a request is, by the system prompt the canvas sends for it (metamedium-core/src/participants/agent.ts). */
+/** Which job a request is, by the system prompt the canvas sends for it (core/src/participants/agent.ts). */
 function jobOf(system) {
   // Reading my notes (I8): a numbered sheet of lines, and a photographed page — told from a single mark's read.
   if (/sheet of numbered lines/.test(system)) return 'read-lines';
@@ -236,7 +236,7 @@ function readBody(req) {
  * OpenRouter — content beside the model's reasoning; reasoning only, the
  * budget spent; 401 for a key that is not the stub's, 404 for an id it does
  * not list, 404 for an image sent to a model that takes text only. Both read
- * from `metamedium-core/src/llm/fixtures/`, the same shapes the core tests
+ * from `core/src/llm/fixtures/`, the same shapes the core tests
  * read. CORS is answered for any origin, as OpenRouter answers it. Every
  * request is kept — what was asked, of which model, whether it carried an
  * image, the budget and the reasoning it asked for, and whether its key was
@@ -390,7 +390,7 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
 export const EMBED_GROUPS = [['pricing', 'price', 'cost', 'budget', 'fee'], ['meeting', 'standup', 'sync', 'call'], ['garden', 'hose', 'lawn']];
 
 export async function startEmbedStub() {
-  const core = await import('../Demos/metamedium-core.node.mjs');
+  const core = await import('../Demos/dynaink-core.node.mjs');
   const built = core.buildStaticModel({ groups: EMBED_GROUPS, extra: ['notes', 'plans', 'the', 'review', 'schedule'], dimension: 64 });
   const tokenizer = Buffer.from(JSON.stringify(built.tokenizer));
   const weights = Buffer.from(built.weights);

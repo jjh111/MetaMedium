@@ -21,7 +21,7 @@ import {
   LocalHub,
   LOCAL_PARTICIPANT,
   type Point,
-} from 'metamedium-core';
+} from '@dynaink/core';
 import { createSpace } from './scene';
 import { createGizmo } from './gizmo';
 import { createInk } from './ink';
@@ -2095,7 +2095,7 @@ undoTile.onclick = () => undo();
  * *Export…* — the board as its own log, downloaded.
  *
  * `encodeLog` of the session's events, one JSON event per line: the canvas's
- * format unchanged (`metamedium-core/src/store/seam.ts`), so a board exported
+ * format unchanged (`core/src/store/seam.ts`), so a board exported
  * here is a log a folder store, a merge or the canvas itself can read. This is
  * how John's boards become fixtures, and it is what settles G1's Y fault
  * against a real drawing rather than a synthetic one.
@@ -2157,7 +2157,7 @@ function openBoard(text: string, o: { confirm?: boolean; what?: string } = {}): 
 }
 
 /**
- * `?fixture=<name>` — one of `shard-3d/fixtures/` at boot, for the e2e and the
+ * `?fixture=<name>` — one of `dynaink-3d/fixtures/` at boot, for the e2e and the
  * demo.
  *
  * A `.mm.log` or `.jsonl` there is a real log and is replayed. A `.json` is a
@@ -2711,7 +2711,7 @@ export interface ShardHook {
   // ---- G5: the hand in the room --------------------------------------------
   /**
    * Join a room over an in-memory hub, seat the MCP hand in it, and hand back
-   * the OTHER hand — the one `shard-3d/mcp.mjs` is in a real room.
+   * the OTHER hand — the one `dynaink-3d/mcp.mjs` is in a real room.
    *
    * No relay, no network, no MCP: the e2e drives the same `room.ts` the server
    * does, so what it proves is the path (park, merge, answer, apply), not a
@@ -3404,7 +3404,7 @@ const hook: ShardHook = {
 
 (window as unknown as { __shard: ShardHook }).__shard = hook;
 
-// ---- `?fixture=<name>` — a board from `shard-3d/fixtures/` at boot ----------
+// ---- `?fixture=<name>` — a board from `dynaink-3d/fixtures/` at boot --------
 // The e2e and the demo both need a board that is John's rather than a synthetic
 // one, and G1 needs his second board standing in front of it to fix the Y
 // fault. A log there is replayed; a captured view is rebuilt from its bounds

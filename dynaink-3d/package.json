@@ -1,9 +1,9 @@
 {
-  "name": "shard-3d",
+  "name": "dynaink-3d",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "A bounded MetaMedium for making things in space. P0: the space — ink on a chosen plane, read by the shape rung. See ../SHARD-3D-PLAN.md.",
+  "description": "DynaInk3D: a bounded dyna.ink for making things in space. P0: the space — ink on a chosen plane, read by the shape rung. See ../SHARD-3D-PLAN.md.",
   "scripts": {
     "dev": "vite --port 5174 --strictPort",
     "build": "tsc --noEmit && vite build",

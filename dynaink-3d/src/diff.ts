@@ -8,7 +8,7 @@
 //     missing = ink & !silhouette   — material the drawing wants and the solid lacks
 //     extra   = silhouette & !ink   — material the solid has and the drawing does not
 //
-// That is `validateRegions` generalised (`metamedium-core/src/parse/scaffold.ts`):
+// That is `validateRegions` generalised (`core/src/parse/scaffold.ts`):
 // the promise that the thing matches the drawing is CHECKED, not assumed. There
 // the promise was "every region id the layout named appears once in the code";
 // here it is "every square unit the drawing asked for is in the body", and the
@@ -23,7 +23,7 @@
 // pixels walked into a path, which is exactly the job `image/trace.ts` already
 // does for a photographed sketch.
 
-import { trace, type Bitmap, type Point } from 'metamedium-core';
+import { trace, type Bitmap, type Point } from '@dynaink/core';
 import type { Bounds2 } from './planarity';
 
 // ---- the thresholds, every one named ---------------------------------------

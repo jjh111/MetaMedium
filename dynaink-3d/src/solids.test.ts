@@ -7,7 +7,7 @@
 // and leaves the ink.
 
 import { describe, it, expect } from 'vitest';
-import { ENGINE_PARTICIPANT, type Point } from 'metamedium-core';
+import { ENGINE_PARTICIPANT, type Point } from '@dynaink/core';
 import { createLog } from './log';
 import { foundation, height, v3, type Plane } from './plane';
 import type { PlaneCandidate } from './planarity';

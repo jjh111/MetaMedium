@@ -2,9 +2,9 @@
 // the budgets in `budgets.test.mjs` (V1-PLAN I2, PLAN-IPAD-NOTES §1 item 4) —
 // the measuring half, run in a process of its own for each board.
 //
-//     node --expose-gc metamedium-core/bench/imports.mjs --pictures=1 --strokes=2000 --svgs=1
-//     node --expose-gc metamedium-core/bench/imports.mjs --pictures=5 --strokes=1000 --svgs=5
-//     MM_CORE_BUNDLE=/path/to/older.node.mjs node --expose-gc metamedium-core/bench/imports.mjs --core=bundle   # an older engine, `git show <ref>:Demos/metamedium-core.node.mjs`
+//     node --expose-gc core/bench/imports.mjs --pictures=1 --strokes=2000 --svgs=1
+//     node --expose-gc core/bench/imports.mjs --pictures=5 --strokes=1000 --svgs=5
+//     MM_CORE_BUNDLE=/path/to/older.node.mjs node --expose-gc core/bench/imports.mjs --core=bundle   # an older engine, `git show <ref>:Demos/dynaink-core.node.mjs` (metamedium-core.node.mjs before RENAME-PLAN N3c)
 //
 // A board of `--svgs` SVG figures and `--pictures` traced pictures (`bench/board.mjs`,
 // `importedBoard`), each brought in as the surface brings it: the traced ink in one

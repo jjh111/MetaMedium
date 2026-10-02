@@ -1,7 +1,7 @@
 // One file, openable from anywhere (SHARD-3D-PLAN §7: "a standalone build …
 // so the demo opens from one file on a phone").
 //
-//   node build-standalone.mjs            → dist/shard-3d.html
+//   node build-standalone.mjs            → dist/dynaink-3d.html
 //   node build-standalone.mjs out.html   → somewhere else
 //
 // `Demos/build-standalone.mjs` inlines a hand-written demo's two script tags;
@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dist = resolve(here, 'dist');
-const out = resolve(here, process.argv[2] ?? 'dist/shard-3d.html');
+const out = resolve(here, process.argv[2] ?? 'dist/dynaink-3d.html');
 
 // 1 · build. `npm run build` typechecks first, which is the point of using it.
 console.log('vite build…');

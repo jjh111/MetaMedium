@@ -2,7 +2,7 @@
 // What a mark PLAYS in space — the form rung (SHARD-3D-PLAN §2.3).
 //
 // The shape rung says *rectangle*; this rung says *profile*. It is the sibling
-// of the diagram rung (`metamedium-core/src/diagram/roles.ts`) and it is read
+// of the diagram rung (`core/src/diagram/roles.ts`) and it is read
 // the same way: a CLOSED vocabulary of seven, placed by a table read top to
 // bottom, first match wins, and a mark no row places is `annotation` — said
 // out loud, never silently dropped.
@@ -20,7 +20,7 @@
 // their engine readings, their planes and their ink. That is what makes this
 // the second thing §11 can land back in core.
 
-import { countCrossings, DEFAULT_ERASE_CROSSINGS, type Point } from 'metamedium-core';
+import { countCrossings, DEFAULT_ERASE_CROSSINGS, type Point } from '@dynaink/core';
 import { overlapOf, viewNameOf } from './diff';
 import {
   add,

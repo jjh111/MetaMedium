@@ -18,7 +18,7 @@
 //             the release to the first frame after it — the stroke read and
 //             its reading drawn under it.
 //
-// The boards are the engine benchmark's own (`metamedium-core/bench/board.mjs`),
+// The boards are the engine benchmark's own (`core/bench/board.mjs`),
 // from the same seed, served from memory; nothing is written to disk.
 
 import os from 'node:os';

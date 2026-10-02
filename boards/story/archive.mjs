@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 const REPO = new URL('../..', import.meta.url).pathname.replace(/\/$/, '');
 const { relayTransport } = await import(REPO + '/Demos/live-node.mjs');
-const MM = await import(REPO + '/Demos/metamedium-core.node.mjs');
+const MM = await import(REPO + '/Demos/dynaink-core.node.mjs');
 
 const [room = 'dyna', out = 'board.jsonl'] = process.argv.slice(2);
 const ME = MM.sittingName('archive');

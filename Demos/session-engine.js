@@ -9,7 +9,7 @@
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
 
-  const MM = window.MetaMediumCore;
+  const MM = window.DynaInkCore;
 
   // The page decides the look: ?theme=light|dark|paper pins a theme, ?embed
   // hides what a figure does not need, ?replay=<url> steps a recorded session.
@@ -9840,7 +9840,7 @@
   // ===== Making them ==========================================================
   // Framing artifacts, framing them like a frame built once, and making a drawn
   // slider are core's tools now (V1-PLAN B1: `frames`, `control` in
-  // metamedium-core/src/tools/) — offered in the field and taken there. What
+  // core/src/tools/) — offered in the field and taken there. What
   // stays here is the surface's side: the harness applied, the knob, rendering.
 
   function exportFrameFiles(id) {

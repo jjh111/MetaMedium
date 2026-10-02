@@ -24,7 +24,7 @@
 // harness actually returns, and exits nonzero if anything in it failed.
 //
 // What it does NOT do: reimplement the scenarios. `Demos/session-engine.e2e.js`
-// and `shard-3d/e2e.js` remain the tests; this is the thing that runs them.
+// and `dynaink-3d/e2e.js` remain the tests; this is the thing that runs them.
 //
 // First time: `cd e2e && npm ci && npx playwright install chromium`.
 
@@ -198,7 +198,7 @@ async function runShard(browser, servers, which /* 'shard' | 'demo' | 'demo2' */
   try {
     await page.goto(out.url, { waitUntil: 'load', timeout: 90000 });
     await page.waitForFunction(() => !!window.__shard, null, { timeout: 90000 });
-    await page.addScriptTag({ path: join(root, 'shard-3d', 'e2e.js') });
+    await page.addScriptTag({ path: join(root, 'dynaink-3d', 'e2e.js') });
     await page.waitForFunction((w) => typeof window[w] === 'function', harness, { timeout: 30000 });
     const r = await page.evaluate(
       async (w) => {
@@ -404,8 +404,8 @@ async function runBudgets(browser, servers, engineName) {
   const measured = {};
   let page = null;
   try {
-    const { loadCore, summarize } = await import('../metamedium-core/bench/lib.mjs');
-    const { generateBoard } = await import('../metamedium-core/bench/board.mjs');
+    const { loadCore, summarize } = await import('../core/bench/lib.mjs');
+    const { generateBoard } = await import('../core/bench/board.mjs');
     const { core } = await loadCore('bundle');
 
     // 1. The 500-mark board, painted both ways.
@@ -473,7 +473,7 @@ async function runBudgets(browser, servers, engineName) {
     //    event instead of once a stroke; the budget is PERF.md's for 5,000
     //    marks, 3 s (`OPEN_MS_PER_MARK`).
     {
-      const { importedBoard } = await import('../metamedium-core/bench/board.mjs');
+      const { importedBoard } = await import('../core/bench/board.mjs');
       const label = 'I2 budget, 5 artifacts and 5,000 traced strokes — open: navigation → the board drawn';
       if (engineName !== 'chromium') check(`${label} — skipped: the budgets were set in Chromium`, true, { why: 'the budgets were set in Chromium' });
       else if (tooLoaded(NaN)) check(`${label} — skipped: ${tooLoaded(NaN)}`, true, { why: tooLoaded(NaN) });
@@ -510,7 +510,7 @@ async function runBudgets(browser, servers, engineName) {
     //    frame of such a board took 117 ms before it, and drawing the same strokes as 18 paths instead of 10,014 took
     //    just as long: the raster is bound by the geometry, not the calls.)
     {
-      const { importedBoard } = await import('../metamedium-core/bench/board.mjs');
+      const { importedBoard } = await import('../core/bench/board.mjs');
       const label = 'P1. a board of 2 pictures of 1,000 traced strokes beside a figure';
       if (engineName !== 'chromium') check(`${label} — skipped: the paint's calls are counted in Chromium`, true, { why: 'counted in Chromium' });
       else {
@@ -630,14 +630,14 @@ async function main() {
       console.log(`· static  ${s.origin}  (repo root, no-store)`);
     }
     if (needShard) {
-      const shardDir = join(root, 'shard-3d');
+      const shardDir = join(root, 'dynaink-3d');
       if (!existsSync(join(shardDir, 'node_modules'))) {
-        throw new Error('shard-3d has no node_modules — run `npm ci` in shard-3d/ first');
+        throw new Error('dynaink-3d has no node_modules — run `npm ci` in dynaink-3d/ first');
       }
       const v = await startVite(shardDir);
       servers.shardOrigin = v.origin;
       stops.push(v.stop);
-      console.log(`· vite    ${v.origin}  (shard-3d, core from source)`);
+      console.log(`· vite    ${v.origin}  (dynaink-3d, core from source)`);
     }
 
     browser = await ENGINES[engineName].launch({ headless: HEADLESS });

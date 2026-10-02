@@ -19,7 +19,7 @@ import { writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const MM = await import(pathToFileURL(path.join(here, 'metamedium-core.node.mjs')).href);
+const MM = await import(pathToFileURL(path.join(here, 'dynaink-core.node.mjs')).href);
 const PORT = 8031, RELAY = 'http://127.0.0.1:' + PORT, ROOM = 'mcp-test-' + Math.random().toString(36).slice(2, 6);
 let failed = 0;
 const check = (name, ok, detail) => { failed += ok ? 0 : 1; console.log((ok ? 'ok   ' : 'FAIL ') + name + (ok || detail === undefined ? '' : ' — ' + JSON.stringify(detail))); };

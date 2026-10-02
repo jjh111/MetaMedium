@@ -19,7 +19,7 @@
 // SURFACE-side, exactly as the canvas's `agents[]` are: the session keeps every
 // `join` in its history, and leaving only stops a model being asked.
 
-import { listModels, PRESETS, providerLocality, type ProviderConfig } from 'metamedium-core';
+import { listModels, PRESETS, providerLocality, type ProviderConfig } from '@dynaink/core';
 import type { SpaceTransport } from './generator';
 import { splitPrompt, type Room } from './room';
 import { chip, esc, pill, row, sep } from './ui';
@@ -332,7 +332,7 @@ export function createModels(o: ModelsOptions): Models {
     html += '</div>';
     if (!room) {
       html += '<div class="why">' + esc(
-        'The room is the relay on this machine: run `node Demos/relay.mjs`, and `node shard-3d/mcp.mjs` beside it — or open this page with ?live=shard&relay=http://127.0.0.1:8020.'
+        'The room is the relay on this machine: run `node Demos/relay.mjs`, and `node dynaink-3d/mcp.mjs` beside it — or open this page with ?live=shard&relay=http://127.0.0.1:8020.'
       ) + '</div>';
     }
 

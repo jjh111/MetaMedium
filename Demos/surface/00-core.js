@@ -7,7 +7,7 @@
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
 
-  const MM = window.MetaMediumCore;
+  const MM = window.DynaInkCore;
 
   // The page decides the look: ?theme=light|dark|paper pins a theme, ?embed
   // hides what a figure does not need, ?replay=<url> steps a recorded session.

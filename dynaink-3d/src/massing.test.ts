@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { ENGINE_PARTICIPANT, type Point } from 'metamedium-core';
+import { ENGINE_PARTICIPANT, type Point } from '@dynaink/core';
 import { createLog, type SpaceRead } from './log';
 import { deriveTree } from './solid';
 import { parseOpTree, type MassingStep, type OpStep } from './op';

@@ -8,8 +8,8 @@
 // In the canvas: the *live* tile → *with Claude*, or open
 // session-engine.html?live=claude&relay=http://127.0.0.1:8020. A relay is
 // started here when none answers on this machine. The engine it runs is the
-// committed Node bundle beside it (Demos/metamedium-core.node.mjs, built by
-// `npm run build:node` in metamedium-core, like the browser bundle).
+// committed Node bundle beside it (Demos/dynaink-core.node.mjs, built by
+// `npm run build:node` in core, like the browser bundle).
 //
 // It is a hand in a room, nothing more. It keeps a session from the merged
 // logs exactly as a tab does, and every tool is a verb a hand already has —
@@ -62,9 +62,9 @@ const NAME = (flag('name') || process.env.MM_NAME || 'claude').replace(/~.*$/, '
 // A picture's bytes are not in the log: an `import` event names them by their SHA-256 and the room's relay keeps
 // them (PLAN-IPAD-NOTES A1) — this hand puts them there before it names them, and fetches them to see them.
 // ----- The engine, built --------------------------------------------------
-const distPath = path.join(here, 'metamedium-core.node.mjs');
+const distPath = path.join(here, 'dynaink-core.node.mjs');
 if (!existsSync(distPath)) {
-  log('Demos/metamedium-core.node.mjs is missing — run `npm run build:node` in metamedium-core and copy dist/metamedium-core.node.mjs to Demos/');
+  log('Demos/dynaink-core.node.mjs is missing — run `npm run build:node` in core and copy dist/dynaink-core.node.mjs to Demos/');
   process.exit(1);
 }
 const MM = await import(pathToFileURL(distPath).href);

@@ -29,7 +29,7 @@ import {
   type Interpretation,
   type CleanShape,
   type Maths,
-} from 'metamedium-core';
+} from '@dynaink/core';
 import { length, NAMED, slide, sub, toWorld, type Plane, type PlaneName, type Pose, type Vec3 } from './plane';
 import { honoursSentence, type BriefPlane, type Honours, type NameInPlay, type SpaceScene } from './brief';
 import { activeConstraints, carryOutline } from './constraints';

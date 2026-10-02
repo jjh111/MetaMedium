@@ -28,7 +28,7 @@
 // and says so.
 
 import { describe, it, expect } from 'vitest';
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import { createLog } from './log';
 import {
   candidatesFor,

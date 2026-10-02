@@ -83,7 +83,7 @@ const fieldNow = (page) => page.evaluate(() => {
   };
 });
 const facts = (page) => page.evaluate(() => {
-  const MM = window.MetaMediumCore, s = window.__mm.session, st = s.getState();
+  const MM = window.DynaInkCore, s = window.__mm.session, st = s.getState();
   const ids = st.summon ? st.summon.enclosedIds : st.contentIds;
   return {
     status: document.getElementById('status').textContent,

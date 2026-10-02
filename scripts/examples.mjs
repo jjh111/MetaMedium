@@ -12,8 +12,8 @@
 // and commit the result. Everything is deterministic — a fixed clock, fixed seeds, no
 // randomness — so the same engine makes the same bytes on every machine.
 //
-// It imports the committed Node bundle the MCP hand runs (`Demos/metamedium-core.node.mjs`), so
-// the engine it asks is the one that is drift-checked against `metamedium-core/src`.
+// It imports the committed Node bundle the MCP hand runs (`Demos/dynaink-core.node.mjs`), so
+// the engine it asks is the one that is drift-checked against `core/src`.
 //
 //   flowchart.jsonl      boxes and arrows read as a flowchart, its Mermaid beside it (D1, D2)
 //   class-diagram.jsonl  three classes, a composition and an association (D4)
@@ -203,7 +203,7 @@ export function writeExamples(root, MM) {
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const MM = await import(pathToFileURL(join(root, 'Demos', 'metamedium-core.node.mjs')).href);
+  const MM = await import(pathToFileURL(join(root, 'Demos', 'dynaink-core.node.mjs')).href);
   if (process.argv.includes('--check')) {
     const drifted = checkExamples(root, MM);
     if (drifted.length) {

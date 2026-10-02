@@ -1,10 +1,10 @@
 // The tables in PERF.md, printed from the result files — so a number in the
 // document is the number a run wrote, never one copied by hand.
 //
-//     node metamedium-core/bench/report.mjs
-//     node metamedium-core/bench/report.mjs --column="after R4b"
+//     node core/bench/report.mjs
+//     node core/bench/report.mjs --column="after R4b"
 //
-// Reads `metamedium-core/dist/bench/engine-*.json` (engine.mjs) and
+// Reads `core/dist/bench/engine-*.json` (engine.mjs) and
 // `e2e/results/perf/perf-*.json` (e2e/perf.mjs); prints markdown.
 // `--column=<label>` prints the engine's table as ONE column, the three
 // sizes in each cell (500; 2,000; 5,000): how PERF.md's "after R4b" column
@@ -91,7 +91,7 @@ row('`getState()` (handed to subscribers on every event)', (i) => pm(boards[i] &
 const briefs = SIZES.map((n, i) => (boards[i] && boards[i].brief) || ((eng(`engine-board-${n}-source.only-brief.json`) || {}).brief) || null);
 row('a model\'s brief (`describeSession`): five marks · the whole board', (i) => { const b = briefs[i]; return b ? `${(b.groupChars / 1024).toFixed(0)} KB · ${(b.wholeChars / 1048576).toFixed(1)} MB` : '—'; });
 out('');
-out('Commands: `node --expose-gc metamedium-core/bench/engine.mjs board --size=N --repeat=K` (500: K=5; 2,000: K=2); 5,000: `node --expose-gc --max-old-space-size=65536 metamedium-core/bench/engine.mjs build --size=5000 --strokes=20`; bundle: add `--core=bundle`; checkpoints off: add `--ablate=checkpoints --only=replay`; the relation list and † (the content plane gathered from the diagrams the board was drawn in, so no replay — the same 336 and 1,377 marks and the same relations the replayed boards hold, and a read within 4% of the session\'s own): `node --expose-gc metamedium-core/bench/engine.mjs relate --size=N --read`.');
+out('Commands: `node --expose-gc core/bench/engine.mjs board --size=N --repeat=K` (500: K=5; 2,000: K=2); 5,000: `node --expose-gc --max-old-space-size=65536 core/bench/engine.mjs build --size=5000 --strokes=20`; bundle: add `--core=bundle`; checkpoints off: add `--ablate=checkpoints --only=replay`; the relation list and † (the content plane gathered from the diagrams the board was drawn in, so no replay — the same 336 and 1,377 marks and the same relations the replayed boards hold, and a read within 4% of the session\'s own): `node --expose-gc core/bench/engine.mjs relate --size=N --read`.');
 out('');
 
 // --- the stroke's cost as the board grows ---
@@ -103,7 +103,7 @@ if (curveFrom) {
   out('|---|---|---|---|---|---|');
   for (const c of curveFrom.curve) out(`| ${c.strokes} | ${c.content} | ${f1(c.median)} | ${f1(c.p95)} | ${f1(c.max)} | ${c.elapsedS} s |`);
   out('');
-  out(`Command: \`node --expose-gc --max-old-space-size=65536 metamedium-core/bench/engine.mjs build --size=${curveFrom.board.marks} --every=250\`. Each row is the 250 strokes ending at that count; a stroke is one \`addStroke\`, with every event before it applied.`);
+  out(`Command: \`node --expose-gc --max-old-space-size=65536 core/bench/engine.mjs build --size=${curveFrom.board.marks} --every=250\`. Each row is the 250 strokes ending at that count; a stroke is one \`addStroke\`, with every event before it applied.`);
   out('');
 }
 
@@ -126,7 +126,7 @@ if (room || room500) {
   lr('**merge work with `notices()`**', 'withNotices');
   out(`| **then \`session.load(merged)\` — a full replay, every line** | ${r5 ? f1(r5.replayMs) : '—'} | ${r2 ? f1(r2.replayMs) : '—'} |`);
   out('');
-  out('Command: `node --expose-gc metamedium-core/bench/engine.mjs room --size=N` (median / p95 over 12 lines).');
+  out('Command: `node --expose-gc core/bench/engine.mjs room --size=N` (median / p95 over 12 lines).');
   out('');
 }
 const hello = eng('engine-hello-2000-source.json');
@@ -144,7 +144,7 @@ if (hello) {
   hr('times each is notified (in the surface: a full re-merge and replay each)', (h) => `${Math.max(...h.peerNotified)} (${Math.max(...h.peerNotifiedWithEvents)} carry events)`);
   hr('times the newcomer is notified', (h) => h.newcomerNotified);
   out('');
-  out('Command: `node --expose-gc metamedium-core/bench/engine.mjs hello --size=2000` (LocalHub; the board split between the hands already there; the newcomer publishes its empty log and says hello, as `openLive` does).');
+  out('Command: `node --expose-gc core/bench/engine.mjs hello --size=2000` (LocalHub; the board split between the hands already there; the newcomer publishes its empty log and says hello, as `openLive` does).');
   out('');
 }
 

@@ -12,7 +12,7 @@
 
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { ENGINE_PARTICIPANT, type Point } from 'metamedium-core';
+import { ENGINE_PARTICIPANT, type Point } from '@dynaink/core';
 import { createLog, type SpaceRead } from './log';
 import { boundsOf, gridFor, padBounds, rasterise } from './diff';
 import type { PlaneSilhouette } from './silhouette';

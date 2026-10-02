@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 // The committed core bundle, for the one test below that composes the reader with
 // core's rule the way the adapter does (V1-PLAN L2i). The reader itself still names nothing.
-import * as MM from '../metamedium-core.node.mjs';
+import * as MM from '../dynaink-core.node.mjs';
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '09-field.js'), 'utf8');
 const { readFieldCommand, verbFor, libraryMatch, typedWord, theirMarks, madeThese, notationWords } = new Function(

@@ -17,13 +17,13 @@
       "port": 8010
     },
     {
-      "name": "shard-3d",
+      "name": "dynaink-3d",
       "runtimeExecutable": "npm",
       "runtimeArgs": [
         "run",
         "dev",
         "--prefix",
-        "shard-3d"
+        "dynaink-3d"
       ],
       "port": 5174,
       "url": "http://localhost:5174"

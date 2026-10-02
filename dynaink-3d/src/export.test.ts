@@ -14,7 +14,7 @@
 // No renderer anywhere: the diff's seam is not what any of this is about.
 
 import { describe, expect, it } from 'vitest';
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import {
   boardFilename,
   boardFromFixture,

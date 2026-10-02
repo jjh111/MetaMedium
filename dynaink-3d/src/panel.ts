@@ -31,7 +31,7 @@
 // already says what Enter will do, and the STATUS LINE, which takes the
 // selection's name and its next act (`selectionLine`).
 
-import { fingerprintOf, type Point } from 'metamedium-core';
+import { fingerprintOf, type Point } from '@dynaink/core';
 import type { Diff, DiffRegion } from './diff';
 import { describeExchange, type Exchange } from './exchange';
 import type { Log, Mark, ProfileOfSolid, Solid } from './log';

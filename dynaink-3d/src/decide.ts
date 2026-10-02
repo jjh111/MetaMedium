@@ -1,6 +1,6 @@
 // ===== the decision seat's questions, and the harness that measures them =====
 //
-// `metamedium-core/src/participants/decide.ts` is the seat: typed questions in,
+// `core/src/participants/decide.ts` is the seat: typed questions in,
 // a typed value out, behind an injected transport. This file is the shard's
 // half of it — **what the space would ask a decision seat**, and a harness that
 // runs a batch over a fixture and prints what happened as a table.
@@ -40,7 +40,7 @@ import {
   type DecisionAnswer,
   type DecideSeat,
   type DecideRun,
-} from 'metamedium-core';
+} from '@dynaink/core';
 import type { BriefMark, SpaceScene } from './brief';
 import { COLOUR_WORDS } from './op';
 import { FORM_ROLES } from './form';
@@ -49,7 +49,7 @@ import { FORM_ROLES } from './form';
  * The shape rung's closed vocabulary, as candidates.
  *
  * Eight entries, and the list is closed on purpose — it is the same one
- * `metamedium-core/src/recognition.ts` detects and the same one a model is
+ * `core/src/recognition.ts` detects and the same one a model is
  * allowed to draw in. A seat asked *what shape is this* may agree with the
  * engine, disagree with it, or say none of these; it may not answer `hexagon`.
  */

@@ -3,9 +3,9 @@
 // its own for each size (a clean heap, and one that can be killed when a
 // replay does not finish) and holds the numbers to the budgets.
 //
-//     node --expose-gc metamedium-core/bench/budgets.mjs --size=2000
-//     node --expose-gc metamedium-core/bench/budgets.mjs --size=5000 --strokes=20
-//     node --expose-gc metamedium-core/bench/budgets.mjs --size=2000 --packs=basics@1,flowchart@1
+//     node --expose-gc core/bench/budgets.mjs --size=2000
+//     node --expose-gc core/bench/budgets.mjs --size=5000 --strokes=20
+//     node --expose-gc core/bench/budgets.mjs --size=2000 --packs=basics@1,flowchart@1
 //
 // `--packs` puts a `use` event for each named library pack at the head of the
 // board's log (V1-PLAN §9 B3), so every group on it is matched against the

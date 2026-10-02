@@ -1,6 +1,6 @@
-/* metamedium-core browser bundle — built from metamedium-core/src via: npm run build:browser. Do not edit directly. */
+/* dynaink-core.browser.js — the @dynaink/core browser bundle, built from core/src via: npm run build:browser. Do not edit directly. */
 "use strict";
-var MetaMediumCore = (() => {
+var DynaInkCore = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
   var __getOwnPropNames = Object.getOwnPropertyNames;
@@ -32774,3 +32774,4 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
   }
   return __toCommonJS(index_exports);
 })();
+var MetaMediumCore = DynaInkCore; /* the old global, for one release (RENAME-PLAN N3c) */

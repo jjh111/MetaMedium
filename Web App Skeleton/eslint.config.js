@@ -27,7 +27,7 @@ export default tseslint.config(
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' },
       ],
-      // Demote to warning until proper types land with the metamedium-core
+      // Demote to warning until proper types land with the core/
       // extraction (ROADMAP.md) — keeps lint usable as a CI gate meanwhile.
       '@typescript-eslint/no-explicit-any': 'warn',
     },

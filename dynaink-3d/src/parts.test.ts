@@ -10,7 +10,7 @@
 // silhouettes from two standpoints do not determine three masses.
 
 import { describe, it, expect } from 'vitest';
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import { createLog, type SpaceRead } from './log';
 import { deriveTree } from './solid';
 import {

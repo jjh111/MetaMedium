@@ -14,7 +14,7 @@
 // It fails nothing: its product is numbers, and beside them each budget
 // (`budgets.mjs`, the same one the gate's `budgets` scenario records) said
 // within or over, with the machine's calibration. The boards
-// are the engine benchmark's own (`metamedium-core/bench/board.mjs`), made
+// are the engine benchmark's own (`core/bench/board.mjs`), made
 // from the same seed, and served to the page from memory — no board is ever
 // written to disk.
 //
@@ -55,8 +55,8 @@ import { probe, tools, serveBoard, openBoard as openFolder, interact as work, ju
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 const OUT = join(here, 'results', 'perf');
-const { loadCore, summarize, args } = await import('../metamedium-core/bench/lib.mjs');
-const { generateBoard } = await import('../metamedium-core/bench/board.mjs');
+const { loadCore, summarize, args } = await import('../core/bench/lib.mjs');
+const { generateBoard } = await import('../core/bench/board.mjs');
 
 const a = args();
 const engineName = a.browser || 'chromium';

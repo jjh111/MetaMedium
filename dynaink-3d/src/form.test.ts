@@ -7,7 +7,7 @@
 // here mentions a pixel.
 
 import { describe, it, expect } from 'vitest';
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import {
   assignForms,
   featuresFrom,

@@ -29,7 +29,7 @@ import {
   interpretationsOf,
   NO_MATCH,
   type StubAnswer,
-} from 'metamedium-core';
+} from '@dynaink/core';
 import { createLog, type Log } from './log';
 import { decodeBoard } from './export';
 import { deriveTree } from './solid';

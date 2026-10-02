@@ -1,9 +1,9 @@
-// A smoke test for the shard's MCP hand: speaks MCP to shard-3d/mcp.mjs over
+// A smoke test for the shard's MCP hand: speaks MCP to dynaink-3d/mcp.mjs over
 // stdio, in a room of its own on a relay of its own, with a second hand in Node
 // standing in for the shard's tab. Not part of `npm test` (it spawns processes
 // and takes a port); run it by hand:
 //
-//   node shard-3d/mcp-smoke.mjs
+//   node dynaink-3d/mcp-smoke.mjs
 //
 // What it proves is the whole of G5's path except the drawing: the hand joins,
 // sees the tab's board, draws a claim on a named plane that the tab reads as a
@@ -20,7 +20,7 @@ import { startRelay } from '../Demos/relay.mjs';
 import { relayTransport } from '../Demos/live-node.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const MM = await import(pathToFileURL(path.join(here, '..', 'Demos', 'metamedium-core.node.mjs')).href);
+const MM = await import(pathToFileURL(path.join(here, '..', 'Demos', 'dynaink-core.node.mjs')).href);
 
 /**
  * A port nothing is listening on, asked for rather than guessed.

@@ -1,8 +1,8 @@
 // Synthetic boards for the performance baseline (V1-PLAN.md §9 R4a; PERF.md).
 //
-//     node metamedium-core/bench/board.mjs 2000            # stats for a 2,000-mark board
-//     node metamedium-core/bench/board.mjs 2000 --hands=3  # the same board drawn by three hands
-//     node metamedium-core/bench/board.mjs 500 --replay    # …and replay it once, reading the result
+//     node core/bench/board.mjs 2000            # stats for a 2,000-mark board
+//     node core/bench/board.mjs 2000 --hands=3  # the same board drawn by three hands
+//     node core/bench/board.mjs 500 --replay    # …and replay it once, reading the result
 //
 // A board is built from a SEED, deterministically: same seed, same log, byte
 // for byte. The generator is saved, never the boards (a 5,000-mark log is

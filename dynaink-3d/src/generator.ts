@@ -24,7 +24,7 @@ import {
   type CompletionResult,
   type ProviderConfig,
   type Point,
-} from 'metamedium-core';
+} from '@dynaink/core';
 import { COLOUR_WORDS } from './op';
 
 /** The transport, exactly core's shape — so `complete` is the default and a stub is a function. */

@@ -20,7 +20,7 @@
 // arithmetic, not a renderer.
 
 import { describe, it, expect } from 'vitest';
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import { createLog, type SpaceRead } from './log';
 import { deriveTree } from './solid';
 import { assignForms, hullableFrom, viewLabelOf, prismsMeet, type FormMark } from './form';

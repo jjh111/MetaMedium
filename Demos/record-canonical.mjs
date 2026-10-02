@@ -2,7 +2,7 @@
 //
 //   node Demos/record-canonical.mjs
 //
-// Runs the executable spec (metamedium-core/src/session/session.scenario.test.ts)
+// Runs the executable spec (core/src/session/session.scenario.test.ts)
 // through the built engine with hand-drawn strokes, and writes every event
 // plus a caption per step to Demos/recordings/canonical-loop.json. The
 // reference surface replays it with ?replay=recordings/canonical-loop.json;
@@ -14,10 +14,10 @@ import { readFileSync, writeFileSync } from 'node:fs';
 // The committed browser bundle is an IIFE that defines a global; evaluate it
 // and take the global. Same code the surface runs, so the recording replays
 // there byte for byte.
-const bundle = readFileSync(new URL('./metamedium-core.browser.js', import.meta.url), 'utf8');
-const { createSession } = new Function(bundle + '\nreturn MetaMediumCore;')();
+const bundle = readFileSync(new URL('./dynaink-core.browser.js', import.meta.url), 'utf8');
+const { createSession } = new Function(bundle + '\nreturn DynaInkCore;')();
 
-// Hand-ish generators: the same idea as metamedium-core/src/test/strokes.ts,
+// Hand-ish generators: the same idea as core/src/test/strokes.ts,
 // kept tiny here so the recording script has no test-only import.
 let seed = 7;
 const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
@@ -89,7 +89,7 @@ const state = s.getState();
 const out = {
   title: 'The canonical loop',
   recordedAt: new Date().toISOString(),
-  engine: 'metamedium-core',
+  engine: '@dynaink/core',
   steps,
   events: s.getEvents(),
 };

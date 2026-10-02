@@ -17,7 +17,7 @@
 /// <reference types="vite/client" />
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { ENGINE_PARTICIPANT, type MMNode, type SessionEvent } from 'metamedium-core';
+import { ENGINE_PARTICIPANT, type MMNode, type SessionEvent } from '@dynaink/core';
 import { createLog, type Log, type SpaceRead } from './log';
 import { deriveTree } from './solid';
 import { validateOpTree, type HullStep } from './op';

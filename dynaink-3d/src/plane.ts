@@ -9,7 +9,7 @@
 // whole module is arithmetic and tests headlessly — which is also why §11
 // names it as the first thing that can land back in core.
 
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 // TYPE ONLY: erased at compile time, so `planarity.ts` → `plane.ts` stays the
 // one run-time direction and the pure modules have no cycle between them.
 import type { PlaneCandidate } from './planarity';

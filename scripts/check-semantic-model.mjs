@@ -4,7 +4,7 @@
 //     node scripts/check-semantic-model.mjs <folder holding tokenizer.json and model.safetensors>
 //     node scripts/check-semantic-model.mjs <https://… folder>      # where the machine can reach the host
 //
-// The semantic seat's reader (`metamedium-core/src/semantic/static.ts`) was proved against a model its own writer
+// The semantic seat's reader (`core/src/semantic/static.ts`) was proved against a model its own writer
 // built, because the container it was written in could not download the real `minishlab/potion-base-8M` (the proxy
 // answers 403). This is the one command that closes that gap the day the files can be had: it reads them with the same
 // code the page runs (the committed Node bundle), says what it found, and asks whether related words are nearer than
@@ -15,7 +15,7 @@ import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const core = await import(resolve(here, '..', 'Demos', 'metamedium-core.node.mjs'));
+const core = await import(resolve(here, '..', 'Demos', 'dynaink-core.node.mjs'));
 
 const arg = process.argv[2];
 if (!arg) { console.error('usage: node scripts/check-semantic-model.mjs <folder | https://… folder holding tokenizer.json and model.safetensors>'); process.exit(2); }

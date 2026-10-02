@@ -1,4 +1,4 @@
-/* metamedium-core node bundle — built from metamedium-core/src via: npm run build:node. Do not edit directly. */
+/* dynaink-core.node.mjs — the @dynaink/core node bundle, built from core/src via: npm run build:node. Do not edit directly. */
 
 // src/geometry.ts
 function getBounds(points) {

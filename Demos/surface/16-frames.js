@@ -43,7 +43,7 @@
   // ===== Making them ==========================================================
   // Framing artifacts, framing them like a frame built once, and making a drawn
   // slider are core's tools now (V1-PLAN B1: `frames`, `control` in
-  // metamedium-core/src/tools/) — offered in the field and taken there. What
+  // core/src/tools/) — offered in the field and taken there. What
   // stays here is the surface's side: the harness applied, the knob, rendering.
 
   function exportFrameFiles(id) {

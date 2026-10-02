@@ -1,7 +1,7 @@
 {
-  "name": "metamedium-core",
+  "name": "@dynaink/core",
   "version": "0.1.0",
-  "description": "Headless engine for MetaMedium: geometric grounding, multi-parse recognition, spatial graph, and the no-modes session engine (see ARCHITECTURE-v6-SESSION-ENGINE.md)",
+  "description": "Headless engine for dyna.ink: geometric grounding, multi-parse recognition, spatial graph, and the no-modes session engine (see ARCHITECTURE-v6-SESSION-ENGINE.md)",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -13,8 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:browser": "esbuild src/index.ts --bundle --format=iife --global-name=MetaMediumCore --banner:js='/* metamedium-core browser bundle \u2014 built from metamedium-core/src via: npm run build:browser. Do not edit directly. */' --outfile=dist/metamedium-core.browser.js",
-    "build:node": "esbuild src/index.ts --bundle --format=esm --platform=node --banner:js='/* metamedium-core node bundle \u2014 built from metamedium-core/src via: npm run build:node. Do not edit directly. */' --outfile=dist/metamedium-core.node.mjs"
+    "build:browser": "esbuild src/index.ts --bundle --format=iife --global-name=DynaInkCore --banner:js='/* dynaink-core.browser.js \u2014 the @dynaink/core browser bundle, built from core/src via: npm run build:browser. Do not edit directly. */' --footer:js='var MetaMediumCore = DynaInkCore; /* the old global, for one release (RENAME-PLAN N3c) */' --outfile=dist/dynaink-core.browser.js",
+    "build:node": "esbuild src/index.ts --bundle --format=esm --platform=node --banner:js='/* dynaink-core.node.mjs \u2014 the @dynaink/core node bundle, built from core/src via: npm run build:node. Do not edit directly. */' --outfile=dist/dynaink-core.node.mjs"
   },
   "license": "MIT",
   "devDependencies": {

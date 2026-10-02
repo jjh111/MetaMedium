@@ -1,6 +1,6 @@
 // transport.mjs — the extraction seat's seam.
 //
-// Shaped like the decision seat's (`metamedium-core/src/participants/decide.ts`):
+// Shaped like the decision seat's (`core/src/participants/decide.ts`):
 // typed questions in, typed answers out, the whole batch in one call, and the
 // thing that answers injected — a local GLiNER2 graph, a stub, or a hand with a
 // highlighter, and the caller cannot tell which. Nothing in this file loads a

@@ -4,14 +4,15 @@
 // knows is shown to change nothing a person or a model reads from it, and
 // exactly what does differ is said.
 //
-//     node metamedium-core/bench/equivalence.mjs                  # the reference commit against src/ as it stands
-//     node metamedium-core/bench/equivalence.mjs --ref=HEAD~2     # another reference
-//     node metamedium-core/bench/equivalence.mjs --old=path.mjs   # a Node bundle on disk as the reference
-//     node metamedium-core/bench/equivalence.mjs --size=500 --every=1 --prefix-step=50
+//     node core/bench/equivalence.mjs                  # the reference commit against src/ as it stands
+//     node core/bench/equivalence.mjs --ref=HEAD~2     # another reference
+//     node core/bench/equivalence.mjs --old=path.mjs   # a Node bundle on disk as the reference
+//     node core/bench/equivalence.mjs --size=500 --every=1 --prefix-step=50
 //
 // The OLD engine is the committed Node bundle at `--ref` (`git show
-// <ref>:Demos/metamedium-core.node.mjs`, R4b's starting point by default); the
-// NEW one is `metamedium-core/src` built now (lib.mjs). Both replay the same
+// <ref>:Demos/dynaink-core.node.mjs`, or by the name it had before RENAME-PLAN
+// N3c, `Demos/metamedium-core.node.mjs`; R4b's starting point by default); the
+// NEW one is `core/src` built now (lib.mjs). Both replay the same
 // events, and the harness reads each board with each engine's own public
 // functions:
 //
@@ -68,11 +69,22 @@ const say = (s) => console.log(s);
 
 // ===== The two engines =====================================================
 
+/** The committed Node bundle at `sha`, by the name it had there: its name since RENAME-PLAN N3c, then the one before. */
+const BUNDLE_NAMES = ['Demos/dynaink-core.node.mjs', 'Demos/metamedium-core.node.mjs'];
+function bundleAt(sha) {
+  for (const p of BUNDLE_NAMES) {
+    try {
+      return execFileSync('git', ['show', `${sha}:${p}`], { cwd: REPO, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
+    } catch { /* not by that name at that commit */ }
+  }
+  throw new Error(`no committed Node bundle at ${sha} — looked for ${BUNDLE_NAMES.join(' and ')}`);
+}
+
 async function loadOld() {
   if (a.old) return { core: await import(pathToFileURL(a.old).href), label: a.old };
   mkdirSync(OUT_DIR, { recursive: true });
   const sha = execFileSync('git', ['rev-parse', '--short', REF], { cwd: REPO }).toString().trim();
-  const text = execFileSync('git', ['show', `${sha}:Demos/metamedium-core.node.mjs`], { cwd: REPO, maxBuffer: 64 * 1024 * 1024 }).toString();
+  const text = bundleAt(sha);
   const file = join(OUT_DIR, `core-ref-${sha}.mjs`);
   writeFileSync(file, text);
   return { core: await import(pathToFileURL(file).href), label: `the bundle at ${sha}` };
@@ -333,9 +345,9 @@ function heldLogs() {
     const raw = JSON.parse(readFileSync(join(rec, f), 'utf8'));
     out.push([`Demos/recordings/${f}`, Array.isArray(raw) ? raw : raw.events ?? []]);
   }
-  const fix = join(REPO, 'shard-3d', 'fixtures');
+  const fix = join(REPO, 'dynaink-3d', 'fixtures');
   for (const f of readdirSync(fix).filter((x) => x.endsWith('.mm.log')).sort()) {
-    out.push([`shard-3d/fixtures/${f}`, engines.new.decodeLog(readFileSync(join(fix, f), 'utf8')).events]);
+    out.push([`dynaink-3d/fixtures/${f}`, engines.new.decodeLog(readFileSync(join(fix, f), 'utf8')).events]);
   }
   return out;
 }

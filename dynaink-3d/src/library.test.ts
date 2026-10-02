@@ -16,7 +16,7 @@
 // There is three.js in here, but no WebGL: geometry is arithmetic.
 
 import { describe, it, expect } from 'vitest';
-import { getFingerprint, type Point } from 'metamedium-core';
+import { getFingerprint, type Point } from '@dynaink/core';
 import {
   addProfileExample,
   compareProfiles,

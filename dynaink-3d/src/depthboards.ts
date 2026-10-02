@@ -22,7 +22,7 @@
 // The first sightline is square to the world (the standpoint is along +Z), so
 // every number the tests read is one a reader can check on paper.
 
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import {
   cross,
   foundation,

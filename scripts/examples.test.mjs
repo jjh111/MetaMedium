@@ -19,7 +19,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
-const MM = await import(pathToFileURL(join(root, 'Demos', 'metamedium-core.node.mjs')).href);
+const MM = await import(pathToFileURL(join(root, 'Demos', 'dynaink-core.node.mjs')).href);
 // Loaded on its own line, so while the script is not written every test fails on its own line.
 const gen = existsSync(join(here, 'examples.mjs')) ? await import('./examples.mjs') : {};
 

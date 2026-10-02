@@ -15,7 +15,7 @@ import { keyForRoom } from './src/auth.mjs';
 import { relayTransport, relayAnswers, checkRelay } from '../../Demos/live-node.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const MM = await import(pathToFileURL(path.join(here, '../../Demos/metamedium-core.node.mjs')).href);
+const MM = await import(pathToFileURL(path.join(here, '../../Demos/dynaink-core.node.mjs')).href);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const until = async (fn, ms = 4000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return true; await wait(25); } return fn(); };
 const boxAt = (x) => [0, 1, 2, 3, 4].map((i) => ({ x: x + [0, 60, 60, 0, 0][i], y: [0, 0, 40, 40, 0][i] })).flatMap((p, i, a) =>

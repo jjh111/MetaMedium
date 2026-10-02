@@ -1,8 +1,8 @@
 // Read a CPU profile back to the engine's source (PERF.md, the hotspots).
 //
-//     node --cpu-prof --cpu-prof-dir=metamedium-core/dist/bench/prof \
-//          metamedium-core/bench/engine.mjs replay --size=2000 --core=source
-//     node metamedium-core/bench/profile.mjs metamedium-core/dist/bench/prof/<file>.cpuprofile
+//     node --cpu-prof --cpu-prof-dir=core/dist/bench/prof \
+//          core/bench/engine.mjs replay --size=2000 --core=source
+//     node core/bench/profile.mjs core/dist/bench/prof/<file>.cpuprofile
 //
 // Self time is where the samples landed; inclusive time counts a function
 // once per sample however deep it recurses. Frames in the engine bundle are
@@ -64,11 +64,12 @@ export function place(frame, maps) {
     if (e && e.originalSource) return `${e.originalSource.replace(/^.*?(src\/)/, '$1')}:${e.originalLine + 1}`;
     return null;
   };
-  if (/core-source[^/]*\.mjs|metamedium-core\.node\.mjs/.test(url)) {
+  // The committed bundles by their names since RENAME-PLAN N3c, and before it (a profile taken earlier names the old file).
+  if (/core-source[^/]*\.mjs|(dynaink|metamedium)-core\.node\.mjs/.test(url)) {
     const p = viaMap(maps && maps.node);
     if (p) return p;
   }
-  if (/metamedium-core\.browser\.js/.test(url)) {
+  if (/(dynaink|metamedium)-core\.browser\.js/.test(url)) {
     const p = viaMap(maps && maps.browser);
     if (p) return p;
   }

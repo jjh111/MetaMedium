@@ -6,7 +6,7 @@
 
 /// <reference types="vite/client" />
 import { describe, it, expect } from 'vitest';
-import { boundsOf, createSession, LocalHub, LOCAL_PARTICIPANT, topInterpretation, type SessionEvent } from 'metamedium-core';
+import { boundsOf, createSession, LocalHub, LOCAL_PARTICIPANT, topInterpretation, type SessionEvent } from '@dynaink/core';
 import { joinRoom, otherHand, refusalOf, saidInRoom, splitPrompt, BRIEF_QUESTION, legacySeatTraffic } from './room';
 import { decodeBoard } from './export';
 import { createLog } from './log';

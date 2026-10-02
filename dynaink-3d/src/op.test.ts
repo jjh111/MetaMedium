@@ -6,7 +6,7 @@
 // renderer does afterwards is a function of exactly those numbers.
 
 import { describe, it, expect } from 'vitest';
-import { ENGINE_PARTICIPANT, type Point } from 'metamedium-core';
+import { ENGINE_PARTICIPANT, type Point } from '@dynaink/core';
 import {
   FULL_SWEEP,
   OP_KINDS,

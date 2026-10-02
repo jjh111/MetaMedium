@@ -23,7 +23,7 @@ import { relayTransport, checkRelay } from '../../Demos/live-node.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const wrangler = path.join(here, 'node_modules', '.bin', 'wrangler');
-const MM = await import(pathToFileURL(path.join(here, '../../Demos/metamedium-core.node.mjs')).href);
+const MM = await import(pathToFileURL(path.join(here, '../../Demos/dynaink-core.node.mjs')).href);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const until = async (fn, ms = 8000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return true; await wait(50); } return fn(); };
 const SECRET = 'workerd-test-secret';

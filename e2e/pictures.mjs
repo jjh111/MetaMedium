@@ -20,8 +20,8 @@ import { isModelRequest } from './guards.mjs';
 import { serveBoard, openBoard, tools, fmt, countCanvasCalls } from './budgets.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const { loadCore, summarize, args } = await import('../metamedium-core/bench/lib.mjs');
-const { importedBoard } = await import('../metamedium-core/bench/board.mjs');
+const { loadCore, summarize, args } = await import('../core/bench/lib.mjs');
+const { importedBoard } = await import('../core/bench/board.mjs');
 const a = args();
 const pictures = Number(a.pictures || 3), strokesEach = Number(a.strokes || 1667), svgs = Number(a.svgs ?? 2);
 

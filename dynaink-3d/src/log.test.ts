@@ -6,7 +6,7 @@
 // what comes back from the engine untouched.
 
 import { describe, it, expect } from 'vitest';
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import { createLog, planeOf, sizeOf } from './log';
 import {
   add,

@@ -4,7 +4,7 @@
 // first thing §11 names for landing back in core.
 
 import { describe, it, expect } from 'vitest';
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import {
   ANCHOR_BASE,
   ANCHOR_MISS,

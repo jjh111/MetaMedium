@@ -37,9 +37,9 @@ const RELAY = (flag('relay') || process.env.MM_RELAY || 'http://127.0.0.1:8020')
 // A relay that wants a key for the room: MM_RELAY_KEY, or --key (an argument is in the process list).
 const KEY = flag('key') || process.env.MM_RELAY_KEY || '';
 
-const distPath = path.join(here, 'metamedium-core.node.mjs');
+const distPath = path.join(here, 'dynaink-core.node.mjs');
 if (!existsSync(distPath)) {
-  process.stderr.write('Demos/metamedium-core.node.mjs is missing — run `npm run build:node` in metamedium-core and copy dist/metamedium-core.node.mjs to Demos/\n');
+  process.stderr.write('Demos/dynaink-core.node.mjs is missing — run `npm run build:node` in core and copy dist/dynaink-core.node.mjs to Demos/\n');
   process.exit(1);
 }
 const MM = await import(pathToFileURL(distPath).href);

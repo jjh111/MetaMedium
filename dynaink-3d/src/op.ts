@@ -22,7 +22,7 @@
 // profile and a line. `solid.ts` turns a tree into geometry; this file never
 // mentions a mesh.
 
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import { cross, dot, length, normalize, offsetOf, sub, toWorld, uAxis, vAxis, type Plane, type Vec3 } from './plane';
 
 /** The whole vocabulary of §2.4. Closed: it grows only by a release. */

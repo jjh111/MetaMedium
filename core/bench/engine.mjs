@@ -1,10 +1,10 @@
 // The engine's side of the performance baseline (V1-PLAN.md §9 R4a; PERF.md).
 //
-//     node --expose-gc metamedium-core/bench/engine.mjs board --size=500 --repeat=5
-//     node --expose-gc metamedium-core/bench/engine.mjs board --size=2000 --repeat=2 --profile
-//     node --expose-gc --max-old-space-size=65536 metamedium-core/bench/engine.mjs board --size=5000 --repeat=0 --strokes=20
-//     node --expose-gc metamedium-core/bench/engine.mjs room --size=2000
-//     node --expose-gc metamedium-core/bench/engine.mjs hello --size=2000
+//     node --expose-gc core/bench/engine.mjs board --size=500 --repeat=5
+//     node --expose-gc core/bench/engine.mjs board --size=2000 --repeat=2 --profile
+//     node --expose-gc --max-old-space-size=65536 core/bench/engine.mjs board --size=5000 --repeat=0 --strokes=20
+//     node --expose-gc core/bench/engine.mjs room --size=2000
+//     node --expose-gc core/bench/engine.mjs hello --size=2000
 //
 // Flags: --core=source|bundle (default source; the two are byte-identical at
 // this commit, which lib.mjs checks can be shown), --seed=N, --repeat=N (warm

@@ -17,7 +17,7 @@
 //
 // This is not part of `npm test`: it exercises the browser surface (canvas,
 // iframes, pointer events), which the headless core suite deliberately does
-// not model. The engine's own guarantees are tested in metamedium-core.
+// not model. The engine's own guarantees are tested in core/.
 
 window.__helpers = function(){
   const c = document.getElementById('canvas');

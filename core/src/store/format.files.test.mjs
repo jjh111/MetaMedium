@@ -37,7 +37,7 @@ function logFilesUnder(dir, out = []) {
 }
 
 describe('the logs kept in this repository', () => {
-  const files = [...logFilesUnder(join(ROOT, 'boards')), ...logFilesUnder(join(ROOT, 'shard-3d/fixtures'))];
+  const files = [...logFilesUnder(join(ROOT, 'boards')), ...logFilesUnder(join(ROOT, 'dynaink-3d/fixtures'))];
 
   it('finds the boards and the shard’s fixtures', () => {
     expect(files.length).toBeGreaterThanOrEqual(8);

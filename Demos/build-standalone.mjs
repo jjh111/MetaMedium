@@ -18,7 +18,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 /** The page in `dir` (a Demos/ folder) with its engine, its surface and its style inlined. */
 export function standalone(dir = here, { fragment = false } = {}) {
   let html = readFileSync(resolve(dir, 'session-engine.html'), 'utf8');
-  const bundle = readFileSync(resolve(dir, 'metamedium-core.browser.js'), 'utf8');
+  const bundle = readFileSync(resolve(dir, 'dynaink-core.browser.js'), 'utf8');
   const surface = readFileSync(resolve(dir, 'session-engine.js'), 'utf8');
   const css = readFileSync(resolve(dir, 'surface/surface.css'), 'utf8');
 
@@ -29,7 +29,7 @@ export function standalone(dir = here, { fragment = false } = {}) {
     // A function, so a `$` in the code is never read as a replacement pattern.
     html = html.replace(tag, () => '<script>\n' + code + '\n</script>');
   };
-  inline('<script src="metamedium-core.browser.js"></script>', bundle, 'bundle');
+  inline('<script src="dynaink-core.browser.js"></script>', bundle, 'bundle');
   inline('<script src="session-engine.js"></script>', surface, 'surface');
   const link = '<link rel="stylesheet" href="surface/surface.css">';
   if (!html.includes(link)) throw new Error('stylesheet link not found — did the demo change?');

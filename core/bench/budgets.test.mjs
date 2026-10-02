@@ -6,7 +6,7 @@
 // numbers (`dist/bench/budgets-<size>-source.json`, and a line each in
 // `dist/bench/budgets-history.jsonl`) and prints them, pass or fail.
 //
-//     node --test metamedium-core/bench/budgets.test.mjs
+//     node --test core/bench/budgets.test.mjs
 //
 // And the same budgets with two library packs in use (V1-PLAN §9 B3):
 // basics@1 and flowchart@1 used at the head of the 2,000-mark board's log, so

@@ -49,7 +49,7 @@ const root = resolve(here, '..');
  * group named — so the log carries more than strokes.
  */
 async function r3Events() {
-  const MM = await import(pathToFileURL(join(root, 'Demos', 'metamedium-core.node.mjs')).href);
+  const MM = await import(pathToFileURL(join(root, 'Demos', 'dynaink-core.node.mjs')).href);
   const s = MM.createSession();
   const line = (a, b, n) => { const p = []; for (let i = 0; i < n; i++) { const t = i / (n - 1); p.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }); } return p; };
   const rect = (x, y, w, h) => { const v = [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }, { x, y }]; let p = []; for (let i = 0; i < 4; i++) p = p.concat(line(v[i], v[i + 1], 20).slice(i ? 1 : 0)); return p; };

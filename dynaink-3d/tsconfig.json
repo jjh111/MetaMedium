@@ -17,7 +17,7 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "metamedium-core": ["../metamedium-core/src/index.ts"]
+      "@dynaink/core": ["../core/src/index.ts"]
     },
 
     "strict": true,

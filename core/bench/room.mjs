@@ -12,8 +12,8 @@
 //     three and six — with a hand that left, and one that vanished without a
 //     word — and the newcomer ends with exactly the logs the room holds.
 //
-//     node --expose-gc metamedium-core/bench/room.mjs --size=2000
-//     node --expose-gc metamedium-core/bench/room.mjs --size=2000 --path=before   # the surface before R4d
+//     node --expose-gc core/bench/room.mjs --size=2000
+//     node --expose-gc core/bench/room.mjs --size=2000 --path=before   # the surface before R4d
 //
 // What "the line" is: what the surface runs when its store says a line landed
 // (Demos/surface/17-folder.js, `mergeLive`), in the order it runs it — the

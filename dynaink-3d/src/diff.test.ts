@@ -8,7 +8,7 @@
 // and a ragged pixel that is neither.
 
 import { describe, it, expect } from 'vitest';
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import {
   NOISE_FRACTION,
   PROFILE_OVERLAP,

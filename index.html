@@ -2725,7 +2725,7 @@
             removeEventListener('touchstart', stamp, true);
         }, { capture: true, passive: true });
     </script>
-    <script src="Demos/metamedium-core.browser.js"></script>
+    <script src="Demos/dynaink-core.browser.js"></script>
     <script>
         // Paper / canvas. Same storage key as brand/styleguide.html, so one
         // choice covers both surfaces. The attribute itself was applied before
@@ -2920,7 +2920,7 @@
         // The same core that runs the reference surface reads the hero. One
         // core, many surfaces: what this canvas says a stroke is, the demo
         // further down says too, for the same reasons.
-        const MMC = window.MetaMediumCore;
+        const MMC = window.DynaInkCore;
         const CLOSED_SHAPES = new Set(['circle', 'rectangle', 'triangle']);
 
         /** A stroke as the engine reads it: a throwaway node with its fingerprint and every reading. */

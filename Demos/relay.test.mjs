@@ -115,7 +115,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { relayTransport } from './live-node.mjs';
 
-const MM = await import(pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), 'metamedium-core.node.mjs')).href);
+const MM = await import(pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), 'dynaink-core.node.mjs')).href);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const until = async (fn, ms = 4000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return true; await wait(25); } return fn(); };
 const boxAt = (x) => [0, 1, 2, 3, 4].map((i) => ({ x: x + [0, 60, 60, 0, 0][i], y: [0, 0, 40, 40, 0][i] })).flatMap((p, i, a) =>

@@ -2,14 +2,14 @@
 // The shard's MCP hand: a 3D drawing space as tools for Claude Code, or any
 // MCP client (SHARD-3D-PUSH-2 G5).
 //
-//   node shard-3d/mcp.mjs                       # room "shard", relay http://127.0.0.1:8020, name "claude"
-//   MM_ROOM=table MM_NAME=fable node shard-3d/mcp.mjs
+//   node dynaink-3d/mcp.mjs                     # room "shard", relay http://127.0.0.1:8020, name "claude"
+//   MM_ROOM=table MM_NAME=fable node dynaink-3d/mcp.mjs
 //
 // In the shard: the models pane → *a hand in the room* → seat it, or open
-// shard-3d with ?live=shard&relay=http://127.0.0.1:8020. A relay is started
+// dynaink-3d with ?live=shard&relay=http://127.0.0.1:8020. A relay is started
 // here when none answers on this machine, exactly as the canvas's hand does
 // it (Demos/mcp.mjs). The engine it runs is the committed Node bundle
-// (Demos/metamedium-core.node.mjs) — the shard's own TypeScript is not
+// (Demos/dynaink-core.node.mjs) — the shard's own TypeScript is not
 // importable here, and deliberately not duplicated: everything below is either
 // core's, or three plane constants and one rep name, marked where they are.
 //
@@ -46,9 +46,9 @@ const RELAY = (flag('relay') || process.env.MM_RELAY || 'http://127.0.0.1:8020')
 const NAME = (flag('name') || process.env.MM_NAME || 'claude').replace(/~.*$/, '');
 
 // ----- The engine, built ----------------------------------------------------
-const distPath = path.join(here, '..', 'Demos', 'metamedium-core.node.mjs');
+const distPath = path.join(here, '..', 'Demos', 'dynaink-core.node.mjs');
 if (!existsSync(distPath)) {
-  log('Demos/metamedium-core.node.mjs is missing — run `npm run build:node` in metamedium-core and copy dist/metamedium-core.node.mjs to Demos/');
+  log('Demos/dynaink-core.node.mjs is missing — run `npm run build:node` in core and copy dist/dynaink-core.node.mjs to Demos/');
   process.exit(1);
 }
 const MM = await import(pathToFileURL(distPath).href);
@@ -63,7 +63,7 @@ const MM = await import(pathToFileURL(distPath).href);
 const ME = MM.sittingName(NAME);
 
 // ----- The shard's own three constants --------------------------------------
-// Duplicated from shard-3d/src/plane.ts and src/log.ts, and that is the whole
+// Duplicated from dynaink-3d/src/plane.ts and src/log.ts, and that is the whole
 // duplication: this process cannot import the shard's TypeScript, and a build
 // step for six tools would be a worse trade than four literals. They are
 // FIXED — the three named planes pass through the origin by definition — so

@@ -739,7 +739,7 @@ export async function notMineTest(browser, servers, ctx) {
  * The size that failed now holds (opt-in: `node e2e/run.mjs big`, minutes).
  *
  * A 2,000-mark board from the engine benchmark's own generator
- * (`metamedium-core/bench/board.mjs`, seed 1) is put on a board the page keeps
+ * (`core/bench/board.mjs`, seed 1) is put on a board the page keeps
  * — `session.load`, the call the surface makes when it opens a board — and the
  * surface's journal writes it; a stroke is drawn on it with the real pointer;
  * the page is reloaded and the board must come back, every event equal. Its
@@ -752,8 +752,8 @@ export async function bigTest(browser, servers, ctx) {
   const { freshContext, steps } = ctx;
   const check = (name, ok, detail) => steps.push({ name, ok: !!ok, detail });
   const marks = Number(process.env.E2E_BIG_MARKS || 2000);
-  const { loadCore } = await import('../metamedium-core/bench/lib.mjs');
-  const { generateBoard } = await import('../metamedium-core/bench/board.mjs');
+  const { loadCore } = await import('../core/bench/lib.mjs');
+  const { generateBoard } = await import('../core/bench/board.mjs');
   const { core } = await loadCore('bundle');
   const { events } = generateBoard(core, { marks, seed: 1 });
   const json = JSON.stringify(events);

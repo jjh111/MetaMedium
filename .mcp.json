@@ -6,7 +6,7 @@
     },
     "metamedium-3d": {
       "command": "node",
-      "args": ["shard-3d/mcp.mjs"]
+      "args": ["dynaink-3d/mcp.mjs"]
     }
   }
 }

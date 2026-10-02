@@ -18,7 +18,7 @@
 
 import * as THREE from 'three';
 import type { Colours } from './theme';
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import { v3, type Pose, type Ray, type Vec3 } from './plane';
 import {
   distForOrthoHeight,

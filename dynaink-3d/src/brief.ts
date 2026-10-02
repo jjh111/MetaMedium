@@ -22,7 +22,7 @@
 // Pure: no three.js, no session, no DOM. The surface gathers the evidence and
 // this file writes the sentence — which is also what makes it testable.
 
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import { describeStep, type OpStep, type OpTree } from './op';
 import type { Vec3 } from './plane';
 

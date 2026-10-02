@@ -24,7 +24,7 @@
 //     straight and getting a cross.
 
 import * as THREE from 'three';
-import type { Point } from 'metamedium-core';
+import type { Point } from '@dynaink/core';
 import { boundsOf, gridFor, outlineOfMask, padBounds, type Grid } from './diff';
 import { mul, add, normalize, toPlane, toWorld, uAxis, vAxis, type Plane, type Vec3 } from './plane';
 

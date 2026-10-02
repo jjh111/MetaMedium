@@ -9,7 +9,7 @@
 // outside `content` and read as none, and every failure was one fleeting
 // sentence. This drives the real transport against a provider that is not one
 // — `startModelStub` (servers.mjs), an OpenAI-compatible endpoint on 127.0.0.1
-// answering with OpenRouter's shapes, recorded in metamedium-core's
+// answering with OpenRouter's shapes, recorded in core's
 // `llm/fixtures` — through the models pane and the field, with the real
 // pointer. No real vendor is asked: the gate's guard still fails a run that
 // reaches one (M0), and nothing on this machine is probed — the page's own
@@ -1001,7 +1001,7 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
     await p6.goto(url, { waitUntil: 'load', timeout: 60000 });
     await waitReady(p6);
     await p6.evaluate(installDraw);
-    const FIX = JSON.parse((await import('node:fs')).readFileSync(new URL('../metamedium-core/src/llm/fixtures/read-lines.json', import.meta.url), 'utf8'));
+    const FIX = JSON.parse((await import('node:fs')).readFileSync(new URL('../core/src/llm/fixtures/read-lines.json', import.meta.url), 'utf8'));
     const PAGE_A = { t0: 100000, lines: [[[560, 140, 200, 44, 7], [800, 140, 170, 44, 6]], [[560, 260, 260, 48, 8]], [[560, 380, 180, 44, 5]]] };
     let A = null;
     const readerJoined = () => p6.evaluate(() => window.__mm.agents.length);

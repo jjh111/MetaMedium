@@ -1,4 +1,4 @@
-// metamedium-core public API.
+// @dynaink/core public API.
 // Headless: no rendering, no framework, no LLM calls. Surfaces feed events in
 // and render state out. See ARCHITECTURE-v6-SESSION-ENGINE.md.
 
