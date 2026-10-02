@@ -711,7 +711,9 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       const nameThrough = async (at, text) => {
         const ok = await holdAt(p2, at.x, at.y);
         if (!ok) return false;
-        await p2.fill('#summon input.filter', text);
+        // `name:` says what the word is for: a lone word waits for a pick (PLAN-FIELD-PAR FP4) — it used to
+        // be a brief, which blessed the group under that word on its way to a page.
+        await p2.fill('#summon input.filter', 'name: ' + text);
         await p2.press('#summon input.filter', 'Enter');
         await sleep(200);
         await letGo(p2);
