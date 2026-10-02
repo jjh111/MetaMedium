@@ -94,7 +94,8 @@ trademark attorney, not legal advice.
   a file format inside people's folders and hidden by default. Writing a new
   folder name while reading the old one forever is a later choice, not part of
   this plan.
-- `metamedium_library_v1` and the other keys of the same kind.
+- `metamedium_library_v1`, `metamedium-brand-theme` (the whitepaper's and the styleguide's theme key) and the
+  other keys of the same kind.
 - **the log's format id, `metamedium-log`** (`LOG_FORMAT` in `core/src/store/format.ts`). Every exported log,
   every `.dyna.zip` and every carried board carries it in its header, and `decodeLog` matches it exactly, so
   renaming it would stop every saved board from opening. Found by N1.
@@ -109,7 +110,10 @@ trademark attorney, not legal advice.
 - `MetaMediumCore`, as an alias for one release, for anything outside this
   repository that loads the bundle.
 - the old address, `jjh111.github.io/MetaMedium/`, which stays live: never
-  break a link.
+  break a link. Every address that contains the old name stays as written (the Substack posts'
+  `a-day-with-metamedium-*`, the bibliography's `jhanacek.net/metamedium-resources-65`), and the titles of
+  outside works stay as published ("A Day with MetaMedium").
+- the old social card, `Assets/thumb-metamedium-v5.png`, kept beside the new one so its address answers.
 - the repository `jjh111/MetaMedium`, **until H1**.
 
 **Renamed:** everything a person sees, installs, downloads or connects to.
@@ -331,7 +335,7 @@ reader together, or the pane says "this page carries no version".
   tests, `seat-watch.mjs`).
 
 **Owns, the 3D surface:**
-- `git mv shard-3d dynaink-3d`, its `package.json` name, its `tsconfig.json`
+- `git mv shard-3d dynaink-3d`, its `package.json` name and description ("A bounded MetaMedium…"), its `tsconfig.json`
   path and `vite.config.ts` alias to `core/`, and its 45 files importing
   `'metamedium-core'`, which become `'@dynaink/core'`.
 - `.mcp.json`'s path to its MCP server, `e2e/run.mjs` and `e2e/servers.mjs`
@@ -392,9 +396,12 @@ a tool by id changes with them, and the director says so to John at the merge.
   inside them.
 - The living documents: `CLAUDE.md`, `README.md`, `ROADMAP.md`,
   `EXPERIMENTS.md`, `HELP.md`, `brand/README.md` and the header comment of
-  `brand/tokens.css`, `e2e/README.md`, `cloudflare/README.md`,
+  `brand/tokens.css`, **`brand/styleguide.html`** (a published, living page: its wordmark specimen and
+  its rule "One word, no space, no hyphen: MetaMedium" follow §1; found by N3a), `e2e/README.md`, `cloudflare/README.md`,
   `dynaink-3d/README.md` and `core/README.md`.
 - Each document's paths changed for the two folders.
+- The README's remaining links and their words (its *Start Here* still names the old whitepaper title), and
+  `scripts/name.test.mjs` named in `CLAUDE.md`'s CI row and `scripts/` row (N3a added the test).
 
 The dated documents stay as written (§2). Memory notes are the director's to
 change after the merge.
