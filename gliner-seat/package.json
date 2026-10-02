@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "description": "J2, the extraction seat — a spike: can GLiNER2 pull typed spans out of MetaMedium's own text, locally, fast enough to ask without a spinner?",
   "type": "module",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "engines": {
     "node": ">=20"
   },

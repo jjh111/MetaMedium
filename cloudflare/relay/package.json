@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "description": "The room relay of Demos/relay.mjs as a Cloudflare Worker and Durable Object",
+  "license": "AGPL-3.0-only",
   "scripts": {
     "test": "node --test relay.worker.test.mjs relay.parity.test.mjs relay.hands.test.mjs relay.workerd.test.mjs",
     "dev": "wrangler dev",
