@@ -84,11 +84,6 @@ const ALLOWLIST = [
     why: 'the .metamedium/ folder format, kept (RENAME-PLAN §2): a file format inside people\'s folders, read by every folder, repository and ?folder= site a board was ever kept in',
     files: ['core/src/store/seam.ts', 'core/src/store/folder.ts'], at: /'\.metamedium'/, max: 1,
   },
-  {
-    why: 'the whitepaper\'s license line, which N2 rewrites (AGPL-3.0-only, the prose under CC BY 4.0)',
-    until: 'N2',
-    files: ['index.html'], at: /License:<\/strong> GPL — the MetaMedium framework is open source/,
-  },
 ];
 
 // ---- Reading what a person sees --------------------------------------------------------------------------------

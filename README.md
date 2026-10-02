@@ -108,3 +108,12 @@ root with `python -m http.server 8000` and open them directly.
 - [Whitepaper v4](https://jjh111.github.io/MetaMedium/archive/MetaMedium_Whitepaper_v4.html) (superseded by v5)
 - Earlier demo iterations live in [`archive/`](archive/)
 - Supplemental resources: [jhanacek.net/metamedium-resources-65](https://jhanacek.net/metamedium-resources-65)
+
+## License
+
+The code is open source under the GNU AGPL-3.0 (`AGPL-3.0-only`,
+[LICENSE](LICENSE)), and the whitepaper's prose and figures are
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). [NOTICE](NOTICE)
+says who holds the copyright and lists the third-party pieces;
+[TRADEMARKS.md](TRADEMARKS.md) says how the names may be used, and
+[CONTRIBUTING.md](CONTRIBUTING.md) how to take part.
