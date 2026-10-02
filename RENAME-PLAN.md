@@ -292,6 +292,8 @@ as written, in lowercase, as the idea it argues for.
 **Trap:** `index.html` is the whitepaper and the hero, and the hero runs the
 engine. Its words change here; the bundle it loads changes in N3c.
 
+**N3a status, 2 Oct 2026: done on `rename`** — `46a3c60` (red: `scripts/name.test.mjs`, in CI's `core` job, 57 places), `104178c`, and the docs after it: what a person sees says dyna.ink — the app's title, home-screen title and wordmark at both addresses, both manifests, a board's title, the help pane's version line and the log's note; the whitepaper's titles, tags, prose, plates (through `build.py`), timeline and wordmarks (*dyna* in the accent, *.ink* in the ink, as *Meta* was), with "dyna.ink (formerly MetaMedium)" once in the overview and Kay's *metamedium* left as written, lowercase; the 404; DynaInk3D on the 3D surface's page and help pane; README's head. The social card is `Assets/thumb-dynaink.png` (`node Assets/make-card.mjs`), named by `og:image` and `twitter:image` in `index.html` and `404.html`; `thumb-metamedium-v5.png` stays published. The name test reads markup and inline scripts' strings, never comments or code, and lets the old name stand only in an address, Kay's idea, an outside work's title, and four reasoned allowlist entries — the history line, the `metamedium-version` tag and its readers (N3b removes it), the `metamedium-brand-theme` key (kept, §2), the license line (N2 removes it). The gate 892 passed, 11 skipped; WebKit 69 and 3.
+
 ### N3b: releases and the build
 
 **Owns:**

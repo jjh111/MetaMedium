@@ -224,14 +224,13 @@ function isOutsideTitle(line) {
 /** Every hit of the old name in what a person sees of each file, each with whether and why it may stand. */
 function hits() {
   const found = [];
-  const look = (file, seen, source, place) => {
+  const look = (file, seen, source) => {
     for (const m of seen.matchAll(/metamedium/gi)) {
       const from = m.index, to = from + m[0].length;
-      const p = place ? place(from, to) : { from, to, split: false };
-      const line = lineAround(source, p.from);
+      const line = lineAround(source, from);
       found.push({
-        file, line: lineOf(source, p.from), text: line.trim(), split: p.split,
-        address: !p.split && isAddress(tokenAround(seen, from, to)),
+        file, line: lineOf(source, from), text: line.trim(), split: false,
+        address: isAddress(tokenAround(seen, from, to)),
         idea: isIdea(seen, from, to),
         title: isOutsideTitle(line),
       });
