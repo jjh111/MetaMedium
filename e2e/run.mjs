@@ -9,6 +9,7 @@
 //     node e2e/run.mjs --browser webkit smoke # the WebKit smoke
 //     node e2e/run.mjs keep                   # no lost work: the kill test, the forced failures
 //     node e2e/run.mjs boards                 # several named boards: the list, the trash, the switch
+//     node e2e/run.mjs carry                  # carry your boards from the old address to dyna.ink: two origins, one tap, never a key (RENAME-PLAN N1)
 //     node e2e/run.mjs big                    # a 2,000-mark board saved and opened again (minutes)
 //     node e2e/run.mjs app                    # one app address: /app/ installs, opens offline, is versioned per release
 //     node e2e/run.mjs budgets                # the surface's budgets on 2,000 marks; the 500-mark board painted both ways; a board of 5 artifacts and 5,000 traced strokes opened (I2)
@@ -36,6 +37,7 @@ import { isModelRequest, allowedError, ALLOWED_PAGE_ERRORS } from './guards.mjs'
 import { runKeep, runBig } from './keep.mjs';
 import { boardOf, serveBoard, openBoard, interact, equivalence, judge, fmt, calibrateInPage, tooLoaded, rendererInPage, softwareRaster, CALIBRATION_MS, countCanvasCalls, pictureFacts, PAINT_STROKE_CALLS_MAX, BLIT_DIFF_MAX } from './budgets.mjs';
 import { runBoards } from './boards.mjs';
+import { runCarry } from './carry.mjs';
 import { runApp } from './app.mjs';
 import { runPencil } from './pencil.mjs';
 import { runModels } from './models.mjs';
@@ -350,8 +352,8 @@ async function runSmoke(browser, servers) {
  * the MCP hand that answers, and reloads its page. So does the hand (H1;
  * `hand.mjs`): a relay, the MCP hand and a counting model of its own.
  */
-const OWN_PAGES = { keep: runKeep, big: runBig, boards: runBoards, app: runApp, pencil: runPencil, models: runModels, seat: runSeat, hand: runHand, walk: runWalk };
-const OWN_URL = { walk: 'app/?fresh=1&nosw=1', app: 'app/', models: 'app/', seat: 'Demos/session-engine.html?live=claude&relay=…', hand: 'Demos/session-engine.html?live=mcp-test&relay=…' };
+const OWN_PAGES = { keep: runKeep, big: runBig, boards: runBoards, carry: runCarry, app: runApp, pencil: runPencil, models: runModels, seat: runSeat, hand: runHand, walk: runWalk };
+const OWN_URL = { carry: 'app/?nosw=1&carryTo=…', walk: 'app/?fresh=1&nosw=1', app: 'app/', models: 'app/', seat: 'Demos/session-engine.html?live=claude&relay=…', hand: 'Demos/session-engine.html?live=mcp-test&relay=…' };
 async function runKeepScenario(browser, servers, engineName, which = 'keep') {
   const out = { name: which, url: `${servers.staticOrigin}/${OWN_URL[which] || 'Demos/session-engine.html?nosw=1'}` };
   let guards = [];
@@ -599,8 +601,8 @@ async function main() {
   // own scenarios, and naming it in the default list would run it twice on Chromium.
   // `pencil` is in the default list (Chromium) and CI's `webkit` job runs it again on WebKit.
   // `big` is opt-in too: a 2,000-mark board saved and opened again, minutes of replay.
-  const all = ['canvas', 'keep', 'boards', 'app', 'pencil', 'models', 'seat', 'hand', 'walk', 'budgets', 'shard', 'demo', 'demo2', 'smoke', 'big'];
-  const byDefault = ['canvas', 'keep', 'boards', 'app', 'pencil', 'models', 'seat', 'hand', 'walk', 'budgets', 'shard', 'demo', 'demo2'];
+  const all = ['canvas', 'keep', 'boards', 'carry', 'app', 'pencil', 'models', 'seat', 'hand', 'walk', 'budgets', 'shard', 'demo', 'demo2', 'smoke', 'big'];
+  const byDefault = ['canvas', 'keep', 'boards', 'carry', 'app', 'pencil', 'models', 'seat', 'hand', 'walk', 'budgets', 'shard', 'demo', 'demo2'];
   const picked = wanted.length ? all.filter((n) => wanted.includes(n)) : byDefault;
   if (!picked.length) {
     console.error(`nothing to run — pick from: ${all.join(', ')}`);
@@ -610,7 +612,7 @@ async function main() {
   rmSync(RESULTS, { recursive: true, force: true });
   mkdirSync(RESULTS, { recursive: true });
 
-  const needCanvas = picked.includes('canvas') || picked.includes('smoke') || picked.includes('keep') || picked.includes('boards') || picked.includes('big') || picked.includes('app') || picked.includes('pencil') || picked.includes('models') || picked.includes('seat') || picked.includes('hand') || picked.includes('walk') || picked.includes('budgets');
+  const needCanvas = picked.includes('canvas') || picked.includes('smoke') || picked.includes('keep') || picked.includes('boards') || picked.includes('carry') || picked.includes('big') || picked.includes('app') || picked.includes('pencil') || picked.includes('models') || picked.includes('seat') || picked.includes('hand') || picked.includes('walk') || picked.includes('budgets');
   const needShard = picked.includes('shard') || picked.includes('demo') || picked.includes('demo2');
 
   const started = Date.now();
