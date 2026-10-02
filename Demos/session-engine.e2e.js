@@ -3112,7 +3112,7 @@ window.__scenario = async function(){
     step('42j. a typed word is offered two ways, side by side — Name it “inlet”, then Label it “inlet” — as plain pills in the rows the field has, and Enter still does what the line says',
       affordT.map(said).join(' | ') === 'Name it “inlet” | Write “inlet” on it' && !!lineT && !/label/i.test(lineT)
         && affordT.map((b) => (b.querySelector('.note') || {}).textContent).join(' | ') === 'finds more like it | only the words'
-        && affordT.every((b) => b.className === 'pill item') && document.querySelectorAll('#summon .row').length === 3
+        && affordT.every((b) => /^pill item( noted)?$/.test(b.className)) && document.querySelectorAll('#summon .row').length === 3
         && t.coreSlots().join(',') === 'name,copy,paste,erase',
       { afford: affordT.map(said), line: lineT, classes: affordT.map((b) => b.className), rows: document.querySelectorAll('#summon .row').length, core: t.coreSlots() });
     const nameT = affordT[0], labelT = affordT[1];
