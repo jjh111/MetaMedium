@@ -10928,7 +10928,7 @@
   }
 
   /** The page's title: the board's name first. */
-  function boardTitle(name) { return name ? name + ' — MetaMedium' : 'MetaMedium'; }
+  function boardTitle(name) { return name ? name + ' — dyna.ink' : 'dyna.ink'; }
   /**
    * The page's address on board `id`: `board=` set (in the place it had, or last), everything else
    * kept — except what would make the board not this board on a reload: `fresh` (a fresh start
@@ -13603,7 +13603,7 @@
     return { events };
   }
   /** What a log written by this page says of itself in the status line: the version, and that an older app opens it. */
-  function logFileNote() { return ' · log version ' + MM.LOG_VERSION + ' — an older MetaMedium opens it too'; }
+  function logFileNote() { return ' · log version ' + MM.LOG_VERSION + ' — an older dyna.ink opens it too'; }
   /** What every log this page writes is written with. */
   function logWrite() {
     const app = ((document.querySelector('meta[name="metamedium-version"]') || {}).content || '').trim();
@@ -15411,8 +15411,8 @@
   const pageVersion = ((document.querySelector('meta[name="metamedium-version"]') || {}).content || '').trim();
   const helpVersion = document.getElementById('helpVersion');
   if (helpVersion) {
-    helpVersion.textContent = !pageVersion ? 'MetaMedium — this page carries no version'
-      : pageVersion === '0.0.0' ? 'MetaMedium 0.0.0 — no release has been cut yet' : 'MetaMedium ' + pageVersion;
+    helpVersion.textContent = !pageVersion ? 'dyna.ink — this page carries no version'
+      : pageVersion === '0.0.0' ? 'dyna.ink 0.0.0 — no release has been cut yet' : 'dyna.ink ' + pageVersion;
   }
   let helpLoaded = false;
   tiles.help.onclick = () => {

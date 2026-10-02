@@ -80,7 +80,7 @@ def plate(key,num,eyebrow,title,dek,art,labels,choices,panels,caption,legend,ext
         body = f'<div id="fp-{key}-reading" class="fp-scenes" style="--scenes:{len(choices)}">{readings}</div><div class="fp-legend">{legend}</div>'
     value=f'''<!-- whitepaper-plate:{key}:start -->
 <figure class="folio-plate fp-{layout}" id="figure-{key}" data-plate="{key}" data-active="{choices[default][0]}" aria-labelledby="fp-{key}-title">
-<div class="fp-heading"><div class="fp-kicker"><span>{num:02} / {esc(eyebrow)}</span><span class="fp-edition">MetaMedium · field notes</span></div>
+<div class="fp-heading"><div class="fp-kicker"><span>{num:02} / {esc(eyebrow)}</span><span class="fp-edition">dyna.ink · field notes</span></div>
 <h3 id="fp-{key}-title">{esc(title)}</h3><p class="fp-dek">{esc(dek)}</p></div>
 {controls}{body}
 <div class="fp-print-note">Illustration shown: <span data-current-view>{esc(choices[default][1])}</span>. All reading notes follow.</div>
@@ -118,7 +118,7 @@ body+=path('M450 115V780M880 270V680M120 270V680','fp-line fp-dash fp-held')
 plate('spectrum',1,'Representation','From marks to meaning','A drawing can preserve appearance, expose structure, or become something both parties can question.',svg('spectrum','Three layers of a digital representation',body,'An exploded stack: raster marks below a connected geometry layer, below a revisable interpretation layer. Select a layer to inspect its role.'),label('Interpretation',78,21)+label('Structure',78,49)+label('Marks',65,88),[('marks','Preserve'),('structure','Structure'),('meaning','Interpret')],[
  note('Preserve the mark','Pixels and captured ink remember what was drawn. They do not, by themselves, say what it means.',[('Representation','Samples, strokes, appearance'),('In the paper','Photoshop; OneNote ink capture'),('Trade-off','Fidelity without an explicit semantic model')]),
  note('Expose the structure','Vectors, components and executable sketches give the drawing addressable parts and relationships.',[('Representation','Geometry, instances, links, behavior'),('In the paper','Illustrator; Figma; Miro; Chalktalk'),('Trade-off','Structure still needs an interpretation')]),
- note('Make interpretation revisable','Model-assisted tools can propose what marks stand for. MetaMedium’s aim is to keep that proposal visible, negotiable and reusable.',[('Representation','Marks + relations + readings'),('In the paper','tldraw computer; MetaMedium’s proposal'),('Trade-off','Interpretations can be wrong; preserve the source')])],'<b>The digital representation spectrum</b>A conceptual map of representations, not a current feature audit or a ranking of products. A tool may work across several layers.',legend([('fp-held','preserved source'),('fp-key','addressable structure'),('fp-model','proposed interpretation')]),default=2)
+ note('Make interpretation revisable','Model-assisted tools can propose what marks stand for. dyna.ink’s aim is to keep that proposal visible, negotiable and reusable.',[('Representation','Marks + relations + readings'),('In the paper','tldraw computer; dyna.ink’s proposal'),('Trade-off','Interpretations can be wrong; preserve the source')])],'<b>The digital representation spectrum</b>A conceptual map of representations, not a current feature audit or a ranking of products. A tool may work across several layers.',legend([('fp-held','preserved source'),('fp-key','addressable structure'),('fp-model','proposed interpretation')]),default=2)
 
 # 02 — Modalities: typographic raster, harmonic engraving, spatial topology.
 body=''

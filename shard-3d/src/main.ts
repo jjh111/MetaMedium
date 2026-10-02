@@ -2080,7 +2080,7 @@ const modelsTile = document.getElementById('tileModels')!;
 // label and the preference (`panel.ts`); the report is re-run because the
 // panel's own standing line depends on whether it is on screen.
 createPanelToggle(document.getElementById('panelToggle')!, () => report());
-pane(helpEl, 'shard 3d', () => helpEl.setAttribute('hidden', ''));
+pane(helpEl, 'DynaInk3D', () => helpEl.setAttribute('hidden', ''));
 
 modelsTile.onclick = () => {
   models.toggle();

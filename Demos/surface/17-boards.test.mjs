@@ -265,8 +265,8 @@ test('the switch: already here, a place, a page that is not on a board, a board 
 });
 
 test('the page says which board it is: the title carries the name, the address the id — and never ?fresh', () => {
-  assert.equal(B.boardTitle('Garden plan'), 'Garden plan — MetaMedium');
-  assert.equal(B.boardTitle(''), 'MetaMedium');
+  assert.equal(B.boardTitle('Garden plan'), 'Garden plan — dyna.ink');
+  assert.equal(B.boardTitle(''), 'dyna.ink');
   assert.equal(B.boardSearch('?nosw=1&theme=dark', 'b-12'), '?nosw=1&theme=dark&board=b-12');
   assert.equal(B.boardSearch('?board=default&nosw=1', 'b-12'), '?board=b-12&nosw=1');
   assert.equal(B.boardSearch('?fresh=1&nosw=1&folder=%2Fsite%2F&git=a%2Fb&live=r&relay=http%3A%2F%2Fx&replay=r.json&embed=1', 'default'), '?nosw=1&board=default',

@@ -106,8 +106,8 @@
   const pageVersion = ((document.querySelector('meta[name="metamedium-version"]') || {}).content || '').trim();
   const helpVersion = document.getElementById('helpVersion');
   if (helpVersion) {
-    helpVersion.textContent = !pageVersion ? 'MetaMedium — this page carries no version'
-      : pageVersion === '0.0.0' ? 'MetaMedium 0.0.0 — no release has been cut yet' : 'MetaMedium ' + pageVersion;
+    helpVersion.textContent = !pageVersion ? 'dyna.ink — this page carries no version'
+      : pageVersion === '0.0.0' ? 'dyna.ink 0.0.0 — no release has been cut yet' : 'dyna.ink ' + pageVersion;
   }
   let helpLoaded = false;
   tiles.help.onclick = () => {

@@ -1445,7 +1445,7 @@
     return { events };
   }
   /** What a log written by this page says of itself in the status line: the version, and that an older app opens it. */
-  function logFileNote() { return ' · log version ' + MM.LOG_VERSION + ' — an older MetaMedium opens it too'; }
+  function logFileNote() { return ' · log version ' + MM.LOG_VERSION + ' — an older dyna.ink opens it too'; }
   /** What every log this page writes is written with. */
   function logWrite() {
     const app = ((document.querySelector('meta[name="metamedium-version"]') || {}).content || '').trim();

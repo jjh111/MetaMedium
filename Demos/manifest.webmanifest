@@ -1,6 +1,6 @@
 {
-  "name": "MetaMedium",
-  "short_name": "MetaMedium",
+  "name": "dyna.ink",
+  "short_name": "dyna.ink",
   "description": "Ink over living artifacts: an infinite canvas where drawings become code you can pause and argue with.",
   "start_url": "./session-engine.html",
   "scope": "./",

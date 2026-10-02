@@ -1,8 +1,11 @@
-# MetaMedium
+# dyna.ink
 
 **A recombinatorial drawing system** — interfaces that learn your visual
 vocabulary, recognize compositional patterns as you draw, and use AI as a
 "meta-word" interpreting over geometrically grounded strokes.
+
+dyna.ink was formerly MetaMedium: the repository and the addresses below still
+carry that name, and [RENAME-PLAN.md](RENAME-PLAN.md) says what changes and when.
 
 ## Start Here
 

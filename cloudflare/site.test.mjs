@@ -39,7 +39,7 @@ test('the site is what GitHub Pages publishes, less what is not a page', () => {
   const files = siteFiles(root);
   for (const f of ['index.html', '404.html', 'app/index.html', 'app/sw.js', 'app/manifest.webmanifest', 'Demos/session-engine.html', 'Demos/session-engine.js',
     'Demos/metamedium-core.browser.js', 'Demos/sw.js', 'Demos/surface/surface.css', 'boards/examples/index.json', 'HELP.md', 'VERSION', 'MetaMedium_Whitepaper_v4.html',
-    'archive/MetaMedium_Whitepaper_v4.html', 'doodle2-canvas.html', 'metadoodle1.html', 'Assets/thumb-metamedium-v5.png']) {
+    'archive/MetaMedium_Whitepaper_v4.html', 'doodle2-canvas.html', 'metadoodle1.html', 'Assets/thumb-metamedium-v5.png', 'Assets/thumb-dynaink.png']) {
     assert.ok(files.includes(f), f + ' is not published');
   }
   for (const f of files) {

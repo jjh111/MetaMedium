@@ -624,9 +624,9 @@ export async function logFormatTest(browser, servers, ctx) {
     const lines = file.split('\n').filter(Boolean);
     const head = JSON.parse(lines[0]);
     const said = await statusText(page);
-    check('N19. the log the export pane writes is version 1: a header line naming the format, the version and the app that wrote it, then every event; and the status line says the version and that an older MetaMedium opens it too',
+    check('N19. the log the export pane writes is version 1: a header line naming the format, the version and the app that wrote it, then every event; and the status line says the version and that an older dyna.ink opens it too',
       head.format === 'metamedium-log' && head.version === 1 && head.app === version && JSON.stringify(lines.slice(1).map((l) => JSON.parse(l))) === want &&
-        /log version 1/.test(said) && /older MetaMedium opens it too/.test(said),
+        /log version 1/.test(said) && /older dyna\.ink opens it too/.test(said),
       { head, events: lines.length - 1, app: version, said });
 
     // ---- N19b. version 1 back, and version 0 too --------------------------------------

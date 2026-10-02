@@ -366,7 +366,7 @@
   }
 
   /** The page's title: the board's name first. */
-  function boardTitle(name) { return name ? name + ' — MetaMedium' : 'MetaMedium'; }
+  function boardTitle(name) { return name ? name + ' — dyna.ink' : 'dyna.ink'; }
   /**
    * The page's address on board `id`: `board=` set (in the place it had, or last), everything else
    * kept — except what would make the board not this board on a reload: `fresh` (a fresh start

@@ -1,6 +1,6 @@
 // Regenerate the social card from the whitepaper's own hero.
 //
-//   node Assets/make-card.mjs [out.png]        # default: Assets/thumb-metamedium-v5.png
+//   node Assets/make-card.mjs [out.png]        # default: Assets/thumb-dynaink.png
 //
 // The card is not a mock-up of the product: it is index.html's hero, driven by
 // synthetic pointer input so the engine really reads the marks it shows. A box
@@ -32,7 +32,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 const page = join(root, 'index.html');
-const out = resolve(process.argv[2] || join(here, 'thumb-metamedium-v5.png'));
+const out = resolve(process.argv[2] || join(here, 'thumb-dynaink.png'));
 // Written into the repo, not a temp dir: the hero needs its fonts and its own
 // relative assets, so the capture page has to sit where index.html sits.
 const staging = join(root, '.card-build.html');
@@ -67,7 +67,7 @@ const SEED_RANDOM = `
 const INJECT = `
 <style id="cardMode">
   /* Affordances for a reader who can click have no job in a still picture. */
-  .scroll-indicator, .hero-hint, nav { display: none !important; }
+  .scroll-indicator, .hero-hint, .hero-loop-link, nav { display: none !important; }
   .hero::after { display: none !important; }   /* the fade into the paper below */
   .hero { min-height: 100vh !important; }
   html, body { overflow: hidden !important; }
