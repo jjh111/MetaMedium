@@ -108,7 +108,10 @@ trademark attorney, not legal advice.
   `archive/`, and git history. They are records, and each keeps the name it had
   when written.
 - `MetaMediumCore`, as an alias for one release, for anything outside this
-  repository that loads the bundle.
+  repository that loads the bundle. **The old bundle's own URL** (`Demos/metamedium-core.browser.js`) retires
+  with N3c: no page outside the repository was found loading it (every local repository searched, 2 Oct), a
+  0.1.0 shell kept offline has it in its cache, and a 2.5 MB duplicate would drift. A shim is one commit if
+  John wants one.
 - the old address, `jjh111.github.io/MetaMedium/`, which stays live: never
   break a link. Every address that contains the old name stays as written (the Substack posts'
   `a-day-with-metamedium-*`, the bibliography's `jhanacek.net/metamedium-resources-65`), and the titles of
@@ -407,7 +410,13 @@ a tool by id changes with them, and the director says so to John at the merge.
   `brand/tokens.css`, **`brand/styleguide.html`** (a published, living page: its wordmark specimen and
   its rule "One word, no space, no hyphen: MetaMedium" follow §1; found by N3a), `e2e/README.md`, `cloudflare/README.md`,
   `dynaink-3d/README.md` and `core/README.md`.
-- Each document's paths changed for the two folders.
+- Each document's paths changed for the two folders — in **every markdown file that is not a dated record**
+  (§2's list), not only the ones named here. N3c found these besides: `gliner-seat/README.md`,
+  `boards/examples/README.md`, `Assets/recognition-strategy.md`, `Assets/point-primitive-design.md`,
+  `core/src/store/fixtures/README.md`, `dynaink-3d/fixtures/README.md`,
+  `dynaink-3d/fixtures/decisions/README.md`, and `dynaink-3d/README.md`'s `dist/shard-3d.html`.
+- `e2e/package.json`'s name (`metamedium-e2e` → `dynaink-e2e`). `Web App Skeleton/` keeps its name: it is
+  a legacy prototype on its way to `archive/` (GUIDE-2026-10-02 §6.4, decision 27).
 - The README's remaining links and their words (its *Start Here* still names the old whitepaper title), and
   `scripts/name.test.mjs` named in `CLAUDE.md`'s CI row and `scripts/` row (N3a added the test).
 
@@ -503,7 +512,7 @@ cd core && npm run typecheck && npm test && npm run build:browser && npm run bui
   && cmp dist/dynaink-core.node.mjs ../Demos/dynaink-core.node.mjs
 node Demos/mcp-smoke.mjs
 node --test Demos/surface/*.test.mjs Demos/relay.test.mjs Demos/ink-png.test.mjs Demos/build-surface.test.mjs \
-  scripts/*.test.mjs cloudflare/relay/relay.worker.test.mjs cloudflare/relay/relay.parity.test.mjs \
+  Demos/core-bundle.test.mjs scripts/*.test.mjs cloudflare/relay/relay.worker.test.mjs cloudflare/relay/relay.parity.test.mjs \
   cloudflare/relay/relay.hands.test.mjs cloudflare/site.test.mjs
 node Demos/build-surface.mjs --check && node scripts/build-app.mjs --check && node scripts/examples.mjs --check
 cd dynaink-3d && npm run typecheck && npm test && node mcp-smoke.mjs
