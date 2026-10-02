@@ -3638,25 +3638,33 @@ the same Find a tab runs) of the room's board, the hand's one board: every word 
 it does there, each hit with the id that holds it, what it stands on and where it stands. **`canvas_region { name,
 around | bounds }`** makes a region (`makeRegion`, the field's own act — a rectangle among the marks that holds the rest
 is the frame, else the box round them with a margin — or `session.region` at a box), and says what it holds; with `id`
-it renames. **`canvas_move { ids, dx, dy | to | into }`** moves in one event what the rule lets it.
+it renames (only a region it made). **`canvas_move { ids, dx, dy | to | into }`** moves in one event anything on the board that is there.
 
-*The ruling, and why* (the label's rule, carried to moving). **A hand may make a region round anyone's marks; a hand
-moves only what it made, and renames only the regions it made.** A region holds by geometry and writes nothing about the
-marks it holds, so making one round another's notes changes nothing of theirs and can be undone by anyone who made it.
-A move is different for the reason that decides it: **undo is per hand** (L2j), so a person's own undo cannot take back
-another hand's move of their marks — they would have to drag everything back by hand. And **a region moved carries what
-it holds** (I5: one `move` naming the region), so a region of the hand's own that holds a note of John's is refused too,
-with the note named — *it would carry … made by john* — and the way round is a new region round the marks the hand made
-itself, moved. `handMoves(board, ids, isMine)` is that rule as a pure function: each id stands on its own (a list may
-be half allowed: what may move moves in ONE event, and each refusal is said by name), an id that is gone is *missing*,
-one another hand made is *not-yours*, a region carrying another's is *carries-not-yours* — the carried things are
-`regionCarries` and `manipulableOf`, so an artifact's marks are asked too. `isMine` is `session.isMine`, the person
-across sittings (L2i): a restarted hand moves what it drew before. **It is the hand's door's rule, not the board's:**
-the board still applies a `move` from anyone, as it always has (a person moves what is in front of them, and their act
-is theirs to undo), and a log carrying another hand's move is not dropped on replay the way another's label is — that
-asymmetry is on purpose (a label is about whose ink it is; a move by a person of another's marks is legitimate).
-Connectors tied to a moved mark follow it (E2), derived — including a person's arrow tied to the hand's own box; that
-follow is not a move the rule asks about.
+*The ruling — John's, 2 Oct 2026 (A2b)* (asked: may Claude's hand move John's marks? *"ya claude can move marks"*).
+**A hand may move anything on the board — another hand's marks, John's included — and a region it made, including one that
+carries his marks; it still makes a region round anyone's marks; but it labels only its own ink and renames only a region it
+made.** Moving is the only rule John changed; labelling and renaming keep the L2b/L2i rule (a label is about whose ink it is;
+nothing in the docs ties renaming to moving). A2 (1 Oct) had ruled the other way — a hand moves only what it made — for the
+reason that decides what has to replace it: **undo is per hand** (L2j), so a person's own undo cannot take back another
+hand's move of their marks. **A2b did not touch undo.** What stands in the refusal's place is honesty and a way back:
+**the hand says whose marks it moved** (`movedSaid`: *moved 3 marks — 2 of john’s by 40,30: …*, *— with what the region
+holds* for a region), **the tab says it too** (below), and **the way back is not undo**: John moves them back himself, or
+asks Claude, which moves them back with the opposite `dx, dy` (the MCP hand has no undo tool of its own, and its session's
+undo would reach only its own log). `handMoves(board, ids)` is the rule as a pure function and still its one home: each id
+stands on its own, what is on the board is allowed and what is not is *missing* (the only refusal left), and `moved` is every
+thing the move moves — the ids named, a region's contents (`regionCarries`), an artifact's marks (`manipulableOf`) — each
+once, for saying whose. **It is the hand's door's rule, not the board's:** the board applies a `move` from anyone, as it
+always has, and a log carrying another hand's move is not dropped on replay the way another's label is. Connectors tied to a
+moved mark follow it (E2), derived — including a person's arrow tied to a mark the hand moved; that follow is not counted as
+a move of the person's marks.
+
+**What John sees when Claude moves his marks** (`otherHandMoves` in core, `tellOtherMoves` in `17-folder.js`'s `mergeLive`;
+`hand` H1.28). The marks move on his board — before A2b that was all, with nothing said — and **the status line says it,
+once, attributed**: *claude moved 2 of your marks — your undo does not reach another hand’s move: move them back yourself, or
+ask Claude* (a merge's moves summed per hand; the hand's own marks are not counted, and a move of marks that are somebody
+else's says nothing to him). A merge that begins the board again — the tab's first sync after a join or reload, a load, his own
+undo — says nothing of moves the room already held; their keys are kept so a later replay does not say them either. The
+hand's own `canvas_look` does not mark a move of another's marks; it said whose in its reply to the move.
 
 **`canvas_look` for notes.** The regions are listed in **the outline's reading order** (`regionOutline`: top to
 bottom, left to right, a region under the smaller one that holds it — *inside “Monday”*), each with what it holds, then
@@ -3672,7 +3680,7 @@ relay typed in the pane wins. The room's key stays the page address's `?key=` (`
 held, read or said by the fragment. **A hosted relay would have refused the seat** — `whyNoSeat` accepted only a relay
 on this machine — so the product's own relay, exactly `https://relay.dyna.ink` and nothing a key or a login is in,
 is accepted too (`ownRelay`); the seat's locality is then `hosted`, as `providerLocality` says, and any other relay
-on another machine is refused as before. A decision for John: the briefs a seat parks are log lines of the room the
+on another machine is refused as before. **John's decision, 2 Oct 2026: *"accept the hosted"*** — the briefs a seat parks are log lines of the room the
 relay already carries, so this sends nothing the room did not.
 
 ### The shard's hand, and the model seat (SHARD-3D-PUSH-2 G5)

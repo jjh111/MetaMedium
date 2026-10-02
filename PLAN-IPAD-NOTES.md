@@ -326,28 +326,42 @@ organising notes was built (I5 regions, I6 Find, I8 reading); the agent's was a 
 **finds** (`canvas_find`: core's search — the same words a tab's Find reads — over the room's board, each hit with its id,
 what it stands on and where), **makes a region** round anyone's marks and renames its own (`canvas_region`: `makeRegion`,
 the field's act, or a box), and **moves what it made** (`canvas_move`: `dx, dy`, `to {x, y}` or `into` a region, one event).
-**The ruling** — checked against *The MCP hand*, *A label*, *Regions* and *Live logs*, which agree with the director's
-suggestion: a hand makes a region round anyone's marks, because a region holds by geometry and writes nothing about what it
-holds; it moves and renames only what it made. The reason that decides it is undo: per hand (L2j), so a person's own undo
-cannot take back another hand's move of their marks. One thing the suggestion did not say, found in `regionCarries`: **a
-region the hand made, moved, carries what it holds** (I5) — so a region round John's notes is not the hand's to move; it is
-refused, with the note named, and the way round is a new region round the hand's own marks. `handMoves`
-(`session/hand-moves.ts`) is the rule, pure, at the hand's door and not the board's (a person still moves anything in
-front of them; a log carrying another hand's move is applied on replay, unlike another's label). `canvas_look` now gives
+**The ruling, first as built (1 Oct) and as John changed it (2 Oct 2026, A2b)** — checked against *The MCP hand*, *A label*,
+*Regions* and *Live logs*: a hand makes a region round anyone's marks, because a region holds by geometry and writes nothing
+about what it holds. A2 then had the hand move and rename only what it made, for the reason that decides it, undo: per hand
+(L2j), so a person's own undo cannot take back another hand's move of their marks — with a corollary found in
+`regionCarries`: a region the hand made, moved, carries what it holds (I5), so a region round John's notes was not the hand's
+to move. **John answered *"ya claude can move marks"* (decision 7), and A2b changed exactly that:** the hand moves anything
+on the board — John's marks, and a region it made that carries them — and `handMoves` (`session/hand-moves.ts`) refuses only
+what is *missing*. The rule at the hand's door, not the board's, as before. **Labels and renames did not change** (a hand
+labels only its own ink and renames only a region it made; nothing in the docs ties renaming to moving). What the refusal
+used to protect is now carried by honesty and a way back, not by undo, which A2b did not touch: the hand's reply says whose
+marks moved (`movedSaid`: *moved 3 marks — 2 of john’s*), **the tab says it too** — `otherHandMoves` finds a move another
+hand wrote that moved marks of the reader's own, and the status line says it once, attributed: *claude moved 2 of your
+marks — your undo does not reach another hand’s move: move them back yourself, or ask Claude* (before A2b a moved mark
+simply moved, with no word; a first sync, a load or the tab's own undo says nothing of moves the room already held) — and
+the way back is to move them himself or ask the hand, which moves them back with the opposite `dx, dy` (the hand has no undo
+tool, and per-hand undo would reach only its own log anyway).
+`canvas_look` now gives
 what organising needs: the regions in the outline's reading order with *inside “…”* and what each holds, a line for what
 stands in no region, **the region each mark stands in**, and **handwriting a line at a time in reading order with what it
 reads as** (or *unread — canvas_see, then canvas_transcribe*). **And "with Claude" on dyna.ink defaults to
 `https://relay.dyna.ink`** (`24-relay.js`, pure, tested; elsewhere `http://127.0.0.1:8020`; the key is the page's `?key=`
 as it was). The A1 note's other open item is closed: `whyNoSeat` refused any relay not on this machine, so a hosted default
 would have joined the room and never seated Claude — the product's own relay (exactly `https://relay.dyna.ink`) is accepted,
-the seat `hosted` to `providerLocality`. Tests, red first (`651f378`): `hand-moves.test.ts` 9, `24-relay.test.mjs` 7, the
+the seat `hosted` to `providerLocality`. Tests, red first (`651f378`, then `816556c` flipping the refusal): `hand-moves.test.ts` 13, `24-relay.test.mjs` 7, the
 MCP smoke 30 new checks and the tool count raised to fourteen (find, region, move and the look), the gate's `hand` H1.26–28 (a region the hand made
-in the tab's outline, a find answered, a move refused on his box, his word and the region that would carry them while its
-own circle moves). **Not done:** a hand does not scale, turn, tidy or line marks up (move is the one verb; a hand's *tidy*
+in the tab's outline, a find answered, and — H1.28 after A2b — the hand moving his box, his word and the region that carries
+them, the tab saying so in the status line attributed, his undo not reaching the move and the hand moving them back). **Not done:** a hand does not scale, turn, tidy or line marks up (move is the one verb; a hand's *tidy*
 of its own marks is a later unit); no `canvas_read` batch of the hand's own — it reads with `canvas_see` and
 `canvas_transcribe` a mark at a time; *Make it a region* from a rectangle the hand drew is `canvas_region`'s frame case,
 untested over a hand's own rectangle; nothing is said of a person's arrow tied to the hand's own box that follows it when
 the box is moved (derived, E2).
+
+*Status, 2 Oct 2026: A2b built on `unit/a2-agent-hand` (red `816556c`).* John's two answers to A2's questions are decisions
+6 and 7 below. The seat accepts `https://relay.dyna.ink` as built. The hand moves anything on the board and says whose; the tab
+says it in the status line attributed (`otherHandMoves`, `17-folder.js`'s `tellOtherMoves`); labels, renames and undo are
+unchanged. Gate: `hand` H1.28 reads the new rule; `canvas` and `seat` unchanged.
 
 Cut order if time runs short: I9, then I8's spike, then I5's outline. Never cut
 I1–I4.
@@ -367,6 +381,13 @@ I1–I4.
    request.]
 5. **Tracing by default** for a picture that reads as a line drawing. [Offer,
    never default, for photos; default only for a scan of a drawing.]
+6. **Does the seat accept the hosted relay?** (A2, asked 1 Oct, answered 2 Oct 2026.) [*"accept the hosted"* — the seat
+   accepts exactly `https://relay.dyna.ink` besides a relay on this machine (`ownRelay`, `24-relay.js`); any other remote
+   relay is refused as before.]
+7. **May Claude's hand move John's marks?** (A2, asked 1 Oct, answered 2 Oct 2026.) [*"ya claude can move marks"* — yes:
+   the hand moves anything on the board, John's marks and a region it made that carries them included (A2b). Labels and
+   renames keep their rule: its own ink, its own region. His undo is per hand (L2j) and does not reach the hand's move,
+   which is why the reply and the tab say whose marks moved.]
 
 ---
 
