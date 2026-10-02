@@ -14,8 +14,10 @@
 // It is a hand in a room, nothing more. It keeps a session from the merged
 // logs exactly as a tab does, and every tool is a verb a hand already has —
 // look, see, draw, say, propose, label, transcribe, write, import — and, to organise
-// a page of notes (PLAN-IPAD-NOTES A2), find, region and move. It moves only what it
-// made: the label's rule, carried to moving (core's `handMoves`). It proposes and never
+// a page of notes (PLAN-IPAD-NOTES A2), find, region and move. It may move anything on
+// the board — John's ruling of 2 Oct 2026 (A2b: "ya claude can move marks") — and says
+// whose marks it moved; a label and a rename keep their rule (its own ink, its own
+// region). It proposes and never
 // blesses; it can write a program and cannot play it; it holds no keys and
 // no truth of its own. Its events reach the tab as its own log, stamped
 // `by` on arrival like any other hand's, and draw in its own colour.
@@ -537,10 +539,11 @@ function placeBy(place, s) {
 // ----- Organising notes: find, regions, moves (PLAN-IPAD-NOTES A2) ----------------------------------------
 // An agent that tidies a page of notes needs three more verbs of a hand's. Find asks core's search (the one Find on a tab
 // asks) of this room's board. A region is made round marks by where they stand and writes nothing about them, so it may
-// go round anyone's. A move is another matter: it is the label's rule carried to moving — a hand moves only what it made
-// (core's `handMoves`), because undo is each hand's own and a person cannot take back what another hand moved of theirs.
-// A region of the hand's own is moved only while it carries nothing but the hand's own marks; the way round, for a page of
-// somebody's notes, is a new region round the marks it made itself.
+// go round anyone's. A move may be of anything on the board (core's `handMoves`; John, 2 Oct 2026: "ya claude can move
+// marks"), a region the hand made included, which carries what it holds. A person's undo is their own and does not reach
+// another hand's move, so the reply says WHOSE marks moved (`movedSaid`: *3 marks — 2 of john’s*), the tab says it in its
+// status line, and the way back is to move them back — the person's hand, or this one. A label and a rename keep their
+// rule: a hand labels only its own ink and renames only a region it made.
 const FIND_MAX = 50;
 async function find(args) {
   const q = String(args.query ?? '').trim();
@@ -623,12 +626,8 @@ async function moveTool(args) {
   const ids = Array.isArray(args.ids) ? args.ids.map(String) : args.id ? [String(args.id)] : [];
   if (!ids.length) return { text: 'a move needs marks (ids)' };
   const s = session.getState();
-  const verdict = MM.handMoves(s, ids, (id) => session.isMine(id));
-  const refusals = verdict.refused.map((x) => {
-    if (x.why === 'missing') return x.id + ': not moved — no mark ' + x.id + ' on the board';
-    if (x.why === 'not-yours') return x.id + ': not moved — it was made by ' + makerOf(x.id, s) + '; a hand moves only what it made, and undo is each hand\'s own, so they could not take a move back. canvas_region puts a place round it without moving it';
-    return x.id + ': not moved — it would carry ' + x.of + ', which was made by ' + makerOf(x.of, s) + '; a hand moves only what it made. Make a new region round your own marks (canvas_region) and move that';
-  });
+  const verdict = MM.handMoves(s, ids);
+  const refusals = verdict.refused.map((x) => x.id + ': not moved — no mark ' + x.id + ' on the board');
   const say = (head) => ({ text: [head, ...refusals].filter(Boolean).join('\n') });
   if (!verdict.allowed.length) return say('');
   // Where to: a step, a place for the marks' top left, or a region to stand them in.
@@ -658,8 +657,10 @@ async function moveTool(args) {
   if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return say('nothing moved: already there');
   session.move({ ids: verdict.allowed, dx, dy, at: now() });
   await flush();
-  const regions = new Set(session.getState().regions);
-  return say('moved ' + verdict.allowed.join(', ') + how + (verdict.allowed.some((id) => regions.has(id)) ? ' — with what the region holds' : ''));
+  const st = session.getState();
+  const regions = new Set(st.regions);
+  const said = MM.movedSaid(st, verdict.moved, (id) => session.isMine(id), (id) => makerOf(id, st));
+  return say('moved ' + said + how + ': ' + verdict.allowed.join(', ') + (verdict.allowed.some((id) => regions.has(id)) ? ' — with what the region holds' : ''));
 }
 
 // ----- A picture on the board (PLAN-IPAD-NOTES A1) -------------------------------------------
@@ -935,13 +936,13 @@ const TOOLS = [
   },
   {
     name: 'canvas_region',
-    description: 'Make a region — a named rectangle that holds whatever stands inside it, so Monday and Pricing are places on the board — or rename one you made. Make it round marks (around: their ids, anyone\'s: a region holds by where things stand and moves nothing, so it may go round another hand\'s notes) or at a box (bounds: {x, y, w, h}, canvas units). The reply says what it holds. Rename: id + name — only a region you made; a person\'s region is theirs to name. A region you made moves with canvas_move only while it holds nothing but your own marks.',
+    description: 'Make a region — a named rectangle that holds whatever stands inside it, so Monday and Pricing are places on the board — or rename one you made. Make it round marks (around: their ids, anyone\'s: a region holds by where things stand and moves nothing, so it may go round another hand\'s notes) or at a box (bounds: {x, y, w, h}, canvas units). The reply says what it holds. Rename: id + name — only a region you made; a person\'s region is theirs to name. A region you made moves with canvas_move, and takes what it holds — another hand\'s marks too.',
     inputSchema: { type: 'object', required: ['name'], properties: { name: { type: 'string' }, around: { type: 'array', items: { type: 'string' } }, bounds: { type: 'object', properties: { x: num, y: num, w: num, h: num } }, id: { type: 'string', description: 'A region of yours to rename.' } } },
     run: regionTool,
   },
   {
     name: 'canvas_move',
-    description: 'Move marks you made, or a region you made, in one act: by dx, dy; or to {x, y} (the marks\' top left); or into a region (its id — centred in it). You move only what YOU made — a person\'s undo cannot take back another hand\'s move of their marks, as your label goes on your own ink only — so a mark someone else made is refused, with whose it is; a region you made that holds their marks is refused too, because moving a region carries what it holds. To organise their notes put a region round them (canvas_region) instead, and move your own pictures, texts and drawings into place. A list may be half allowed: the marks you may move move in one event and each refusal is said.',
+    description: 'Move marks or a region, in one act: by dx, dy; or to {x, y} (the marks\' top left); or into a region (its id — centred in it). You may move ANYTHING on the board, a person\'s marks and a region of yours that holds them included (John, 2 Oct 2026: "ya claude can move marks"); a region moved takes what it holds. The reply says WHOSE marks moved — “3 marks — 2 of john’s” — and so should you: the person\'s undo is their own and cannot take back another hand\'s move, and their tab says who moved their marks; their way back is to move them themselves or ask you, and you move them back with the opposite dx, dy. To organise their notes either put a region round them (canvas_region) or move them into one. A list may be half moved: what is on the board moves in one event and each id that is not is said. Labels and renames are not moves: you label only your own ink and rename only a region you made.',
     inputSchema: { type: 'object', required: ['ids'], properties: { ids: { type: 'array', items: { type: 'string' } }, dx: num, dy: num, to: { type: 'object', properties: { x: num, y: num } }, into: { type: 'string' } } },
     run: moveTool,
   },
@@ -981,7 +982,7 @@ async function handle(line) {
           protocolVersion: (msg.params && msg.params.protocolVersion) || '2025-06-18',
           capabilities: { tools: {} },
           serverInfo: { name: 'metamedium', version: '0.1.0' },
-          instructions: 'You are a hand on a MetaMedium canvas, in room "' + ROOM + '" as "' + label(ME) + '". The human draws; the engine reads every mark (shape, role, concept) and the human names and builds from those readings. Look first (canvas_look), see the ink when it matters (canvas_see), then act with the same verbs a hand has: draw in the shape vocabulary, say a sentence beside marks, propose a reading, label your own marks, transcribe writing, write code, put a picture on the board (canvas_import), find words (canvas_find), make a region round marks (canvas_region) and move what you made into place (canvas_move — only what you made; round someone else\'s marks put a region, never a move). Everything you do is held and attributed to you; the human blesses or ignores it. Never claim a reading is settled — offer it with a confidence and a reason. You are also the SEAT: when the human asks *Claude Code (MCP hand)* — What is this?, Read the writing, a question — the brief is parked here; canvas_pending gives you it, the marks and the contract (and for a read, the ink as a picture), and canvas_answer returns your answer in that contract, which the page takes exactly as it takes a model\'s.',
+          instructions: 'You are a hand on a MetaMedium canvas, in room "' + ROOM + '" as "' + label(ME) + '". The human draws; the engine reads every mark (shape, role, concept) and the human names and builds from those readings. Look first (canvas_look), see the ink when it matters (canvas_see), then act with the same verbs a hand has: draw in the shape vocabulary, say a sentence beside marks, propose a reading, label your own marks, transcribe writing, write code, put a picture on the board (canvas_import), find words (canvas_find), make a region round marks (canvas_region) and move marks into place (canvas_move — anything on the board, John said you may; the reply says whose marks you moved, say so in your own words too: his undo does not reach your move, so offer to move them back). Everything you do is held and attributed to you; the human blesses or ignores it. Never claim a reading is settled — offer it with a confidence and a reason. You are also the SEAT: when the human asks *Claude Code (MCP hand)* — What is this?, Read the writing, a question — the brief is parked here; canvas_pending gives you it, the marks and the contract (and for a read, the ink as a picture), and canvas_answer returns your answer in that contract, which the page takes exactly as it takes a model\'s.',
         });
         break;
       case 'notifications/initialized':

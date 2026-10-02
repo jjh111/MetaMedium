@@ -26,7 +26,7 @@ function room() {
   const annRegion = ann.region({ name: 'Ann’s place', bounds: R(900, 900, 300, 300), at: 1003 })!;
   const me = hand('claude');
   me.load(mergeLogs({ ann: ann.getEvents().slice(), claude: [] }, { me: 'claude' }));
-  const verdict = (ids: string[]) => handMoves(me.getState(), ids, (id) => me.isMine(id));
+  const verdict = (ids: string[]) => handMoves(me.getState(), ids);
   return { me, ann, annBox, annNote, annPic, annRegion, verdict };
 }
 
@@ -111,7 +111,7 @@ describe('movedSaid — honest about whose marks moved', () => {
     const { me, annBox, annPic, verdict } = room();
     const board = me.getState();
     const name = (id: string) => (id === annBox ? 'ann’s-friend' : me.isMine(id) ? 'claude' : 'ann');
-    expect(movedSaid(board, verdict([annBox, annPic]).moved, (id) => me.isMine(id), name)).toBe('2 marks — 1 of ann’s, 1 of ann’s-friend’s');
+    expect(movedSaid(board, verdict([annBox, annPic]).moved, (id) => me.isMine(id), name)).toBe('2 marks — 1 of ann’s-friend’s, 1 of ann’s');
   });
 });
 

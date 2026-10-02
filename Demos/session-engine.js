@@ -11166,7 +11166,8 @@
 //   focus views (setViewMode, focusOn), imageUrlFor, folderStatus; a live room (openLive: logs
 //   arriving live over a BroadcastChannel or a relay, merged as they land, and — over a relay — the bytes of
 //   the pictures they name: put on it before a line names them, fetched by hash when one is missing,
-//   roomAssetFetch; PLAN-IPAD-NOTES A1); and the boards this
+//   roomAssetFetch; PLAN-IPAD-NOTES A1; and tellOtherMoves — another hand's move of marks of mine, said once in the status
+//   line and attributed, A2b); and the boards this
 //   browser keeps when there is no folder (V1-PLAN R3, R1) — the adapter over 17-board.js's journal
 //   and 17-boards.js's list: IndexedDB (openBoard, persistBoard, flushBoard, forgetLocalLog; the list:
 //   switchBoard, newBoard, renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash,
@@ -11210,6 +11211,7 @@
     // (the store's `notices`) — so each is flashed once, then stands in the
     // status line.
     noticed: new Set(),
+    movesSaid: new Set(),
     // What the merge said about a folder's logs: a log name two DIFFERENT
     // events were both numbered under (L1b) — two writers under one name. A
     // live room says it through its store; a folder has only the merge.
@@ -11425,6 +11427,7 @@
     leaveBoard();
     if (folder.store && folder.store.close) folder.store.close();
     folder.noticed = new Set();
+    folder.movesSaid = new Set();
     // A hand in a room is one SITTING: a second tab of the same person is a
     // second log, or their lines would be taken for its own. The name is the
     // person's; the suffix is this page load's. Held in memory only: a
@@ -11485,6 +11488,30 @@
   /** A hand's name as shown: the person's, without the sitting's suffix (core's one rule). */
   function handLabel(name) { return MM.handLabel(name); }
   /**
+   * Another hand moved marks of mine (PLAN-IPAD-NOTES A2b; John: "ya claude can move marks"): said once, in the status line,
+   * attributed — who, how many of mine, and that my undo is my own and does not reach it, so the way back is to move them
+   * myself or ask the hand to. A merge that begins the board again (the first sync, a load, my own undo) says nothing of
+   * moves the room already held; their keys are kept so a later replay does not say them either.
+   */
+  function tellOtherMoves(report) {
+    const board = session.getState();
+    const moves = MM.otherHandMoves(board, report.rebuilt ? session.getEvents() : session.getEvents().slice(report.kept), (id) => session.isMine(id));
+    const fresh = new Map();
+    for (const m of moves) {
+      if (folder.movesSaid.has(m.key)) continue;
+      folder.movesSaid.add(m.key);
+      if (report.rebuilt) continue;
+      const ids = fresh.get(m.by) || new Set();
+      m.mine.forEach((id) => ids.add(id));
+      fresh.set(m.by, ids);
+    }
+    for (const [by, ids] of fresh) {
+      const name = by.charAt(0).toUpperCase() + by.slice(1);
+      say(by + ' moved ' + ids.size + ' of your marks — your undo does not reach another hand’s move: move ' + (ids.size === 1 ? 'it' : 'them') + ' back yourself, or ask ' + name);
+    }
+  }
+
+  /**
    * A line landed: merge it — only when a log another hand wrote changed.
    * A hello, a goodbye, the relay's word, a whole log already held change no
    * log and do no work here; what the room says about itself is still said.
@@ -11499,7 +11526,9 @@
     const rev = folder.store.revision();
     if (rev !== folder.mergedRevision) {
       folder.mergedRevision = rev;
-      changed = folder.merge.sync(folder.store.heldLogs()).how !== 'none';
+      const report = folder.merge.sync(folder.store.heldLogs());
+      changed = report.how !== 'none';
+      if (changed) tellOtherMoves(report);
     }
     // What the room says about itself is said here once, the moment it is
     // heard, and then stands in the status line (folderStatus).
