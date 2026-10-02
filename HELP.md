@@ -166,9 +166,11 @@ asked only when you ask — never while you draw.
   relay (the room's key goes on the page's address as `&key=`); anywhere else, through
   the relay on this machine, or the one you type there.
 - **Claude and your notes.** Claude's hand can find a word on the board, put a region round
-  your notes — a region holds what stands in it and moves nothing — and move what it drew or
-  brought in itself. It never moves your marks: your undo cannot take back what another
-  hand moved, so it names a region round them instead.
+  your notes — a region holds what stands in it — and move marks into place, yours too. When
+  it moves your marks the status line says so — *claude moved 2 of your marks* — and your
+  **undo does not reach it**: undo takes back your own last act, never another hand's. To get
+  them back, move them yourself, or ask Claude to move them back. Claude labels only its own
+  ink and renames only a region it made.
 - **Seats.** The pane is four seats, one job each. **Reader** reads handwriting
   into text — a model that can see, the quickest you have. **Writer** writes
   briefs, pages and programs and says what a group is. **Decider** is a

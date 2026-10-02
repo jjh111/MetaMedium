@@ -54,9 +54,9 @@
 //   H1.26-28 A2, the hand organises notes (PLAN-IPAD-NOTES): a region the hand makes round his box and his word
 //          (canvas_region) is in the tab's board outline with what it holds, made by the hand, and moved nothing of
 //          his; the hand finds his words (canvas_find: the label, the transcript, the region's name) and the tab's
-//          own Find on the same board finds the region; a move of his box, his word or the region that would carry
-//          them is refused with whose they are and nothing moves in the tab, while the hand's own circle moves and
-//          the tab shows it moved
+//          own Find on the same board finds the region; H1.28 (A2b, John's ruling of 2 Oct 2026): the hand moves
+//          his box, his word and the region that carries them, says whose it moved, the tab says it in the status line
+//          attributed, his undo does not reach the hand's move, and the hand moves them back
 //   H1.S1-4 the rows only John's own hand can walk: skips, by name
 //   H1.Y   the invariant: Tier 1 before a model — the model was asked once, by H1.19, and no brief,
 //          no seat, no real model
@@ -830,22 +830,37 @@ export async function runHand(browser, servers, { freshContext, screenshot }) {
     });
 
     await record('H1.28', async () => {
-      // A move the hand may not make: his box, his word, the region that would carry them. What it made, it moves.
+      // John's ruling (2 Oct 2026, A2b: "ya claude can move marks"): the hand moves what is his — his box, his word, and the
+      // region that carries them — says whose it moved, and the tab SAYS it too, attributed. His undo is his own (L2j) and
+      // does not reach the hand's move; his way back is to move it himself or to ask the hand, which moves it back.
       const movesBefore = await eventsOf(page, 'move');
-      const asBox = textOf(await hand.call('canvas_move', { ids: [boxB], dx: 300, dy: 300 }));
-      const asWord = textOf(await hand.call('canvas_move', { ids: [word], to: { x: 0, y: 0 } }));
-      const asRegion = textOf(await hand.call('canvas_move', { ids: [notesRegion], dx: 40, dy: 40 }));
+      const asBox = textOf(await hand.call('canvas_move', { ids: [boxB], dx: 40, dy: 30 }));
+      const boxMoved = await waitFor(page, ([id, x]) => { const n = window.__mm.session.getState().nodes.get(id), b = n && window.__mm.MM.boundsOf(n); return !!b && Math.abs(b.minX - x) < 1; }, [boxB, boxBefore.minX + 40], 8000);
+      // The tab says it in words: who, how many of his, that his undo does not reach it, and the way back.
+      const told = await waitFor(page, () => /claude moved 1 of your marks/.test(document.getElementById('status').textContent), null, 6000);
+      const status = await page.evaluate(() => (document.getElementById('status').textContent || '').replace(/\s+/g, ' ').trim());
+      const asWord = textOf(await hand.call('canvas_move', { ids: [word], dx: 40, dy: 30 }));
+      const asRegion = textOf(await hand.call('canvas_move', { ids: [notesRegion], dx: 10, dy: 10 }));
       await sleep(500);
-      const now = await Promise.all([boundsOfIn(page, boxB), boundsOfIn(page, word)]);
+      const afterRegion = await Promise.all([boundsOfIn(page, boxB), boundsOfIn(page, word)]);
       const movesAfter = await eventsOf(page, 'move');
+      // His undo takes back HIS last act, not the hand's move (per-hand undo, L2j).
+      await letGo(page);
+      await page.click('#undoBtn');
+      await sleep(300);
+      const afterUndo = await boundsOfIn(page, boxB);
+      // The way back: the hand moves them back.
+      const back1 = textOf(await hand.call('canvas_move', { ids: [notesRegion], dx: -10, dy: -10 }));
+      const back2 = textOf(await hand.call('canvas_move', { ids: [boxB, word], dx: -40, dy: -30 }));
+      const home = await waitFor(page, ([a, b]) => { const mm = window.__mm, s = mm.session.getState(), q = (id) => mm.MM.boundsOf(s.nodes.get(id)); return Math.abs(q(a).minX - b[0]) < 1 && Math.abs(q(a).minY - b[1]) < 1; }, [boxB, [boxBefore.minX, boxBefore.minY]], 8000);
       const sunBefore = await boundsOfIn(page, sun);
       const own = textOf(await hand.call('canvas_move', { ids: [sun], dx: 0, dy: 120 }));
       const moved = await waitFor(page, ([id, y]) => { const n = window.__mm.session.getState().nodes.get(id), b = n && window.__mm.MM.boundsOf(n); return !!b && Math.abs(b.minY - y) < 1; }, [sun, sunBefore.minY + 120], 8000);
-      const refusedAll = [asBox, asWord, asRegion].every((t) => !/^moved/m.test(t));
-      check(`H1.28. A2: the hand asks to move his box, his word and the region round them — refused, each naming whose it is ("${asBox.split('\n')[0].slice(0, 90)}" … "${asRegion.split('\n')[0].slice(0, 100)}") — and in the tab nothing of his has moved (${movesAfter - movesBefore} move events, both marks where they stood); its own circle moves, and the tab shows it moved by 120 (${own.split('\n')[0].slice(0, 50)})`,
-        refusedAll && /was made by john/.test(asBox) && /was made by john/.test(asWord) && /would carry/.test(asRegion) && /made by john/.test(asRegion)
-          && movesAfter === movesBefore && JSON.stringify(now[0]) === JSON.stringify(boxBefore) && JSON.stringify(now[1]) === JSON.stringify(wordBefore) && /^moved/m.test(own) && moved,
-        { asBox, asWord, asRegion, own, now, movesBefore, movesAfter, moved });
+      check(`H1.28. A2b: the hand moves his box ("${asBox.split('\n')[0].slice(0, 70)}") — the tab shows it moved by 40,30 and says so in the status line, attributed ("${status.slice(0, 120)}"); his word and the region round them ("${asRegion.split('\n')[0].slice(0, 80)}") move too (${movesAfter - movesBefore} move events); his undo does not take the hand's move back (his box still ${Math.round(afterUndo.minX - boxBefore.minX)} right of where it stood); the hand moves them back and the tab sees it home; its own circle moves by 120 and says no one else's ("${own.split('\n')[0].slice(0, 40)}")`,
+        /^moved 1 mark — 1 of john’s/m.test(asBox) && /^moved 1 mark — 1 of john’s/m.test(asWord) && /^moved \d+ marks — \d+ of john’s[^\n]*with what the region holds/m.test(asRegion) && boxMoved && told && /claude moved 1 of your marks/.test(status) && /your undo does not reach/.test(status) && /ask Claude/.test(status)
+          && movesAfter - movesBefore === 3 && Math.abs(afterRegion[0].minX - (boxBefore.minX + 50)) < 1 && Math.abs(afterUndo.minX - (boxBefore.minX + 50)) < 1
+          && /^moved/m.test(back1) && /^moved 2 marks — 2 of john’s/m.test(back2) && home && /^moved 1 mark\b/m.test(own) && !/ of john/.test(own.split('\n')[0]) && moved,
+        { asBox, asWord, asRegion, status, own, afterRegion, afterUndo, boxBefore, back1, back2, movesBefore, movesAfter, boxMoved, told, home, moved });
     });
 
     // ---- The rows of QA-v10 that only John's own hand can walk ----

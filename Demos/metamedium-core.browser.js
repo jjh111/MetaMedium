@@ -585,6 +585,8 @@ var MetaMediumCore = (() => {
     mindMapPortsOf: () => mindMapPortsOf,
     modelFacts: () => modelFacts,
     modelWords: () => modelWords,
+    movedSaid: () => movedSaid,
+    movedThings: () => movedThings,
     movesWhole: () => movesWhole,
     nameMarks: () => nameMarks,
     nearLimitOf: () => nearLimitOf,
@@ -605,6 +607,7 @@ var MetaMediumCore = (() => {
     offersFor: () => offersFor,
     offsetPolygon: () => offsetPolygon,
     onToolsChange: () => onToolsChange,
+    otherHandMoves: () => otherHandMoves,
     otsu: () => otsu,
     outlineOf: () => outlineOf,
     outwardOf: () => outwardOf,
@@ -20188,28 +20191,56 @@ ${p.svg}</section>`),
 
   // src/session/hand-moves.ts
   var live2 = (n2) => !!n2 && !getRep(n2, "erased");
-  function handMoves(board2, ids, isMine) {
+  function movedThings(board2, ids) {
+    const out = [];
+    const seen = /* @__PURE__ */ new Set();
+    const add7 = (id) => {
+      if (!seen.has(id) && live2(board2.nodes.get(id))) {
+        seen.add(id);
+        out.push(id);
+      }
+    };
+    for (const id of ids) {
+      add7(id);
+      const carried = regionCarries(board2, [id]);
+      carried.forEach(add7);
+      manipulableOf(board2.nodes, carried).forEach((n2) => add7(n2.id));
+    }
+    return out;
+  }
+  function handMoves(board2, ids) {
     const allowed = [];
     const refused = [];
     const seen = /* @__PURE__ */ new Set();
     for (const id of ids) {
       if (seen.has(id)) continue;
       seen.add(id);
-      if (!live2(board2.nodes.get(id))) {
-        refused.push({ id, why: "missing", of: id });
-        continue;
-      }
-      if (!isMine(id)) {
-        refused.push({ id, why: "not-yours", of: id });
-        continue;
-      }
-      const carried = regionCarries(board2, [id]);
-      const moved2 = manipulableOf(board2.nodes, carried).map((n2) => n2.id);
-      const other = [...carried, ...moved2].find((c) => c !== id && live2(board2.nodes.get(c)) && !isMine(c));
-      if (other !== void 0) refused.push({ id, why: "carries-not-yours", of: other });
+      if (!live2(board2.nodes.get(id))) refused.push({ id, why: "missing", of: id });
       else allowed.push(id);
     }
-    return { allowed, refused };
+    return { allowed, refused, moved: movedThings(board2, allowed) };
+  }
+  function movedSaid(board2, moved2, isMine, nameOf4) {
+    const regions = new Set(board2.regions);
+    const marks = moved2.filter((id) => !regions.has(id));
+    if (!marks.length) return moved2.length + " region" + (moved2.length === 1 ? "" : "s");
+    const others = /* @__PURE__ */ new Map();
+    for (const id of marks) if (!isMine(id)) {
+      const who = nameOf4(id);
+      others.set(who, (others.get(who) ?? 0) + 1);
+    }
+    const of = [...others].map(([who, n2]) => n2 + " of " + who + "\u2019s").join(", ");
+    return marks.length + " mark" + (marks.length === 1 ? "" : "s") + (of ? " \u2014 " + of : "");
+  }
+  function otherHandMoves(board2, events, isMine) {
+    const regions = new Set(board2.regions);
+    const out = [];
+    for (const ev of events) {
+      if (!ev || ev.type !== "move" || !ev.by || !Array.isArray(ev.ids)) continue;
+      const mine = movedThings(board2, ev.ids).filter((id) => !regions.has(id) && isMine(id));
+      if (mine.length) out.push({ key: ev.by + ":" + (ev.seq ?? ev.at) + ":" + ev.at, by: handLabel(ev.by), mine });
+    }
+    return out;
   }
 
   // src/store/merge.ts
