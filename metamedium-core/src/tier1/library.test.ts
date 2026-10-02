@@ -73,7 +73,7 @@ describe('the tier 1 library', () => {
     expect(describeRoute(r)).toMatch(/tier 2, local/);
   });
 
-  it('builds the structure of a layout with no words: every region in place, labelled with its id and role', () => {
+  it('builds the structure of a layout with no words: every region in place, saying what it plays in words — never its id (PLAN-FIELD-PAR FP6)', () => {
     const { s, id } = fourBoxes();
     const res = buildStructure(s, id);
     expect(res.ok).toBe(true);
@@ -82,8 +82,12 @@ describe('the tier 1 library', () => {
     expect(res.ids.length).toBe(4);
     for (const rid of res.ids) {
       expect(res.code).toContain(`data-region="${rid}"`);
-      expect(res.code).toContain(`${rid} · `);
+      expect(res.code).not.toContain(`${rid} · `);
     }
+    // Each slot says what its region plays, in the person's words: four boxes of a layout.
+    const slots = [...res.code.matchAll(/<span class="mm-slot">([^<]*)<\/span>/g)].map((m) => m[1]);
+    expect(slots.length).toBe(4);
+    for (const w of slots) expect(['a box', 'an area', 'a heading', 'a line', 'a note']).toContain(w);
     expect(res.code).toMatch(/display:flex/);
     expect(res.code).not.toMatch(/lorem|ipsum/i);
     expect(res.participantId).toBe(ENGINE_PARTICIPANT);
