@@ -115,6 +115,12 @@ jobs:
       # allowlist whose every entry says why and is still needed.
       - name: The name a person sees
         run: node --test ../scripts/name.test.mjs
+      # The rights (RENAME-PLAN N2): LICENSE is the FSF's AGPL-3.0 text byte for
+      # byte, every package says AGPL-3.0-only, NOTICE is the one home of who
+      # holds the copyright and the whitepaper's footer and TRADEMARKS.md name the
+      # same holder, and no published page still gives GPL as its license.
+      - name: The rights
+        run: node --test ../scripts/rights.test.mjs
       # The example boards a first-time hand opens from the boards pane (V1-PLAN R5)
       # are logs the engine makes, never drawn: what is committed under
       # boards/examples must be what scripts/examples.mjs makes today — and the
