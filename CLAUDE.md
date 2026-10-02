@@ -305,6 +305,11 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   name; the push FP1–FP9 (intent words, a graph is a diagram, the tip binds …) and what a decision
   model adds after it (D1–D3), with how to set one up and compare Jev, the semantic seat and GLiNER2;
   John's decisions (§7), and Name and Label folded into one pill where they do the same
+- `GUIDE-2026-10-02.md` — **the hand-over, 2 Oct 2026**: where it all stands on `master`, every affordance
+  with where it lives, the user's tasks end to end, the agent guide (Claude as a hand and the seat; a dev agent's
+  commands, invariants and traps), the QA guide (the gate by scenario, the field push by hand, what is known) and
+  the director's view (against v1.0.0, risks, next pushes, John's open decisions in one table). A snapshot: the
+  files it points to are the truth
 - `UX-AUDIT-2026-09-28.md` — **the canvas as a user meets it**: sixteen findings
   from a walk of `/app/` using only what the screen gives (the models pane that
   pops and drops the question, no way to reach Claude, the inspector as the panel,
