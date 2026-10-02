@@ -49,9 +49,11 @@ const HANDS = ['Demos/mcp.mjs', 'dynaink-3d/mcp.mjs', 'Demos/mcp-client.mjs', 'D
 // The servers .mcp.json registers, by the names a session lists them under (`/mcp`, mcp__<name>__<tool>), and
 // the hand each one runs.
 const SERVERS = { dynaink: 'Demos/mcp.mjs', 'dynaink-3d': 'dynaink-3d/mcp.mjs' };
-// The last strings a person meets outside the pages (N3e): the repository backend's commit messages, which land in
-// the person's own GitHub repository, and the programs written for the canvas, which draw on the board.
-const OUTSIDE = ['core/src/store/git.ts'];
+// The last strings a person meets outside the pages (N3e): the engine's — the sentences every surface says, the
+// repository backend's commit messages, which land in the person's own GitHub repository, the name a model provider
+// lists the app's calls under — and the programs written for the canvas, which draw on the board.
+const ENGINE = readdirSync(join(root, 'core/src'), { recursive: true })
+  .filter((f) => /\.ts$/.test(f) && !/\.test\.ts$/.test(f) && !/(^|\/)(test|fixtures)\//.test(f)).sort().map((f) => 'core/src/' + f);
 const PROGRAMS = readdirSync(join(root, 'Demos/programs')).filter((f) => /\.run\.js$/.test(f)).sort().map((f) => 'Demos/programs/' + f);
 
 /** The titles of outside works that carry the old name. They are cited, never renamed. */
@@ -73,6 +75,14 @@ const ALLOWLIST = [
   {
     why: 'a key in this browser\'s storage, the paper/canvas preference — kept like the mm-* keys and metamedium_library_v1 (RENAME-PLAN §2): renaming it forgets every reader\'s choice',
     files: ['index.html'], at: /['"]metamedium-brand-theme['"]/,
+  },
+  {
+    why: 'the log\'s format id, kept (RENAME-PLAN §2): every exported log, every .dyna.zip and every carried board carries it in its header, and decodeLog matches it exactly, so renaming it would stop every saved board from opening',
+    files: ['core/src/store/format.ts'], at: /export const LOG_FORMAT = 'metamedium-log';/, max: 1,
+  },
+  {
+    why: 'the .metamedium/ folder format, kept (RENAME-PLAN §2): a file format inside people\'s folders, read by every folder, repository and ?folder= site a board was ever kept in',
+    files: ['core/src/store/seam.ts', 'core/src/store/folder.ts'], at: /'\.metamedium'/, max: 1,
   },
   {
     why: 'the whitepaper\'s license line, which N2 rewrites (AGPL-3.0-only, the prose under CC BY 4.0)',
@@ -267,7 +277,7 @@ function hits() {
   for (const file of FRAGMENTS) { const t = read(file); look(file, scriptStrings(t), t); }
   for (const file of HANDS) { const t = read(file); look(file, scriptStrings(t), t, false); }
   // A commit message and a program's words are no essay: a lowercase `metamedium` there is the old name, not Kay's idea.
-  for (const file of OUTSIDE) { const t = read(file); look(file, scriptStrings(t), t, false); }
+  for (const file of ENGINE) { const t = read(file); look(file, scriptStrings(t), t, false); }
   for (const file of PROGRAMS) {
     const t = read(file);
     // Its file name is no address here: a board that opens the folder shows it on the program's frame.

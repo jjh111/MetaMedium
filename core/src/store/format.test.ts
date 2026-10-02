@@ -113,6 +113,10 @@ describe('the readers', () => {
     expect(e.message).toMatch(/version 1|versions 0 and 1/);
     expect(e.message).toMatch(/0\.9\.0/);
     expect(e.message).toMatch(/nothing/);
+    // The sentence a person reads names the product (RENAME-PLAN §1, N3e); the format id in the header keeps its name (§2).
+    expect(e.message).toMatch(/written by dyna\.ink 0\.9\.0/);
+    expect(e.message).toMatch(/open it with a newer dyna\.ink$/);
+    expect(e.message).not.toMatch(/metamedium/i);
   });
 
   it('a header that names no version at all is refused too, not guessed at', () => {

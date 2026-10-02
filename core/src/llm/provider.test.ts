@@ -235,6 +235,9 @@ describe('what is sent (J5)', () => {
     expect(asked[0].headers.authorization).toBe(`Bearer ${KEY}`);
     expect(asked[0].headers['http-referer']).toBe(OPENROUTER_APP.url);
     expect(asked[0].headers['x-title']).toBe(OPENROUTER_APP.title);
+    // The name OpenRouter lists the calls under is the product's (RENAME-PLAN §1, N3e); the site's address keeps its
+    // name until N4 moves the canonical links.
+    expect(OPENROUTER_APP.title).toBe('dyna.ink');
   });
 
   it('to any other endpoint: the budget, and nothing only OpenRouter reads', async () => {
