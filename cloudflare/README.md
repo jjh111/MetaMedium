@@ -18,7 +18,34 @@ iPad  ── https://dyna.ink/app/?live=claude&relay=https://relay.dyna.ink&key=
 Claude Code session ── MM_RELAY=https://relay.dyna.ink MM_RELAY_KEY=… node Demos/mcp.mjs ──┘
 ```
 
-## What you do, once
+## What you do, once — from a browser (an iPad is enough)
+
+Nothing to install: the workflow on GitHub does the deploying (`.github/workflows/deploy-cloudflare.yml`
+makes the Pages project the first time, deploys the site and the Worker, and puts the relay's secret).
+
+1. **Sign in to Cloudflare with GitHub** (the dashboard's *Sign in with GitHub*; it uses your GitHub
+   primary email, and makes an account if that email has none).
+2. **Add dyna.ink**: *Add a domain*, then change the nameservers at your registrar to the two it gives
+   (this can wait — the `*.pages.dev` and `*.workers.dev` addresses work without it).
+3. **An API token**: *My Profile → API Tokens → Create Token → Custom token*, permissions **Account ·
+   Cloudflare Pages · Edit** and **Account · Workers Scripts · Edit**, your account. Copy it, and your
+   **account id** (the dashboard's account home, right-hand side).
+4. **A relay secret**: any long random string — a password manager's generator, 32 characters or more.
+   **Keep it**: every room key is made from it.
+5. **GitHub → the repository → Settings → Secrets and variables → Actions → New repository secret**, three
+   times: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `MM_RELAY_SECRET`.
+6. **Actions → Deploy to Cloudflare → Run workflow** (or any push to `master`). Green means the site is at (usually)
+   `https://dyna-ink.pages.dev` and the relay at `https://dyna-relay.<your-subdomain>.workers.dev`.
+7. **Bind the addresses** once dyna.ink is active: *Workers & Pages → dyna-ink → Custom domains →*
+   `dyna.ink`, and *dyna-relay → Settings → Domains & Routes → Add → Custom domain →* `relay.dyna.ink`.
+   (The seat — Claude answering what the iPad asks — takes exactly `https://relay.dyna.ink`; a
+   `*.workers.dev` relay carries a room but is refused as the seat.)
+8. **A room key** is made from the secret, on any machine with Node (or in a Claude Code session you
+   give the secret to): `MM_RELAY_SECRET=… node cloudflare/relay/room-key.mjs claude` (*Keys*, below).
+
+The same, from a terminal instead, is below.
+
+## What you do, once — from a terminal
 
 You need a Cloudflare account with **dyna.ink added as a zone** (Websites → Add a site; change
 the nameservers at the registrar as it says). To try it first with no domain, use the

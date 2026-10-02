@@ -7,6 +7,9 @@ name: Deploy to Cloudflare
 # Secrets: CLOUDFLARE_API_TOKEN (Pages: Edit, Workers Scripts: Edit) and CLOUDFLARE_ACCOUNT_ID.
 # With either absent — a fork, a repository not yet set up — every deploy step is skipped and
 # the run is green: the first step says whether there is anything to deploy with.
+# And, optional, MM_RELAY_SECRET: put on the Worker after each deploy when it is set (from stdin,
+# never on a command line or in a log); with none, the Worker keeps the secret it has. The Pages
+# project is made the first time, so the whole setup can be done from a browser.
 
 on:
   push:
@@ -44,6 +47,15 @@ jobs:
       - name: Build the site
         if: steps.have.outputs.yes == 'true'
         run: node cloudflare/build-site.mjs
+      - name: Wrangler, from the relay's lockfile
+        if: steps.have.outputs.yes == 'true'
+        working-directory: cloudflare/relay
+        run: npm ci
+      - name: The Pages project, made the first time
+        if: steps.have.outputs.yes == 'true'
+        run: |
+          W=cloudflare/relay/node_modules/.bin/wrangler
+          if "$W" pages project list | grep -qw dyna-ink; then echo "the Pages project dyna-ink is there"; else "$W" pages project create dyna-ink --production-branch=master; fi
       - name: Deploy to Pages
         if: steps.have.outputs.yes == 'true'
         uses: cloudflare/wrangler-action@v3
@@ -85,3 +97,11 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: cloudflare/relay
           command: deploy
+      - name: The relay's secret, from MM_RELAY_SECRET when it is set
+        if: steps.have.outputs.yes == 'true'
+        working-directory: cloudflare/relay
+        env:
+          MM_RELAY_SECRET: ${{ secrets.MM_RELAY_SECRET }}
+        run: |
+          if [ -z "$MM_RELAY_SECRET" ]; then echo "MM_RELAY_SECRET is not set here — the Worker keeps the secret it has (with none it refuses every room)."; exit 0; fi
+          printf '%s' "$MM_RELAY_SECRET" | npx wrangler secret put MM_RELAY_SECRET

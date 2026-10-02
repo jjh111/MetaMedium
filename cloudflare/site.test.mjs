@@ -136,6 +136,13 @@ test('the deploy workflow skips cleanly without its secrets, and names no key', 
   assert.match(wf, /CLOUDFLARE_ACCOUNT_ID/);
   const deploys = wf.split('\n').filter((l) => /uses: cloudflare\/wrangler-action/.test(l)).length;
   assert.equal(deploys, 2);
+  // Set up from a browser alone (John, 2 Oct 2026: the token and the secrets, then a push): the Pages project
+  // is made when the account has none of that name, and the relay's secret is put from a GitHub secret when one is set.
+  assert.match(wf, /pages project list[\s\S]*grep -qw dyna-ink[\s\S]*pages project create dyna-ink --production-branch=master/, 'the site job makes its Pages project when it is missing');
+  assert.match(wf, /MM_RELAY_SECRET: \$\{\{ secrets\.MM_RELAY_SECRET \}\}/, 'the relay secret comes from a GitHub secret, through the env');
+  assert.match(wf, /printf '%s' "\$MM_RELAY_SECRET" \| npx wrangler secret put MM_RELAY_SECRET/, 'put on the Worker from stdin, never on a command line');
+  assert.match(wf, /if \[ -z "\$MM_RELAY_SECRET" \]; then[^\n]*exit 0; fi/, 'no secret set: the Worker keeps the one it has');
+  assert.ok(!/echo "\$MM_RELAY_SECRET"/.test(wf), 'the secret is never echoed into a log');
   assert.equal(wf.split('\n').filter((l) => /^\s+if: steps\.have\.outputs\.yes == 'true'/.test(l)).length >= 8, true, 'every step after the check waits on it');
   // A secret is never read in an `if:` (GitHub cannot), only through the env of the job.
   assert.ok(!/if:.*secrets\./.test(wf));
