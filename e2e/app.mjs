@@ -262,7 +262,7 @@ async function appTest(browser, servers, ctx) {
     check(`A7. the help pane says the version — “${said.line || ''}” (VERSION ${version})`,
       !!version && said.meta === version && typeof said.line === 'string' && said.line.includes(version), said);
 
-    // ---- A7b. …and offers the source (AGPL-3.0 §13) ----------------------------------------------
+    // ---- A7c. …and offers the source (AGPL-3.0 §13) ----------------------------------------------
     let src7 = {};
     if (ready) {
       await page.click('#ccBtn');
@@ -271,7 +271,7 @@ async function appTest(browser, servers, ctx) {
       src7 = await sourceSaid(page);
       await page.click('#helpPanel .paneClose').catch(() => {});
     }
-    check(`A7b. the help pane, opened by its tile, offers the source — “${src7.text || ''}”: ${(src7.links || []).map((l) => l.text + ' → ' + l.href).join(', ') || 'no link'}`,
+    check(`A7c. the help pane, opened by its tile, offers the source — “${src7.text || ''}”: ${(src7.links || []).map((l) => l.text + ' → ' + l.href).join(', ') || 'no link'}`,
       src7.shown && sourceRight(src7), { ...src7, want: SOURCE_URL });
 
     // ---- A8. A request that carries a key is never kept -----------------------------------------

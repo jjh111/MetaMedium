@@ -324,6 +324,9 @@ body.panelHidden #field {
 .paneTitle { flex: 1; color: var(--teal); text-transform: uppercase; letter-spacing: 0.08em; font-size: var(--t-micro); }
 .paneClose { background: none; border: 0; color: var(--ink-3); font-size: 18px; cursor: pointer; line-height: 1; }
 .pane p { margin: 0 0 var(--s2); }
+/* The help's source line (AGPL-3.0 §13), quiet: the pane's muted ink, small, underlined. */
+.pane .source { color: var(--ink-3); font-size: var(--t-micro); }
+.pane .source a { color: inherit; }
 .pane kbd {
   background: var(--paper-dk); border: 1px solid var(--rule-soft); border-radius: var(--radius-sm);
   padding: 0 4px; font-family: var(--face); font-size: var(--t-micro);

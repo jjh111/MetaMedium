@@ -7,7 +7,8 @@
 // Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
 //   boardOnScreenName, resetBoard), models (agents, deciderHost), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude); the page's
 //   version (folder's pageVersion: its <meta name="dynaink-version">, V1-PLAN R7, or on a page an older worker kept the
-//   tag's old name, RENAME-PLAN N3b; boards' versionWords), said at the head of the help pane.
+//   tag's old name, RENAME-PLAN N3b; boards' versionWords), said at the head of the help pane, and under it the
+//   source line (boards' sourceLine: "Source code · AGPL-3.0", linking SOURCE_URL and its LICENSE — AGPL-3.0 §13).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -107,6 +108,22 @@
   // page an older worker kept, carrying the tag under its old name, still says its own (RENAME-PLAN N3b).
   const helpVersion = document.getElementById('helpVersion');
   if (helpVersion) helpVersion.textContent = versionWords(pageVersion());
+  // Under it, where this app's source is and its license (AGPL-3.0 §13): one quiet line, built from the one address
+  // 17-boards.js holds, so a fork that changes SOURCE_URL offers its own source. Each part is set as text.
+  const helpSource = document.getElementById('helpSource');
+  if (helpSource) {
+    helpSource.textContent = '';
+    for (const part of sourceLine()) {
+      if (!part.href) { helpSource.appendChild(document.createTextNode(part.text)); continue; }
+      const a = document.createElement('a');
+      a.href = part.href;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      if (part.title) a.title = part.title;
+      a.textContent = part.text;
+      helpSource.appendChild(a);
+    }
+  }
   let helpLoaded = false;
   tiles.help.onclick = () => {
     togglePanel(helpPanel, tiles.help);

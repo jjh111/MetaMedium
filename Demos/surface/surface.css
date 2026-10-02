@@ -216,6 +216,11 @@ html, body {
 #helpPanel .helpBody li { margin: 0 0 4px; }
 #helpPanel .helpBody code { font-family: var(--mono); font-size: 10.5px; background: var(--well); padding: 0 3px; border-radius: 3px; }
 #helpPanel .helpBody a { color: var(--gold); }
+/* The source line under the version (AGPL-3.0 §13) stays quiet: the hint's own colour, underlined; the version
+   line keeps its space below, so the two read as one header. */
+#helpPanel #helpVersion { margin-bottom: 2px; }
+#helpPanel #helpSource a { color: inherit; text-underline-offset: 2px; }
+#helpPanel #helpSource a:hover { color: var(--ink); }
 #helpPanel .helpBody hr { border: 0; border-top: 1px solid var(--rule); margin: 10px 0; }
 /* The boards pane (V1-PLAN R1): the boards this browser keeps, the places opened lately, the trash. */
 #boardsPanel { width: min(320px, calc(100vw - 24px)); box-sizing: border-box; max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }

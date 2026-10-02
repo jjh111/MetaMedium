@@ -10,6 +10,8 @@
 //   switchPlan (what opening an entry does), boardTitle / boardSearch (the page's title and address),
 //   VERSION_META / VERSION_META_BEFORE / pageVersionOf / versionWords (the version the page says, read from
 //   the tag the build stamps or, on a page an older worker kept, the name that tag had before — RENAME-PLAN N3b),
+//   SOURCE_URL / sourceLine (where this app's source is, and the help pane's line that offers it with its license,
+//   "Source code · AGPL-3.0" — AGPL-3.0 §13),
 //   and the examples (R5) — EXAMPLES_BASE / exampleUrl (where boards/examples stands from the page),
 //   exampleRows (the pane's Examples, read from the index and never trusted), exampleName (what a board
 //   made from one is called), starterOf (which one a first run's tap opens), and what the iPad needs kept
@@ -392,6 +394,29 @@
   /** What the help pane leads with: the version this page is. */
   function versionWords(v) {
     return !v ? 'dyna.ink — this page carries no version' : v === '0.0.0' ? 'dyna.ink 0.0.0 — no release has been cut yet' : 'dyna.ink ' + v;
+  }
+  /**
+   * Where this app's source code is: the repository, an ADDRESS — RENAME-PLAN H1 changes it when the repository moves
+   * to an organisation. The one place the surface holds it; the help pane's line is built from it (sourceLine), and a
+   * fork that runs a changed copy changes this line to offer its own source (AGPL-3.0 §13: a person using a modified
+   * copy over a network must be offered its source). DynaInk3D's help names the same address, and
+   * scripts/rights.test.mjs holds the two, and the repository TRADEMARKS.md and CONTRIBUTING.md name, to agree.
+   */
+  const SOURCE_URL = 'https://github.com/jjh111/MetaMedium';
+  /** Where the license stands in the repository: LICENSE at its root, on the branch GitHub shows. */
+  const LICENSE_PATH = '/blob/master/LICENSE';
+  /**
+   * The help pane's source line, as parts — `{ text, href?, title? }` — for the adapter to render (20-controls.js):
+   * "Source code · AGPL-3.0", the first linking the repository at `url` (SOURCE_URL when none is given), the second
+   * its LICENSE. Text, never markup, so the adapter sets it as text.
+   */
+  function sourceLine(url) {
+    const base = String(url || SOURCE_URL).replace(/\/+$/, '') || SOURCE_URL;
+    return [
+      { text: 'Source code', href: base, title: 'This app\'s source code — yours to read, change and share under the AGPL-3.0' },
+      { text: ' · ' },
+      { text: 'AGPL-3.0', href: base + LICENSE_PATH, title: 'Its license: the GNU Affero General Public License, version 3 only' },
+    ];
   }
   /**
    * The page's address on board `id`: `board=` set (in the place it had, or last), everything else

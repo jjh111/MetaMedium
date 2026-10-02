@@ -222,7 +222,10 @@ on Chromium and WebKit (`--browser webkit app`):
   and comes back on a reload the worker served; `?fresh=1` and `?board=` are
   read there, and `/app?board=` lands on `/app/?board=` (the static server
   sends a folder asked for without its slash to it, query and all, as Pages
-  does); the help pane says `VERSION`; a same-origin request carrying
+  does); the help pane says `VERSION`, and under it offers the source — *Source
+  code · AGPL-3.0*, linking the address `17-boards.js`'s `SOURCE_URL` holds and
+  its `LICENSE` (A7c, opened by its tile; A9b, at the old address — AGPL-3.0
+  §13); a same-origin request carrying
   `Authorization` — or asking for an event stream — is never kept, while the
   same request without one is; the old address opens as it did, with its own
   worker at `/Demos/`, on the same board; that worker keeps to its own caches;
