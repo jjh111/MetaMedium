@@ -5,7 +5,7 @@
 // The product is dyna.ink, and the 3D surface DynaInk3D (§1 is the one home of
 // the spellings). This test reads every file a person sees in the product — the
 // whitepaper and its 404, the app at both addresses and their manifests, the
-// help, the 3D surface's page, the strings of the surface's fragments, and what a
+// help, the 3D surface's page, the brand's styleguide (a published page, N3e), the strings of the surface's fragments, and what a
 // session connects to: the MCP servers .mcp.json registers and the strings of the
 // hands, the door and the seat's watcher (N3d) — and the last strings a person
 // meets outside the pages (N3e): the commit messages the repository backend
@@ -39,7 +39,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 const read = (p) => readFileSync(join(root, p), 'utf8');
 
-const PAGES = ['index.html', '404.html', 'Demos/session-engine.html', 'app/index.html', 'dynaink-3d/index.html'];
+const PAGES = ['index.html', '404.html', 'Demos/session-engine.html', 'app/index.html', 'dynaink-3d/index.html', 'brand/styleguide.html'];
 const WHOLE = ['Demos/manifest.webmanifest', 'app/manifest.webmanifest', 'HELP.md'];
 // The fragments the build concatenates (Demos/build-surface.mjs), never their tests.
 const FRAGMENTS = readdirSync(join(root, 'Demos/surface')).filter((f) => /^\d\d-.*\.js$/.test(f)).sort().map((f) => 'Demos/surface/' + f);
@@ -74,7 +74,7 @@ const ALLOWLIST = [
   },
   {
     why: 'a key in this browser\'s storage, the paper/canvas preference — kept like the mm-* keys and metamedium_library_v1 (RENAME-PLAN §2): renaming it forgets every reader\'s choice',
-    files: ['index.html'], at: /['"]metamedium-brand-theme['"]/,
+    files: ['index.html', 'brand/styleguide.html'], at: /['"]metamedium-brand-theme['"]/,
   },
   {
     why: 'the log\'s format id, kept (RENAME-PLAN §2): every exported log, every .dyna.zip and every carried board carries it in its header, and decodeLog matches it exactly, so renaming it would stop every saved board from opening',
