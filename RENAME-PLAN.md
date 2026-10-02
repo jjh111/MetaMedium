@@ -182,6 +182,15 @@ MetaMedium, runnable from one file.
 **Trap:** the first release's changelog section is the whole history unless
 `--since` says where to start. Choose it on purpose.
 
+*Status, 2 Oct 2026: done.* The suite was green on `c3f5a4a`: core 2,668;
+Node 297; the gate 874 passed and 11 skipped by name on Chromium, 51 on WebKit.
+`v0.1.0` was cut at `7ae63ce` with the whole history on purpose (801 commits,
+73 KB, under GitHub's limit for release notes). John pushed `master` and the
+tag and published the release with `metamedium-0.1.0.html`
+(https://github.com/jjh111/MetaMedium/releases/tag/v0.1.0). The rename's
+N1 and N3a–N3e followed on `master` (`55c1041`), and GitHub Pages built and
+served it.
+
 ### N1: carry your boards
 
 **Owns:**
