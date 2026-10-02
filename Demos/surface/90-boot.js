@@ -50,6 +50,9 @@
     dragHold: () => (drag && drag.hold ? { nodeId: drag.hold.site.nodeId, kind: drag.hold.site.kind, index: drag.hold.site.index } : null),
     // What the last paint drew under the inspected mark, and the check that a hand's paint draws and says what the whole-board read would (R4c).
     readingDrawn: () => (readingDrawn ? Object.assign({}, readingDrawn) : null), paintCheck: paintCheck, rolesCheck: rolesCheck, heldCheck: heldCheck, paints: () => paints,
+    // The ink's raster (V1-PLAN P1), for tests: whether the paint holds one, how often it was drawn and blitted, and a switch.
+    inkCache: () => ({ on: inkCacheOn, held: inkCache ? inkCache.ids.size : 0, builds: inkCacheStats.builds, hits: inkCacheStats.hits, live: inkCacheStats.live, blitted: !!inkCached }),
+    setInkCache: (on) => { inkCacheOn = on !== false; inkCacheMode = on === 'direct' || on === 'bypass' ? on : 'blit'; if (!inkCacheOn) { inkCache = null; inkCached = null; } },
     // Point at a mark the way a hover does, for tests: it is inspected, its reading drawn under it and its ladder in the panel.
     inspect: (id) => { hoverId = id || null; render(state); },
     colourOf: (id) => { const n = session.getState().nodes.get(id); return n ? colourOf(n) : null; },

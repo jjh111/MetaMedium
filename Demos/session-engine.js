@@ -4467,33 +4467,33 @@
   // and at working zoom a hand's points stand further apart than it and every
   // one is drawn. The reference paint draws every point.
   const THIN_PX = 1;
-  function path(points, closed) {
-    ctx.beginPath();
+  function path(points, closed, g = ctx) {
+    g.beginPath();
     const n = points.length;
     if (!n) return;
     const tol = paintReference ? 0 : THIN_PX / view.zoom, tol2 = tol * tol;
     let lx = points[0].x, ly = points[0].y;
-    ctx.moveTo(lx, ly);
+    g.moveTo(lx, ly);
     for (let i = 1; i < n; i++) {
       const p = points[i];
       if (i < n - 1 && tol2 > 0) { const dx = p.x - lx, dy = p.y - ly; if (dx * dx + dy * dy < tol2) continue; }
-      ctx.lineTo(p.x, p.y);
+      g.lineTo(p.x, p.y);
       lx = p.x; ly = p.y;
     }
-    if (closed) ctx.closePath();
+    if (closed) g.closePath();
   }
-  function inkStroke(points, closed, style) {
-    path(points, closed);
+  function inkStroke(points, closed, style, g = ctx) {
+    path(points, closed, g);
     // A dark halo under every mark. On the ground it is invisible; over a
     // live artifact it is the difference between ink you can see and ink that
     // disappears into whatever colour the model happened to choose. One rule,
     // no special case for "is this stroke over a page".
-    ctx.strokeStyle = C.halo;
-    ctx.lineWidth = style.width + wpx(2.5);
-    ctx.stroke();
-    ctx.strokeStyle = style.color;
-    ctx.lineWidth = style.width;
-    ctx.stroke();
+    g.strokeStyle = C.halo;
+    g.lineWidth = style.width + wpx(2.5);
+    g.stroke();
+    g.strokeStyle = style.color;
+    g.lineWidth = style.width;
+    g.stroke();
   }
 
   /** The colour each mark's ink was stroked in by the last paint, by node id. For tests. */
@@ -4512,10 +4512,39 @@
     return s.live.includes(top) ? `rgba(${C.goldRGB},0.85)` : colourOf(n);
   }
 
+  /**
+   * The offer: a ghost of what this mark would be, drawn clean. Dashed and
+   * faint so it reads as a question, not a change already made — and for
+   * a moment, not forever (v10 F4): the mark just drawn, what is hovered,
+   * what is held. The offer itself stands; the dashes do not.
+   */
+  function ghostOf(node) {
+    const offer = snapOffers.get(node.id);
+    if (!offer || !ghostShown(state, node.id)) return;
+    const ideal = idealOf(node, offer.shape);
+    if (!ideal) return;
+    // The ghost follows the ink: same placement (transform, rotation).
+    const ghost = MM.placed(node, ideal.points);
+    if (paintOps) recordOp({ kind: 'ghost', id: node.id, box: boxOfPoints(ghost), moved: paintMoved });
+    path(ghost, ideal.closed);
+    ctx.setLineDash([wpx(3), wpx(4)]);
+    ctx.strokeStyle = `rgba(${C.goldRGB},0.7)`;
+    ctx.lineWidth = wpx(1.2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
   function inkOf(node, style) {
     const points = MM.strokePointsOf(node);
     if (points) {
       inkDrawn.set(node.id, style.color);
+      // Ink the paint's raster already holds (V1-PLAN P1, `inkCacheFor`) is not stroked again: it says what it
+      // drew, and the offer's ghost, which is a moment's and the paint's own, is drawn over it.
+      if (inkCached && inkCached.ids.has(node.id) && !style.gesture && !paintMoved && style.width === inkCached.width) {
+        if (paintOps) recordOp({ kind: 'ink', id: node.id, colour: style.color, width: round2(style.width), box: boxOfPoints(points), clean: null, moved: false, gesture: false });
+        ghostOf(node);
+        return;
+      }
       // A handle being dragged (V1-PLAN E1): the form shown is the one the
       // mark will hold when the hand lets go — born clean, if it was ink.
       const reshaping = reshapeShownFor(node.id);
@@ -4550,25 +4579,7 @@
         return;
       }
       inkStroke(points, false, style);
-      // The offer: a ghost of what this mark would be, drawn clean. Dashed and
-      // faint so it reads as a question, not a change already made — and for
-      // a moment, not forever (v10 F4): the mark just drawn, what is hovered,
-      // what is held. The offer itself stands; the dashes do not.
-      const offer = snapOffers.get(node.id);
-      if (offer && !style.gesture && ghostShown(state, node.id)) {
-        const ideal = idealOf(node, offer.shape);
-        if (ideal) {
-          // The ghost follows the ink: same placement (transform, rotation).
-          const ghost = MM.placed(node, ideal.points);
-          if (paintOps) recordOp({ kind: 'ghost', id: node.id, box: boxOfPoints(ghost), moved: paintMoved });
-          path(ghost, ideal.closed);
-          ctx.setLineDash([wpx(3), wpx(4)]);
-          ctx.strokeStyle = `rgba(${C.goldRGB},0.7)`;
-          ctx.lineWidth = wpx(1.2);
-          ctx.stroke();
-          ctx.setLineDash([]);
-        }
-      }
+      if (!style.gesture) ghostOf(node);
       return;
     }
     // Text made from writing stands in place of the ink: the writing shows only when flipped over (v10 F8).
@@ -4737,6 +4748,141 @@
     return !(isFigureArtifact(node) && id !== inspectedId && !s.selection.includes(id));
   }
 
+  // ===== The ink's raster: a big still group is drawn once (V1-PLAN P1) ========
+  // A page of notes traced into ink is five thousand short strokes, and a pan stroked every one of them
+  // again each frame — ten thousand `stroke()` calls, 117–150 ms a frame where the 2,000-mark board met
+  // its frame (PERF.md, "After P1"). The paint's own JavaScript was 16 ms of that. Stroking the marks
+  // as one path a colour did not take it (the browser's raster is bound by the geometry, not the calls:
+  // 18 calls cost what 10,014 did); not stroking them did. So the plain ink of the marks on and about
+  // the screen is drawn ONCE onto a canvas of its own — the screen and a quarter of it past every edge,
+  // in device pixels, laid out exactly as the main canvas lays it out at the view it was drawn at — and
+  // a paint blits that, shifted by how far the view has panned since, and draws only what is not in it.
+  // A pan inside the margin strokes no ink at all; a pan out of it draws the cache again, centred.
+  //
+  // What is in it is what the paint would have stroked with nothing special about it: a top-level mark
+  // with ink and no clean form, no route and no handle drag on it (`plainInk`), at the board's ink width.
+  // Everything else — clean forms, routes, artifacts and their members, the mark inspected (drawn wider
+  // over its own thin ink), a ghost, the marks a drag, a follow or a tank moves (`exempt`, left out of
+  // the raster while they move) — is drawn live after it. So the ink stands over nothing a live mark
+  // draws... and one live mark's halo can lie over cached ink where before a later mark's would: ink
+  // drawn live stands over the raster, as ink drawn later stood over earlier ink. Cached ink is exactly
+  // what the live paint stroked: the same thinning, the same width and halo, the same order, and at a
+  // view the raster was drawn at, the same pixels (the gate compares them).
+  //
+  // **Held by the log and the view, never stale** (`logKey`, the zoom, the device's pixel ratio, the
+  // screen's size, the theme, the ink's colours and width, what is exempt): a raster that does not
+  // match the paint in any of them is not blitted, whatever it holds — the paint is live, as it was —
+  // and a new one is drawn when the paint has asked for the same one for `INK_CACHE_SETTLE_MS`
+  // (a pinch changes the zoom every frame, and a stroke changes the log: neither pays for a raster
+  // that is out of date by the next paint; a timer paints again to make it). A pan beyond the margin
+  // asks for the same raster at a new place, which needs no wait. Only where it pays: fewer than
+  // `INK_CACHE_MIN` plain marks about the screen and nothing is cached.
+  const INK_CACHE_MIN = 300;
+  const INK_CACHE_MARGIN = 0.25;     // of the screen's own size, past each edge
+  const INK_CACHE_MAX_PX = 16e6;     // device pixels in one raster; the margin shrinks to fit
+  const INK_CACHE_SETTLE_MS = 150;
+  const INK_CACHE_EXEMPT_MAX = 200;  // a drag of more than this many marks is drawn live whole
+  let inkCacheOn = true;             // a test's: off, every paint strokes what it draws, as before P1
+  let inkCacheMode = 'blit';         // a test's: 'direct' strokes what the raster holds onto the canvas itself, in the raster's order — what a blit must equal — and 'bypass' paints live, the raster kept
+  let inkCache = null;               // { base, panX, panY, sx0, sy0, w, h, width, canvas, list, ids: Set }
+  let inkCached = null;              // the raster this paint blits, or null: what inkOf leaves to it
+  let inkCacheWant = null, inkCacheWantAt = 0, inkCacheTimer = 0, inkCacheSmall = null;
+  const inkCacheStats = { builds: 0, hits: 0, live: 0 };
+
+  /** Does the paint stroke this mark as plain ink — nothing drawn in its place, nothing drawn over it as itself? */
+  function plainInk(node) {
+    const points = MM.strokePointsOf(node);
+    if (!points || !points.length) return false;
+    if (reshapeShownFor(node.id) || MM.cleanPointsOf(node)) return false;
+    const rt = MM.routeRepOf(node);
+    return !(rt && rt.points.length >= 2);
+  }
+
+  /**
+   * Blit the raster of this paint's view, drawing it first if the paint is to have one, and return it (the
+   * ids it holds); or null, and every mark is stroked live. Called after the pictures, before the ink.
+   */
+  function inkCacheFor(s, ix, order, pv, inkW) {
+    // Fewer marks than that on the screen: not a board it pays on, and a paint of it does nothing more than before.
+    if (!inkCacheOn || !ix || inkCacheMode === 'bypass' || order.length < INK_CACHE_MIN) return null;
+    const exempt = [];
+    if (pv) for (const id of pv.ids) exempt.push(id);
+    if (followShown) for (const id of followShown.keys()) exempt.push(id);
+    for (const id of tank.place.keys()) exempt.push(id);
+    if (drag && drag.mode === 'reshape' && drag.moved && drag.id) exempt.push(drag.id);
+    if (exempt.length > INK_CACHE_EXEMPT_MAX) { inkCacheStats.live++; return null; }
+    const dpr = window.devicePixelRatio || 1;
+    const base = [ix.key, view.zoom, dpr, innerWidth, innerHeight, document.documentElement.getAttribute('data-theme'), C.ink, C.halo, inkW, exempt.sort().join(',')].join('|');
+    const covers = (c) => {
+      const bx = c.sx0 + (view.panX - c.panX) * dpr, by = c.sy0 + (view.panY - c.panY) * dpr, pad = 8 * dpr;
+      return bx <= -pad && by <= -pad && bx + c.w >= innerWidth * dpr + pad && by + c.h >= innerHeight * dpr + pad;
+    };
+    let c = inkCache;
+    if (!c || c.base !== base || !covers(c)) {
+      // The same raster, asked for at a place the view has panned out of, is drawn at once; any other that
+      // is not the one held waits until the paint has asked for it for a moment.
+      const same = !!c && c.base === base;
+      // A raster that held too few marks here is not asked for again until the log, the zoom or the view has moved on.
+      const place = base + '|' + Math.floor(view.panX / (innerWidth / 2)) + '|' + Math.floor(view.panY / (innerHeight / 2));
+      if (inkCacheSmall === place) return null;
+      const now = performance.now();
+      if (inkCacheWant !== base) { inkCacheWant = base; inkCacheWantAt = now; }
+      const wait = same ? 0 : INK_CACHE_SETTLE_MS - (now - inkCacheWantAt);
+      if (wait > 0) {
+        if (!inkCacheTimer) inkCacheTimer = setTimeout(() => { inkCacheTimer = 0; if (inkCacheOn) render(session.getState()); }, wait + 5);
+        inkCacheStats.live++;
+        return null;
+      }
+      c = buildInkCache(s, ix, base, exempt, inkW, dpr);
+      if (!c) { inkCacheSmall = place; inkCacheStats.live++; return null; }
+    } else inkCacheStats.hits++;
+    if (inkCacheMode === 'direct') {
+      for (const id of c.list) { const node = s.nodes.get(id); inkStroke(MM.strokePointsOf(node), false, { color: colourOf(node), width: c.width }); }
+      return c;
+    }
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(c.canvas, Math.round(c.sx0 + (view.panX - c.panX) * dpr), Math.round(c.sy0 + (view.panY - c.panY) * dpr));
+    ctx.restore();
+    return c;
+  }
+
+  /** Draw the plain ink of the screen and its margin onto a canvas of its own, at the view that stands; null where it would not pay. */
+  function buildInkCache(s, ix, base, exempt, inkW, dpr) {
+    const zoom = view.zoom, screenW = innerWidth * dpr, screenH = innerHeight * dpr;
+    let mx = Math.round(screenW * INK_CACHE_MARGIN), my = Math.round(screenH * INK_CACHE_MARGIN);
+    while (mx > 0 && (screenW + 2 * mx) * (screenH + 2 * my) > INK_CACHE_MAX_PX) { mx = Math.floor(mx / 2); my = Math.floor(my / 2); }
+    const w = Math.ceil(screenW + 2 * mx), h = Math.ceil(screenH + 2 * my), sx0 = -mx, sy0 = -my;
+    // The world the raster covers, and what a stroke's width and halo carry past its box.
+    const pad = inkW + wpx(2.5);
+    const region = { minX: (sx0 / dpr - view.panX) / zoom - pad, minY: (sy0 / dpr - view.panY) / zoom - pad, maxX: ((sx0 + w) / dpr - view.panX) / zoom + pad, maxY: ((sy0 + h) / dpr - view.panY) / zoom + pad };
+    const skip = new Set(exempt), artifactSet = new Set(s.artifacts);
+    const ids = [];
+    for (const id of ix.paint.query(region)) {
+      if (!ix.contentAt.has(id) || skip.has(id) || artifactSet.has(id)) continue;
+      const node = s.nodes.get(id);
+      if (node && plainInk(node)) ids.push(id);
+    }
+    if (ids.length < INK_CACHE_MIN) { inkCache = null; return null; }
+    ids.sort((a, b) => ix.contentAt.get(a) - ix.contentAt.get(b));
+    const canvas = inkCache && inkCache.canvas || document.createElement('canvas');
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    const g = canvas.getContext('2d');
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, w, h);
+    // The main canvas's transform, moved so that device pixel (sx0, sy0) of the screen is this one's (0, 0).
+    g.setTransform(dpr * zoom, 0, 0, dpr * zoom, dpr * view.panX - sx0, dpr * view.panY - sy0);
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    for (const id of ids) {
+      const node = s.nodes.get(id);
+      inkStroke(MM.strokePointsOf(node), false, { color: colourOf(node), width: inkW }, g);
+    }
+    inkCacheStats.builds++;
+    inkCache = { base, panX: view.panX, panY: view.panY, sx0, sy0, w, h, width: inkW, canvas, list: ids, ids: new Set(ids) };
+    return inkCache;
+  }
+
   /**
    * The content marks this paint draws, in the board's order: those whose
    * box meets the screen, and — wherever they are — what the hand is on or
@@ -4788,6 +4934,7 @@
     paints++;
     state = s;
     picturesBegin();
+    inkCached = null;
     chipHits = [];
     chromeDrawn = [];
     readingDrawn = null;
@@ -4893,7 +5040,11 @@
       if (st && paintOps) { const pb = MM.boundsOf(pn); recordOp({ kind: 'picture', id: id, text: st === 'drawn' ? 'drawn' : 'standing', box: boxOfRect(pb.minX, pb.minY, pb.maxX - pb.minX, pb.maxY - pb.minY), moved: !!heldPic }); }
     }
 
+    // The ink's raster under everything else this paint draws (inkCacheFor): what it holds is not stroked again.
+    inkCached = inkCacheFor(s, ix, order, pv, inkW);
     for (const id of order) {
+      // A mark the raster holds, with nothing to say beyond it, is passed over — unless a test is recording what is drawn.
+      if (inkCached && !paintOps && inkCached.ids.has(id) && id !== inspectedId && !snapOffers.has(id)) continue;
       const follows = followShown && followShown.get(id);
       const node = follows || s.nodes.get(id);
       const isArtifact = artifactSet.has(id);
@@ -15889,6 +16040,9 @@
     dragHold: () => (drag && drag.hold ? { nodeId: drag.hold.site.nodeId, kind: drag.hold.site.kind, index: drag.hold.site.index } : null),
     // What the last paint drew under the inspected mark, and the check that a hand's paint draws and says what the whole-board read would (R4c).
     readingDrawn: () => (readingDrawn ? Object.assign({}, readingDrawn) : null), paintCheck: paintCheck, rolesCheck: rolesCheck, heldCheck: heldCheck, paints: () => paints,
+    // The ink's raster (V1-PLAN P1), for tests: whether the paint holds one, how often it was drawn and blitted, and a switch.
+    inkCache: () => ({ on: inkCacheOn, held: inkCache ? inkCache.ids.size : 0, builds: inkCacheStats.builds, hits: inkCacheStats.hits, live: inkCacheStats.live, blitted: !!inkCached }),
+    setInkCache: (on) => { inkCacheOn = on !== false; inkCacheMode = on === 'direct' || on === 'bypass' ? on : 'blit'; if (!inkCacheOn) { inkCache = null; inkCached = null; } },
     // Point at a mark the way a hover does, for tests: it is inspected, its reading drawn under it and its ladder in the panel.
     inspect: (id) => { hoverId = id || null; render(state); },
     colourOf: (id) => { const n = session.getState().nodes.get(id); return n ? colourOf(n) : null; },

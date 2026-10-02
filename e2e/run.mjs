@@ -34,7 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { startStatic, startVite } from './servers.mjs';
 import { isModelRequest, allowedError, ALLOWED_PAGE_ERRORS } from './guards.mjs';
 import { runKeep, runBig } from './keep.mjs';
-import { boardOf, serveBoard, openBoard, interact, equivalence, judge, fmt, calibrateInPage, tooLoaded, rendererInPage, softwareRaster, CALIBRATION_MS, countCanvasCalls, pictureFacts, PAINT_STROKE_CALLS_MAX } from './budgets.mjs';
+import { boardOf, serveBoard, openBoard, interact, equivalence, judge, fmt, calibrateInPage, tooLoaded, rendererInPage, softwareRaster, CALIBRATION_MS, countCanvasCalls, pictureFacts, PAINT_STROKE_CALLS_MAX, BLIT_DIFF_MAX } from './budgets.mjs';
 import { runBoards } from './boards.mjs';
 import { runApp } from './app.mjs';
 import { runPencil } from './pencil.mjs';
@@ -501,10 +501,11 @@ async function runBudgets(browser, servers, engineName) {
         await guards.context.close();
       }
     }
-    // 4. P1 (V1-PLAN; PERF.md "After P1"): a board of pictures traced into ink is painted as a few paths, not one a
-    //    stroke. A fact about what a paint hands the canvas, never a time — so it runs on any machine, a loaded one
-    //    and a software renderer too, where the pan's own frame is skipped by name above. Before it a paint of
-    //    this board made two `stroke()` calls a mark and a pan frame in this container's Chromium took 117 ms.
+    // 4. P1 (V1-PLAN; PERF.md "After P1"): a board of pictures traced into ink is drawn once and blitted, not stroked
+    //    again every frame. Facts about what a paint does, never a time — so they run on any machine, a loaded one and a
+    //    software renderer too, where the pan's own frame is skipped by name above. (On this container's Chromium a pan
+    //    frame of such a board took 117 ms before it, and drawing the same strokes as 18 paths instead of 10,014 took
+    //    just as long: the raster is bound by the geometry, not the calls.)
     {
       const { importedBoard } = await import('../metamedium-core/bench/board.mjs');
       const label = 'P1. a board of 2 pictures of 1,000 traced strokes beside a figure';
@@ -520,16 +521,26 @@ async function runBudgets(browser, servers, engineName) {
         page = opened.page;
         if (!page) check(`${label}: the board did not open`, false, opened.out);
         else {
-          const f = await page.evaluate(pictureFacts);
+          const f = await page.evaluate(pictureFacts, BLIT_DIFF_MAX);
           measured.pictureFacts = f;
-          check(`${label}: the board holds its ${made.marks} traced strokes`, f.strokes === made.marks, { strokes: f.strokes, expected: made.marks });
-          for (const [where, c] of [['zoomed out to the whole board', f.fit], ['after a pan', f.fitPanned], ['at zoom 1', f.work]]) {
-            check(`P1. a paint of it ${where} makes ${c.stroke} stroke() calls, at most ${PAINT_STROKE_CALLS_MAX} and not one a stroke (the same ink stroked a mark at a time makes ${f.unbatchedCalls ? f.unbatchedCalls.stroke : '—'})`,
-              c.stroke <= PAINT_STROKE_CALLS_MAX && c.stroke > 0, { calls: c, strokes: f.strokes, unbatched: f.unbatchedCalls });
-          }
-          check(`P1. the ink is never covered: every pixel of the ink's own colour a mark-by-mark paint puts down is ink in the batched one (${f.pixels ? f.pixels.single : '—'} pixels; ${f.pixels ? f.pixels.lost : '—'} lost, the batched paint has ${f.pixels ? f.pixels.batched : '—'})`,
-            !!f.pixels && f.pixels.lost === 0 && f.pixels.single > 1000 && f.pixels.batched >= f.pixels.single, { hook: f.hook, pixels: f.pixels });
-          // What is drawn is what the whole-board read would draw (R4c's check), on this board too.
+          const same = (x) => !!x && x.differ <= f.allow;
+          check(`${label}: the board holds its ${made.marks} traced strokes and the surface has the ink's raster`, f.hook && f.strokes === made.marks, { strokes: f.strokes, expected: made.marks, hook: f.hook });
+          check(`P1. settled, the paint holds the strokes in one raster and blits it (${f.opened ? f.opened.held : '—'} held, drawn ${f.opened ? f.opened.builds : '—'}×)`,
+            !!f.opened && f.opened.held >= made.marks * 0.95 && f.opened.builds >= 1 && f.opened.blitted, f.opened);
+          check(`P1. a paint with it makes ${f.calls ? f.calls.stroke : '—'} stroke() calls, at most ${PAINT_STROKE_CALLS_MAX} (the ${made.marks} strokes drawn alone make ${2 * made.marks})`,
+            !!f.calls && f.calls.stroke <= PAINT_STROKE_CALLS_MAX, f.calls);
+          check(`P1. the canvas with the raster is the canvas without it (${f.atRest ? f.atRest.differ : '—'} of ${f.pixels} pixels differ, by more than rounding; at most ${f.allow} are allowed)`, same(f.atRest) && f.atRest.blitted, f.atRest);
+          check(`P1. twenty pans inside its margin draw it again ${f.pan ? f.pan.builds : '—'} times and blit it ${f.pan ? f.pan.hits : '—'}, a paint's stroke() calls at most ${f.pan ? f.pan.maxStrokeCalls : '—'}, and the panned canvas is the canvas without the raster (${f.panned ? f.panned.differ : '—'} pixels differ)`,
+            !!f.pan && f.pan.builds === 0 && f.pan.hits === 20 && f.pan.live === 0 && f.pan.maxStrokeCalls <= PAINT_STROKE_CALLS_MAX && same(f.panned) && f.panned.blitted, { pan: f.pan, panned: f.panned });
+          check(`P1. never stale — a zoom is painted live at once, the raster not blitted and the canvas the unrastered one (${f.zoomAtOnce ? f.zoomAtOnce.differ : '—'} pixels differ), and drawn again, once, when the paint settles (${f.zoomSettled ? f.zoomSettled.differ : '—'} differ)`,
+            same(f.zoomAtOnce) && !f.zoomAtOnce.blitted && same(f.zoomSettled) && f.zoomSettled.blitted && f.zoomSettled.builds === 1, { atOnce: f.zoomAtOnce, settled: f.zoomSettled });
+          check(`P1. never stale — a stroke drawn is on the canvas at once and in the raster drawn again when the paint settles (${f.drawnAtOnce ? f.drawnAtOnce.differ : '—'} then ${f.drawnSettled ? f.drawnSettled.differ : '—'} pixels differ); an undo the same (${f.undoneAtOnce ? f.undoneAtOnce.differ : '—'} then ${f.undoneSettled ? f.undoneSettled.differ : '—'})`,
+            same(f.drawnAtOnce) && !f.drawnAtOnce.blitted && same(f.drawnSettled) && f.drawnSettled.blitted && f.drawnSettled.builds === 1 && same(f.undoneAtOnce) && !f.undoneAtOnce.blitted && same(f.undoneSettled) && f.undoneSettled.blitted,
+            { drawn: [f.drawnAtOnce, f.drawnSettled], undone: [f.undoneAtOnce, f.undoneSettled] });
+          check(`P1. a mark a drag moves is out of the raster while it moves and leaves nothing behind (${f.dragSettled ? f.dragSettled.differ : '—'} pixels differ; ${f.dragSettled ? f.dragSettled.heldBefore - f.dragSettled.held : '—'} fewer held), and the drop is the canvas without the raster (${f.dropSettled ? f.dropSettled.differ : '—'})`,
+            !!f.target && same(f.dragAtOnce) && same(f.dragSettled) && f.dragSettled.blitted && f.dragSettled.heldBefore - f.dragSettled.held >= 1 && same(f.dropAtOnce) && same(f.dropSettled) && f.dropSettled.blitted,
+            { target: f.target, atOnce: f.dragAtOnce, settled: f.dragSettled, drop: [f.dropAtOnce, f.dropSettled] });
+          // What is drawn is what the whole-board read would draw (R4c's check), on this board too — through the raster.
           const pc = await page.evaluate(() => { window.__mm.fitAll(); const id = window.__mm.session.getState().contentIds[0]; window.__mm.inspect(id); const r = window.__mm.paintCheck(); window.__mm.inspect(null); return { ok: r.ok, diffs: r.diffs.slice(0, 3), ink: r.ink, minimap: r.minimap }; });
           check(`P1. a hand's paint of the board of pictures draws what the whole-board read draws (${pc.ink.drawn} ink ops of ${pc.ink.of}, the minimap ${pc.minimap.drawn} of ${pc.minimap.of})`, pc.ok && pc.minimap.drawn === pc.minimap.of, pc);
         }

@@ -7,8 +7,9 @@
 //
 // Beside the gate, like `perf.mjs`, on its servers and model guard, and never
 // run by it: its product is numbers — a paint's JavaScript, a pan frame's
-// interval, and how many `stroke()` calls a paint makes — for this machine, to
-// be compared with the same run before and after a change to `08-render.js`.
+// interval, and how many `stroke()` calls a paint makes — for this machine, each
+// view with the ink's raster (P1) and without it (`mm.setInkCache(false)`: every
+// mark stroked every frame, the paint as it was).
 // Headless Chromium rasterises on the CPU, so a frame here is not an iPad's.
 
 import { chromium } from 'playwright';
@@ -40,16 +41,24 @@ try {
   await page.evaluate(tools);
   await page.waitForTimeout(1500);
   const result = {};
-  for (const [name, setup] of [['fit-all', async () => { await page.evaluate(() => window.__mm.fitAll()); }],
-    ['zoom 1', async () => { const box = await page.evaluate(() => window.__perfTools.worldBox()); await page.evaluate(([x, y]) => window.__mm.setView(1, 720 - x, 450 - y), [(box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2]); }]]) {
-    await setup();
-    await page.waitForTimeout(400);
-    const calls = await page.evaluate(() => { const v = window.__mm.view; window.__canvasCalls.reset(); window.__mm.setView(v.zoom, v.panX, v.panY); return window.__canvasCalls.take(); });
-    const renders = summarize(await page.evaluate(() => window.__perfTools.renders(8)));
-    const pan = await page.evaluate(() => window.__perfTools.pan(60, 6, 4));
-    const handler = summarize(pan.handler), interval = summarize(pan.intervals);
-    result[name] = { calls, render: renders, handler, interval };
-    console.log(`${name}: a paint makes ${calls.stroke} stroke() and ${calls.beginPath} beginPath · paint JS median ${fmt(renders.median)} · pan handler median ${fmt(handler.median)} p95 ${fmt(handler.p95)} · frame interval median ${fmt(interval.median)} p95 ${fmt(interval.p95)}`);
+  const views = [['fit-all', async () => { await page.evaluate(() => window.__mm.fitAll()); }],
+    ['zoom 1', async () => { const box = await page.evaluate(() => window.__perfTools.worldBox()); await page.evaluate(([x, y]) => window.__mm.setView(1, 720 - x, 450 - y), [(box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2]); }]];
+  // Each view twice: with the ink's raster (V1-PLAN P1) and without it, every mark stroked every frame — what the paint did before.
+  for (const [name, setup] of views) {
+    for (const raster of [false, true]) {
+      await page.evaluate((on) => window.__mm.setInkCache(on), raster);
+      await setup();
+      await page.waitForTimeout(800); // the raster is drawn once the paint has asked for it for INK_CACHE_SETTLE_MS
+      const before = await page.evaluate(() => window.__mm.inkCache());
+      const calls = await page.evaluate(() => { const v = window.__mm.view; window.__canvasCalls.reset(); window.__mm.setView(v.zoom, v.panX, v.panY); return window.__canvasCalls.take(); });
+      const renders = summarize(await page.evaluate(() => window.__perfTools.renders(8)));
+      const pan = await page.evaluate(() => window.__perfTools.pan(60, 6, 4));
+      const handler = summarize(pan.handler), interval = summarize(pan.intervals);
+      const after = await page.evaluate(() => window.__mm.inkCache());
+      const label = `${name}${raster ? ' + raster' : ''}`;
+      result[label] = { calls, render: renders, handler, interval, cache: { builds: after.builds - before.builds, hits: after.hits - before.hits, live: after.live - before.live } };
+      console.log(`${label.padEnd(18)} a paint makes ${String(calls.stroke).padStart(6)} stroke() · paint JS median ${fmt(renders.median).padStart(7)} · pan frame interval median ${fmt(interval.median).padStart(7)} p95 ${fmt(interval.p95).padStart(7)} · over 60 pans the raster was drawn ${after.builds - before.builds}× and blitted ${after.hits - before.hits}×`);
+    }
   }
   if (a.json) console.log(JSON.stringify(result));
 } finally {

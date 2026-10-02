@@ -283,58 +283,129 @@ export function countCanvasCalls() {
 }
 
 /**
- * P1's structural budget: ink of one colour and width is stroked as a few paths, not one a mark, so a
- * paint of a board of traced pictures hands the canvas a handful of `stroke()` calls whatever the
- * board's size. A fact about what the paint does, not a time: it holds on any machine. (After P1 a
- * paint of 2,000 or 5,000 traced strokes makes two, with the pictures and the figure's plate; the
- * allowance is for the chrome a paint may add, and it is nothing like the thousands before.)
+ * P1's structural budget: a paint of a board of traced pictures that has the ink's raster strokes none of
+ * that ink — a pan inside the raster's margin hands the canvas a handful of `stroke()` calls whatever the
+ * board's size (what is drawn live: the brackets of the pictures, the members of a figure), where before
+ * it handed it two for every stroke. A fact about what the paint does, not a time: it holds on any machine.
  */
-export const PAINT_STROKE_CALLS_MAX = 16;
+export const PAINT_STROKE_CALLS_MAX = 40;
+
+/** The share of the canvas's pixels a blitted raster may differ from the strokes laid on it directly (see `pictureFacts`'s `diff`). */
+export const BLIT_DIFF_MAX = 1e-4;
 
 /**
- * Runs in the page, on a board of traced pictures with `countCanvasCalls` installed: the `stroke()` calls
- * one paint makes zoomed out to the whole board and at zoom 1, after a pan, and what the ink looks
- * like batched against drawn mark by mark — every pixel of the ink's own colour that the mark-by-mark
- * paint puts down is ink in the batched one too (ink is never covered; a batch lays every halo
- * before every ink, so what a later mark's halo dimmed is not dimmed).
+ * Runs in the page, on a board of traced pictures with `countCanvasCalls` installed. Everything it says is
+ * structural, so it holds in a container that rasterises in software and on a loaded machine:
+ *
+ *  - once the paint has settled, the raster is held and blitted (`mm.inkCache()`), and holds the strokes;
+ *  - twenty pans inside its margin draw it again never — `builds` stands, `hits` rises by twenty — and
+ *    each paint's `stroke()` calls stay at a handful (the unrastered paint's are two a stroke);
+ *  - the canvas a paint leaves with the raster is the canvas it leaves without it, pixel for pixel — at
+ *    the view it was drawn at and after a pan of whole pixels (`diff`: how many of the canvas's pixels differ);
+ *  - never stale: a zoom, a stroke drawn, an undo and a drag of a mark are each painted live at once —
+ *    the raster is not blitted — and the same canvas as without it, and the raster is drawn again once
+ *    the paint settles, and again the same;
+ *  - the mark a drag moves is left out of the raster while it moves, so it leaves nothing behind.
  */
-export async function pictureFacts() {
-  const mm = window.__mm, canvas = document.getElementById('canvas');
+export async function pictureFacts(blitDiffMax) {
+  const mm = window.__mm, canvas = document.getElementById('canvas'), MM = mm.MM;
   const raf = () => new Promise((r) => requestAnimationFrame(r));
-  const paint = () => { const v = mm.view; window.__canvasCalls.reset(); mm.setView(v.zoom, v.panX, v.panY); return window.__canvasCalls.take(); };
-  const out = { strokes: 0, hook: typeof mm.setInkBatching === 'function' };
-  for (const node of mm.session.getState().nodes.values()) if (node.reps.some((r) => r.modality === 'stroke')) out.strokes++;
-  mm.fitAll(); await raf(); await raf();
-  out.fit = paint();
-  mm.setView(mm.view.zoom, mm.view.panX - 37, mm.view.panY - 11); await raf();
-  out.fitPanned = paint();
-  const s = mm.session.getState(), MM = mm.MM;
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const id of s.contentIds) { const b = MM.boundsOf(s.nodes.get(id)); if (b) { minX = Math.min(minX, b.minX); minY = Math.min(minY, b.minY); maxX = Math.max(maxX, b.maxX); maxY = Math.max(maxY, b.maxY); } }
-  mm.setView(1, 720 - (minX + maxX) / 2, 450 - (minY + maxY) / 2); await raf();
-  out.work = paint();
-  if (!out.hook) return out;
-  // Pixels: the ink's own colour, mark by mark and batched, at the view that stands.
-  const inkMark = s.contentIds.find((id) => MM.strokePointsOf(s.nodes.get(id)));
-  const probe = document.createElement('canvas').getContext('2d');
-  probe.fillStyle = mm.inkDrawn(inkMark); probe.fillRect(0, 0, 1, 1);
-  const want = Array.from(probe.getImageData(0, 0, 1, 1).data);
-  const inkPixels = () => {
-    const d = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
-    const set = new Uint8Array(canvas.width * canvas.height);
+  const settle = async () => { await new Promise((r) => setTimeout(r, 500)); await raf(); await raf(); };
+  const repaint = () => { const v = mm.view; mm.setView(v.zoom, v.panX, v.panY); };
+  const grab = () => canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+  // Two canvases differ at a pixel when a premultiplied channel is more than `ROUND` apart. The raster is composited
+  // onto the canvas once where the strokes were laid on it one by one, and where a dozen translucent halos and the
+  // anti-aliased edges of a dozen strokes overlap, eight bits round differently each way: a few pixels in a hundred
+  // thousand, in the densest knots of ink, never a mark (BLIT_DIFF_MAX is that share).
+  const ROUND = 3;
+  const diff = (a, b) => {
     let n = 0;
-    for (let i = 0, p = 0; i < d.length; i += 4, p++) if (d[i] === want[0] && d[i + 1] === want[1] && d[i + 2] === want[2] && d[i + 3] === 255) { set[p] = 1; n++; }
-    return { set, n };
+    for (let i = 0; i < a.length; i += 4) {
+      const pa = a[i + 3] / 255, pb = b[i + 3] / 255;
+      if (Math.abs(a[i] * pa - b[i] * pb) > ROUND || Math.abs(a[i + 1] * pa - b[i + 1] * pb) > ROUND || Math.abs(a[i + 2] * pa - b[i + 2] * pb) > ROUND || Math.abs(a[i + 3] - b[i + 3]) > ROUND) n++;
+    }
+    return n;
   };
-  mm.fitAll(); await raf(); await raf();
-  mm.setInkBatching(false); mm.setView(mm.view.zoom, mm.view.panX, mm.view.panY);
-  const single = inkPixels();
-  out.unbatchedCalls = (() => { const v = mm.view; window.__canvasCalls.reset(); mm.setView(v.zoom, v.panX, v.panY); return window.__canvasCalls.take(); })();
-  mm.setInkBatching(true); mm.setView(mm.view.zoom, mm.view.panX, mm.view.panY);
-  const batched = inkPixels();
-  let lost = 0;
-  for (let i = 0; i < single.set.length; i++) if (single.set[i] && !batched.set[i]) lost++;
-  out.pixels = { single: single.n, batched: batched.n, lost };
+  const calls = () => { window.__canvasCalls.reset(); repaint(); return window.__canvasCalls.take(); };
+  /**
+   * The canvas as it stands, against the same paint without the blit — the raster's strokes laid on the canvas itself in
+   * the raster's order when it is blitted, every mark live when it is not: `{ differ, blitted, held }`.
+   */
+  const against = () => {
+    const held = mm.inkCache(), on = grab();
+    mm.setInkCache(held.blitted ? 'direct' : 'bypass'); repaint();
+    const off = grab();
+    mm.setInkCache(true);
+    return { differ: diff(on, off), blitted: held.blitted, held: held.held };
+  };
+  const out = { strokes: 0, hook: typeof mm.inkCache === 'function', pixels: canvas.width * canvas.height, allow: Math.floor(canvas.width * canvas.height * blitDiffMax) };
+  if (!out.hook) return out;
+  for (const node of mm.session.getState().nodes.values()) if (node.reps.some((r) => r.modality === 'stroke')) out.strokes++;
+
+  // Zoomed out to the whole board, settled: the raster is held and blitted.
+  mm.fitAll(); await settle();
+  out.opened = mm.inkCache();
+  out.calls = calls();
+  out.atRest = against();
+  await settle();
+
+  // Twenty pans inside the margin: the raster is blitted every time and never drawn again.
+  const before = mm.inkCache();
+  let max = 0;
+  for (let i = 0; i < 20; i++) { const v = mm.view; window.__canvasCalls.reset(); mm.setView(v.zoom, v.panX - 6, v.panY - 4); max = Math.max(max, window.__canvasCalls.take().stroke); }
+  const after = mm.inkCache();
+  out.pan = { builds: after.builds - before.builds, hits: after.hits - before.hits, live: after.live - before.live, maxStrokeCalls: max };
+  out.panned = against();
+  await settle();
+
+  // Never stale — a zoom.
+  const z0 = mm.inkCache(); const v = mm.view;
+  mm.setView(v.zoom * 1.1, v.panX, v.panY);
+  out.zoomAtOnce = against();
+  await settle();
+  out.zoomSettled = Object.assign({ builds: mm.inkCache().builds - z0.builds }, against());
+  await settle();
+
+  // …a stroke drawn, an undo.
+  const s0 = mm.inkCache(), sv = mm.view, at = (x, y) => ({ x: (x - sv.panX) / sv.zoom, y: (y - sv.panY) / sv.zoom });
+  const pts = []; for (let i = 0; i <= 12; i++) pts.push(at(500 + i * 8, 300 + Math.sin(i / 2) * 20));
+  mm.session.addStroke(pts, Date.now() + 5, undefined, 1 / sv.zoom, { content: true });
+  out.drawnAtOnce = against();
+  await settle();
+  out.drawnSettled = Object.assign({ builds: mm.inkCache().builds - s0.builds }, against());
+  await settle();
+  mm.session.undo();
+  out.undoneAtOnce = against();
+  await settle();
+  out.undoneSettled = against();
+  await settle();
+
+  // A drag: the mark it moves is out of the raster while it moves, and leaves nothing behind.
+  const st = mm.session.getState();
+  const vw = { minX: -mm.view.panX / mm.view.zoom, minY: -mm.view.panY / mm.view.zoom, maxX: (innerWidth - mm.view.panX) / mm.view.zoom, maxY: (innerHeight - mm.view.panY) / mm.view.zoom };
+  let target = null;
+  for (const id of st.contentIds) {
+    const n = st.nodes.get(id), b = MM.boundsOf(n);
+    if (!b || !MM.strokePointsOf(n) || (b.maxX - b.minX) < 6 || (b.maxY - b.minY) < 6) continue;
+    const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
+    if (cx > vw.minX + 300 / mm.view.zoom && cx < vw.maxX - 300 / mm.view.zoom && cy > vw.minY + 200 / mm.view.zoom && cy < vw.maxY - 200 / mm.view.zoom) { target = { id, cx, cy }; break; }
+  }
+  out.target = !!target;
+  if (target) {
+    mm.session.select([target.id], Date.now()); await settle();
+    const px = target.cx * mm.view.zoom + mm.view.panX, py = target.cy * mm.view.zoom + mm.view.panY;
+    const fire = (type, x, y) => canvas.dispatchEvent(new PointerEvent(type, { pointerId: 1, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1 }));
+    const heldBefore = mm.inkCache().held;
+    fire('pointerdown', px, py);
+    for (let i = 1; i <= 6; i++) fire('pointermove', px + i * 12, py + i * 7);
+    out.dragAtOnce = against();
+    await settle();
+    out.dragSettled = Object.assign({ heldBefore }, against());
+    fire('pointerup', px + 72, py + 42);
+    out.dropAtOnce = against();
+    await settle();
+    out.dropSettled = against();
+  }
   return out;
 }
 
