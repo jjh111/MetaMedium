@@ -9,7 +9,8 @@
 //   browser keeps when there is no folder (V1-PLAN R3, R1) — the adapter over 17-board.js's journal
 //   and 17-boards.js's list: IndexedDB (openBoard, persistBoard, flushBoard, forgetLocalLog; the list:
 //   switchBoard, newBoard, renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash,
-//   emptyTrash, boardFromFile, resetBoard, rememberPlace, openPlace), the log format's surface (R2:
+//   emptyTrash, boardFromFile, resetBoard, rememberPlace, openPlace; and boards carried in from the old address,
+//   RENAME-PLAN N1: carryIn, carryHeld, logHash), the log format's surface (R2:
 //   readLogText — a log's text as events or the sentence for a version this build does not read —
 //   logWrite, logFileNote; a folder whose log is of a newer version is refused before it is opened),
 //   the view per board, browser
@@ -19,7 +20,9 @@
 // Uses: core, board (createJournal, openPlan, troubleOf, troubleWords, journalEvents, journalFold,
 //   journalText), boards (the list's pure half), view (fitAll, afterViewChange, clampZoom), teach
 //   (savedMark, restoreMark), artifacts, render, input (say, flash), images (downloadText), controls
-//   (syncTiles), the boards pane (renderBoardsPane, roomChanged), the seat (seatRoomOpened: who is heard in a room).
+//   (syncTiles), the boards pane (renderBoardsPane, roomChanged), the seat (seatRoomOpened: who is heard in a room),
+//   carrying (17-carry.js's rules; 22-carry.js's carryTake; the bundle reader and inflateRaw, 17-bundle.js and 18-out.js;
+//   rememberMark, 03-teach.js).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -1464,6 +1467,14 @@
     let events = null, stored = [], notes = null;
     if (zipped) {
       if (boards.how !== 'indexeddb') return newBoard(o);   // says why, and stores nothing
+      // Every board in one file (RENAME-PLAN N1): each comes in as a carry does — a new entry each, nothing twice.
+      const whole = new Uint8Array(await file.arrayBuffer());
+      const every = await everyRead(whole, { inflate: inflateRaw });
+      if (!every.notEvery && !every.unread) {
+        const r = await carryTake(whole, 'file', { read: every });
+        if (o && o.said) o.said(r.words); else say(r.words);
+        return false;
+      }
       const b = await bundleLoad(file);
       if (!b.ok) return refuse('“' + file.name + '”: ' + b.words);
       events = b.events; stored = b.pending;
@@ -1486,6 +1497,121 @@
       return made;
     } finally { for (const ref of stored) assets.pending.delete(ref); }
   }
+  // ----- Carried in (RENAME-PLAN N1) -----------------------------------------------------------------------
+  // Every board a browser kept at the old address, arriving as one file (17-carry.js's everyBuild) — through the
+  // window a carry opened, or through *From a file…*. Each board's bundle is read as a bundle is (every picture's hash
+  // checked), and the board is written in as a NEW entry with its log exactly as it came: no event is rewritten. What
+  // this browser keeps already is hashed — each board's log as its journal holds it, and what each was carried in as —
+  // so a carry made twice brings nothing in twice.
+
+  /** The digest of a log as its journal holds it: one event a line, each written as it stands. */
+  function logHash(events) { return digestHex(new TextEncoder().encode(journalText(events))); }
+  /** Every board this browser keeps, the trash's included, as a carry compares them: name, empty or not, its log's digest, what it was carried in as. */
+  async function carryHeld() {
+    const db = await boardDB();
+    const out = [];
+    for (const e of boards.entries.values()) {
+      if (!isKept(e)) continue;
+      let events = null;
+      try {
+        if (onBoardHere() && e.id === board.id) events = session.getEvents();
+        else events = journalFold((await idbBackend(db, e.id).read()).records).events;
+      } catch (err) { events = null; }
+      out.push({ id: e.id, name: e.name, trashed: e.trashed || 0, empty: events ? carryEmpty(events) : false,
+        hash: events ? await logHash(events) : null, carried: typeof e.carried === 'string' ? e.carried : null });
+    }
+    return out;
+  }
+  /** The taught mark that came, learned again here from its five samples: 'taught' (this device held none), 'same', 'kept' (this device's own stands) or null. */
+  function carryMarkIn(m) {
+    if (!m) return null;
+    const mine = carryMark(savedMark());
+    if (mine) return JSON.stringify(mine.samples) === JSON.stringify(m.samples) ? 'same' : 'kept';
+    let mark;
+    try { mark = MM.learnCommandMark(m.samples, 'your mark'); } catch (err) { return null; }
+    rememberMark(mark, m.samples);
+    return 'taught';
+  }
+  /** The preferences that came, set where this device holds none (17-carry.js's takePrefs), and the ones the page shows taken up now. */
+  function carryPrefsIn(p) {
+    const read = (k) => { try { return localStorage.getItem(k); } catch (err) { return null; } };
+    const t = takePrefs(p, read);
+    let n = 0;
+    for (const k of Object.keys(t.set)) { try { localStorage.setItem(k, t.set[k]); n++; } catch (err) { /* private mode: not kept */ } }
+    if (t.set['mm-theme']) setThemeMode(prefs.get('theme', 'system'));
+    if (t.set['mm-hand']) setHand(prefs.get('hand', 'right'));
+    if (t.set['mm-draws']) setDraws(prefs.get('draws', null));
+    return n;
+  }
+  /**
+   * Boards carried in: `bytes` is every board in one file (`o.read`, when it has been read already). Each board that is
+   * not held already comes in as a new entry — its pictures stored first, their hashes checked, then its log, event for
+   * event — under its own name, or with a suffix where a board here has it; the mark and the preferences come where this
+   * device holds none. When the board on screen is empty the page goes to a board that came (the one of its name, else
+   * the first), and an empty board whose name a carried board took goes to the trash. Never throws: what could not come
+   * is said. Resolves `{ ok, brought, held, failed, damaged, mark, prefs, emptied }` or `{ ok: false, words }`.
+   */
+  async function carryIn(bytes, o) {
+    o = o || {};
+    if (boards.how !== 'indexeddb') return { ok: false, words: 'this browser keeps one board here (it has no IndexedDB), so carried boards cannot come in — open them in a browser that keeps boards' };
+    if (boardsListed) await boardsListed.catch(() => {});
+    await rereadBoards(); // another tab may have made, renamed or carried boards since this page read the list
+    const r = o.read || await everyRead(bytes, { inflate: inflateRaw });
+    if (!r.ok) return { ok: false, words: r.notEvery ? 'that is not every board in one file — nothing was opened' : r.words };
+    const failed = [], incoming = [];
+    for (const [key, b] of r.boards.entries()) {
+      if (b.bad) { failed.push({ name: b.name, why: b.bad }); continue; }
+      const br = await bundleRead(b.bytes, { inflate: inflateRaw, digest: digestHex });
+      if (!br.ok) { failed.push({ name: b.name, why: br.words }); continue; }
+      let read;
+      try { read = readLogText(br.text, b.name); } catch (err) { read = { notLog: true }; }
+      if (!read.events) { failed.push({ name: b.name, why: read.refused || 'its board.jsonl is not a board’s log' }); continue; }
+      incoming.push({ key: key, name: b.name, view: b.view, events: read.events, assets: br.assets, damaged: br.damaged.length, hash: await logHash(read.events) });
+    }
+    const held = await carryHeld();
+    const plan = carryPlan({ held: held, incoming: incoming.map((x) => ({ key: x.key, name: x.name, hash: x.hash })) });
+    const brought = [];
+    let damaged = 0;
+    for (const p of plan.bring) {
+      const x = incoming.find((i) => i.key === p.key);
+      // What each picture is, from the events that name it: a picture no event names is not kept.
+      const info = new Map();
+      for (const ev of x.events) if (ev && ev.type === 'import' && isAssetRef(ev.asset)) info.set(ev.asset, { mime: ev.mime, w: ev.w, h: ev.h });
+      const stored = [];
+      try {
+        for (const a of x.assets) {
+          const i = info.get(a.ref);
+          if (!i) continue;
+          await assetPut({ hash: a.ref, bytes: a.bytes, mime: i.mime || a.mime, w: i.w, h: i.h });
+          stored.push(a.ref);
+        }
+        const entry = Object.assign(newBoardEntry([...boards.entries.values()], mintBoardId(), Date.now(), p.name), { carried: p.hash });
+        await writeNewBoard(entry, x.events, carryView(x.view));
+        brought.push({ id: entry.id, name: entry.name, pictures: stored.length });
+        damaged += x.damaged;
+      } catch (err) {
+        failed.push({ name: x.name, why: (err && err.message) || String(err) });
+      } finally { for (const ref of stored) assets.pending.delete(ref); }
+    }
+    const mark = carryMarkIn(r.mark);
+    const prefsSet = carryPrefsIn(r.prefs);
+    // The empty board the page opened with: the page goes to a board that came, and the empty one gives its name up.
+    let moved = false;
+    if (brought.length && onBoardHere() && carryEmpty(session.getEvents())) {
+      const here = boardEntryName(board.id);
+      const to = (plan.empty.includes(board.id) && brought.find((b) => b.name === here)) || brought[0];
+      moved = await switchBoard(to.id, { said: () => {} });
+    }
+    const emptied = [];
+    const gone = plan.empty.filter((id) => !(onBoardHere() && id === board.id));
+    if (gone.length) {
+      try { for (const e of await updateBoardEntries(gone, (cur) => (cur.trashed ? null : trashed(cur, Date.now())))) emptied.push(e.name); } catch (err) { /* left where it was */ }
+    }
+    // A mark taught here and now: the board on screen answers to it (opening a board does this; a page that did not move, here).
+    if (mark === 'taught' && !moved && onBoardHere()) restoreMark();
+    return { ok: true, brought: brought, held: plan.held, failed: failed, damaged: damaged, mark: mark, prefs: prefsSet, emptied: emptied };
+  }
+
   /**
    * Reset: a fresh board, never one tap from losing this one. The board on
    * screen goes to the trash (it comes back whole from there) and a fresh one

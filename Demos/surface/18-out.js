@@ -3,12 +3,15 @@
 //   tests), the marks an export is of (exportIds: the held marks, else the board), the board as layers (boardLayers),
 //   the board as one SVG with its pictures and figures in it (exportSvg; exportBoardSVG and svgOf, the sync ink-and-
 //   figures forms the clipboard's Copy still asks), as a PNG of the WHOLE board drawn offscreen (exportPng), as a PDF
-//   of one page (exportPdf), as a bundle — a zip holding the log and its pictures (exportBundle) — and a bundle read
-//   back (bundleLoad: every picture stored, hash checked, before the board's events land); exportLog; the export pane.
+//   of one page (exportPdf), as a bundle — a zip holding the log and its pictures (boardBundleOf, exportBundle) — and a
+//   bundle read back (bundleLoad: every picture stored, hash checked, before the board's events land); exportLog; the
+//   export pane; and every board this browser keeps out in one file (everyBoardsOut, RENAME-PLAN N1: what *Every board
+//   out* downloads and what a carry to dyna.ink sends; joinParts).
 // Uses: core, folder (session, boards, board, boardOnScreenName, logWrite, logFileNote, readLogText), images (the asset
 //   store: assetGet, assetList, assetPut, decodeAsset, digestHex), artifacts (codeRepOf, isWritingArtifact), kinds
 //   (TEXT_FITS_LINES, linesOf), controls (closePanel, togglePanel), input (flash), 17-assets.js (assetsOfEvents),
-//   17-bundle.js (the zip, the bundle, the svg, the plans).
+//   17-bundle.js (the zip, the bundle, the svg, the plans), 17-carry.js (carryEmpty, carryMark, carryPrefs, everyBuild,
+//   everyName), the boards list (boardShelves, boardDB, idbBackend, journalFold, BOARD_VIEW_KEY), teach (savedMark).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the closure's; no imports, no exports,
 // no build step beyond the concatenation.
@@ -262,12 +265,12 @@
   const bytesOf = (b) => (b instanceof Uint8Array ? b : new Uint8Array(b));
 
   /**
-   * The whole board and every picture it names, as one zip (17-bundle.js): `board.jsonl` — the version 1 log, its
-   * header saying how many pictures sit beside it — and `assets/<hash>.<ext>`. A picture this device does not hold
-   * (a log that came from elsewhere) cannot be put in, and is said.
+   * One board's log and every picture it names, as one zip (17-bundle.js): `board.jsonl` — the version 1 log, its
+   * header saying how many pictures sit beside it — and `assets/<hash>.<ext>`. `evs` is the log as it is held, each
+   * event written as it stands. A picture this device does not hold (a log that came from elsewhere) cannot be put
+   * in, and is counted. Returns zipWrite's `{ parts, size }` and the counts.
    */
-  async function exportBundle() {
-    const evs = session.getEvents();
+  async function boardBundleOf(evs) {
     const got = [];
     let missing = 0;
     for (const ref of assetsOfEvents(evs)) {
@@ -275,12 +278,64 @@
       if (rec) got.push({ ref: ref, mime: rec.mime || 'image/jpeg', bytes: bytesOf(rec.bytes) }); else missing++;
     }
     const log = MM.encodeLog(evs, Object.assign(logWrite(), got.length ? { assets: got.length } : {}));
-    const z = bundleBuild({ log: log, assets: got, time: Date.now() });
+    return { zip: bundleBuild({ log: log, assets: got, time: Date.now() }), assets: got.length, missing: missing };
+  }
+  /** A zip's pieces as one run of bytes, for a zip that goes inside another or into a message. */
+  function joinParts(parts, size) {
+    const out = new Uint8Array(size === undefined ? parts.reduce((a, p) => a + p.length, 0) : size);
+    let at = 0;
+    for (const p of parts) { out.set(p, at); at += p.length; }
+    return out;
+  }
+
+  /** The board on screen and every picture it names, as one zip — the export pane's *board + pictures*. */
+  async function exportBundle() {
+    const evs = session.getEvents();
+    const b = await boardBundleOf(evs);
     const name = bundleName(boardOnScreenName());
-    const held = got.length ? plural(got.length, 'picture') : 'no pictures';
+    const held = b.assets ? plural(b.assets, 'picture') : 'no pictures';
     const said = name + ' — the whole board, its ' + plural(evs.length, 'event') + ' and ' + held + ' in one file; boards ▸ from a file… opens it whole' +
-      (missing ? ' · ' + plural(missing, 'picture') + ' this device does not hold could not be put in it' : '');
-    return { name: name, blob: new Blob(z.parts, { type: 'application/zip' }), assets: got.length, missing: missing, events: evs.length, said: said };
+      (b.missing ? ' · ' + plural(b.missing, 'picture') + ' this device does not hold could not be put in it' : '');
+    return { name: name, blob: new Blob(b.zip.parts, { type: 'application/zip' }), assets: b.assets, missing: b.missing, events: evs.length, said: said };
+  }
+
+  /**
+   * Every board this browser keeps, out in one file (RENAME-PLAN N1; 17-carry.js's everyBuild): each board on the list
+   * as its bundle — the board on screen as it stands, every other as its journal holds it — with its name and its
+   * view, the taught mark's five samples and the preferences by name, never a key. A board with nothing on it is left
+   * out and counted, the trash stays here, and a board whose store cannot be read is said. What the boards pane's
+   * *Every board out* downloads, and what *Carry my boards to dyna.ink* sends the window it opens.
+   */
+  async function everyBoardsOut() {
+    const out = { boards: [], empty: 0, trash: 0, pictures: 0, missing: 0, failed: [] };
+    const shelves = boardShelves([...boards.entries.values()]);
+    out.trash = shelves.trash.length;
+    const many = boards.how === 'indexeddb';
+    const db = many ? await boardDB() : null;
+    const list = many ? shelves.boards : (onBoardHere() ? [{ id: board.id, name: boardEntryName(board.id) }] : []);
+    for (const e of list) {
+      let events = null;
+      try {
+        if (onBoardHere() && e.id === board.id) events = session.getEvents();
+        else if (db) events = journalFold((await idbBackend(db, e.id).read()).records).events;
+      } catch (err) { out.failed.push({ name: e.name, why: (err && err.message) || String(err) }); continue; }
+      if (!events) continue;
+      if (carryEmpty(events)) { out.empty++; continue; }
+      const b = await boardBundleOf(events);
+      out.pictures += b.assets;
+      out.missing += b.missing;
+      out.boards.push({ name: e.name, view: prefs.get(BOARD_VIEW_KEY + e.id, null), bytes: joinParts(b.zip.parts, b.zip.size) });
+    }
+    const mark = carryMark(savedMark());
+    const kept = carryPrefs((k) => { try { return localStorage.getItem(k); } catch (err) { return null; } });
+    const time = Date.now();
+    const z = everyBuild({ boards: out.boards, mark: mark, prefs: kept, from: location.origin, time: time });
+    out.bytes = joinParts(z.parts, z.size);
+    out.name = everyName(time);
+    out.count = out.boards.length;
+    out.mark = !!mark;
+    out.prefs = Object.keys(kept).length;
+    return out;
   }
 
   /**

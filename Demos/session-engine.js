@@ -10933,10 +10933,11 @@
    * The page's address on board `id`: `board=` set (in the place it had, or last), everything else
    * kept — except what would make the board not this board on a reload: `fresh` (a fresh start
    * replaces the board at its first change), and a folder, a repository, a room (and its `key`, which is the
-   * room's and never a board's) or a figure.
+   * room's and never a board's) or a figure — and `carry`, which asks a page once to take boards carried from the
+   * old address (RENAME-PLAN N1): a reload is no second carry.
    */
   function boardSearch(search, id) {
-    const drop = { fresh: 1, folder: 1, git: 1, live: 1, relay: 1, key: 1, replay: 1, embed: 1 };
+    const drop = { fresh: 1, folder: 1, git: 1, live: 1, relay: 1, key: 1, replay: 1, embed: 1, carry: 1 };
     const out = [];
     let said = false;
     for (const p of String(search || '').replace(/^\?/, '').split('&')) {
@@ -11368,6 +11369,381 @@
     return out;
   }
 
+// ===== carry (your boards, from the old address to the new home) =====
+// Provides: the pure half of RENAME-PLAN N1 — CARRY_OLD_ORIGIN / CARRY_HOME_ORIGIN (the two addresses, fixed),
+//   NEW_HOME_NOTICE (the old address's notice that dyna.ink is the new home: OFF until N4 turns it on),
+//   isLocalOrigin, carryTarget / carryOpenUrl (where a page carries to, and the address it opens there),
+//   carrySources / carryAccepts (whom a page takes boards from), carryOffered / homeNoticeShown (what the boards
+//   pane shows), CARRY_TYPES / carryMessage (the messages, read and never trusted), CARRY_PREFS / CARRY_NEVER /
+//   keyShaped / carryPrefs / takePrefs (the preferences, by an allowlist of names — never a key), carryMark (the
+//   taught mark as its five samples), carryView (a board's zoom and pan), carryEmpty / carryPlan (what a carry
+//   brings in: a new entry each, a suffix for a name already here, a log already held said and skipped, the
+//   empty first board giving its name up), EVERY_MANIFEST / everyName / everyBuild / everyRead (one file holding
+//   every board's .dyna.zip — the fallback, and what the window is sent) and carryWhere / carryWords /
+//   carrySentWords (the sentences).
+// Uses: NOTHING outside the pure fragments: boardName and BOARD_NAME_MAX (17-boards.js), zipWrite / zipRead /
+//   bundleName (17-bundle.js) — called, never at load, so it loads after them and with them in Node:
+//   node --test Demos/surface/17-carry.test.mjs
+//   22-carry.js is the adapter (the window, the messages, the pane's acts), 17-folder.js writes the boards in and
+//   reads them out, 18-out.js makes each board's bundle.
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+//
+// WHY THIS EXISTS. What a person keeps in a browser belongs to the address: boards in IndexedDB (`mm-boards`), the
+// pictures beside them (`mm-assets`), the taught mark and every preference in `mm-*` keys. A page at dyna.ink cannot
+// read what jjh111.github.io kept, so the old address carries it across: one tap opens dyna.ink in a window of its own,
+// the new page says it is ready, and the old one sends it one file — every board as I4's bundle, each board's name,
+// the mark's five samples and the preferences. The same file, downloaded, is the fallback: it works offline, between
+// devices, and where a window is refused.
+//
+// THE ORIGINS ARE FIXED, BOTH WAYS. The receiving page takes boards from the old address's origin and from nothing a
+// message or an address claims; the sending page posts only to dyna.ink's origin, by name, never to '*'. The one
+// exception is for this machine — the gate, and development — and it cannot open a hole on either real address: a
+// page served from 127.0.0.1 or localhost may name ANOTHER such origin in its own address (`?carryTo=` on the sender,
+// `?carry=` on the receiver, which the sender writes), and a page anywhere else reads neither.
+//
+// NEVER A KEY. Preferences are gathered by an allowlist of names (CARRY_PREFS), never "every mm- key": the remembered
+// model keys, a repository's token, the model picks and a room's key live beside the preferences, and are named in
+// CARRY_NEVER so a test can see that they are not carried. A value that looks like a key is left out even under an
+// allowed name, and the receiving page reads what arrives through the same allowlist again.
+//
+// THE LOG IS THE BOARD. Each log goes out as its journal holds it and comes in event for event: nothing here, or in
+// the adapters, rewrites an event. A log already held — or carried here before and drawn on since — is not brought in
+// twice: it is said to be held and skipped.
+
+  /** The old address: where boards are carried FROM. */
+  const CARRY_OLD_ORIGIN = 'https://jjh111.github.io';
+  /** The new home: where boards are carried TO. */
+  const CARRY_HOME_ORIGIN = 'https://dyna.ink';
+  /** The app's path on either: the window opens there. */
+  const CARRY_APP_PATH = '/app/';
+  /**
+   * The notice on the old address — a lasting line in the boards pane, and the status line once — that dyna.ink is the
+   * new home, with the tap that carries the boards there. OFF until RENAME-PLAN N4 turns it on, once dyna.ink answers;
+   * that unit flips this one constant and nothing else. (The offer itself can be reached before that with `?carryTo`
+   * in the old address: carryOffered.)
+   */
+  const NEW_HOME_NOTICE = false;
+  /** The messages between the two windows, and their version; anything else is not ours. */
+  const CARRY_V = 1;
+  const CARRY_TYPES = { ready: 'mm-carry-ready', ping: 'mm-carry-ping', boards: 'mm-carry', done: 'mm-carry-done' };
+  /** The device preferences carried, by name — the localStorage keys, as the surface writes them. Nothing else is. */
+  const CARRY_PREFS = [
+    'mm-theme', 'mm-hand', 'mm-draws', 'mm-autoRead', 'mm-hand-name',
+    'mm-snap', 'mm-panel', 'mm-inspect', 'mm-palette-uses', 'mm-palette-uses-here',
+  ];
+  /**
+   * What a browser keeps beside the preferences and NEVER carries, named so a test can see it is not: a provider's key
+   * (`mm-model-key`, `mm-model-keys`), a repository's token, the model picks and the semantic seat's address (a model
+   * is joined again at the new home), the folder log's name and the persist ask (this device's, per address), the old
+   * board in browser storage, the taught mark (carried as its samples, learned again where it lands) and the help's
+   * notice said once. A room's key is never kept at all: it lives in a room's address, which no carry reads.
+   */
+  const CARRY_NEVER = [
+    'mm-model-key', 'mm-model-keys', 'mm-git-token', 'mm-model-pick', 'mm-seats', 'mm-semantic',
+    'mm-participant', 'mm-persist-asked', 'mm-log', 'mm-command-mark', 'mm-home-said',
+  ];
+  /** How long one preference may be, and all of them together, in characters. */
+  const CARRY_PREF_MAX = 65536, CARRY_PREFS_MAX = 262144;
+  /** The samples a taught mark is learned from (MM.COMMAND_MARK_SAMPLES), and the points one may have. */
+  const CARRY_MARK_SAMPLES = 5, CARRY_MARK_POINTS = 4000;
+  /** The one file: its manifest, its format and the version this build writes and reads. */
+  const EVERY_MANIFEST = 'boards.json';
+  const EVERY_FORMAT = 'dyna-boards';
+  const EVERY_VERSION = 1;
+
+  // ----- who sends, who takes ---------------------------------------------------------------------------
+
+  /** An origin on this machine: http, 127.0.0.1 or localhost, a port — the origin and nothing more. */
+  function isLocalOrigin(o) {
+    if (typeof o !== 'string') return false;
+    const m = /^http:\/\/(127\.0\.0\.1|localhost):(\d{1,5})$/.exec(o);
+    return !!m && +m[2] > 0 && +m[2] < 65536;
+  }
+  /**
+   * Where a page served from `self` carries boards to: dyna.ink from the old address, whatever its address says; from a
+   * page on this machine, the other local origin its address names (`asked`); from anywhere else, nowhere (null).
+   */
+  function carryTarget(self, asked) {
+    if (self === CARRY_OLD_ORIGIN) return CARRY_HOME_ORIGIN;
+    if (isLocalOrigin(self) && isLocalOrigin(asked) && asked !== self) return asked;
+    return null;
+  }
+  /** The address the window opens: the app at the target, told it is being carried to — and, on this machine, from where. */
+  function carryOpenUrl(self, target) {
+    return target + CARRY_APP_PATH + (isLocalOrigin(target) ? '?carry=' + encodeURIComponent(self) : '?carry');
+  }
+  /**
+   * The origins a page served from `self` takes boards from: the old address — never itself — and, when the page is on
+   * this machine, the other local origin its own address names (`named`). The old address takes from no one.
+   */
+  function carrySources(self, named) {
+    if (self === CARRY_OLD_ORIGIN) return [];
+    const out = [CARRY_OLD_ORIGIN];
+    if (isLocalOrigin(self) && isLocalOrigin(named) && named !== self) out.push(named);
+    return out;
+  }
+  /** Whether a message's origin is one of them — exactly, as the browser says it. */
+  function carryAccepts(allowed, origin) {
+    return typeof origin === 'string' && Array.isArray(allowed) && allowed.includes(origin);
+  }
+  /**
+   * Whether the boards pane offers *Carry my boards to dyna.ink*: where the page can carry, once the notice is on — or
+   * before, when the address asks (`?carryTo`), so the carry can be tried by hand ahead of N4.
+   */
+  function carryOffered(o) {
+    const q = o || {};
+    return !!q.target && (q.notice === true || !!q.asked);
+  }
+  /** Whether the old address's notice shows: on the old address only, and only once it is on. */
+  function homeNoticeShown(self, notice) {
+    return notice === true && self === CARRY_OLD_ORIGIN;
+  }
+  /**
+   * A message read: `{ type, … }` with only what that type carries, or null for anything that is not one of ours, of
+   * this version, in its shape. `mm-carry` must carry the file as bytes; `mm-carry-done` carries three counts.
+   */
+  function carryMessage(data) {
+    if (!data || typeof data !== 'object' || data.v !== CARRY_V || typeof data.type !== 'string') return null;
+    const count = (n) => (Number.isInteger(n) && n >= 0 && n < 1e6 ? n : 0);
+    switch (data.type) {
+      case CARRY_TYPES.ready: case CARRY_TYPES.ping: return { type: data.type };
+      case CARRY_TYPES.boards: return data.file instanceof ArrayBuffer ? { type: data.type, file: data.file } : null;
+      case CARRY_TYPES.done: return { type: data.type, brought: count(data.brought), held: count(data.held), failed: count(data.failed) };
+      default: return null;
+    }
+  }
+
+  // ----- what is carried: never a key ----------------------------------------------------------------------
+  /** Shapes a key or token takes (scripts/release.mjs keeps the same list for what a release may hold). */
+  const KEY_SHAPES = [
+    /sk-ant-[A-Za-z0-9_-]{20,}/, /sk-or-v1-[A-Za-z0-9]{20,}/, /\bsk-(?:proj-)?[A-Za-z0-9_-]{32,}/,
+    /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}/, /\bgithub_pat_[A-Za-z0-9_]{30,}/, /\bAKIA[0-9A-Z]{16}\b/,
+    /\bxox[abprs]-[A-Za-z0-9-]{10,}/, /\bAIza[0-9A-Za-z_-]{35}/,
+  ];
+  /** Whether some text holds something shaped like a key. */
+  function keyShaped(s) {
+    const t = String(s == null ? '' : s);
+    return KEY_SHAPES.some((re) => re.test(t));
+  }
+  /** Whether a preference may travel: a carried name, a string, not too long, nothing key-shaped in it. */
+  function prefTravels(k, v) {
+    return CARRY_PREFS.includes(k) && !CARRY_NEVER.includes(k) && typeof v === 'string' && v.length <= CARRY_PREF_MAX && !keyShaped(v);
+  }
+  /**
+   * The preferences carried, read through `read(key)` (localStorage.getItem's shape: the raw string, or null): every
+   * name of CARRY_PREFS that holds a value that may travel, as it is held. Nothing else is ever read.
+   */
+  function carryPrefs(read) {
+    const out = {};
+    let total = 0;
+    for (const k of CARRY_PREFS) {
+      let v = null;
+      try { v = read(k); } catch (err) { v = null; }
+      if (v === null || v === undefined || !prefTravels(k, v)) continue;
+      if (total + v.length > CARRY_PREFS_MAX) break;
+      total += v.length;
+      out[k] = v;
+    }
+    return out;
+  }
+  /**
+   * The preferences that arrived, taken: only a carried name, a value that may travel, and only where this page holds
+   * none — what it already holds stands (`kept`). `read` is as for carryPrefs.
+   */
+  function takePrefs(incoming, read) {
+    const set = {}, kept = [];
+    if (!incoming || typeof incoming !== 'object') return { set, kept };
+    for (const k of CARRY_PREFS) {
+      if (!Object.prototype.hasOwnProperty.call(incoming, k) || !prefTravels(k, incoming[k])) continue;
+      let here = null;
+      try { here = read(k); } catch (err) { here = null; }
+      if (here !== null && here !== undefined) kept.push(k); else set[k] = incoming[k];
+    }
+    return { set, kept };
+  }
+  /** One sample's points, x and y only, or null when it is not a stroke. */
+  function markStroke(pts) {
+    if (!Array.isArray(pts) || pts.length < 2 || pts.length > CARRY_MARK_POINTS) return null;
+    const out = [];
+    for (const p of pts) {
+      if (!p || typeof p !== 'object' || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
+      out.push({ x: p.x, y: p.y });
+    }
+    return out;
+  }
+  /**
+   * The taught mark as it is carried: its five samples (x and y) and when it was taught — never the learned signature,
+   * which the page it lands on learns again from the samples. `saved` is the device's record ({ mark, samples, at });
+   * anything else, or a mark not taught from five strokes, is null.
+   */
+  function carryMark(saved) {
+    if (!saved || typeof saved !== 'object' || !saved.mark || !Array.isArray(saved.samples) || saved.samples.length !== CARRY_MARK_SAMPLES) return null;
+    const samples = saved.samples.map(markStroke);
+    if (samples.some((s) => !s)) return null;
+    return { samples, at: Number.isFinite(saved.at) ? saved.at : 0 };
+  }
+  /** A board's view as it travels: zoom, panX, panY, finite, the zoom above nothing — or null. */
+  function carryView(v) {
+    if (!v || typeof v !== 'object') return null;
+    const { zoom, panX, panY } = v;
+    return Number.isFinite(zoom) && zoom > 0 && Number.isFinite(panX) && Number.isFinite(panY) ? { zoom, panX, panY } : null;
+  }
+
+  // ----- what a carry brings in --------------------------------------------------------------------------------
+  /** A board with nothing in its log but the device's mark taught again on opening (17-folder.js's markAfterOpen). */
+  function carryEmpty(events) {
+    return !(events || []).some((e) => !e || e.type !== 'teach');
+  }
+  /** A name with a number after it, room left within the limit. */
+  function carryNumbered(stem, n) {
+    const tail = ' ' + n;
+    return stem.slice(0, BOARD_NAME_MAX - tail.length).trim() + tail;
+  }
+  /**
+   * What a carry brings in. `held`: the boards this page keeps — `{ id, name, trashed, empty, hash, carried? }`, `hash`
+   * the digest of the log as its journal holds it, `carried` what it was carried as — and `incoming`: `{ key, name, hash }`.
+   * Returns `bring` (a new entry each: `{ key, name, hash, from }`, the name its own or with a suffix where a board here
+   * has it), `held` (`{ key, name, as }`: a log this page holds already — as it is now, or as it was carried in — said and
+   * skipped; the same log twice in one carry comes once) and `empty` (the ids of empty boards on the list whose name a
+   * carried board takes: the board a new page opens with, which held nothing, gives its name up to the trash).
+   */
+  function carryPlan(o) {
+    const held = (o && o.held) || [];
+    const incoming = (o && o.incoming) || [];
+    const asOf = new Map();
+    for (const h of held) {
+      if (h.hash && !asOf.has(h.hash)) asOf.set(h.hash, h.name);
+      if (h.carried && !asOf.has(h.carried)) asOf.set(h.carried, h.name);
+    }
+    const yielding = held.filter((h) => h.empty && !h.trashed);
+    const taken = new Set(held.filter((h) => !(h.empty && !h.trashed)).map((h) => h.name));
+    const bring = [], skip = [], empty = [];
+    for (const x of incoming) {
+      if (x.hash && asOf.has(x.hash)) { skip.push({ key: x.key, name: x.name, as: asOf.get(x.hash) }); continue; }
+      const stem = boardName(x.name) || 'Board';
+      let name = stem;
+      for (let n = 2; taken.has(name); n++) name = carryNumbered(stem, n);
+      taken.add(name);
+      if (x.hash) asOf.set(x.hash, name);
+      for (const e of yielding) if (e.name === name && !empty.includes(e.id)) empty.push(e.id);
+      bring.push({ key: x.key, name, hash: x.hash, from: x.name });
+    }
+    return { bring, held: skip, empty };
+  }
+
+  // ----- the one file every board goes out in ----------------------------------------------------------------
+  const everyUtf8 = (s) => new TextEncoder().encode(s);
+  /** What the file is called: `every-board-<the day>.zip`. */
+  function everyName(time) {
+    const d = new Date(Number.isFinite(time) ? time : 0);
+    const p = (n) => String(n).padStart(2, '0');
+    return 'every-board-' + d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()) + '.zip';
+  }
+  /**
+   * Every board in one zip (stored, as the bundles in it are): `boards.json` first — the format, where it came from,
+   * each board's file, name and view, the mark's samples and the preferences — then `boards/<nn>-<name>.dyna.zip`, each
+   * board's bundle untouched. `boards`: `[{ name, view?, bytes }]`. Returns zipWrite's `{ parts, size }`.
+   */
+  function everyBuild(o) {
+    const files = [], list = [];
+    (o.boards || []).forEach((b, i) => {
+      const file = 'boards/' + String(i + 1).padStart(2, '0') + '-' + bundleName(b.name);
+      files.push({ name: file, data: b.bytes });
+      list.push({ file, name: String(b.name || ''), view: carryView(b.view) });
+    });
+    const prefs = {};
+    for (const k of Object.keys(o.prefs || {})) if (prefTravels(k, o.prefs[k])) prefs[k] = o.prefs[k];
+    const manifest = { format: EVERY_FORMAT, version: EVERY_VERSION, from: String(o.from || ''), at: Number.isFinite(o.time) ? o.time : 0, boards: list, mark: o.mark || null, prefs };
+    return zipWrite([{ name: EVERY_MANIFEST, data: everyUtf8(JSON.stringify(manifest)) }].concat(files), { time: o.time });
+  }
+  /**
+   * Every board read back, never trusted: `{ ok: true, from, at, boards: [{ name, view, bytes } | { name, view, bad }],
+   * mark, prefs }` — each board's bundle as it stands in the file (its own reader checks its log and its pictures), a
+   * board whose entry is damaged or missing said in `bad`, the mark only as five strokes, the preferences only by the
+   * allowlist. `{ ok: false, notEvery: true, words }` for a zip with no manifest (a single board's bundle, say),
+   * `{ ok: false, unread: true, words }` for bytes that are no zip that can be read, and `{ ok: false, words }` for a
+   * manifest that cannot be. Never throws. `o.inflate` as zipRead's.
+   */
+  async function everyRead(bytes, o) {
+    try {
+      const z = await zipRead(bytes, o);
+      if (!z.ok) return { ok: false, unread: true, words: z.words };
+      const base = (n) => n.slice(n.lastIndexOf('/') + 1);
+      const man = z.entries.filter((e) => base(e.name) === EVERY_MANIFEST).sort((a, b) => a.name.split('/').length - b.name.split('/').length)[0];
+      if (!man) return { ok: false, notEvery: true, words: 'this zip holds no ' + EVERY_MANIFEST + ', so it is not every board in one file' };
+      if (man.bad) return { ok: false, words: 'the list of boards in this file is damaged (' + man.bad + ') — nothing was opened' };
+      let m = null;
+      try { m = JSON.parse(new TextDecoder().decode(man.data)); } catch (err) { m = null; }
+      if (!m || typeof m !== 'object' || m.format !== EVERY_FORMAT) return { ok: false, words: 'the list of boards in this file could not be read — nothing was opened' };
+      if (!Number.isInteger(m.version) || m.version < 1) return { ok: false, words: 'the list of boards in this file names no version this build reads — nothing was opened' };
+      if (m.version > EVERY_VERSION) return { ok: false, words: 'this file is version ' + m.version + ' of every board in one file, and this build reads version ' + EVERY_VERSION + ' — nothing was opened; open it with a newer dyna.ink' };
+      const dir = man.name.slice(0, man.name.length - EVERY_MANIFEST.length);
+      const byName = new Map(z.entries.map((e) => [e.name, e]));
+      const boards = [];
+      for (const b of Array.isArray(m.boards) ? m.boards : []) {
+        if (!b || typeof b !== 'object') continue;
+        const name = typeof b.name === 'string' ? b.name : '';
+        const view = carryView(b.view);
+        const file = typeof b.file === 'string' && /^boards\/[^/]+\.zip$/.test(b.file) ? dir + b.file : null;
+        const e = file ? byName.get(file) : null;
+        if (!e) { boards.push({ name, view, bad: 'it is not in the file' }); continue; }
+        if (e.bad) { boards.push({ name, view, bad: e.bad }); continue; }
+        boards.push({ name, view, bytes: e.data });
+      }
+      const mark = m.mark && typeof m.mark === 'object' ? carryMark({ mark: true, samples: m.mark.samples, at: m.mark.at }) : null;
+      const prefs = {};
+      if (m.prefs && typeof m.prefs === 'object') for (const k of Object.keys(m.prefs)) if (prefTravels(k, m.prefs[k])) prefs[k] = m.prefs[k];
+      return { ok: true, from: typeof m.from === 'string' ? m.from : '', at: Number.isFinite(m.at) ? m.at : 0, boards, mark, prefs };
+    } catch (err) {
+      return { ok: false, words: 'this file could not be read (' + ((err && err.message) || err) + ') — nothing was opened' };
+    }
+  }
+
+  // ----- the sentences ------------------------------------------------------------------------------------------
+  const carryCount = (n, one, many) => n + ' ' + (n === 1 ? one : many || one + 's');
+  const carryList = (xs) => (xs.length <= 1 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]);
+  /** Where boards came from or went, in a few words: the old address, dyna.ink, the file — or a host on this machine. */
+  function carryWhere(origin) {
+    if (origin === CARRY_OLD_ORIGIN) return 'the old address';
+    if (origin === CARRY_HOME_ORIGIN) return 'dyna.ink';
+    if (origin === 'file') return 'the file';
+    return String(origin || '').replace(/^https?:\/\//, '') || 'elsewhere';
+  }
+  /**
+   * What a carry did, said where it landed: `{ from, brought: [{ name, pictures }], held: [{ name, as }], failed:
+   * [{ name, why }], damaged, mark: 'taught' | 'same' | 'kept' | null, prefs, emptied: [name] }`.
+   */
+  function carryWords(r) {
+    const from = carryWhere(r.from);
+    const brought = r.brought || [], held = r.held || [], failed = r.failed || [];
+    const parts = [];
+    if (brought.length) {
+      const pics = brought.reduce((a, b) => a + (b.pictures || 0), 0);
+      parts.push(carryCount(brought.length, 'board') + ' came from ' + from + ' — ' + carryList(brought.map((b) => '“' + b.name + '”')) + (pics ? ', with ' + carryCount(pics, 'picture') : ''));
+      if (held.length) parts.push(held.length === 1 ? '“' + held[0].name + '” was here already' : held.length + ' were here already');
+    } else if (held.length) {
+      parts.push('nothing new from ' + from + ' — ' + (held.length === 1 ? '“' + held[0].name + '” is' : held.length === 2 ? 'both boards are' : 'all ' + held.length + ' boards are') + ' here already');
+    } else if (!failed.length) parts.push('no boards came from ' + from + ' — it had none with anything on them');
+    for (const f of failed) parts.push('“' + (f.name || 'a board') + '” could not be read (' + f.why + ') and stayed behind');
+    if (r.damaged) parts.push(carryCount(r.damaged, 'picture') + (r.damaged === 1 ? ' was' : ' were') + ' damaged and ' + (r.damaged === 1 ? 'stands as its name' : 'stand as their names'));
+    if (r.mark === 'taught') parts.push('your mark came too');
+    else if (r.mark === 'kept') parts.push('the mark taught here was kept — the one from ' + from + ' was not');
+    if (r.prefs) parts.push(carryCount(r.prefs, 'preference') + ' came too');
+    for (const n of r.emptied || []) parts.push('the empty “' + n + '” this page began with is in the trash');
+    return parts.join(' · ');
+  }
+  /** What a carry did, said where it began: `{ target, brought, held, failed }` — the counts the new page sent back. */
+  function carrySentWords(r) {
+    const to = carryWhere(r.target);
+    if (!r.brought && r.held && !r.failed) return 'nothing new to carry — ' + (r.held === 1 ? 'the board is' : r.held === 2 ? 'both boards are' : 'all ' + r.held + ' boards are') + ' on ' + to + ' already';
+    const tail = [];
+    if (r.held) tail.push(r.held + (r.held === 1 ? ' was' : ' were') + ' there already');
+    if (r.failed) tail.push(r.failed + ' could not be read there');
+    return carryCount(r.brought || 0, 'board') + ' carried to ' + to + (tail.length ? ' — ' + tail.join(', ') : '');
+  }
+
 // ===== find (the kept index, and the boards' pictures) =====
 // Provides: what Find keeps beside the journals (PLAN-IPAD-NOTES I6) — for every board this browser keeps, what it
 //   SAYS (the labels, names, typed text, figures' words, Mermaid, picture names, read writing: core's
@@ -11791,7 +12167,8 @@
 //   browser keeps when there is no folder (V1-PLAN R3, R1) — the adapter over 17-board.js's journal
 //   and 17-boards.js's list: IndexedDB (openBoard, persistBoard, flushBoard, forgetLocalLog; the list:
 //   switchBoard, newBoard, renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash,
-//   emptyTrash, boardFromFile, resetBoard, rememberPlace, openPlace), the log format's surface (R2:
+//   emptyTrash, boardFromFile, resetBoard, rememberPlace, openPlace; and boards carried in from the old address,
+//   RENAME-PLAN N1: carryIn, carryHeld, logHash), the log format's surface (R2:
 //   readLogText — a log's text as events or the sentence for a version this build does not read —
 //   logWrite, logFileNote; a folder whose log is of a newer version is refused before it is opened),
 //   the view per board, browser
@@ -11801,7 +12178,9 @@
 // Uses: core, board (createJournal, openPlan, troubleOf, troubleWords, journalEvents, journalFold,
 //   journalText), boards (the list's pure half), view (fitAll, afterViewChange, clampZoom), teach
 //   (savedMark, restoreMark), artifacts, render, input (say, flash), images (downloadText), controls
-//   (syncTiles), the boards pane (renderBoardsPane, roomChanged), the seat (seatRoomOpened: who is heard in a room).
+//   (syncTiles), the boards pane (renderBoardsPane, roomChanged), the seat (seatRoomOpened: who is heard in a room),
+//   carrying (17-carry.js's rules; 22-carry.js's carryTake; the bundle reader and inflateRaw, 17-bundle.js and 18-out.js;
+//   rememberMark, 03-teach.js).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -13246,6 +13625,14 @@
     let events = null, stored = [], notes = null;
     if (zipped) {
       if (boards.how !== 'indexeddb') return newBoard(o);   // says why, and stores nothing
+      // Every board in one file (RENAME-PLAN N1): each comes in as a carry does — a new entry each, nothing twice.
+      const whole = new Uint8Array(await file.arrayBuffer());
+      const every = await everyRead(whole, { inflate: inflateRaw });
+      if (!every.notEvery && !every.unread) {
+        const r = await carryTake(whole, 'file', { read: every });
+        if (o && o.said) o.said(r.words); else say(r.words);
+        return false;
+      }
       const b = await bundleLoad(file);
       if (!b.ok) return refuse('“' + file.name + '”: ' + b.words);
       events = b.events; stored = b.pending;
@@ -13268,6 +13655,121 @@
       return made;
     } finally { for (const ref of stored) assets.pending.delete(ref); }
   }
+  // ----- Carried in (RENAME-PLAN N1) -----------------------------------------------------------------------
+  // Every board a browser kept at the old address, arriving as one file (17-carry.js's everyBuild) — through the
+  // window a carry opened, or through *From a file…*. Each board's bundle is read as a bundle is (every picture's hash
+  // checked), and the board is written in as a NEW entry with its log exactly as it came: no event is rewritten. What
+  // this browser keeps already is hashed — each board's log as its journal holds it, and what each was carried in as —
+  // so a carry made twice brings nothing in twice.
+
+  /** The digest of a log as its journal holds it: one event a line, each written as it stands. */
+  function logHash(events) { return digestHex(new TextEncoder().encode(journalText(events))); }
+  /** Every board this browser keeps, the trash's included, as a carry compares them: name, empty or not, its log's digest, what it was carried in as. */
+  async function carryHeld() {
+    const db = await boardDB();
+    const out = [];
+    for (const e of boards.entries.values()) {
+      if (!isKept(e)) continue;
+      let events = null;
+      try {
+        if (onBoardHere() && e.id === board.id) events = session.getEvents();
+        else events = journalFold((await idbBackend(db, e.id).read()).records).events;
+      } catch (err) { events = null; }
+      out.push({ id: e.id, name: e.name, trashed: e.trashed || 0, empty: events ? carryEmpty(events) : false,
+        hash: events ? await logHash(events) : null, carried: typeof e.carried === 'string' ? e.carried : null });
+    }
+    return out;
+  }
+  /** The taught mark that came, learned again here from its five samples: 'taught' (this device held none), 'same', 'kept' (this device's own stands) or null. */
+  function carryMarkIn(m) {
+    if (!m) return null;
+    const mine = carryMark(savedMark());
+    if (mine) return JSON.stringify(mine.samples) === JSON.stringify(m.samples) ? 'same' : 'kept';
+    let mark;
+    try { mark = MM.learnCommandMark(m.samples, 'your mark'); } catch (err) { return null; }
+    rememberMark(mark, m.samples);
+    return 'taught';
+  }
+  /** The preferences that came, set where this device holds none (17-carry.js's takePrefs), and the ones the page shows taken up now. */
+  function carryPrefsIn(p) {
+    const read = (k) => { try { return localStorage.getItem(k); } catch (err) { return null; } };
+    const t = takePrefs(p, read);
+    let n = 0;
+    for (const k of Object.keys(t.set)) { try { localStorage.setItem(k, t.set[k]); n++; } catch (err) { /* private mode: not kept */ } }
+    if (t.set['mm-theme']) setThemeMode(prefs.get('theme', 'system'));
+    if (t.set['mm-hand']) setHand(prefs.get('hand', 'right'));
+    if (t.set['mm-draws']) setDraws(prefs.get('draws', null));
+    return n;
+  }
+  /**
+   * Boards carried in: `bytes` is every board in one file (`o.read`, when it has been read already). Each board that is
+   * not held already comes in as a new entry — its pictures stored first, their hashes checked, then its log, event for
+   * event — under its own name, or with a suffix where a board here has it; the mark and the preferences come where this
+   * device holds none. When the board on screen is empty the page goes to a board that came (the one of its name, else
+   * the first), and an empty board whose name a carried board took goes to the trash. Never throws: what could not come
+   * is said. Resolves `{ ok, brought, held, failed, damaged, mark, prefs, emptied }` or `{ ok: false, words }`.
+   */
+  async function carryIn(bytes, o) {
+    o = o || {};
+    if (boards.how !== 'indexeddb') return { ok: false, words: 'this browser keeps one board here (it has no IndexedDB), so carried boards cannot come in — open them in a browser that keeps boards' };
+    if (boardsListed) await boardsListed.catch(() => {});
+    await rereadBoards(); // another tab may have made, renamed or carried boards since this page read the list
+    const r = o.read || await everyRead(bytes, { inflate: inflateRaw });
+    if (!r.ok) return { ok: false, words: r.notEvery ? 'that is not every board in one file — nothing was opened' : r.words };
+    const failed = [], incoming = [];
+    for (const [key, b] of r.boards.entries()) {
+      if (b.bad) { failed.push({ name: b.name, why: b.bad }); continue; }
+      const br = await bundleRead(b.bytes, { inflate: inflateRaw, digest: digestHex });
+      if (!br.ok) { failed.push({ name: b.name, why: br.words }); continue; }
+      let read;
+      try { read = readLogText(br.text, b.name); } catch (err) { read = { notLog: true }; }
+      if (!read.events) { failed.push({ name: b.name, why: read.refused || 'its board.jsonl is not a board’s log' }); continue; }
+      incoming.push({ key: key, name: b.name, view: b.view, events: read.events, assets: br.assets, damaged: br.damaged.length, hash: await logHash(read.events) });
+    }
+    const held = await carryHeld();
+    const plan = carryPlan({ held: held, incoming: incoming.map((x) => ({ key: x.key, name: x.name, hash: x.hash })) });
+    const brought = [];
+    let damaged = 0;
+    for (const p of plan.bring) {
+      const x = incoming.find((i) => i.key === p.key);
+      // What each picture is, from the events that name it: a picture no event names is not kept.
+      const info = new Map();
+      for (const ev of x.events) if (ev && ev.type === 'import' && isAssetRef(ev.asset)) info.set(ev.asset, { mime: ev.mime, w: ev.w, h: ev.h });
+      const stored = [];
+      try {
+        for (const a of x.assets) {
+          const i = info.get(a.ref);
+          if (!i) continue;
+          await assetPut({ hash: a.ref, bytes: a.bytes, mime: i.mime || a.mime, w: i.w, h: i.h });
+          stored.push(a.ref);
+        }
+        const entry = Object.assign(newBoardEntry([...boards.entries.values()], mintBoardId(), Date.now(), p.name), { carried: p.hash });
+        await writeNewBoard(entry, x.events, carryView(x.view));
+        brought.push({ id: entry.id, name: entry.name, pictures: stored.length });
+        damaged += x.damaged;
+      } catch (err) {
+        failed.push({ name: x.name, why: (err && err.message) || String(err) });
+      } finally { for (const ref of stored) assets.pending.delete(ref); }
+    }
+    const mark = carryMarkIn(r.mark);
+    const prefsSet = carryPrefsIn(r.prefs);
+    // The empty board the page opened with: the page goes to a board that came, and the empty one gives its name up.
+    let moved = false;
+    if (brought.length && onBoardHere() && carryEmpty(session.getEvents())) {
+      const here = boardEntryName(board.id);
+      const to = (plan.empty.includes(board.id) && brought.find((b) => b.name === here)) || brought[0];
+      moved = await switchBoard(to.id, { said: () => {} });
+    }
+    const emptied = [];
+    const gone = plan.empty.filter((id) => !(onBoardHere() && id === board.id));
+    if (gone.length) {
+      try { for (const e of await updateBoardEntries(gone, (cur) => (cur.trashed ? null : trashed(cur, Date.now())))) emptied.push(e.name); } catch (err) { /* left where it was */ }
+    }
+    // A mark taught here and now: the board on screen answers to it (opening a board does this; a page that did not move, here).
+    if (mark === 'taught' && !moved && onBoardHere()) restoreMark();
+    return { ok: true, brought: brought, held: plan.held, failed: failed, damaged: damaged, mark: mark, prefs: prefsSet, emptied: emptied };
+  }
+
   /**
    * Reset: a fresh board, never one tap from losing this one. The board on
    * screen goes to the trash (it comes back whole from there) and a fresh one
@@ -14169,12 +14671,15 @@
 //   tests), the marks an export is of (exportIds: the held marks, else the board), the board as layers (boardLayers),
 //   the board as one SVG with its pictures and figures in it (exportSvg; exportBoardSVG and svgOf, the sync ink-and-
 //   figures forms the clipboard's Copy still asks), as a PNG of the WHOLE board drawn offscreen (exportPng), as a PDF
-//   of one page (exportPdf), as a bundle — a zip holding the log and its pictures (exportBundle) — and a bundle read
-//   back (bundleLoad: every picture stored, hash checked, before the board's events land); exportLog; the export pane.
+//   of one page (exportPdf), as a bundle — a zip holding the log and its pictures (boardBundleOf, exportBundle) — and a
+//   bundle read back (bundleLoad: every picture stored, hash checked, before the board's events land); exportLog; the
+//   export pane; and every board this browser keeps out in one file (everyBoardsOut, RENAME-PLAN N1: what *Every board
+//   out* downloads and what a carry to dyna.ink sends; joinParts).
 // Uses: core, folder (session, boards, board, boardOnScreenName, logWrite, logFileNote, readLogText), images (the asset
 //   store: assetGet, assetList, assetPut, decodeAsset, digestHex), artifacts (codeRepOf, isWritingArtifact), kinds
 //   (TEXT_FITS_LINES, linesOf), controls (closePanel, togglePanel), input (flash), 17-assets.js (assetsOfEvents),
-//   17-bundle.js (the zip, the bundle, the svg, the plans).
+//   17-bundle.js (the zip, the bundle, the svg, the plans), 17-carry.js (carryEmpty, carryMark, carryPrefs, everyBuild,
+//   everyName), the boards list (boardShelves, boardDB, idbBackend, journalFold, BOARD_VIEW_KEY), teach (savedMark).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the closure's; no imports, no exports,
 // no build step beyond the concatenation.
@@ -14428,12 +14933,12 @@
   const bytesOf = (b) => (b instanceof Uint8Array ? b : new Uint8Array(b));
 
   /**
-   * The whole board and every picture it names, as one zip (17-bundle.js): `board.jsonl` — the version 1 log, its
-   * header saying how many pictures sit beside it — and `assets/<hash>.<ext>`. A picture this device does not hold
-   * (a log that came from elsewhere) cannot be put in, and is said.
+   * One board's log and every picture it names, as one zip (17-bundle.js): `board.jsonl` — the version 1 log, its
+   * header saying how many pictures sit beside it — and `assets/<hash>.<ext>`. `evs` is the log as it is held, each
+   * event written as it stands. A picture this device does not hold (a log that came from elsewhere) cannot be put
+   * in, and is counted. Returns zipWrite's `{ parts, size }` and the counts.
    */
-  async function exportBundle() {
-    const evs = session.getEvents();
+  async function boardBundleOf(evs) {
     const got = [];
     let missing = 0;
     for (const ref of assetsOfEvents(evs)) {
@@ -14441,12 +14946,64 @@
       if (rec) got.push({ ref: ref, mime: rec.mime || 'image/jpeg', bytes: bytesOf(rec.bytes) }); else missing++;
     }
     const log = MM.encodeLog(evs, Object.assign(logWrite(), got.length ? { assets: got.length } : {}));
-    const z = bundleBuild({ log: log, assets: got, time: Date.now() });
+    return { zip: bundleBuild({ log: log, assets: got, time: Date.now() }), assets: got.length, missing: missing };
+  }
+  /** A zip's pieces as one run of bytes, for a zip that goes inside another or into a message. */
+  function joinParts(parts, size) {
+    const out = new Uint8Array(size === undefined ? parts.reduce((a, p) => a + p.length, 0) : size);
+    let at = 0;
+    for (const p of parts) { out.set(p, at); at += p.length; }
+    return out;
+  }
+
+  /** The board on screen and every picture it names, as one zip — the export pane's *board + pictures*. */
+  async function exportBundle() {
+    const evs = session.getEvents();
+    const b = await boardBundleOf(evs);
     const name = bundleName(boardOnScreenName());
-    const held = got.length ? plural(got.length, 'picture') : 'no pictures';
+    const held = b.assets ? plural(b.assets, 'picture') : 'no pictures';
     const said = name + ' — the whole board, its ' + plural(evs.length, 'event') + ' and ' + held + ' in one file; boards ▸ from a file… opens it whole' +
-      (missing ? ' · ' + plural(missing, 'picture') + ' this device does not hold could not be put in it' : '');
-    return { name: name, blob: new Blob(z.parts, { type: 'application/zip' }), assets: got.length, missing: missing, events: evs.length, said: said };
+      (b.missing ? ' · ' + plural(b.missing, 'picture') + ' this device does not hold could not be put in it' : '');
+    return { name: name, blob: new Blob(b.zip.parts, { type: 'application/zip' }), assets: b.assets, missing: b.missing, events: evs.length, said: said };
+  }
+
+  /**
+   * Every board this browser keeps, out in one file (RENAME-PLAN N1; 17-carry.js's everyBuild): each board on the list
+   * as its bundle — the board on screen as it stands, every other as its journal holds it — with its name and its
+   * view, the taught mark's five samples and the preferences by name, never a key. A board with nothing on it is left
+   * out and counted, the trash stays here, and a board whose store cannot be read is said. What the boards pane's
+   * *Every board out* downloads, and what *Carry my boards to dyna.ink* sends the window it opens.
+   */
+  async function everyBoardsOut() {
+    const out = { boards: [], empty: 0, trash: 0, pictures: 0, missing: 0, failed: [] };
+    const shelves = boardShelves([...boards.entries.values()]);
+    out.trash = shelves.trash.length;
+    const many = boards.how === 'indexeddb';
+    const db = many ? await boardDB() : null;
+    const list = many ? shelves.boards : (onBoardHere() ? [{ id: board.id, name: boardEntryName(board.id) }] : []);
+    for (const e of list) {
+      let events = null;
+      try {
+        if (onBoardHere() && e.id === board.id) events = session.getEvents();
+        else if (db) events = journalFold((await idbBackend(db, e.id).read()).records).events;
+      } catch (err) { out.failed.push({ name: e.name, why: (err && err.message) || String(err) }); continue; }
+      if (!events) continue;
+      if (carryEmpty(events)) { out.empty++; continue; }
+      const b = await boardBundleOf(events);
+      out.pictures += b.assets;
+      out.missing += b.missing;
+      out.boards.push({ name: e.name, view: prefs.get(BOARD_VIEW_KEY + e.id, null), bytes: joinParts(b.zip.parts, b.zip.size) });
+    }
+    const mark = carryMark(savedMark());
+    const kept = carryPrefs((k) => { try { return localStorage.getItem(k); } catch (err) { return null; } });
+    const time = Date.now();
+    const z = everyBuild({ boards: out.boards, mark: mark, prefs: kept, from: location.origin, time: time });
+    out.bytes = joinParts(z.parts, z.size);
+    out.name = everyName(time);
+    out.count = out.boards.length;
+    out.mark = !!mark;
+    out.prefs = Object.keys(kept).length;
+    return out;
   }
 
   /**
@@ -15016,7 +15573,10 @@
 //   starter, one tap; *more examples* opens this pane).
 //   renderBoardsPane (the adapter calls it when the list changes), and at its foot how much room this browser
 //   holds and has left and whether it may clear it (PLAN-IPAD-NOTES I3: loadRoom, roomChanged).
+//   And carrying (RENAME-PLAN N1): *Every board out* and, where this page can carry, *Carry my boards to dyna.ink*,
+//   at the pane's foot, and the old address's notice at its head once N4 turns it on (carryEl, homeNoticeEl).
 // Uses: the kept index and pictures (17-find.js: finder, findLoad, findThumbCurrent, findSyncSoon — a board's picture in its row),
+//   carrying (22-carry.js: carryHere, carryOut, everyOut; 17-carry.js: carryWhere),
 //   ui (pane, chip), controls (tiles.boards, togglePanel/closePanel), boards list (boardRows,
 //   sizeWords, storageWords, isKept), folder (the boards adapter: boards, board, onBoardHere, switchBoard, newBoard,
 //   renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash, emptyTrash, boardFromFile,
@@ -15173,6 +15733,9 @@
     const rows = boardRows([...boards.entries.values()], stats, Date.now(), onBoardHere() ? board.id : null);
     const frag = document.createDocumentFragment();
     const many = boards.how === 'indexeddb';
+    // The old address's notice that dyna.ink is the new home (RENAME-PLAN N1; off until N4 turns it on).
+    const here = carryHere();
+    if (here.notice) frag.appendChild(homeNoticeEl(here));
     const head = bdJoin(bdEl('div', 'bdHead'), [
       bdButton('New board', 'bdNew', { boardNew: '' }, 'a new, empty board — the one on screen stays as it is'),
       bdButton('from a file…', 'bdFrom', { boardFile: '' }, 'a board from a .zip made by export with its pictures, or from a log file — one event per line'),
@@ -15207,9 +15770,34 @@
       // With nothing it could take yet (a board open elsewhere), asking again is the next move.
       if (rows.trash.length && (!c || !c.gone.length)) tr.appendChild(bdButton('Empty the trash…', 'bdEmpty', { emptyTrash: '' }, 'says what it will delete, and asks again'));
     }
+    frag.appendChild(carryEl(here));
     frag.appendChild(roomEl());
     bdList.replaceChildren(frag);
     paintBoardsSaid();
+  }
+
+  // ----- Carry, and every board out (RENAME-PLAN N1) ------------------------------------------------------
+  // What the board list is for when a person moves: every board in one file, always — and where this page can carry
+  // (the old address, once the notice is on; before that when its address asks), one tap that carries them to the
+  // new home. The acts are 22-carry.js's; the pane only shows them, and its line says what they did.
+  function carryButton(h) {
+    return bdButton('Carry my boards to dyna.ink', 'bdCarryGo', { carry: '' },
+      'opens ' + carryWhere(h.target) + ' in a window of its own and sends it every board kept here — each with its pictures, its name and your mark and preferences, never a key');
+  }
+  function homeNoticeEl(h) {
+    const box = bdEl('div', 'bdHome');
+    box.appendChild(bdEl('p', '', 'dyna.ink is this app’s new home. What is kept here stays here — carry it there in one tap.'));
+    if (h.target) box.appendChild(carryButton(h));
+    return box;
+  }
+  function carryEl(h) {
+    const box = bdEl('div', 'bdCarry');
+    box.appendChild(bdEl('div', 'bdLabel', 'take them with you'));
+    bdJoin(box.appendChild(bdEl('div', 'bdCarryRow')), [
+      h.offered && !h.notice ? carryButton(h) : null,
+      bdButton('Every board out', 'bdEvery', { everyOut: '' }, 'one file holding every board with its pictures, your mark and your preferences — From a file… opens it on any address, this one or another'),
+    ]);
+    return box;
   }
 
   // ----- The examples (V1-PLAN R5) ---------------------------------------------------------------
@@ -15335,6 +15923,9 @@
         if (d.open !== undefined) await openFromPane(d.open);
         else if (d.exampleOpen !== undefined) await exampleFromPane(d.exampleOpen);
         else if (d.boardNew !== undefined) await newFromPane();
+        // The carry opens its window inside this tap, before anything is awaited (22-carry.js).
+        else if (d.carry !== undefined) carryOut();
+        else if (d.everyOut !== undefined) await everyOut();
         else if (d.boardFile !== undefined) { bdFile.value = ''; bdFile.click(); }
         else if (d.rename !== undefined) {
           bd.renaming = d.rename; bd.confirm = null;
@@ -15400,6 +15991,225 @@
       bdFile.value = '';
       if (made) { closePanel(boardsPanel, tiles.boards); flash('“' + made.name + '” — ' + sizeWords(boards.stats.get(made.id)) + ', from ' + f.name + (notes.length ? ' · ' + notes.join(' · ') : '')); }
     });
+  }
+
+// ===== carry (the window, the messages) =====
+// Provides: carrying every board this browser keeps from the old address to the new home (RENAME-PLAN N1) — the
+//   adapter over 17-carry.js's rules: carryHere (what this page may do: its target, the offer, the notice), carryOut
+//   (the tap — a window opened inside it, before anything is awaited — and carrySend: the boards sent once the window
+//   says it is ready, its answer said in the boards pane), everyOut (every board out in one file, downloaded),
+//   carryReceive (a page opened with ?carry: it says it is ready to the origins it takes boards from, takes them in,
+//   says what came and answers with the counts; a message from anywhere else is refused, once, out loud), carryTake (one
+//   carry taken in — from a window or from a file — and noted), homeNoticeOnce (the notice said once in the status
+//   line), carryAtBoot, and `carry` (what the page has carried and heard, for the boards pane and the tests).
+// Uses: core (params, prefs), carry's rules (17-carry.js), folder (carryIn, boardsListed, onBoardHere), the board out
+//   (everyBoardsOut, downloadBlob, plural; 18-out.js), the boards pane (paneSay, renderBoardsPane, boardsPanel), input (say).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+//
+// THE TWO WINDOWS. The old address's page opens the new home's app with `?carry` in a window of its own — inside the
+// tap's own handler, or the browser refuses the window — and listens for that window, and only it, at the target's
+// origin. The new page, once its boards are open, says it is ready to the origins it takes boards from (a fixed list;
+// postMessage always with a target origin, never '*'), and to a ping from one of them. The old page then sends ONE
+// message: every board in one file as bytes, transferred, not copied. The new page takes it in (17-folder.js's
+// carryIn), says what came in its status line, and answers with three counts — never a name it holds. A window the
+// browser would not open, one that never answers, one closed half way: each is a sentence in the boards pane, with the
+// way that always works — *Every board out*, then *From a file…* there.
+
+  /** How long the old page waits for the new one to say it is ready, and for it to say what it kept. */
+  const CARRY_READY_MS = 45000, CARRY_DONE_MS = 600000;
+  const carry = {
+    // The receiving side: whom it takes boards from, its opener, carries taken in, what it said, origins refused.
+    allowed: [], opener: null, readyFor: false, busy: false, carried: 0, words: '', last: null, refused: [],
+    // The sending side: a carry under way, carries answered, what was said.
+    job: null, sending: false, sent: 0, sentWords: '',
+    // For tests: the notice shown as N4 will show it, on a page that is not the old address.
+    noticeForced: false,
+  };
+
+  /** What this page may do: where it carries to, whether the pane offers it, whether the notice shows. */
+  function carryHere() {
+    const self = location.origin;
+    const target = carryTarget(self, params.get('carryTo'));
+    const notice = homeNoticeShown(self, NEW_HOME_NOTICE) || carry.noticeForced;
+    return { self: self, target: target, notice: notice, offered: carryOffered({ target: target, notice: notice, asked: params.has('carryTo') }) };
+  }
+  /** A sentence about a carry begun in the boards pane: in the pane while it stands open, else in the status line. */
+  function carrySay(words) {
+    if (boardsPanel && !boardsPanel.hasAttribute('hidden')) paneSay(words);
+    else say(words, 12000);
+  }
+
+  // ----- The sending side: the old address ---------------------------------------------------------------
+  /**
+   * The tap. The window is opened here, synchronously, inside the click that asked for it — a window opened after an
+   * await is a popup the browser blocks — and everything else follows it.
+   */
+  function carryOut() {
+    const h = carryHere();
+    if (!h.target) return;
+    const where = carryWhere(h.target);
+    if (carry.sending) { carrySay('the boards are already on their way to ' + where + ' — its window says what it kept'); return; }
+    let w = null;
+    try { w = window.open(carryOpenUrl(h.self, h.target), '_blank'); } catch (err) { w = null; }
+    if (!w) {
+      carrySay('the browser would not open a window for ' + where + ' — nothing was carried. Every board out makes one file of them all, and From a file… on ' + where + ' opens it');
+      return;
+    }
+    carrySend(w, h.target);
+  }
+  /** Gather every board while the window opens; send them once it says it is ready; say what it answered. */
+  async function carrySend(w, target) {
+    const where = carryWhere(target);
+    const job = { ready: false, file: null, posted: false, count: 0 };
+    carry.job = job;
+    carry.sending = true;
+    carrySay('opening ' + where + ' and gathering the boards…');
+    let settle;
+    const finished = new Promise((r) => { settle = r; });
+    const post = () => {
+      if (!job.ready || !job.file || job.posted) return;
+      job.posted = true;
+      const buf = job.file.buffer;
+      try { w.postMessage({ type: CARRY_TYPES.boards, v: CARRY_V, file: buf }, target, [buf]); }
+      catch (err) { settle({ failed: 'the boards could not be sent — ' + ((err && err.message) || err) }); return; }
+      carrySay('sending ' + plural(job.count, 'board') + ' to ' + where + '…');
+      clearTimeout(readyBy);
+      doneBy = setTimeout(() => settle({ late: true }), CARRY_DONE_MS);
+    };
+    const heard = (e) => {
+      if (e.source !== w || e.origin !== target) return;
+      const m = carryMessage(e.data);
+      if (!m) return;
+      if (m.type === CARRY_TYPES.ready) { job.ready = true; post(); }
+      else if (m.type === CARRY_TYPES.done && job.posted) settle({ done: m });
+    };
+    // Listening from the tap on, so the window's first word cannot come before it. A window closed by hand is noticed.
+    addEventListener('message', heard);
+    const watch = setInterval(() => { if (w.closed) settle({ closed: true }); }, 400);
+    const readyBy = setTimeout(() => { if (!job.ready) settle({ silent: true }); }, CARRY_READY_MS);
+    let doneBy = 0;
+    everyBoardsOut().then((out) => {
+      if (!out.count) { settle({ nothing: true }); return; }
+      job.file = out.bytes;
+      job.count = out.count;
+      post();
+    }, (err) => settle({ failed: 'the boards could not be gathered — ' + ((err && err.message) || err) }));
+    const r = await finished;
+    removeEventListener('message', heard);
+    clearInterval(watch);
+    clearTimeout(readyBy);
+    clearTimeout(doneBy);
+    let words;
+    if (r.done) {
+      carry.sent++;
+      words = carrySentWords({ target: target, brought: r.done.brought, held: r.done.held, failed: r.done.failed }) + (r.done.brought ? ' — they are open there' : '');
+    } else if (r.closed) words = job.posted ? 'the window on ' + where + ' was closed before it said what it kept — open boards there to see' : 'the window on ' + where + ' was closed before the boards were sent — nothing was carried';
+    else if (r.silent) words = where + ' did not answer — nothing was carried. Every board out makes one file of them all, and From a file… on ' + where + ' opens it';
+    else if (r.late) words = where + ' has not said what it kept — open boards there to see';
+    else if (r.nothing) words = 'there is nothing to carry — no board here has anything on it';
+    else words = r.failed;
+    carry.sentWords = words;
+    carry.job = null;
+    carry.sending = false;
+    carrySay(words);
+  }
+
+  /** *Every board out*: every board in one file, downloaded — the way that works offline, between devices, and where a window is refused. */
+  async function everyOut() {
+    carrySay('gathering every board…');
+    try {
+      const out = await everyBoardsOut();
+      if (!out.count) { carrySay('there is nothing to take out — no board here has anything on it'); return; }
+      downloadBlob(out.name, new Blob([out.bytes], { type: 'application/zip' }));
+      const also = [out.pictures ? plural(out.pictures, 'picture') : '', out.mark ? 'your mark' : '', out.prefs ? plural(out.prefs, 'preference') : ''].filter(Boolean);
+      const left = [];
+      if (out.empty) left.push(plural(out.empty, 'empty board') + ' left out');
+      if (out.trash) left.push('the trash stays here');
+      if (out.missing) left.push(plural(out.missing, 'picture') + ' this device does not hold could not be put in');
+      for (const f of out.failed) left.push('“' + f.name + '” could not be read (' + f.why + ')');
+      carrySay(out.name + ' — ' + plural(out.count, 'board') + (also.length ? ' with ' + (also.length > 1 ? also.slice(0, -1).join(', ') + ' and ' + also[also.length - 1] : also[0]) : '') +
+        ' in one file; From a file… opens it on any address' + (left.length ? ' · ' + left.join(' · ') : ''));
+    } catch (err) {
+      carrySay('the boards could not be taken out — ' + ((err && err.message) || err));
+    }
+  }
+
+  // ----- The receiving side: the new home ------------------------------------------------------------------
+  /** One carry taken in — from the window (`from` its origin) or a file ('file') — noted, and its sentence made. */
+  async function carryTake(bytes, from, o) {
+    carry.busy = true;
+    let r;
+    try { r = await carryIn(bytes, o); } catch (err) { r = { ok: false, words: 'the boards could not be taken in — ' + ((err && err.message) || err) }; }
+    finally { carry.busy = false; }
+    if (r.ok) r.words = carryWords({ from: from, brought: r.brought, held: r.held, failed: r.failed, damaged: r.damaged, mark: r.mark, prefs: r.prefs, emptied: r.emptied });
+    carry.carried++;
+    carry.words = r.words;
+    carry.last = r.ok ? { brought: r.brought.length, held: r.held.length, failed: r.failed.length } : { brought: 0, held: 0, failed: 1 };
+    return r;
+  }
+  /** A page opened with ?carry: listen for the old address, say it is ready once the boards are open. */
+  function carryReceive() {
+    carry.allowed = carrySources(location.origin, params.get('carry'));
+    carry.opener = window.opener || null;
+    addEventListener('message', carryHeard);
+    if (!carry.allowed.length) { say('this is the old address — it carries boards to the new home, and takes none'); return; }
+    if (!carry.opener) {
+      say('this page takes the boards when the old address opens it — tap Carry my boards to dyna.ink in its boards pane, or bring them in a file: Every board out there, From a file… here', 20000);
+      return;
+    }
+    // Ready is said to the one origin this page expects its boards from — the one its address names on this machine,
+    // else the old address — so it is never posted to a window at another; a ping from any it takes them from is answered.
+    const expected = carry.allowed[carry.allowed.length - 1];
+    carryWhenOpen().then(() => {
+      carryReady(expected);
+      // Said once the board is back (after its own "is back"), unless the boards have come already.
+      if (!carry.carried && !carry.busy) say('waiting for your boards from ' + carryWhere(expected) + '…', 20000);
+    });
+  }
+  /** The boards this browser keeps, open — a carry is written into the list. */
+  function carryWhenOpen() { return (boardsListed || Promise.resolve()).catch(() => {}); }
+  /** Tell the opener, at one origin, that this page is ready: an explicit target origin, never '*'. */
+  function carryReady(origin) {
+    try { carry.opener.postMessage({ type: CARRY_TYPES.ready, v: CARRY_V }, origin); } catch (err) { /* the opener is gone */ }
+    carry.readyFor = true;
+  }
+  /** A message: ours, from the opener, at an origin this page takes boards from — or refused, and said once. */
+  async function carryHeard(e) {
+    const m = carryMessage(e.data);
+    if (!m || (m.type !== CARRY_TYPES.boards && m.type !== CARRY_TYPES.ping)) return;
+    if (!carry.opener || e.source !== carry.opener || !carryAccepts(carry.allowed, e.origin)) {
+      if (!carry.refused.includes(e.origin)) {
+        carry.refused.push(e.origin);
+        say('boards offered from ' + carryWhere(e.origin) + ' were refused — this page takes them only from the old address', 20000);
+      }
+      return;
+    }
+    await carryWhenOpen();
+    if (m.type === CARRY_TYPES.ping) { carryReady(e.origin); return; }
+    if (carry.busy) return;
+    const r = await carryTake(new Uint8Array(m.file), e.origin, {});
+    say(r.words, 60000);
+    try { e.source.postMessage({ type: CARRY_TYPES.done, v: CARRY_V, brought: carry.last.brought, held: carry.last.held, failed: carry.last.failed }, e.origin); } catch (err) { /* the old page is gone; its boards are here */ }
+  }
+
+  // ----- The notice: dyna.ink is the new home (off until RENAME-PLAN N4) -------------------------------------
+  const HOME_SAID_KEY = 'home-said';
+  /** The status line says it once on this device, after the board has come back and said so. */
+  function homeNoticeOnce() {
+    if (!carryHere().notice || prefs.get(HOME_SAID_KEY, null)) return;
+    carryWhenOpen().then(() => setTimeout(() => {
+      if (prefs.get(HOME_SAID_KEY, null)) return;
+      prefs.set(HOME_SAID_KEY, Date.now());
+      say('dyna.ink is this app’s new home — boards ▸ Carry my boards to dyna.ink takes everything kept here with you', 20000);
+    }, 1800));
+  }
+  /** At boot: a page asked to take boards listens for them; the old address says it is not the home any more, once. */
+  function carryAtBoot() {
+    if (EMBED) return;
+    if (params.has('carry')) carryReceive();
+    homeNoticeOnce();
   }
 
 // ===== packs (the pane) =====
@@ -16780,6 +17590,22 @@
     boardFromFile: boardFromFile, dropAssets: assetDrop,
   });
 
+  // Carrying your boards (RENAME-PLAN N1), for tests: what this page carried and heard, every board out as the pane makes it, a file of
+  // them read back, the preferences carried by name, and the old address's notice shown as N4 will show it (on any page, for a test).
+  Object.assign(window.__mm, {
+    carryState: () => ({
+      allowed: carry.allowed.slice(), refused: carry.refused.slice(), carried: carry.carried, busy: carry.busy, words: carry.words, last: carry.last,
+      sent: carry.sent, sending: carry.sending, sentWords: carry.sentWords, here: carryHere(),
+    }),
+    everyBoardsOut: everyBoardsOut,
+    everyProbe: async (bytes) => {
+      const r = await everyRead(bytes, { inflate: inflateRaw });
+      return r.ok ? { ok: true, from: r.from, boards: r.boards.map((b) => ({ name: b.name, bad: b.bad || null, size: b.bytes ? b.bytes.length : 0 })), mark: r.mark ? r.mark.samples.length : 0, prefs: Object.keys(r.prefs) } : { ok: false, words: r.words };
+    },
+    carryPrefsAllowed: () => CARRY_PREFS.slice(),
+    showHomeNotice: (on) => { carry.noticeForced = !!on; renderBoardsPane(); if (on) homeNoticeOnce(); },
+  });
+
   // Mermaid (V1-PLAN D2, D3), for tests: the library a frame loads (a stand-in, or the CDN's again), what a frame said of itself, what Draw it drew.
   Object.assign(window.__mm, {
     mermaidFrom: mermaidFrom,
@@ -16821,6 +17647,9 @@
     if (params.get('folder')) openStatic(params.get('folder'));
     else if (params.get('git')) openGit(params.get('git'));
     else if (params.get('live')) openLive(params.get('live'), params.get('relay') ? { relay: params.get('relay') } : {});
+    // Boards carried from the old address (RENAME-PLAN N1): a page opened to take them listens for them; the old
+    // address says once that dyna.ink is the new home (off until N4).
+    carryAtBoot();
   } else {
     startReplay(replayUrl);
   }

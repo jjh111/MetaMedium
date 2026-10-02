@@ -7,7 +7,7 @@
   "scripts": {
     "e2e": "node run.mjs",
     "smoke:webkit": "node run.mjs --browser webkit smoke",
-    "webkit": "node run.mjs --browser webkit smoke pencil keep",
+    "webkit": "node run.mjs --browser webkit smoke pencil keep carry",
     "install:browsers": "playwright install chromium",
     "install:webkit": "playwright install webkit"
   },

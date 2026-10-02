@@ -240,6 +240,13 @@ html, body {
 #boardsPanel .bdConfirmRow { display: flex; gap: 7px; }
 #boardsPanel .bdConfirmRow button { flex: 1; }
 #boardsPanel .bdEmpty { margin-top: 7px; width: 100%; }
+/* Carry, and every board out (RENAME-PLAN N1): at the foot, two acts side by side; the old address's notice at the head. */
+#boardsPanel .bdCarry { margin-top: 8px; border-top: 1px solid var(--edge); }
+#boardsPanel .bdCarryRow { display: flex; flex-wrap: wrap; gap: 7px; }
+#boardsPanel .bdCarryRow button { flex: 1 1 auto; }
+#boardsPanel .bdHome { margin-bottom: 9px; padding: 8px 9px; border: 1px solid var(--gold); border-radius: 6px; line-height: 1.45; }
+#boardsPanel .bdHome p { margin: 0 0 7px; color: var(--ink); }
+#boardsPanel .bdHome button { width: 100%; }
 #boardsPanel #boardsStatus:not(:empty) { margin: 9px 0 0; }
 /* A board's picture in its row (Find, I6): at the left, the name and the rest beside it. */
 #boardsPanel .bdItem.hasThumb { display: grid; grid-template-columns: 64px minmax(0, 1fr); column-gap: 9px; align-items: start; }

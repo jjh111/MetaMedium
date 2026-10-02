@@ -82,6 +82,11 @@ jobs:
       # written by hand.
       - name: The board bundle, the SVG and the PDF, on their own
         run: node --test ../Demos/surface/17-bundle.test.mjs
+      # And carrying every board from the old address to dyna.ink (RENAME-PLAN
+      # N1): who may send and who may take, the preferences by name and never a
+      # key, what a carry brings in, and every board out in one file.
+      - name: Carrying the boards to the new home, on its own
+        run: node --test ../Demos/surface/17-carry.test.mjs
       # Where "with Claude" looks for the room's relay (PLAN-IPAD-NOTES A2): the
       # hosted relay on dyna.ink, this machine's anywhere else.
       - name: The relay "with Claude" defaults to, on its own
@@ -163,7 +168,7 @@ jobs:
           if-no-files-found: warn
 
   webkit:
-    name: WebKit — the smoke, pencil and tablet, and no lost work, on a second engine
+    name: WebKit — the smoke, pencil and tablet, no lost work, and carrying the boards, on a second engine
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -184,10 +189,12 @@ jobs:
       # hover, the field by pen and a pill, a clean, an undo, the keyboard, the
       # hand tile, the mouse untouched, a save and a reload; `keep` is the kill
       # test and the forced failures where WebKit can run them (no crash to
-      # send, no quota to force: those skip by name). The canvas only, so the
+      # send, no quota to force: those skip by name); `carry` (RENAME-PLAN N1)
+      # is a window opened by a tap on one origin, the boards sent to it on
+      # another, and a third refused. The canvas only, so the
       # shard needs no install here; the same model guard and exit rules.
       - name: Run them
-        run: node e2e/run.mjs --browser webkit smoke pencil keep
+        run: node e2e/run.mjs --browser webkit smoke pencil keep carry
       - name: What the run saw
         if: failure()
         uses: actions/upload-artifact@v4

@@ -147,6 +147,22 @@
     boardFromFile: boardFromFile, dropAssets: assetDrop,
   });
 
+  // Carrying your boards (RENAME-PLAN N1), for tests: what this page carried and heard, every board out as the pane makes it, a file of
+  // them read back, the preferences carried by name, and the old address's notice shown as N4 will show it (on any page, for a test).
+  Object.assign(window.__mm, {
+    carryState: () => ({
+      allowed: carry.allowed.slice(), refused: carry.refused.slice(), carried: carry.carried, busy: carry.busy, words: carry.words, last: carry.last,
+      sent: carry.sent, sending: carry.sending, sentWords: carry.sentWords, here: carryHere(),
+    }),
+    everyBoardsOut: everyBoardsOut,
+    everyProbe: async (bytes) => {
+      const r = await everyRead(bytes, { inflate: inflateRaw });
+      return r.ok ? { ok: true, from: r.from, boards: r.boards.map((b) => ({ name: b.name, bad: b.bad || null, size: b.bytes ? b.bytes.length : 0 })), mark: r.mark ? r.mark.samples.length : 0, prefs: Object.keys(r.prefs) } : { ok: false, words: r.words };
+    },
+    carryPrefsAllowed: () => CARRY_PREFS.slice(),
+    showHomeNotice: (on) => { carry.noticeForced = !!on; renderBoardsPane(); if (on) homeNoticeOnce(); },
+  });
+
   // Mermaid (V1-PLAN D2, D3), for tests: the library a frame loads (a stand-in, or the CDN's again), what a frame said of itself, what Draw it drew.
   Object.assign(window.__mm, {
     mermaidFrom: mermaidFrom,
@@ -188,6 +204,9 @@
     if (params.get('folder')) openStatic(params.get('folder'));
     else if (params.get('git')) openGit(params.get('git'));
     else if (params.get('live')) openLive(params.get('live'), params.get('relay') ? { relay: params.get('relay') } : {});
+    // Boards carried from the old address (RENAME-PLAN N1): a page opened to take them listens for them; the old
+    // address says once that dyna.ink is the new home (off until N4).
+    carryAtBoot();
   } else {
     startReplay(replayUrl);
   }

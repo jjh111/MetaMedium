@@ -42,6 +42,9 @@ const PLANTED = {
   'mm-model-key': JSON.stringify('sk-or-v1-PLANTEDcarrykey' + 'q'.repeat(30)),
   'mm-model-keys': JSON.stringify({ 'https://openrouter.ai/api/v1': 'sk-ant-PLANTEDcarrykey' + 'r'.repeat(24) }),
   'mm-git-token': JSON.stringify('ghp_PLANTEDcarrytoken' + 's'.repeat(24)),
+  // Not shaped like keys: left out by name alone.
+  'mm-seats': JSON.stringify({ writer: { where: 'https://openrouter.ai/api/v1', model: 'PLANTEDseat' } }),
+  'mm-semantic': JSON.stringify({ source: 'http://127.0.0.1:9/PLANTEDsemantic/' }),
 };
 const ROOM_KEY = 'PLANTEDroomkey' + 't'.repeat(20);
 const SECRET = /PLANTED/;
@@ -208,7 +211,7 @@ export async function runCarry(browser, servers, ctx) {
     pages.push(pa);
     await pa.goto(`${A}/app/?nosw=1&carryTo=${encodeURIComponent(B)}&key=${ROOM_KEY}`, { waitUntil: 'load', timeout: 60000 });
     await waitReady(pa);
-    await pa.evaluate((planted) => { for (const k of Object.keys(planted)) localStorage.setItem(k, planted[k]); }, PLANTED);
+    const plantedA = await pa.evaluate((planted) => { for (const k of Object.keys(planted)) localStorage.setItem(k, planted[k]); return Object.keys(planted).filter((k) => localStorage.getItem(k) === planted[k]).length; }, PLANTED);
     for (let i = 0; i < 3; i++) await draw(pa);
     const assetsA = await importRed(pa);
     const gardenA = await newBoardVia(pa);
@@ -219,15 +222,29 @@ export async function runCarry(browser, servers, ctx) {
     await pa.evaluate(() => window.__mm.boardIdle());
     const logsA = await logsByName(pa);
     const markA = await pa.evaluate(() => window.__mm.savedMark());
-    check('C1. A (the old address’s stand-in) keeps “My board” — three boxes and a picture — and “Garden”, two boxes; a mark is taught (five samples), the theme is dark and the hand left',
+    check('C1. A (the old address’s stand-in) keeps “My board” — three boxes and a picture — and “Garden”, two boxes; a mark is taught (five samples), the theme is dark and the hand left; five keys and picks are planted in its storage, and the room key it was opened with is gone from its address',
       Object.keys(logsA).sort().join('|') === 'Garden|My board' && logsA['My board'].log.filter((e) => e.type === 'stroke').length === 3 && logsA['My board'].log.some((e) => e.type === 'import' && e.asset)
-        && logsA.Garden.log.filter((e) => e.type === 'stroke').length === 2 && assetsA.length === 1 && taught.mark === 'your mark' && taught.samples === 5,
-      { boards: Object.keys(logsA), assetsA, taught });
+        && logsA.Garden.log.filter((e) => e.type === 'stroke').length === 2 && assetsA.length === 1 && taught.mark === 'your mark' && taught.samples === 5
+        && plantedA === Object.keys(PLANTED).length && !(await pa.evaluate(() => location.search)).includes('key='),
+      { boards: Object.keys(logsA), assetsA, taught, plantedA });
     const offered = await (async () => { await openBoardsPane(pa); return pa.evaluate(() => { const b = document.querySelector('#boardsPanel button[data-carry]'); return b ? b.textContent.trim() : null; }); })();
     check('C1b. A’s boards pane offers “Carry my boards to dyna.ink” (named by its address on this machine; on the old address only once N4 turns the notice on) and “Every board out” beside it, and says no notice while the notice is off',
       offered === 'Carry my boards to dyna.ink' && await pa.evaluate(() => !!document.querySelector('#boardsPanel button[data-every-out]') && !document.querySelector('#boardsPanel .bdHome')),
       { offered });
     await closeBoardsPane(pa);
+
+    // ---- C1c. The notice, as RENAME-PLAN N4 will turn it on (NEW_HOME_NOTICE; here through a test's switch) ----------
+    await pa.evaluate(() => window.__mm.showHomeNotice(true));
+    await openBoardsPane(pa);
+    const notice = await pa.evaluate(() => {
+      const h = document.querySelector('#boardsPanel .bdHome');
+      return { text: h ? h.textContent.replace(/\s+/g, ' ').trim() : null, taps: document.querySelectorAll('#boardsPanel button[data-carry]').length, inIt: !!document.querySelector('#boardsPanel .bdHome button[data-carry]'), first: !!h && h === document.querySelector('#boardsPanel .bdList').firstElementChild };
+    });
+    const saidOnce = await until(pa, () => /new home/.test(document.getElementById('status').textContent || '') && !!localStorage.getItem('mm-home-said'), null, 8000);
+    await pa.evaluate(() => window.__mm.showHomeNotice(false));
+    await closeBoardsPane(pa);
+    check('C1c. with the notice on, as N4 will turn it on: the boards pane leads with it — dyna.ink is the new home, the one carry tap in it — and the status line says it once on this device',
+      !!notice.text && /dyna\.ink is this app’s new home/.test(notice.text) && notice.inIt && notice.taps === 1 && notice.first && saidOnce, { notice, saidOnce });
 
     // ---- C2. Carried: one tap, a window on B, the boards land ---------------------------------------------------
     const first = await carryVia(pa);
@@ -243,9 +260,9 @@ export async function runCarry(browser, servers, ctx) {
         && logsB.Garden.log.filter((e) => e.type === 'stroke').length === 1,
       { names, trash: kept(bList).filter((e) => e.trashed).map((e) => e.name), current: bList.current });
     check('C2b. each log is carried exactly as A’s journal holds it — “Garden 2” event for event, “My board” too, then only the mark taught again on opening it — and each entry remembers what it was carried as',
-      sameLog(logsB['Garden 2'].log, logsA.Garden.log) && logsB['Garden 2'].log.length === logsA.Garden.log.length && sameLog(logsB['My board'].log, logsA['My board'].log)
-        && !!logsB['My board'].carried && !!logsB['Garden 2'].carried,
-      { garden: [logsA.Garden.log.length, logsB['Garden 2'].log.length], board: [logsA['My board'].log.length, logsB['My board'].log.length] });
+      !!logsB['Garden 2'] && !!logsB['My board'] && sameLog(logsB['Garden 2'].log, logsA.Garden.log) && logsB['Garden 2'].log.length === logsA.Garden.log.length
+        && sameLog(logsB['My board'].log, logsA['My board'].log) && !!logsB['My board'].carried && !!logsB['Garden 2'].carried,
+      { boards: Object.keys(logsB), garden: [logsA.Garden.log.length, (logsB['Garden 2'] || { log: [] }).log.length], board: [logsA['My board'].log.length, (logsB['My board'] || { log: [] }).log.length] });
     const lookB = await pictureLook(pop);
     check('C2c. the picture came with its board: B keeps its bytes under the same hash, and paints it, red', lookB.assets.join() === assetsA.join() && lookB.missing === 0 && lookB.colours.length === 1 && isRed(lookB.colours[0]), lookB);
     const markB = await pop.evaluate(() => ({ saved: window.__mm.savedMark(), now: (window.__mm.session.getState().commandMark || {}).name || null, chip: (document.getElementById('markName') || {}).textContent || '' }));
@@ -299,7 +316,7 @@ export async function runCarry(browser, servers, ctx) {
     // ---- C4. A third origin is refused --------------------------------------------------------------------------
     const pc = await context.newPage();
     pages.push(pc);
-    await pc.goto(`${C}/VERSION`, { waitUntil: 'load', timeout: 30000 });
+    await pc.goto(`${C}/boards/examples/index.json`, { waitUntil: 'load', timeout: 30000 });
     await pc.evaluate(([b, a]) => {
       const btn = document.createElement('button');
       btn.id = 'go'; btn.textContent = 'open';

@@ -100,8 +100,9 @@ test('the policy and the source agree on which hosts the app talks to', () => {
   const sources = [...readdirSync(path.join(root, 'Demos/surface')).filter((f) => f.endsWith('.js')).map((f) => 'Demos/surface/' + f),
     ...readdirSync(path.join(root, 'metamedium-core/src/llm')).filter((f) => f.endsWith('.ts') && !/\.test\./.test(f)).map((f) => 'metamedium-core/src/llm/' + f),
     'metamedium-core/src/store/git.ts'];
-  // Hosts named in the source that are no fetch: an xmlns, a link in a sentence.
-  const NOT_FETCHED = new Set(['www.w3.org', 'jjh111.github.io', 'host']);
+  // Hosts named in the source that are no fetch: an xmlns, a link in a sentence — and the two addresses a carry
+  // (RENAME-PLAN N1, 17-carry.js) opens a window at and sends a message to, which no connect-src governs.
+  const NOT_FETCHED = new Set(['www.w3.org', 'jjh111.github.io', 'dyna.ink', 'host']);
   const named = new Set();
   for (const f of sources) for (const m of read(f).matchAll(/https:\/\/([a-zA-Z0-9.-]+)/g)) if (!NOT_FETCHED.has(m[1])) named.add(m[1]);
   const allowed = new Set([...csp.matchAll(/https:\/\/([a-zA-Z0-9.-]+)/g)].map((m) => m[1]));

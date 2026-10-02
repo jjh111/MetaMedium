@@ -8,7 +8,10 @@
 //   starter, one tap; *more examples* opens this pane).
 //   renderBoardsPane (the adapter calls it when the list changes), and at its foot how much room this browser
 //   holds and has left and whether it may clear it (PLAN-IPAD-NOTES I3: loadRoom, roomChanged).
+//   And carrying (RENAME-PLAN N1): *Every board out* and, where this page can carry, *Carry my boards to dyna.ink*,
+//   at the pane's foot, and the old address's notice at its head once N4 turns it on (carryEl, homeNoticeEl).
 // Uses: the kept index and pictures (17-find.js: finder, findLoad, findThumbCurrent, findSyncSoon — a board's picture in its row),
+//   carrying (22-carry.js: carryHere, carryOut, everyOut; 17-carry.js: carryWhere),
 //   ui (pane, chip), controls (tiles.boards, togglePanel/closePanel), boards list (boardRows,
 //   sizeWords, storageWords, isKept), folder (the boards adapter: boards, board, onBoardHere, switchBoard, newBoard,
 //   renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash, emptyTrash, boardFromFile,
@@ -165,6 +168,9 @@
     const rows = boardRows([...boards.entries.values()], stats, Date.now(), onBoardHere() ? board.id : null);
     const frag = document.createDocumentFragment();
     const many = boards.how === 'indexeddb';
+    // The old address's notice that dyna.ink is the new home (RENAME-PLAN N1; off until N4 turns it on).
+    const here = carryHere();
+    if (here.notice) frag.appendChild(homeNoticeEl(here));
     const head = bdJoin(bdEl('div', 'bdHead'), [
       bdButton('New board', 'bdNew', { boardNew: '' }, 'a new, empty board — the one on screen stays as it is'),
       bdButton('from a file…', 'bdFrom', { boardFile: '' }, 'a board from a .zip made by export with its pictures, or from a log file — one event per line'),
@@ -199,9 +205,34 @@
       // With nothing it could take yet (a board open elsewhere), asking again is the next move.
       if (rows.trash.length && (!c || !c.gone.length)) tr.appendChild(bdButton('Empty the trash…', 'bdEmpty', { emptyTrash: '' }, 'says what it will delete, and asks again'));
     }
+    frag.appendChild(carryEl(here));
     frag.appendChild(roomEl());
     bdList.replaceChildren(frag);
     paintBoardsSaid();
+  }
+
+  // ----- Carry, and every board out (RENAME-PLAN N1) ------------------------------------------------------
+  // What the board list is for when a person moves: every board in one file, always — and where this page can carry
+  // (the old address, once the notice is on; before that when its address asks), one tap that carries them to the
+  // new home. The acts are 22-carry.js's; the pane only shows them, and its line says what they did.
+  function carryButton(h) {
+    return bdButton('Carry my boards to dyna.ink', 'bdCarryGo', { carry: '' },
+      'opens ' + carryWhere(h.target) + ' in a window of its own and sends it every board kept here — each with its pictures, its name and your mark and preferences, never a key');
+  }
+  function homeNoticeEl(h) {
+    const box = bdEl('div', 'bdHome');
+    box.appendChild(bdEl('p', '', 'dyna.ink is this app’s new home. What is kept here stays here — carry it there in one tap.'));
+    if (h.target) box.appendChild(carryButton(h));
+    return box;
+  }
+  function carryEl(h) {
+    const box = bdEl('div', 'bdCarry');
+    box.appendChild(bdEl('div', 'bdLabel', 'take them with you'));
+    bdJoin(box.appendChild(bdEl('div', 'bdCarryRow')), [
+      h.offered && !h.notice ? carryButton(h) : null,
+      bdButton('Every board out', 'bdEvery', { everyOut: '' }, 'one file holding every board with its pictures, your mark and your preferences — From a file… opens it on any address, this one or another'),
+    ]);
+    return box;
   }
 
   // ----- The examples (V1-PLAN R5) ---------------------------------------------------------------
@@ -327,6 +358,9 @@
         if (d.open !== undefined) await openFromPane(d.open);
         else if (d.exampleOpen !== undefined) await exampleFromPane(d.exampleOpen);
         else if (d.boardNew !== undefined) await newFromPane();
+        // The carry opens its window inside this tap, before anything is awaited (22-carry.js).
+        else if (d.carry !== undefined) carryOut();
+        else if (d.everyOut !== undefined) await everyOut();
         else if (d.boardFile !== undefined) { bdFile.value = ''; bdFile.click(); }
         else if (d.rename !== undefined) {
           bd.renaming = d.rename; bd.confirm = null;

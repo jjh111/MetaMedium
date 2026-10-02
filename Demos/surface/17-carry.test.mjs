@@ -320,6 +320,7 @@ test('a zip that is no every-board file says so; a newer version and a damaged m
   assert.deepEqual(m.boards.map((x) => [x.name, !!x.bad]), [['Gone', true], ['Out', true]]);
   const cut = await C.everyRead(newer.slice(0, 30), { inflate });
   assert.equal(cut.ok, false);
+  assert.equal(cut.unread, true, 'bytes that are no zip go back to the single bundle’s reader, which names the file');
   assert.equal(typeof cut.words, 'string');
 });
 
