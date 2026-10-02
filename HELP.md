@@ -169,7 +169,10 @@ asked only when you ask — never while you draw.
   decision model (Jev): when two things you have named match a group about
   equally, *Which is it?* asks it, and its answer joins the readings — taken
   only when it is 0.99 sure, otherwise what the canvas ranked stands.
-  **Semantic** (notes like this) runs on this device, and is coming. Choose a
+  **Semantic** is a small model that runs on this device — no key, nothing sent
+  anywhere: tap **load it here** once (about 30 MB, fetched once and kept in the
+  browser; nothing loads until you tap) and **find** also looks by meaning, and
+  **notes like this** lists the notes nearest what you hold (see *Find*). Choose a
   model for a seat from its list, or join one **for** that seat; local ones
   are listed before hosted, each row says how long its last call took. A seat
   you do not choose does what it did before: nothing is narrowed until you
@@ -209,6 +212,16 @@ in context (*“Pricing” — label on a box*); the first few words you type ar
 ringed for a moment — looking never changes a board. **↑ ↓** choose and **Enter**
 opens. It works with no network, and a board in the trash is not searched. In the
 **boards** pane each board shows a small picture of itself, made when you leave it.
+
+**By meaning.** With the **semantic** seat loaded (*Models*, *Seats*), find also lets in
+what says the same thing in other words: *budget* finds *Pricing*, each such hit marked
+*by meaning* with its number. And with marks that carry words held — or a region
+selected, in its panel — type **notes like this** (or *like*, or *similar*) in the field
+and find lists the notes nearest them, across every board, each saying how near and why
+(*is about the same thing — 0.71; no word in common*). It is typed, never a button in
+the row, and it only runs when you ask: nothing is read by meaning as you draw. A tap
+opens the board at the note; typing a word goes back to searching. With the seat empty,
+find is exactly by the words you type.
 
 ## Packs
 
