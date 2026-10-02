@@ -7,8 +7,8 @@
 > affordance the canvas already has, and say what is left that a decision
 > model could fix and how to set one up. This is that map and the next push.
 
-**Status: proposed.** Nothing below is built. Section 7 lists the decisions
-that are John's.
+**Status: decided 2 Oct 2026, not yet built.** John's answers are §7; the units
+below are amended to match.
 
 ## 1. How it was walked
 
@@ -146,10 +146,12 @@ from the roles and the ties).
   by the heads.
 - So *Make it Mermaid*, *Tidy the diagram* and *Route* are offered for John's
   drawing.
-- **The decision is John's (§7a):** the canonical molecule is also a graph with
-  tied ends. Read as a diagram it would gain *Make it Mermaid* and *Tidy*, and
-  e2e 49's golden would change by design. The alternative is to leave
-  all-circle graphs to the molecule's reading.
+- **Decided (§7a): the molecule is its own thing.** A graph whose nodes are
+  all circles is left to the molecule's reading and is not *a diagram*, so
+  e2e 49's golden stands. John: *we will have expandable classes of things* —
+  a diagram, a molecule, and more to come, each a class a drawing can belong
+  to. FP2 reads *a diagram* as one such class, by a rule that names what it
+  is not, so a later class can claim its own drawings the same way.
 - **Red first:** john-line-lasso offers *Make it Mermaid*.
 
 **FP3 — An arrow's tip binds where its ink points** (surface `07-input.js`,
@@ -166,13 +168,15 @@ with core's `inkTipIndex`).
 
 - One or two words that match no intent, no name in the library and no verb
   say what they could be: *Name it*, *Label it*, quietly, last.
-- Enter on such a word does **nothing until a completion is chosen**. A brief
+- **Decided (§7b):** Enter on such a word does **nothing until a completion is
+  chosen**. A brief
   is a sentence, or `page:` / `run:`.
 - The structure built with no model stays reachable by `page:`. Its regions
   lose `r1 · node`: blank, or the role in words.
 - **Red first:** Enter on *diagram* adds no artifact.
 
-**FP5 — A concept is a reading, not a name** (`09-palette.js`).
+**FP5 — A concept is a reading, not a name** (`09-palette.js`). **Deferred
+(§7e): John keeps the readings as they are for now.** Not in this push.
 
 - `flow 0.90` becomes the person's words, *joined by lines*. Tapping it says
   what it affords, and blesses nothing.
@@ -213,8 +217,8 @@ records, in the default run). The records:
 
 The prose report stays as the opt-in map.
 
-**Order:** FP3 → FP2 → FP1 → FP4 → FP7 → FP5 → FP6 → FP8 → FP9, each red
-first. FP3 and FP2 alone give John his drawing back. FP1 is the largest.
+**Order:** FP3 → FP2 → FP1 → FP4 → FP7 → FP6 → FP8 → FP9, each red first
+(FP5 deferred). FP3 and FP2 alone give John his drawing back. FP1 is the largest.
 
 ## 6. What a decision model can fix after that
 
@@ -228,7 +232,7 @@ jobs it would add, in order of value:
 
 | | the question | candidates the engine holds | asked when | the answer |
 |---|---|---|---|---|
-| **D1** | **What did the person mean by these words?** For example *make it a process diagram*, *turn into an ER*, *org chart*, *straighten*. | every intent the scope has (FP1), offered or not, plus *name it*, *label it*, *a brief*, and `no-match` | **Enter**, a deliberate act, when FP1 found nothing | shown as the top pill with its reason (*Make it Mermaid 0.93 · Jev*); a second Enter takes it. A choice never acts on its own |
+| **D1** | **What did the person mean by these words?** For example *make it a process diagram*, *turn into an ER*, *org chart*, *straighten*. | every intent the scope has (FP1), offered or not, plus *name it*, *label it*, *a brief*, and `no-match` | **live while typing by the semantic seat, on the device** (§7d, below), and the decider on **Enter**, a deliberate act, when neither found a clear match | shown as the top pill with its reason (*Make it Mermaid 0.93 · Jev*); a second Enter takes it. A choice never acts on its own |
 | **D2** | **Which diagram is this?** It reads under every floor, or as two notations near each other. | the notations read (*a flowchart 0.36*, *an ER diagram 0.16*, *a plain diagram*) and `no-match` | a tap on *Which is it?*, generalised from definitions to notations | one held reading in the decider's name. Above `DECIDER_TAKE_AT` that notation's Mermaid and routing are offered |
 | **D3** | **What should this brief make?** | a page, a program, a diagram, an answer | Enter on a brief, before any writer is asked | picks the writer's prompt, or *Draw it* from Mermaid. Saves a wrong page |
 | D4 | **Which definition?** | the field's top two matches | the tap (built: `tools/which.ts`) | built |
@@ -239,7 +243,12 @@ does not see; that job stays the reader seat's.
 **Which model.** Three candidates are within reach. They are compared on one
 bench, and the shipped one is the one that earns it.
 
-- **Jev (OpenRouter `typesafe/jev-1.13`, as John was told; unverified).**
+- **Jev.** John holds a key from TypeSafe directly (2 Oct). That key is
+  TypeSafe's: it works on TypeSafe's own API (`POST https://api.typesafe.ai/v1/systemone`,
+  as `DIRECTOR-VIEW-2026-09-17.md` §3 recorded), **not on OpenRouter**, which
+  takes only an OpenRouter key and bills through OpenRouter. Whether Jev is
+  listed on OpenRouter at all (`typesafe/jev-1.13`, as John was told) is still
+  unverified: this container's network policy refuses both hosts.
   - It is built for exactly this shape: typed choices in, a distribution out.
   - The seam is ready: `llm/decide-openrouter.ts` with a `DecideWire` that
     a native shape can replace.
@@ -291,21 +300,35 @@ bench, and the shipped one is the one that earns it.
    - the key, entered once for its provider;
    - *try it*.
 
-## 7. What is John's
+## 7. What John decided (2 Oct 2026)
 
-a. **FP2:** is the molecule a diagram? Reading every graph with tied ends as
-   *a diagram* gives the molecule *Make it Mermaid* and *Tidy* too (e2e 49's
-   golden changes by design). The alternative is to keep all-circle graphs out.
-b. **FP4:** should Enter on a lone unmatched word do nothing until a completion
-   is chosen, and a brief need a sentence or `page:`?
-c. **Jev:**
-   - the API document, the endpoint and a key, for recording real replies;
-   - if Jev refuses a browser, is a forwarding route on our relay acceptable?
-     It would see the key in transit and keep nothing.
-d. **D1:** on Enter only, or also live while typing through the on-device
-   semantic seat (nothing sent)?
-e. **FP5:** concept readings in words (*joined by lines*), with or without
-   their number?
+a. **FP2: the molecule is its own thing.** All-circle graphs stay out of *a
+   diagram*; e2e 49's golden stands. *We will have expandable classes of
+   things.*
+b. **FP4: yes.** A lone unmatched word waits until a completion is picked.
+c. **Jev:** John has a key from TypeSafe and asked whether OpenRouter can be
+   used with it instead. It cannot: an OpenRouter call needs an OpenRouter key
+   (§6, *Which model*). The two ways to Jev are:
+   - **through OpenRouter**, if Jev is listed there: an OpenRouter key, entered
+     in the models pane like any hosted model. The seam is built
+     (`llm/decide-openrouter.ts`); nothing is proxied;
+   - **TypeSafe's own API** with this key: a native `DecideWire` written from
+     TypeSafe's API document, which is still needed. If the API refuses a
+     browser's origin, it also needs a forwarding route that sees the key in
+     transit. That route is still undecided.
+
+   The key was pasted into this conversation; it was not written to any file.
+   Rotate it once it has been used for whatever test it was meant for.
+d. **D1: live while typing, by the semantic seat, rate-limited so it is not
+   spammy.** What that means here:
+   - only once the seat is held (nothing loads at boot, I9's rule);
+   - only after the typing rests (Find's own `FIND_SEM_MS`), never per key;
+   - each intent's words embedded once and kept, the typed text once per rest;
+   - nothing sent anywhere: the seat runs on the device;
+   - the field changes only when the top intent changes;
+   - the decider, which is a network call, is never asked while typing; only
+     Enter asks it.
+e. **FP5: keep things as they are for now.** Deferred.
 
 ## 8. Commands
 
