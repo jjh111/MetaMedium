@@ -282,6 +282,46 @@ left in a `license` field, and the whitepaper says the license it is under.
 If John wants headers, they go in this unit, inside the freeze, never later
 beside live lanes.
 
+**John's amendment, 2 Oct 2026:** the holder named today is John Hanacek personally, not JHDesign LLC; a company
+for dyna.ink will be formed and the rights assigned to it, so N2 did not wait for a signature. **The switch**, when
+the company exists and the assignment is signed, is one small commit in exactly three places: `NOTICE`'s first line
+(`dyna.ink (formerly MetaMedium) — Copyright © 2015–2026 John Hanacek`), `TRADEMARKS.md`'s *trademarks of John
+Hanacek, to be held by the company that offers dyna.ink*, and the whitepaper's footer (`index.html`, `<p
+class="footer-copyright">© 2015–2026 <a …>John Hanacek</a></p>`). `scripts/rights.test.mjs` reads the holder from
+`NOTICE` and fails if the footer or `TRADEMARKS.md` disagrees, so it needs no edit. Every other *John Hanacek* is
+authorship, which an assignment does not change (the whitepaper's *by John Hanacek* line and signature).
+
+**N2 status, 2 Oct 2026: done on `n2-rights`** — `13d59f4` (red: `scripts/rights.test.mjs`, new and in CI's `core`
+job, 6 of 6 failing), `50f26d6`, `e711d7d`, `2399a32`, and the docs after them. `LICENSE` is the FSF's
+`agpl-3.0.txt` byte for byte (fetched, 661 lines; the test pins its SHA-256). All eight tracked `package.json` files
+say `AGPL-3.0-only` (the engine's was MIT, gliner-seat's MIT, v2-poc's ISC, five named none), and so do the three
+lockfiles whose root named a license (`core`, `gliner-seat`, `v2-poc`; edited, nothing reinstalled — the other five
+gain the field at their next `npm install`). `NOTICE` is the holder's one home: the code AGPL-3.0-only, the
+whitepaper's prose and figures (`index.html`'s text and `Assets/whitepaper-figures/`) CC BY 4.0, the names declined
+under the AGPL's §7(e), then the third-party pieces, found by search and each license read from its package, the npm
+registry or its model card: bundled — Space Grotesk inlined in `surface.css` (OFL-1.1; its name table carries the
+notice and the OFL's address), three.js, three-bvh-csg and three-mesh-bvh in DynaInk3D (MIT), Pretext in
+`v2-poc/bundle.js` (MIT), `gliner-seat/processor.mjs` as a port of gliner2 (Apache-2.0); the engine and the relay's
+Worker bundle nothing; from CDNs — three.js r128 and Mermaid 11.4.0 (MIT), IBM Plex Mono and five more Google
+Fonts (OFL-1.1), Transformers.js (Apache-2.0), MiniSearch, React and Babel (MIT) on the experiments; models —
+Model2Vec potion-base-8M (MIT), GLiNER2's export and checkpoint (Apache-2.0), Qwen3.5 0.8B and Whisper tiny.en
+(Apache-2.0). **Not confirmed**, and said so in `NOTICE`: TrOCR's exports for `Demos/spike-trocr.html` state no
+license (Microsoft's base checkpoint is MIT, its small one states none), and `Assets/fig-dynabook.jpg` — Alan Kay's
+1972 Dynabook drawings, tracked, loaded by no page, its source unrecorded. `TRADEMARKS.md` reserves dyna.ink,
+DynaInk3D, the wordmark and the logo, welcomes forks and redistributions under another name and plain statements of
+fact, and cites §7(e); `CONTRIBUTING.md` takes issues now and outside code once the contributor agreement is
+published. The whitepaper's license line says *dyna.ink is open source under the GNU AGPL-3.0, and this essay's prose
+and figures are CC BY 4.0*; README gained a License section; gliner-seat's README says AGPL-3.0 where it said GPL-3.0;
+the name test's entry for the old license line is gone. Left as written, with their reasons: `archive/`'s v4
+whitepaper still says *License: GPL* (a record; the test reads published pages outside `archive/`), and the 2025
+demos' author credits *JOHN HANACEK, JHDESIGN LLC* (comments in `doodle2-canvas.html` and `metadoodle1.html`, a
+header span in `Demos/doodle2-v1.html`) and the React skeleton's *JHDesign, LLC* link (`Web App Skeleton/src/App.tsx`),
+which are no copyright line of today's — John's to settle. No SPDX headers (not asked). The suite: the engine 2,668
+in 147 files and both bundles equal a fresh build; Node 333 (the six new); the canvas's smoke 118, the shard's 34;
+gliner-seat 32; the shard 607 in 31; the drift checks and `build.py --check`; the gate 893 passed, 0 failed, 11
+skipped (one earlier `app canvas` run failed 27c–27d, a program reporting its parts, and passed on the rerun, with
+nothing it reads changed here); WebKit smoke, pencil, keep, carry and app 88 and 3.
+
 ### N3a: the words a person sees
 
 **Owns:**
