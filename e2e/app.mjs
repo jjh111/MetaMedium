@@ -48,11 +48,11 @@ const root = resolve(here, '..');
 /** The repository's version, the one line the release script keeps. */
 const versionIn = (dir) => readFileSync(join(dir, 'VERSION'), 'utf8').trim();
 /** What the app's worker must hold after one visit, relative to the site's root. */
-const APP_SHELL = ['app/', 'app/manifest.webmanifest', 'Demos/session-engine.js', 'Demos/surface/surface.css', 'Demos/metamedium-core.browser.js', 'HELP.md'];
+const APP_SHELL = ['app/', 'app/manifest.webmanifest', 'Demos/session-engine.js', 'Demos/surface/surface.css', 'Demos/dynaink-core.browser.js', 'HELP.md'];
 /** The icons the page and its manifest name (PLAN-IPAD-NOTES I3): a PNG each, made by scripts/make-icons.mjs. */
 const ICON_FILES = ['apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 /** What a copy of the site needs for the app to open and for its build to run (the release, in part C). */
-const SITE = ['VERSION', 'HELP.md', 'app', 'Demos/session-engine.html', 'Demos/session-engine.js', 'Demos/metamedium-core.browser.js', 'Demos/surface/surface.css', 'Demos/sw.js', 'Demos/manifest.webmanifest', 'Demos/icons'];
+const SITE = ['VERSION', 'HELP.md', 'app', 'Demos/session-engine.html', 'Demos/session-engine.js', 'Demos/dynaink-core.browser.js', 'Demos/surface/surface.css', 'Demos/sw.js', 'Demos/manifest.webmanifest', 'Demos/icons'];
 
 /** Every response of the site's own origin that failed while the page was open (the host's favicon is not the site's). */
 function watchFailures(page, origin) {

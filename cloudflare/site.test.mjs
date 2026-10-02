@@ -38,7 +38,7 @@ const policy = (directive) => (csp.split(';').map((d) => d.trim()).find((d) => d
 test('the site is what GitHub Pages publishes, less what is not a page', () => {
   const files = siteFiles(root);
   for (const f of ['index.html', '404.html', 'app/index.html', 'app/sw.js', 'app/manifest.webmanifest', 'Demos/session-engine.html', 'Demos/session-engine.js',
-    'Demos/metamedium-core.browser.js', 'Demos/sw.js', 'Demos/surface/surface.css', 'boards/examples/index.json', 'HELP.md', 'VERSION', 'MetaMedium_Whitepaper_v4.html',
+    'Demos/dynaink-core.browser.js', 'Demos/sw.js', 'Demos/surface/surface.css', 'boards/examples/index.json', 'HELP.md', 'VERSION', 'MetaMedium_Whitepaper_v4.html',
     'archive/MetaMedium_Whitepaper_v4.html', 'doodle2-canvas.html', 'metadoodle1.html', 'Assets/thumb-metamedium-v5.png', 'Assets/thumb-dynaink.png']) {
     assert.ok(files.includes(f), f + ' is not published');
   }
@@ -98,8 +98,8 @@ test('the policy lets the app run: scripts and styles inline, a program\'s eval,
 
 test('the policy and the source agree on which hosts the app talks to', () => {
   const sources = [...readdirSync(path.join(root, 'Demos/surface')).filter((f) => f.endsWith('.js')).map((f) => 'Demos/surface/' + f),
-    ...readdirSync(path.join(root, 'metamedium-core/src/llm')).filter((f) => f.endsWith('.ts') && !/\.test\./.test(f)).map((f) => 'metamedium-core/src/llm/' + f),
-    'metamedium-core/src/store/git.ts'];
+    ...readdirSync(path.join(root, 'core/src/llm')).filter((f) => f.endsWith('.ts') && !/\.test\./.test(f)).map((f) => 'core/src/llm/' + f),
+    'core/src/store/git.ts'];
   // Hosts named in the source that are no fetch: an xmlns, a link in a sentence — and the two addresses a carry
   // (RENAME-PLAN N1, 17-carry.js) opens a window at and sends a message to, which no connect-src governs.
   const NOT_FETCHED = new Set(['www.w3.org', 'jjh111.github.io', 'dyna.ink', 'host']);

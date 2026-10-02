@@ -34,7 +34,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 const read = (p) => readFileSync(join(root, p), 'utf8');
 
-const PAGES = ['index.html', '404.html', 'Demos/session-engine.html', 'app/index.html', 'shard-3d/index.html'];
+const PAGES = ['index.html', '404.html', 'Demos/session-engine.html', 'app/index.html', 'dynaink-3d/index.html'];
 const WHOLE = ['Demos/manifest.webmanifest', 'app/manifest.webmanifest', 'HELP.md'];
 // The fragments the build concatenates (Demos/build-surface.mjs), never their tests.
 const FRAGMENTS = readdirSync(join(root, 'Demos/surface')).filter((f) => /^\d\d-.*\.js$/.test(f)).sort().map((f) => 'Demos/surface/' + f);

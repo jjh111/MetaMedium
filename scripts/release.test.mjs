@@ -142,7 +142,7 @@ test('a key-shaped string is found and never said back; the files a release ship
   assert.ok(!JSON.stringify(found).includes(fakeKey()), 'the finding repeats the key');
   assert.equal(keyShapesIn(['ghp', 'A'.repeat(36)].join('_')).length, 1);
   assert.equal(keyShapesIn('<input id="mpKey" type="password" placeholder="API key" autocomplete="off" />').length, 0);
-  for (const f of ['Demos/session-engine.html', 'Demos/session-engine.js', 'Demos/metamedium-core.browser.js', 'Demos/surface/surface.css']) {
+  for (const f of ['Demos/session-engine.html', 'Demos/session-engine.js', 'Demos/dynaink-core.browser.js', 'Demos/surface/surface.css']) {
     assert.equal(keyShapesIn(readFileSync(join(root, f), 'utf8')).length, 0, f);
   }
 });
@@ -151,7 +151,7 @@ test('a key-shaped string is found and never said back; the files a release ship
 
 /** The files a release reads or writes, copied from this repository. */
 const FILES = ['.gitignore', 'CHANGELOG.md', 'VERSION', 'HELP.md', 'app', 'Demos/session-engine.html', 'Demos/sw.js', 'Demos/manifest.webmanifest',
-  'Demos/session-engine.js', 'Demos/metamedium-core.browser.js', 'Demos/surface/surface.css'];
+  'Demos/session-engine.js', 'Demos/dynaink-core.browser.js', 'Demos/surface/surface.css'];
 
 /** A small repository holding those files at `version`, released as such (tagged, pushed to a remote of its own). */
 function smallRepo(version = '0.1.0') {
@@ -225,7 +225,8 @@ test('a dry run prints the release and changes nothing; the release is one commi
   assert.match(html, /<meta name="dynaink-version" content="0\.2\.0">/);
   // The page's tag, not the surface inlined beside it, which falls back to the old name for a page an older worker kept.
   assert.ok(!/<meta name="metamedium-version"/.test(html), 'the standalone file carries the old tag');
-  assert.ok(html.includes('var MetaMediumCore') && !html.includes('src="metamedium-core.browser.js"'), 'the engine is not inlined');
+  assert.ok(html.includes('var DynaInkCore') && !html.includes('src="dynaink-core.browser.js"'), 'the engine is not inlined');
+  assert.ok(html.includes('var MetaMediumCore = DynaInkCore'), 'the old global is not defined beside the new one (RENAME-PLAN N3c, for one release)');
   assert.equal(keyShapesIn(html).length, 0);
 });
 

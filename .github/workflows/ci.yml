@@ -31,6 +31,11 @@ jobs:
           npm run build:node
           cp dist/metamedium-core.node.mjs ../Demos/metamedium-core.node.mjs
           git diff --exit-code -- ../Demos/metamedium-core.node.mjs
+      # …and by their names (RENAME-PLAN N3c): the browser bundle, run as a page runs it, defines
+      # DynaInkCore — and, for one release, MetaMediumCore as the same object, for a page outside this
+      # repository that loads the bundle and reads the old global.
+      - name: The engine bundles' names and globals
+        run: node --test ../Demos/core-bundle.test.mjs
       - name: The MCP hand answers over stdio
         run: node ../Demos/mcp-smoke.mjs
       # The room relay as a Worker (CF1): its protocol, keys and hands over a socket, on a fake Durable
