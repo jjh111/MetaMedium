@@ -178,7 +178,7 @@ test('wherever the whitepaper names Kay\'s 1972 paper, the title links it — th
 test('NOTICE credits the Dynabook drawings in place, beside the works by others the whitepaper shows — never under "Not confirmed"', () => {
   const unconfirmed = noticeSection(/^Not confirmed/);
   assert.ok(unconfirmed === null || !unconfirmed.includes(DYNABOOK), `${DYNABOOK} is no longer under "Not confirmed": its source is known`);
-  const credited = noticeSection(/works by others/i);
+  const credited = noticeSection(/^Works by others the whitepaper shows/);
   assert.ok(credited, 'NOTICE has a section of works by others the whitepaper shows');
   assert.ok(credited.includes(DYNABOOK), `that section names ${DYNABOOK}`);
   const said = credited.replace(/\s+/g, ' ');
@@ -187,7 +187,7 @@ test('NOTICE credits the Dynabook drawings in place, beside the works by others 
   assert.ok(said.includes(KAY_1972), `its address, ${KAY_1972}`);
   assert.match(said, /neither LICENSE nor CC BY 4\.0/, 'that neither license covers them');
   assert.match(said, /commentary/, 'why the whitepaper shows them');
-  assert.match(read('NOTICE'), /Words and works by others that it quotes or cites\s+stay theirs\./, 'NOTICE keeps its sentence that works by others stay theirs');
+  assert.match(read('NOTICE').replace(/\s+/g, ' '), /Words and works by others that it quotes or cites stay theirs\./, 'NOTICE keeps its sentence that works by others stay theirs');
 });
 
 // ---- The source, offered (AGPL-3.0 §13; John's decision, 2 Oct 2026) ----------------------------------------------
