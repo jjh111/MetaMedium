@@ -24,7 +24,7 @@ const NAMES = [
   'placesPlan', 'boardRows', 'leaveVerdict', 'switchPlan', 'boardTitle', 'boardSearch',
   'EXAMPLES_BASE', 'exampleUrl', 'exampleRows', 'exampleName', 'starterOf',
   'spaceWords', 'storageWords', 'persistPlan', 'PERSIST_KEY',
-  'VERSION_META', 'VERSION_META_BEFORE', 'pageVersionOf', 'versionWords',
+  'VERSION_META', 'VERSION_META_BEFORE', 'pageVersionOf', 'versionWords', 'SOURCE_URL', 'sourceLine',
 ];
 const file = join(dirname(fileURLToPath(import.meta.url)), '17-boards.js');
 // Loaded as the browser loads it. While the fragment is not written, every
@@ -298,6 +298,24 @@ test('the page says its version: the tag scripts/build-app.mjs stamps, and — o
   assert.equal(B.versionWords('0.2.0'), 'dyna.ink 0.2.0');
   assert.equal(B.versionWords('0.0.0'), 'dyna.ink 0.0.0 — no release has been cut yet');
   assert.equal(B.versionWords(''), 'dyna.ink — this page carries no version');
+});
+
+test('the help pane offers the source: "Source code · AGPL-3.0", each a link, built from the one address the fragment holds', () => {
+  // AGPL-3.0 §13: a person using a modified copy over a network must be offered its source. The line says where this
+  // one's is, and a fork that changes SOURCE_URL offers its own (RENAME-PLAN H1 changes it when the repository moves).
+  assert.equal(typeof B.SOURCE_URL, 'string');
+  assert.match(B.SOURCE_URL, /^https:\/\/[^/]+\/[^/]+\/[^/]+$/, 'a repository\'s address, no trailing slash');
+  const parts = B.sourceLine();
+  assert.equal(parts.map((p) => p.text).join(''), 'Source code · AGPL-3.0');
+  assert.deepEqual(parts.map((p) => p.href || null), [B.SOURCE_URL, null, B.SOURCE_URL + '/blob/master/LICENSE']);
+  for (const p of parts.filter((x) => x.href)) assert.ok(typeof p.title === 'string' && p.title.length > 10, 'a link says where it goes: ' + p.text);
+  assert.match(parts[2].title, /GNU Affero General Public License/);
+  // Any address: a fork's, a trailing slash or two dropped.
+  const fork = B.sourceLine('https://example.org/someone/fork//');
+  assert.deepEqual(fork.map((p) => p.href || null), ['https://example.org/someone/fork', null, 'https://example.org/someone/fork/blob/master/LICENSE']);
+  assert.equal(fork.map((p) => p.text).join(''), 'Source code · AGPL-3.0');
+  assert.deepEqual(B.sourceLine(''), parts, 'no address is this one\'s');
+  assert.deepEqual(B.sourceLine(null), parts);
 });
 
 test('at random: new, rename, copy, trash, restore and empty — ids stay unique, a rename never moves an id, and a board is only ever gone by emptying the trash', () => {

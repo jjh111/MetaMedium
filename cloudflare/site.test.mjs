@@ -49,6 +49,15 @@ test('the site is what GitHub Pages publishes, less what is not a page', () => {
   }
 });
 
+test('every file the whitepaper loads by a relative address is published — its figures, the drawings it credits, its scripts', () => {
+  const files = new Set(siteFiles(root));
+  const html = read('index.html').replace(/<!--[\s\S]*?-->/g, '');
+  const loaded = [...new Set([...html.matchAll(/\bsrc="([^"]+)"/g)].map((m) => m[1]).filter((s) => !/^(?:[a-z]+:|\/\/|#)/i.test(s))
+    .map((s) => decodeURIComponent(s.replace(/^\.\//, '').split(/[?#]/)[0])))];
+  assert.ok(loaded.includes('Assets/fig-dynabook.jpg'), 'the whitepaper shows Kay\'s Dynabook drawings (NOTICE credits them)');
+  assert.deepEqual(loaded.filter((f) => !files.has(f)), [], 'a file the whitepaper loads that the site would not publish');
+});
+
 test('only what git tracks is published: an untracked key, a committed node_modules and the working parts stay out', () => {
   const repo = mkdtempSync(path.join(tmpdir(), 'dyna-site-'));
   try {
