@@ -114,6 +114,9 @@ trademark attorney, not legal advice.
   `a-day-with-metamedium-*`, the bibliography's `jhanacek.net/metamedium-resources-65`), and the titles of
   outside works stay as published ("A Day with MetaMedium").
 - the old social card, `Assets/thumb-metamedium-v5.png`, kept beside the new one so its address answers.
+- the version tag's old name, `metamedium-version`, read as a fallback (`VERSION_META_BEFORE` in `17-boards.js`)
+  so a page an older service worker kept still says its version (N3b); and the release `v0.1.0` — its message
+  "MetaMedium 0.1.0" and its file `metamedium-0.1.0.html` — which is history.
 - the repository `jjh111/MetaMedium`, **until H1**.
 
 **Renamed:** everything a person sees, installs, downloads or connects to.
@@ -145,8 +148,8 @@ folders, the MCP servers, the skills, and the living documents.
 |---|---|---|
 | **N0** | Checkpoint: release `0.1.0`, the last MetaMedium | the gate green on `master` |
 | **N1** | Carry your boards: one tap from the old address to dyna.ink, with a file as the fallback | N0 |
-| **N2** | The rights: license, trademark policy, contributors, notices | N0; the IP assignment |
-| **N3a–e** | The rename, one layer per unit | N1, N2 |
+| **N2** | The rights: license, trademark policy, contributors, notices | the IP assignment; any time before the push |
+| **N3a–e** | The rename, one layer per unit | N1 |
 | — | Push, on John's word | N3e |
 | **N4** | dyna.ink becomes the address: canonical links, the notice on the old address | John's Cloudflare steps; dyna.ink bound |
 | **N5** | Release `0.2.0`, the first dyna.ink | N4 |
@@ -232,7 +235,8 @@ holds it, and no event is rewritten on the way in or out.
 - `TRADEMARKS.md`, `CONTRIBUTING.md` and `NOTICE`.
 - The whitepaper's license line and footer.
 
-N2 runs before N3c, so it names the folders as they still are.
+N2 runs whenever the IP assignment is signed, before or after N3c (amended 2 Oct, so the rename does not wait
+on a signature); it names the folders as they stand when it runs.
 
 **What:**
 - `LICENSE` becomes the AGPL-3.0 text, and every `license` field
