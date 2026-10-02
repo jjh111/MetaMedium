@@ -1,4 +1,4 @@
-// MetaMedium, explained — a program on the canvas.
+// dyna.ink, explained — a program on the canvas.
 //
 // This file is the body of a function of `mm` (kind `run`; the harness is in
 // Demos/surface/13-kinds.js). It draws into mm.ctx, steps on mm.onFrame,
@@ -321,11 +321,11 @@ const REGION_LOOP = handLoop(178, 141, 78, 20, 909);
 function sTitle(u) {
   const a = fade(u, 0, 0.8, 3.4, 4);
   ctx.save(); ctx.font = font(64, 500);
-  const mw = ctx.measureText('Meta').width, dw = ctx.measureText('Medium').width;
+  const mw = ctx.measureText('dyna').width, dw = ctx.measureText('.ink').width;
   ctx.restore();
   const x0 = 480 - (mw + dw) / 2;
-  txt('Meta', x0, 238, { s: 64, w: 500, c: C.teal, a });
-  txt('Medium', x0 + mw, 238, { s: 64, w: 500, c: C.ink, a });
+  txt('dyna', x0, 238, { s: 64, w: 500, c: C.teal, a });
+  txt('.ink', x0 + mw, 238, { s: 64, w: 500, c: C.ink, a });
   const tag = 'drawing as the interface to AI';
   txt(tag.slice(0, Math.round(tag.length * prog(u, 0.6, 1.8))), 480, 282, { s: 16, c: C.ink3, al: 'center', a });
   ink(handLine(x0 + 4, 262, x0 + mw + dw - 6, 258, 11, 0.015), eInOut(prog(u, 1.0, 2.1)), C.teal, 2.2, a * 0.8);
@@ -775,7 +775,7 @@ function sYou(u) {
 // ---------------------------------------------------------------------------
 // The timeline
 const SCENES = [
-  { name: 'MetaMedium', dur: 4.0, draw: sTitle },
+  { name: 'dyna.ink', dur: 4.0, draw: sTitle },
   { name: 'a mark is points', dur: 5.5, draw: sInk },
   { name: 'measured', dur: 7.0, draw: sMeasure },
   { name: 'read many ways', dur: 6.5, draw: sRead },
@@ -831,9 +831,9 @@ function cap(u, list) {
 function chrome(i) {
   txt(String(i + 1).padStart(2, '0') + ' / ' + String(SCENES.length).padStart(2, '0'), 36, 46, { s: 11, c: C.ink4 });
   txt(SCENES[i].name, 104, 46, { s: 11, c: C.ink2, w: 500 });
-  const mw = measure('Medium', 12, 500);
-  txt('Medium', 924, 46, { s: 12, w: 500, c: C.ink3, al: 'right' });
-  txt('Meta', 924 - mw, 46, { s: 12, w: 500, c: C.teal, al: 'right' });
+  const mw = measure('.ink', 12, 500);
+  txt('.ink', 924, 46, { s: 12, w: 500, c: C.ink3, al: 'right' });
+  txt('dyna', 924 - mw, 46, { s: 12, w: 500, c: C.teal, al: 'right' });
 }
 function ground() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);

@@ -20783,7 +20783,7 @@ var GitStore = class {
     const r = await this.fetcher(`${this.api}/repos/${this.spec.owner}/${this.spec.repo}/contents/${this.full(path).split("/").map(encodeURIComponent).join("/")}`, {
       method: "PUT",
       headers: { ...this.headers(), "Content-Type": "application/json" },
-      body: JSON.stringify({ message: message ?? `metamedium: ${path}`, content: b64encode(toBytes(data)), branch, ...sha ? { sha } : {} })
+      body: JSON.stringify({ message: message ?? `dyna.ink: ${path}`, content: b64encode(toBytes(data)), branch, ...sha ? { sha } : {} })
     });
     if (!r.ok) throw new Error(`write ${path}: ${r.status}`);
     const body = JSON.parse(await r.text());
@@ -20795,7 +20795,7 @@ var GitStore = class {
     const path = logPathFor(participant);
     const existing = await this.contents(path);
     const text = appendToLogText(existing ? toText(existing.content) : "", events, { source: path });
-    await this.write(path, text, `metamedium: ${participant}, ${events.length} event${events.length === 1 ? "" : "s"}`);
+    await this.write(path, text, `dyna.ink: ${participant}, ${events.length} event${events.length === 1 ? "" : "s"}`);
   }
   async readLogs() {
     if (this.shas.size === 0) await this.list();
