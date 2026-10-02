@@ -6,8 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **The product is dyna.ink** (formerly MetaMedium; renamed 2 Oct 2026, `RENAME-PLAN.md` — §1 holds the
 spellings). The repository, its GitHub Pages address and what the plan's §2 lists keep the old name.
-**Frozen from 2 Oct
-2026**: nothing but the rename's units lands on `master` until N3e.
+**The freeze is over** (2 Oct 2026):
+the rename's N0, N1 and N3a–N3e are on `master`. N2 (the license), N4 (dyna.ink as the address, after John's
+Cloudflare steps), N5 and H1 remain, each with its place in the plan's ladder. Lanes start again from this
+`master`, in fresh worktrees.
 
 **dyna.ink** is a recombinatorial drawing system: interfaces that learn user
 vocabularies, recognize compositional patterns in real-time, and evolve through
