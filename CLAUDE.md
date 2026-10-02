@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Name: the product is becoming dyna.ink** (John, 28 Sep 2026, for copyright); the
-repository, the whitepaper and the code still say MetaMedium until the rename in
-`RENAME-PLAN.md` lands, which also fixes the spellings (its §1). **Frozen from 2 Oct
+**The product is dyna.ink** (formerly MetaMedium; renamed 2 Oct 2026, `RENAME-PLAN.md` — §1 holds the
+spellings). The repository, its GitHub Pages address and what the plan's §2 lists keep the old name.
+**Frozen from 2 Oct
 2026**: nothing but the rename's units lands on `master` until N3e.
 
-**MetaMedium** is a recombinatorial drawing system: interfaces that learn user
+**dyna.ink** is a recombinatorial drawing system: interfaces that learn user
 vocabularies, recognize compositional patterns in real-time, and evolve through
 use. Strokes are grounded geometrically (fingerprints, spatial graphs), users
 name what they draw, names compose recursively, and LLMs interpret over that
@@ -107,8 +107,8 @@ undo, which now reaches every peer (`LiveStore.publish` sends the whole log
 when it did not only grow), nor after a peer's line or a reload; one event
 is applied once however many logs carry it (L1b, `store/merge.ts`). The
 shard pairs a brief and its answer by the brief's node id
-(L2a, `shard-3d/src/room.ts`) and asks how deep a hull seen from one
-standpoint is (L2c, `shard-3d/src/depth.ts`). A hand puts a word on its own
+(L2a, `dynaink-3d/src/room.ts`) and asks how deep a hull seen from one
+standpoint is (L2c, `dynaink-3d/src/depth.ts`). A hand puts a word on its own
 ink and never on another's — the MCP hand's `canvas_label` (`Demos/mcp.mjs`),
 a person's `label:` in the field (`09-field.js`; L2b, L2e); an artifact is
 made by whoever blessed it and a word by whoever wrote its letters, on every
@@ -165,7 +165,7 @@ offers attachment and a connector released on a site binds to it, one
 `bound-to` edge per endpoint (BIND-1). The MCP door (`Demos/mcp-client.mjs`):
 the canvas is an MCP client too — a server's tools map to read, answer and
 draw, and it joins as `mcp:<name>`. The 3D shard (`SHARD-3D-PLAN.md`,
-`shard-3d/`): P0–P6 to the MVP line plus a navigation compass. And
+`dynaink-3d/`): P0–P6 to the MVP line plus a navigation compass. And
 `DIRECTOR-REVIEW-2026-09-15.md`, every package landed: a late result never
 resurrects an erased target (STATE-1), the browser scenarios run headless
 in CI (QA-1, `node e2e/run.mjs`), the shard undoes whole acts (ACT-1) and
@@ -312,7 +312,7 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   the director's view (against v1.0.0, risks, next pushes, John's open decisions in one table). A snapshot: the
   files it points to are the truth
 - `RENAME-PLAN.md` — **the rename, 2 Oct 2026**: MetaMedium becomes dyna.ink. §1 is the one home of the
-  spellings (dyna.ink, DynaInk3D, `DynaInk`, `dynaink`, the folders `core/` and `dynaink-3d/`); §2 what keeps
+  spellings — read it there, never from a copy; §2 what keeps
   the old name and why (the `mm-*` keys, `mm-boards`, the `mm` contract, `.metamedium/`, the dated documents,
   the old address); §3 John's decisions (AGPL-3.0-only, an organisation before a hard launch). Units: N0 a
   checkpoint release `0.1.0`; N1 carry boards from the old address to dyna.ink in one tap, since browser-kept
@@ -342,7 +342,7 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   produced; §5 is what is still John's
 - `BUILD-PLAN-v8.md` — **the executable plan for v8**: invariants no package may break, fixed contracts (events, reps, kinds, the verb basis, the storage seam, the palette item), fourteen work packages with owned files and done-criteria, the parallel threads and the surface weave, and self-contained briefs for sub-contracting models
 - `WHITEPAPER-v5.1-PLAN.md` — **the package**: what the whitepaper shows vs. what the engine does, replays-as-figures, the demos as the paper's spine, the prose pass, and the palette decision John owns
-- `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `metamedium-core/`
+- `ARCHITECTURE-v6-SESSION-ENGINE.md` — **active design**: the no-modes session engine (deferred commitment, summoning, promotion ladder, capability tiers), implemented in `core/`
 - `metamedium-core-schema.md` — graph data model ("everything is a node; type emerges from connections") — load-bearing via v6
 - `ARCHITECTURE-v5-UNIFIED-ENGINE.md` — partly superseded by v6; still the reference for the deferred MoE-routing and embedding-space work
 - `archive/PRD-v4-LLM-Grounded.md` — **archived**; still the spec for the tiered escalation (Tier 0 heuristics / Tier 1 light LLM / Tier 2 Claude) and the unbuilt MCP server
@@ -360,27 +360,27 @@ any structural change.
 
 | Path | What it is |
 |---|---|
-| `metamedium-core/` | **The canonical engine** (TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, the UML class diagram, the sequence diagram and the dashed lines it reads, the state diagram, the ER diagram, the mind map, the garment pattern piece, Mermaid out and in, and a layered layout), **routing** (`src/diagram/route.ts`: orthogonal routes between bound ports, derived, and the tidy plan; `src/tools/route.ts`; under *Routing*), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print, what is said of it on the board — `board.ts` — and what a pattern piece's marks come to, `garment.ts`), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **find** (`src/search/`: words folded and cut, what a board says extracted from its state, a query ranked across boards with a hook for a meaning seat, which boards to read again, a thumbnail's fit; under *Find*, in *Several boards*), **the semantic seat** (`src/semantic/`: an injectable embedding transport, cosine, a stub, the score function Find takes, *notes like this*, a static-embedding model read from its own files; `src/tools/like.ts`; under *The semantic seat*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*), **magnets, handles and bindings that follow** (`src/session/magnets.ts`, `handles.ts`, `follow.ts` with `affine.ts` and `manipulate.ts`; under *Magnets and bindings* and *Handles*), **regions** (`src/session/board-regions.ts`, `src/tools/region.ts`: named places that hold what stands inside them; under *Regions*) and the LLM transport. New recognition/engine work lands HERE |
-| `index.html` | **Interactive whitepaper v5** "MetaMedium: AI Beyond Chat" (live on GitHub Pages). Fully on the `brand/` system as of 3 Sept 2026 — its `:root` is `brand/tokens.css` under the names this page already used, so change a value THERE first |
-| `brand/` | **The visual system, one home**: `tokens.css` holds every MetaMedium colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
+| `core/` | **The canonical engine** (`@dynaink/core`, not published; TypeScript, zero deps, tested): geometry, recognition (the shape rung), relations, the diagram rung (`src/diagram/`), notations over it (`src/notations/`: the flowchart, the UML class diagram, the sequence diagram and the dashed lines it reads, the state diagram, the ER diagram, the mind map, the garment pattern piece, Mermaid out and in, and a layered layout), **routing** (`src/diagram/route.ts`: orthogonal routes between bound ports, derived, and the tidy plan; `src/tools/route.ts`; under *Routing*), concepts, the no-modes session engine, the layout and graph parsers, maths (`src/maths/`: quantities, expressions, the sheet, dimensions, solving figure by figure, true size and tiled print, what is said of it on the board — `board.ts` — and what a pattern piece's marks come to, `garment.ts`), the participants — a model's prompts and parsing, the router, the bridge, and **the decision seat** (`src/participants/decide.ts`, tier 1½; under *Tiered LLM Interpretation*) — **the tools** (`src/tools/`: what the field affords, one contract and one registry; under *Tools*), **the context** (`src/context/`; under *Context*), **find** (`src/search/`: words folded and cut, what a board says extracted from its state, a query ranked across boards with a hook for a meaning seat, which boards to read again, a thumbnail's fit; under *Find*, in *Several boards*), **the semantic seat** (`src/semantic/`: an injectable embedding transport, cosine, a stub, the score function Find takes, *notes like this*, a static-embedding model read from its own files; `src/tools/like.ts`; under *The semantic seat*), **the library packs** (`src/packs/`: the format, the validator, the shipped packs by `id@version`, `use`/`unuse`, the bench; under *Library packs*), **magnets, handles and bindings that follow** (`src/session/magnets.ts`, `handles.ts`, `follow.ts` with `affine.ts` and `manipulate.ts`; under *Magnets and bindings* and *Handles*), **regions** (`src/session/board-regions.ts`, `src/tools/region.ts`: named places that hold what stands inside them; under *Regions*) and the LLM transport. New recognition/engine work lands HERE |
+| `index.html` | **Interactive whitepaper v5** "dyna.ink: AI Beyond Chat" (live on GitHub Pages). Fully on the `brand/` system as of 3 Sept 2026 — its `:root` is `brand/tokens.css` under the names this page already used, so change a value THERE first |
+| `brand/` | **The visual system, one home**: `tokens.css` holds every dyna.ink colour, face, size and figure/diagram token; `styleguide.html` is the living specimen (light paper first, IBM Plex Mono throughout, teal keyword, colour as signal, §11 figures and diagrams, §12 long-form furniture). v1 draft — the whitepaper's **figures** have migrated, the page around them has not; `brand/README.md` carries the four laws, the convergence order, and what applying it to the whitepaper taught the system |
 | `doodle2-canvas.html` | **Flagship demo**: heuristic recognition, spatial graph, library, undo/redo, touch. No LLM. Single-file (~500KB) |
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
 | `Demos/surface/` | **The reference surface's source**: `surface.css` and forty-four script fragments (incl. `17-find` and `26-find`, I6, under *Several boards*: Find, `17-carry` and `22-carry`, RENAME-PLAN N1, under *Several boards*: carried to the new home, `24-relay`, A2, under *The hand organises notes*, and `03-semantic`, I9, the semantic seat's adapter) (`00-core`, `00-ui` … `12-regions` (regions: the frame, the title as a handle, the outline; I5), … `17-assets`, `17-bundle`, … `20-controls`, `21-minimap`, `22-boards`, `23-packs`, `24-seat`, `25-maths`, `25-mermaid`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Because they are one closure, the build and its `--check` refuse a name declared at the top of two fragments — the last would silently replace the first everywhere, which broke rendering once — reading the fragments as one strict block, so they must also compile as strict code (`Demos/build-surface.test.mjs`, in CI's `core` job). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. **`17-board.js` is the second** (V1-PLAN R3): the journal the board this browser keeps is written through, driven in Node by a store held in memory — `node --test Demos/surface/17-board.test.mjs`, in CI's `core` job too. **`17-boards.js` is the third** (R1): the list of boards — names, the trash, which board a page opens, whether the one on screen may be left — `node --test Demos/surface/17-boards.test.mjs`, also in CI. **`07-hand.js` is the fourth** (R6): the hand's rules — what a pen, a finger and a palm do, and the hand tile's face and cycle — `node --test Demos/surface/07-hand.test.mjs`, also in CI; `07-input.js` is its adapter. **`17-assets.js` is the sixth** (I1): what a picture is kept as, its name, where a pick stands, which assets nothing uses and what the decoded pictures cost — `node --test Demos/surface/17-assets.test.mjs`, also in CI (`18-images.js` is its adapter: IndexedDB, workers, canvas). **`17-bundle.js` is the seventh** (I4): the zip written and read by hand, the board bundle, the board as one SVG, the PNG's size and the PDF writer — `node --test Demos/surface/17-bundle.test.mjs`, also in CI (`18-out.js` is its adapter: the export pane, the offscreen canvas, the file opened). **`17-carry.js` is the eighth** (RENAME-PLAN N1): who may send boards and who may take them (two fixed origins, and an address read only on a page on this machine), the preferences carried by name and never a key, what a carry brings in, and every board out in one file — `node --test Demos/surface/17-carry.test.mjs`, also in CI, loaded with `17-boards.js` and `17-bundle.js`, whose `boardName` and zip it calls (`22-carry.js` is its adapter: the window, the messages, the pane's acts).
 **`03-seats.js` is the fifth** (I7): the seats' rules — who reads, who writes, whose key is whose, what an older device's pick becomes — `node --test Demos/surface/03-seats.test.mjs`; `04-models.js` and `04-seatpane.js` are its adapters. **`24-relay.js` is the eighth** (A2): which relay *with Claude* defaults to for the page's hostname, and the one hosted relay the seat accepts — `node --test Demos/surface/24-relay.test.mjs`, also in CI (`24-seat.js` is its adapter). A fragment's `.test.mjs` is not concatenated into the build. `09-palette.js` is the adapter over core's tools (B1): it reads the readings, maps `MM.offersFor` to pills and performs what only the surface can, and builds no affordance by hand |
-| `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `metamedium-core.browser.js` bundle. **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file (and exports the same build as `standalone(dir)`, which the release script attaches to a release). **`sw.js` is the service worker for both addresses** — this one and `/app/` — copied to `app/sw.js` by `scripts/build-app.mjs`, which stamps `VERSION` into it and into the page's `<meta name="dynaink-version">` (*One app address*, below). **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture (and, since A1, the PNG reader and the pictures under it) and `mcp-smoke.mjs` as its stdio test; it is also the canvas's seat's answerer, and **`seat-watch.mjs`** is the silent reader that prints one line per brief parked there — what wakes a Claude Code session (*The canvas's seat*, below); `metamedium-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). **`relay-protocol.mjs`** is the relay's protocol with no server in it (what a client is replayed, the truncation word, the cap — and, since A1, a room's pictures: the asset address, `sniffImage`, the verdicts and their sentences), read by `relay.mjs` and by the Cloudflare Worker (`cloudflare/relay`); `relay-assets.conformance.mjs` is the one definition of the asset cases, run against both servers; `ink-png.test.mjs` is the PNG reader's. **`relay.test.mjs`** is the relay's own test (`node --test Demos/relay.test.mjs`, in CI's `core` job): the catch-up as a pure function, and, over a real relay on a free port, the truncation line and three hands with one departed. `Demos/programs/` holds `run` programs written for the canvas (`dynaink-explained.run.js`: the loop told as a program, ending on a real measurement of the viewer's own stroke). Plus fish, composition diagrams, no-modes graph, etc. |
+| `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `dynaink-core.browser.js` bundle, whose global is `DynaInkCore` — with `MetaMediumCore` assigned the same object for one release, for anything outside the repository that reads the old one (RENAME-PLAN N3c; `core-bundle.test.mjs` runs the bundle as a page does and asks that both are one, in CI's `core` job). **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file (and exports the same build as `standalone(dir)`, which the release script attaches to a release). **`sw.js` is the service worker for both addresses** — this one and `/app/` — copied to `app/sw.js` by `scripts/build-app.mjs`, which stamps `VERSION` into it and into the page's `<meta name="dynaink-version">` (*One app address*, below). **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture (and, since A1, the PNG reader and the pictures under it) and `mcp-smoke.mjs` as its stdio test; it is also the canvas's seat's answerer, and **`seat-watch.mjs`** is the silent reader that prints one line per brief parked there — what wakes a Claude Code session (*The canvas's seat*, below); `dynaink-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). **`relay-protocol.mjs`** is the relay's protocol with no server in it (what a client is replayed, the truncation word, the cap — and, since A1, a room's pictures: the asset address, `sniffImage`, the verdicts and their sentences), read by `relay.mjs` and by the Cloudflare Worker (`cloudflare/relay`); `relay-assets.conformance.mjs` is the one definition of the asset cases, run against both servers; `ink-png.test.mjs` is the PNG reader's. **`relay.test.mjs`** is the relay's own test (`node --test Demos/relay.test.mjs`, in CI's `core` job): the catch-up as a pure function, and, over a real relay on a free port, the truncation line and three hands with one departed. `Demos/programs/` holds `run` programs written for the canvas (`dynaink-explained.run.js`: the loop told as a program, ending on a real measurement of the viewer's own stroke). Plus fish, composition diagrams, no-modes graph, etc. |
 | `app/` | **The app — v1's one address, `https://jjh111.github.io/MetaMedium/app/`** (V1-PLAN R7). Made, never edited: `index.html` is `Demos/session-engine.html` with each file it asks for asked for from `/app/` (`../Demos/…`), `sw.js` is `Demos/sw.js` byte for byte, `manifest.webmanifest` is the old address's starting and scoped at `./` — all three written by `node scripts/build-app.mjs` and drift-checked in CI (`--check`). Installable there, and it opens with no network after one visit. `Demos/session-engine.html` stays where it was and works as it always has |
 | `HELP.md` | **The help pane's page**, for a person using the canvas (PLAN-USER-SURFACE U1g): the loop, the field, handling marks, models and Claude, boards, rooms, your mark, undo, *On an iPad* (the Home Screen and why, the pencil, pictures), the shortcuts. The help tile reads it (`20-controls.js`), both service workers keep it for offline, and the gate's `app` scenario asks for it. Keep it true to the surface — it names controls and keys |
 | `VERSION`, `CHANGELOG.md` | **The version, one line** (`MAJOR.MINOR.PATCH`, an optional pre-release; `0.0.0` until the first release) — stamped into the page and both service workers' cache names by `scripts/build-app.mjs`, said at the head of the help pane. **The changelog**, newest first, one section a release, written only by `scripts/release.mjs` |
-| `scripts/` | **The app's build and the release** (V1-PLAN R7): `build-app.mjs` (stamps `VERSION`, makes `app/`; `--check` in CI) and `release.mjs` (`node scripts/release.mjs <version> [--dry-run] [--since <ref>]`: refuses a dirty tree and a version not greater than the last, writes the changelog's section by unit, bumps and stamps, builds the standalone file into `dist/release/`, commits, tags `v<version>` annotated — and never pushes). `build-app.test.mjs` and `release.test.mjs` are theirs (`node --test`, in CI's `core` job). **`make-icons.mjs`** (PLAN-IPAD-NOTES I3) draws the app's PNG icons into `Demos/icons/` (committed) with Playwright's Chromium, from the old SVG glyph and the surface's dark ground. **`examples.mjs`** (V1-PLAN R5) makes the example boards under `boards/examples/` from the engine — `--check` in CI, `examples.test.mjs` its Node test (*Several boards*, below). **`check-semantic-model.mjs`** (PLAN-IPAD-NOTES I9, not in CI: it needs the real model's files) reads a static-embedding model's folder or address with the same code the page runs and asks whether related words are nearer than unrelated — the one command that closes the semantic seat's *unrun* (*The semantic seat*, above) |
+| `scripts/` | **The app's build and the release** (V1-PLAN R7): `build-app.mjs` (stamps `VERSION`, makes `app/`; `--check` in CI) and `release.mjs` (`node scripts/release.mjs <version> [--dry-run] [--since <ref>]`: refuses a dirty tree and a version not greater than the last, writes the changelog's section by unit, bumps and stamps, builds the standalone file into `dist/release/`, commits, tags `v<version>` annotated — and never pushes). `build-app.test.mjs` and `release.test.mjs` are theirs (`node --test`, in CI's `core` job). **`name.test.mjs`** (RENAME-PLAN N3a, N3d, N3e; in CI's `core` job) reads everything a person sees — the pages and their manifests, the help, the 3D surface's page, the surface's fragments' strings, the MCP hands' and `.mcp.json`, the engine's strings and the programs under `Demos/programs/` — and fails on the old name outside an address, Kay's lowercase idea, an outside work's title and an allowlist whose every entry says why. **`make-icons.mjs`** (PLAN-IPAD-NOTES I3) draws the app's PNG icons into `Demos/icons/` (committed) with Playwright's Chromium, from the old SVG glyph and the surface's dark ground. **`examples.mjs`** (V1-PLAN R5) makes the example boards under `boards/examples/` from the engine — `--check` in CI, `examples.test.mjs` its Node test (*Several boards*, below). **`check-semantic-model.mjs`** (PLAN-IPAD-NOTES I9, not in CI: it needs the real model's files) reads a static-embedding model's folder or address with the same code the page runs and asks whether related words are nearer than unrelated — the one command that closes the semantic seat's *unrun* (*The semantic seat*, above) |
 | `boards/` | **Boards kept as logs.** A board worth keeping is its log, one event per line (a version 1 header first, R2 — `boards/story/board.jsonl` stays version 0 as it was kept), as the app's export writes it and the boards pane opens (*from a file…*). `boards/story/` is the first (28 Sep 2026): dyna.ink explained in its own medium — the architecture, a stroke's life drawn in ink and read back by the engine as a sequence diagram, the plan's 59 units, the ten scenarios, the numbers, a treemap of the code, a flowchart and a class diagram read live beside the Mermaid the engine wrote, and the thirteen gaps building it found — with the scripts that drew it through an MCP hand run from the shell (its README says how, and how to make the next). **`boards/examples/`** (R5, 29 Sep 2026) is the app's own examples — a flowchart with its Mermaid beside it, a class diagram, a molecule from the Basics pack, a pattern page with a right triangle — each a log **made by `scripts/examples.mjs`**, never drawn, listed by `index.json` in the boards pane's *Examples* and opened as a new board of your own (its README) |
-| `skills/` | Claude Code skills: `metamedium-code` (code patterns), `metamedium-design` (design principles) |
+| `skills/` | Claude Code skills: `dynaink-code` (code patterns), `dynaink-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal), and the social card. `Assets/ux-audit-2026-09-28/` holds the screenshots of the audit walked again (U2), which `UX-AUDIT-2026-09-28.md` cites. `make-card.mjs` regenerates that card from index.html's own hero — synthetic pointer input, so the picture shows the engine really reading a mark; `node Assets/make-card.mjs`. Change the picture and you must change the FILENAME and the four og:/twitter: tags in `index.html` and `404.html`, because scrapers cache by URL. **`Assets/whitepaper-figures/`** is the whitepaper's seven graphic plates: `build.py` holds their content and geometry and emits the static blocks `index.html` carries between `whitepaper-plate:KEY` markers (`--check` says they are in sync), `figures.css` and `figures.js` style and enhance them with no build, and `e2e/whitepaper-figures.mjs` audits the real page; its README is the workflow |
 | `archive/` | Retired versions and superseded plans, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) and PRDs v3.2/v4 |
-| `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `shard-3d`), opens a **fresh browser context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `shard-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — and awaits the result object each one returns. It does not reimplement them. **Fourteen scenarios** on Chromium by default (`canvas`, `keep`, `boards`, `carry`, `app`, `pencil`, `models`, `seat`, `hand`, `walk`, `budgets`, `shard`, `demo`, `demo2`) — **`walk`** (`e2e/walk.mjs`, PLAN-FIELD-PAR FP9; 14 records, about two minutes) holds the field push with the pointer's own strokes: an arrow tied at its tip, John's two boxes and a line read as a diagram and offered Mermaid and tidy, the molecule its own thing, the words that find acts, what is missing said, `?`, *export* from the field, a lone word that waits, Name and Write folded, no *Read as writing* on a head, no developer's words, and a word found by meaning with the seat asked once: 885 records as of 2 Oct 2026, after the iPad units (I1–I9, CF1, A1, A2, A2b, P1 and the rejoin fix) and the field push (PLAN-FIELD-PAR) — canvas 470 (468 and two honest skips, 25d and 62d, the real Mermaid library a CDN this machine may not reach), keep 38, boards 68, app 18, pencil 18, models 47, seat 12, walk 14, hand 37 (32 and five skipped by name: John's handwriting, a small model that fails, a ghost's timing), budgets 17 (P1's structural records of the ink raster among them), shard 123 + 11 + 12; on a machine too loaded or too slow to measure, or one whose page draws in software, the budgets' timing records are skipped by name (a cloud container on SwiftShader ran 873 passing and twelve skips in 687 s). **`carry`** (`e2e/carry.mjs`, RENAME-PLAN N1, in the default run and CI's WebKit job; 18 records, about 12 s, on Chromium and WebKit) starts two static servers of its own beside the gate's, so three origins play the old address (A, whose address names B with `?carryTo=`), dyna.ink (B) and a stranger (C): one tap in A's boards pane opens B in a window, which takes both boards whole — each log as A's journal held it, the picture painted, the mark taught, the preferences set, a name B already had suffixed, the empty board B opened with in the trash; a second carry brings nothing twice; keys planted in A's storage and a room key in its address are in no message, in nothing B keeps and not in the file; C's carry is refused and C is never told B is ready; *Every board out* round-trips through *From a file…* on a browser that never saw the boards and doubles nothing on B; and the notice, shown as N4 will turn it on, leads the pane and is said once. **`models`** (`e2e/models.mjs`, V1-PLAN J5 and I7, in the default run; 38 records, about 30 s; M0–M12 are J5's and passed on WebKit too, M13–M19 are the seats' and run on Chromium) runs the real transport through the models pane and the field against `startModelStub` (`e2e/servers.mjs`) — an OpenAI-compatible endpoint on 127.0.0.1 answering `/v1/models` and `/v1/chat/completions` in OpenRouter's recorded shapes (`metamedium-core/src/llm/fixtures/`, the core tests' too): the guard still stops a real model host, one local model suggested a job (Ollama's list a stand-in in the page, nothing on the machine probed), *What is this?* with no model kept and run on join, a wrong id refused with the nearest ids, text only and *sees* from the list, *Read the writing* saying which model cannot and why and running when one that sees joins, a 401 and a reasoning-only reply said in the row, *try it*, a reload rejoining with the vision flag right, and the key nowhere but where *remember* put it — then **seats** (I7, M13–M19, each in a clean context of its own): one key typed once serving a writer, a reader and a decider on the stub; *Read the writing* asking the reader alone and *What is this?* the writer alone, and nobody asking the decider or a model with no seat; *Which is it?* offered on a tie and not otherwise, asking the stub's decision model once and its answer standing at 0.99 beside the engine's, an answer at 0.97 said and held for nobody; a reload keeping the seats; the key nowhere but `mm-model-keys` across every seat; a device that did not remember the key, whose seats come back and are served by the key typed once; and an old pick and key becoming the writer seat. The stub answers the decision model's call shape too (`fixtures/decide-replies.json`, its shapes written by hand — nothing says what the real model returns). **`seat`** (`e2e/seat.mjs`, V1-PLAN J4; 12 records, about 13 s) is Claude Code as the canvas's seat with no model anywhere: a relay of its own on a free port — never `:8020`, where a room of John's may be; a request there is refused and counted — `Demos/mcp.mjs` as the answerer over stdio and `Demos/seat-watch.mjs` beside it; the pane leading with Claude Code, one tap, *What is this?* and *Read the writing* parked, listed, answered and landing as a model's, a refusal said, a brief withdrawn by Esc, a reload that finds the pairing, and *with Claude* as the room and the seat in one act (*The canvas's seat*). **`hand`** (`e2e/hand.mjs`, V1-PLAN H1 and PLAN-IPAD-NOTES A1, in the default run; 34 records — 29 passing and five skipped by name — about a minute) is the MCP hand in the gate: a relay of its own on a free port (never `:8020`; refused and counted), `Demos/mcp.mjs` over stdio in room `mcp-test`, a tab as *john* and a counting model of the gate's own, walking QA-v10 §4, §6 and §7 and acceptance A7 — a sentence, a reading, a transcript and a label landing on the right marks after an undo and a reload, a field left open and a loop that waits under the hand's stroke, the minimap, *Show it in 3D*, and pictures in a room (H1.22–25: the hand imports a PNG and a tab that holds none of it fetches it by hash and draws it; a picture a tab imports is put on the relay and a second tab, a context of its own, fetches and draws it, and the hand sees it; the same on the Worker's logic with a room key, by Bearer after a CORS preflight) — with the rows that need John's own handwriting as skips by name and every generated stroke said `synthetic`; its invariant is *Tier 1 before a model* (the gate's model is asked once, by *What is this?*, and never by the hand's arrival or any of its tools). **`budgets`** (`e2e/budgets.mjs`, V1-PLAN R4c) paints the bench's 500-mark board both ways, every mark pointed at, boxes drawn and undone, and every mark held (`paintCheck`, `rolesCheck`, `heldCheck`: a hand's paint must draw and say what the whole-board read would), then measures PERF.md's budgets on the 2,000-mark board — open, release → reading drawn, a pointer move, a pan at zoom 1 and at fit-all — each a step with its number, **skipped by name** on a machine too loaded to measure or slower than the one they were set on (a calibration in the page), or whose page draws with a software renderer (SwiftShader: a container's paint is slower than its calibration says); and, last (V1-PLAN I2), a board of five artifacts and 5,000 strokes traced from pictures (3 pictures of 1,667 beside 2 SVGs) opened as a folder, held to PERF.md's 3 s at 5,000 marks (it took 96 s) — a record that it opens whole, and one for its open, skipped by name like the others. **P1 added** (1 Oct 2026) a fourth block, structural so it never skips: a board of 2 pictures of 1,000 traced strokes beside a figure, its paint's `stroke()` calls counted (`countCanvasCalls`), the ink's raster held, blitted over twenty pans and never stale across a zoom, a stroke, an undo and a drag, the blit equal to the same strokes laid on the canvas (`pictureFacts`, 9 records; *A big still group is drawn once*). Beside them, **`smoke`** is opt-in and runs on WebKit (`node e2e/run.mjs --browser webkit smoke`): the board loads, ink drawn with real pointer input is read back, press-and-hold opens the field and one pill is taken — four checks in `run.mjs` itself, a WebKit smoke and not an iPhone test. CI's `webkit` job runs it with `pencil` and `keep` (`--browser webkit smoke pencil keep`, `npm run webkit` in `e2e/`, about 30 s). **`pencil`** (`e2e/pencil.mjs`, V1-PLAN R6, in the default run and on WebKit; 16 records, about 17 s) is the canvas by pen and finger at an iPad's size: a pen and fingers synthesised in the page as iPadOS delivers them (`pointerType` `pen` with a pressure and a tilt, `touch`), and the on-screen keyboard as iPadOS tells the page (a stand-in `visualViewport`, installed before the page's scripts, that shrinks) — the pen draws with its pressure on every point, the switch said once, a finger pans, two pinch and leave nothing in the log, a palm during, just after and just before the pen is nothing, the pencil's hover shows the reading and the magnet, the field by the pen's hold and a pill, a clean, an undo, the field above the keyboard with every pill scrolled to and hit, the hand tile round, the mouse untouched, a save and a reload, a handle of the one selected mark dragged by the pen while a finger laid on another pans (E1), and a tap off the open field with a few pixels of wobble that closes it and leaves no dot, by the pen and by a finger that draws (P12, W3); the pencil's coalesced samples all recorded, in order, and a time on every point (I3, P13–P13b); `QA-v1.md` §A10 is what only an iPad can say. Pass, fail and **skip** are counted separately (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. Beside the gate, on its static server and never run by it or by CI: `e2e/walk.mjs` (a user's walk: real pointer input, what the field offers with nothing typed and with ten words typed, per scene — PLAN-FIELD-PAR §1), `e2e/perf.mjs` (the surface's half of `PERF.md`, numbers, each budget said within or over — measured with the gate's own `budgets.mjs`), `e2e/pictures.mjs` (P1: a board of traced pictures panned, each view with the ink's raster and without it, the paint's JavaScript, the frame interval and the `stroke()` calls a paint makes) and `e2e/whitepaper-figures.mjs` (the plates' audit, Chromium and WebKit). **`keep`** (`e2e/keep.mjs`, V1-PLAN R3) loads no harness: the kill test (the page crashed or closed at random points, reopened, every completed stroke there), a save forced to fail, the one import of browser storage's old board, two tabs, and the pages that must not write — in the default run, and on WebKit where it can (`--browser webkit keep`, in CI's `webkit` job since R6: 22 records and 3 skipped by name — the quota is Chromium's to force); **`big`** (opt-in, minutes) saves and reopens a 2,000-mark board. Since R1 the kill test keeps two boards and switches between them through the boards pane mid-session, killing right after a switch and in the middle of one. **`boards`** (`e2e/boards.mjs`, R1, in the default run) drives the boards pane with the real pointer: the old board as the first entry, new, switch, reload and `?board=`, rename, duplicate, delete, restore, emptying the trash said first, a board open in another tab, one tab per board, the view per board, recent places, Reset, a board out as a file and back, a board that is not saved never left without a word, a library pack kept with its board through a reload (B3), and the ask that the browser keep the device's storage and the pane's foot saying how much room is left (I3, N20–N20f, against a stand-in for the storage API), and the semantic seat's records (I9, N24–N24l, `e2e/semantic.mjs`: Find by meaning, *Notes like this* and a region's button with a stand-in transport seated, then the page's own loader against a model the gate BUILDS and serves from an origin of its own — its two files fetched once with no key, kept in the browser's cache, nothing loaded at boot, and a refusal, a missing file, a page of HTML and a file too big each said in words). **`app`** (`e2e/app.mjs`, R7, in the default run; 14 records on Chromium and WebKit, about 10 s) opens `/app/` on the gate's static server: every file it asks for answers, the manifest starts and is scoped there (and Chromium finds it installable), the worker's scope covers the page and the page is *controlled* by it, a box drawn comes back on a reload the worker served and with the server gone, the help pane says `VERSION`, a request carrying a key is never kept, the old address and every address the whitepaper, `404.html` and the README link still answer, the PNG apple-touch-icon and manifest icons answering at their sizes, the iOS meta and a theme colour from the tokens, and both workers keeping the icons (I3, A12–A15) — and a release renames the cache, beside a control that shows the stale shell a cache that kept its name serves. `e2e/README.md` has the rest |
-| `PERF.md`, `metamedium-core/bench/`, `e2e/perf.mjs` | **The performance baseline** (V1-PLAN §9 R4a, 27 Sep 2026): `bench/board.mjs` draws deterministic boards of 500, 2,000 and 5,000 marks from a seed (the generator is kept, never the boards); `bench/engine.mjs` times replay, memory, relations, the whole-board read, one more stroke, a live room's incoming line and a newcomer's hello; `e2e/perf.mjs`, beside the gate and on its servers and model guard, times the surface — open, pan, draw, release → reading drawn — in Chromium and WebKit; `bench/profile.mjs` reads a CPU profile back to `src/…:line` and the surface's fragments; `bench/report.mjs` prints `PERF.md`'s tables from the results. `PERF.md` has the answer (500 marks usable, 2,000 not, 5,000 does not open), every number with its command, the hotspots ranked with file:line, and budgets for R4b — and, after R4b, the engine's numbers beside them. **R4b added** `bench/budgets.test.mjs` (`node --test`: the engine's budgets on the generated 2,000-mark board — replay ≤ 0.5 s, a stroke ≤ 4 / 16 ms, ≤ 150 MB — and the 5,000 board replays; each size in a process of its own, every run's numbers recorded in `dist/bench`) and `bench/equivalence.mjs` (every held log, a scripted log of the rarer acts and the 500-mark board replayed by the old engine — a committed bundle at `--ref` — and by `src/`, every reading and id compared, and what differs said). Not in `npm test` (`vitest.config.mjs` keeps `bench/` out) or the gate. **R4c added** the surface's column, and its budgets to the gate: `e2e/budgets.mjs` (what `perf.mjs` and the gate's `budgets` scenario both measure with) **I2 added** (V1-PLAN I2, 1 Oct 2026) pictures traced into ink beside artifacts: `bench/board.mjs`'s `tracedStrokes` and `importedBoard` (what `trace` leaves of a photograph, and a board of SVG figures and pictures as the surface brings them in — the traced ink, then the picture beside it), `bench/imports.mjs` (apply per import, cold and warm replay, a stroke drawn on a picture's ink; `--bundle=` for an older engine) and two tests in `bench/budgets.test.mjs` (an import of 2,000 traced strokes beside an SVG applies in ≤ 4 ms a stroke on average and replays in ≤ 0.25 ms a mark, a stroke on its ink ≤ 4 / 16 ms; 5 pictures beside 5 SVGs the same, replay ≤ 1.25 s) — a minute and a half to apply and replay before, under a second after. **R4d added** `bench/room.test.mjs` (`node --test`: a live room's budgets on the 2,000-mark board — a line ≤ 16 ms at p95 with no full replay, one crossing a mark just drawn too, a line that lands earlier from a checkpoint, a line with no events no work, a newcomer's hello one copy of each log in rooms of three and six with a hand gone — measured by `bench/room.mjs`, whose `--path=before` is the surface before R4d). |
+| `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `dynaink-3d`), opens a **fresh browser context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `dynaink-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — and awaits the result object each one returns. It does not reimplement them. **Fourteen scenarios** on Chromium by default (`canvas`, `keep`, `boards`, `carry`, `app`, `pencil`, `models`, `seat`, `hand`, `walk`, `budgets`, `shard`, `demo`, `demo2`) — **`walk`** (`e2e/walk.mjs`, PLAN-FIELD-PAR FP9; 14 records, about two minutes) holds the field push with the pointer's own strokes: an arrow tied at its tip, John's two boxes and a line read as a diagram and offered Mermaid and tidy, the molecule its own thing, the words that find acts, what is missing said, `?`, *export* from the field, a lone word that waits, Name and Write folded, no *Read as writing* on a head, no developer's words, and a word found by meaning with the seat asked once: 885 records as of 2 Oct 2026, after the iPad units (I1–I9, CF1, A1, A2, A2b, P1 and the rejoin fix) and the field push (PLAN-FIELD-PAR) — canvas 470 (468 and two honest skips, 25d and 62d, the real Mermaid library a CDN this machine may not reach), keep 38, boards 68, app 18, pencil 18, models 47, seat 12, walk 14, hand 37 (32 and five skipped by name: John's handwriting, a small model that fails, a ghost's timing), budgets 17 (P1's structural records of the ink raster among them), shard 123 + 11 + 12; on a machine too loaded or too slow to measure, or one whose page draws in software, the budgets' timing records are skipped by name (a cloud container on SwiftShader ran 873 passing and twelve skips in 687 s). **`carry`** (`e2e/carry.mjs`, RENAME-PLAN N1, in the default run and CI's WebKit job; 18 records, about 12 s, on Chromium and WebKit) starts two static servers of its own beside the gate's, so three origins play the old address (A, whose address names B with `?carryTo=`), dyna.ink (B) and a stranger (C): one tap in A's boards pane opens B in a window, which takes both boards whole — each log as A's journal held it, the picture painted, the mark taught, the preferences set, a name B already had suffixed, the empty board B opened with in the trash; a second carry brings nothing twice; keys planted in A's storage and a room key in its address are in no message, in nothing B keeps and not in the file; C's carry is refused and C is never told B is ready; *Every board out* round-trips through *From a file…* on a browser that never saw the boards and doubles nothing on B; and the notice, shown as N4 will turn it on, leads the pane and is said once. **`models`** (`e2e/models.mjs`, V1-PLAN J5 and I7, in the default run; 38 records, about 30 s; M0–M12 are J5's and passed on WebKit too, M13–M19 are the seats' and run on Chromium) runs the real transport through the models pane and the field against `startModelStub` (`e2e/servers.mjs`) — an OpenAI-compatible endpoint on 127.0.0.1 answering `/v1/models` and `/v1/chat/completions` in OpenRouter's recorded shapes (`core/src/llm/fixtures/`, the core tests' too): the guard still stops a real model host, one local model suggested a job (Ollama's list a stand-in in the page, nothing on the machine probed), *What is this?* with no model kept and run on join, a wrong id refused with the nearest ids, text only and *sees* from the list, *Read the writing* saying which model cannot and why and running when one that sees joins, a 401 and a reasoning-only reply said in the row, *try it*, a reload rejoining with the vision flag right, and the key nowhere but where *remember* put it — then **seats** (I7, M13–M19, each in a clean context of its own): one key typed once serving a writer, a reader and a decider on the stub; *Read the writing* asking the reader alone and *What is this?* the writer alone, and nobody asking the decider or a model with no seat; *Which is it?* offered on a tie and not otherwise, asking the stub's decision model once and its answer standing at 0.99 beside the engine's, an answer at 0.97 said and held for nobody; a reload keeping the seats; the key nowhere but `mm-model-keys` across every seat; a device that did not remember the key, whose seats come back and are served by the key typed once; and an old pick and key becoming the writer seat. The stub answers the decision model's call shape too (`fixtures/decide-replies.json`, its shapes written by hand — nothing says what the real model returns). **`seat`** (`e2e/seat.mjs`, V1-PLAN J4; 12 records, about 13 s) is Claude Code as the canvas's seat with no model anywhere: a relay of its own on a free port — never `:8020`, where a room of John's may be; a request there is refused and counted — `Demos/mcp.mjs` as the answerer over stdio and `Demos/seat-watch.mjs` beside it; the pane leading with Claude Code, one tap, *What is this?* and *Read the writing* parked, listed, answered and landing as a model's, a refusal said, a brief withdrawn by Esc, a reload that finds the pairing, and *with Claude* as the room and the seat in one act (*The canvas's seat*). **`hand`** (`e2e/hand.mjs`, V1-PLAN H1 and PLAN-IPAD-NOTES A1, in the default run; 34 records — 29 passing and five skipped by name — about a minute) is the MCP hand in the gate: a relay of its own on a free port (never `:8020`; refused and counted), `Demos/mcp.mjs` over stdio in room `mcp-test`, a tab as *john* and a counting model of the gate's own, walking QA-v10 §4, §6 and §7 and acceptance A7 — a sentence, a reading, a transcript and a label landing on the right marks after an undo and a reload, a field left open and a loop that waits under the hand's stroke, the minimap, *Show it in 3D*, and pictures in a room (H1.22–25: the hand imports a PNG and a tab that holds none of it fetches it by hash and draws it; a picture a tab imports is put on the relay and a second tab, a context of its own, fetches and draws it, and the hand sees it; the same on the Worker's logic with a room key, by Bearer after a CORS preflight) — with the rows that need John's own handwriting as skips by name and every generated stroke said `synthetic`; its invariant is *Tier 1 before a model* (the gate's model is asked once, by *What is this?*, and never by the hand's arrival or any of its tools). **`budgets`** (`e2e/budgets.mjs`, V1-PLAN R4c) paints the bench's 500-mark board both ways, every mark pointed at, boxes drawn and undone, and every mark held (`paintCheck`, `rolesCheck`, `heldCheck`: a hand's paint must draw and say what the whole-board read would), then measures PERF.md's budgets on the 2,000-mark board — open, release → reading drawn, a pointer move, a pan at zoom 1 and at fit-all — each a step with its number, **skipped by name** on a machine too loaded to measure or slower than the one they were set on (a calibration in the page), or whose page draws with a software renderer (SwiftShader: a container's paint is slower than its calibration says); and, last (V1-PLAN I2), a board of five artifacts and 5,000 strokes traced from pictures (3 pictures of 1,667 beside 2 SVGs) opened as a folder, held to PERF.md's 3 s at 5,000 marks (it took 96 s) — a record that it opens whole, and one for its open, skipped by name like the others. **P1 added** (1 Oct 2026) a fourth block, structural so it never skips: a board of 2 pictures of 1,000 traced strokes beside a figure, its paint's `stroke()` calls counted (`countCanvasCalls`), the ink's raster held, blitted over twenty pans and never stale across a zoom, a stroke, an undo and a drag, the blit equal to the same strokes laid on the canvas (`pictureFacts`, 9 records; *A big still group is drawn once*). Beside them, **`smoke`** is opt-in and runs on WebKit (`node e2e/run.mjs --browser webkit smoke`): the board loads, ink drawn with real pointer input is read back, press-and-hold opens the field and one pill is taken — four checks in `run.mjs` itself, a WebKit smoke and not an iPhone test. CI's `webkit` job runs it with `pencil` and `keep` (`--browser webkit smoke pencil keep`, `npm run webkit` in `e2e/`, about 30 s). **`pencil`** (`e2e/pencil.mjs`, V1-PLAN R6, in the default run and on WebKit; 16 records, about 17 s) is the canvas by pen and finger at an iPad's size: a pen and fingers synthesised in the page as iPadOS delivers them (`pointerType` `pen` with a pressure and a tilt, `touch`), and the on-screen keyboard as iPadOS tells the page (a stand-in `visualViewport`, installed before the page's scripts, that shrinks) — the pen draws with its pressure on every point, the switch said once, a finger pans, two pinch and leave nothing in the log, a palm during, just after and just before the pen is nothing, the pencil's hover shows the reading and the magnet, the field by the pen's hold and a pill, a clean, an undo, the field above the keyboard with every pill scrolled to and hit, the hand tile round, the mouse untouched, a save and a reload, a handle of the one selected mark dragged by the pen while a finger laid on another pans (E1), and a tap off the open field with a few pixels of wobble that closes it and leaves no dot, by the pen and by a finger that draws (P12, W3); the pencil's coalesced samples all recorded, in order, and a time on every point (I3, P13–P13b); `QA-v1.md` §A10 is what only an iPad can say. Pass, fail and **skip** are counted separately (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. Beside the gate, on its static server and never run by it or by CI: `e2e/walk.mjs` (a user's walk: real pointer input, what the field offers with nothing typed and with ten words typed, per scene — PLAN-FIELD-PAR §1), `e2e/perf.mjs` (the surface's half of `PERF.md`, numbers, each budget said within or over — measured with the gate's own `budgets.mjs`), `e2e/pictures.mjs` (P1: a board of traced pictures panned, each view with the ink's raster and without it, the paint's JavaScript, the frame interval and the `stroke()` calls a paint makes) and `e2e/whitepaper-figures.mjs` (the plates' audit, Chromium and WebKit). **`keep`** (`e2e/keep.mjs`, V1-PLAN R3) loads no harness: the kill test (the page crashed or closed at random points, reopened, every completed stroke there), a save forced to fail, the one import of browser storage's old board, two tabs, and the pages that must not write — in the default run, and on WebKit where it can (`--browser webkit keep`, in CI's `webkit` job since R6: 22 records and 3 skipped by name — the quota is Chromium's to force); **`big`** (opt-in, minutes) saves and reopens a 2,000-mark board. Since R1 the kill test keeps two boards and switches between them through the boards pane mid-session, killing right after a switch and in the middle of one. **`boards`** (`e2e/boards.mjs`, R1, in the default run) drives the boards pane with the real pointer: the old board as the first entry, new, switch, reload and `?board=`, rename, duplicate, delete, restore, emptying the trash said first, a board open in another tab, one tab per board, the view per board, recent places, Reset, a board out as a file and back, a board that is not saved never left without a word, a library pack kept with its board through a reload (B3), and the ask that the browser keep the device's storage and the pane's foot saying how much room is left (I3, N20–N20f, against a stand-in for the storage API), and the semantic seat's records (I9, N24–N24l, `e2e/semantic.mjs`: Find by meaning, *Notes like this* and a region's button with a stand-in transport seated, then the page's own loader against a model the gate BUILDS and serves from an origin of its own — its two files fetched once with no key, kept in the browser's cache, nothing loaded at boot, and a refusal, a missing file, a page of HTML and a file too big each said in words). **`app`** (`e2e/app.mjs`, R7, in the default run; 14 records on Chromium and WebKit, about 10 s) opens `/app/` on the gate's static server: every file it asks for answers, the manifest starts and is scoped there (and Chromium finds it installable), the worker's scope covers the page and the page is *controlled* by it, a box drawn comes back on a reload the worker served and with the server gone, the help pane says `VERSION`, a request carrying a key is never kept, the old address and every address the whitepaper, `404.html` and the README link still answer, the PNG apple-touch-icon and manifest icons answering at their sizes, the iOS meta and a theme colour from the tokens, and both workers keeping the icons (I3, A12–A15) — and a release renames the cache, beside a control that shows the stale shell a cache that kept its name serves. `e2e/README.md` has the rest |
+| `PERF.md`, `core/bench/`, `e2e/perf.mjs` | **The performance baseline** (V1-PLAN §9 R4a, 27 Sep 2026): `bench/board.mjs` draws deterministic boards of 500, 2,000 and 5,000 marks from a seed (the generator is kept, never the boards); `bench/engine.mjs` times replay, memory, relations, the whole-board read, one more stroke, a live room's incoming line and a newcomer's hello; `e2e/perf.mjs`, beside the gate and on its servers and model guard, times the surface — open, pan, draw, release → reading drawn — in Chromium and WebKit; `bench/profile.mjs` reads a CPU profile back to `src/…:line` and the surface's fragments; `bench/report.mjs` prints `PERF.md`'s tables from the results. `PERF.md` has the answer (500 marks usable, 2,000 not, 5,000 does not open), every number with its command, the hotspots ranked with file:line, and budgets for R4b — and, after R4b, the engine's numbers beside them. **R4b added** `bench/budgets.test.mjs` (`node --test`: the engine's budgets on the generated 2,000-mark board — replay ≤ 0.5 s, a stroke ≤ 4 / 16 ms, ≤ 150 MB — and the 5,000 board replays; each size in a process of its own, every run's numbers recorded in `dist/bench`) and `bench/equivalence.mjs` (every held log, a scripted log of the rarer acts and the 500-mark board replayed by the old engine — a committed bundle at `--ref` — and by `src/`, every reading and id compared, and what differs said). Not in `npm test` (`vitest.config.mjs` keeps `bench/` out) or the gate. **R4c added** the surface's column, and its budgets to the gate: `e2e/budgets.mjs` (what `perf.mjs` and the gate's `budgets` scenario both measure with) **I2 added** (V1-PLAN I2, 1 Oct 2026) pictures traced into ink beside artifacts: `bench/board.mjs`'s `tracedStrokes` and `importedBoard` (what `trace` leaves of a photograph, and a board of SVG figures and pictures as the surface brings them in — the traced ink, then the picture beside it), `bench/imports.mjs` (apply per import, cold and warm replay, a stroke drawn on a picture's ink; `--bundle=` for an older engine) and two tests in `bench/budgets.test.mjs` (an import of 2,000 traced strokes beside an SVG applies in ≤ 4 ms a stroke on average and replays in ≤ 0.25 ms a mark, a stroke on its ink ≤ 4 / 16 ms; 5 pictures beside 5 SVGs the same, replay ≤ 1.25 s) — a minute and a half to apply and replay before, under a second after. **R4d added** `bench/room.test.mjs` (`node --test`: a live room's budgets on the 2,000-mark board — a line ≤ 16 ms at p95 with no full replay, one crossing a mark just drawn too, a line that lands earlier from a checkpoint, a line with no events no work, a newcomer's hello one copy of each log in rooms of three and six with a hand gone — measured by `bench/room.mjs`, whose `--path=before` is the surface before R4d). |
 | `cloudflare/` | **dyna.ink on Cloudflare** (CF1, 1 Oct 2026; `cloudflare/README.md` is what John does, once): **the site** — `build-site.mjs` makes what GitHub Pages publishes (git's tracked files less the tests, CI and this folder) plus `_headers` (`pages/headers.template` + `pages/csp.txt`: the app's CSP held to what its source loads — `'unsafe-eval'` stays because a program's frame inherits it and runs `new Function`; no COOP/COEP, the reason written) and `_redirects` (`/app` → `/app/`), for Cloudflare Pages; `site.test.mjs` holds it. **The room relay** — `relay/`: `Demos/relay.mjs`'s protocol as a Worker + one Durable Object per room (`src/worker.mjs`; lines kept in SQLite-backed storage in pieces, bounded in lines and characters), **a key per room** (`src/auth.mjs`: HMAC-SHA256 of the room's name under a secret; `room-key.mjs` makes one; `*` opens every room), CORS for the app's origins, fail closed with no secret. Since A1 it also keeps a room's pictures by their hash, in the Durable Object's storage (`PUT|GET|HEAD /rooms/<room>/assets/<sha256>`; *A picture in a room*, under *The MCP hand*). `dev-server.mjs` runs the Worker's logic in Node; `relay.worker.test.mjs` (24 protocol cases over a fake storage, and the picture cases), `relay.parity.test.mjs` and `relay.hands.test.mjs` (`live-node.mjs`, `mcp.mjs`, `seat-watch.mjs` over a socket, with a key) and `relay.workerd.test.mjs` (the real runtime via `wrangler dev --local`, skipped by name without `npm ci`) are `cd cloudflare/relay && npm test`. `.github/workflows/deploy-cloudflare.yml` deploys both on a push to master and skips cleanly without `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`; it makes the Pages project `dyna-ink` the first time and puts the relay's secret from a GitHub secret `MM_RELAY_SECRET` when one is set (from stdin, never logged), so the README's setup can be done from a browser alone (2 Oct 2026) |
-| `.github/workflows/ci.yml` | CI, on every push/PR: typecheck + test + build for `metamedium-core` — with the drift check for both committed bundles, the MCP hand's smoke, the surface's drift check and its build's test, the field reader's, the hand's rules', the relay's, the board journal's and the board list's Node tests, the carry's (`17-carry.test.mjs`, RENAME-PLAN N1), the app's drift check (`scripts/build-app.mjs --check`), the app build's and release script's Node tests, and the example boards' drift check and test (`scripts/examples.mjs --check`, `examples.test.mjs`) — `shard-3d` (with its MCP hand's smoke) and `Web App Skeleton` (with lint); the **browser gate** (`e2e/run.mjs` on Chromium); and **WebKit** — the smoke, `pencil`, `keep` and `carry` (`--browser webkit smoke pencil keep carry`) — in a job of its own. Both browser jobs upload `e2e/results` when they fail |
+| `.github/workflows/ci.yml` | CI, on every push/PR: typecheck + test + build for `core` — with the drift check for both committed bundles and the test of the browser bundle's two globals (`Demos/core-bundle.test.mjs`), the MCP hand's smoke, the surface's drift check and its build's test, the field reader's, the hand's rules', the relay's, the board journal's and the board list's Node tests, the carry's (`17-carry.test.mjs`, RENAME-PLAN N1), the app's drift check (`scripts/build-app.mjs --check`), the app build's and release script's Node tests, the name test (`scripts/name.test.mjs`, RENAME-PLAN N3a: what a person sees says dyna.ink), and the example boards' drift check and test (`scripts/examples.mjs --check`, `examples.test.mjs`) — `dynaink-3d` (with its MCP hand's smoke) and `Web App Skeleton` (with lint); the **browser gate** (`e2e/run.mjs` on Chromium); and **WebKit** — the smoke, `pencil`, `keep` and `carry` (`--browser webkit smoke pencil keep carry`) — in a job of its own. Both browser jobs upload `e2e/results` when they fail |
 
 ### Experiments (subordinate tier — see `EXPERIMENTS.md`)
 
@@ -396,12 +396,12 @@ not the product. Each entry's rationale and what it feeds back lives in
 | `test-llm.html` | Standalone LLM harness |
 | `manim-explainer/` | ~50s explainer video. Source + stills tracked; renders and `media/` cache gitignored (regenerate from the scripts) |
 | `playground.html` | Personal sandbox on the personal-site design language |
-| `shard-3d/` | **Live · the plan's MVP line (P0–P6) + the compass + the review's four shard packages + push 2 (G0–G5)** — a bounded MetaMedium for making things in space: ink on a plane read by the shape rung in that plane's own units, a form rung, solids as **op trees in the log** (the tree is the source, the mesh is derived), the diff as the brief, definitions and placements. **Push 2 is geometry from the drawing** (`SHARD-3D-PUSH-2.md`): the board goes out and comes back as its own core-format log; every free stroke is a **silhouette claim**, so a footprint plus ⊓ drawn from wherever the hand stood stands a **hull** at tier 1, in the volume its claims define; the hull is cut into **parts** with ids and a sentence each; the brief a small model can answer is 1048 characters and its reply names parts by id and never writes geometry; and `shard-3d/mcp.mjs` is the shard's own MCP hand **and the model seat** — Claude Code answers the parked brief and the shard applies it as it would a model's (`.mcp.json`, `metamedium-3d`). **`shard-3d/README.md` is the single source** for how it works, what it does not do, what core would need, and the fixtures; don't restate it here. `npm install && npm run dev` in `shard-3d/` (vite on :5174); `?demo=castle` runs the whole loop on John's own drawing at boot and `?fixture=<name>` loads a board from `shard-3d/fixtures/`; `npm test` is vitest on the pure rungs (606 in 31 files on 27 Sep); the engine is imported from source, so there is no bundle to drift |
-| `gliner-seat/` | **Parked with its answer, *not yet* (J2, 26 Sep 2026)** — can GLiNER2 be the middle layer's `extract` seat? It runs where MetaMedium runs: the one-graph ONNX export of `fastino/gliner2-multi-v1` (Apache-2.0) with a JS port of the library's processor, token-identical to the Python original; a line of a pattern page in 24 ms in a Chromium page on WebGPU, 55 ms in WebKit, 23 ms in a Node process. But it misses the names a seat would add (measurement names 7/11 at best, part names 6/9, operators 8/26), and a page pays 614 MB and ~2.2 GB of memory. `transport.mjs` is the seat's seam, shaped like `DecideTransport`, with a fake; `node --test gliner-seat/*.test.mjs` needs no model. `gliner-seat/README.md` has the numbers, the commands and what a later unit would need. Weights, venv and caches are never committed (`node fetch.mjs`). **Not in CI** |
+| `dynaink-3d/` | **Live · the plan's MVP line (P0–P6) + the compass + the review's four shard packages + push 2 (G0–G5)** — **DynaInk3D**, a bounded dyna.ink for making things in space: ink on a plane read by the shape rung in that plane's own units, a form rung, solids as **op trees in the log** (the tree is the source, the mesh is derived), the diff as the brief, definitions and placements. **Push 2 is geometry from the drawing** (`SHARD-3D-PUSH-2.md`): the board goes out and comes back as its own core-format log; every free stroke is a **silhouette claim**, so a footprint plus ⊓ drawn from wherever the hand stood stands a **hull** at tier 1, in the volume its claims define; the hull is cut into **parts** with ids and a sentence each; the brief a small model can answer is 1048 characters and its reply names parts by id and never writes geometry; and `dynaink-3d/mcp.mjs` is the shard's own MCP hand **and the model seat** — Claude Code answers the parked brief and the shard applies it as it would a model's (`.mcp.json`, `dynaink-3d`). **`dynaink-3d/README.md` is the single source** for how it works, what it does not do, what core would need, and the fixtures; don't restate it here. `npm install && npm run dev` in `dynaink-3d/` (vite on :5174); `?demo=castle` runs the whole loop on John's own drawing at boot and `?fixture=<name>` loads a board from `dynaink-3d/fixtures/`; `npm test` is vitest on the pure rungs (606 in 31 files on 27 Sep); the engine is imported from source (`'@dynaink/core'`, aliased to `../core/src`), so there is no bundle to drift |
+| `gliner-seat/` | **Parked with its answer, *not yet* (J2, 26 Sep 2026)** — can GLiNER2 be the middle layer's `extract` seat? It runs where dyna.ink runs: the one-graph ONNX export of `fastino/gliner2-multi-v1` (Apache-2.0) with a JS port of the library's processor, token-identical to the Python original; a line of a pattern page in 24 ms in a Chromium page on WebGPU, 55 ms in WebKit, 23 ms in a Node process. But it misses the names a seat would add (measurement names 7/11 at best, part names 6/9, operators 8/26), and a page pays 614 MB and ~2.2 GB of memory. `transport.mjs` is the seat's seam, shaped like `DecideTransport`, with a fake; `node --test gliner-seat/*.test.mjs` needs no model. `gliner-seat/README.md` has the numbers, the commands and what a later unit would need. Weights, venv and caches are never committed (`node fetch.mjs`). **Not in CI** |
 
 **Known duplication:** recognition logic still exists independently in
 `doodle2-canvas.html`, `metadoodle1.html`, `Web App Skeleton/src/core/`, and
-`v2-poc/bundle.js`. As of June 2026, **`metamedium-core/` is the canonical
+`v2-poc/bundle.js`. As of June 2026, **`core/` is the canonical
 source** (geometry/recognition ported from the Web App Skeleton with
 behavior-identical tests). Land improvements in core; the legacy copies
 converge onto it per ROADMAP.md and should not receive new logic.
@@ -424,7 +424,7 @@ library hierarchical.
 
 ### Recognition Engine
 
-> **Source of truth: `metamedium-core/src/recognition.ts` and
+> **Source of truth: `core/src/recognition.ts` and
 > `src/geometry.ts`, with `*.test.ts` beside them.** Exact thresholds are
 > deliberately *not* restated here — they used to be, in ten documents, and
 > they drifted. Read the code for values; read this for shape. The reasoning
@@ -561,7 +561,7 @@ what a definition is called.
 
 ### The maths of a mark
 
-> `metamedium-core/src/session/measure.ts` — `measure(node, nodes, board?)`, `describeMaths`.
+> `core/src/session/measure.ts` — `measure(node, nodes, board?)`, `describeMaths`.
 
 What follows from a reading, as numbers: a circle's centre, radius,
 circumference and area; a rectangle's sides — at whatever angle it stands,
@@ -574,7 +574,7 @@ wobble. It is arithmetic on a reading, not a reading — no confidence and no
 candidates — and writing has none. The inspector shows it as *the maths*; it is
 the one thing the 2025 prototype did that the engine had dropped.
 
-**Maths on a page** (`metamedium-core/src/maths/`; `MATHS-PLAN.md`, units M1
+**Maths on a page** (`core/src/maths/`; `MATHS-PLAN.md`, units M1
 and M2 of `DIRECTOR-PLAN-W2.md`). `quantity.ts` holds a number as the hand
 writes it — a value or a range, a unit or none, exact or approximate — with
 interval arithmetic that converts units and says so. `expr.ts` is a grammar
@@ -673,7 +673,7 @@ with its reason until a figure has numbers and a unit.
 
 ### Clean forms: a confident reading, redrawn
 
-> `metamedium-core/src/session/clean.ts` — `snapReading`, `idealize`,
+> `core/src/session/clean.ts` — `snapReading`, `idealize`,
 > `session.snap()`, `session.snapCandidates()`.
 
 The shape rung says "rectangle 0.86"; the canvas can draw that rectangle. A
@@ -936,7 +936,7 @@ it; every real scratch in the controls still erases exactly what it did.
 
 ### Tools: what the field affords, one contract (V1-PLAN §2.1, B1)
 
-> `metamedium-core/src/tools/` — `tool.ts` (the contract), `registry.ts`,
+> `core/src/tools/` — `tool.ts` (the contract), `registry.ts`,
 > `rank.ts`, one file per built-in tool, `builtin.ts` (the registration lines).
 
 **Every affordance the field shows is an offer from a registered tool.** A
@@ -989,7 +989,7 @@ offers for three scopes, captured before tools and unchanged since.
 
 ### Context: what stands beside the hand lifts, and the top holds (V1-PLAN §2.2, B2)
 
-> `metamedium-core/src/context/` — `context.ts` (`contextAt`, `nearnessOf`,
+> `core/src/context/` — `context.ts` (`contextAt`, `nearnessOf`,
 > `describeContext`), `rank.ts` (`rank`, `liftOf`, `liftTargets`, `steadyTop`,
 > `canLift`); the surface's side in `Demos/surface/09-palette.js`
 > (`contextFor`, `rankItems`, `steadyTops`, the per-context use counts),
@@ -1072,7 +1072,7 @@ the same order.
 
 ### Library packs: premade content, used by an event (V1-PLAN §2.3, B3)
 
-> `metamedium-core/src/packs/` — `pack.ts` (the format, `id@version`),
+> `core/src/packs/` — `pack.ts` (the format, `id@version`),
 > `validate.ts`, `registry.ts` (the shipped packs), `shipped/` (one module a
 > pack), `synthesize.ts` and `definitions.ts` (a definition's signature from
 > its drawings), `follow.ts` (a pack's notation on the pen), `bench.ts`;
@@ -1179,7 +1179,7 @@ for the journal through a reload.
 
 ### Magnets and bindings: the pen feels where a mark offers attachment
 
-> `metamedium-core/src/session/magnets.ts` (sites, `magnetRadius`, the
+> `core/src/session/magnets.ts` (sites, `magnetRadius`, the
 > binding queries), `bind.test.ts`; `Demos/surface/05-snap.js`, `07-input.js`.
 
 **Sites are derived, never stored**: a line's ends and middle, a box's
@@ -1320,7 +1320,7 @@ is the board's, and state stays a pure function of the log.
 
 ### Routing: connectors at right angles between their ports (V1-PLAN §3, D7)
 
-> `metamedium-core/src/diagram/route.ts` (`routeBetween`, `outwardOf`,
+> `core/src/diagram/route.ts` (`routeBetween`, `outwardOf`,
 > `deriveRoute`, `tidyPlanOf`), `route.test.ts`; the `route` event and
 > `applyRoute` / `reroute` in `session/session.ts`; `tools/route.ts`;
 > `Demos/surface/08-render.js`, `05-selection.js`; e2e 66.
@@ -1394,7 +1394,7 @@ is tied to (`dragFollowers`): the preview is the act.
 
 ### Handles: the one selected mark's own points (V1-PLAN E1)
 
-> `metamedium-core/src/session/handles.ts` (`handlesOf`, `reshapePreview`,
+> `core/src/session/handles.ts` (`handlesOf`, `reshapePreview`,
 > `reshapedClean`, `reshapeClean`, `MIN_EXTENT_PX`), `handles.test.ts`; the
 > `reshape` event in `session.ts`; `standingPointsOf`, `unplaced` and
 > `boundsOf` in `nodes.ts`; `Demos/surface/05-selection.js`, `08-render.js`.
@@ -1473,7 +1473,7 @@ holds it and lets go anywhere else, in the reshape's act.
 
 ### Regions: named places on a board (PLAN-IPAD-NOTES I5)
 
-> `metamedium-core/src/session/board-regions.ts` (the rule, nesting, what a move carries, the sentence, the outline),
+> `core/src/session/board-regions.ts` (the rule, nesting, what a move carries, the sentence, the outline),
 > `board-regions.test.ts`; the `region` and `rename` events in `session.ts`; `tools/region.ts`;
 > `Demos/surface/12-regions.js`, `05-selection.js`, `08-render.js`, `10-inspector.js`, `21-minimap.js`; e2e 71–71m.
 > (Not `session/regions.ts`, which is an artifact's layout — the drawn boxes a page is read from.)
@@ -1516,7 +1516,7 @@ region alone; the minimap outlines regions; a text or figure in a dragged region
 
 ### Parsing: the drawing as a layout
 
-> `metamedium-core/src/parse/` — `layout.ts` reads it, `scaffold.ts` builds from it.
+> `core/src/parse/` — `layout.ts` reads it, `scaffold.ts` builds from it.
 
 Regions alone are a bag of rects, and a model handed pixel rects writes
 absolutely-positioned divs: a faithful tracing of the ink that is not real code.
@@ -1650,7 +1650,7 @@ makes it render as real DOM in the canvas. The rules:
 
 ### Relations and concepts (Tier 1)
 
-> `metamedium-core/src/relate/relations.ts` and `src/concepts/concept.ts`.
+> `core/src/relate/relations.ts` and `src/concepts/concept.ts`.
 
 **Relations** are what the canvas can SEE between marks: `contains`/`inside`,
 `crossing`, `touching`, `near`, `above`/`below`/`left-of`/`right-of`,
@@ -1714,7 +1714,7 @@ test) — a thousand strokes read in 0.3 s and 1.0 s that took 3.4 s and 6.3 s. 
 derived, none logged; `bench/equivalence.mjs` says nothing reads differently, and
 `src/session/settle.test.ts` and `src/diagram/index.test.ts` hold each to the
 walk. Checkpoints share the rep and edge objects the live graph holds (none is ever
-changed in place). `metamedium-core/bench/equivalence.mjs` replays every held
+changed in place). `core/bench/equivalence.mjs` replays every held
 log, a scripted log of the acts the boards never make and the 500-mark board
 with the old and the new engine and says what reads differently (nothing; the stored out-of-reach relations and the brief's
 lines listing them are what changed), and `bench/budgets.test.mjs` holds
@@ -1816,7 +1816,7 @@ is never destroyed — the original stroke is untouched and the mark gains a
 
 ### The diagram rung: what a mark PLAYS
 
-> `metamedium-core/src/diagram/roles.ts` — KEYFRAMES.md §2–3.
+> `core/src/diagram/roles.ts` — KEYFRAMES.md §2–3.
 
 Shape says *rectangle*; this rung says *container*. It is the link between
 seeing a shape and writing a div, and it is a **closed vocabulary of six**:
@@ -2024,7 +2024,7 @@ as dashes with a triangle apart — the round trip the test
 
 ### The state diagram (V1-PLAN D5, the state half)
 
-> `metamedium-core/src/notations/state.ts` (the reading, `STATE_TABLE`),
+> `core/src/notations/state.ts` (the reading, `STATE_TABLE`),
 > `state-mermaid.ts` (the writer, the reader, the drawing), `graph-kit.ts`
 > (what the graph notations share), `box-routing.ts` (sides, arcs and spread
 > ends), `packs/shipped/state.ts`, `fixtures/state.ts` and `state.mermaid.ts`,
@@ -2076,7 +2076,7 @@ pack names the notation and restates none of its table.
 
 ### The ER diagram (V1-PLAN D6)
 
-> `metamedium-core/src/notations/er.ts` (the reading, `ER_TABLE`),
+> `core/src/notations/er.ts` (the reading, `ER_TABLE`),
 > `er-mermaid.ts` (the writer, the reader, the drawing), `graph-kit.ts`,
 > `packs/shipped/er.ts`, `fixtures/er.ts`, `er.mermaid.ts` and
 > `er.mermaid-in.ts`, `er.test.ts` (the board, A5), `er.read.test.ts`,
@@ -2132,7 +2132,7 @@ the floor.
 
 ### The mind map (V1-PLAN D6)
 
-> `metamedium-core/src/notations/mindmap.ts` (the reading, `MINDMAP_TABLE`),
+> `core/src/notations/mindmap.ts` (the reading, `MINDMAP_TABLE`),
 > `mindmap-mermaid.ts` (the writer, the reader, the drawing), `graph-kit.ts`,
 > `packs/shipped/mindmap.ts`, `fixtures/mindmap.ts`, `mindmap.mermaid.ts` and
 > `mindmap.mermaid-in.ts`, `mindmap.test.ts` (the board, A6),
@@ -2170,7 +2170,7 @@ writing: highest 0.05, the molecule 0.24, none above the floor.
 
 ### The garment pattern piece (V1-PLAN M6)
 
-> `metamedium-core/src/notations/garment.ts` (the reading, `GARMENT_TABLE`),
+> `core/src/notations/garment.ts` (the reading, `GARMENT_TABLE`),
 > `maths/garment.ts` (what the marks come to, what true size prints),
 > `packs/shipped/garment.ts`, `fixtures/garment.ts`, `garment.test.ts`,
 > `garment.bench.test.ts`, `maths/garment.test.ts`; e2e 68.
@@ -2794,7 +2794,7 @@ form and the seats wait for the key typed once (`rejoinPending`), a custom endpo
 rejoins keyless as it always did. **Nothing here asks a model**: who is asked, by
 what act, is §6.3's, unchanged.
 
-**The semantic seat: meaning, on this device** (PLAN-IPAD-NOTES I9, 1 Oct 2026; core `metamedium-core/src/semantic/`, the
+**The semantic seat: meaning, on this device** (PLAN-IPAD-NOTES I9, 1 Oct 2026; core `core/src/semantic/`, the
 surface's `03-seats.js` rules and `03-semantic.js` adapter, `26-find.js`, `12-regions.js`; core tests `semantic/*.test.ts` and
 `tools/like.test.ts`, `node --test Demos/surface/03-seats.test.mjs`, e2e `boards` N24–N24l in `e2e/semantic.mjs`). **A seat, not a
 dependency**, the rule `decide.ts` set: an injectable **`EmbedTransport`** (`{ name, dimension, embed(texts, { signal }) }`,
@@ -3064,7 +3064,7 @@ verb is doing now → source.
 
 ### The folder is the canvas (v8, WP-11)
 
-> `metamedium-core/src/store/` (the seam and three backends);
+> `core/src/store/` (the seam and three backends);
 > `Demos/surface/17-folder.js`.
 
 Nothing is invented: a canvas is a folder. *Open a folder…* walks it for
@@ -3073,7 +3073,7 @@ at 400 files and saying so) and each becomes an artifact of its kind
 through an `import` event **in this participant's log**, laid out as
 cards; a second machine that pulls sees the same board and discovers
 nothing twice. Logs are one file per participant under
-`.metamedium/logs/`, one event per line — **a header line first, since R2
+`.metamedium/logs/` (the folder format keeps the old name, RENAME-PLAN §2), one event per line — **a header line first, since R2
 (*The log format*, below)** — and the canvas is `mergeLogs` of
 them; **autosave** rewrites only this participant's file. A static site is opened read-only through
 `.metamedium/manifest.json` (`?folder=<base>`), so a published canvas can be
@@ -3229,7 +3229,7 @@ neither is said to. The size of each board in its row is still marks and the
 journal's KB.
 
 **Find, and a picture of each board** (PLAN-IPAD-NOTES I6, 1 Oct 2026;
-`metamedium-core/src/search/`, `Demos/surface/17-find.js`, `26-find.js`,
+`core/src/search/`, `Demos/surface/17-find.js`, `26-find.js`,
 `22-boards.js`; e2e boards N23–N23i, `search.test.ts`). **A word is looked for on
 EVERY board this browser keeps, as it is typed.** The *find* button in the bar, `/`,
 ⌘K and ⌘F open one field under it; results are grouped by board, each hit as the
@@ -3406,25 +3406,26 @@ and writes nothing, exiting 1 where the real run would refuse.
 
 ### The log format: a header, version 0 and 1 (V1-PLAN R2)
 
-> `metamedium-core/src/store/format.ts` (the one definition; `seam.ts`
+> `core/src/store/format.ts` (the one definition; `seam.ts`
 > re-exports `encodeLog` / `decodeLog`), `format.test.ts`,
 > `format.files.test.mjs`; the surface's `readLogText`, `logWrite` and
 > `logFileNote` in `Demos/surface/17-folder.js`; e2e N19–N19f.
 
 **A log kept as a file is versioned.** Version 1 begins with a header line,
 `{"type":"format","format":"metamedium-log","version":1,"app":"<VERSION>"}`
-(`app` when the writer knows it — the page's own version; the generated
+(the format id keeps the old name: every saved board carries it — RENAME-PLAN §2;
+`app` when the writer knows it — the page's own version; the generated
 examples leave it out so their drift check holds across releases), then one
 event per line as ever; **version 0 is a log with no header** — every log kept
 before R2, and every one still under `boards/story/` and
-`shard-3d/fixtures/`. Every writer writes 1 (`encodeLog`; `appendToLogText`
+`dynaink-3d/fixtures/`. Every writer writes 1 (`encodeLog`; `appendToLogText`
 for an append: nothing yet gets the header, a version 1 file only the tail, a
 version 0 file is brought to 1 with its events as they were); every reader
 accepts 0 and 1 (`decodeLog` returns `version`, and the header is never among
 its events). **A version newer than this build reads is refused whole**
 (`LogFormatError`, before one event is returned): *“canvas.jsonl” is a version
-2 log, written by MetaMedium 0.9.0 — this build reads versions 0 and 1, so
-nothing of it was read; open it with a newer MetaMedium*. A header naming no
+2 log, written by dyna.ink 0.9.0 — this build reads versions 0 and 1, so
+nothing of it was read; open it with a newer dyna.ink*. A header naming no
 usable version is refused the same way, never guessed at, and nothing appends
 to a file this build cannot read. The surface says the sentence where the file
 was met: in the boards pane for *from a file…* and the examples, in the status
@@ -3449,16 +3450,16 @@ day before (`src/store/fixtures/core-before-r2.node.mjs.gz`, kept as a
 witness, never rebuilt): that bundle's `decodeLog`, `mergeLogs` and session
 load a version 1 file, and every board under `boards/` written as version 1,
 to the same board as version 0. The export says it in the status line (*log
-version 1 — an older MetaMedium opens it too*). A folder this hand wrote as
+version 1 — an older dyna.ink opens it too*). A folder this hand wrote as
 version 0 opens as ever and its next save is version 1.
 
 ### Live logs: multiplayer as a transport (v9 S6)
 
-> `metamedium-core/src/store/live.ts` (`LiveStore`, `LocalHub`),
+> `core/src/store/live.ts` (`LiveStore`, `LocalHub`),
 > `session/hands.ts` (`sittingName`, `handLabel`), `store/merge.ts`
 > (`mergeLogs(logs, { me })`), `store/livemerge.ts` (`LiveMerge`, R4d),
 > `Demos/surface/17-folder.js` (`openLive`, `mergeLive`), `Demos/relay.mjs`,
-> `shard-3d/src/room.ts`.
+> `dynaink-3d/src/room.ts`.
 
 Nothing in the engine changes: a second person on the canvas is a second
 log arriving live instead of after a pull. `LiveStore` is a `Store` with
@@ -3601,7 +3602,7 @@ stands, the replay goes back to the nearest checkpoint before its first event
 (none taken with it), and `generation` moves only when an event left after it
 mints ids off the counter. Nothing else is new: the log shrank, so `publish`
 sends it whole, and every other hand's `LiveMerge` cuts the act out. The
-shard reads its acts off its own events too (`undo` in `shard-3d/src/log.ts`),
+shard reads its acts off its own events too (`undo` in `dynaink-3d/src/log.ts`),
 and a failed brief's bless is dropped when it is still this hand's last act
 (`dropFailedBless`). There is no redo. The room's oracle holds every undo —
 the reader's and every other hand's, tool acts among them — to a record of
@@ -3651,7 +3652,7 @@ mints `participant:<log>:<n>` from that log, so its proposals name the
 same participant in every reader however the logs were merged
 (`ids.test.ts`). A log written with no name — one from before ids per
 hand, or what a shard tab drew before it joined a room (the shard names its
-log as it joins, `shard-3d/src/room.ts`) — keeps counter ids
+log as it joins, `dynaink-3d/src/room.ts`) — keeps counter ids
 (`participant:N`), which a merge can renumber; nothing translates them.
 
 **An artifact is made by whoever blessed it** (V1-PLAN L2f; `applyBless`
@@ -3732,7 +3733,7 @@ not arithmetic; the notes' §F), **`canvas_import`** (a picture on the board;
 It **proposes and never blesses**; it can write a program and **cannot
 play it**; it holds no keys. MCP over stdio is newline-delimited JSON-RPC
 written by hand, so the repo takes no dependency; it imports the committed
-Node bundle `Demos/metamedium-core.node.mjs`. In the canvas: the *live*
+Node bundle `Demos/dynaink-core.node.mjs`. In the canvas: the *live*
 tile → *with Claude*, or `?live=claude&relay=http://127.0.0.1:8020` (on dyna.ink the tile defaults to `https://relay.dyna.ink`). Its
 ink arrives as its own log, stamped `by` on arrival, in its own colour. It
 is one sitting, named per process (`sittingName`) — a restart is a new hand
@@ -3847,9 +3848,9 @@ relay already carries, so this sends nothing the room did not.
 
 ### The shard's hand, and the model seat (SHARD-3D-PUSH-2 G5)
 
-> `shard-3d/mcp.mjs` (the server), `shard-3d/src/room.ts` (the transport and
-> the parked brief), `src/models.ts` (`joinHand`), `shard-3d/mcp-smoke.mjs`
-> (the stdio test, in CI), `.mcp.json` (`metamedium-3d`).
+> `dynaink-3d/mcp.mjs` (the server), `dynaink-3d/src/room.ts` (the transport and
+> the parked brief), `src/models.ts` (`joinHand`), `dynaink-3d/mcp-smoke.mjs`
+> (the stdio test, in CI), `.mcp.json` (`dynaink-3d`).
 
 The shard joins a live room exactly as the canvas does — nothing in the engine
 changes, because the shard's log IS a core session. The same process is both
@@ -3872,9 +3873,9 @@ is `brief`; its reply is an answer whose question IS that id, about the ids the
 brief node's own `about` edges name — the same ids in both sessions. Nothing is
 minted. The old `brief:<key>` / `answer:<key>` spelling is only read, by
 `legacySeatTraffic`, tested against a log the old pairing wrote
-(`shard-3d/fixtures/seat-before-ids.mm.log`).
+(`dynaink-3d/fixtures/seat-before-ids.mm.log`).
 
-**A hull seen from one standpoint asks how deep** (L2c, `shard-3d/src/depth.ts`).
+**A hull seen from one standpoint asks how deep** (L2c, `dynaink-3d/src/depth.ts`).
 A plan and one other standpoint whose silhouette covers less than four fifths
 of the plan across the view: along that sightline only the plan bounds the
 hull, so the act that stands it also puts one question on the explanation
@@ -3906,7 +3907,7 @@ awaited and the seat silently never took while the room joined fine.
 
 ### The canvas's seat: Claude Code as the model (V1-PLAN J4)
 
-> `metamedium-core/src/participants/seat.ts` (the seat, the brief, the plane
+> `core/src/participants/seat.ts` (the seat, the brief, the plane
 > read for both sides), `Demos/surface/24-seat.js` (the pane, *with Claude*),
 > `canvas_pending` and `canvas_answer` in `Demos/mcp.mjs`,
 > `Demos/seat-watch.mjs` (the watcher), `e2e/seat.mjs` (the gate's `seat`
@@ -3973,10 +3974,12 @@ prints one line per brief parked, and nothing else — `brief <key> · what is
 this · about … · from john · room claude — canvas_pending reads it,
 canvas_answer answers it`. To take the seat from a Claude Code session:
 
-1. The session's `metamedium` MCP server must be the `Demos/mcp.mjs` that has
+1. The session's `dynaink` MCP server must be the `Demos/mcp.mjs` that has
    `canvas_pending` and `canvas_answer`. A server's tools are read when it
-   starts, so after pulling this, restart it — `/mcp` → `metamedium` →
-   reconnect, or a new session. Until then, run `mcp.mjs` from the shell as
+   starts, so after pulling this, restart it — `/mcp` → `dynaink` →
+   reconnect, or a new session. Its tools are `mcp__dynaink__canvas_*` (and the
+   3D hand's `mcp__dynaink-3d__space_*`); a session begun before the rename
+   (RENAME-PLAN N3d) holds them under the old server names until it reconnects. Until then, run `mcp.mjs` from the shell as
    *The MCP hand* says (its stdin a `tail -f` on a command file): the same eleven
    tools, and the page sees that process as the seat's hand.
 2. Put the watcher under the Monitor tool: `node Demos/seat-watch.mjs`. Each
@@ -4073,7 +4076,7 @@ the writing is, the ink staying.
 
 ### Frames: artifacts wired by reference, and the drawn slider (v8, WP-10)
 
-> `metamedium-core/src/frames/frame.ts`; `Demos/surface/16-frames.js`.
+> `core/src/frames/frame.ts`; `Demos/surface/16-frames.js`.
 
 A **frame** is an artifact that *refers* to other artifacts and carries the
 **connections** between their ports; nothing is copied or moved. Interfaces
@@ -4091,7 +4094,7 @@ resemblance, and export writes it as a folder of wired files.
 
 ### Pictures: kept, drawn and traced on request (v8 WP-9a; PLAN-IPAD-NOTES I1, 1 Oct 2026)
 
-> `metamedium-core/src/kinds/picture.ts` (`isPictureKind`, `pictureOf`, `isAssetRef`),
+> `core/src/kinds/picture.ts` (`isPictureKind`, `pictureOf`, `isAssetRef`),
 > `tools/trace.ts`, `image/trace.ts` — `trace(bitmap)`; the surface's
 > `Demos/surface/17-assets.js` (pure, `node --test Demos/surface/17-assets.test.mjs`)
 > and `18-images.js` (the board out is `18-out.js`'s); e2e 69–69k, `keep`'s P and `boards`' N20.
@@ -4278,16 +4281,17 @@ degrade to Tier 0, never gate on a tier.
 
 ## Working with the Codebase
 
-### metamedium-core (the engine — start here for recognition/engine work)
+### core (the engine, `@dynaink/core` — start here for recognition/engine work)
 
 ```bash
-cd metamedium-core
+cd core
 npm install
 npm test         # full suite incl. the canonical-loop scenario (keep green)
 npm run typecheck
 npm run build    # ESM + d.ts → dist/
-npm run build:browser  # IIFE bundle; a copy is committed at Demos/metamedium-core.browser.js
-npm run build:node     # ESM bundle for Node; a copy is committed at Demos/metamedium-core.node.mjs
+npm run build:browser  # IIFE bundle; a copy is committed at Demos/dynaink-core.browser.js
+npm run build:node     # ESM bundle for Node; a copy is committed at Demos/dynaink-core.node.mjs
+cp dist/dynaink-core.browser.js dist/dynaink-core.node.mjs ../Demos/
 ```
 
 After engine changes, rebuild both bundles and re-copy them to `Demos/`
@@ -4382,7 +4386,7 @@ WebLLM features require WebGPU.
 
 ## Design System
 
-> **Source of truth: `brand/tokens.css`.** Every MetaMedium colour, face, size
+> **Source of truth: `brand/tokens.css`.** Every dyna.ink colour, face, size
 > and spacing value is defined there and nowhere else; `brand/styleguide.html`
 > is the living specimen, and `brand/README.md` has the four laws and how to
 > adopt them on a surface. Don't restate a hex here — that is how three
@@ -4403,7 +4407,7 @@ typeface, figures, diagrams, timeline, hero and footer. The demos have not moved
 |---|---|---|
 | `index.html` (whitepaper v5) | **migrated.** Warm paper · sea ink · teal keyword · IBM Plex Mono throughout · signal colours · `--thread-*` badges · one plate/padding/caption per figure · the hero and footer on the canvas ground · paper/canvas switch in the bar (`?theme=` shares a surface) · the sketchbook gallery as one stage + a thumbnail strip (the lightbox feeds off the same strip) · set grids for rungs/roadmap/scenarios (`.grid-band`, cols 2–3 on desktop, one column on a phone) | — |
 | `Demos/`, flagship demos | `#0a0a0f` · `#e8e4d9` · gold `#c9a84c` · Space Grotesk | the canvas ground; the gold retires |
-| `lens-canvas/`, `manim-explainer/`, `playground.html` | `#020a12` sea-deep · cyan `#7dd8f7` · gold `#d4af37` · JetBrains Mono | **left alone** — this is johnhanacek.com's language, not MetaMedium's |
+| `lens-canvas/`, `manim-explainer/`, `playground.html` | `#020a12` sea-deep · cyan `#7dd8f7` · gold `#d4af37` · JetBrains Mono | **left alone** — this is johnhanacek.com's language, not dyna.ink's |
 
 Recognition feedback in the unmigrated surfaces (accepted `#0066ff`, pending
 `#666666`, green/orange confidence) maps onto `--sig-read`, `--sig-held`,
@@ -4429,7 +4433,7 @@ which only works because every diagram is authored 1000 units wide.
 
 - **Ship something visible weekly** — no infrastructure-only weeks
 - **Simple first** — build the simplest thing that works; refactor when patterns emerge
-- **One core, many surfaces** — recognition logic belongs in `metamedium-core`; demos consume builds
+- **One core, many surfaces** — recognition logic belongs in `core`; demos consume builds
 - **Progressive enhancement** — heuristics always work offline; LLM tiers enhance, never gate
 - **Experiments feed the platform** — they may fork and re-implement to move fast, but a proven idea lands in core with tests, and experiments never become the focus (`EXPERIMENTS.md`)
 - **One definition, one home** — a threshold, a palette, or an inventory lives in exactly one place; everything else links to it
@@ -4450,8 +4454,8 @@ which only works because every diagram is authored 1000 units wide.
 3. Don't over-engineer ahead of a shippable demo (MoE/embeddings are deferred — see ROADMAP.md)
 4. **Don't restate thresholds in prose.** They lived in ten documents and
    drifted; this file's own copy went stale twice. Cite
-   `metamedium-core/src/*.ts` instead. The one intentional mirror is
-   `skills/metamedium-code/skill.md`, which Claude Code loads standalone —
+   `core/src/*.ts` instead. The one intentional mirror is
+   `skills/dynaink-code/skill.md`, which Claude Code loads standalone —
    re-verify it against the engine when recognition changes
 5. The legacy monoliths (`doodle2-canvas.html`, `metadoodle1.html`,
    `Web App Skeleton/src/core/`) still carry their own diverged recognition
