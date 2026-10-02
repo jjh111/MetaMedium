@@ -614,7 +614,7 @@ export async function logFormatTest(browser, servers, ctx) {
     for (let i = 0; i < 2; i++) await drawPath(page, boxPath(cellBox(i, rand)));
     await page.evaluate(() => window.__mm.boardIdle());
     const want = await page.evaluate(() => JSON.stringify(window.__mm.session.getEvents()));
-    const version = await page.evaluate(() => (document.querySelector('meta[name="metamedium-version"]') || {}).content || '');
+    const version = await page.evaluate(() => (document.querySelector('meta[name="dynaink-version"]') || {}).content || '');
 
     // ---- N19. a log out is version 1, and says so ---------------------------------------
     await page.click('#ccBtn');

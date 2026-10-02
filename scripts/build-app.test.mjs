@@ -63,9 +63,12 @@ test('a file the page comes to ask for is asked for from /app/ too; what is not 
 });
 
 test('the version is stamped into the page and into the worker — and a page or a worker with no line for it is refused', () => {
-  assert.equal(stampPage('<head>\n<meta name="metamedium-version" content="0.0.0">\n</head>', '1.2.3'), '<head>\n<meta name="metamedium-version" content="1.2.3">\n</head>');
+  assert.equal(stampPage('<head>\n<meta name="dynaink-version" content="0.0.0">\n</head>', '1.2.3'), '<head>\n<meta name="dynaink-version" content="1.2.3">\n</head>');
   assert.equal(stampWorker("// a worker\nconst VERSION = '0.0.0';\nconst X = 1;\n", '1.2.3-rc.1'), "// a worker\nconst VERSION = '1.2.3-rc.1';\nconst X = 1;\n");
-  assert.throws(() => stampPage('<head></head>', '1.2.3'), /metamedium-version/);
+  assert.throws(() => stampPage('<head></head>', '1.2.3'), /dynaink-version/);
+  // The tag is named dyna.ink's way (RENAME-PLAN §1, N3b): a page carrying only the name it had before is not stamped
+  // under that name — the build writes one name, and an old shell's tag is for the page's readers to fall back on.
+  assert.throws(() => stampPage('<head>\n<meta name="metamedium-version" content="0.1.0">\n</head>', '1.2.3'), /dynaink-version/);
   assert.throws(() => stampWorker('const X = 1;\n', '1.2.3'), /VERSION/);
   assert.throws(() => stampWorker("const VERSION = '0.0.0';\n", 'banana'), /version/);
 });
@@ -91,7 +94,8 @@ test('what is committed is the build of what is committed — the worker at /app
   assert.deepEqual(drift, [], 'run: node scripts/build-app.mjs');
   assert.equal(read('app/sw.js'), read('Demos/sw.js'));
   assert.match(read('Demos/sw.js'), new RegExp(`const VERSION = '${readVersion(root).replace(/\./g, '\\.')}';`));
-  assert.match(read('Demos/session-engine.html'), new RegExp(`<meta name="metamedium-version" content="${readVersion(root).replace(/\./g, '\\.')}">`));
+  assert.match(read('Demos/session-engine.html'), new RegExp(`<meta name="dynaink-version" content="${readVersion(root).replace(/\./g, '\\.')}">`));
+  for (const p of ['Demos/session-engine.html', 'app/index.html']) assert.ok(!read(p).includes('metamedium-version'), `${p} still carries the old tag's name`);
 });
 
 test('--check fails by name on a page edited or a version bumped without the build, and the build puts it right', () => {
@@ -119,7 +123,7 @@ test('--check fails by name on a page edited or a version bumped without the bui
   for (const p of ['Demos/session-engine.html', 'Demos/sw.js', 'app/index.html', 'app/sw.js']) assert.ok(check.stderr.includes(p), `--check did not name ${p}`);
   assert.equal(run().status, 0);
   assert.match(readFileSync(join(dir, 'app', 'sw.js'), 'utf8'), /const VERSION = '7\.8\.9';/);
-  assert.match(readFileSync(join(dir, 'app', 'index.html'), 'utf8'), /<meta name="metamedium-version" content="7\.8\.9">/);
+  assert.match(readFileSync(join(dir, 'app', 'index.html'), 'utf8'), /<meta name="dynaink-version" content="7\.8\.9">/);
   assert.equal(run('--check').status, 0);
 
   writeFileSync(join(dir, 'VERSION'), 'banana\n');

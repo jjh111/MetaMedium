@@ -52,10 +52,8 @@ const ALLOWLIST = [
     files: null, at: /formerly MetaMedium/, max: 1,
   },
   {
-    why: 'the version tag\'s name, <meta name="metamedium-version">, and every reader of it by name: N3b renames the tag and its readers together',
-    until: 'N3b',
-    files: ['Demos/session-engine.html', 'app/index.html', 'Demos/surface/17-folder.js', 'Demos/surface/20-controls.js'],
-    at: /metamedium-version/,
+    why: 'an old shell\'s tag: a page a service worker kept before the rename (0.1.0) carries <meta name="metamedium-version">, and the one reader of the version falls back to that name so the page still says its version — the build stamps dynaink-version (RENAME-PLAN N3b)',
+    files: ['Demos/surface/17-boards.js'], at: /VERSION_META_BEFORE = 'metamedium-version'/, max: 1,
   },
   {
     why: 'a key in this browser\'s storage, the paper/canvas preference — kept like the mm-* keys and metamedium_library_v1 (RENAME-PLAN §2): renaming it forgets every reader\'s choice',

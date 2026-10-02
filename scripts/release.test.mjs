@@ -163,7 +163,7 @@ function smallRepo(version = '0.1.0') {
   git(dir, 'init', '-q', '-b', 'master');
   git(dir, 'add', '-A');
   git(dir, 'commit', '-q', '-m', 'The base');
-  git(dir, 'tag', '-a', `v${version}`, '-m', `MetaMedium ${version}`);
+  git(dir, 'tag', '-a', `v${version}`, '-m', `MetaMedium ${version}`); // as 0.1.0, the last before the rename, was tagged
   git(dir, 'tag', '-a', 'v1.0-day1', '-m', 'Day 1 MVP'); // looks like a 1.0 and is not a release
   git(remote, 'init', '-q', '--bare');
   git(dir, 'remote', 'add', 'origin', remote);
@@ -186,10 +186,12 @@ test('a dry run prints the release and changes nothing; the release is one commi
 
   const dry = release(r.dir, '0.2.0', '--dry-run');
   assert.equal(dry.status, 0, dry.stderr + dry.stdout);
-  assert.match(dry.stdout, /dry run/);
+  assert.match(dry.stdout, /^dyna\.ink 0\.2\.0 — a dry run/);
   assert.match(dry.stdout, /## 0\.2\.0 — \d{4}-\d{2}-\d{2}\n\nSince v0\.1\.0: 4 commits/);
   assert.match(dry.stdout, /### R7\n\n- R7 red: one app address, failing \(`[0-9a-f]{7,}`\)\n- R7: the app at \/app\/ \(`[0-9a-f]{7,}`\)/);
-  assert.match(dry.stdout, /dist\/release\/metamedium-0\.2\.0\.html/);
+  assert.match(dry.stdout, /dist\/release\/dynaink-0\.2\.0\.html/);
+  assert.match(dry.stdout, /gh release create v0\.2\.0 dist\/release\/dynaink-0\.2\.0\.html --title "dyna\.ink 0\.2\.0" --notes-from-tag/);
+  assert.ok(!/metamedium-0\.2\.0|MetaMedium 0\.2\.0/i.test(dry.stdout), 'the dry run names the release the old way');
   assert.match(dry.stdout, /git push \S+ v0\.2\.0/);
   assert.deepEqual(r.state(), before, 'the dry run changed the repository');
   assert.equal(existsSync(join(r.dir, 'dist')), false, 'the dry run wrote dist/');
@@ -204,7 +206,9 @@ test('a dry run prints the release and changes nothing; the release is one commi
   assert.match(git(r.dir, 'tag', '-l', '--format=%(contents)', 'v0.2.0'), /### R7/);
   assert.equal(now.status, '', 'the release left the tree dirty');
   assert.equal(now.remote, before.remote, 'the release pushed');
-  assert.match(real.stdout, /nothing has been pushed/i);
+  assert.match(real.stdout, /^Released dyna\.ink 0\.2\.0 here — nothing has been pushed/);
+  assert.match(real.stdout, /--title "dyna\.ink 0\.2\.0"/);
+  assert.equal(git(r.dir, 'tag', '-l', '--format=%(contents:subject)', 'v0.2.0'), 'dyna.ink 0.2.0', "the tag's message does not lead with the release's name");
   assert.match(real.stdout, /git push \S+ v0\.2\.0/);
 
   assert.equal(readFileSync(join(r.dir, 'VERSION'), 'utf8'), '0.2.0\n');
@@ -214,10 +218,12 @@ test('a dry run prints the release and changes nothing; the release is one commi
   assert.deepEqual(make(r.dir).filter((f) => f.changed).map((f) => f.path), [], 'the app and the stamps are not the build of the new VERSION');
   assert.match(readFileSync(join(r.dir, 'app', 'sw.js'), 'utf8'), /const VERSION = '0\.2\.0';/);
 
-  const file = join(r.dir, 'dist', 'release', 'metamedium-0.2.0.html');
+  const file = join(r.dir, 'dist', 'release', 'dynaink-0.2.0.html');
   assert.ok(existsSync(file), 'no standalone file');
+  assert.equal(existsSync(join(r.dir, 'dist', 'release', 'metamedium-0.2.0.html')), false, 'the standalone file is named the old way too');
   const html = readFileSync(file, 'utf8');
-  assert.match(html, /<meta name="metamedium-version" content="0\.2\.0">/);
+  assert.match(html, /<meta name="dynaink-version" content="0\.2\.0">/);
+  assert.ok(!html.includes('metamedium-version'), 'the standalone file carries the old tag');
   assert.ok(html.includes('var MetaMediumCore') && !html.includes('src="metamedium-core.browser.js"'), 'the engine is not inlined');
   assert.equal(keyShapesIn(html).length, 0);
 });
@@ -260,7 +266,7 @@ test('it refuses a dirty tree, a version not greater than the last, and a key in
   assert.ok(!out.stderr.includes(fakeKey()) && !out.stdout.includes(fakeKey()), 'the refusal says the key back');
   assert.deepEqual(r.state(), withKey, 'the refusal left something behind');
   assert.equal(readFileSync(join(r.dir, 'VERSION'), 'utf8'), '0.1.0\n');
-  assert.equal(existsSync(join(r.dir, 'dist', 'release', 'metamedium-0.2.0.html')), false);
+  assert.equal(existsSync(join(r.dir, 'dist', 'release', 'dynaink-0.2.0.html')), false);
   assert.notDeepEqual(withKey.head, clean.head);
 });
 
@@ -289,7 +295,7 @@ test('a dry run on a scratch clone of this repository prints the release and cha
   assert.equal(out.status, 0, out.stderr + out.stdout);
   assert.match(out.stdout, /dry run/);
   assert.match(out.stdout, new RegExp(`## ${next.replace(/\./g, '\\.')} — \\d{4}-\\d{2}-\\d{2}\\n\\n(?:Since|From)`));
-  assert.match(out.stdout, new RegExp(`dist/release/metamedium-${next.replace(/\./g, '\\.')}\\.html`));
+  assert.match(out.stdout, new RegExp(`dist/release/dynaink-${next.replace(/\./g, '\\.')}\\.html --title "dyna\\.ink ${next.replace(/\./g, '\\.')}"`));
   assert.deepEqual(snap(), before, 'the dry run changed the clone');
   assert.equal(existsSync(join(dir, 'dist')), false, 'the dry run wrote dist/');
 });

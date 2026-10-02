@@ -24,6 +24,7 @@ const NAMES = [
   'placesPlan', 'boardRows', 'leaveVerdict', 'switchPlan', 'boardTitle', 'boardSearch',
   'EXAMPLES_BASE', 'exampleUrl', 'exampleRows', 'exampleName', 'starterOf',
   'spaceWords', 'storageWords', 'persistPlan', 'PERSIST_KEY',
+  'VERSION_META', 'VERSION_META_BEFORE', 'pageVersionOf', 'versionWords',
 ];
 const file = join(dirname(fileURLToPath(import.meta.url)), '17-boards.js');
 // Loaded as the browser loads it. While the fragment is not written, every
@@ -277,6 +278,26 @@ test('the page says which board it is: the title carries the name, the address t
   assert.equal(B.boardSearch('?carry', 'b-3'), '?board=b-3');
   assert.equal(B.boardSearch('?live=claude&relay=https%3A%2F%2Frelay.dyna.ink&key=SECRET&nosw=1', 'b-1'), '?nosw=1&board=b-1',
     'a room\'s key belongs to the room: it is never carried into the address of a board');
+});
+
+test('the page says its version: the tag scripts/build-app.mjs stamps, and — on a page an older worker kept — the name that tag had before', () => {
+  // RENAME-PLAN N3b: the build stamps <meta name="dynaink-version">. A shell a service worker cached before the
+  // rename (0.1.0, the last MetaMedium) carries <meta name="metamedium-version"> instead, and still says its version.
+  assert.equal(B.VERSION_META, 'dynaink-version');
+  assert.equal(B.VERSION_META_BEFORE, 'metamedium-version');
+  const page = (tags) => (name) => (Object.prototype.hasOwnProperty.call(tags, name) ? tags[name] : null);
+  assert.equal(B.pageVersionOf(page({ 'dynaink-version': '0.2.0' })), '0.2.0');
+  assert.equal(B.pageVersionOf(page({ 'metamedium-version': '0.1.0' })), '0.1.0', "an old shell's tag is read");
+  assert.equal(B.pageVersionOf(page({ 'dynaink-version': '0.2.0', 'metamedium-version': '0.1.0' })), '0.2.0', 'the new name first');
+  assert.equal(B.pageVersionOf(page({ 'dynaink-version': '  0.2.1 \n' })), '0.2.1');
+  assert.equal(B.pageVersionOf(page({ 'dynaink-version': ' ', 'metamedium-version': '0.1.0' })), '0.1.0', 'an empty tag is no version');
+  assert.equal(B.pageVersionOf(page({})), '');
+  assert.equal(B.pageVersionOf(page({ 'metamedium-version': undefined })), '');
+  // …and what the help pane leads with: a 0.1.0 shell says 0.1.0, never "carries no version".
+  assert.equal(B.versionWords(B.pageVersionOf(page({ 'metamedium-version': '0.1.0' }))), 'dyna.ink 0.1.0');
+  assert.equal(B.versionWords('0.2.0'), 'dyna.ink 0.2.0');
+  assert.equal(B.versionWords('0.0.0'), 'dyna.ink 0.0.0 — no release has been cut yet');
+  assert.equal(B.versionWords(''), 'dyna.ink — this page carries no version');
 });
 
 test('at random: new, rename, copy, trash, restore and empty — ids stay unique, a rename never moves an id, and a board is only ever gone by emptying the trash', () => {

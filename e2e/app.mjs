@@ -20,7 +20,9 @@
 //     is tested, not the registration;
 //   - a box drawn at /app/ comes back on a reload the worker served, and after
 //     one visit the board opens with the server gone;
-//   - the help pane says the version, VERSION's;
+//   - the help pane says the version, VERSION's — read from <meta name="dynaink-version">, and from
+//     the name that tag had before, <meta name="metamedium-version">, on a page an older worker kept
+//     (RENAME-PLAN N3b);
 //   - a release renames the cache, so after the new release's first network
 //     fetch the old release's shell is never served — beside a control that
 //     shows what a cache that kept its name serves instead;
@@ -102,7 +104,7 @@ function groundTokens() {
 
 /** The version the page says: its meta, and the help pane's line. */
 const versionSaid = (page) => page.evaluate(() => ({
-  meta: (document.querySelector('meta[name="metamedium-version"]') || {}).content || '',
+  meta: (document.querySelector('meta[name="dynaink-version"]') || {}).content || '',
   line: ((document.getElementById('helpVersion') || {}).textContent || '').trim(),
 }));
 
@@ -460,6 +462,43 @@ async function releaseTest(browser, ctx, { stamp }) {
   return guards;
 }
 
+// ===== D. An old shell still says its version (RENAME-PLAN N3b) =======================
+
+/**
+ * The build stamps the version into <meta name="dynaink-version">. A page a service worker kept before the
+ * rename — 0.1.0, the last MetaMedium — carries the tag under its old name, <meta name="metamedium-version">,
+ * and the surface that reads it may be newer than the page (the HTTP cache, a release's first visit). The
+ * surface reads the new name first and falls back to the old, so such a page still says its version: here
+ * the page is served as that shell would be, the tag's old name put back, and the help pane is read.
+ */
+async function oldShellTest(browser, servers, ctx) {
+  const { freshContext, steps } = ctx;
+  const check = (name, ok, detail) => steps.push({ name, ok: !!ok, detail });
+  const origin = servers.staticOrigin;
+  const guards = await freshContext(browser, { origins: [origin], label: 'app-old-shell' });
+  try {
+    const version = versionIn(root);
+    await guards.context.route((u) => u.pathname === '/Demos/session-engine.html', async (route) => {
+      const res = await route.fetch();
+      const body = (await res.text()).replace('<meta name="dynaink-version"', '<meta name="metamedium-version"');
+      await route.fulfill({ response: res, body });
+    });
+    const page = await guards.context.newPage();
+    await page.goto(`${origin}/Demos/session-engine.html?nosw=1`, { waitUntil: 'load', timeout: 60000 });
+    await waitReady(page, 60000);
+    const seen = await page.evaluate(() => ({
+      now: !!document.querySelector('meta[name="dynaink-version"]'),
+      before: (document.querySelector('meta[name="metamedium-version"]') || {}).content || '',
+      line: ((document.getElementById('helpVersion') || {}).textContent || '').trim(),
+    }));
+    check(`A7b. a page an older worker kept carries the tag's old name, <meta name="metamedium-version" content="${seen.before}">, and still says its version — “${seen.line}”`,
+      !seen.now && seen.before === version && seen.line.startsWith(`dyna.ink ${version}`), { version, ...seen });
+  } catch (err) {
+    check('A7b. an old shell\'s version was read to its end', false, String(err && err.stack ? err.stack : err));
+  }
+  return guards;
+}
+
 export async function runApp(browser, servers, ctx) {
   const steps = [];
   const measured = {};
@@ -470,5 +509,6 @@ export async function runApp(browser, servers, ctx) {
   await timed('offline s', () => offlineTest(browser, c));
   await timed('release s', () => releaseTest(browser, c, { stamp: true }));
   await timed('control s', () => releaseTest(browser, c, { stamp: false }));
+  await timed('old shell s', () => oldShellTest(browser, servers, c));
   return { steps, guards, measured };
 }
