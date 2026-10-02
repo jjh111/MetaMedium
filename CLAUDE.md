@@ -5,8 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 **Name: the product is becoming dyna.ink** (John, 28 Sep 2026, for copyright); the
-repository, the whitepaper and the code still say MetaMedium until a rename unit
-decides how far it goes.
+repository, the whitepaper and the code still say MetaMedium until the rename in
+`RENAME-PLAN.md` lands, which also fixes the spellings (its §1). **Frozen from 2 Oct
+2026**: nothing but the rename's units lands on `master` until N3e.
 
 **MetaMedium** is a recombinatorial drawing system: interfaces that learn user
 vocabularies, recognize compositional patterns in real-time, and evolve through
@@ -310,6 +311,13 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   commands, invariants and traps), the QA guide (the gate by scenario, the field push by hand, what is known) and
   the director's view (against v1.0.0, risks, next pushes, John's open decisions in one table). A snapshot: the
   files it points to are the truth
+- `RENAME-PLAN.md` — **the rename, 2 Oct 2026**: MetaMedium becomes dyna.ink. §1 is the one home of the
+  spellings (dyna.ink, DynaInk3D, `DynaInk`, `dynaink`, the folders `core/` and `dynaink-3d/`); §2 what keeps
+  the old name and why (the `mm-*` keys, `mm-boards`, the `mm` contract, `.metamedium/`, the dated documents,
+  the old address); §3 John's decisions (AGPL-3.0-only, an organisation before a hard launch). Units: N0 a
+  checkpoint release `0.1.0`; N1 carry boards from the old address to dyna.ink in one tap, since browser-kept
+  boards belong to the address; N2 the rights; N3a–e the rename by layer; N4 dyna.ink as the address, the
+  old one kept live; N5; H1. **A freeze from N0 to N3e**: nothing else lands
 - `UX-AUDIT-2026-09-28.md` — **the canvas as a user meets it**: sixteen findings
   from a walk of `/app/` using only what the screen gives (the models pane that
   pops and drops the question, no way to reach Claude, the inspector as the panel,
