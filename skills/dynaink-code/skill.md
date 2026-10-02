@@ -1,20 +1,20 @@
-<metamedium-code>
+<dynaink-code>
 
-# MetaMedium Code Patterns Skill
+# dyna.ink Code Patterns Skill
 
-This skill documents reusable code patterns from the MetaMedium engine. Use
+This skill documents reusable code patterns from the dyna.ink engine. Use
 these patterns when building recognition systems, gesture-based interfaces, or
 composable drawing applications.
 
 > **Provenance — the one intentional mirror.** Every other document in this
-> repo cites `metamedium-core/src/*.ts` instead of restating thresholds,
+> repo cites `core/src/*.ts` instead of restating thresholds,
 > because ten copies drifted. This skill keeps real code inline on purpose:
 > Claude Code loads it standalone, without the repo. That makes it the one file
 > that can silently go stale.
 >
 > **Verified against the engine: September 2026.** Every code block below is
 > the engine's own code, copied as shipped (a few are abridged, and say so).
-> Re-verify when recognition changes — `metamedium-core/src/geometry.ts`,
+> Re-verify when recognition changes — `core/src/geometry.ts`,
 > `src/recognition.ts` and `src/session/clean.ts` win any disagreement, and
 > the numbers live only there and in the tests beside them
 > (`geometry.test.ts`, `recognition.test.ts`, `recognition.bench.test.ts`,
@@ -24,7 +24,7 @@ composable drawing applications.
 
 ## Core Type Patterns
 
-> `metamedium-core/src/types.ts`
+> `core/src/types.ts`
 
 ### Geometric Primitives
 
@@ -100,7 +100,7 @@ reading without one is a verdict, not evidence.
 
 ## Geometry Utilities
 
-> `metamedium-core/src/geometry.ts`
+> `core/src/geometry.ts`
 
 ### Bounds Calculation
 
@@ -504,7 +504,7 @@ the path means the same physical thing at any speed, density, or zoom.
 
 ## Shape Detection Patterns
 
-> `metamedium-core/src/recognition.ts`
+> `core/src/recognition.ts`
 
 ### Evidence-Scored, Multi-Parse — not pass/fail
 
@@ -664,7 +664,7 @@ rectangle — and its clean form keeps the turn.)
 
 ## Clean Forms: the snap gate
 
-> `metamedium-core/src/session/clean.ts` — `snapReading`, `idealize`,
+> `core/src/session/clean.ts` — `snapReading`, `idealize`,
 > `session.snap()`, `session.snapCandidates()`.
 
 The shape rung says "rectangle 0.86"; the canvas can draw that rectangle. A
@@ -738,7 +738,7 @@ clean form, drawn again as ink, reads as the shape it cleans.
 
 ## Relations — what the canvas can SEE between marks
 
-> `metamedium-core/src/relate/relations.ts`. This replaced the old spatial
+> `core/src/relate/relations.ts`. This replaced the old spatial
 > graph (`spatial.ts`, with its fixed 50px "touching"), which is retired.
 
 Two rules, both learned the hard way:
@@ -1137,7 +1137,7 @@ const useStore = create<Store>((set, get) => ({
 
 ## Summary
 
-These patterns form the foundation of MetaMedium's recognition system:
+These patterns form the foundation of dyna.ink's recognition system:
 
 1. **Fingerprinting** — extract numeric signatures from strokes; `extent` is
    the strongest discriminator, corner count the most fragile
@@ -1159,4 +1159,4 @@ The key insight: **Recognition should flow from geometric features, not pixel
 matching — and every number in it should be a measurement the engine can
 explain.**
 
-</metamedium-code>
+</dynaink-code>

@@ -1,17 +1,17 @@
-# MetaMedium Code Patterns
+# dyna.ink Code Patterns
 
-Reusable code patterns from the MetaMedium engine, for building recognition
+Reusable code patterns from the dyna.ink engine, for building recognition
 systems, gesture-based interfaces, and composable drawing applications.
 
 > `skill.md` carries the engine's code **as shipped** (a few blocks are
 > abridged, and say so) because Claude Code loads it standalone. Exact
-> behaviour is defined by `metamedium-core/src/geometry.ts`,
+> behaviour is defined by `core/src/geometry.ts`,
 > `src/recognition.ts` and `src/session/clean.ts`, with the tests beside them;
 > those win any disagreement. Verified September 2026.
 
 ## Overview
 
-The MetaMedium engine (`metamedium-core/`) implements a **stroke fingerprinting
+The dyna.ink engine (`core/`) implements a **stroke fingerprinting
 and recognition system** that:
 - Extracts geometric signatures from hand-drawn strokes, measured along the
   path and relative to the stroke's own size
@@ -119,7 +119,7 @@ show at once; nothing commits.
 ## File Structure
 
 ```
-metamedium-core/src/
+core/src/
 ├── types.ts                 # Point, Bounds, Fingerprint, RecognitionResult
 ├── geometry.ts              # bounds, denoise, straightness, closure, corners, extent, fingerprint
 ├── recognition.ts           # the eight detectors, analyzeStroke, library matching
@@ -150,5 +150,5 @@ See `skill.md` for the code with inline documentation.
 
 ## Related Skills
 
-- **metamedium-design**: Design principles for no-mode interfaces
+- **dynaink-design**: Design principles for no-mode interfaces
 - **CLAUDE.md**: Project context and development roadmap

@@ -1,12 +1,12 @@
-<metamedium-design>
+<dynaink-design>
 
-# MetaMedium Design Skill
+# dyna.ink Design Skill
 
-You are now equipped to help design **low/no-mode software** following MetaMedium principles. This skill helps you create interfaces where actions flow from context rather than tool selection, where users build personal vocabularies, and where the system learns from use.
+You are now equipped to help design **low/no-mode software** following dyna.ink principles. This skill helps you create interfaces where actions flow from context rather than tool selection, where users build personal vocabularies, and where the system learns from use.
 
 ## Core Philosophy
 
-**The MetaMedium Principle**: The interface should be a collaborative medium where human intent and machine capability meet on shared ground—not a control panel where humans issue commands to a machine.
+**The dyna.ink Principle**: The interface should be a collaborative medium where human intent and machine capability meet on shared ground—not a control panel where humans issue commands to a machine.
 
 ### The Five Pillars
 
@@ -183,7 +183,7 @@ When asked to design an interface or feature:
 
 ## Examples
 
-### Drawing Application (MetaMedium Canvas)
+### Drawing Application (the dyna.ink canvas)
 
 - **No-mode selection**: Circle + check gesture selects enclosed shapes
 - **Recognition**: Strokes interpreted as shapes, confidence shown
@@ -218,4 +218,4 @@ Design interfaces where:
 
 The goal is **collaborative grounding**: a shared space where human intent meets machine capability, and both become more powerful through the partnership.
 
-</metamedium-design>
+</dynaink-design>

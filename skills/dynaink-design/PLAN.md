@@ -1,8 +1,8 @@
-# MetaMedium Design Skill - Planning Document
+# dyna.ink Design Skill - Planning Document
 
 ## Purpose
 
-A skill that helps LLM agents design software following MetaMedium principles:
+A skill that helps LLM agents design software following dyna.ink principles:
 - **Low/No-Mode Interfaces** - Actions flow from context, not tool selection
 - **Gesture-Based Interaction** - Natural, learnable gestures over explicit commands
 - **Collaborative Grounding** - Shared semantic substrate between human and AI
@@ -18,7 +18,7 @@ A skill that helps LLM agents design software following MetaMedium principles:
 ## Skill Structure
 
 ```
-skills/metamedium-design/
+skills/dynaink-design/
 ├── skill.md              # Main skill file (loaded by Claude Code)
 ├── principles/
 │   ├── no-mode.md        # No-mode design principles
@@ -38,7 +38,7 @@ skills/metamedium-design/
 ├── evaluation/
 │   └── checklist.md      # Evaluation criteria
 └── examples/
-    ├── drawing-app.md    # MetaMedium canvas example
+    ├── drawing-app.md    # dyna.ink canvas example
     ├── text-editor.md    # Text editing example
     └── data-viz.md       # Data visualization example
 ```
@@ -123,7 +123,7 @@ Questions to ask of any design:
 ## Skill Invocation
 
 ```
-/metamedium-design [subcommand]
+/dynaink-design [subcommand]
 
 Subcommands:
   principles    - Show core design principles
@@ -147,5 +147,5 @@ Subcommands:
 
 - An LLM agent can invoke the skill and get actionable guidance
 - The skill helps identify mode-heavy designs
-- The skill suggests alternatives following MetaMedium principles
+- The skill suggests alternatives following dyna.ink principles
 - Designs evaluated with the skill feel more fluid/natural
