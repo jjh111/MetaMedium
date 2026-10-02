@@ -147,7 +147,7 @@ For a Claude Code session, give the MCP server the environment without committin
 `.mcp.json` in this repository stays as it is (a local relay):
 
 ```sh
-claude mcp add metamedium --scope user \
+claude mcp add dynaink --scope user \
   --env MM_RELAY=https://relay.dyna.ink --env MM_RELAY_KEY=<key> --env MM_ROOM=claude \
   -- node /path/to/MetaMedium/Demos/mcp.mjs
 ```
@@ -158,7 +158,7 @@ Run `seat-watch.mjs` under the session's Monitor tool as `CLAUDE.md` (*The canva
 
 ### What an agent does there: look, import a picture, say
 
-An agent with a room key — Claude Code with the `metamedium` MCP server above, or any MCP client that can
+An agent with a room key — Claude Code with the `dynaink` MCP server above, or any MCP client that can
 run `node Demos/mcp.mjs` with `MM_RELAY=https://relay.dyna.ink MM_RELAY_KEY=<key> MM_ROOM=claude` — is **a hand in John's room**: what it
 draws, writes and says arrives in his tab as that hand's own ink, in its own colour, and what he draws arrives for it.
 Eleven tools; the ones for this flow, in the order a session uses them:

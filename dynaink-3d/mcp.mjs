@@ -656,8 +656,8 @@ async function handle(line) {
         reply({
           protocolVersion: (msg.params && msg.params.protocolVersion) || '2025-06-18',
           capabilities: { tools: {} },
-          serverInfo: { name: 'metamedium-3d', version: '0.1.0' },
-          instructions: 'You are a hand in a MetaMedium 3D space, in room "' + ROOM + '" as "' + label(ME) +
+          serverInfo: { name: 'dynaink-3d', version: '0.1.0' },
+          instructions: 'You are a hand in a DynaInk3D space, in room "' + ROOM + '" as "' + label(ME) +
             '". The human draws profiles on three named planes and from free views; the space reads each mark (shape, form, plane) and stands solids from what the drawing shares, with no model. You are also the SEAT: when the human types a brief at *Claude Code (MCP hand)*, it is parked here — space_pending gives you the brief and the contract, space_answer returns the reply, and the shard applies it exactly as it applies a small model\'s. Look first (space_look). You propose and never bless; you write no code that runs and cannot play anything. Answer in the contract you are given, name parts from the human\'s own words, and say plainly what you could not do rather than inventing geometry.',
         });
         break;
@@ -705,4 +705,4 @@ const shutdown = () => { try { store.close(); } catch { /* closing */ } if (rela
 process.stdin.on('end', shutdown);
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
-log('metamedium-3d mcp: room ' + ROOM + ' as ' + label(ME) + ' via ' + RELAY);
+log('dynaink-3d mcp: room ' + ROOM + ' as ' + label(ME) + ' via ' + RELAY);

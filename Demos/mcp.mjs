@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The MCP hand: MetaMedium's canvas as tools for Claude Code, or any MCP
+// The MCP hand: dyna.ink's canvas as tools for Claude Code, or any MCP
 // client (SURFACE-v10-PLAN D1).
 //
 //   node Demos/mcp.mjs                          # room "claude", relay http://127.0.0.1:8020, name "claude"
@@ -88,7 +88,7 @@ if (relayServer) log(`relay started on ${RELAY} (none was answering)`);
 // key and is given none or a wrong one would otherwise be a room that is silently empty.
 {
   const verdict = await checkRelay(RELAY, ROOM, { key: KEY });
-  if (!verdict.ok) { log('metamedium mcp: ' + verdict.words); process.exit(1); }
+  if (!verdict.ok) { log('dynaink mcp: ' + verdict.words); process.exit(1); }
 }
 const transport = relayTransport(RELAY, ROOM, { key: KEY });
 const assets = roomAssets(RELAY, ROOM, { key: KEY });
@@ -876,7 +876,7 @@ const num = { type: 'number' };
 const TOOLS = [
   {
     name: 'canvas_look',
-    description: 'What is on the MetaMedium canvas, in words: every mark with what the engine reads it as (shape and confidence), names, transcripts, artifacts and their kinds, the regions (named places in the board\'s outline — reading order, nested ones under the one that holds them — with what each holds, and which things stand in none), each mark with the region it stands in, handwriting a line at a time in reading order with what a hand has read it as (or that it is unread), what is playing, the selection, who else is in the room. Use ids from here in the other tools. detail "full" is the brief a model gets (relations included).',
+    description: 'What is on the dyna.ink canvas, in words: every mark with what the engine reads it as (shape and confidence), names, transcripts, artifacts and their kinds, the regions (named places in the board\'s outline — reading order, nested ones under the one that holds them — with what each holds, and which things stand in none), each mark with the region it stands in, handwriting a line at a time in reading order with what a hand has read it as (or that it is unread), what is playing, the selection, who else is in the room. Use ids from here in the other tools. detail "full" is the brief a model gets (relations included).',
     inputSchema: { type: 'object', properties: { detail: { type: 'string', enum: ['brief', 'full'] }, ids: { type: 'array', items: { type: 'string' } } } },
     run: look,
   },
@@ -981,8 +981,8 @@ async function handle(line) {
         reply({
           protocolVersion: (msg.params && msg.params.protocolVersion) || '2025-06-18',
           capabilities: { tools: {} },
-          serverInfo: { name: 'metamedium', version: '0.1.0' },
-          instructions: 'You are a hand on a MetaMedium canvas, in room "' + ROOM + '" as "' + label(ME) + '". The human draws; the engine reads every mark (shape, role, concept) and the human names and builds from those readings. Look first (canvas_look), see the ink when it matters (canvas_see), then act with the same verbs a hand has: draw in the shape vocabulary, say a sentence beside marks, propose a reading, label your own marks, transcribe writing, write code, put a picture on the board (canvas_import), find words (canvas_find), make a region round marks (canvas_region) and move marks into place (canvas_move — anything on the board, John said you may; the reply says whose marks you moved, say so in your own words too: his undo does not reach your move, so offer to move them back). Everything you do is held and attributed to you; the human blesses or ignores it. Never claim a reading is settled — offer it with a confidence and a reason. You are also the SEAT: when the human asks *Claude Code (MCP hand)* — What is this?, Read the writing, a question — the brief is parked here; canvas_pending gives you it, the marks and the contract (and for a read, the ink as a picture), and canvas_answer returns your answer in that contract, which the page takes exactly as it takes a model\'s.',
+          serverInfo: { name: 'dynaink', version: '0.1.0' },
+          instructions: 'You are a hand on a dyna.ink canvas, in room "' + ROOM + '" as "' + label(ME) + '". The human draws; the engine reads every mark (shape, role, concept) and the human names and builds from those readings. Look first (canvas_look), see the ink when it matters (canvas_see), then act with the same verbs a hand has: draw in the shape vocabulary, say a sentence beside marks, propose a reading, label your own marks, transcribe writing, write code, put a picture on the board (canvas_import), find words (canvas_find), make a region round marks (canvas_region) and move marks into place (canvas_move — anything on the board, John said you may; the reply says whose marks you moved, say so in your own words too: his undo does not reach your move, so offer to move them back). Everything you do is held and attributed to you; the human blesses or ignores it. Never claim a reading is settled — offer it with a confidence and a reason. You are also the SEAT: when the human asks *Claude Code (MCP hand)* — What is this?, Read the writing, a question — the brief is parked here; canvas_pending gives you it, the marks and the contract (and for a read, the ink as a picture), and canvas_answer returns your answer in that contract, which the page takes exactly as it takes a model\'s.',
         });
         break;
       case 'notifications/initialized':
@@ -1029,4 +1029,4 @@ const shutdown = () => { try { store.close(); } catch { /* closing */ } if (rela
 process.stdin.on('end', shutdown);
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
-log('metamedium mcp: room ' + ROOM + ' as ' + label(ME) + ' via ' + RELAY);
+log('dynaink mcp: room ' + ROOM + ' as ' + label(ME) + ' via ' + RELAY);

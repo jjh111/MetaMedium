@@ -77,7 +77,7 @@ async function start() {
       if (msg.id != null && pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); }
     });
   }
-  const init = await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'metamedium-door', version: '0.1.0' } });
+  const init = await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'dynaink-door', version: '0.1.0' } });
   if (!URL_) child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
   const listed = await rpc('tools/list', {});
   const server = (init && init.serverInfo) || { name: URL_ || CMD[0], version: '' };

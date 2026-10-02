@@ -1,10 +1,10 @@
 {
   "mcpServers": {
-    "metamedium": {
+    "dynaink": {
       "command": "node",
       "args": ["Demos/mcp.mjs"]
     },
-    "metamedium-3d": {
+    "dynaink-3d": {
       "command": "node",
       "args": ["dynaink-3d/mcp.mjs"]
     }
