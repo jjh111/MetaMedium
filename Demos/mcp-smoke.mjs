@@ -43,7 +43,8 @@ tab.hello();
 // An MCP hand: mcp.mjs as a child process, spoken to over stdio.
 function spawnHand(env, tag) {
   const child = spawn(process.execPath, [path.join(here, 'mcp.mjs')], { env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
-  child.stderr.on('data', (d) => process.stderr.write('  [' + tag + '] ' + d));
+  let said = '';
+  child.stderr.on('data', (d) => { said += d; process.stderr.write('  [' + tag + '] ' + d); });
   let out = '';
   const pending = new Map();
   child.stdout.on('data', (d) => {
@@ -63,19 +64,26 @@ function spawnHand(env, tag) {
     setTimeout(() => { if (pending.has(id)) { pending.delete(id); reject(new Error(method + ' timed out')); } }, 8000);
   });
   const call = async (name, args) => { const m = await rpc('tools/call', { name, arguments: args || {} }); return m.result || m.error; };
-  return { child, rpc, call };
+  return { child, rpc, call, stderr: () => said };
 }
 
 // The MCP hand.
-const { child, rpc, call } = spawnHand({ MM_ROOM: ROOM, MM_RELAY: RELAY, MM_NAME: 'smoke' }, 'mcp');
+const { child, rpc, call, stderr } = spawnHand({ MM_ROOM: ROOM, MM_RELAY: RELAY, MM_NAME: 'smoke' }, 'mcp');
 const textOf = (res) => (res.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('\n');
 
 try {
   const init = await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '0' } });
-  check('initialize names the server', init.result && init.result.serverInfo && init.result.serverInfo.name === 'metamedium', init);
+  // The server is dyna.ink's (RENAME-PLAN §1, N3d): a session lists it as `dynaink`, and its tools as mcp__dynaink__canvas_*.
+  check('initialize names the server dynaink', init.result && init.result.serverInfo && init.result.serverInfo.name === 'dynaink', init.result && init.result.serverInfo);
+  const instructions = (init.result && init.result.instructions) || '';
+  check('its instructions say it is a hand on a dyna.ink canvas, and never name MetaMedium', /^You are a hand on a dyna\.ink canvas, in room "/.test(instructions) && !/metamedium/i.test(instructions), instructions.slice(0, 120));
+  check('its log says which server it is', await until(() => /^dynaink mcp: room /m.test(stderr()), 3000), stderr());
   child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
   const list = await rpc('tools/list', {});
   const names = (list.result && list.result.tools || []).map((t) => t.name);
+  const described = (list.result && list.result.tools || []).filter((t) => /metamedium/i.test(t.description || '')).map((t) => t.name);
+  check('no tool\'s description names MetaMedium; canvas_look says what is on the dyna.ink canvas', described.length === 0
+    && /^What is on the dyna\.ink canvas, in words/.test(((list.result && list.result.tools || []).find((t) => t.name === 'canvas_look') || {}).description || ''), described);
   check('eight tools, each a verb a hand has', ['canvas_look', 'canvas_see', 'canvas_draw', 'canvas_say', 'canvas_propose', 'canvas_label', 'canvas_transcribe', 'canvas_write'].every((n) => names.includes(n)), names);
   // …and the seat's two (V1-PLAN J4): the briefs parked for Claude Code, and the answer to one.
   // …and a ninth verb of a hand's (PLAN-IPAD-NOTES A1): putting a picture on the board.

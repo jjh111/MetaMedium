@@ -5,8 +5,10 @@
 // The product is dyna.ink, and the 3D surface DynaInk3D (§1 is the one home of
 // the spellings). This test reads every file a person sees in the product — the
 // whitepaper and its 404, the app at both addresses and their manifests, the
-// help, the 3D surface's page, and the strings of the surface's fragments — and
-// fails on "MetaMedium", in any case, except where it is:
+// help, the 3D surface's page, the strings of the surface's fragments, and what a
+// session connects to: the MCP servers .mcp.json registers and the strings of the
+// hands, the door and the seat's watcher (N3d) — and fails on "MetaMedium", in
+// any case, except where it is:
 //
 //   - inside an ADDRESS: a URL, a host and path, a path the site serves, a file
 //     name. The repository and its Pages path keep the old name until H1, and an
@@ -38,6 +40,12 @@ const PAGES = ['index.html', '404.html', 'Demos/session-engine.html', 'app/index
 const WHOLE = ['Demos/manifest.webmanifest', 'app/manifest.webmanifest', 'HELP.md'];
 // The fragments the build concatenates (Demos/build-surface.mjs), never their tests.
 const FRAGMENTS = readdirSync(join(root, 'Demos/surface')).filter((f) => /^\d\d-.*\.js$/.test(f)).sort().map((f) => 'Demos/surface/' + f);
+// What a Claude Code session connects to (N3d): the two MCP hands, the door, and the seat's watcher — their
+// strings are a server's name, its instructions, its tools' descriptions and the lines it logs.
+const HANDS = ['Demos/mcp.mjs', 'dynaink-3d/mcp.mjs', 'Demos/mcp-client.mjs', 'Demos/seat-watch.mjs'];
+// The servers .mcp.json registers, by the names a session lists them under (`/mcp`, mcp__<name>__<tool>), and
+// the hand each one runs.
+const SERVERS = { dynaink: 'Demos/mcp.mjs', 'dynaink-3d': 'dynaink-3d/mcp.mjs' };
 
 /** The titles of outside works that carry the old name. They are cited, never renamed. */
 const OUTSIDE_TITLES = [/A Day with MetaMedium/i];
@@ -222,14 +230,16 @@ function isOutsideTitle(line) {
 /** Every hit of the old name in what a person sees of each file, each with whether and why it may stand. */
 function hits() {
   const found = [];
-  const look = (file, seen, source) => {
+  // `ideas`: whether Kay's word may stand here. Not in what a session connects to: a server, its instructions and its
+  // log say the product's name, and a lowercase `metamedium` there is the old server name, never the idea.
+  const look = (file, seen, source, ideas = true) => {
     for (const m of seen.matchAll(/metamedium/gi)) {
       const from = m.index, to = from + m[0].length;
       const line = lineAround(source, from);
       found.push({
         file, line: lineOf(source, from), text: line.trim(), split: false,
         address: isAddress(tokenAround(seen, from, to)),
-        idea: isIdea(seen, from, to),
+        idea: ideas && isIdea(seen, from, to),
         title: isOutsideTitle(line),
       });
     }
@@ -248,6 +258,8 @@ function hits() {
   }
   for (const file of WHOLE) { const t = read(file); look(file, t.replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, ' ')), t); }
   for (const file of FRAGMENTS) { const t = read(file); look(file, scriptStrings(t), t); }
+  for (const file of HANDS) { const t = read(file); look(file, scriptStrings(t), t, false); }
+  look('.mcp.json', read('.mcp.json'), read('.mcp.json'), false);
   return found;
 }
 
@@ -295,6 +307,17 @@ test('a person sees dyna.ink, never MetaMedium — outside an address, the idea,
   assert.ok(all.length > 0, 'the test found no addresses or ideas at all — is it reading the files?');
   assert.deepEqual(wrong.map((h) => `${h.file}:${h.line}${h.split ? ' (split by markup)' : ''} — ${h.text.slice(0, 160)}`), [],
     `${wrong.length} place(s) a person sees name the product MetaMedium — say dyna.ink (DynaInk3D for the 3D surface; RENAME-PLAN §1)`);
+});
+
+test('a session connects to dynaink and dynaink-3d — .mcp.json names each server and the hand it runs', () => {
+  const servers = JSON.parse(read('.mcp.json')).mcpServers || {};
+  assert.deepEqual(Object.keys(servers).sort(), Object.keys(SERVERS).sort(), 'the servers .mcp.json registers (RENAME-PLAN §1: dynaink, dynaink-3d)');
+  for (const [name, hand] of Object.entries(SERVERS)) {
+    assert.equal(servers[name].command, 'node', name);
+    assert.deepEqual(servers[name].args, [hand], `${name} runs ${hand}`);
+    const said = read(hand).match(/serverInfo: \{ name: '([^']+)'/);
+    assert.equal(said && said[1], name, `${hand} names itself as .mcp.json lists it`);
+  }
 });
 
 test('every allowlist entry is still needed, says why, and keeps to its count', () => {

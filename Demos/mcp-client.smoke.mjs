@@ -14,7 +14,10 @@ process.stdin.on('data', (d) => {
   for (const line of String(d).split('\\n')) {
     if (!line.trim()) continue;
     const msg = JSON.parse(line);
-    if (msg.method === 'initialize') reply({ protocolVersion: '2024-11-05', capabilities: {}, serverInfo: { name: 'fake-parser', version: '9' } }, msg.id);
+    if (msg.method === 'initialize') {
+      process.stderr.write('the door introduced itself as ' + ((msg.params && msg.params.clientInfo && msg.params.clientInfo.name) || '(nothing)') + '\\n');
+      reply({ protocolVersion: '2024-11-05', capabilities: {}, serverInfo: { name: 'fake-parser', version: '9' } }, msg.id);
+    }
     else if (msg.method === 'tools/list') reply({ tools: [
       { name: 'parse_marks', description: 'read marks', inputSchema: { type: 'object' } },
       { name: 'answer_question', description: 'answer', inputSchema: { type: 'object' } },
@@ -34,7 +37,8 @@ function reply(result, id) { process.stdout.write(JSON.stringify({ jsonrpc: '2.0
 
 const PORT = 8039;
 const door = spawn('node', [path.join(here, 'mcp-client.mjs'), '--port', String(PORT), '--', 'node', fake], { stdio: ['ignore', 'pipe', 'pipe'] });
-door.stderr.on('data', (d) => process.stderr.write('[door] ' + d));
+let doorSaid = '';
+door.stderr.on('data', (d) => { doorSaid += d; process.stderr.write('[door] ' + d); });
 process.on('exit', () => { door.kill(); try { unlinkSync(fake); } catch {} });
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -48,6 +52,8 @@ try {
     try { const r = await fetch(`http://127.0.0.1:${PORT}/tools`); if (r.ok) tools = await r.json(); } catch {}
   }
   check('the door answers /tools', !!tools);
+  // The door is dyna.ink's (RENAME-PLAN §1, N3d): it introduces itself to a server as dynaink-door.
+  check('the door introduces itself as dynaink-door', /^the door introduced itself as dynaink-door$/m.test(doorSaid), doorSaid);
   check('the server is named and its tools listed',
     tools && tools.server.name === 'fake-parser' && tools.tools.length === 2 && tools.tools[0].name === 'parse_marks', tools);
 

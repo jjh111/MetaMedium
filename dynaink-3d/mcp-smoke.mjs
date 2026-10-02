@@ -99,7 +99,11 @@ function spawnHand(env, tag) {
     env: { ...process.env, ...env },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
-  child.stderr.on('data', (d) => process.stderr.write('  [' + tag + '] ' + d));
+  let said = '';
+  child.stderr.on('data', (d) => {
+    said += d;
+    process.stderr.write('  [' + tag + '] ' + d);
+  });
   let out = '';
   const pendingRpc = new Map();
   child.stdout.on('data', (d) => {
@@ -137,21 +141,31 @@ function spawnHand(env, tag) {
     const m = await rpc('tools/call', { name, arguments: args || {} });
     return m.result || m.error;
   };
-  return { child, rpc, call };
+  return { child, rpc, call, stderr: () => said };
 }
 
 // The MCP hand.
-const { child, rpc, call } = spawnHand({ MM_ROOM: ROOM, MM_RELAY: RELAY, MM_NAME: 'smoke' }, 'mcp');
+const { child, rpc, call, stderr } = spawnHand({ MM_ROOM: ROOM, MM_RELAY: RELAY, MM_NAME: 'smoke' }, 'mcp');
 const textOf = (res) => (res.content || []).filter((c) => c.type === 'text').map((c) => c.text).join('\n');
 
 try {
   const init = await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '0' } });
-  check('initialize names the shard\'s server', init.result && init.result.serverInfo && init.result.serverInfo.name === 'metamedium-3d', init);
+  // The server is DynaInk3D's (RENAME-PLAN §1, N3d): a session lists it as `dynaink-3d`, its tools as mcp__dynaink-3d__space_*.
+  check('initialize names the shard\'s server dynaink-3d', init.result && init.result.serverInfo && init.result.serverInfo.name === 'dynaink-3d', init.result && init.result.serverInfo);
   check('it says it is the seat as well as a hand', /space_pending/.test((init.result && init.result.instructions) || ''), (init.result || {}).instructions);
+  const instructions = (init.result && init.result.instructions) || '';
+  check('its instructions say it is a hand in a DynaInk3D space, and never name MetaMedium', /^You are a hand in a DynaInk3D space, in room "/.test(instructions) && !/metamedium/i.test(instructions), instructions.slice(0, 120));
+  const saidIt = async () => {
+    for (let i = 0; i < 60 && !/^dynaink-3d mcp: room /m.test(stderr()); i++) await wait(50);
+    return /^dynaink-3d mcp: room /m.test(stderr());
+  };
+  check('its log says which server it is', await saidIt(), stderr());
   child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
 
   const list = await rpc('tools/list', {});
   const names = (list.result && list.result.tools || []).map((t) => t.name);
+  const described = (list.result && list.result.tools || []).filter((t) => /metamedium/i.test(t.description || '')).map((t) => t.name);
+  check('no tool\'s description names MetaMedium', described.length === 0, described);
   check(
     'six tools: four verbs a hand has, and the two that are the seat',
     names.length === 6 && ['space_look', 'space_draw', 'space_propose', 'space_say', 'space_pending', 'space_answer'].every((n) => names.includes(n)),
