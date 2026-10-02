@@ -39,7 +39,7 @@ export interface LogHeader {
   type: 'format';
   format: typeof LOG_FORMAT;
   version: number;
-  /** The MetaMedium that wrote it (`VERSION`), when the writer knew. */
+  /** The build that wrote it (`VERSION`), when the writer knew. */
   app?: string;
   /**
    * How many pictures sit beside this log, in a board bundle (PLAN-IPAD-NOTES I4: a zip holding the log and
@@ -73,11 +73,11 @@ export class LogFormatError extends Error {
   source?: string;
   constructor(found: number | null, raw: unknown, app: string | undefined, source: string | undefined) {
     const what = source ? `“${source}”` : 'this log';
-    const by = app ? `, written by MetaMedium ${app}` : '';
+    const by = app ? `, written by dyna.ink ${app}` : '';
     const reads = LOG_VERSION > 1 ? `versions 0 to ${LOG_VERSION}` : 'versions 0 and 1';
     super(found === null
       ? `${what} begins with a log header that names no version this build can read (${JSON.stringify(raw)})${by} — this build reads ${reads}, so nothing of it was read`
-      : `${what} is a version ${found} log${by} — this build reads ${reads}, so nothing of it was read; open it with a newer MetaMedium`);
+      : `${what} is a version ${found} log${by} — this build reads ${reads}, so nothing of it was read; open it with a newer dyna.ink`);
     this.name = 'LogFormatError';
     this.found = found;
     this.supported = LOG_VERSION;

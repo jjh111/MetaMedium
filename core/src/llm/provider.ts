@@ -167,7 +167,7 @@ export const OPENROUTER_REASONING = { effort: 'low' } as const;
  * name its activity is listed under. Only OpenRouter is sent them — a custom
  * endpoint's CORS may not allow a header it does not know.
  */
-export const OPENROUTER_APP = { url: 'https://jjh111.github.io/MetaMedium/', title: 'MetaMedium' } as const;
+export const OPENROUTER_APP = { url: 'https://jjh111.github.io/MetaMedium/', title: 'dyna.ink' } as const;
 
 /**
  * How long a provider's list of models is waited for (J5). OpenRouter's is

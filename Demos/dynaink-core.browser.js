@@ -20406,9 +20406,9 @@ ${p.svg}</section>`),
   var LogFormatError = class extends Error {
     constructor(found, raw, app, source) {
       const what = source ? `\u201C${source}\u201D` : "this log";
-      const by = app ? `, written by MetaMedium ${app}` : "";
+      const by = app ? `, written by dyna.ink ${app}` : "";
       const reads2 = LOG_VERSION > 1 ? `versions 0 to ${LOG_VERSION}` : "versions 0 and 1";
-      super(found === null ? `${what} begins with a log header that names no version this build can read (${JSON.stringify(raw)})${by} \u2014 this build reads ${reads2}, so nothing of it was read` : `${what} is a version ${found} log${by} \u2014 this build reads ${reads2}, so nothing of it was read; open it with a newer MetaMedium`);
+      super(found === null ? `${what} begins with a log header that names no version this build can read (${JSON.stringify(raw)})${by} \u2014 this build reads ${reads2}, so nothing of it was read` : `${what} is a version ${found} log${by} \u2014 this build reads ${reads2}, so nothing of it was read; open it with a newer dyna.ink`);
       this.name = "LogFormatError";
       this.found = found;
       this.supported = LOG_VERSION;
@@ -26327,7 +26327,7 @@ ${pad}</${tag}>`;
   var DEFAULT_MAX_TOKENS = 8192;
   var MIN_REPLY_TOKENS = 1024;
   var OPENROUTER_REASONING = { effort: "low" };
-  var OPENROUTER_APP = { url: "https://jjh111.github.io/MetaMedium/", title: "MetaMedium" };
+  var OPENROUTER_APP = { url: "https://jjh111.github.io/MetaMedium/", title: "dyna.ink" };
   var MODEL_LIST_TIMEOUT_MS = 15e3;
   function providerLabel(config) {
     return config.label ?? `llm:${config.model}`;
