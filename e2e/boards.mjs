@@ -38,6 +38,7 @@ import {
   rng, sleep, cellBox, boxPath, sig, sameSig, drawPath, waitReady, strokesOnBoard, statusText,
   boardsNow, openBoardsPane, closeBoardsPane, waitOnBoard, switchTo, newBoardVia,
 } from './keep.mjs';
+import { semanticTest } from './semantic.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -1271,5 +1272,8 @@ export async function runBoards(browser, servers, ctx) {
   const t7 = Date.now();
   const found = await findTest(browser, servers, { ...ctx, steps });
   measured['find s'] = +((Date.now() - t7) / 1000).toFixed(1);
-  return { steps, guards: [guards, ...first, format, ...storage, pictures, bundle, found], measured };
+  const t8 = Date.now();
+  const meaning = await semanticTest(browser, servers, { ...ctx, steps });
+  measured['semantic s'] = +((Date.now() - t8) / 1000).toFixed(1);
+  return { steps, guards: [guards, ...first, format, ...storage, pictures, bundle, found, meaning], measured };
 }

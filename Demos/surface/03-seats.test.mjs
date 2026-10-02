@@ -186,6 +186,7 @@ test('the seat row says who holds it, where it runs and what it costs — or wha
   assert.match(held.who, /256/);
   assert.match(held.who, /30 MB/);
   assert.match(held.who, /no key/);
+  assert.match(S.semanticWords({ name: 'tiny', dimension: 64, bytes: 5483 }).who, /5 KB/);
   assert.ok(S.SEMANTIC_MAX_BYTES >= 32 * 1048576 && S.SEMANTIC_MAX_BYTES <= 64 * 1048576);
 });
 

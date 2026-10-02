@@ -751,7 +751,9 @@
 //   and resolveWriters (who is asked to read and who to write, with the fallback said), fallbackWords (what a seat
 //   does when nothing is chosen for it), keyId, keysToKeep and migrateStored (one key a provider; what is kept on
 //   the device; an old pick and key become the writer seat), orderChoices (local before hosted, quickest first),
-//   seatsOfPick and pickOf (what a kept pick holds, and never a key).
+//   seatsOfPick and pickOf (what a kept pick holds, and never a key), and the semantic seat's (I9): SEMANTIC_SOURCE
+//   (where its model is asked for), semanticSourceOf (an address read, never a key), semanticNameOf, semanticWords (what
+//   its row says), semanticFailed (a load that did not work, in words).
 // Uses: NOTHING. Like 07-hand.js and 09-field.js, this fragment names no closure variable, touches no DOM and asks
 //   the session nothing; 04-models.js is the adapter that gathers the joined models, asks, and acts. So it loads on
 //   its own in Node, which is how it is tested:
@@ -763,7 +765,7 @@
 // THE RULES (PLAN-IPAD-NOTES §3; CLAUDE.md, "Tiered LLM Interpretation")
 //   - A seat is a JOB, not a kind of participant: reader (handwriting to text — a model that sees), writer (briefs,
 //     pages, programs, *What is this?*), decider (a decision model: the engine's own ranking stands unless it is
-//     sure) and semantic (on this device — coming). A model holds the seats the hand gave it; one that holds none
+//     sure) and semantic (on this device: a small model that runs here, no key — I9). A model holds the seats the hand gave it; one that holds none
 //     is "any job", asked as every model was before seats.
 //   - A seat chosen NARROWS who is asked; a seat left alone changes nothing. That is the whole of the migration:
 //     with no seat chosen every rule here returns what the surface did before.
@@ -791,7 +793,7 @@
       case 'reader': return 'nothing chosen — Claude Code reads while it is seated, else the writer if it sees, else the smallest joined model that sees';
       case 'writer': return 'nothing chosen — every joined model that holds no other seat is asked, and Claude Code first while it is seated';
       case 'decider': return 'nothing chosen — the engine’s ranking stands, and nothing offers to ask a decision model';
-      case 'semantic': return 'on this device — coming: a small model that runs here, never a key and never a call';
+      case 'semantic': return 'nothing chosen — search stays by the words typed and nothing offers notes like this; a small model that runs on this device, with no key and no call, would add both';
       default: return '';
     }
   }
@@ -823,6 +825,67 @@
     const chosen = models.filter((m) => !m.claude && m.seats.includes('writer'));
     const pool = chosen.length ? chosen : models.filter((m) => !m.claude && m.seats.length === 0);
     return { who: claude.concat(pool).map((m) => m.id), why: chosen.length ? 'the writer seat' : 'every joined model with no seat' };
+  }
+
+  // ---- the semantic seat (I9): a small model on this device, asked for by an address, no key ----
+
+  /**
+   * Where the seat's model is asked for unless the hand says otherwise: a folder holding `tokenizer.json` and
+   * `model.safetensors` — Model2Vec's `potion-base-8M` (about 30 MB, no GPU; PLAN-IPAD-NOTES §3). UNVERIFIED where this
+   * was written (the container cannot reach the host: the proxy answers 403), and on `main`, not pinned to a revision
+   * — pin it to the commit John checks (the questions at the foot of the unit's status line).
+   */
+  const SEMANTIC_SOURCE = 'https://huggingface.co/minishlab/potion-base-8M/resolve/main/';
+  /** The most a model's file may be before the seat will not take it: the plan's budget is under 32 MB, and a page holds it in memory. */
+  const SEMANTIC_MAX_BYTES = 48 * 1024 * 1024;
+
+  /**
+   * An address the hand typed (or none: the default), read: https, or plain http on this machine only; no user, no
+   * password, no query and no fragment — a key must never ride in an address, and the seat holds none. `{ ok, base }`
+   * with a trailing slash, or `{ ok: false, why }` in words.
+   */
+  function semanticSourceOf(text) {
+    const t = String(text == null ? '' : text).trim();
+    if (!t) return { ok: true, base: SEMANTIC_SOURCE };
+    let u;
+    try { u = new URL(t); } catch (e) { return { ok: false, why: 'that is not an address — give the folder that holds tokenizer.json and model.safetensors, as https://…' }; }
+    const here = u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '[::1]';
+    if (u.protocol !== 'https:' && !(u.protocol === 'http:' && here)) return { ok: false, why: 'a model is fetched over https, or from this machine — “' + u.protocol + '” is neither' };
+    if (u.username || u.password) return { ok: false, why: 'an address with a user or a password in it is refused — the seat holds no key' };
+    if (u.search || u.hash) return { ok: false, why: 'an address with a query or a fragment in it is refused — a key must never ride in an address' };
+    return { ok: true, base: u.origin + (u.pathname.endsWith('/') ? u.pathname : u.pathname + '/') };
+  }
+
+  /** A model named for its folder: the part before `resolve/main`, else the last part, else the host. */
+  function semanticNameOf(base) {
+    let u;
+    try { u = new URL(base); } catch (e) { return String(base || 'model'); }
+    const parts = u.pathname.split('/').filter(Boolean);
+    const at = parts.indexOf('resolve');
+    if (at > 0) return parts[at - 1];
+    return parts.length ? parts[parts.length - 1] : u.host;
+  }
+
+  /** What the seat's row says: who holds it, where it runs, what it came to and that it holds no key. `held` is `{ name, dimension, words?, bytes? }` or null. */
+  function semanticWords(held) {
+    if (!held) return { who: 'nothing chosen' };
+    const bits = [held.name, 'on this device', held.dimension + ' numbers a text'];
+    if (held.words) bits.push(held.words + ' words');
+    if (held.bytes) bits.push(held.bytes < 1048576 ? Math.max(1, Math.round(held.bytes / 1024)) + ' KB' : Math.round(held.bytes / 1048576) + ' MB');
+    bits.push('no key, nothing sent');
+    return { who: bits.join(' · ') };
+  }
+
+  /** A load that did not work, in the person's words. `f`: `{ status?, network?, what?, bytes?, reason? }`. */
+  function semanticFailed(f) {
+    const what = f && f.what ? f.what : 'the model';
+    if (f && f.bytes && f.bytes > SEMANTIC_MAX_BYTES) return what + ' is too big — ' + Math.round(f.bytes / 1048576) + ' MB, more than the ' + Math.round(SEMANTIC_MAX_BYTES / 1048576) + ' MB the seat takes';
+    if (f && f.status === 403) return 'could not load ' + what + ' — the host refused it (HTTP 403): it will not hand that file to this page';
+    if (f && f.status === 404) return 'could not load ' + what + ' — no such file there (HTTP 404)';
+    if (f && f.status) return 'could not load ' + what + ' — the host answered HTTP ' + f.status;
+    if (f && f.network) return 'could not reach ' + what + ' — offline, or the host does not let this page read it';
+    if (f && f.reason) return 'could not use ' + what + ' — it came, but it is not a model this device can read: ' + f.reason;
+    return 'could not load ' + what;
   }
 
   // ---- keys: one a provider ----
@@ -876,6 +939,248 @@
     // `seat` is what a join was for, not what is kept of the model; a key is never kept.
     if (extra) for (const k of Object.keys(extra)) if (extra[k] !== undefined && k !== 'apiKey' && k !== 'seat') out[k] = extra[k];
     return out;
+  }
+
+// ===== the semantic seat (the adapter) =====
+// Provides: the semantic seat on the page (PLAN-IPAD-NOTES I9) — a small model that runs on THIS device and turns words
+//   into numbers, so Find can let in what no word typed matched and *Notes like this* can list the others nearest in
+//   meaning. semanticSeat (null, or who holds it), semanticHost (what the tools are told), joinSemantic (load a model
+//   from its address, lazily, by the seat's own control — never at boot, never on draw), leaveSemantic, trySemantic (one
+//   tiny ask), semanticRowParts / bindSemanticRow (the seat row in the models pane), findSemantic (Find's scorer for a
+//   query, made when asked and read from memory), semanticNotesLike (the notes nearest one thing), semanticNow (for tests).
+// Uses: core (MM.createStaticTransport, createStubEmbedTransport, createEmbedCache, semanticScorer, notesLike, groupLikes,
+//   embedAll, StaticModelError), seats' rules (03-seats.js: SEMANTIC_SOURCE, SEMANTIC_MAX_BYTES, semanticSourceOf,
+//   semanticNameOf, semanticWords, semanticFailed, fallbackWords), store (00-core), say / flash (07-input), esc, the seat
+//   pane (renderSeats) and the field (refreshPalette), the kept index (findBoards, 17-find.js), the find pane (renderFind).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the closure's; no imports, no exports.
+// It sits at 03- so that its state is declared before 04-seatpane.js draws the seats at load.
+//
+// A SEAT, NOT A DEPENDENCY. With nobody in this seat Find is exactly the lexical Find and the field offers exactly what it
+// offered; nothing here runs. The seat holds NO KEY — the model is a file on this device once loaded — and asks nothing
+// of anyone: a model's files are fetched once, by a tap, from an address the hand can read and change, then kept in
+// the browser's cache (`mm-semantic`); what is embedded is held in memory by text and lost with the page.
+//
+// ONLY A DELIBERATE ACT ASKS. Nothing is loaded at boot and nothing is embedded on draw, on a hold or on opening the
+// field: the model is loaded by *load it here*, Find embeds when a query is typed in it while the seat is held, and
+// *Notes like this* embeds when it is taken.
+//
+// UNRUN WHERE IT WAS WRITTEN. The container this was built in cannot reach the model's host (the proxy answers 403), so
+// `loadSemantic` has never fetched the real `potion-base-8M`: it has run, in the gate, against a model BUILT for the
+// test and served from the gate's own origin (e2e `models` M29–M36), and its failures — a refusal, a missing file, bytes
+// that are no model, a file too big — in words. The real files are what `scripts/check-semantic-model.mjs` asks.
+
+  const SEMANTIC_KEY = 'mm-semantic';     // { source } — which address the hand last loaded from; never a key
+  const SEMANTIC_CACHE = 'mm-semantic';   // the Cache API's name for the model's files, beside no other
+  const semanticVectors = MM.createEmbedCache();
+  /** { name, base, transport, dimension, words, bytes, loadMs } once a model is loaded here; null when nobody holds the seat. */
+  let semanticSeat = null;
+  /** What the seat is doing or last did, for its row: { loading: 'text' } | { failed: 'text' } | { call: { ok, ms, text } } | null. */
+  let semanticSaid = null;
+  let semanticLoad = null;                // the load in flight (a promise), so a second tap joins it
+  let semanticTyped = null;               // the address as typed and not yet loaded, so a redraw of the row does not lose it
+  let semanticAsked = 0;                  // texts handed to the model since the page opened (for tests: a text is embedded once)
+
+  function semanticStored() { const v = store.get(SEMANTIC_KEY); return v && typeof v.source === 'string' ? v : { source: '' }; }
+  /** What the tools are told: the seat's name when held, else null (and so no *Notes like this* is offered). */
+  function semanticHost() { return semanticSeat ? { name: semanticSeat.name } : null; }
+  /** The seat changed: the row, the field's offers and Find read it again. */
+  function semanticChanged() {
+    renderSeats();
+    refreshPalette();
+    if (typeof renderFind === 'function') renderFind();
+  }
+
+  /** A transport that counts what it was asked: nothing more. */
+  function countedTransport(inner) {
+    return { name: inner.name, dimension: inner.dimension, embed: (texts, opts) => { semanticAsked += texts.length; return inner.embed(texts, opts); } };
+  }
+
+  // ----- loading a model from an address ---------------------------------------------------------------------------
+  /** One file of the model's: from the browser's cache when held, else fetched (with the bytes counted as they come) and kept. */
+  async function semanticFile(base, name, progress) {
+    const url = base + name;
+    let cache = null;
+    try { cache = typeof caches !== 'undefined' ? await caches.open(SEMANTIC_CACHE) : null; } catch (e) { cache = null; }
+    if (cache) {
+      try { const hit = await cache.match(url); if (hit) { const b = new Uint8Array(await hit.arrayBuffer()); progress(b.length, b.length); return { bytes: b, kept: true }; } } catch (e) { /* fetched below */ }
+    }
+    let res;
+    try { res = await fetch(url, { credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-cache' }); } catch (e) { throw { network: true, what: name }; }
+    if (!res.ok) throw { status: res.status, what: name };
+    const declared = Number(res.headers.get('content-length')) || 0;
+    if (declared > SEMANTIC_MAX_BYTES) throw { bytes: declared, what: name };
+    let bytes;
+    if (res.body && res.body.getReader) {
+      const reader = res.body.getReader();
+      const parts = [];
+      let got = 0;
+      for (;;) {
+        const r = await reader.read();
+        if (r.done) break;
+        parts.push(r.value);
+        got += r.value.length;
+        if (got > SEMANTIC_MAX_BYTES) { try { reader.cancel(); } catch (e) { /* too big already */ } throw { bytes: got, what: name }; }
+        progress(got, declared);
+      }
+      bytes = new Uint8Array(got);
+      let at = 0;
+      for (const p of parts) { bytes.set(p, at); at += p.length; }
+    } else {
+      bytes = new Uint8Array(await res.arrayBuffer());
+      if (bytes.length > SEMANTIC_MAX_BYTES) throw { bytes: bytes.length, what: name };
+    }
+    if (cache) { try { await cache.put(url, new Response(bytes, { headers: { 'content-type': 'application/octet-stream' } })); } catch (e) { /* kept for this page only */ } }
+    return { bytes: bytes, kept: false };
+  }
+
+  /**
+   * Load the model at an address and seat it: its tokenizer and its table of vectors, fetched once (or read from the
+   * browser's cache), read by core, and held as the seat. Nothing is asked of anyone but the host of the files; a failure
+   * is said in words in the seat's row and in the status line, and the seat stays empty. The address is the hand's
+   * (`semanticSourceOf`: https, or this machine; no key can ride in it); the one used is kept for the next time.
+   */
+  function joinSemantic(sourceText) {
+    if (semanticLoad) return semanticLoad;
+    const src = semanticSourceOf(sourceText);
+    if (!src.ok) { semanticSaid = { failed: src.why }; semanticChanged(); say(src.why); return Promise.resolve(false); }
+    const name = semanticNameOf(src.base);
+    const t0 = performance.now();
+    const sizes = { 'tokenizer.json': 0, 'model.safetensors': 0 };
+    const progress = (file) => (got, of) => {
+      sizes[file] = got;
+      const total = sizes['tokenizer.json'] + sizes['model.safetensors'];
+      semanticSaid = { loading: name + ' — ' + (total / 1048576).toFixed(1) + ' MB' + (of && file === 'model.safetensors' ? ' of ' + (of / 1048576).toFixed(1) : '') };
+      semanticRowSoon();
+    };
+    semanticSaid = { loading: name + ' — asking for it' };
+    renderSeats();
+    semanticLoad = (async () => {
+      try {
+        const tok = await semanticFile(src.base, 'tokenizer.json', progress('tokenizer.json'));
+        const wts = await semanticFile(src.base, 'model.safetensors', progress('model.safetensors'));
+        let inner;
+        try { inner = MM.createStaticTransport({ name: name, tokenizer: new TextDecoder().decode(tok.bytes), weights: wts.bytes }); }
+        catch (e) { throw { reason: String((e && e.message) || e), what: 'the files at ' + src.base }; }
+        semanticSeat = { name: name, base: src.base, transport: countedTransport(inner), dimension: inner.dimension, bytes: tok.bytes.length + wts.bytes.length, loadMs: Math.round(performance.now() - t0), kept: tok.kept && wts.kept };
+        semanticSaid = null;
+        store.set(SEMANTIC_KEY, { source: src.base === SEMANTIC_SOURCE ? '' : src.base });
+        semanticChanged();
+        say(name + ' sits in the semantic seat — on this device, no key; Find now looks by meaning too, and “Notes like this” is typed on marks with words');
+        return true;
+      } catch (f) {
+        const words = semanticFailed(f && typeof f === 'object' ? f : { reason: String(f) });
+        semanticSaid = { failed: words };
+        semanticChanged();
+        say('the semantic seat: ' + words);
+        return false;
+      } finally { semanticLoad = null; }
+    })();
+    return semanticLoad;
+  }
+
+  /** The seat let go: its model is dropped from memory (the browser's cache keeps the files for the next load). */
+  function leaveSemantic() {
+    if (!semanticSeat) return;
+    const name = semanticSeat.name;
+    semanticSeat = null;
+    semanticSaid = null;
+    semanticChanged();
+    say(name + ' left the semantic seat — Find is by the words typed again');
+  }
+
+  /** For tests (the gate's own transport): seat a stand-in, as a loaded model would be, with no files. */
+  function joinSemanticTransport(transport, extra) {
+    semanticSeat = Object.assign({ name: transport.name, base: '', transport: countedTransport(transport), dimension: transport.dimension, bytes: 0, loadMs: 0, kept: false }, extra || {});
+    semanticSaid = null;
+    semanticChanged();
+    return semanticHost();
+  }
+
+  /** *Try it*: three tiny texts through the transport, timed — a deliberate act, the result in the row. */
+  async function trySemantic() {
+    if (!semanticSeat) return;
+    const s = semanticSeat;
+    const t0 = performance.now();
+    try {
+      const v = await s.transport.embed(['pricing', 'what it costs', 'a garden hose']);
+      const cos = (a, b) => MM.semanticCosine(a, b).toFixed(2);
+      semanticSaid = { call: { ok: true, ms: Math.round(performance.now() - t0), text: 'ok · 3 texts · pricing ~ “what it costs” ' + cos(v[0], v[1]) + ', ~ “a garden hose” ' + cos(v[0], v[2]) } };
+    } catch (e) { semanticSaid = { call: { ok: false, ms: Math.round(performance.now() - t0), text: String((e && e.message) || e) } }; }
+    renderSeats();
+  }
+
+  // ----- the seat's row --------------------------------------------------------------------------------------------
+  let semanticRowTimer = 0;
+  /** A load reports many times a second; the row is drawn a few times. */
+  function semanticRowSoon() { if (semanticRowTimer) return; semanticRowTimer = setTimeout(() => { semanticRowTimer = 0; renderSeats(); }, 120); }
+
+  /** The row's parts: `{ who, body, call, note }` as HTML-safe strings (the pane puts them in its own row). */
+  function semanticRowParts() {
+    const input = '<input class="seatSource" data-semantic-source type="text" spellcheck="false" autocapitalize="off" autocomplete="off" value="' + esc(semanticTyped !== null ? semanticTyped : semanticStored().source) + '" placeholder="' + esc(SEMANTIC_SOURCE) + '" aria-label="where the model is: a folder holding tokenizer.json and model.safetensors" title="a folder holding tokenizer.json and model.safetensors — https, or this machine. Left empty it is ' + esc(semanticNameOf(SEMANTIC_SOURCE)) + ' (about 30 MB, fetched once and kept on this device)">';
+    if (semanticSeat) {
+      const s = semanticSeat;
+      const words = semanticWords({ name: s.name, dimension: s.dimension, bytes: s.bytes || 0 });
+      const call = semanticSaid && semanticSaid.call ? '<div class="seatCall mpCall ' + (semanticSaid.call.ok ? 'ok' : 'bad') + '">' + esc(semanticSaid.call.text + (semanticSaid.call.ok ? ' · ' + semanticSaid.call.ms + ' ms' : '')) + '</div>' : (s.loadMs ? '<div class="seatCall mpCall ok">' + esc('loaded in ' + (s.loadMs / 1000).toFixed(1) + ' s' + (s.kept ? ' · from this device’s cache' : '')) + '</div>' : '');
+      return {
+        who: words.who,
+        body: '<button class="ghost" data-semantic-try title="three tiny texts through it, timed: is it there, and does it put related words near?">try it</button><button class="ghost" data-semantic-leave>leave</button>',
+        call: call, note: '',
+      };
+    }
+    if (semanticSaid && semanticSaid.loading) return { who: 'loading ' + semanticSaid.loading, body: '', call: '', note: 'a model is a file: fetched once, then kept on this device' };
+    const failed = semanticSaid && semanticSaid.failed ? '<div class="seatCall mpCall bad">' + esc(semanticSaid.failed) + '</div>' : '';
+    return {
+      who: 'nothing chosen',
+      body: input + '<button class="ghost" data-semantic-load title="fetches the model once (about 30 MB) — nothing is loaded until you tap">load it here</button>',
+      call: failed, note: fallbackWords('semantic'),
+    };
+  }
+  /** The row's buttons, wired by the pane after it draws. */
+  function bindSemanticRow(root) {
+    const src = root.querySelector('[data-semantic-source]');
+    const load = root.querySelector('[data-semantic-load]');
+    if (load) load.onclick = () => { joinSemantic(src ? src.value : ''); };
+    if (src) src.addEventListener('input', () => { semanticTyped = src.value; });
+    if (src) src.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); joinSemantic(src.value); } });
+    const tr = root.querySelector('[data-semantic-try]');
+    if (tr) tr.onclick = () => { trySemantic(); };
+    const lv = root.querySelector('[data-semantic-leave]');
+    if (lv) lv.onclick = () => leaveSemantic();
+  }
+
+  // ----- what Find and *Notes like this* ask of it -------------------------------------------------------------------
+  /**
+   * Find's score for a query over the boards' entries: the query and every entry text not yet held are embedded (each
+   * once, by text), and the function that comes back answers from memory. A failure is said and the search stands
+   * without meaning. Null with nobody in the seat.
+   */
+  async function findSemantic(query, boards) {
+    const s = semanticSeat;
+    if (!s) return null;
+    const entries = [];
+    for (const b of boards) for (const e of b.entries) entries.push(e);
+    try { return await MM.semanticScorer(s.transport, query, entries, { cache: semanticVectors }); }
+    catch (e) { semanticSaid = { call: { ok: false, ms: 0, text: 'could not read by meaning — ' + String((e && e.message) || e) } }; renderSeats(); say(semanticSaid.call.text); return null; }
+  }
+
+  /** The notes nearest one thing's words across the boards, as groups the pane lists; `{ groups, likes, name }` or `{ error }`. */
+  async function semanticNotesLike(data, boards) {
+    const s = semanticSeat;
+    if (!s) return { error: 'no semantic seat is held — load one under models' };
+    try {
+      const likes = await MM.notesLike(s.transport, boards, { text: data.text, board: boards.some((b) => b.id === data.board) ? data.board : undefined, ids: data.ids || [] }, { cache: semanticVectors });
+      return { groups: MM.groupLikes(likes, boards), likes: likes, name: s.name };
+    } catch (e) { return { error: 'could not read by meaning — ' + String((e && e.message) || e) }; }
+  }
+
+  /** For tests: who holds the seat, what it has been asked, how many vectors are held — never a key (there is none). */
+  function semanticNow() {
+    return {
+      held: semanticSeat ? { name: semanticSeat.name, base: semanticSeat.base, dimension: semanticSeat.dimension, bytes: semanticSeat.bytes, kept: semanticSeat.kept } : null,
+      said: semanticSaid ? JSON.parse(JSON.stringify(semanticSaid)) : null,
+      asked: semanticAsked, held_vectors: semanticVectors.size, stored: semanticStored(), loading: !!semanticLoad,
+    };
   }
 
 // ===== teach =====
@@ -1940,7 +2245,7 @@
 //   who is asked (writers; readers is 06-handwriting.js's, both by 03-seats.js's rules), one key a provider (keyFor,
 //   holdKey, commitKey), the decider (joinDecider, askDecider, deciderHost), what a reload brings back
 //   (rejoinRemembered: the old pick and key become the writer seat, once), the pane's seats section (renderSeats; the
-//   form's For: forSeat) and seatsNow for tests.
+//   form's For: forSeat) and seatsNow for tests. (The semantic seat's row is 03-semantic.js's; this pane only draws it.)
 // Uses: core (MM, store), seats (03-seats.js — every rule), models (agents, join, joinHosted, factsFor, applyFacts,
 //   recording, lastCall, noteOutcome, callLine, isModel, modelWords, withWork, workSignal, factsOf, tryModel, renderAgents,
 //   probeLocal, the pane's elements), input (say), render (render), palette (refreshPalette).
@@ -2301,8 +2606,9 @@
       const w = SEAT_WORDS[seat];
       let who = '', body = '', call = '', note = '';
       if (seat === 'semantic') {
-        who = 'on this device — coming';
-        note = fallbackWords('semantic');
+        // The semantic seat is on this device (I9, 03-semantic.js): a model loaded by a tap, no key, nothing sent.
+        const p = semanticRowParts();
+        who = p.who; body = p.body; call = p.call; note = p.note;
       } else if (seat === 'decider') {
         if (decider) {
           who = decider.name + ' · ' + MM.providerLocality(decider.config) + ' · taken only at ' + MM.DECIDER_TAKE_AT;
@@ -2325,6 +2631,7 @@
         '<div class="seatWho t">' + esc(who) + '</div>' + call + (note ? '<div class="seatFallback note">' + esc(note) + '</div>' : '') + '</div>';
     }
     seatsPane.innerHTML = html;
+    bindSemanticRow(seatsPane);
     seatsPane.querySelectorAll('[data-seat-pick]').forEach((sel) => {
       sel.onchange = () => {
         const seat = sel.dataset.seatPick;
@@ -2366,6 +2673,7 @@
       readers: resolveReaders(seatModels()).who.map(agentById).filter(Boolean).map((a) => a.config.model),
       writers: resolveWriters(seatModels()).who.map(agentById).filter(Boolean).map((a) => a.config.model),
       kept: JSON.parse(JSON.stringify(seatPicks)),
+      semantic: semanticNow().held,
     };
   }
 
@@ -6051,6 +6359,8 @@
       // `sees`: who READS, by seat (I7) — a model that sees but sits elsewhere does not answer a read; `decider`: the decision model seated, if one is (*Which is it?*).
       models: agents.map((a) => ({ name: a.name, sees: readers().includes(a) })),
       decider: deciderHost(),
+      // The semantic seat held here, if one is (I9; 03-semantic.js): with it *Notes like this* is typed on marks that have words; without, the field offers what it always did.
+      semantic: semanticHost(),
       isRead: (id) => { const n = session.getState().nodes.get(id); return !!n && isRead(n); },
       // The board's lines of writing and how many are unread (I8): *Read the board* stands only where there is some.
       writing: () => boardWriting(),
@@ -6291,6 +6601,8 @@
     what: (o) => askModelsAbout(o.data.ids.slice()),
     // *Which is it?* asks the decider — only by this tap (I7; 04-seatpane.js), never on a hold.
     which: (o) => askDecider(o.data),
+    // *Notes like this* lists the notes nearest these marks' words across every board — in Find's pane, only by this tap (I9; 26-find.js).
+    like: (o) => { likeNotes(o.data); },
     // The maths tool's acts (M5): the sizes said and left showing beside their figure, the drawing printed at its real size.
     'maths-show': (o) => mathsShow(o.data),
     'maths-print': () => mathsPrint(),
@@ -8142,10 +8454,16 @@
     return '<div class="eyebrow">region</div>' +
       '<div class="row"><span class="k">is</span><span class="v">' + esc(MM.regionSaid(d)) + '</span></div>' +
       '<div class="row"><span class="k">becomes</span><span class="v">move it by its title — what it holds goes with it, in one act</span></div>' +
+      regionLikeHtml(s, id) +
       '<div class="acts"><input class="regionName" type="text" value="' + esc(d.name) + '" maxlength="60" aria-label="the region\'s name" data-region-name="' + esc(id) + '">' +
       '<button class="mini" type="button" data-region-rename="' + esc(id) + '" title="give it this name">rename</button>' +
       '<button class="mini" type="button" data-region-fit="' + esc(id) + '" title="take the view to it">show it</button></div>' +
       '<div class="why">erasing it keeps everything it holds; a mark moved out of it is let go, and one drawn in is held</div>';
+  }
+  /** *Notes like this* for a region: a region is selected, never held by the field, so its offer is a button here — only with a semantic seat held and words in it (I9). */
+  function regionLikeHtml(s, id) {
+    if (!semanticHost() || !MM.wordsOfMarks(s, [id])) return '';
+    return '<div class="acts"><button class="mini" type="button" data-region-like="' + esc(id) + '" title="lists the notes nearest what this region says, across every board — by the model on this device, nothing sent anywhere">notes like this</button></div>';
   }
   /** The board's outline, at the foot of the panel: its regions as a tree, a tap on a line takes the view there. Empty when there are none. */
   function regionOutlineHtml(s) {
@@ -8170,8 +8488,9 @@
     return done;
   }
   inspectorEl.addEventListener('click', (e) => {
-    const t = e.target && e.target.closest && e.target.closest('[data-region-fit],[data-region-rename]');
+    const t = e.target && e.target.closest && e.target.closest('[data-region-fit],[data-region-rename],[data-region-like]');
     if (!t) return;
+    if (t.hasAttribute('data-region-like')) { const id = t.getAttribute('data-region-like'); likeNotes({ text: MM.wordsOfMarks(session.getState(), [id]), ids: [id] }); return; }
     if (t.hasAttribute('data-region-fit')) { regionFit(t.getAttribute('data-region-fit')); return; }
     const id = t.getAttribute('data-region-rename');
     const input = inspectorEl.querySelector('input[data-region-name="' + id + '"]');
@@ -15591,10 +15910,14 @@
 //   context (*“Pricing” — label on a box · Board “Q4 notes”*); a tap on one opens that board in place (the switch
 //   the boards pane does) and takes the view to what was found, which is ringed for a moment. renderFind (the kept
 //   index landed, or a board changed), openFind / closeFind, findOpenHit, findShow, findFlashState (for tests).
+//   With the semantic seat held (I9, 03-semantic.js) the same query is also asked by meaning — what no word typed
+//   matched is let in when the seat scores it near, each such hit said *by meaning 0.72* — and likeNotes (the field's
+//   *Notes like this*, a region's button) lists the notes nearest one thing's words across every board in this same
+//   list, each with its number and reason. With nobody in the seat none of that exists and Find is as it was.
 // Uses: ui (pane, esc), controls (openPane, closePanel, tiles), core (MM.searchBoards, describeHit, boundsOf,
 //   getRep), the session, view (fitTo, view, worldToScreen), the boards adapter (board, boards, onBoardHere,
 //   switchBoard), the kept index (finder, findBoards, findSync, findIdle, findIndexCurrent), the boards pane
-//   (rereadBoards), input (say, flash).
+//   (rereadBoards), input (say, flash), the semantic seat (semanticHost, findSemantic, semanticNotesLike).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the closure's; no imports, no exports.
 //
@@ -15609,7 +15932,14 @@
   const findStatusEl = document.getElementById('findStatus');
   const findList = findPanel ? findPanel.querySelector('.fdList') : null;
   /** What the pane holds between paints: the hit the keys are on, the boards shown whole. */
-  const fd = { sel: 0, whole: new Set(), query: '' };
+  const fd = {
+    sel: 0, whole: new Set(), query: '',
+    // The semantic seat's side (I9): the score function made for the last query asked by meaning, and the key it was made under
+    // (the query and how many entries stood then); and *notes like this* when a thing's words are being looked for instead of a typed word.
+    sem: { fn: null, key: '', pending: '', timer: 0 }, like: null, likeSeq: 0,
+  };
+  /** How long a typed query rests before it is asked by meaning: a word being typed is not asked at every key. */
+  const FIND_SEM_MS = 180;
   /** A board shows this many hits until a tap on *more*. */
   const FIND_HITS = 5;
   /** The ring round what was found: how long it stays, and the least a find is shown at (a label is small; the view should not be a blob). */
@@ -15617,8 +15947,9 @@
 
   if (findPanel) ui.pane(findPanel, 'find', () => closeFind());
   const findOpen = () => !!findPanel && !findPanel.hasAttribute('hidden');
-  function openFind() {
+  function openFind(keepLike) {
     if (!findPanel || EMBED) return;
+    if (!keepLike) { fd.like = null; findInput.placeholder = ''; }
     if (!findOpen()) openPane(findPanel, findBtn);
     findInput.focus();
     findInput.select();
@@ -15665,60 +15996,144 @@
     b.dataset.kind = h.kind;
     b.title = MM.describeHit(h);
     if (h.kind === 'board') { b.appendChild(fdEl('span', 'fdText', 'open this board')); b.appendChild(fdEl('span', 'fdWhat', ' — its name says it')); }
-    else { b.appendChild(fdWords(h)); b.appendChild(fdEl('span', 'fdWhat', ' — ' + h.what)); }
+    else {
+      b.appendChild(fdWords(h));
+      b.appendChild(fdEl('span', 'fdWhat', ' — ' + h.what + (h.meaning && !(h.spans && h.spans.length) && !h.reason ? ' · by meaning ' + h.meaning.toFixed(2) : '')));
+      // *Notes like this*: each note says why it is near — its number, what measured it, whether a word is shared.
+      if (h.reason) { b.appendChild(fdEl('span', 'fdWhy', h.reason)); b.title = h.reason; }
+    }
     return b;
   }
 
-  /** The list for what is typed: grouped by board, a board by its best hit, the words in context. */
+  /** One board's group of hits, as the list shows it; the hit buttons go into `hits` for the keys. */
+  function fdGroupEl(g, hits) {
+    const box = fdEl('div', 'fdGroup');
+    box.dataset.board = g.board;
+    const here = onBoardHere() && board.id === g.board;
+    const head = fdEl('div', 'fdHead');
+    head.appendChild(fdEl('span', 'fdBoardName', g.name));
+    if (here) head.appendChild(ui.chip('here', { cls: 'bdHere', why: 'the board on screen' }));
+    box.appendChild(head);
+    const shown = fd.whole.has(g.board) ? g.hits : g.hits.slice(0, FIND_HITS);
+    for (const h of shown) { const el = fdHitEl(h); hits.push(el); box.appendChild(el); }
+    const rest = g.hits.length - shown.length + g.more;
+    if (rest > 0) {
+      const m = fdEl('button', 'fdMore', rest + ' more on this board');
+      m.type = 'button';
+      m.dataset.whole = g.board;
+      box.appendChild(m);
+    }
+    return box;
+  }
+  /** The entries every board says, counted: part of what a meaning score was made under. */
+  const fdEntryCount = (kept) => kept.reduce((n, b) => n + b.entries.length, 0);
+  /**
+   * Ask the seat about this query, once it has rested: the query and every entry text it lacks are embedded, and the score
+   * function that comes back is kept for the list, which is drawn again. Never at a key, never with nobody in the seat.
+   */
+  function fdAskMeaning(q, kept) {
+    const key = q.trim() + '|' + fdEntryCount(kept);
+    if (fd.sem.key === key || fd.sem.pending === key) return;
+    fd.sem.pending = key;
+    clearTimeout(fd.sem.timer);
+    fd.sem.timer = setTimeout(async () => {
+      const fn = await findSemantic(q, findBoards());
+      if (fd.sem.pending !== key) return;
+      fd.sem.pending = '';
+      if (fn) { fd.sem.fn = fn; fd.sem.key = key; renderFind(); }
+    }, FIND_SEM_MS);
+  }
+
+  /** The list for what is typed: grouped by board, a board by its best hit, the words in context — and by meaning too while the seat is held. */
   function renderFind() {
     if (!findPanel || !findList || !findOpen()) return;
     const q = findInput.value;
     fd.query = q;
     const kept = findBoards();
+    if (fd.like) { renderLike(kept); return; }
     const frag = document.createDocumentFragment();
     const hits = [];
+    const seat = semanticHost();
+    if (!seat) { fd.sem.fn = null; fd.sem.key = ''; fd.sem.pending = ''; }
     if (!/[\p{L}\p{N}]/u.test(q)) {
       findStatusEl.textContent = kept.length
-        ? 'a word is looked for on every board you keep here — labels, names, typed text, figures, Mermaid, and what was read from writing'
+        ? 'a word is looked for on every board you keep here — labels, names, typed text, figures, Mermaid, and what was read from writing' + (seat ? ' — and by meaning, by ' + seat.name : '')
         : 'there is no board here to look through yet';
     } else {
-      const groups = MM.searchBoards(kept, q, { hitsPerBoard: 60 });
-      for (const g of groups) {
-        const box = fdEl('div', 'fdGroup');
-        box.dataset.board = g.board;
-        const here = onBoardHere() && board.id === g.board;
-        const head = fdEl('div', 'fdHead');
-        head.appendChild(fdEl('span', 'fdBoardName', g.name));
-        if (here) head.appendChild(ui.chip('here', { cls: 'bdHere', why: 'the board on screen' }));
-        box.appendChild(head);
-        const shown = fd.whole.has(g.board) ? g.hits : g.hits.slice(0, FIND_HITS);
-        for (const h of shown) { const el = fdHitEl(h); hits.push(el); box.appendChild(el); }
-        const rest = g.hits.length - shown.length + g.more;
-        if (rest > 0) {
-          const m = fdEl('button', 'fdMore', rest + ' more on this board');
-          m.type = 'button';
-          m.dataset.whole = g.board;
-          box.appendChild(m);
-        }
-        frag.appendChild(box);
-      }
+      if (seat) fdAskMeaning(q, kept);
+      const groups = MM.searchBoards(kept, q, Object.assign({ hitsPerBoard: 60 }, seat && fd.sem.fn ? { semantic: fd.sem.fn } : {}));
+      for (const g of groups) frag.appendChild(fdGroupEl(g, hits));
       const reading = finder.progress ? ' · reading the boards… ' + finder.progress.done + ' of ' + finder.progress.total : '';
+      const meaning = seat ? (fd.sem.pending ? ' · reading by meaning…' : ' · by meaning too') : '';
       const n = kept.length;
       findStatusEl.textContent = groups.length
-        ? groups.length + ' board' + (groups.length === 1 ? '' : 's') + ' of ' + n + ' say it' + reading
-        : 'nothing on ' + (n === 1 ? 'the board' : n + ' boards') + ' says “' + q.trim() + '”' + reading;
+        ? groups.length + ' board' + (groups.length === 1 ? '' : 's') + ' of ' + n + ' say it' + reading + meaning
+        : 'nothing on ' + (n === 1 ? 'the board' : n + ' boards') + ' says “' + q.trim() + '”' + reading + meaning;
     }
     findList.replaceChildren(frag);
     fd.sel = Math.min(fd.sel, Math.max(0, hits.length - 1));
     fdMark(hits);
   }
+
+  // ----- notes like this (I9) -------------------------------------------------------------------------------------------
+  /** The list for *notes like this*: the thing's words at the head, then the notes nearest it, by board, each with its reason. */
+  function renderLike(kept) {
+    const L = fd.like;
+    const frag = document.createDocumentFragment();
+    const hits = [];
+    const head = fdEl('div', 'fdLikeHead');
+    head.appendChild(fdEl('span', 'fdText', 'notes like “' + (L.text.length > 90 ? L.text.slice(0, 90) + '…' : L.text) + '”'));
+    const clear = fdEl('button', 'fdMore', 'search instead');
+    clear.type = 'button';
+    clear.dataset.likeClear = '1';
+    head.appendChild(clear);
+    frag.appendChild(head);
+    if (L.busy) findStatusEl.textContent = 'reading what every board says, by meaning — the first time takes a moment';
+    else if (L.error) findStatusEl.textContent = L.error;
+    else {
+      for (const g of L.groups || []) frag.appendChild(fdGroupEl(g, hits));
+      const n = (L.likes || []).length;
+      const boardsN = (L.groups || []).length;
+      findStatusEl.textContent = n
+        ? n + ' note' + (n === 1 ? '' : 's') + ' near it, on ' + boardsN + ' board' + (boardsN === 1 ? '' : 's') + ' of ' + kept.length + ' · by ' + L.name + ', on this device, nothing sent'
+        : 'nothing on ' + (kept.length === 1 ? 'the board' : kept.length + ' boards') + ' is near “' + (L.text.length > 40 ? L.text.slice(0, 40) + '…' : L.text) + '”';
+    }
+    findList.replaceChildren(frag);
+    fd.sel = Math.min(fd.sel, Math.max(0, hits.length - 1));
+    fdMark(hits);
+  }
+  /**
+   * *Notes like this*, taken: the pane opens on the notes nearest one thing's words across every board — a deliberate act, the
+   * only thing here that asks the seat besides a query typed in the pane. `data`: `{ text, ids }` (the tool's offer data).
+   * Reads the boards first (a board never indexed is read) and writes nothing.
+   */
+  async function likeNotes(data) {
+    if (!findPanel || EMBED) return false;
+    if (!semanticHost()) { say('no semantic seat is held — load one under models'); return false; }
+    const my = { text: String(data.text || ''), ids: (data.ids || []).slice(), board: onBoardHere() ? board.id : null, busy: true, groups: null, likes: null, error: null, name: null, seq: ++fd.likeSeq };
+    fd.like = my;
+    fd.sel = 0; fd.whole.clear();
+    openFind(true);
+    findInput.value = '';
+    findInput.placeholder = 'type to search instead';
+    renderFind();
+    try { findIndexCurrent(); await rereadBoards(); await findSync(); findIndexCurrent(); } catch (e) { /* what is indexed is what is asked about */ }
+    if (fd.like !== my) return false;
+    const r = await semanticNotesLike(my, findBoards());
+    if (fd.like !== my) return false;
+    my.busy = false;
+    my.groups = r.groups || null; my.likes = r.likes || null; my.error = r.error || null; my.name = r.name || null;
+    renderFind();
+    return !r.error;
+  }
+
   /** The hit the keys are on. */
   function fdMark(hits) {
     (hits || [...findList.querySelectorAll('.fdHit')]).forEach((h, i) => h.classList.toggle('on', i === fd.sel));
   }
 
   if (findInput) {
-    findInput.addEventListener('input', () => { fd.sel = 0; fd.whole.clear(); renderFind(); });
+    findInput.addEventListener('input', () => { fd.sel = 0; fd.whole.clear(); if (fd.like) { fd.like = null; findInput.placeholder = ''; } renderFind(); });
     findInput.addEventListener('keydown', (e) => {
       // Keys stay in the field: ⌘Z in a word is not an undo on the board.
       e.stopPropagation();
@@ -15737,6 +16152,7 @@
   if (findList) {
     findList.addEventListener('click', (e) => {
       const more = e.target.closest && e.target.closest('button.fdMore');
+      if (more && more.dataset.likeClear) { fd.like = null; findInput.placeholder = ''; findInput.focus(); renderFind(); return; }
       if (more) { fd.whole.add(more.dataset.whole); renderFind(); return; }
       const b = e.target.closest && e.target.closest('button.fdHit');
       if (b) findOpenHit({ board: b.dataset.board, id: b.dataset.id || null });
@@ -15861,6 +16277,8 @@
     // Device preferences and the chrome, for tests: the theme, the hand, auto-read, the field's reader, the clip.
     themeMode: () => themeMode, setThemeMode: setThemeMode, hand: () => hand, setHand: setHand,
     // Find (PLAN-IPAD-NOTES I6), for tests: what is kept for each board, everything pending done, the ring round what was found.
+    // The semantic seat (PLAN-IPAD-NOTES I9), for tests: who holds it and what it was asked, a stand-in seated with no files, a model loaded from an address, the seat let go, notes like this.
+    semantic: semanticNow, joinSemantic: joinSemantic, joinSemanticTransport: joinSemanticTransport, leaveSemantic: leaveSemantic, likeNotes: likeNotes,
     findState: findState, findIdle: findIdle, findFlashState: findFlashState, finderThumbs: () => [...finder.thumbs.keys()],
     // Pen, finger and palm (V1-PLAN R6), for tests: what draws, the magnet a hovering pen feels, and the hands down.
     draws: () => draws, setDraws: setDraws, palmMs: PALM_MS,

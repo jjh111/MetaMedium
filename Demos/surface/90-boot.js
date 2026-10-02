@@ -22,6 +22,8 @@
     // Device preferences and the chrome, for tests: the theme, the hand, auto-read, the field's reader, the clip.
     themeMode: () => themeMode, setThemeMode: setThemeMode, hand: () => hand, setHand: setHand,
     // Find (PLAN-IPAD-NOTES I6), for tests: what is kept for each board, everything pending done, the ring round what was found.
+    // The semantic seat (PLAN-IPAD-NOTES I9), for tests: who holds it and what it was asked, a stand-in seated with no files, a model loaded from an address, the seat let go, notes like this.
+    semantic: semanticNow, joinSemantic: joinSemantic, joinSemanticTransport: joinSemanticTransport, leaveSemantic: leaveSemantic, likeNotes: likeNotes,
     findState: findState, findIdle: findIdle, findFlashState: findFlashState, finderThumbs: () => [...finder.thumbs.keys()],
     // Pen, finger and palm (V1-PLAN R6), for tests: what draws, the magnet a hovering pen feels, and the hands down.
     draws: () => draws, setDraws: setDraws, palmMs: PALM_MS,
