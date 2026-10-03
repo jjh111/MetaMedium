@@ -32,7 +32,7 @@
 <div id="bar"><button id="play">play</button><input id="scrub" type="range" min="0" max="160.4" step="0.0333" value="0"><span id="tc">0.00</span></div>
 <script>
 'use strict';
-const W = 1920, H = 1080, DURATION = 160.4;
+const W = 1920, H = 1080;
 const params = new URLSearchParams(location.search);
 // The address the end card names. The app lives here today; pass ?url=dyna.ink once N4 makes it the address.
 const APP_URL = params.get('url') || 'jjh111.github.io/MetaMedium/app';
@@ -241,58 +241,143 @@ const camT = (c, cx = W / 2, cy = H / 2) => `translate(${f1(cx)} ${f1(cy)}) scal
 /* The scenes. Each draws in world units; the camera chooses what is seen. */
 /* ======================================================================== */
 
-/* 01 — read: a circle read and redrawn; a pentagon held open. */
-const S1 = {
-  circle: hand(ellipsePts(-210, -20, 128, 116, -2.3, 0.16), 11, 2.6),
-  penta: hand((() => { const o = []; for (let i = 0; i <= 5; i++) { const a = -Math.PI / 2 + i * Math.PI * 2 / 5 + (i === 5 ? 0.06 : 0); const r = [118, 124, 112, 126, 116, 118][i]; o.push([250 + r * Math.cos(a), -6 + r * Math.sin(a)]); } return o; })(), 12, 2.2),
-};
+/* 01 — read: a circle read and redrawn; a pentagon measured, side by side and corner by corner, and named
+   for what the numbers say; a scribble that reads as nothing above the floor, kept as ink. */
+const S1 = (() => {
+  const PC = [-20, -40], radii = [119, 122, 117, 123, 118];
+  const V = radii.map((r, i) => { const a = -Math.PI / 2 + i * Math.PI * 2 / 5; return [PC[0] + r * Math.cos(a), PC[1] + r * Math.sin(a)]; });
+  const sides = V.map((p, i) => Math.hypot(V[(i + 1) % 5][0] - p[0], V[(i + 1) % 5][1] - p[1]));
+  const angles = V.map((p, i) => { const a = V[(i + 4) % 5], b = V[(i + 1) % 5]; const u = [a[0] - p[0], a[1] - p[1]], w = [b[0] - p[0], b[1] - p[1]]; return Math.acos((u[0] * w[0] + u[1] * w[1]) / Math.hypot(...u) / Math.hypot(...w)) * 180 / Math.PI; });
+  const mean = sides.reduce((x, y) => x + y) / 5, sideDev = Math.max(...sides.map(x => Math.abs(x / mean - 1))) * 100;
+  const angDev = Math.max(...angles.map(a => Math.abs(a - 108)));
+  const R = radii.reduce((x, y) => x + y) / 5;
+  const squig = []; for (let i = 0; i <= 140; i++) { const th = i / 140 * 8 * Math.PI; const u = i / 140, a = 0.7 + 0.45 * Math.sin(u * 5.1 + 0.6); squig.push([390 + 9.2 * th - 30 * a * Math.sin(th), -40 + 46 * a * Math.cos(th) - 22 * Math.sin(u * Math.PI) + 10 * u]); }
+  return {
+    circle: hand(ellipsePts(-560, -40, 128, 116, -2.3, 0.16), 11, 2.6),
+    PC, V, R, angles, sideDev: Math.ceil(sideDev), angDev: Math.ceil(angDev),
+    penta: hand([...V, [V[0][0] + 6, V[0][1] + 3]], 12, 2.2),
+    squig: hand(squig, 13, 2.2),
+  };
+})();
 function scene1(t) {
   if (t > 12) return '';
   let s = '';
-  const clean = seg(t, 3.4, 4.0);
-  s += ink(S1.circle, seg(t, 0.7, 2.3), { color: clean > 0 ? C.ghost : C.ink, o: 1 - 0.35 * clean, w: clean > 0 ? 2.6 : 3.4 });
-  if (clean > 0) s += `<ellipse cx="-210" cy="-20" rx="${f1(lerp(122, 124, clean))}" ry="${f1(lerp(118, 119, clean))}" fill="none" stroke="${C.clean}" stroke-width="3.6" opacity="${clean}" stroke-dasharray="${f1(780 * clean)} 900"/>`;
-  s += mono(-210, 150, typed('circle 0.86', seg(t, 2.5, 3.1)), { size: 24, color: C.ink3, anchor: 'middle' });
-  s += mono(-210, 182, 'drawn clean', { size: 18, color: C.clean, anchor: 'middle', o: seg(t, 3.9, 4.4) });
-  // the pentagon: two readings, neither drawn over it
-  s += ink(S1.penta, seg(t, 5.0, 6.4));
-  const r = seg(t, 6.6, 7.1), r2 = seg(t, 7.0, 7.5);
-  s += chip(150, 165, 'rectangle 0.44', { kind: 'held', o: r, size: 19 });
-  s += chip(150, 214, 'circle 0.43', { kind: 'held', o: r2, size: 19 });
-  s += mono(250, 268, 'too close to call — nothing redrawn', { size: 17, color: C.ink3, anchor: 'middle', o: seg(t, 7.9, 8.4) });
+  // the circle: read, then drawn clean in front of the ink
+  const clean = seg(t, 2.6, 3.2);
+  s += ink(S1.circle, seg(t, 0.6, 1.8), { color: clean > 0 ? C.ghost : C.ink, o: 1 - 0.35 * clean, w: clean > 0 ? 2.6 : 3.4 });
+  if (clean > 0) s += `<ellipse cx="-560" cy="-40" rx="123" ry="118" fill="none" stroke="${C.clean}" stroke-width="3.6" opacity="${f1(clean)}" stroke-dasharray="${f1(780 * clean)} 900"/>`;
+  s += mono(-560, 130, typed('circle 0.86', seg(t, 2.0, 2.5)), { size: 24, color: C.ink3, anchor: 'middle' });
+  s += mono(-560, 162, 'drawn clean', { size: 17, color: C.clean, anchor: 'middle', o: seg(t, 3.0, 3.3) });
+  // the pentagon: its corners found, its sides compared, its angles measured — then named, and drawn clean
+  const { V, PC, R } = S1, pc = seg(t, 6.5, 7.0);
+  s += ink(S1.penta, seg(t, 3.6, 4.8), { color: pc > 0 ? C.ghost : C.ink, o: 1 - 0.35 * pc, w: pc > 0 ? 2.6 : 3.4 });
+  if (pc > 0) {
+    const reg = []; for (let i = 0; i <= 5; i++) { const a = -Math.PI / 2 + i * Math.PI * 2 / 5; reg.push([PC[0] + R * Math.cos(a), PC[1] + R * Math.sin(a)]); }
+    s += `<path d="${dOf(partial(reg, easeOut(pc)))}" fill="none" stroke="${C.clean}" stroke-width="3.6" stroke-linejoin="round"/>`;
+  }
+  const dim = 1 - 0.45 * pc;
+  V.forEach((p, i) => {
+    const q = V[(i + 1) % 5], prev = V[(i + 4) % 5];
+    const cd = seg(t, 5.0 + i * 0.07, 5.15 + i * 0.07);
+    if (cd > 0) s += `<circle cx="${f1(p[0])}" cy="${f1(p[1])}" r="${f1(6 * back(cd))}" fill="${C.teal}" opacity="${f1(dim)}"/>`;
+    const tk = seg(t, 5.4 + i * 0.07, 5.55 + i * 0.07);
+    if (tk > 0) { const m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], d = [q[0] - p[0], q[1] - p[1]], l = Math.hypot(...d), n = [-d[1] / l, d[0] / l], h = 9 * tk; s += `<line x1="${f1(m[0] - n[0] * h)}" y1="${f1(m[1] - n[1] * h)}" x2="${f1(m[0] + n[0] * h)}" y2="${f1(m[1] + n[1] * h)}" stroke="${C.teal}" stroke-width="2.4" stroke-linecap="round" opacity="${f1(dim)}"/>`; }
+    const an = seg(t, 5.8 + i * 0.1, 6.05 + i * 0.1);
+    if (an > 0) {
+      const a1 = Math.atan2(prev[1] - p[1], prev[0] - p[0]), a2 = Math.atan2(q[1] - p[1], q[0] - p[0]), r = 24;
+      let da = a2 - a1; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+      const e = a1 + da * an;
+      s += `<path d="M${f1(p[0] + r * Math.cos(a1))} ${f1(p[1] + r * Math.sin(a1))} A ${r} ${r} 0 0 ${da > 0 ? 1 : 0} ${f1(p[0] + r * Math.cos(e))} ${f1(p[1] + r * Math.sin(e))}" fill="none" stroke="${C.teal}" stroke-width="2" opacity="${f1(dim)}"/>`;
+      const toC = [PC[0] - p[0], PC[1] - p[1]], lc = Math.hypot(...toC);
+      s += mono(p[0] + toC[0] / lc * 52, p[1] + toC[1] / lc * 52 + 5, Math.round(S1.angles[i]) + '°', { size: 15, color: C.teal, anchor: 'middle', o: f1(seg(t, 6.0 + i * 0.1, 6.2 + i * 0.1) * dim) });
+    }
+  });
+  s += mono(PC[0], 130, typed('regular pentagon 0.88', seg(t, 7.0, 7.4)), { size: 24, color: C.ink3, anchor: 'middle' });
+  s += mono(PC[0], 162, `5 sides within ${S1.sideDev}% · corners 108° ± ${S1.angDev}°`, { size: 17, color: C.clean, anchor: 'middle', o: seg(t, 7.2, 7.5) });
+  // the scribble: nothing above the floor, so nothing is drawn over it
+  s += ink(S1.squig, seg(t, 7.8, 8.8));
+  s += chip(410, 128, 'arc 0.21', { kind: 'held', o: seg(t, 9.0, 9.25), size: 19 });
+  s += chip(410, 176, 'writing 0.18', { kind: 'held', o: seg(t, 9.15, 9.4), size: 19 });
+  s += mono(500, 236, 'below the floor — kept as ink', { size: 17, color: C.ink3, anchor: 'middle', o: seg(t, 9.6, 10.0) });
   return s;
 }
 
-/* 02 — name: a molecule drawn, held, named; the next one is known. */
+/* 02 — name: a molecule drawn and held; "molecule" typed; a model proposes structures; the hand picks water,
+   and the ink is drawn as water — atoms by element, its bond angle — with the ink beneath. The next one is known. */
 function molecule(ax, ay, seed) {
   const A = [ax, ay], B = [ax + 150, ay - 92], Cc = [ax + 300, ay], r = 46;
   const u = (p, q, d) => { const dx = q[0] - p[0], dy = q[1] - p[1], l = Math.hypot(dx, dy); return [p[0] + dx / l * d, p[1] + dy / l * d]; };
   return [hand(ellipsePts(A[0], A[1], r, r * 0.95, -2, 0.18, 60), seed, 1.6), hand(ellipsePts(B[0], B[1], r, r, -2.3, 0.15, 60), seed + 1, 1.6), hand(ellipsePts(Cc[0], Cc[1], r * 1.03, r, -1.9, 0.2, 60), seed + 2, 1.6),
           hand([u(A, B, r + 6), u(B, A, r + 6)], seed + 3, 1.0), hand([u(B, Cc, r + 6), u(Cc, B, r + 6)], seed + 4, 1.0)];
 }
-const S2 = { m1: molecule(1980, -10, 21), m2: molecule(2560, 190, 31) };
+const S2 = { m1: molecule(1980, -10, 21), m2: molecule(2560, 150, 31) };
+const WATER = (() => {
+  const O = [2130, -102], L = 170, h = 104.5 / 2 * Math.PI / 180;
+  return { A: [1980, -10], C: [2280, -10], O, H1: [O[0] - L * Math.sin(h), O[1] + L * Math.cos(h)], H2: [O[0] + L * Math.sin(h), O[1] + L * Math.cos(h)], h };
+})();
+function waterStructure(t, t0 = 17.8, dx = 0, dy = 0, angle = true) {
+  const c1 = seg(t, t0, t0 + 0.4), m = easeQuint(seg(t, t0 + 0.4, t0 + 1.1)); if (c1 <= 0) return '';
+  const sh = p => [p[0] + dx, p[1] + dy], W_ = { A: sh(WATER.A), C: sh(WATER.C), O: sh(WATER.O), H1: sh(WATER.H1), H2: sh(WATER.H2), h: WATER.h }, H1 = [lerp(W_.A[0], W_.H1[0], m), lerp(W_.A[1], W_.H1[1], m)], H2 = [lerp(W_.C[0], W_.H2[0], m), lerp(W_.C[1], W_.H2[1], m)], O = W_.O;
+  const rO = lerp(46, 30, m), rH = lerp(46, 27, m);
+  let s = `<g opacity="${f1(c1)}">`;
+  for (const [P, r] of [[H1, rH], [H2, rH]]) {
+    const d = [P[0] - O[0], P[1] - O[1]], l = Math.hypot(...d), a = [O[0] + d[0] / l * rO, O[1] + d[1] / l * rO], b = [P[0] - d[0] / l * r, P[1] - d[1] / l * r];
+    s += `<line x1="${f1(a[0])}" y1="${f1(a[1])}" x2="${f1(b[0])}" y2="${f1(b[1])}" stroke="${C.clean}" stroke-width="3.6" stroke-linecap="round"/>`;
+  }
+  const ring = 1 - m;
+  if (ring > 0.01) for (const [P, r] of [[O, rO], [H1, rH], [H2, rH]]) s += `<circle cx="${f1(P[0])}" cy="${f1(P[1])}" r="${f1(r)}" fill="none" stroke="${C.clean}" stroke-width="3.4" opacity="${f1(ring)}"/>`;
+  if (m > 0) {
+    s += mono(O[0], O[1] + 18, 'O', { size: 50, color: C.clean, anchor: 'middle', weight: 500, o: f1(m) });
+    s += mono(H1[0], H1[1] + 15, 'H', { size: 42, color: C.clean, anchor: 'middle', weight: 500, o: f1(m) });
+    s += mono(H2[0], H2[1] + 15, 'H', { size: 42, color: C.clean, anchor: 'middle', weight: 500, o: f1(m) });
+  }
+  // two lone pairs over the oxygen, then the bond angle
+  const lp = seg(t, t0 + 1.0, t0 + 1.3);
+  if (lp > 0) for (const a of [-Math.PI / 2 - 0.62, -Math.PI / 2 + 0.62]) {
+    const c = [O[0] + 40 * Math.cos(a), O[1] + 40 * Math.sin(a)], n = [-Math.sin(a), Math.cos(a)];
+    for (const k of [-5, 5]) s += `<circle cx="${f1(c[0] + n[0] * k)}" cy="${f1(c[1] + n[1] * k)}" r="${f1(3.2 * back(lp))}" fill="${C.clean}"/>`;
+  }
+  const an = angle ? seg(t, t0 + 1.2, t0 + 1.6) : 0;
+  if (an > 0) {
+    const r = 58, a1 = Math.PI / 2 + W_.h, a2 = Math.PI / 2 - W_.h, e = lerp(a1, a2, easeOut(an));
+    s += `<path d="M${f1(O[0] + r * Math.cos(a1))} ${f1(O[1] + r * Math.sin(a1))} A ${r} ${r} 0 0 0 ${f1(O[0] + r * Math.cos(e))} ${f1(O[1] + r * Math.sin(e))}" fill="none" stroke="${C.teal}" stroke-width="2"/>`;
+    s += mono(O[0], O[1] + 92, '104.5°', { size: 18, color: C.teal, anchor: 'middle', o: seg(t, t0 + 1.4, t0 + 1.6) });
+  }
+  return s + '</g>';
+}
 function scene2(t) {
   if (t < 9.5 || t > 26) return '';
   let s = '';
-  s += drawSeq(S2.m1, t, 11.4, 13.6);
+  const st = seg(t, 17.8, 18.4);
+  s += drawSeq(S2.m1, t, 11.4, 13.6, st > 0 ? { color: C.ghost, o: 1 - 0.45 * st, w: 2.6 } : {});
   s += holdRing(2130, -102, t, 14.0);
-  const sel = fade(t, 14.3, 14.6, 17.8, 18.2);
-  s += selection(1910, -175, 440, 240, sel);
-  const fo = fade(t, 14.5, 14.9, 17.7, 18.1);
-  const name = 'molecule'; const ty = seg(t, 15.4, 16.6);
+  s += selection(1910, -175, 440, 240, fade(t, 14.3, 14.6, 16.3, 16.7));
+  const fo = fade(t, 14.5, 14.9, 16.3, 16.7), ty = seg(t, 15.0, 15.8), word = typed('molecule', ty), done = ty >= 1;
   s += field(2400, -250, {
-    o: fo, text: typed(name, ty), line: ty > 0 ? '↵ name it “' + typed(name, ty) + '”' : '↵ draw them clean',
-    reads: [{ label: '3 circles, 2 lines' }], offers: [{ label: 'Name it', on: t > 16.9 && t < 17.7 }, { label: 'Draw them clean' }, { label: 'What is this?', dot: true }],
+    o: fo, text: word,
+    line: ty <= 0 ? '↵ draw them clean' : done ? '↵ name it “molecule” — and find one like it' : '↵ name it “' + word + '”',
+    reads: [{ label: done ? '3 atoms · 2 bonds · bent' : '3 circles, 2 lines' }],
+    offers: done ? [{ label: 'Name it' }, { label: 'Find a structure', dot: true, on: t > 16.0 }, { label: 'Draw them clean' }]
+                 : [{ label: 'Name it' }, { label: 'Draw them clean' }, { label: 'What is this?', dot: true }],
   });
-  s += tap(2495, -84, t, 16.9);
-  // named
-  const nm = seg(t, 17.6, 18.2);
-  s += mono(2130, -200, 'molecule', { size: 24, color: C.ink, anchor: 'middle', o: nm, weight: 500 });
-  if (nm > 0) s += `<line x1="2070" y1="-190" x2="2190" y2="-190" stroke="${C.ink4}" stroke-width="1" opacity="${nm}"/>`;
+  s += tap(2730, -84, t, 16.0);
+  // what a model proposes, held until the hand picks one
+  const pr = fade(t, 16.6, 16.9, 18.4, 18.8), picked = t >= 17.65;
+  s += mono(2400, -196, 'proposed by a model — pick one', { size: 16, color: C.ink3, o: f1(pr * seg(t, 16.6, 16.9)) });
+  s += chip(2400, -150, 'water · H₂O 0.81', { kind: picked ? 'match' : 'model', o: f1(pr * seg(t, 16.6, 16.85)), size: 20 });
+  s += chip(2400, -100, 'ozone · O₃ 0.64', { kind: 'model', o: f1(pr * seg(t, 16.75, 17.0) * (picked ? 0.5 : 1)), size: 20 });
+  s += tap(2510, -150, t, 17.6);
+  s += waterStructure(t);
+  // named: the word the hand typed, and what it turned out to be
+  const nm = seg(t, 19.2, 19.6);
+  s += mono(2130, -214, 'molecule', { size: 24, color: C.ink, anchor: 'middle', o: nm, weight: 500 });
+  s += mono(2130, -184, 'water · H₂O', { size: 18, color: C.clean, anchor: 'middle', o: seg(t, 19.35, 19.7) });
   // the next one, recognised
-  s += drawSeq(S2.m2, t, 18.7, 20.6);
-  const ch = seg(t, 21.0, 21.4);
-  if (ch > 0) s += `<g transform="translate(2585 ${Math.round(310 - 8 * back(ch))})">${chip(0, 0, 'molecule 0.92', { o: ch, size: 21, sub: 'same circles, same links' })}</g>`;
+  const st2 = seg(t, 22.7, 23.3);
+  s += drawSeq(S2.m2, t, 20.0, 21.8, st2 > 0 ? { color: C.ghost, o: 1 - 0.45 * st2, w: 2.6 } : {});
+  s += waterStructure(t, 22.7, 580, 160, false);
+  const ch = seg(t, 22.2, 22.6);
+  if (ch > 0) s += `<g transform="translate(2585 ${Math.round(270 - 8 * back(ch))})">${chip(0, 0, 'molecule 0.92', { o: ch, size: 21, sub: 'water — same atoms, same bonds' })}</g>`;
   return s;
 }
 
@@ -527,11 +612,42 @@ const BEATS = [ // start, the year on the timeline — each beat stands at HX(in
   [0, '1945'], [5.6, '1963'], [11.8, '1977'], [17.6, '1980'], [23.2, '1996'],
   [29.2, '2015'], [35.6, '2016'], [42.0, 'today'], [50.0, '2026'], [55.8, ''],
 ];
-const DEMO0 = 59.2, TECH1 = 69.4, TECH2 = 78.4;
+// The demo's scenes keep the clock they were written on (v1 seconds), and this list maps the film's clock onto it,
+// step by step from DEMO0: [film seconds, the v1 time it reaches] — a step that keeps v1 is a pause, a step of 0 s a cut;
+// ['shot', x, y, scale] points the camera from that moment; ['mark', name] remembers it.
+const DEMO0 = 59.2;
+const DEMO_STEPS = [
+  ['shot', 20, -10, 1.0],                                                     // 01 read
+  [0.6, 0.6], [2.6, 3.2], [0.9, 3.2], [1.4, 4.9], [2.6, 7.4], [1.8, 7.4], [2.2, 10.0], [1.8, 10.0], [0, 10.3],
+  ['mark', 'TECH1'], ['shot', 0, 1490, 1.0], [9.0, 10.3],                     // inside: the rungs
+  ['mark', 'TECH2'], ['shot', 0, 2930, 1.0], [8.0, 10.3],                     // inside: the tiers
+  ['mark', 'NAME'], ['shot', 2430, 0, 1.0],                                   // 02 name
+  [0.6, 11.4], [2.0, 13.6], [1.4, 15.0], [1.0, 15.8], [0.6, 15.8], [1.4, 17.2], [1.2, 17.2], [2.2, 19.6], [1.8, 19.6], [2.4, 22.6], [1.2, 23.9], [1.3, 23.9], [0, 25.2],
+  ['shot', 5010, -40, 0.85],                                                  // 03 diagram
+  [5.9, 32.0], [1.3, 33.7], [1.7, 36.0], [1.2, 36.0], [2.2, 38.4], [1.5, 38.4], [0.5, 40.0],
+  ['shot', 4900, -40, 1.05],                                                  // 04 run
+  [2.0, 42.2], [5.9, 49.0], [1.3, 49.4], [0, 49.8],
+  ['shot', 7330, -20, 0.8],                                                   // 05 kinds
+  [0.6, 51.0], [2.85, 55.0], [1.6, 56.6], [1.0, 56.6], [2.1, 58.9], [0.6, 58.9], [1.8, 60.9], [0.6, 60.9], [1.9, 63.0], [1.6, 63.6],
+  ['shot', 7200, 70, 0.76],                                                   // 06 arrange
+  [4.15, 68.8], [1.8, 69.2], [0, 72.8],
+  ['shot', 7370, 70, 0.77],                                                   // 07 together
+  [4.9, 77.9], [1.0, 78.4], [2.6, 81.0], [1.4, 81.6],
+  ['shot', 12000, 0, 1.0],                                                    // the end card
+  [0.5, 82.2], [0, 88.6], [6.4, 95.0], [1.5, 95.0],
+];
+const { WARP, DEMO_SHOTS, MARK, DURATION } = (() => {
+  let t = DEMO0; const warp = [[t, 0]], shots = [], mark = {};
+  for (const s of DEMO_STEPS) {
+    if (s[0] === 'shot') shots.push([t, s[1], s[2], s[3]]);
+    else if (s[0] === 'mark') mark[s[1]] = t;
+    else { t = Math.round((t + s[0]) * 1000) / 1000; warp.push([t, s[1]]); }
+  }
+  return { WARP: warp, DEMO_SHOTS: shots, MARK: mark, DURATION: t };
+})();
+const TECH1 = MARK.TECH1, TECH2 = MARK.TECH2, NAME_T = MARK.NAME;
 const SHOTS = [ // start, x, y, scale
-  ...BEATS.map((b, i) => [b[0], HX(i), -10, 1.0]),
-  [DEMO0, 20, -10, 1.0], [TECH1, 0, 1490, 1.0], [TECH2, 0, 2930, 1.0], [86.4, 2430, 0, 1.0], [98.0, 5010, -40, 0.85],
-  [112.3, 4900, -40, 1.05], [121.5, 7330, -20, 0.8], [136.15, 7200, 70, 0.76], [142.1, 7370, 70, 0.77], [152.0, 12000, 0, 1.0],
+  ...BEATS.map((b, i) => [b[0], HX(i), -10, 1.0]), ...DEMO_SHOTS,
 ];
 function camAt2(t) {
   let i = 0; while (i < SHOTS.length - 1 && t >= SHOTS[i + 1][0]) i++;
@@ -541,20 +657,15 @@ function camAt2(t) {
   const a = held(SHOTS[i - 1], cur[0]), k = (t - cur[0]) / PAN, e = easeQuint(k);
   return { x: lerp(a.x, cur[1], e), y: lerp(a.y, cur[2], e), s: lerp(a.s, cur[3], e) * (1 - 0.1 * Math.sin(Math.PI * k)) };
 }
-// The demo's scenes keep the clock they were written on (v1 seconds); this maps the film's clock onto it:
-// actions run at their speed or quicker, pauses hold still (two points at one v1 time), and a cut jumps (two at one film time).
-const WARP = [
-  [59.2, 0], [59.8, 0.5], [63.2, 4.4], [64.4, 4.4], [67.7, 8.4], [69.4, 8.6], [69.5, 10.3], [86.4, 10.3],
-  [92.7, 18.2], [93.5, 18.2], [96.3, 21.6], [98.0, 21.6], [98.0, 25.2], [103.9, 32.0], [105.2, 33.7], [106.9, 36.0], [108.1, 36.0],
-  [110.3, 38.4], [111.8, 38.4], [112.3, 40.0], [114.3, 42.2], [120.2, 49.0], [121.5, 49.4], [121.5, 49.8], [122.1, 51.0],
-  [124.95, 55.0], [126.55, 56.6], [127.55, 56.6], [129.65, 58.9], [130.25, 58.9], [132.05, 60.9], [132.65, 60.9], [134.55, 63.0],
-  [136.15, 63.6], [140.3, 68.8], [142.1, 69.2], [142.1, 72.8], [147.0, 77.9], [148.0, 78.4], [150.6, 81.0], [152.0, 81.6],
-  [152.5, 82.2], [152.5, 88.6], [158.9, 95.0], [160.4, 95.0],
-];
 function warp(t) {
   if (t < DEMO0) return null;
   for (let i = 0; i < WARP.length - 1; i++) { const a = WARP[i], b = WARP[i + 1]; if (t >= a[0] && t < b[0]) return lerp(a[1], b[1], (t - a[0]) / (b[0] - a[0])); }
   return WARP[WARP.length - 1][1];
+}
+// the film time a v1 moment is first reached (null when a cut jumps over it) — for the sound's cues
+function unwarp(v1) {
+  for (let i = 0; i < WARP.length - 1; i++) { const a = WARP[i], b = WARP[i + 1]; if (b[1] > a[1] && v1 >= a[1] && v1 <= b[1]) return a[0] + (b[0] - a[0]) * (v1 - a[1]) / (b[1] - a[1]); }
+  return null;
 }
 let NOW = 0; // the film's clock, for what moves through a pause (a model's breathing dot, the room's traffic)
 
@@ -880,7 +991,7 @@ function tech2(t) {
 }
 const TCAPS = [
   { a: TECH1 + 0.3, b: TECH2 - 0.1, k: 'inside — how it reads', lines: [['every mark climbs *three rungs*.', TECH1 + 0.4], ['measured from the ink, ranked, said *why*.', TECH1 + 2.2], ['and it becomes *code*.', TECH1 + 4.6]] },
-  { a: TECH2 + 0.3, b: 86.3, k: 'inside — how it answers', lines: [['the canvas answers *first*, in milliseconds.', TECH2 + 0.4], ['a model is *asked*. it proposes; *you* keep.', TECH2 + 2.6]] },
+  { a: TECH2 + 0.3, b: NAME_T - 0.1, k: 'inside — how it answers', lines: [['the canvas answers *first*, in milliseconds.', TECH2 + 0.4], ['a model is *asked*. it proposes; *you* keep.', TECH2 + 2.6]] },
 ];
 
 /* the end card: the name written by hand, then drawn clean in front of it */
@@ -902,8 +1013,8 @@ function scene7(t) {
 
 /* ---- screen space: captions, the status line ---------------------------- */
 const CAPS = [
-  { a: 0.6, b: 10.0, k: '01 — read', lines: [['you draw.', 0.8], ['it *reads*.', 2.8], ['and holds what is *ambiguous* open.', 6.6]] },
-  { a: 11.0, b: 23.8, k: '02 — name', lines: [['*name* what you draw.', 12.0], ['it learns *your* words.', 20.8]] },
+  { a: 0.6, b: 10.25, k: '01 — read', lines: [['you draw.', 0.8], ['it *measures*: corners, sides, angles.', 5.0], ['and says when it *doesn’t know*.', 9.0]] },
+  { a: 11.0, b: 24.2, k: '02 — name', lines: [['*name* what you draw.', 11.3], ['type *molecule*: it proposes a *structure*.', 16.2], ['it learns *your* words.', 22.2]] },
   { a: 25.0, b: 39.8, k: '03 — diagram', lines: [['draw a flowchart, *by hand*.', 25.8], ['it reads as one, and *is code*.', 33.8], ['tidied and routed — still your ink.', 37.4]] },
   { a: 40.6, b: 49.8, k: '04 — run', lines: [['and then it *runs*.', 42.0]] },
   { a: 51.0, b: 63.8, k: '05 — kinds', lines: [['colour is not picked.', 52.4], ['it *follows meaning*.', 56.2]] },
@@ -929,11 +1040,13 @@ function captions(t, list = CAPS) {
   return s;
 }
 const STATUS = [
-  [1.6, 4.6, () => 'circle 0.86 — closed, even, fills 0.79 of its box'],
-  [6.8, 9.8, () => 'rectangle 0.44 · circle 0.43 — held open, nothing redrawn'],
-  [14.4, 17.4, () => 'held 5 marks — 3 circles, 2 lines between them'],
-  [17.7, 20.4, () => 'named “molecule” — a definition this board keeps'],
-  [21.1, 23.8, () => 'molecule 0.92 — nothing taught twice; no model asked'],
+  [1.4, 3.5, () => 'circle 0.86 — closed, even, fills 0.79 of its box'],
+  [5.0, 7.7, () => 'regular pentagon 0.88 — 5 corners, measured; nothing guessed'],
+  [8.9, 10.3, () => 'arc 0.21 · writing 0.18 — under the floor, nothing redrawn'],
+  [14.4, 15.4, () => 'held 5 marks — 3 circles, 2 lines between them'],
+  [16.0, 17.6, () => 'a model asked for structures — 2 proposed, held for you'],
+  [17.8, 20.0, () => 'water · H₂O — drawn as a structure, your ink beneath'],
+  [22.3, 24.2, () => 'molecule 0.92 — nothing taught twice; no model asked'],
   [32.2, 33.7, () => 'a flowchart 0.92 — 3 processes, 1 decision, 5 flows'],
   [33.8, 36.2, () => 'Mermaid written from the marks — tier 1, no model'],
   [37.0, 39.8, () => 'tidied: ranks lined up · 5 connectors routed · one undo'],
@@ -941,7 +1054,7 @@ const STATUS = [
   [56.2, 57.4, () => '2 notes are ideas · orange — a new kind'],
   [57.5, 59.0, () => 'offered: idea — it stands among ideas · paler until said'],
   [60.6, 62.0, () => 'insight — a kind of idea, a step lighter'],
-  [62.6, 63.8, () => 'evidence ⟷ assumption — opposites, across the wheel'],
+  [62.6, 63.8, () => 'evidence ↔ assumption — opposites, across the wheel'],
   [66.4, 71.8, () => 'an orbit — the task at the centre, 2 on the inner ring, 4 on the outer'],
   [73.4, 77.3, () => 'claude drew a link — a said relation, held and attributed, never blessed'],
   [77.6, 78.4, () => 'kept — by john'],
@@ -989,7 +1102,7 @@ function render(t) {
   const mainO = v === null ? 1 : 1 - fade(v, 78.6, 79.1, 81.8, 82.2);
   const endFade = seg(t, DURATION - 0.8, DURATION);
   const hud = v === null ? 0 : seg(t, DEMO0, DEMO0 + 0.5) * (1 - seg(v, 88.6, 89.4));
-  const inside = t >= TECH1 - 0.2 && t < 86.4;
+  const inside = t >= TECH1 - 0.2 && t < NAME_T;
   svg.innerHTML =
     `<defs><pattern id="grid" width="26" height="26" patternUnits="userSpaceOnUse"><path d="M26 0H0V26" fill="none" stroke="rgba(90,72,44,0.07)" stroke-width="1"/></pattern>${DEFS.join('')}</defs>`
     + `<rect width="${W}" height="${H}" fill="${C.paper}"/>`
@@ -1000,11 +1113,62 @@ function render(t) {
     + (endFade > 0 ? `<rect width="${W}" height="${H}" fill="${C.paper}" opacity="${f1(endFade)}"/>` : '');
 }
 
+/* ---- the sound's cues: what happens when, for sound.mjs to synthesise ---- */
+// Each cue is { t (film seconds), kind, dur?, note?, gain? }. History beats are timed from their beat, the inside from
+// TECH1/TECH2, and the demo in v1 seconds through unwarp, so the sound moves with the picture whenever the timing does.
+// A chime's note is a step of D major's pentatonic scale (0 = D5); quiet by design — emphasis, never a soundtrack.
+const CUES = (() => {
+  const out = [], at = (t, kind, o = {}) => { if (t !== null && t >= 0) out.push({ t: Math.round(t * 1000) / 1000, kind, ...o }); };
+  const H = (i, L, kind, o) => at(B(i) + L, kind, o);
+  const V = (v, kind, o = {}) => { const t = unwarp(v); if (t === null) return; const d = o.to !== undefined ? unwarp(o.to) : null; const { to, ...rest } = o; at(t, kind, d !== null ? { ...rest, dur: Math.round((d - t) * 1000) / 1000 } : rest); };
+  SHOTS.slice(1).forEach(s => at(s[0], 'whoosh', { dur: PAN }));
+  // the timeline: a soft bell as each year lights
+  BEATS.slice(0, 9).forEach((b, i) => at(b[0] + 0.15, 'tick', { note: i % 5, gain: 0.6 }));
+  H(0, 0.2, 'pen', { dur: 1.4 }); H(0, 1.3, 'pen', { dur: 1.6, gain: 0.6 }); H(0, 2.9, 'chime', { note: 0 });
+  H(1, 0.4, 'pen', { dur: 2.2, gain: 0.5 }); H(1, 3.0, 'snap', { note: 3 }); H(1, 3.5, 'chime', { note: 2 });
+  H(2, 0.3, 'pen', { dur: 1.9 }); H(2, 2.2, 'pen', { dur: 0.8, gain: 0.8 }); H(2, 3.0, 'chime', { note: 4 });
+  H(3, 0.2, 'pen', { dur: 0.5 }); H(3, 1.5, 'tap'); H(3, 2.3, 'whoosh', { dur: 0.8, gain: 0.5 }); H(3, 3.1, 'pop');
+  H(4, 0.3, 'pen', { dur: 1.7 }); H(4, 2.3, 'snap', { note: 1 }); H(4, 3.3, 'tap'); H(4, 3.9, 'slide', { dur: 0.7 });
+  H(5, 0.3, 'pen', { dur: 1.3 }); H(5, 2.0, 'snap', { note: 2 }); H(5, 2.4, 'chime', { note: 4 });
+  H(6, 0.3, 'pen', { dur: 0.8 }); H(6, 1.2, 'snap', { note: 0 }); H(6, 1.7, 'type', { dur: 2.2, gain: 0.5 });
+  H(7, 0.6, 'pen', { dur: 1.7 }); H(7, 2.4, 'hmm'); H(7, 3.4, 'scratch', { dur: 1.4 }); H(7, 4.9, 'erase'); H(7, 5.9, 'chime', { note: 2 }); H(7, 6.2, 'pop');
+  H(8, 0.3, 'pen', { dur: 1.3 }); H(8, 2.2, 'pen', { dur: 1.0, gain: 0.7 }); H(8, 2.5, 'chime', { note: 3 });
+  H(9, 0.3, 'resolve', { gain: 0.8 });
+  // inside: the rungs, then the tiers
+  at(TECH1 + 0.4, 'pen', { dur: 1.1 }); [0, 1, 2].forEach(i => at(TECH1 + 1.8 + i * 0.25, 'tick', { note: i })); [0, 1, 2].forEach(i => at(TECH1 + 3.2 + i * 0.2, 'tick', { note: 2 + i }));
+  at(TECH1 + 4.6, 'type', { dur: 0.7 }); at(TECH1 + 5.4, 'chime', { note: 3 });
+  [0, 1, 2].forEach(i => at(TECH2 + 0.4 + i * 0.7, 'pop', { gain: 0.7 })); at(TECH2 + 3.6, 'chime', { note: 4 });
+  // 01 read
+  V(0.6, 'pen', { to: 1.8 }); V(2.0, 'chime', { note: 0 }); V(2.6, 'snap', { note: 3 });
+  V(3.6, 'pen', { to: 4.8 }); [0, 1, 2, 3, 4].forEach(i => V(5.0 + i * 0.07, 'tick', { note: i, gain: 0.5 }));
+  [0, 1, 2, 3, 4].forEach(i => V(5.8 + i * 0.1, 'tick', { note: 4 - i, gain: 0.4 })); V(6.5, 'snap', { note: 4 }); V(7.0, 'chime', { note: 2 });
+  V(7.8, 'pen', { to: 8.8 }); V(9.0, 'hmm');
+  // 02 name
+  V(11.4, 'pen', { to: 13.6 }); V(14.0, 'tap'); V(14.5, 'pop', { gain: 0.6 }); V(15.0, 'type', { to: 15.8 }); V(16.0, 'tap');
+  V(16.6, 'chime', { note: 1, gain: 0.7 }); V(16.75, 'chime', { note: 3, gain: 0.5 }); V(17.6, 'tap'); V(17.8, 'snap', { note: 0 });
+  V(18.2, 'chime', { note: 2 }); V(18.8, 'tick', { note: 4, gain: 0.5 }); V(19.2, 'chime', { note: 4 }); V(20.0, 'pen', { to: 21.8 });
+  V(22.2, 'chime', { note: 3 }); V(22.7, 'snap', { note: 1 });
+  // 03 diagram, 04 run
+  V(25.6, 'pen', { to: 31.9 }); V(32.0, 'chime', { note: 0 }); V(33.0, 'tap'); V(33.7, 'type', { to: 36.0 }); V(36.1, 'tap');
+  V(36.7, 'slide', { to: 38.3 }); V(38.3, 'chime', { note: 2 }); V(41.7, 'tap');
+  RUN.forEach(([, a], i) => V(a, 'tick', { note: [0, 1, 2, 3, 1, 4][i] })); V(48.7, 'chime', { note: 5 });
+  // 05 kinds, 06 arrange, 07 together
+  V(51.0, 'pen', { to: 54.3, gain: 0.8 }); V(54.2, 'pop', { gain: 0.6 }); V(56.2, 'chime', { note: 1 }); V(58.3, 'tap'); V(58.6, 'chime', { note: 2 });
+  V(60.6, 'chime', { note: 3 }); V(62.6, 'chime', { note: 4 }); V(65.4, 'tap'); V(66.1, 'slide', { to: 67.0 }); V(67.4, 'pop'); V(67.6, 'pop', { gain: 0.7 });
+  V(73.3, 'pen', { to: 75.0, gain: 0.6 }); V(75.2, 'pop', { gain: 0.6 }); V(77.25, 'tap'); V(77.4, 'chime', { note: 5 });
+  V(79.3, 'tick', { note: 2 }); V(80.0, 'tick', { note: 4, gain: 0.6 });
+  // the end card
+  V(89.4, 'pen', { to: 91.0 }); V(91.0, 'resolve'); V(92.9, 'tick', { note: 0, gain: 0.6 });
+  return out.sort((a, b) => a.t - b.t);
+})();
+window.CUES = CUES;
+
 window.render = render; window.DURATION = DURATION;
 
 /* ---- the scrubber (absent when rendering) ---------------------------- */
 if (params.has('render')) document.body.classList.add('render');
 const scrub = document.getElementById('scrub'), tc = document.getElementById('tc'), playB = document.getElementById('play');
+scrub.max = DURATION;
 let playing = false, t0 = 0, tAt = Number(params.get('t') || 0);
 function show(t) { tAt = t; render(t); scrub.value = t; tc.textContent = t.toFixed(2); }
 scrub.addEventListener('input', () => { playing = false; playB.textContent = 'play'; show(Number(scrub.value)); });

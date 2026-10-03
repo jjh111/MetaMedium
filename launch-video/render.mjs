@@ -3,12 +3,14 @@
 //   node launch-video/render.mjs --fps 30 --from 40 --to 50 --out clip.mp4
 //   node launch-video/render.mjs --stills 3,17,34       → launch-video/out/still-<t>.png
 //   node launch-video/render.mjs --url dyna.ink         → the end card names that address
+//   node launch-video/render.mjs --silent               → no sound (otherwise sound.mjs synthesises it from the page's cues)
 // Needs Playwright (the e2e's, or a global one) and ffmpeg on the PATH.
 import { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { synth } from './sound.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -32,6 +34,8 @@ page.on('pageerror', e => { console.error('page error:', e.message); process.exi
 await page.goto(page_url);
 await page.waitForFunction(() => window.__ready === true, null, { timeout: 30000 });
 const duration = await page.evaluate(() => window.DURATION);
+const cues = await page.evaluate(() => window.CUES);
+writeFileSync(join(outDir, 'cues.json'), JSON.stringify({ duration, cues }, null, 1));
 const faces = await page.evaluate(() => [...document.fonts].map(f => `${f.family} ${f.weight} ${f.status}`));
 if (!faces.length || faces.some(f => !f.endsWith('loaded'))) throw new Error('fonts not loaded: ' + faces.join(', '));
 const shot = () => page.screenshot({ type: 'jpeg', quality: 93, clip: { x: 0, y: 0, width: 1920, height: 1080 } });
@@ -48,8 +52,9 @@ if (stills) {
 
 const from = Number(opt('from', 0)), to = Number(opt('to', duration));
 const out = resolve(opt('out', join(outDir, 'dynaink-soft-launch.mp4')));
+const silent = args.includes('--silent'), video = silent ? out : join(outDir, 'video-only.mp4');
 const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'mjpeg', '-i', '-',
-  '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', out], { stdio: ['pipe', 'inherit', 'inherit'] });
+  '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', video], { stdio: ['pipe', 'inherit', 'inherit'] });
 const frames = Math.round((to - from) * fps); const started = Date.now();
 for (let i = 0; i < frames; i++) {
   const t = from + i / fps;
@@ -61,4 +66,12 @@ for (let i = 0; i < frames; i++) {
 ff.stdin.end();
 await new Promise((res, rej) => ff.on('close', c => c ? rej(new Error('ffmpeg ' + c)) : res()));
 await browser.close();
+if (!silent) { // the sound, synthesised from the page's cues for the same stretch of film, then laid under the picture
+  const part = cues.filter(c => c.t >= from - 0.05 && c.t < to).map(c => ({ ...c, t: c.t - from }));
+  const { wav, peakDb } = synth(part, to - from);
+  const wavPath = join(outDir, 'sound.wav'); writeFileSync(wavPath, wav);
+  console.log(`sound: ${part.length} cues, peak before gain ${peakDb.toFixed(1)} dB`);
+  await new Promise((res, rej) => spawn('ffmpeg', ['-y', '-loglevel', 'error', '-i', video, '-i', wavPath, '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', out], { stdio: 'inherit' })
+    .on('close', c => c ? rej(new Error('ffmpeg mux ' + c)) : res()));
+}
 console.log('wrote', out);
