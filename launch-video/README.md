@@ -1,29 +1,34 @@
 # dyna.ink — the soft-launch film
 
-A 97-second motion-graphics teaser for a semi-technical audience. It shows rather than tells: one
-infinite canvas, panned through nine beats, each a thing only dyna.ink does, in the brand's own tokens
-(`brand/tokens.css`: warm paper, sea ink, teal keyword, IBM Plex Mono; the hand's writing in Caveat).
+A 156-second motion-graphics teaser for a semi-technical audience, in three acts on one infinite canvas, in the
+brand's own tokens (`brand/tokens.css`: warm paper, sea ink, teal keyword, IBM Plex Mono; the hand's writing in Caveat).
+It shows rather than tells, and the story is the whitepaper's: why a drawing should mean something to the computer.
+
+**Act I — where it comes from** (0–58 s): a timeline the camera travels along.
 
 | t (s) | Beat | What is shown |
 |---|---|---|
-| 0–10 | 01 read | a circle drawn, read (*circle 0.86*) and redrawn clean with the ink faint beneath; a pentagon held open (*rectangle 0.44 · circle 0.43*, nothing redrawn) |
-| 10–24 | 02 name | three bubbles and two lines, press-and-hold, the field, *molecule* typed; the next molecule drawn is known (*molecule 0.92*) |
-| 24–40 | 03 diagram | a flowchart drawn by hand, read as one, *Make it Mermaid* (the text beside it), *Tidy the diagram* (ranks lined up, connectors routed at right angles) |
-| 40–50 | 04 run | *Run it ▸* offered at rest; a token steps the flowchart, `paid = no` round the loop, then `paid = yes` (V1-SPEC RN5) |
-| 50–64 | 05 kinds | notes in ink; *it's an idea · orange*; a neighbour offered paler; *insight is a kind of idea* a step lighter; *evidence opposes assumption* across the wheel — hue, lightness, chroma (V1-SPEC §3.2–3.3) |
-| 64–72 | 06 arrange | *Make it an orbit*: the notes onto rings round the task |
-| 72–82 | 07 together | Claude's hand draws a said relation (*opposes? 0.71 · claude*) and a card; *keep*. One board on the desk and the pad, through the room |
-| 82–88 | 08 medium | a whiteboard's toolbar, scratched three times and erased |
-| 88–97 | end | *dyna.ink* written, then drawn clean in front; *the diagrammatic notebook that runs*; the address |
+| 0–7 | 1945 | Bush, *As We May Think*: pages, and a trail drawn between them |
+| 7–14.5 | 1963 | Sketchpad: a truss drawn by light pen, its constraints satisfied |
+| 14.5–21.5 | 1977 | Kay & Goldberg, *Personal Dynamic Media*: a Dynabook sketched, every medium inside it — *metamedium* |
+| 21.5–28.5 | 1980 | Put-That-There: “put that… there.” and the box moves where the speech points |
+| 28.5–40 | then / so | *dead drawing on a living medium*: a whiteboard's toolbar and a flowchart whose arrows do not flow; the toolbar scratched three times and erased; the arrows start to flow |
+| 40–47 | 2016 | *As We May Sketch*: a hand curve fitted to a function, and the thesis's line on a truly metamedium |
+| 47–53 | 2026 | AI as a meta-word: language → computation, then meaning put back in the loop |
+| 53–58 | title | dyna.ink — beyond chat |
 
-Beats 04–06 and the desk-and-pad shot are **v1 as specced** (V1-SPEC §5–§6), not yet built — a teaser's
-promise, drawn the way the spec says it will look.
+**Act II — the demo** (58–148.5 s), v1's beats on a warped clock so each has room: 01 read, 02 name, 03 diagram (Mermaid,
+tidy), 04 run, 05 kinds (colour follows meaning), 06 arrange (orbit), 07 together (Claude's hand; the desk and the pad).
+Beats 04–07 are **v1 as specced** (V1-SPEC §5–§6), not yet built — a teaser's promise, drawn as the spec says it will look.
+
+**Act III** (148.5–156 s): *dyna.ink* written by hand, then drawn clean in front; *the diagrammatic notebook that runs*; the address.
 
 ## Use
 
 ```bash
 open launch-video/index.html                    # scrub it: the bar under the stage, space to play
-node launch-video/render.mjs                    # → launch-video/out/dynaink-soft-launch.mp4 (about 4 min)
+node launch-video/render.mjs                    # → launch-video/out/dynaink-soft-launch.mp4 (about 6 min)
+node launch-video/check.mjs                     # the layout check: text clipped, spilling out of its box, covered, overlapping
 node launch-video/render.mjs --stills 3,35,77   # → out/still-<t>.png
 node launch-video/render.mjs --from 40 --to 50 --out clip.mp4
 node launch-video/render.mjs --url dyna.ink     # the end card's address (default: the live app's)

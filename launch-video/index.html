@@ -29,10 +29,10 @@
 </head>
 <body>
 <div id="stage"><svg id="svg" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg"></svg></div>
-<div id="bar"><button id="play">play</button><input id="scrub" type="range" min="0" max="97" step="0.0333" value="0"><span id="tc">0.00</span></div>
+<div id="bar"><button id="play">play</button><input id="scrub" type="range" min="0" max="156" step="0.0333" value="0"><span id="tc">0.00</span></div>
 <script>
 'use strict';
-const W = 1920, H = 1080, DURATION = 97;
+const W = 1920, H = 1080, DURATION = 156;
 const params = new URLSearchParams(location.search);
 // The address the end card names. The app lives here today; pass ?url=dyna.ink once N4 makes it the address.
 const APP_URL = params.get('url') || 'jjh111.github.io/MetaMedium/app';
@@ -165,7 +165,7 @@ function chip(x, y, text, { o = 1, kind = 'match', size = 19, sub = '' } = {}) {
   if (o <= 0) return '';
   const col = kind === 'model' ? C.model : kind === 'held' ? C.held : kind === 'read' ? C.read : C.teal;
   const all = text + (sub ? '  ' + sub : ''); const w = monoW(all, size) + 26, h = size + 16;
-  return `<g opacity="${o}"><rect x="${f1(x)}" y="${f1(y - h / 2)}" width="${f1(w)}" height="${h}" rx="${h / 2}" fill="${C.plate}" stroke="${col}" stroke-width="1.6"${kind === 'held' || kind === 'model' ? ' stroke-dasharray="5 4"' : ''}/>`
+  return `<g opacity="${o}"><rect data-box="1" x="${f1(x)}" y="${f1(y - h / 2)}" width="${f1(w)}" height="${h}" rx="${h / 2}" fill="${C.plate}" stroke="${col}" stroke-width="1.6"${kind === 'held' || kind === 'model' ? ' stroke-dasharray="5 4"' : ''}/>`
     + `<text x="${f1(x + 13)}" y="${f1(y + size * 0.36)}" font-family="${MONO}" font-size="${size}" fill="${col}">${esc(text)}${sub ? `<tspan fill="${C.ink3}">  ${esc(sub)}</tspan>` : ''}</text></g>`;
 }
 function selection(x, y, w, h, o) {
@@ -181,7 +181,7 @@ function pill(x, y, label, { size = 18, state = 'offer', num = '', dot = false }
   const text = label + (num ? ' ' + num : ''); const w = monoW(text, size) + 28 + (dot ? 14 : 0), h = size + 18;
   const on = state === 'on', reading = state === 'reading';
   const fill = on ? C.teal : C.plate, stroke = on ? C.teal : reading ? C.ink4 : C.rule, col = on ? C.plate : C.ink;
-  let s = `<rect x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="${h}" rx="${h / 2}" fill="${fill}" stroke="${stroke}" stroke-width="1.4"/>`;
+  let s = `<rect data-box="1" x="${f1(x)}" y="${f1(y)}" width="${f1(w)}" height="${h}" rx="${h / 2}" fill="${fill}" stroke="${stroke}" stroke-width="1.4"/>`;
   s += `<text x="${f1(x + 14)}" y="${f1(y + h / 2 + size * 0.36)}" font-family="${MONO}" font-size="${size}" fill="${col}">${esc(label)}${num ? `<tspan fill="${on ? C.plate : C.ink3}"> ${esc(num)}</tspan>` : ''}</text>`;
   if (dot) s += `<circle cx="${f1(x + w - 16)}" cy="${f1(y + h / 2)}" r="4" fill="${C.model}"/>`;
   return { s, w, h };
@@ -189,9 +189,11 @@ function pill(x, y, label, { size = 18, state = 'offer', num = '', dot = false }
 // The field: one input, what Enter will do, the four core buttons, what this is, what it affords.
 function field(x, y, { o = 1, scale = 1, text = '', caret = true, line = '', reads = [], offers = [], width = 560 } = {}) {
   if (o <= 0) return '';
+  const rowW = (items, isRead) => items.reduce((a, r) => a + pill(0, 0, r.label, { num: isRead ? r.num : '', size: 17, dot: r.dot }).w + 8, 0);
+  width = Math.max(width, 120 + rowW(reads, true) + 12, 120 + rowW(offers, false) + 12, 36 + monoW(text, 21) + 20, 36 + monoW(line, 16));
   const k = 0.94 + 0.06 * easeOut(clamp(o)); let s = `<g opacity="${clamp(o)}" transform="translate(${f1(x)} ${f1(y)}) scale(${f1(scale * k * 100) / 100})">`;
-  const h = 206; s += `<rect x="0" y="0" width="${width}" height="${h}" rx="10" fill="${C.plate}" stroke="${C.edge}" stroke-width="1.4"/><rect x="0" y="2" width="${width}" height="${h}" rx="10" fill="none" stroke="rgba(12,26,36,0.05)" stroke-width="3"/>`;
-  s += `<rect x="16" y="16" width="${width - 32}" height="44" rx="6" fill="${C.paper}" stroke="${C.rule}" stroke-width="1.2"/>`;
+  const h = 206; s += `<rect data-box="1" x="0" y="0" width="${width}" height="${h}" rx="10" fill="${C.plate}" stroke="${C.edge}" stroke-width="1.4"/><rect x="0" y="2" width="${width}" height="${h}" rx="10" fill="none" stroke="rgba(12,26,36,0.05)" stroke-width="3"/>`;
+  s += `<rect data-box="1" x="16" y="16" width="${width - 32}" height="44" rx="6" fill="${C.paper}" stroke="${C.rule}" stroke-width="1.2"/>`;
   s += mono(30, 46, text || '', { size: 21, color: C.ink });
   if (caret) s += `<rect x="${f1(30 + monoW(text, 21) + 2)}" y="27" width="2" height="24" fill="${C.teal}"/>`;
   s += mono(18, 84, line, { size: 16, color: C.teal });
@@ -213,7 +215,7 @@ function card(x, y, w, head, body, { o = 1, color = C.model, buttons = null, kep
   if (o <= 0) return '';
   const lines = body, h = 60 + lines.length * 36 + (buttons ? 52 : 0);
   const border = kept > 0 ? `rgb(${Math.round(lerp(123, 28, kept))},${Math.round(lerp(138, 95, kept))},${Math.round(lerp(148, 184, kept))})` : C.held;
-  let s = `<g opacity="${o}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="${C.plate}" stroke="${border}" stroke-width="1.6"${kept < 1 ? ' stroke-dasharray="6 4"' : ''}/>`;
+  let s = `<g opacity="${o}"><rect data-box="1" x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="${C.plate}" stroke="${border}" stroke-width="1.6"${kept < 1 ? ' stroke-dasharray="6 4"' : ''}/>`;
   s += `<circle cx="${x + 22}" cy="${y + 26}" r="5" fill="${color}"/>` + mono(x + 36, y + 32, head, { size: 18, color: C.ink3 });
   lines.forEach((l, i) => { s += mono(x + 20, y + 74 + i * 36, l, { size: 24, color: C.ink }); });
   if (buttons) { let bx = x + 20; for (const b of buttons) { const p = pill(bx, y + h - 52, b.label, { size: 19, state: b.on ? 'on' : 'offer' }); s += p.s; bx += p.w + 10; } }
@@ -225,7 +227,7 @@ const CAM = [
   [0, 0, 0, 1.06], [4.6, 20, -10, 1.0], [9.6, 20, -10, 1.0], [10.6, 1200, 0, 0.82], [11.6, 2420, -10, 1.0],
   [23.8, 2440, 10, 1.0], [24.9, 3700, 0, 0.8], [26.0, 5010, -40, 0.85], [39.8, 5010, -40, 0.85], [40.6, 4900, -40, 1.05],
   [49.8, 4900, -40, 1.05], [50.7, 6100, 0, 0.72], [51.6, 7330, -20, 0.8], [63.8, 7330, -20, 0.8], [65.0, 7200, 70, 0.76],
-  [72.0, 7200, 70, 0.76], [73.2, 7360, 70, 0.76], [78.4, 7380, 70, 0.78], [82.0, 9600, -40, 1.0], [88.0, 9620, -40, 1.0], [88.9, 10800, 0, 0.82],
+  [72.0, 7200, 70, 0.76], [73.2, 7360, 70, 0.76], [78.4, 7380, 70, 0.78], [82.0, 12000, 0, 0.98],
   [89.8, 12000, 0, 1.0], [97, 12000, 0, 1.02],
 ];
 function camAt(t) {
@@ -462,11 +464,11 @@ function scene4(t) {
   s += chip(n3[0] + w3 / 2 + 18, n3[1] - 2, 'idea?', { o: fade(t, 57.4, 57.8, 58.4, 58.8), kind: 'held', size: 19, sub: 'it stands among ideas' });
   s += tap(n3[0] + w3 / 2 + 50, n3[1] - 2, t, 58.3);
   // relations between kinds, said in the field
-  const mini = (x, y, text, a, b) => { const o = fade(t, a, a + 0.25, b, b + 0.3); if (o <= 0) return ''; const tt = typed(text, seg(t, a + 0.2, a + 1.0)); const w = monoW(text, 21) + 40; return `<g opacity="${o}"><rect x="${x}" y="${y}" width="${w}" height="50" rx="8" fill="${C.plate}" stroke="${C.edge}" stroke-width="1.4"/>` + mono(x + 18, y + 33, tt, { size: 21 }) + `<rect x="${f1(x + 20 + monoW(tt, 21))}" y="${y + 13}" width="2" height="24" fill="${C.teal}"/></g>`; };
+  const mini = (x, y, text, a, b) => { const o = fade(t, a, a + 0.25, b, b + 0.3); if (o <= 0) return ''; const tt = typed(text, seg(t, a + 0.2, a + 1.0)); const w = monoW(text, 21) + 40; return `<g opacity="${o}"><rect data-box="1" x="${x}" y="${y}" width="${w}" height="50" rx="8" fill="${C.plate}" stroke="${C.edge}" stroke-width="1.4"/>` + mono(x + 18, y + 33, tt, { size: 21 }) + `<rect x="${f1(x + 20 + monoW(tt, 21))}" y="${y + 13}" width="2" height="24" fill="${C.teal}"/></g>`; };
   s += mini(NX + 120, -260, 'insight is a kind of idea', 59.2, 60.6);
   s += mini(NX - 140, 300, 'evidence opposes assumption', 61.2, 62.6);
   // the colour space, beside the notes
-  s += wheel(NX + 1020, -40, t);
+  s += wheel(NX + 900, -40, t);
   // take the orbit
   const n6 = notePos(6, t);
   s += chip(n6[0] - 160, n6[1] - 70, 'Make it an orbit', { o: fade(t, 64.4, 64.8, 65.5, 65.8), size: 20, sub: '7 notes, one task' });
@@ -480,7 +482,7 @@ function wheel(cx, cy, t) {
   for (let i = 0; i < 72; i++) { const a0 = i * 5, a1 = a0 + 5.4; const p = (a, r) => [cx + r * Math.cos((a - 90) * Math.PI / 180), cy + r * Math.sin((a - 90) * Math.PI / 180)]; const [x0, y0] = p(a0, R), [x1, y1] = p(a1, R), [x2, y2] = p(a1, r0), [x3, y3] = p(a0, r0); s += `<path d="M${f1(x0)} ${f1(y0)}A${R} ${R} 0 0 1 ${f1(x1)} ${f1(y1)}L${f1(x2)} ${f1(y2)}A${r0} ${r0} 0 0 0 ${f1(x3)} ${f1(y3)}Z" fill="${oklch(0.74, 0.11, a0)}"/>`; }
   const dot = (lch, label, rad, show, dx = 0, dy = 0, anchor = 'start') => { if (show <= 0) return ''; const a = (lch[2] - 90) * Math.PI / 180; const x = cx + rad * Math.cos(a), y = cy + rad * Math.sin(a); return `<g opacity="${show}"><circle cx="${f1(x)}" cy="${f1(y)}" r="15" fill="${oklch(...lch)}" stroke="${C.plate}" stroke-width="3"/>` + mono(x + dx, y + dy, label, { size: 22, color: C.ink2, anchor }) + `</g>`; };
   s += dot(KIND.idea, 'idea', 170, seg(t, 57.2, 57.6), 26, 6);
-  s += dot(KIND.insight, 'insight — lighter', 232, seg(t, 60.6, 61.0), 24, 6);
+  s += dot(KIND.insight, 'insight', 232, seg(t, 60.6, 61.0), 24, 6);
   s += dot(KIND.evidence, 'evidence', 170, seg(t, 62.6, 63.0), 26, 6);
   s += dot(KIND.assumption, 'assumption', 170, seg(t, 62.6, 63.0), -26, 6, 'end');
   if (seg(t, 62.8, 63.2) > 0) { const a = (KIND.evidence[2] - 90) * Math.PI / 180, b = (KIND.assumption[2] - 90) * Math.PI / 180; s += `<line x1="${f1(cx + 140 * Math.cos(a))}" y1="${f1(cy + 140 * Math.sin(a))}" x2="${f1(cx + 140 * Math.cos(b))}" y2="${f1(cy + 140 * Math.sin(b))}" stroke="${C.ink4}" stroke-width="1.4" stroke-dasharray="5 5" opacity="${seg(t, 62.8, 63.2)}"/>`; }
@@ -510,33 +512,251 @@ function scene5(t) {
   return s;
 }
 
-/* 08 — medium: a whiteboard's toolbar, scratched out. */
-const WX = 9600;
-const SCRATCH = hand((() => { const o = []; const xs = [-540, -330, -120, 100, 320, 540]; let up = true; for (let i = 0; i < 9; i++) { const x = -560 + i * 140; o.push([WX + x, up ? -150 : 70]); up = !up; } return o; })(), 88, 2);
-function scene6(t) {
-  if (t < 79 || t > 91) return '';
+/* ======================================================================== */
+/* Act I — where it comes from. A timeline on the same canvas, left of the  */
+/* demo; every beat runs on the film's own clock (v2 seconds).              */
+/* ======================================================================== */
+const BEATS = [ // start, x, camera y, scale, year
+  [0,    -19200, -10, 1.0,  '1945'],
+  [7.0,  -16800, -10, 1.0,  '1963'],
+  [14.5, -14400, -10, 1.0,  '1977'],
+  [21.5, -12000, -10, 1.0,  '1980'],
+  [28.5, -9600,  0,   1.0,  'then'],
+  [40.0, -7200,  -10, 1.0,  '2016'],
+  [47.0, -4800,  -10, 1.0,  '2026'],
+  [53.0, -2400,  0,   1.0,  ''],
+];
+const DEMO0 = 58; // the demo begins: v1's scenes, on a warped clock
+const HCAM = (() => {
+  const k = [];
+  BEATS.forEach((b, i) => {
+    const next = BEATS[i + 1] ? BEATS[i + 1][0] : DEMO0;
+    const nx = BEATS[i + 1] ? BEATS[i + 1][1] : 0;
+    k.push([b[0], b[1], b[2], b[3]], [next - 1.0, b[1] + 30, b[2], b[3] * 1.025], [next - 0.5, (b[1] + nx) / 2, b[2], 0.82]);
+  });
+  k.push([DEMO0, 0, 0, 1.06]);
+  return k;
+})();
+function camOf(list, t) {
+  let i = 0; while (i < list.length - 2 && t > list[i + 1][0]) i++;
+  const a = list[i], b = list[i + 1], k = ease(seg(t, a[0], b[0]));
+  return { x: lerp(a[1], b[1], k), y: lerp(a[2], b[2], k), s: lerp(a[3], b[3], k) };
+}
+// The demo's clock: v2 seconds → v1 seconds, so each beat gets a breath. Two pieces: the whiteboard beat moved to Act I.
+const WARP = [[58, 0], [68.5, 10], [69.1, 10.6], [83.5, 24], [101, 40], [111.5, 50], [128, 64], [137, 72], [144.5, 78.6], [148.5, 82.2]];
+const WARP_END = [[148.5, 88.6], [156, 97]];
+function warp(t) {
+  if (t < DEMO0) return null;
+  const list = t >= WARP_END[0][0] ? WARP_END : WARP;
+  for (let i = 0; i < list.length - 1; i++) if (t <= list[i + 1][0]) return lerp(list[i][1], list[i + 1][1], seg(t, list[i][0], list[i + 1][0]));
+  return list[list.length - 1][1];
+}
+
+const TL_Y = -420;
+function timeline(t) {
+  if (t > DEMO0) return '';
+  let s = `<line x1="-20400" y1="${TL_Y}" x2="-3900" y2="${TL_Y}" stroke="${C.ink4}" stroke-width="1.6"/>`;
+  BEATS.slice(0, 7).forEach((b, i) => {
+    const on = t >= b[0] && t < (BEATS[i + 1] ? BEATS[i + 1][0] : DEMO0);
+    const seen = t >= b[0] - 1.2;
+    s += `<circle cx="${b[1]}" cy="${TL_Y}" r="${on ? 9 : 6}" fill="${on ? C.teal : seen ? C.ink3 : C.paper}" stroke="${on ? C.teal : C.ink4}" stroke-width="1.6"/>`;
+    s += mono(b[1], TL_Y - 24, b[4], { size: 22, color: on ? C.teal : C.ink4, anchor: 'middle', weight: on ? 500 : 400 });
+  });
+  return s;
+}
+
+/* 1945 — the memex: trails between documents. */
+const H0 = (() => {
+  const x0 = -19200, P = [[-520, -60], [-250, 110], [0, -110], [260, 70], [520, -50]];
+  const pages = P.map(([x, y], i) => ({ c: [x0 + x, y], box: hand(rectPts(x0 + x, y, 110, 140), 60 + i, 1.4), lines: [0, 1, 2].map(j => hand([[x0 + x - 34, y - 34 + j * 26], [x0 + x + 30 - j * 14, y - 34 + j * 26]], 70 + i * 3 + j, 0.8)) }));
+  const knots = pages.map(p => p.c); const trail = [];
+  for (let i = 0; i < knots.length - 1; i++) { const a = knots[i], b = knots[i + 1]; for (let k = 0; k <= 20; k++) { const u = k / 20; trail.push([lerp(a[0], b[0], u), lerp(a[1], b[1], u) + Math.sin(u * Math.PI) * (i % 2 ? 70 : -70)]); } }
+  return { pages, trail: hand(trail, 81, 2) };
+})();
+function hist0(t) {
+  if (t > 7.6) return '';
   let s = '';
-  const er = seg(t, 85.6, 86.2), gone = seg(t, 86.2, 87.0);
-  const o = fade(t, 82.0, 82.6) * (1 - gone);
+  H0.pages.forEach((p, i) => { s += drawSeq([p.box, ...p.lines], t, 0.3 + i * 0.32, 0.9 + i * 0.32, { w: 2.6 }); });
+  s += ink(H0.trail, seg(t, 2.1, 5.2), { color: C.teal, w: 3.2 });
+  return s;
+}
+
+/* 1963 — Sketchpad: a truss drawn by light pen, its constraints satisfied. */
+const H1 = (() => {
+  const x0 = -16800, r = rng(91), J = () => [(r() - 0.5) * 46, (r() - 0.5) * 40];
+  const nodes = [[-300, 110], [-100, 110], [100, 110], [300, 110], [-200, -70], [0, -70], [200, -70]].map(([x, y]) => ({ at: [x0 + x, y], j: J() }));
+  const members = [[0, 1], [1, 2], [2, 3], [4, 5], [5, 6], [0, 4], [4, 1], [1, 5], [5, 2], [2, 6], [6, 3]];
+  return { x0, nodes, members };
+})();
+function hist1(t) {
+  const L = t - 7; if (L < -1 || L > 8) return '';
+  let s = '';
+  const { x0, nodes, members } = H1; const fix = ease(seg(L, 4.2, 5.2)); const phos = C.tealSoft;
+  s += `<rect x="${x0 - 420}" y="-290" width="840" height="520" rx="34" fill="#0f1d25"/>`;
+  s += mono(x0 - 384, -250, 'TX-2 · LIGHT PEN', { size: 16, color: '#557784', ls: 2 });
+  const P = i => { const n = nodes[i]; return [n.at[0] + n.j[0] * (1 - fix), n.at[1] + n.j[1] * (1 - fix)]; };
+  let tip = null;
+  members.forEach(([a, b], i) => {
+    const k = seg(L, 0.5 + i * 0.27, 0.77 + i * 0.27); if (k <= 0) return;
+    const A = P(a), B = P(b), E = [lerp(A[0], B[0], k), lerp(A[1], B[1], k)];
+    s += `<line x1="${f1(A[0])}" y1="${f1(A[1])}" x2="${f1(E[0])}" y2="${f1(E[1])}" stroke="${phos}" stroke-width="9" opacity="0.18" stroke-linecap="round"/><line x1="${f1(A[0])}" y1="${f1(A[1])}" x2="${f1(E[0])}" y2="${f1(E[1])}" stroke="#9fe3df" stroke-width="2.6" stroke-linecap="round"/>`;
+    if (k < 1) tip = E;
+  });
+  nodes.forEach((n, i) => { if (L > 0.5) { const q = P(i); s += `<circle cx="${f1(q[0])}" cy="${f1(q[1])}" r="5" fill="#9fe3df"/>`; } });
+  if (tip) s += `<line x1="${f1(tip[0])}" y1="${f1(tip[1])}" x2="${x0 + 560}" y2="380" stroke="${C.ink2}" stroke-width="7" stroke-linecap="round"/><circle cx="${f1(tip[0])}" cy="${f1(tip[1])}" r="14" fill="#9fe3df" opacity="0.25"/>`;
+  s += mono(x0, 190, fix > 0 ? 'constraints satisfied — equal, joined, level' : '', { size: 18, color: phos, anchor: 'middle', o: seg(L, 5.0, 5.5) });
+  return s;
+}
+
+/* 1977 — a Dynabook sketched, and every medium inside it. */
+const H2 = (() => {
+  const x0 = -14400, cx = x0 - 160;
+  return {
+    x0, cx,
+    shell: hand(rectPts(cx, -60, 540, 380), 101, 1.8),
+    screen: hand(rectPts(cx, -120, 470, 200), 102, 1.4),
+    keys: [0, 1, 2].map(j => hand([[cx - 220, 75 + j * 30], [cx + 220, 75 + j * 30]], 103 + j, 1.2)),
+    media: [
+      hand(ellipsePts(cx - 160, -130, 40, 40, -2, 0.15, 50), 110, 1.2),
+      hand((() => { const o = []; for (let i = 0; i <= 40; i++) o.push([cx - 90 + i * 3.4, -120 + Math.sin(i / 3) * 22]); return o; })(), 111, 0.8),
+      ...[0, 1, 2].map(j => hand([[cx + 70, -175 + j * 34], [cx + 200 - j * 30, -175 + j * 34]], 112 + j, 0.9)),
+    ],
+  };
+})();
+function hist2(t) {
+  const L = t - 14.5; if (L < -1 || L > 8) return '';
+  let s = drawSeq([H2.shell, H2.screen, ...H2.keys], L, 0.3, 2.2, { w: 3 });
+  s += drawSeq(H2.media, L, 2.3, 3.7, { w: 2.6, color: C.teal });
+  s += writing(H2.x0 + 170, -40, 'metamedium', 76, seg(L, 3.6, 4.8));
+  s += mono(H2.x0 + 172, 20, 'a medium that can be all other media', { size: 20, color: C.ink3, o: seg(L, 4.8, 5.3) });
+  return s;
+}
+
+/* 1980 — Put-That-There: speech that points. */
+function hist3(t) {
+  const L = t - 21.5; if (L < -1 || L > 8) return '';
+  const x0 = -12000; let s = '';
+  const from = [x0 - 330, 40], to = [x0 + 300, 40], mv = ease(seg(L, 3.6, 4.8));
+  const c = [lerp(from[0], to[0], mv), lerp(from[1], to[1], mv)];
+  s += ink(hand([[to[0] - 26, to[1] - 26], [to[0] + 26, to[1] + 26]], 121, 1), seg(L, 2.3, 2.6), { tip: false, color: C.ink3 });
+  s += ink(hand([[to[0] + 26, to[1] - 26], [to[0] - 26, to[1] + 26]], 122, 1), seg(L, 2.6, 2.9), { tip: false, color: C.ink3 });
+  if (mv > 0) s += `<line x1="${from[0]}" y1="${from[1]}" x2="${f1(c[0])}" y2="${f1(c[1])}" stroke="${C.ink4}" stroke-width="2" stroke-dasharray="6 7"/>`;
+  s += ink(hand(rectPts(c[0], c[1], 150, 110), 120, 1.4).map(q => q), seg(L, 0.2, 0.9), { w: 3.2 });
+  const hand0 = [x0 - 40, 260], aim = L < 2.4 ? from : to, aimK = L < 2.4 ? seg(L, 1.1, 1.6) : seg(L, 2.4, 2.9);
+  if (L > 1.1) s += `<line x1="${hand0[0]}" y1="${hand0[1]}" x2="${f1(lerp(hand0[0], aim[0], aimK))}" y2="${f1(lerp(hand0[1], aim[1] + 60, aimK))}" stroke="${C.teal}" stroke-width="2.4" stroke-dasharray="3 8" stroke-linecap="round"/>`;
+  s += `<circle cx="${hand0[0]}" cy="${hand0[1]}" r="9" fill="${C.teal}" opacity="${seg(L, 1.0, 1.3)}"/>`;
+  s += mono(x0 - 330, -170, typed('“put that…', seg(L, 0.8, 1.6)), { size: 34, color: C.ink, anchor: 'middle' });
+  s += mono(x0 + 300, -170, typed('…there.”', seg(L, 2.3, 2.9)), { size: 34, color: C.ink, anchor: 'middle' });
+  return s;
+}
+
+/* then — dead drawing on a living medium: a toolbar, scratched out; the arrows start to flow. */
+const WX = -9600;
+const SCRATCH = hand((() => { const o = []; let up = true; for (let i = 0; i < 9; i++) { o.push([WX - 560 + i * 140, up ? -300 : -110]); up = !up; } return o; })(), 88, 2);
+const DEAD = (() => {
+  const xs = [-380, 0, 380], y = 150, words = ['idea', 'draft', 'ship'];
+  return {
+    boxes: xs.map((x, i) => ({ c: [WX + x, y], pts: hand(rectPts(WX + x, y, 200, 92), 130 + i, 1.6), word: words[i] })),
+    arrows: [0, 1].map(i => arrowStrokes([WX + xs[i] + 112, y + 4], [WX + xs[i + 1] - 112, y - 2], 140 + i * 3)),
+  };
+})();
+function scene6(L) {
+  if (L < -1 || L > 12.5) return '';
+  let s = '';
+  const er = seg(L, 7.1, 7.7), gone = seg(L, 7.7, 8.5);
+  const o = fade(L, 0.2, 0.8) * (1 - gone);
   if (o > 0) {
-    const col = c => er > 0 ? C.gone : c;
-    s += `<g opacity="${f1(o)}" transform="translate(0 ${f1(30 * easeOut(gone))})">`;
-    s += `<rect x="${WX - 520}" y="-105" width="1040" height="112" rx="18" fill="${C.plate}" stroke="${col(C.rule)}" stroke-width="2"/>`;
-    ['#e53935', '#fdd835', '#43a047', '#1e88e5', '#212121'].forEach((c, i) => { s += `<circle cx="${WX - 460 + i * 58}" cy="-49" r="20" fill="${er > 0 ? C.gone : c}" opacity="${er > 0 ? 0.35 : 1}"/>`; });
-    s += `<line x1="${WX - 150}" y1="-85" x2="${WX - 150}" y2="-13" stroke="${col(C.rule)}" stroke-width="2"/>`;
+    const col = c => er > 0 ? C.gone : c, Y = -258;
+    s += `<g opacity="${f1(o * 100) / 100}" transform="translate(0 ${f1(30 * easeOut(gone))})">`;
+    s += `<rect x="${WX - 520}" y="${Y}" width="1040" height="112" rx="18" fill="${C.plate}" stroke="${col(C.rule)}" stroke-width="2"/>`;
+    ['#e53935', '#fdd835', '#43a047', '#1e88e5', '#212121'].forEach((c, i) => { s += `<circle cx="${WX - 460 + i * 58}" cy="${Y + 56}" r="20" fill="${er > 0 ? C.gone : c}" opacity="${er > 0 ? 0.35 : 1}"/>`; });
+    s += `<line x1="${WX - 150}" y1="${Y + 20}" x2="${WX - 150}" y2="${Y + 92}" stroke="${col(C.rule)}" stroke-width="2"/>`;
     const st = `fill="none" stroke="${col(C.ink3)}" stroke-width="3"`;
-    s += `<rect x="${WX - 115}" y="-70" width="42" height="42" ${st}/><circle cx="${WX - 18}" cy="-49" r="22" ${st}/><path d="M${WX + 40} -30 L${WX + 90} -70 M${WX + 72} -70 L${WX + 90} -70 L${WX + 90} -52" ${st}/><rect x="${WX + 125}" y="-72" width="46" height="46" fill="${er > 0 ? C.gone : '#ffe082'}" opacity="${er > 0 ? 0.3 : 1}"/>`;
-    s += mono(WX + 210, -40, 'templates ▾', { size: 24, color: col(C.ink3) });
-    s += mono(WX - 500, 60, 'pick a colour · drag a shape · stick a note', { size: 20, color: col(C.ink4), o: seg(t, 82.6, 83.1) });
+    s += `<rect x="${WX - 115}" y="${Y + 35}" width="42" height="42" ${st}/><circle cx="${WX - 18}" cy="${Y + 56}" r="22" ${st}/><path d="M${WX + 40} ${Y + 75} L${WX + 90} ${Y + 35} M${WX + 72} ${Y + 35} L${WX + 90} ${Y + 35} L${WX + 90} ${Y + 53}" ${st}/><rect x="${WX + 125}" y="${Y + 33}" width="46" height="46" fill="${er > 0 ? C.gone : '#ffe082'}" opacity="${er > 0 ? 0.3 : 1}"/>`;
+    s += mono(WX + 210, Y + 65, 'templates ▾', { size: 24, color: col(C.ink3) });
+    s += mono(WX, Y + 150, 'pick a colour · drag a shape · stick a note', { size: 20, color: col(C.ink4), anchor: 'middle', o: seg(L, 0.8, 1.3) * (1 - er) });
     s += '</g>';
   }
-  const sk = seg(t, 83.6, 85.5);
+  // a flowchart drawn under it, whose arrows go nowhere — until the other road
+  DEAD.boxes.forEach((b, i) => { s += ink(b.pts, seg(L, 1.4 + i * 0.5, 1.8 + i * 0.5), { w: 3 }); s += writing(b.c[0], b.c[1] + 12, b.word, 38, seg(L, 1.8 + i * 0.5, 2.2 + i * 0.5), { anchor: 'middle', tip: false }); });
+  DEAD.arrows.forEach((a, i) => { s += drawSeq(a, L, 3.1 + i * 0.4, 3.4 + i * 0.4, { w: 3 }); });
+  s += chip(WX - 165, 252, 'the arrows do not flow', { kind: 'held', o: fade(L, 3.8, 4.2, 8.4, 8.8), size: 19 });
+  if (L > 8.8) for (const [i, a] of DEAD.arrows.entries()) { const sh = a[0]; for (const off of [0, 0.5]) { const u = ((L - 8.8) * 0.7 + off + i * 0.25) % 1; const q = sh[Math.floor(u * (sh.length - 1))]; s += `<circle cx="${f1(q[0])}" cy="${f1(q[1])}" r="8" fill="${C.teal}" opacity="${f1(fade(L, 8.8, 9.2) * 0.9)}"/>`; } }
+  s += chip(WX - 115, 252, 'now they do', { kind: 'match', o: fade(L, 9.4, 9.8), size: 19 });
+  const sk = seg(L, 5.2, 7.0);
   s += ink(SCRATCH, sk, { color: er > 0 ? C.gone : C.ink, o: 1 - gone, w: 4 });
   const crossings = Math.min(3, Math.floor(sk * 8 / 2.4));
   const words = ['', 'crossed it once', 'crossed it twice', 'three times — erased'];
-  s += mono(WX, 190, words[crossings], { size: 22, color: crossings === 3 ? C.gone : C.ink3, anchor: 'middle', o: (sk > 0.1 ? 1 : 0) * (1 - seg(t, 87.2, 87.7)) });
+  s += mono(WX, -40, words[crossings], { size: 22, color: crossings === 3 ? C.gone : C.ink3, anchor: 'middle', o: (sk > 0.1 ? 1 : 0) * (1 - seg(L, 8.6, 9.1)) });
   return s;
 }
+
+/* 2016 — As We May Sketch: a curve drawn by hand is a function waiting. */
+const H5 = (() => {
+  const x0 = -7200, o = [];
+  for (let i = 0; i <= 90; i++) { const x = -460 + i * 920 / 90; o.push([x0 + x, -240 + Math.sin(x / 72) * 46]); }
+  return { x0, drawn: hand(o, 150, 7), clean: o };
+})();
+const QUOTE = ['“when I draw into a computer with the flourish', 'of my hand, we can take it beyond pixels, beyond', 'even vectors, toward a truly metamedium.”'];
+function hist5(t) {
+  const L = t - 40; if (L < -1 || L > 8) return '';
+  const k = seg(L, 1.9, 2.5); let s = '';
+  s += ink(H5.drawn, seg(L, 0.3, 1.7), { color: k > 0 ? C.ghost : C.ink, o: 1 - 0.4 * k, w: k > 0 ? 2.4 : 3.4 });
+  if (k > 0) s += `<path d="${dOf(partial(H5.clean, k))}" fill="none" stroke="${C.clean}" stroke-width="3.4"/>`;
+  s += mono(H5.x0 + 470, -232, 'y = 46 · sin(x ⁄ 72)', { size: 22, color: C.clean, o: seg(L, 2.5, 2.9) });
+  const total = QUOTE.join('').length; let left = Math.round(total * seg(L, 2.8, 5.0));
+  QUOTE.forEach((l, i) => { s += mono(H5.x0 - 520, -60 + i * 52, l.slice(0, Math.max(0, left)), { size: 34, color: C.ink }); left -= l.length; });
+  s += mono(H5.x0 - 520, 120, '— John Hanacek, As We May Sketch, Georgetown, 2016', { size: 20, color: C.ink3, o: seg(L, 5.1, 5.6) });
+  return s;
+}
+
+/* 2026 — AI as a meta-word: meaning back inside the loop. */
+function hist6(t) {
+  const L = t - 47; if (L < -1 || L > 7.5) return '';
+  const x0 = -4800, R = 96, s0 = [];
+  const N = { lang: [x0 - 340, 110], comp: [x0 + 340, 110], mean: [x0, -210] };
+  const edge = (a, b, bend) => { const A = N[a], B = N[b], dx = B[0] - A[0], dy = B[1] - A[1], l = Math.hypot(dx, dy), ux = dx / l, uy = dy / l; const p = [A[0] + ux * (R + 14), A[1] + uy * (R + 14)], q = [B[0] - ux * (R + 18), B[1] - uy * (R + 18)]; const m = [(p[0] + q[0]) / 2 - uy * bend, (p[1] + q[1]) / 2 + ux * bend]; const o = []; for (let i = 0; i <= 24; i++) { const u = i / 24; o.push([(1 - u) ** 2 * p[0] + 2 * (1 - u) * u * m[0] + u * u * q[0], (1 - u) ** 2 * p[1] + 2 * (1 - u) * u * m[1] + u * u * q[1]]); } return o; };
+  let s = '';
+  const circ = (n, seed, a, b, col) => ink(hand(ellipsePts(N[n][0], N[n][1], R, R, -2, 0.15, 70), seed, 1.6), seg(L, a, b), { color: col, w: 3 });
+  s += circ('lang', 160, 0.2, 0.8, C.ink) + circ('comp', 161, 0.6, 1.2, C.ink);
+  s += mono(N.lang[0], N.lang[1] + 8, 'language', { size: 22, anchor: 'middle', o: seg(L, 0.8, 1.1) });
+  s += mono(N.comp[0], N.comp[1] + 8, 'computation', { size: 22, anchor: 'middle', o: seg(L, 1.2, 1.5) });
+  const head = (pts, col, k) => k >= 1 ? headAt(pts, col, 1) : '';
+  const e1 = edge('lang', 'comp', -40), e2 = edge('comp', 'lang', -40);
+  s += ink(e1, seg(L, 1.3, 1.8), { tip: false, w: 3 }) + head(e1, C.ink, seg(L, 1.3, 1.8));
+  s += ink(e2, seg(L, 1.8, 2.3), { tip: false, w: 3, color: C.ink3 }) + head(e2, C.ink3, seg(L, 1.8, 2.3));
+  s += circ('mean', 162, 2.6, 3.3, C.teal);
+  s += mono(N.mean[0], N.mean[1] + 8, 'meaning', { size: 22, anchor: 'middle', color: C.teal, weight: 500, o: seg(L, 3.3, 3.6) });
+  const e3 = edge('comp', 'mean', -30), e4 = edge('mean', 'lang', -30);
+  s += ink(e3, seg(L, 3.5, 4.0), { tip: false, w: 3, color: C.teal }) + head(e3, C.teal, seg(L, 3.5, 4.0));
+  s += ink(e4, seg(L, 4.0, 4.5), { tip: false, w: 3, color: C.teal }) + head(e4, C.teal, seg(L, 4.0, 4.5));
+  if (L > 4.6) { const loop = [...e1, ...e3, ...e4], q = loop[Math.floor(((L - 4.6) * 0.45 % 1) * (loop.length - 1))]; s += `<circle cx="${f1(q[0])}" cy="${f1(q[1])}" r="9" fill="${C.teal}"/>`; }
+  return s;
+}
+
+/* the title, between the history and the demo */
+function title(t) {
+  const L = t - 53; if (L < -1 || L > 5.5) return '';
+  const x0 = -2400; let s = '';
+  s += `<text x="${x0}" y="-10" font-family="${MONO}" font-size="160" font-weight="500" text-anchor="middle" letter-spacing="-4" opacity="${seg(L, 0.3, 0.9)}"><tspan fill="${C.ink}">dyna</tspan><tspan fill="${C.teal}">.ink</tspan></text>`;
+  s += mono(x0, 80, 'beyond chat — drawing as the interface to AI', { size: 34, color: C.ink2, anchor: 'middle', o: seg(L, 1.0, 1.5) });
+  s += mono(x0, 140, 'a drawing medium native to the computer', { size: 22, color: C.ink3, anchor: 'middle', o: seg(L, 1.6, 2.1) });
+  return s;
+}
+function history(t) {
+  if (t > DEMO0 + 1) return '';
+  return timeline(t) + hist0(t) + hist1(t) + hist2(t) + hist3(t) + scene6(t - 28.5) + hist5(t) + hist6(t) + title(t);
+}
+const HCAPS = [
+  { a: 0.3, b: 6.6, k: '1945', lines: [['Vannevar Bush, *As We May Think*.', 0.5], ['machines that keep the *trails* between ideas.', 2.4]] },
+  { a: 7.3, b: 14.1, k: '1963', lines: [['Ivan Sutherland’s *Sketchpad*.', 7.5], ['the drawing was a *structure*, not a picture.', 10.6]] },
+  { a: 14.8, b: 21.1, k: '1977', lines: [['Kay & Goldberg: *Personal Dynamic Media*.', 15.0], ['the computer as a *metamedium*.', 18.2]] },
+  { a: 21.8, b: 28.1, k: '1980', lines: [['Bolt’s *Put-That-There*.', 22.0], ['speech that *points* with the hand.', 24.6]] },
+  { a: 28.8, b: 36.1, k: 'then', lines: [['drawing on computers learned to *imitate paper*.', 29.0], ['you draw a flowchart. the arrows do not flow.', 31.8]] },
+  { a: 36.4, b: 39.6, k: 'so', lines: [['take the other road: *Sketchpad’s*.', 36.6]] },
+  { a: 40.3, b: 46.6, k: '2016', lines: [['a thesis: *As We May Sketch*.', 40.5]] },
+  { a: 47.3, b: 52.6, k: '2026', lines: [['models got good at *words*.', 47.5], ['a *meta-word* puts meaning back in the loop.', 50.0]] },
+];
 
 /* the end card: the name written by hand, then drawn clean in front of it */
 function scene7(t) {
@@ -559,22 +779,21 @@ function scene7(t) {
 const CAPS = [
   { a: 0.6, b: 10.0, k: '01 — read', lines: [['you draw.', 0.8], ['it *reads*.', 2.8], ['and holds what is *ambiguous* open.', 6.6]] },
   { a: 11.0, b: 23.8, k: '02 — name', lines: [['*name* what you draw.', 12.0], ['it learns *your* words.', 20.8]] },
-  { a: 25.0, b: 39.8, k: '03 — diagram', lines: [['a drawing that *is code*.', 33.8], ['tidied and routed — still your ink.', 37.4]] },
+  { a: 25.0, b: 39.8, k: '03 — diagram', lines: [['draw a flowchart, *by hand*.', 25.8], ['it reads as one, and *is code*.', 33.8], ['tidied and routed — still your ink.', 37.4]] },
   { a: 40.6, b: 49.8, k: '04 — run', lines: [['and then it *runs*.', 42.0]] },
   { a: 51.0, b: 63.8, k: '05 — kinds', lines: [['colour is not picked.', 52.4], ['it *follows meaning*.', 56.2]] },
   { a: 64.4, b: 71.8, k: '06 — arrange', lines: [['messy notes, into *orbits* the board keeps.', 65.6]] },
   { a: 72.4, b: 78.2, k: '07 — together', lines: [['Claude sits in as a *second hand*.', 73.0], ['it proposes. *you keep*.', 76.4]] },
   { a: 78.8, b: 81.8, k: '07 — together', lines: [['one board — the *desk* and the *pad*.', 79.2]] },
-  { a: 82.4, b: 88.0, k: '08 — medium', lines: [['not a whiteboard.', 82.8], ['a drawing medium *native to the computer*.', 86.2]] },
 ];
 function rich(x, y, text, size, o) {
   const parts = text.split('*'); let tsp = '';
   parts.forEach((p, i) => { if (p) tsp += `<tspan fill="${i % 2 ? C.teal : C.ink}"${i % 2 ? ' font-weight="500"' : ''}>${esc(p)}</tspan>`; });
   return `<text x="${x}" y="${y}" font-family="${MONO}" font-size="${size}" opacity="${o}">${tsp}</text>`;
 }
-function captions(t) {
+function captions(t, list = CAPS) {
   let s = '';
-  for (const c of CAPS) {
+  for (const c of list) {
     const o = fade(t, c.a, c.a + 0.4, c.b - 0.4, c.b); if (o <= 0) continue;
     const shown = c.lines.filter(l => t >= l[1]); const n = shown.length; if (!n) continue;
     const baseY = 960 - (n - 1) * 58;
@@ -634,23 +853,28 @@ function devices(t, gridRect) {
 }
 
 /* ---- one frame ---------------------------------------------------------- */
+// t is the film's clock; v is v1's, which the demo's scenes, captions and status line run on.
 const svg = document.getElementById('svg');
+function camAt2(t) { const v = warp(t); return v === null ? camOf(HCAM, t) : camAt(v); }
+window.__camAt = camAt2;
 function render(t) {
   DEFS = []; uid = 0;
-  const cam = camAt(t);
-  const world = scene1(t) + scene2(t) + scene3(t) + scene4(t) + scene6(t) + scene7(t);
+  const v = warp(t), cam = camAt2(t);
+  const world = history(t) + (v === null ? '' : scene1(v) + scene2(v) + scene3(v) + scene4(v) + scene7(v));
   const gridRect = c => { const vw = W / c.s, vh = H / c.s; return `<rect x="${f1(c.x - vw / 2 - 60)}" y="${f1(c.y - vh / 2 - 60)}" width="${f1(vw + 120)}" height="${f1(vh + 120)}" fill="url(#grid)"/>`; };
-  const mainO = 1 - fade(t, 78.6, 79.1, 81.8, 82.2);
-  const endFade = seg(t, 96.2, 97);
+  const mainO = v === null ? 1 : 1 - fade(v, 78.6, 79.1, 81.8, 82.2);
+  const endFade = seg(t, DURATION - 0.8, DURATION);
+  const hud = v === null ? 0 : seg(t, DEMO0, DEMO0 + 1) * (1 - seg(v, 88.6, 89.4));
   svg.innerHTML =
-    `<defs><pattern id="grid" width="26" height="26" patternUnits="userSpaceOnUse"><path d="M26 0H0V26" fill="none" stroke="rgba(90,72,44,0.07)" stroke-width="1"/></pattern>${DEFS.join('')}<g id="world">${world}</g></defs>`
+    `<defs><pattern id="grid" width="26" height="26" patternUnits="userSpaceOnUse"><path d="M26 0H0V26" fill="none" stroke="rgba(90,72,44,0.07)" stroke-width="1"/></pattern>${DEFS.join('')}</defs>`
     + `<rect width="${W}" height="${H}" fill="${C.paper}"/>`
-    + `<g opacity="${f1(mainO * 100) / 100}" transform="${camT(cam)}">${gridRect(cam)}<use href="#world"/></g>`
-    + devices(t, gridRect)
-    + mono(64, 74, 'dyna.ink', { size: 22, color: C.ink3, weight: 500, o: 1 - seg(t, 88.6, 89.4) })
-    + captions(t) + statusLine(t)
+    + `<g opacity="${f1(mainO * 100) / 100}" transform="${camT(cam)}">${gridRect(cam)}<g id="world">${world}</g></g>`
+    + (v === null ? '' : devices(v, gridRect))
+    + mono(64, 74, 'dyna.ink', { size: 22, color: C.ink3, weight: 500, o: hud })
+    + (v === null ? captions(t, HCAPS) : captions(v) + statusLine(v))
     + (endFade > 0 ? `<rect width="${W}" height="${H}" fill="${C.paper}" opacity="${endFade}"/>` : '');
 }
+
 window.render = render; window.DURATION = DURATION;
 
 /* ---- the scrubber (absent when rendering) ---------------------------- */
