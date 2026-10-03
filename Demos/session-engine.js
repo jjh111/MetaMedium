@@ -15506,20 +15506,24 @@
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
     const out = [];
     let list = null; // 'ul' | 'ol'
+    // A paragraph's lines and a list item's are kept raw and rendered when they end, so emphasis or a link may wrap
+    // across lines: rendered a line at a time, a *…* that wrapped showed its asterisks.
+    let item = null; // the list item being read
     let para = [];   // the lines of a paragraph, joined at the next blank line
-    const closeList = () => { if (list) { out.push('</' + list + '>'); list = null; } };
-    const closePara = () => { if (para.length) { out.push('<p>' + para.join(' ') + '</p>'); para = []; } };
+    const closeItem = () => { if (item !== null) { out.push('<li>' + inline(item) + '</li>'); item = null; } };
+    const closeList = () => { closeItem(); if (list) { out.push('</' + list + '>'); list = null; } };
+    const closePara = () => { if (para.length) { out.push('<p>' + inline(para.join(' ')) + '</p>'); para = []; } };
     for (const raw of md.split('\n')) {
       const line = raw.replace(/\s+$/, '');
       const h = /^(#{1,3})\s+(.*)$/.exec(line);
       const li = /^\s*(?:[-*]|\d+\.)\s+(.*)$/.exec(line);
       const cont = /^\s{2,}(\S.*)$/.exec(line);
       if (h) { closeList(); closePara(); out.push('<h' + (h[1].length + 1) + '>' + inline(h[2]) + '</h' + (h[1].length + 1) + '>'); }
-      else if (li) { closePara(); const kind = /^\s*\d+\./.test(line) ? 'ol' : 'ul'; if (list !== kind) { closeList(); list = kind; out.push('<' + kind + '>'); } out.push('<li>' + inline(li[1]) + '</li>'); }
-      else if (cont && list) { out[out.length - 1] = out[out.length - 1].replace(/<\/li>$/, ' ' + inline(cont[1]) + '</li>'); }
+      else if (li) { closePara(); const kind = /^\s*\d+\./.test(line) ? 'ol' : 'ul'; if (list !== kind) { closeList(); list = kind; out.push('<' + kind + '>'); } else closeItem(); item = li[1]; }
+      else if (cont && list) { item = (item === null ? '' : item + ' ') + cont[1]; }
       else if (!line.trim()) { closeList(); closePara(); }
       else if (/^---+$/.test(line)) { closeList(); closePara(); out.push('<hr>'); }
-      else { closeList(); para.push(inline(line)); }
+      else { closeList(); para.push(line); }
     }
     closeList(); closePara();
     return out.join('\n');
