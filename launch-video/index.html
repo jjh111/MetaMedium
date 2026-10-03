@@ -28,11 +28,11 @@
 </style>
 </head>
 <body>
-<div id="stage"><svg id="svg" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg"></svg></div>
-<div id="bar"><button id="play">play</button><input id="scrub" type="range" min="0" max="156" step="0.0333" value="0"><span id="tc">0.00</span></div>
+<div id="stage"><svg id="svg" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg" text-rendering="geometricPrecision"></svg></div>
+<div id="bar"><button id="play">play</button><input id="scrub" type="range" min="0" max="160.4" step="0.0333" value="0"><span id="tc">0.00</span></div>
 <script>
 'use strict';
-const W = 1920, H = 1080, DURATION = 156;
+const W = 1920, H = 1080, DURATION = 160.4;
 const params = new URLSearchParams(location.search);
 // The address the end card names. The app lives here today; pass ?url=dyna.ink once N4 makes it the address.
 const APP_URL = params.get('url') || 'jjh111.github.io/MetaMedium/app';
@@ -55,7 +55,7 @@ const easeOut = e => 1 - Math.pow(1 - e, 3);
 const back = e => { const c = 1.70158; return 1 + (c + 1) * Math.pow(e - 1, 3) + c * Math.pow(e - 1, 2); };
 const fade = (t, a, b, c = Infinity, d = Infinity) => c === Infinity ? seg(t, a, b) : Math.min(seg(t, a, b), 1 - seg(t, c, d));
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const f1 = n => Math.round(n * 10) / 10;
+const f1 = n => Math.round(n * 100) / 100; // two places: a tenth of a pixel stepped visibly on slow moves
 
 /* ---- colour: OKLCH → sRGB (V1-SPEC §3.3) --------------------------------- */
 function oklch(L, Cc, h) {
@@ -191,7 +191,7 @@ function field(x, y, { o = 1, scale = 1, text = '', caret = true, line = '', rea
   if (o <= 0) return '';
   const rowW = (items, isRead) => items.reduce((a, r) => a + pill(0, 0, r.label, { num: isRead ? r.num : '', size: 17, dot: r.dot }).w + 8, 0);
   width = Math.max(width, 120 + rowW(reads, true) + 12, 120 + rowW(offers, false) + 12, 36 + monoW(text, 21) + 20, 36 + monoW(line, 16));
-  const k = 0.94 + 0.06 * easeOut(clamp(o)); let s = `<g opacity="${clamp(o)}" transform="translate(${f1(x)} ${f1(y)}) scale(${f1(scale * k * 100) / 100})">`;
+  const k = 1; let s = `<g opacity="${clamp(o)}" transform="translate(${f1(x)} ${f1(y)}) scale(${(scale * k).toFixed(4)})">`;
   const h = 206; s += `<rect data-box="1" x="0" y="0" width="${width}" height="${h}" rx="10" fill="${C.plate}" stroke="${C.edge}" stroke-width="1.4"/><rect x="0" y="2" width="${width}" height="${h}" rx="10" fill="none" stroke="rgba(12,26,36,0.05)" stroke-width="3"/>`;
   s += `<rect data-box="1" x="16" y="16" width="${width - 32}" height="44" rx="6" fill="${C.paper}" stroke="${C.rule}" stroke-width="1.2"/>`;
   s += mono(30, 46, text || '', { size: 21, color: C.ink });
@@ -235,7 +235,7 @@ function camAt(t) {
   const a = CAM[i], b = CAM[i + 1], k = ease(seg(t, a[0], b[0]));
   return { x: lerp(a[1], b[1], k), y: lerp(a[2], b[2], k), s: lerp(a[3], b[3], k) };
 }
-const camT = (c, cx = W / 2, cy = H / 2) => `translate(${f1(cx)} ${f1(cy)}) scale(${(Math.round(c.s * 1000) / 1000)}) translate(${f1(-c.x)} ${f1(-c.y)})`;
+const camT = (c, cx = W / 2, cy = H / 2) => `translate(${f1(cx)} ${f1(cy)}) scale(${c.s.toFixed(5)}) translate(${f1(-c.x)} ${f1(-c.y)})`;
 
 /* ======================================================================== */
 /* The scenes. Each draws in world units; the camera chooses what is seen. */
@@ -292,7 +292,7 @@ function scene2(t) {
   // the next one, recognised
   s += drawSeq(S2.m2, t, 18.7, 20.6);
   const ch = seg(t, 21.0, 21.4);
-  if (ch > 0) s += `<g transform="translate(2585 ${f1(310 - 8 * back(ch))})">${chip(0, 0, 'molecule 0.92', { o: ch, size: 21, sub: 'same circles, same links' })}</g>`;
+  if (ch > 0) s += `<g transform="translate(2585 ${Math.round(310 - 8 * back(ch))})">${chip(0, 0, 'molecule 0.92', { o: ch, size: 21, sub: 'same circles, same links' })}</g>`;
   return s;
 }
 
@@ -367,14 +367,14 @@ function scene3(t) {
   // the reading
   const sel = fade(t, 32.0, 32.3, 36.8, 37.1);
   s += selection(FX - 290, -410, 760, 730, sel);
-  s += field(FX - 900, -170, {
+  s += field(FX - 840, -170, {
     o: fade(t, 32.2, 32.6, 36.7, 37.0), text: '', caret: true, width: 560,
     line: t < 33.6 ? '↵ make it Mermaid' : '↵ tidy the diagram',
     reads: [{ label: 'a flowchart', num: '0.92' }],
     offers: [{ label: 'Make it Mermaid', on: t > 33.0 && t < 33.6 }, { label: 'Tidy the diagram', on: t > 36.1 && t < 36.7 }],
   });
-  s += tap(FX - 900 + 120 + 90, -170 + 166, t, 33.0);
-  s += tap(FX - 900 + 120 + 196 + 105, -170 + 166, t, 36.1);
+  s += tap(FX - 840 + 120 + 90, -170 + 166, t, 33.0);
+  s += tap(FX - 840 + 120 + 196 + 105, -170 + 166, t, 36.1);
   // the Mermaid, written from the marks, standing beside them in the board's ink
   const mm = seg(t, 33.7, 36.0);
   if (mm > 0) {
@@ -501,7 +501,7 @@ function scene5(t) {
   s += ink(loop, lk, { color: C.model, w: 3.2, tip: false });
   // Claude's pen: a tag that travels with its ink
   const ho = fade(t, 72.6, 73.0, 77.5, 78.0);
-  if (ho > 0) { const q = lk > 0 && lk < 1 ? partial(loop, lk).slice(-1)[0] : (lk >= 1 ? loop[loop.length - 1] : [cx + 380, cy - 220]); const enter = ease(seg(t, 72.6, 73.3)); const px = lk > 0 ? q[0] : lerp(cx + 560, q[0], enter), py = lk > 0 ? q[1] : lerp(cy - 320, q[1], enter); const br = 0.6 + 0.4 * Math.sin(t * 6); s += `<g opacity="${ho}"><circle cx="${f1(px)}" cy="${f1(py)}" r="${f1(12 + 4 * br)}" fill="${C.model}" opacity="0.15"/><circle cx="${f1(px)}" cy="${f1(py)}" r="5" fill="${C.model}"/><rect x="${f1(px + 14)}" y="${f1(py + 10)}" width="88" height="30" rx="15" fill="${C.model}"/>` + mono(px + 58, py + 31, 'claude', { size: 17, color: C.plate, anchor: 'middle' }) + '</g>'; }
+  if (ho > 0) { const q = lk > 0 && lk < 1 ? partial(loop, lk).slice(-1)[0] : (lk >= 1 ? loop[loop.length - 1] : [cx + 380, cy - 220]); const enter = ease(seg(t, 72.6, 73.3)); const px = lk > 0 ? q[0] : lerp(cx + 560, q[0], enter), py = lk > 0 ? q[1] : lerp(cy - 320, q[1], enter); const br = 0.6 + 0.4 * Math.sin(NOW * 6); s += `<g opacity="${ho}"><circle cx="${f1(px)}" cy="${f1(py)}" r="${f1(12 + 4 * br)}" fill="${C.model}" opacity="0.15"/><circle cx="${f1(px)}" cy="${f1(py)}" r="5" fill="${C.model}"/><rect x="${f1(px + 14)}" y="${f1(py + 10)}" width="88" height="30" rx="15" fill="${C.model}"/>` + mono(px + 58, py + 31, 'claude', { size: 17, color: C.plate, anchor: 'middle' }) + '</g>'; }
   s += chip(cx - 140, cy + 196, 'opposes? 0.71', { kind: 'model', o: seg(t, 75.2, 75.6), size: 19, sub: '· claude' });
   const co = seg(t, 75.8, 76.3); const kept = seg(t, 77.4, 77.8);
   if (co > 0) {
@@ -513,108 +513,114 @@ function scene5(t) {
 }
 
 /* ======================================================================== */
-/* Act I — where it comes from. A timeline on the same canvas, left of the  */
-/* demo; every beat runs on the film's own clock (v2 seconds).              */
+/* The film's clock: shots that punch in and then pause.                    */
+/* Every shot is a pose the camera cuts to in PAN seconds (a quick quintic  */
+/* ease), then holds STILL. Measured: text moved by a fraction of a pixel   */
+/* a frame shimmers (the browser snaps glyphs), even rendered at 2x — so a  */
+/* pause never drifts, slides land on whole pixels, and what moves through  */
+/* a pause is a shape (a ring, a dot), which antialiases smoothly.          */
 /* ======================================================================== */
-const BEATS = [ // start, x, camera y, scale, year
-  [0,    -19200, -10, 1.0,  '1945'],
-  [7.0,  -16800, -10, 1.0,  '1963'],
-  [14.5, -14400, -10, 1.0,  '1977'],
-  [21.5, -12000, -10, 1.0,  '1980'],
-  [28.5, -9600,  0,   1.0,  'then'],
-  [40.0, -7200,  -10, 1.0,  '2016'],
-  [47.0, -4800,  -10, 1.0,  '2026'],
-  [53.0, -2400,  0,   1.0,  ''],
+const PAN = 0.65, DRIFT = 0; // seconds a cut takes; screen pixels a second a pause drifts (0: see above)
+const easeQuint = e => e < .5 ? 16 * e ** 5 : 1 - Math.pow(-2 * e + 2, 5) / 2;
+const HX = i => -24000 + 2400 * i;
+const BEATS = [ // start, the year on the timeline — each beat stands at HX(index)
+  [0, '1945'], [5.6, '1963'], [11.8, '1977'], [17.6, '1980'], [23.2, '1996'],
+  [29.2, '2015'], [35.6, '2016'], [42.0, 'today'], [50.0, '2026'], [55.8, ''],
 ];
-const DEMO0 = 58; // the demo begins: v1's scenes, on a warped clock
-const HCAM = (() => {
-  const k = [];
-  BEATS.forEach((b, i) => {
-    const next = BEATS[i + 1] ? BEATS[i + 1][0] : DEMO0;
-    const nx = BEATS[i + 1] ? BEATS[i + 1][1] : 0;
-    k.push([b[0], b[1], b[2], b[3]], [next - 1.0, b[1] + 30, b[2], b[3] * 1.025], [next - 0.5, (b[1] + nx) / 2, b[2], 0.82]);
-  });
-  k.push([DEMO0, 0, 0, 1.06]);
-  return k;
-})();
-function camOf(list, t) {
-  let i = 0; while (i < list.length - 2 && t > list[i + 1][0]) i++;
-  const a = list[i], b = list[i + 1], k = ease(seg(t, a[0], b[0]));
-  return { x: lerp(a[1], b[1], k), y: lerp(a[2], b[2], k), s: lerp(a[3], b[3], k) };
+const DEMO0 = 59.2, TECH1 = 69.4, TECH2 = 78.4;
+const SHOTS = [ // start, x, y, scale
+  ...BEATS.map((b, i) => [b[0], HX(i), -10, 1.0]),
+  [DEMO0, 20, -10, 1.0], [TECH1, 0, 1490, 1.0], [TECH2, 0, 2930, 1.0], [86.4, 2430, 0, 1.0], [98.0, 5010, -40, 0.85],
+  [112.3, 4900, -40, 1.05], [121.5, 7330, -20, 0.8], [136.15, 7200, 70, 0.76], [142.1, 7370, 70, 0.77], [152.0, 12000, 0, 1.0],
+];
+function camAt2(t) {
+  let i = 0; while (i < SHOTS.length - 1 && t >= SHOTS[i + 1][0]) i++;
+  const held = (s, until) => ({ x: s[1] + DRIFT * Math.max(0, until - s[0] - PAN) / s[3], y: s[2], s: s[3] });
+  const cur = SHOTS[i];
+  if (i === 0 || t >= cur[0] + PAN) return held(cur, t);
+  const a = held(SHOTS[i - 1], cur[0]), k = (t - cur[0]) / PAN, e = easeQuint(k);
+  return { x: lerp(a.x, cur[1], e), y: lerp(a.y, cur[2], e), s: lerp(a.s, cur[3], e) * (1 - 0.1 * Math.sin(Math.PI * k)) };
 }
-// The demo's clock: v2 seconds → v1 seconds, so each beat gets a breath. Two pieces: the whiteboard beat moved to Act I.
-const WARP = [[58, 0], [68.5, 10], [69.1, 10.6], [83.5, 24], [101, 40], [111.5, 50], [128, 64], [137, 72], [144.5, 78.6], [148.5, 82.2]];
-const WARP_END = [[148.5, 88.6], [156, 97]];
+// The demo's scenes keep the clock they were written on (v1 seconds); this maps the film's clock onto it:
+// actions run at their speed or quicker, pauses hold still (two points at one v1 time), and a cut jumps (two at one film time).
+const WARP = [
+  [59.2, 0], [59.8, 0.5], [63.2, 4.4], [64.4, 4.4], [67.7, 8.4], [69.4, 8.6], [69.5, 10.3], [86.4, 10.3],
+  [92.7, 18.2], [93.5, 18.2], [96.3, 21.6], [98.0, 21.6], [98.0, 25.2], [103.9, 32.0], [105.2, 33.7], [106.9, 36.0], [108.1, 36.0],
+  [110.3, 38.4], [111.8, 38.4], [112.3, 40.0], [114.3, 42.2], [120.2, 49.0], [121.5, 49.4], [121.5, 49.8], [122.1, 51.0],
+  [124.95, 55.0], [126.55, 56.6], [127.55, 56.6], [129.65, 58.9], [130.25, 58.9], [132.05, 60.9], [132.65, 60.9], [134.55, 63.0],
+  [136.15, 63.6], [140.3, 68.8], [142.1, 69.2], [142.1, 72.8], [147.0, 77.9], [148.0, 78.4], [150.6, 81.0], [152.0, 81.6],
+  [152.5, 82.2], [152.5, 88.6], [158.9, 95.0], [160.4, 95.0],
+];
 function warp(t) {
   if (t < DEMO0) return null;
-  const list = t >= WARP_END[0][0] ? WARP_END : WARP;
-  for (let i = 0; i < list.length - 1; i++) if (t <= list[i + 1][0]) return lerp(list[i][1], list[i + 1][1], seg(t, list[i][0], list[i + 1][0]));
-  return list[list.length - 1][1];
+  for (let i = 0; i < WARP.length - 1; i++) { const a = WARP[i], b = WARP[i + 1]; if (t >= a[0] && t < b[0]) return lerp(a[1], b[1], (t - a[0]) / (b[0] - a[0])); }
+  return WARP[WARP.length - 1][1];
 }
+let NOW = 0; // the film's clock, for what moves through a pause (a model's breathing dot, the room's traffic)
 
+/* ======================================================================== */
+/* Act I — where it comes from: a timeline on the same canvas.              */
+/* ======================================================================== */
 const TL_Y = -420;
 function timeline(t) {
   if (t > DEMO0) return '';
-  let s = `<line x1="-20400" y1="${TL_Y}" x2="-3900" y2="${TL_Y}" stroke="${C.ink4}" stroke-width="1.6"/>`;
-  BEATS.slice(0, 7).forEach((b, i) => {
-    const on = t >= b[0] && t < (BEATS[i + 1] ? BEATS[i + 1][0] : DEMO0);
-    const seen = t >= b[0] - 1.2;
-    s += `<circle cx="${b[1]}" cy="${TL_Y}" r="${on ? 9 : 6}" fill="${on ? C.teal : seen ? C.ink3 : C.paper}" stroke="${on ? C.teal : C.ink4}" stroke-width="1.6"/>`;
-    s += mono(b[1], TL_Y - 24, b[4], { size: 22, color: on ? C.teal : C.ink4, anchor: 'middle', weight: on ? 500 : 400 });
+  let s = `<line x1="${HX(0) - 800}" y1="${TL_Y}" x2="${HX(8) + 800}" y2="${TL_Y}" stroke="${C.ink4}" stroke-width="1.6"/>`;
+  BEATS.slice(0, 9).forEach((b, i) => {
+    const on = t >= b[0] && t < BEATS[i + 1][0], seen = t >= b[0];
+    if (on) { const ph = ((t - b[0]) % 2.4) / 2.4; s += `<circle cx="${HX(i)}" cy="${TL_Y}" r="${f1(10 + 16 * ph)}" fill="none" stroke="${C.teal}" stroke-width="1.6" opacity="${f1(0.5 * (1 - ph))}"/>`; }
+    s += `<circle cx="${HX(i)}" cy="${TL_Y}" r="${on ? 9 : 6}" fill="${on ? C.teal : seen ? C.ink3 : C.paper}" stroke="${on ? C.teal : C.ink4}" stroke-width="1.6"/>`;
+    s += mono(HX(i), TL_Y - 24, b[1], { size: 22, color: on ? C.teal : C.ink4, anchor: 'middle', weight: on ? 500 : 400 });
   });
   return s;
 }
+const local = (t, i) => t - BEATS[i][0];
+const inBeat = (L, i) => L > -1 && L < (BEATS[i + 1] ? BEATS[i + 1][0] - BEATS[i][0] : 4) + 1;
 
 /* 1945 — the memex: trails between documents. */
 const H0 = (() => {
-  const x0 = -19200, P = [[-520, -60], [-250, 110], [0, -110], [260, 70], [520, -50]];
+  const x0 = HX(0), P = [[-520, -60], [-250, 110], [0, -110], [260, 70], [520, -50]];
   const pages = P.map(([x, y], i) => ({ c: [x0 + x, y], box: hand(rectPts(x0 + x, y, 110, 140), 60 + i, 1.4), lines: [0, 1, 2].map(j => hand([[x0 + x - 34, y - 34 + j * 26], [x0 + x + 30 - j * 14, y - 34 + j * 26]], 70 + i * 3 + j, 0.8)) }));
-  const knots = pages.map(p => p.c); const trail = [];
-  for (let i = 0; i < knots.length - 1; i++) { const a = knots[i], b = knots[i + 1]; for (let k = 0; k <= 20; k++) { const u = k / 20; trail.push([lerp(a[0], b[0], u), lerp(a[1], b[1], u) + Math.sin(u * Math.PI) * (i % 2 ? 70 : -70)]); } }
+  const trail = [];
+  for (let i = 0; i < pages.length - 1; i++) { const a = pages[i].c, b = pages[i + 1].c; for (let k = 0; k <= 20; k++) { const u = k / 20; trail.push([lerp(a[0], b[0], u), lerp(a[1], b[1], u) + Math.sin(u * Math.PI) * (i % 2 ? 70 : -70)]); } }
   return { pages, trail: hand(trail, 81, 2) };
 })();
 function hist0(t) {
-  if (t > 7.6) return '';
+  const L = local(t, 0); if (!inBeat(L, 0)) return '';
   let s = '';
-  H0.pages.forEach((p, i) => { s += drawSeq([p.box, ...p.lines], t, 0.3 + i * 0.32, 0.9 + i * 0.32, { w: 2.6 }); });
-  s += ink(H0.trail, seg(t, 2.1, 5.2), { color: C.teal, w: 3.2 });
+  H0.pages.forEach((p, i) => { s += drawSeq([p.box, ...p.lines], L, 0.2 + i * 0.2, 0.6 + i * 0.2, { w: 2.6 }); });
+  s += ink(H0.trail, easeOut(seg(L, 1.3, 2.9)), { color: C.teal, w: 3.2 });
   return s;
 }
 
 /* 1963 — Sketchpad: a truss drawn by light pen, its constraints satisfied. */
 const H1 = (() => {
-  const x0 = -16800, r = rng(91), J = () => [(r() - 0.5) * 46, (r() - 0.5) * 40];
+  const x0 = HX(1), r = rng(91), J = () => [(r() - 0.5) * 46, (r() - 0.5) * 40];
   const nodes = [[-300, 110], [-100, 110], [100, 110], [300, 110], [-200, -70], [0, -70], [200, -70]].map(([x, y]) => ({ at: [x0 + x, y], j: J() }));
-  const members = [[0, 1], [1, 2], [2, 3], [4, 5], [5, 6], [0, 4], [4, 1], [1, 5], [5, 2], [2, 6], [6, 3]];
-  return { x0, nodes, members };
+  return { x0, nodes, members: [[0, 1], [1, 2], [2, 3], [4, 5], [5, 6], [0, 4], [4, 1], [1, 5], [5, 2], [2, 6], [6, 3]] };
 })();
 function hist1(t) {
-  const L = t - 7; if (L < -1 || L > 8) return '';
-  let s = '';
-  const { x0, nodes, members } = H1; const fix = ease(seg(L, 4.2, 5.2)); const phos = C.tealSoft;
-  s += `<rect x="${x0 - 420}" y="-290" width="840" height="520" rx="34" fill="#0f1d25"/>`;
-  s += mono(x0 - 384, -250, 'TX-2 · LIGHT PEN', { size: 16, color: '#557784', ls: 2 });
+  const L = local(t, 1); if (!inBeat(L, 1)) return '';
+  const { x0, nodes, members } = H1, fix = easeQuint(seg(L, 3.0, 3.6)), phos = C.tealSoft;
+  let s = `<rect x="${x0 - 420}" y="-290" width="840" height="520" rx="34" fill="#0f1d25"/>` + mono(x0 - 384, -250, 'TX-2 · LIGHT PEN', { size: 16, color: '#557784', ls: 2 });
   const P = i => { const n = nodes[i]; return [n.at[0] + n.j[0] * (1 - fix), n.at[1] + n.j[1] * (1 - fix)]; };
   let tip = null;
   members.forEach(([a, b], i) => {
-    const k = seg(L, 0.5 + i * 0.27, 0.77 + i * 0.27); if (k <= 0) return;
+    const k = easeOut(seg(L, 0.4 + i * 0.2, 0.62 + i * 0.2)); if (k <= 0) return;
     const A = P(a), B = P(b), E = [lerp(A[0], B[0], k), lerp(A[1], B[1], k)];
     s += `<line x1="${f1(A[0])}" y1="${f1(A[1])}" x2="${f1(E[0])}" y2="${f1(E[1])}" stroke="${phos}" stroke-width="9" opacity="0.18" stroke-linecap="round"/><line x1="${f1(A[0])}" y1="${f1(A[1])}" x2="${f1(E[0])}" y2="${f1(E[1])}" stroke="#9fe3df" stroke-width="2.6" stroke-linecap="round"/>`;
     if (k < 1) tip = E;
   });
-  nodes.forEach((n, i) => { if (L > 0.5) { const q = P(i); s += `<circle cx="${f1(q[0])}" cy="${f1(q[1])}" r="5" fill="#9fe3df"/>`; } });
+  if (L > 0.4) nodes.forEach((n, i) => { const q = P(i); s += `<circle cx="${f1(q[0])}" cy="${f1(q[1])}" r="5" fill="#9fe3df"/>`; });
   if (tip) s += `<line x1="${f1(tip[0])}" y1="${f1(tip[1])}" x2="${x0 + 560}" y2="380" stroke="${C.ink2}" stroke-width="7" stroke-linecap="round"/><circle cx="${f1(tip[0])}" cy="${f1(tip[1])}" r="14" fill="#9fe3df" opacity="0.25"/>`;
-  s += mono(x0, 190, fix > 0 ? 'constraints satisfied — equal, joined, level' : '', { size: 18, color: phos, anchor: 'middle', o: seg(L, 5.0, 5.5) });
+  s += mono(x0, 190, 'constraints satisfied — equal, joined, level', { size: 18, color: phos, anchor: 'middle', o: seg(L, 3.5, 3.8) });
   return s;
 }
 
 /* 1977 — a Dynabook sketched, and every medium inside it. */
 const H2 = (() => {
-  const x0 = -14400, cx = x0 - 160;
+  const x0 = HX(2), cx = x0 - 190;
   return {
-    x0, cx,
-    shell: hand(rectPts(cx, -60, 540, 380), 101, 1.8),
-    screen: hand(rectPts(cx, -120, 470, 200), 102, 1.4),
+    x0, shell: hand(rectPts(cx, -60, 540, 380), 101, 1.8), screen: hand(rectPts(cx, -120, 470, 200), 102, 1.4),
     keys: [0, 1, 2].map(j => hand([[cx - 220, 75 + j * 30], [cx + 220, 75 + j * 30]], 103 + j, 1.2)),
     media: [
       hand(ellipsePts(cx - 160, -130, 40, 40, -2, 0.15, 50), 110, 1.2),
@@ -624,138 +630,257 @@ const H2 = (() => {
   };
 })();
 function hist2(t) {
-  const L = t - 14.5; if (L < -1 || L > 8) return '';
-  let s = drawSeq([H2.shell, H2.screen, ...H2.keys], L, 0.3, 2.2, { w: 3 });
-  s += drawSeq(H2.media, L, 2.3, 3.7, { w: 2.6, color: C.teal });
-  s += writing(H2.x0 + 170, -40, 'metamedium', 76, seg(L, 3.6, 4.8));
-  s += mono(H2.x0 + 172, 20, 'a medium that can be all other media', { size: 20, color: C.ink3, o: seg(L, 4.8, 5.3) });
+  const L = local(t, 2); if (!inBeat(L, 2)) return '';
+  let s = drawSeq([H2.shell, H2.screen, ...H2.keys], easeOut(seg(L, 0.3, 1.4)), 0, 1, { w: 3 });
+  s += drawSeq(H2.media, easeOut(seg(L, 1.4, 2.2)), 0, 1, { w: 2.6, color: C.teal });
+  s += writing(H2.x0 + 140, -40, 'metamedium', 76, seg(L, 2.2, 3.0));
+  s += mono(H2.x0 + 142, 20, 'a medium that can be all other media', { size: 20, color: C.ink3, o: seg(L, 3.0, 3.3) });
   return s;
 }
 
 /* 1980 — Put-That-There: speech that points. */
 function hist3(t) {
-  const L = t - 21.5; if (L < -1 || L > 8) return '';
-  const x0 = -12000; let s = '';
-  const from = [x0 - 330, 40], to = [x0 + 300, 40], mv = ease(seg(L, 3.6, 4.8));
+  const L = local(t, 3); if (!inBeat(L, 3)) return '';
+  const x0 = HX(3); let s = '';
+  const from = [x0 - 330, 40], to = [x0 + 300, 40], mv = easeQuint(seg(L, 2.3, 3.1));
   const c = [lerp(from[0], to[0], mv), lerp(from[1], to[1], mv)];
-  s += ink(hand([[to[0] - 26, to[1] - 26], [to[0] + 26, to[1] + 26]], 121, 1), seg(L, 2.3, 2.6), { tip: false, color: C.ink3 });
-  s += ink(hand([[to[0] + 26, to[1] - 26], [to[0] - 26, to[1] + 26]], 122, 1), seg(L, 2.6, 2.9), { tip: false, color: C.ink3 });
+  s += ink(hand([[to[0] - 26, to[1] - 26], [to[0] + 26, to[1] + 26]], 121, 1), seg(L, 1.5, 1.7), { tip: false, color: C.ink3 });
+  s += ink(hand([[to[0] + 26, to[1] - 26], [to[0] - 26, to[1] + 26]], 122, 1), seg(L, 1.7, 1.9), { tip: false, color: C.ink3 });
   if (mv > 0) s += `<line x1="${from[0]}" y1="${from[1]}" x2="${f1(c[0])}" y2="${f1(c[1])}" stroke="${C.ink4}" stroke-width="2" stroke-dasharray="6 7"/>`;
-  s += ink(hand(rectPts(c[0], c[1], 150, 110), 120, 1.4).map(q => q), seg(L, 0.2, 0.9), { w: 3.2 });
-  const hand0 = [x0 - 40, 260], aim = L < 2.4 ? from : to, aimK = L < 2.4 ? seg(L, 1.1, 1.6) : seg(L, 2.4, 2.9);
-  if (L > 1.1) s += `<line x1="${hand0[0]}" y1="${hand0[1]}" x2="${f1(lerp(hand0[0], aim[0], aimK))}" y2="${f1(lerp(hand0[1], aim[1] + 60, aimK))}" stroke="${C.teal}" stroke-width="2.4" stroke-dasharray="3 8" stroke-linecap="round"/>`;
-  s += `<circle cx="${hand0[0]}" cy="${hand0[1]}" r="9" fill="${C.teal}" opacity="${seg(L, 1.0, 1.3)}"/>`;
-  s += mono(x0 - 330, -170, typed('“put that…', seg(L, 0.8, 1.6)), { size: 34, color: C.ink, anchor: 'middle' });
-  s += mono(x0 + 300, -170, typed('…there.”', seg(L, 2.3, 2.9)), { size: 34, color: C.ink, anchor: 'middle' });
+  s += ink(hand(rectPts(c[0], c[1], 150, 110), 120, 1.4), easeOut(seg(L, 0.2, 0.7)), { w: 3.2 });
+  const hand0 = [x0 - 20, 250], aim = L < 1.7 ? from : to, aimK = easeOut(L < 1.7 ? seg(L, 0.8, 1.2) : seg(L, 1.7, 2.1));
+  if (L > 0.8) s += `<line x1="${hand0[0]}" y1="${hand0[1]}" x2="${f1(lerp(hand0[0], aim[0], aimK))}" y2="${f1(lerp(hand0[1], aim[1] + 60, aimK))}" stroke="${C.teal}" stroke-width="2.4" stroke-dasharray="3 8" stroke-linecap="round"/>`;
+  s += `<circle cx="${hand0[0]}" cy="${hand0[1]}" r="9" fill="${C.teal}" opacity="${seg(L, 0.7, 0.9)}"/>`;
+  s += mono(x0 - 330, -150, typed('“put that…', seg(L, 0.6, 1.2)), { size: 34, anchor: 'middle' });
+  s += mono(x0 + 300, -150, typed('…there.”', seg(L, 1.5, 2.0)), { size: 34, anchor: 'middle' });
   return s;
 }
 
-/* then — dead drawing on a living medium: a toolbar, scratched out; the arrows start to flow. */
-const WX = -9600;
+/* 1996 — SILK: a sketched interface, recognised and made real. */
+const H4 = (() => {
+  const x0 = HX(4);
+  return {
+    x0,
+    window: hand(rectPts(x0, -40, 600, 360), 301, 1.8),
+    bar: hand([[x0 - 296, -168], [x0 + 296, -168]], 302, 1),
+    text: hand((() => { const o = []; for (let i = 0; i <= 60; i++) o.push([x0 - 240 + i * 7.2, -100 + Math.sin(i * 1.3) * 7]); return o; })(), 306, 0.6),
+    button: hand(rectPts(x0 - 140, 60, 180, 70), 303, 1.2),
+    track: hand([[x0 + 40, 60], [x0 + 240, 60]], 304, 0.8),
+    knob: hand(ellipsePts(x0 + 90, 60, 17, 17, -2, 0.2, 40), 305, 0.8),
+  };
+})();
+function hist4(t) {
+  const L = local(t, 4); if (!inBeat(L, 4)) return '';
+  const { x0 } = H4, rec = seg(L, 2.3, 2.7);
+  let s = drawSeq([H4.window, H4.bar, H4.text, H4.button, H4.track, H4.knob], easeOut(seg(L, 0.3, 2.0)), 0, 1, { w: 3, color: rec > 0 ? C.ghost : C.ink, o: 1 - 0.3 * rec });
+  s += writing(x0 - 140, 72, 'OK', 36, seg(L, 1.7, 2.0), { anchor: 'middle', tip: false, color: rec > 0 ? C.ghost : C.ink });
+  if (rec > 0) {
+    const press = fade(L, 3.3, 3.45, 3.7, 4.0), kx = x0 + 90 + 130 * easeQuint(seg(L, 3.9, 4.6));
+    s += `<g opacity="${f1(rec)}"><rect x="${x0 - 230}" y="25" width="180" height="70" rx="10" fill="${C.clean}" fill-opacity="${f1(0.06 + 0.3 * press)}" stroke="${C.clean}" stroke-width="3.2"/>`;
+    s += `<line x1="${x0 + 40}" y1="60" x2="${x0 + 240}" y2="60" stroke="${C.clean}" stroke-width="3.2" stroke-linecap="round"/><circle cx="${f1(kx)}" cy="60" r="16" fill="${C.plate}" stroke="${C.clean}" stroke-width="3.2"/></g>`;
+    s += mono(x0 - 140, 72, 'OK', { size: 26, color: C.clean, anchor: 'middle', o: rec, weight: 500 });
+    s += mono(x0 - 140, 128, 'button', { size: 17, color: C.clean, anchor: 'middle', o: rec });
+    s += mono(x0 + 140, 128, 'slider', { size: 17, color: C.clean, anchor: 'middle', o: rec });
+  }
+  return s;
+}
+
+/* 2015 — Chalktalk: a drawing that moves. */
+const H5 = (() => {
+  const x0 = HX(5);
+  return { x0, pivot: hand([[x0 - 100, -230], [x0 + 100, -230]], 401, 1), rod: hand([[x0, -230], [x0 + 2, 40]], 402, 1), bob: hand(ellipsePts(x0 + 2, 92, 52, 50, -2, 0.18, 60), 403, 1.6) };
+})();
+function hist5(t) {
+  const L = local(t, 5); if (!inBeat(L, 5)) return '';
+  const { x0 } = H5, rec = seg(L, 2.0, 2.4);
+  let s = drawSeq([H5.pivot, H5.rod, H5.bob], easeOut(seg(L, 0.3, 1.6)), 0, 1, { w: 3.2, color: rec > 0 ? C.ghost : C.ink, o: 1 - 0.5 * rec });
+  if (rec > 0) {
+    const swing = L < 2.4 ? 0 : 0.5 * Math.sin((L - 2.4) * 2.7) * Math.min(1, (L - 2.4) / 0.4);
+    const px = x0, py = -230, len = 322, bx = px + Math.sin(swing) * len, by = py + Math.cos(swing) * len;
+    s += `<g opacity="${f1(rec)}"><path d="M${px - 100} ${py}H${px + 100}" stroke="${C.clean}" stroke-width="3.4"/>`;
+    s += `<path d="M${f1(px - Math.sin(0.5) * len)} ${f1(py + Math.cos(0.5) * len)} A ${len} ${len} 0 0 0 ${f1(px + Math.sin(0.5) * len)} ${f1(py + Math.cos(0.5) * len)}" fill="none" stroke="${C.ink4}" stroke-width="1.4" stroke-dasharray="4 7"/>`;
+    s += `<line x1="${px}" y1="${py}" x2="${f1(bx)}" y2="${f1(by)}" stroke="${C.clean}" stroke-width="3.4"/><circle cx="${f1(bx)}" cy="${f1(by)}" r="50" fill="${C.plate}" stroke="${C.clean}" stroke-width="3.4"/></g>`;
+    s += mono(x0 + 160, -222, 'pendulum · running', { size: 18, color: C.clean, o: rec });
+  }
+  return s;
+}
+
+/* 2016 — As We May Sketch: a curve drawn by hand is a function waiting. */
+const H6 = (() => {
+  const x0 = HX(6), o = [];
+  for (let i = 0; i <= 90; i++) { const x = -460 + i * 920 / 90; o.push([x0 + x, -240 + Math.sin(x / 72) * 46]); }
+  return { x0, drawn: hand(o, 150, 7), clean: o };
+})();
+const QUOTE = ['“when I draw into a computer with the flourish', 'of my hand, we can take it beyond pixels, beyond', 'even vectors, toward a truly metamedium.”'];
+function hist6(t) {
+  const L = local(t, 6); if (!inBeat(L, 6)) return '';
+  const k = easeOut(seg(L, 1.2, 1.6)); let s = '';
+  s += ink(H6.drawn, easeOut(seg(L, 0.3, 1.1)), { color: k > 0 ? C.ghost : C.ink, o: 1 - 0.4 * k, w: k > 0 ? 2.4 : 3.4 });
+  if (k > 0) s += `<path d="${dOf(partial(H6.clean, k))}" fill="none" stroke="${C.clean}" stroke-width="3.4"/>`;
+  s += mono(H6.x0 + 470, -232, 'y = 46 · sin(x ⁄ 72)', { size: 22, color: C.clean, o: seg(L, 1.6, 1.9) });
+  const total = QUOTE.join('').length; let left = Math.round(total * seg(L, 1.7, 3.9));
+  QUOTE.forEach((l, i) => { s += mono(H6.x0 - 520, -60 + i * 52, l.slice(0, Math.max(0, left)), { size: 34 }); left -= l.length; });
+  s += mono(H6.x0 - 520, 120, '— John Hanacek, As We May Sketch, Georgetown, 2016', { size: 20, color: C.ink3, o: seg(L, 4.0, 4.4) });
+  return s;
+}
+
+/* today — most drawing tools imitate paper: a toolbar, scratched out; the arrows start to flow. */
+const WX = HX(7);
 const SCRATCH = hand((() => { const o = []; let up = true; for (let i = 0; i < 9; i++) { o.push([WX - 560 + i * 140, up ? -300 : -110]); up = !up; } return o; })(), 88, 2);
 const DEAD = (() => {
-  const xs = [-380, 0, 380], y = 150, words = ['idea', 'draft', 'ship'];
+  const xs = [-380, 0, 380], y = 90, words = ['idea', 'draft', 'ship'];
   return {
     boxes: xs.map((x, i) => ({ c: [WX + x, y], pts: hand(rectPts(WX + x, y, 200, 92), 130 + i, 1.6), word: words[i] })),
     arrows: [0, 1].map(i => arrowStrokes([WX + xs[i] + 112, y + 4], [WX + xs[i + 1] - 112, y - 2], 140 + i * 3)),
   };
 })();
-function scene6(L) {
-  if (L < -1 || L > 12.5) return '';
+function hist7(t) {
+  const L = local(t, 7); if (!inBeat(L, 7)) return '';
   let s = '';
-  const er = seg(L, 7.1, 7.7), gone = seg(L, 7.7, 8.5);
-  const o = fade(L, 0.2, 0.8) * (1 - gone);
+  const er = seg(L, 4.9, 5.2), gone = easeQuint(seg(L, 5.2, 5.8));
+  const o = seg(L, 0.2, 0.5) * (1 - gone);
   if (o > 0) {
     const col = c => er > 0 ? C.gone : c, Y = -258;
-    s += `<g opacity="${f1(o * 100) / 100}" transform="translate(0 ${f1(30 * easeOut(gone))})">`;
+    s += `<g opacity="${f1(o)}" transform="translate(0 ${f1(30 * gone)})">`;
     s += `<rect x="${WX - 520}" y="${Y}" width="1040" height="112" rx="18" fill="${C.plate}" stroke="${col(C.rule)}" stroke-width="2"/>`;
     ['#e53935', '#fdd835', '#43a047', '#1e88e5', '#212121'].forEach((c, i) => { s += `<circle cx="${WX - 460 + i * 58}" cy="${Y + 56}" r="20" fill="${er > 0 ? C.gone : c}" opacity="${er > 0 ? 0.35 : 1}"/>`; });
     s += `<line x1="${WX - 150}" y1="${Y + 20}" x2="${WX - 150}" y2="${Y + 92}" stroke="${col(C.rule)}" stroke-width="2"/>`;
     const st = `fill="none" stroke="${col(C.ink3)}" stroke-width="3"`;
     s += `<rect x="${WX - 115}" y="${Y + 35}" width="42" height="42" ${st}/><circle cx="${WX - 18}" cy="${Y + 56}" r="22" ${st}/><path d="M${WX + 40} ${Y + 75} L${WX + 90} ${Y + 35} M${WX + 72} ${Y + 35} L${WX + 90} ${Y + 35} L${WX + 90} ${Y + 53}" ${st}/><rect x="${WX + 125}" y="${Y + 33}" width="46" height="46" fill="${er > 0 ? C.gone : '#ffe082'}" opacity="${er > 0 ? 0.3 : 1}"/>`;
     s += mono(WX + 210, Y + 65, 'templates ▾', { size: 24, color: col(C.ink3) });
-    s += mono(WX, Y + 150, 'pick a colour · drag a shape · stick a note', { size: 20, color: col(C.ink4), anchor: 'middle', o: seg(L, 0.8, 1.3) * (1 - er) });
     s += '</g>';
   }
-  // a flowchart drawn under it, whose arrows go nowhere — until the other road
-  DEAD.boxes.forEach((b, i) => { s += ink(b.pts, seg(L, 1.4 + i * 0.5, 1.8 + i * 0.5), { w: 3 }); s += writing(b.c[0], b.c[1] + 12, b.word, 38, seg(L, 1.8 + i * 0.5, 2.2 + i * 0.5), { anchor: 'middle', tip: false }); });
-  DEAD.arrows.forEach((a, i) => { s += drawSeq(a, L, 3.1 + i * 0.4, 3.4 + i * 0.4, { w: 3 }); });
-  s += chip(WX - 165, 252, 'the arrows do not flow', { kind: 'held', o: fade(L, 3.8, 4.2, 8.4, 8.8), size: 19 });
-  if (L > 8.8) for (const [i, a] of DEAD.arrows.entries()) { const sh = a[0]; for (const off of [0, 0.5]) { const u = ((L - 8.8) * 0.7 + off + i * 0.25) % 1; const q = sh[Math.floor(u * (sh.length - 1))]; s += `<circle cx="${f1(q[0])}" cy="${f1(q[1])}" r="8" fill="${C.teal}" opacity="${f1(fade(L, 8.8, 9.2) * 0.9)}"/>`; } }
-  s += chip(WX - 115, 252, 'now they do', { kind: 'match', o: fade(L, 9.4, 9.8), size: 19 });
-  const sk = seg(L, 5.2, 7.0);
+  DEAD.boxes.forEach((b, i) => { s += ink(b.pts, easeOut(seg(L, 0.6 + i * 0.3, 0.9 + i * 0.3)), { w: 3 }); s += writing(b.c[0], b.c[1] + 12, b.word, 38, seg(L, 0.9 + i * 0.3, 1.2 + i * 0.3), { anchor: 'middle', tip: false }); });
+  DEAD.arrows.forEach((a, i) => { s += drawSeq(a, L, 1.8 + i * 0.25, 2.0 + i * 0.25, { w: 3 }); });
+  s += chip(WX - 140, 196, 'the arrows do not flow', { kind: 'held', o: fade(L, 2.4, 2.6, 5.6, 5.8), size: 19 });
+  if (L > 5.9) for (const [i, a] of DEAD.arrows.entries()) { const sh = a[0]; for (const off of [0, 0.5]) { const u = ((L - 5.9) * 0.7 + off + i * 0.25) % 1; const q = sh[Math.floor(u * (sh.length - 1))]; s += `<circle cx="${f1(q[0])}" cy="${f1(q[1])}" r="8" fill="${C.teal}" opacity="${f1(seg(L, 5.9, 6.1) * 0.9)}"/>`; } }
+  s += chip(WX - 80, 196, 'now they do', { kind: 'match', o: seg(L, 6.2, 6.4), size: 19 });
+  const sk = seg(L, 3.4, 4.8);
   s += ink(SCRATCH, sk, { color: er > 0 ? C.gone : C.ink, o: 1 - gone, w: 4 });
   const crossings = Math.min(3, Math.floor(sk * 8 / 2.4));
   const words = ['', 'crossed it once', 'crossed it twice', 'three times — erased'];
-  s += mono(WX, -40, words[crossings], { size: 22, color: crossings === 3 ? C.gone : C.ink3, anchor: 'middle', o: (sk > 0.1 ? 1 : 0) * (1 - seg(L, 8.6, 9.1)) });
-  return s;
-}
-
-/* 2016 — As We May Sketch: a curve drawn by hand is a function waiting. */
-const H5 = (() => {
-  const x0 = -7200, o = [];
-  for (let i = 0; i <= 90; i++) { const x = -460 + i * 920 / 90; o.push([x0 + x, -240 + Math.sin(x / 72) * 46]); }
-  return { x0, drawn: hand(o, 150, 7), clean: o };
-})();
-const QUOTE = ['“when I draw into a computer with the flourish', 'of my hand, we can take it beyond pixels, beyond', 'even vectors, toward a truly metamedium.”'];
-function hist5(t) {
-  const L = t - 40; if (L < -1 || L > 8) return '';
-  const k = seg(L, 1.9, 2.5); let s = '';
-  s += ink(H5.drawn, seg(L, 0.3, 1.7), { color: k > 0 ? C.ghost : C.ink, o: 1 - 0.4 * k, w: k > 0 ? 2.4 : 3.4 });
-  if (k > 0) s += `<path d="${dOf(partial(H5.clean, k))}" fill="none" stroke="${C.clean}" stroke-width="3.4"/>`;
-  s += mono(H5.x0 + 470, -232, 'y = 46 · sin(x ⁄ 72)', { size: 22, color: C.clean, o: seg(L, 2.5, 2.9) });
-  const total = QUOTE.join('').length; let left = Math.round(total * seg(L, 2.8, 5.0));
-  QUOTE.forEach((l, i) => { s += mono(H5.x0 - 520, -60 + i * 52, l.slice(0, Math.max(0, left)), { size: 34, color: C.ink }); left -= l.length; });
-  s += mono(H5.x0 - 520, 120, '— John Hanacek, As We May Sketch, Georgetown, 2016', { size: 20, color: C.ink3, o: seg(L, 5.1, 5.6) });
+  s += mono(WX, -40, words[crossings], { size: 22, color: crossings === 3 ? C.gone : C.ink3, anchor: 'middle', o: (sk > 0.1 ? 1 : 0) * (1 - seg(L, 5.6, 5.9)) });
   return s;
 }
 
 /* 2026 — AI as a meta-word: meaning back inside the loop. */
-function hist6(t) {
-  const L = t - 47; if (L < -1 || L > 7.5) return '';
-  const x0 = -4800, R = 96, s0 = [];
-  const N = { lang: [x0 - 340, 110], comp: [x0 + 340, 110], mean: [x0, -210] };
+function hist8(t) {
+  const L = local(t, 8); if (!inBeat(L, 8)) return '';
+  const x0 = HX(8), R = 96, N = { lang: [x0 - 340, 110], comp: [x0 + 340, 110], mean: [x0, -210] };
   const edge = (a, b, bend) => { const A = N[a], B = N[b], dx = B[0] - A[0], dy = B[1] - A[1], l = Math.hypot(dx, dy), ux = dx / l, uy = dy / l; const p = [A[0] + ux * (R + 14), A[1] + uy * (R + 14)], q = [B[0] - ux * (R + 18), B[1] - uy * (R + 18)]; const m = [(p[0] + q[0]) / 2 - uy * bend, (p[1] + q[1]) / 2 + ux * bend]; const o = []; for (let i = 0; i <= 24; i++) { const u = i / 24; o.push([(1 - u) ** 2 * p[0] + 2 * (1 - u) * u * m[0] + u * u * q[0], (1 - u) ** 2 * p[1] + 2 * (1 - u) * u * m[1] + u * u * q[1]]); } return o; };
-  let s = '';
-  const circ = (n, seed, a, b, col) => ink(hand(ellipsePts(N[n][0], N[n][1], R, R, -2, 0.15, 70), seed, 1.6), seg(L, a, b), { color: col, w: 3 });
-  s += circ('lang', 160, 0.2, 0.8, C.ink) + circ('comp', 161, 0.6, 1.2, C.ink);
-  s += mono(N.lang[0], N.lang[1] + 8, 'language', { size: 22, anchor: 'middle', o: seg(L, 0.8, 1.1) });
-  s += mono(N.comp[0], N.comp[1] + 8, 'computation', { size: 22, anchor: 'middle', o: seg(L, 1.2, 1.5) });
+  const circ = (n, seed, a, b, col) => ink(hand(ellipsePts(N[n][0], N[n][1], R, R, -2, 0.15, 70), seed, 1.6), easeOut(seg(L, a, b)), { color: col, w: 3 });
   const head = (pts, col, k) => k >= 1 ? headAt(pts, col, 1) : '';
-  const e1 = edge('lang', 'comp', -40), e2 = edge('comp', 'lang', -40);
-  s += ink(e1, seg(L, 1.3, 1.8), { tip: false, w: 3 }) + head(e1, C.ink, seg(L, 1.3, 1.8));
-  s += ink(e2, seg(L, 1.8, 2.3), { tip: false, w: 3, color: C.ink3 }) + head(e2, C.ink3, seg(L, 1.8, 2.3));
-  s += circ('mean', 162, 2.6, 3.3, C.teal);
-  s += mono(N.mean[0], N.mean[1] + 8, 'meaning', { size: 22, anchor: 'middle', color: C.teal, weight: 500, o: seg(L, 3.3, 3.6) });
-  const e3 = edge('comp', 'mean', -30), e4 = edge('mean', 'lang', -30);
-  s += ink(e3, seg(L, 3.5, 4.0), { tip: false, w: 3, color: C.teal }) + head(e3, C.teal, seg(L, 3.5, 4.0));
-  s += ink(e4, seg(L, 4.0, 4.5), { tip: false, w: 3, color: C.teal }) + head(e4, C.teal, seg(L, 4.0, 4.5));
-  if (L > 4.6) { const loop = [...e1, ...e3, ...e4], q = loop[Math.floor(((L - 4.6) * 0.45 % 1) * (loop.length - 1))]; s += `<circle cx="${f1(q[0])}" cy="${f1(q[1])}" r="9" fill="${C.teal}"/>`; }
+  let s = circ('lang', 160, 0.3, 0.7, C.ink) + circ('comp', 161, 0.5, 0.9, C.ink);
+  s += mono(N.lang[0], N.lang[1] + 8, 'language', { size: 22, anchor: 'middle', o: seg(L, 0.7, 0.9) });
+  s += mono(N.comp[0], N.comp[1] + 8, 'computation', { size: 22, anchor: 'middle', o: seg(L, 0.9, 1.1) });
+  const e1 = edge('lang', 'comp', -40), e2 = edge('comp', 'lang', -40), e3 = edge('comp', 'mean', -30), e4 = edge('mean', 'lang', -30);
+  s += ink(e1, seg(L, 1.0, 1.3), { tip: false, w: 3 }) + head(e1, C.ink, seg(L, 1.0, 1.3));
+  s += ink(e2, seg(L, 1.3, 1.6), { tip: false, w: 3, color: C.ink3 }) + head(e2, C.ink3, seg(L, 1.3, 1.6));
+  s += circ('mean', 162, 2.2, 2.6, C.teal);
+  s += mono(N.mean[0], N.mean[1] + 8, 'meaning', { size: 22, anchor: 'middle', color: C.teal, weight: 500, o: seg(L, 2.5, 2.7) });
+  s += ink(e3, seg(L, 2.6, 2.9), { tip: false, w: 3, color: C.teal }) + head(e3, C.teal, seg(L, 2.6, 2.9));
+  s += ink(e4, seg(L, 2.9, 3.2), { tip: false, w: 3, color: C.teal }) + head(e4, C.teal, seg(L, 2.9, 3.2));
+  if (L > 3.3) { const loop = [...e1, ...e3, ...e4], q = loop[Math.floor(((L - 3.3) * 0.45 % 1) * (loop.length - 1))]; s += `<circle cx="${f1(q[0])}" cy="${f1(q[1])}" r="9" fill="${C.teal}"/>`; }
   return s;
 }
 
 /* the title, between the history and the demo */
 function title(t) {
-  const L = t - 53; if (L < -1 || L > 5.5) return '';
-  const x0 = -2400; let s = '';
-  s += `<text x="${x0}" y="-10" font-family="${MONO}" font-size="160" font-weight="500" text-anchor="middle" letter-spacing="-4" opacity="${seg(L, 0.3, 0.9)}"><tspan fill="${C.ink}">dyna</tspan><tspan fill="${C.teal}">.ink</tspan></text>`;
-  s += mono(x0, 80, 'beyond chat — drawing as the interface to AI', { size: 34, color: C.ink2, anchor: 'middle', o: seg(L, 1.0, 1.5) });
-  s += mono(x0, 140, 'a drawing medium native to the computer', { size: 22, color: C.ink3, anchor: 'middle', o: seg(L, 1.6, 2.1) });
+  const L = local(t, 9); if (L < -1 || L > 5) return '';
+  const x0 = HX(9); let s = '';
+  s += `<text x="${x0}" y="-10" font-family="${MONO}" font-size="160" font-weight="500" text-anchor="middle" letter-spacing="-4" opacity="${f1(seg(L, 0.3, 0.7))}"><tspan fill="${C.ink}">dyna</tspan><tspan fill="${C.teal}">.ink</tspan></text>`;
+  s += mono(x0, 80, 'beyond chat — drawing as the interface to AI', { size: 34, color: C.ink2, anchor: 'middle', o: seg(L, 0.8, 1.1) });
+  s += mono(x0, 140, 'a drawing medium native to the computer', { size: 22, color: C.ink3, anchor: 'middle', o: seg(L, 1.2, 1.5) });
   return s;
 }
 function history(t) {
   if (t > DEMO0 + 1) return '';
-  return timeline(t) + hist0(t) + hist1(t) + hist2(t) + hist3(t) + scene6(t - 28.5) + hist5(t) + hist6(t) + title(t);
+  return timeline(t) + hist0(t) + hist1(t) + hist2(t) + hist3(t) + hist4(t) + hist5(t) + hist6(t) + hist7(t) + hist8(t) + title(t);
 }
+const B = i => BEATS[i][0];
 const HCAPS = [
-  { a: 0.3, b: 6.6, k: '1945', lines: [['Vannevar Bush, *As We May Think*.', 0.5], ['machines that keep the *trails* between ideas.', 2.4]] },
-  { a: 7.3, b: 14.1, k: '1963', lines: [['Ivan Sutherland’s *Sketchpad*.', 7.5], ['the drawing was a *structure*, not a picture.', 10.6]] },
-  { a: 14.8, b: 21.1, k: '1977', lines: [['Kay & Goldberg: *Personal Dynamic Media*.', 15.0], ['the computer as a *metamedium*.', 18.2]] },
-  { a: 21.8, b: 28.1, k: '1980', lines: [['Bolt’s *Put-That-There*.', 22.0], ['speech that *points* with the hand.', 24.6]] },
-  { a: 28.8, b: 36.1, k: 'then', lines: [['drawing on computers learned to *imitate paper*.', 29.0], ['you draw a flowchart. the arrows do not flow.', 31.8]] },
-  { a: 36.4, b: 39.6, k: 'so', lines: [['take the other road: *Sketchpad’s*.', 36.6]] },
-  { a: 40.3, b: 46.6, k: '2016', lines: [['a thesis: *As We May Sketch*.', 40.5]] },
-  { a: 47.3, b: 52.6, k: '2026', lines: [['models got good at *words*.', 47.5], ['a *meta-word* puts meaning back in the loop.', 50.0]] },
+  { a: B(0) + 0.2, b: B(1) - 0.1, k: '1945', lines: [['Vannevar Bush, *As We May Think*.', B(0) + 0.3], ['machines that keep the *trails* between ideas.', B(0) + 1.8]] },
+  { a: B(1) + 0.3, b: B(2) - 0.1, k: '1963', lines: [['Ivan Sutherland’s *Sketchpad*.', B(1) + 0.4], ['the drawing was a *structure*, not a picture.', B(1) + 3.2]] },
+  { a: B(2) + 0.3, b: B(3) - 0.1, k: '1977', lines: [['Kay & Goldberg: *Personal Dynamic Media*.', B(2) + 0.4], ['the computer as a *metamedium*.', B(2) + 2.4]] },
+  { a: B(3) + 0.3, b: B(4) - 0.1, k: '1980', lines: [['Bolt’s *Put-That-There*.', B(3) + 0.4], ['speech that *points* with the hand.', B(3) + 2.2]] },
+  { a: B(4) + 0.3, b: B(5) - 0.1, k: '1996', lines: [['Landay’s *SILK*: sketched interfaces, recognised.', B(4) + 0.4], ['a scribbled button becomes a real one.', B(4) + 2.6]] },
+  { a: B(5) + 0.3, b: B(6) - 0.1, k: '2015', lines: [['Perlin’s *Chalktalk*: a drawing that moves.', B(5) + 0.4], ['recognised sketches become *live simulations*.', B(5) + 2.4]] },
+  { a: B(6) + 0.3, b: B(7) - 0.1, k: '2016', lines: [['a thesis: *As We May Sketch*.', B(6) + 0.4]] },
+  { a: B(7) + 0.3, b: B(8) - 0.1, k: 'today', lines: [['most drawing tools *imitate paper*.', B(7) + 0.4], ['the arrows don’t flow. nothing runs.', B(7) + 2.4], ['dyna.ink takes *Sketchpad’s road*.', B(7) + 6.0]] },
+  { a: B(8) + 0.3, b: B(9) - 0.1, k: '2026', lines: [['models got good at *words*.', B(8) + 0.4], ['a *meta-word* puts meaning back in the loop.', B(8) + 2.4]] },
+];
+
+/* ======================================================================== */
+/* Inside — how it reads, and how it answers.                               */
+/* ======================================================================== */
+const T1Y = 1490;
+const T1 = {
+  a: hand(rectPts(-600, T1Y - 120, 180, 100), 201, 1.6),
+  b: hand(rectPts(-600, T1Y + 120, 180, 100), 202, 1.6),
+  arrow: arrowStrokes([-596, T1Y - 58], [-600, T1Y + 58], 203),
+};
+const COLS = [['INK', -690], ['SHAPE · what it is', -380], ['ROLE · what it plays', 60], ['CODE · what it becomes', 440]];
+function tech1(t) {
+  const L = t - TECH1; if (L < -1 || L > TECH2 - TECH1 + 1) return '';
+  let s = '';
+  const on = [seg(L, 0.4, 0.6), seg(L, 1.8, 2.0), seg(L, 3.2, 3.4), seg(L, 4.4, 4.6)];
+  COLS.forEach(([h, x], i) => { s += mono(x, T1Y - 250, h, { size: 18, ls: 2, weight: 500, color: on[i] > 0.5 ? C.teal : C.ink4 }); });
+  s += `<line x1="-700" y1="${T1Y - 228}" x2="760" y2="${T1Y - 228}" stroke="${C.rule}" stroke-width="1.4"/>`;
+  s += drawSeq([T1.a, ...T1.arrow, T1.b], easeOut(seg(L, 0.4, 1.5)), 0, 1, { w: 3.2 });
+  s += writing(-600, T1Y - 108, 'draft', 36, seg(L, 1.0, 1.3), { anchor: 'middle', tip: false });
+  s += writing(-600, T1Y + 132, 'ship', 36, seg(L, 1.3, 1.6), { anchor: 'middle', tip: false });
+  const rows = [
+    [T1Y - 120, 'rectangle 0.91', '4 corners · closed · fills 0.97', 'node', 'a process'],
+    [T1Y, 'arrow 0.88', 'its barb 0.13 of the shaft', 'edge', 'draft → ship'],
+    [T1Y + 120, 'rectangle 0.89', '4 corners · closed · fills 0.95', 'node', 'a process'],
+  ];
+  rows.forEach(([y, r, why, role, plays], i) => {
+    const a = seg(L, 1.8 + i * 0.25, 2.05 + i * 0.25), b = seg(L, 3.2 + i * 0.2, 3.45 + i * 0.2);
+    if (a > 0) s += `<line x1="-498" y1="${y}" x2="${f1(lerp(-498, -400, a))}" y2="${y}" stroke="${C.teal}" stroke-width="1.6" stroke-dasharray="4 5"/>`;
+    s += mono(-380, y - 4, r, { size: 24, o: a, color: C.ink });
+    s += mono(-380, y + 24, why, { size: 17, o: a, color: C.ink3 });
+    if (b > 0) s += `<line x1="-50" y1="${y}" x2="${f1(lerp(-50, 40, b))}" y2="${y}" stroke="${C.teal}" stroke-width="1.6" stroke-dasharray="4 5"/>`;
+    s += mono(60, y - 4, role, { size: 24, o: b, color: C.teal, weight: 500 });
+    s += mono(60, y + 24, plays, { size: 17, o: b, color: C.ink3 });
+  });
+  const c = seg(L, 4.4, 4.7);
+  if (c > 0) {
+    s += `<rect data-box="1" x="420" y="${T1Y - 150}" width="340" height="300" rx="10" fill="${C.plate}" stroke="${C.edge}" stroke-width="1.4" opacity="${f1(c)}"/>`;
+    const code = ['flowchart TD', '  draft --> ship'], total = code.join('').length; let left = Math.round(total * seg(L, 4.6, 5.3));
+    code.forEach((l, i) => { s += mono(444, T1Y - 92 + i * 38, l.slice(0, Math.max(0, left)), { size: 22, color: i ? C.ink : C.teal }); left -= l.length; });
+    s += mono(444, T1Y + 60, 'a flowchart 0.92', { size: 20, color: C.teal, o: seg(L, 5.4, 5.7) });
+    s += mono(444, T1Y + 92, 'no model asked', { size: 17, color: C.ink3, o: seg(L, 5.6, 5.9) });
+  }
+  return s;
+}
+const T2Y = 2930;
+const TIERS = [
+  ['TIER 0', 'the shape rung', 'rectangle 0.91 — 4 corners, fills 0.97', '0.2 ms · offline'],
+  ['TIER 1', 'the instant library', 'a flowchart 0.92 · tidy · Mermaid', '4 ms · no model'],
+  ['TIER 2', 'a model, local or hosted', '“a sign-up flow” 0.80 · claude', '1.8 s · asked'],
+];
+function tech2(t) {
+  const L = t - TECH2; if (L < -1 || L > 9) return '';
+  let s = '';
+  TIERS.forEach(([tier, who, says, when], i) => {
+    const a = easeQuint(seg(L, 0.4 + i * 0.7, 0.75 + i * 0.7)); if (a <= 0) return;
+    const y = T2Y - 200 + i * 130, model = i === 2, kept = model ? seg(L, 3.6, 3.9) : 0;
+    const border = model ? (kept > 0.5 ? C.read : C.held) : C.edge;
+    s += `<g opacity="${f1(a)}" transform="translate(0 ${Math.round(16 * (1 - a))})">`;
+    s += `<rect data-box="1" x="-720" y="${y - 52}" width="1440" height="104" rx="10" fill="${C.plate}" stroke="${border}" stroke-width="1.6"${model && kept < 0.5 ? ' stroke-dasharray="6 5"' : ''}/>`;
+    s += mono(-690, y - 12, tier, { size: 16, color: C.teal, ls: 2, weight: 500 }) + mono(-690, y + 22, who, { size: 22 });
+    s += mono(-300, y + 8, says, { size: 24, color: model ? C.model : C.ink });
+    const ping = seg(L, 0.7 + i * 0.7, 1.1 + i * 0.7 + (model ? 0.6 : 0));
+    if (ping > 0 && ping < 1) s += `<circle cx="${f1(lerp(-300, 680, easeOut(ping)))}" cy="${y + 34}" r="5" fill="${C.teal}"/>`;
+    s += mono(690, y + 8, model && kept > 0.5 ? 'asked · kept by you' : when, { size: 20, color: model && kept > 0.5 ? C.read : C.ink3, anchor: 'end', o: seg(L, 1.0 + i * 0.7 + (model ? 0.6 : 0), 1.2 + i * 0.7 + (model ? 0.6 : 0)) });
+    s += '</g>';
+  });
+  s += mono(0, T2Y + 160, 'a model gets the drawing’s structure — never a screenshot of it', { size: 20, color: C.ink3, anchor: 'middle', o: seg(L, 4.4, 4.8) });
+  return s;
+}
+const TCAPS = [
+  { a: TECH1 + 0.3, b: TECH2 - 0.1, k: 'inside — how it reads', lines: [['every mark climbs *three rungs*.', TECH1 + 0.4], ['measured from the ink, ranked, said *why*.', TECH1 + 2.2], ['and it becomes *code*.', TECH1 + 4.6]] },
+  { a: TECH2 + 0.3, b: 86.3, k: 'inside — how it answers', lines: [['the canvas answers *first*, in milliseconds.', TECH2 + 0.4], ['a model is *asked*. it proposes; *you* keep.', TECH2 + 2.6]] },
 ];
 
 /* the end card: the name written by hand, then drawn clean in front of it */
@@ -794,11 +919,11 @@ function rich(x, y, text, size, o) {
 function captions(t, list = CAPS) {
   let s = '';
   for (const c of list) {
-    const o = fade(t, c.a, c.a + 0.4, c.b - 0.4, c.b); if (o <= 0) continue;
+    const o = fade(t, c.a, c.a + 0.25, c.b - 0.3, c.b); if (o <= 0) continue;
     const shown = c.lines.filter(l => t >= l[1]); const n = shown.length; if (!n) continue;
     const baseY = 960 - (n - 1) * 58;
     s += `<g opacity="${f1(o * 100) / 100}">` + mono(120, baseY - 62, c.k.toUpperCase(), { size: 18, color: C.teal, ls: 3, weight: 500 });
-    shown.forEach((l, i) => { const k = easeOut(seg(t, l[1], l[1] + 0.45)); s += `<g transform="translate(0 ${f1(14 * (1 - k))})">${rich(120, baseY + i * 58, l[0], 46, k)}</g>`; });
+    shown.forEach((l, i) => { const k = easeOut(seg(t, l[1], l[1] + 0.3)); s += `<g transform="translate(0 ${Math.round(14 * (1 - k))})">${rich(120, baseY + i * 58, l[0], 46, k)}</g>`; });
     s += '</g>';
   }
   return s;
@@ -846,7 +971,7 @@ function devices(t, gridRect) {
   s += mono(D.x + D.w / 2, D.y + D.h + 134, 'the desk · Claude Code · local models', { size: 22, color: C.ink2, anchor: 'middle' });
   // the room between them
   const y = 760; s += `<path d="M${P.x + P.w / 2} ${P.y + P.h + 100} C ${P.x + P.w / 2} ${y + 40}, ${D.x + D.w / 2} ${y + 40}, ${D.x + D.w / 2} ${D.y + D.h + 160}" fill="none" stroke="${C.teal}" stroke-width="2" stroke-dasharray="6 7"/>`;
-  const u = ((t - 79) * 0.6) % 1; const bz = (p0, p1, p2, p3, u) => (1 - u) ** 3 * p0 + 3 * (1 - u) ** 2 * u * p1 + 3 * (1 - u) * u * u * p2 + u ** 3 * p3;
+  const u = ((NOW - 140) * 0.6) % 1; const bz = (p0, p1, p2, p3, u) => (1 - u) ** 3 * p0 + 3 * (1 - u) ** 2 * u * p1 + 3 * (1 - u) * u * u * p2 + u ** 3 * p3;
   for (const uu of [u, (u + 0.5) % 1]) s += `<circle cx="${f1(bz(P.x + P.w / 2, P.x + P.w / 2, D.x + D.w / 2, D.x + D.w / 2, uu))}" cy="${f1(bz(P.y + P.h + 100, y + 40, y + 40, D.y + D.h + 160, uu))}" r="6" fill="${C.teal}"/>`;
   s += mono(960, y + 70, 'the room', { size: 20, color: C.teal, anchor: 'middle' });
   return s + '</g>';
@@ -855,24 +980,24 @@ function devices(t, gridRect) {
 /* ---- one frame ---------------------------------------------------------- */
 // t is the film's clock; v is v1's, which the demo's scenes, captions and status line run on.
 const svg = document.getElementById('svg');
-function camAt2(t) { const v = warp(t); return v === null ? camOf(HCAM, t) : camAt(v); }
 window.__camAt = camAt2;
 function render(t) {
-  DEFS = []; uid = 0;
+  DEFS = []; uid = 0; NOW = t;
   const v = warp(t), cam = camAt2(t);
-  const world = history(t) + (v === null ? '' : scene1(v) + scene2(v) + scene3(v) + scene4(v) + scene7(v));
+  const world = history(t) + tech1(t) + tech2(t) + (v === null ? '' : scene1(v) + scene2(v) + scene3(v) + scene4(v) + scene7(v));
   const gridRect = c => { const vw = W / c.s, vh = H / c.s; return `<rect x="${f1(c.x - vw / 2 - 60)}" y="${f1(c.y - vh / 2 - 60)}" width="${f1(vw + 120)}" height="${f1(vh + 120)}" fill="url(#grid)"/>`; };
   const mainO = v === null ? 1 : 1 - fade(v, 78.6, 79.1, 81.8, 82.2);
   const endFade = seg(t, DURATION - 0.8, DURATION);
-  const hud = v === null ? 0 : seg(t, DEMO0, DEMO0 + 1) * (1 - seg(v, 88.6, 89.4));
+  const hud = v === null ? 0 : seg(t, DEMO0, DEMO0 + 0.5) * (1 - seg(v, 88.6, 89.4));
+  const inside = t >= TECH1 - 0.2 && t < 86.4;
   svg.innerHTML =
     `<defs><pattern id="grid" width="26" height="26" patternUnits="userSpaceOnUse"><path d="M26 0H0V26" fill="none" stroke="rgba(90,72,44,0.07)" stroke-width="1"/></pattern>${DEFS.join('')}</defs>`
     + `<rect width="${W}" height="${H}" fill="${C.paper}"/>`
-    + `<g opacity="${f1(mainO * 100) / 100}" transform="${camT(cam)}">${gridRect(cam)}<g id="world">${world}</g></g>`
+    + `<g opacity="${f1(mainO)}" transform="${camT(cam)}">${gridRect(cam)}<g id="world">${world}</g></g>`
     + (v === null ? '' : devices(v, gridRect))
     + mono(64, 74, 'dyna.ink', { size: 22, color: C.ink3, weight: 500, o: hud })
-    + (v === null ? captions(t, HCAPS) : captions(v) + statusLine(v))
-    + (endFade > 0 ? `<rect width="${W}" height="${H}" fill="${C.paper}" opacity="${endFade}"/>` : '');
+    + (v === null ? captions(t, HCAPS) : inside ? captions(t, TCAPS) : captions(v) + statusLine(v))
+    + (endFade > 0 ? `<rect width="${W}" height="${H}" fill="${C.paper}" opacity="${f1(endFade)}"/>` : '');
 }
 
 window.render = render; window.DURATION = DURATION;
