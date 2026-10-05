@@ -1,5 +1,5 @@
 // ===== view =====
-// Provides: view {zoom, panX, panY}, screenToWorld/worldToScreen/wpx, zoomBy, zoomAround, fitAll, afterViewChange, viewChanged (one paint a frame), the wheel/pinch/keyboard zoom, resize,
+// Provides: view {zoom, panX, panY}, screenToWorld/worldToScreen/wpx, zoomBy, zoomAround, fitAll, afterViewChange, viewChanged (one paint a frame), the wheel/pinch/keyboard zoom, resize, settleViewport (the page never scrolls; the canvas is the window),
 //   and the space actually visible: usableRect (pure), viewportRect, usableViewport, relayoutChrome.
 // Uses: core; input (panning/pinch state, the touches down); palette (replaceOpenField).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -269,8 +269,8 @@
   // ===== Canvas sizing =====
   function resize() {
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = innerWidth * dpr;
-    canvas.height = innerHeight * dpr;
+    canvas.width = Math.round(innerWidth * dpr);
+    canvas.height = Math.round(innerHeight * dpr);
     // A <canvas> is a REPLACED element: `inset: 0` does not stretch it, its
     // CSS box defaults to its bitmap size. On a retina screen that made the
     // canvas twice the viewport, so every stroke landed at twice the pointer's
@@ -309,6 +309,34 @@
     visualViewport.addEventListener('resize', relayoutChrome);
     visualViewport.addEventListener('scroll', relayoutChrome);
   }
+  // ===== The page never scrolls, and the canvas is always the window ========
+  // On an iPad the page itself could be left scrolled — an input scrolled into
+  // view, the keyboard going away, a file picker returning — or the canvas
+  // sized while the window was smaller, and the board then stood in a smaller
+  // box with dead edges round it. Nothing on this page scrolls, so a scroll is
+  // put back (never while a field is being typed in: that is the keyboard
+  // showing it), and the canvas is sized again whenever the window it was
+  // sized for is not the window there is.
+  function settleViewport() {
+    const a = document.activeElement;
+    const typing = a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && !(a.classList && a.classList.contains('fileIn'));
+    if (!typing) {
+      if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
+      const se = document.scrollingElement;
+      if (se && (se.scrollTop || se.scrollLeft)) { se.scrollTop = 0; se.scrollLeft = 0; }
+    }
+    const dpr = window.devicePixelRatio || 1;
+    if (canvas.width !== Math.round(innerWidth * dpr) || canvas.height !== Math.round(innerHeight * dpr)) { resize(); relayoutChrome(); }
+  }
+  const settleSoon = () => setTimeout(settleViewport, 80);
+  addEventListener('scroll', settleViewport, { passive: true });
+  addEventListener('focusout', settleSoon);
+  addEventListener('focus', settleSoon);
+  addEventListener('pageshow', settleSoon);
+  addEventListener('orientationchange', () => setTimeout(settleViewport, 300));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) settleSoon(); });
+  if (window.visualViewport) visualViewport.addEventListener('resize', settleSoon);
+
   // The panel growing a row, or changing size with the theme — a box that
   // changed, whatever caused it.
   if (window.ResizeObserver) {

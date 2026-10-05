@@ -1364,8 +1364,8 @@ window.__scenario = async function(){
       { text: panel65.textContent.slice(0, 200), start: !!start65 });
     const pane65 = await paneOpen65();
     const rows65 = [...pane65.querySelectorAll('.bdExamples .bdItem')].map((r) => ({ id: r.dataset.example, text: r.textContent.replace(/\s+/g, ' ').trim() }));
-    step('65a. the boards pane has an Examples section: a flowchart, a class diagram, a molecule and a pattern page, each saying what it shows and how many marks it holds, under the boards the browser keeps',
-      rows65.map((r) => r.id).join() === 'flowchart,class-diagram,molecule,pattern-page' && rows65.every((r, i) => r.text.includes(index65.examples[i].name) && new RegExp(index65.examples[i].marks + ' marks').test(r.text))
+    step('65a. the boards pane has an Examples section: a flowchart, a class diagram, a molecule, a pattern page and the story with its storyboard, each saying what it shows and how many marks it holds, under the boards the browser keeps',
+      rows65.map((r) => r.id).join() === 'flowchart,class-diagram,molecule,pattern-page,story' && rows65.every((r, i) => r.text.includes(index65.examples[i].name) && new RegExp(index65.examples[i].marks + ' marks').test(r.text))
         && !!pane65.querySelector('.bdExamples .bdLabel') && /example/i.test(pane65.querySelector('.bdExamples .bdLabel').textContent),
       rows65);
     // A flowchart: a board of its own, named for it, holding its marks, read as a flowchart with its Mermaid beside it.

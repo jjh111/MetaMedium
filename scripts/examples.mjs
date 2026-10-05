@@ -19,6 +19,9 @@
 //   class-diagram.jsonl  three classes, a composition and an association (D4)
 //   molecule.jsonl       the Basics pack in use: two molecules and a bubble, nothing taught (B3)
 //   pattern-page.jsonl   a right triangle with 24 and 8 on its legs, a page of steps (M5)
+//   story.jsonl          the story board (boards/story, 28 Sep 2026: dyna.ink explained in its own medium, drawn by
+//                        Claude's hand) and, beside it, the storyboard (boards/storyboard: sixteen shots of maths,
+//                        physics, reasoning and design, each a region with a live sketch) — one board to open and draw on
 //   index.json           what the boards pane lists: name, what it shows, file, marks; the starter
 //
 // Every note on a board says what to do with it in the person's words and carries no digit: a
@@ -28,6 +31,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { makeStoryboard } from '../boards/storyboard/make.mjs';
 
 export const EXAMPLES_DIR = 'boards/examples';
 /** 29 Sep 2026, 09:00 UTC — the first event of every example. */
@@ -128,6 +132,29 @@ function molecule(MM) {
   return h.s;
 }
 
+/** The story board's log moved `dx` across: a stroke's points and a figure's box — nothing else of its events holds a place. */
+function shifted(events, dx) {
+  return events.map((e) => {
+    if (e.type === 'stroke' && Array.isArray(e.points)) return { ...e, points: e.points.map((p) => ({ ...p, x: p.x + dx })) };
+    if (e.bounds) return { ...e, bounds: { ...e.bounds, minX: e.bounds.minX + dx, maxX: e.bounds.maxX + dx } };
+    return e;
+  });
+}
+/** Where the story board stands: left of the storyboard, a gap between. */
+const STORY_DX = -8000;
+
+function story(MM) {
+  // The story board as it was kept (a version 0 log, its marks Claude's hand's), moved left of the storyboard …
+  const { events } = MM.decodeLog(readFileSync(join(root, 'boards', 'story', 'board.jsonl'), 'utf8'));
+  const s = MM.createSession();
+  s.load(shifted(events, STORY_DX));
+  // … made a place of its own, so the outline lists it beside the storyboard's rows …
+  const last = events.reduce((t, e) => Math.max(t, e.at || 0), 0);
+  s.region({ name: 'The story — dyna.ink explained in its own medium, 28 Sep 2026', bounds: { minX: STORY_DX - 120, minY: -240, maxX: STORY_DX + 7520, maxY: 6520 }, at: last + GAP });
+  // … and the storyboard drawn beside it.
+  return makeStoryboard(MM, s);
+}
+
 function patternPage(MM) {
   const h = hand(MM);
   // The page of steps, left; each step checks itself at the end of its line.
@@ -151,6 +178,7 @@ export const EXAMPLES = [
   { id: 'class-diagram', name: 'Class diagram', says: 'three classes, a composition and an association, read as a UML class diagram', make: classDiagram },
   { id: 'molecule', name: 'Molecule', says: 'the Basics pack in use: two molecules and a bubble, read with nothing taught', make: molecule },
   { id: 'pattern-page', name: 'Pattern page', says: 'a right triangle with 24 and 8 on its legs says its long side, and a page of steps checks itself', make: patternPage },
+  { id: 'story', name: 'Story and storyboard', says: 'dyna.ink explained in its own medium, and beside it a shot list for maths, physics, reasoning and design to draw on', make: story },
 ];
 
 /**

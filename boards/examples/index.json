@@ -28,6 +28,13 @@
       "says": "a right triangle with 24 and 8 on its legs says its long side, and a page of steps checks itself",
       "file": "pattern-page.jsonl",
       "marks": 4
+    },
+    {
+      "id": "story",
+      "name": "Story and storyboard",
+      "says": "dyna.ink explained in its own medium, and beside it a shot list for maths, physics, reasoning and design to draw on",
+      "file": "story.jsonl",
+      "marks": 151
     }
   ]
 }

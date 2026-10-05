@@ -40,6 +40,7 @@ const EXTRA = [
   '../boards/examples/class-diagram.jsonl',
   '../boards/examples/molecule.jsonl',
   '../boards/examples/pattern-page.jsonl',
+  '../boards/examples/story.jsonl',
   // The icons (PLAN-IPAD-NOTES I3): the Home Screen's, which the page and its manifest name — kept so the installed app's icon is there offline.
   '../Demos/icons/apple-touch-icon.png',
   '../Demos/icons/icon-192.png',

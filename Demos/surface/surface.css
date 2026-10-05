@@ -71,6 +71,15 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* The page never scrolls (01-view.js puts back any scroll): pinned to the window, so a focused input, the
+   keyboard or a file picker on an iPad cannot leave the board in a smaller box with dead edges round it. */
+body { position: fixed; inset: 0; }
+
+/* A file input is opened by its button's tap. It is out of sight but not display:none — iOS does not open the
+   picker for a display:none input's click() — and the board's own input takes any file (iOS greys out a file
+   whose type it cannot match to an accept list, and has none for .jsonl): a board is known by its bytes. */
+input.fileIn { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; overflow: hidden; }
+
 #canvas { position: absolute; left: 0; top: 0; cursor: crosshair; touch-action: none;
   /* A pencil or a finger held still on the board is a hold, never a text selection or a
      callout (V1-PLAN R6): there is no text in the canvas to select. */

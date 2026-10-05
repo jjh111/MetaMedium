@@ -536,8 +536,8 @@ export async function firstRunTest(browser, servers, ctx) {
     await page.waitForSelector('#boardsPanel .bdExamples .bdItem', { timeout: 10000 }).catch(() => {});
     const listed = await page.evaluate(() => [...document.querySelectorAll('#boardsPanel .bdExamples .bdItem')].map((r) => ({ id: r.dataset.example, text: r.textContent.replace(/\s+/g, ' ').trim() })));
     await closeBoardsPane(page);
-    check('N18b. the boards pane lists the examples — flowchart, class diagram, molecule, pattern page — each with what it shows and how many marks it holds',
-      listed.map((r) => r.id).join() === 'flowchart,class-diagram,molecule,pattern-page' && listed.every((r) => /\d+ marks/.test(r.text)),
+    check('N18b. the boards pane lists the examples — flowchart, class diagram, molecule, pattern page, story and storyboard — each with what it shows and how many marks it holds',
+      listed.map((r) => r.id).join() === 'flowchart,class-diagram,molecule,pattern-page,story' && listed.every((r) => /\d+ marks/.test(r.text)),
       listed);
     // One tap on the panel's start.
     const first = a.b.current;
