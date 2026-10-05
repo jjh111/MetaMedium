@@ -9,9 +9,9 @@ Find finds any word on it.
 ## Open it
 
 The app (`https://jjh111.github.io/MetaMedium/app/`) → the control centre's
-**boards** tile → *examples* → **Story and storyboard**: the storyboard beside the
-story board of 28 September, made into one example by `scripts/examples.mjs`
-(`boards/examples/story.jsonl`). Or **from a file…** → `board.jsonl` here, the
+**boards** tile → *examples* → **The film and the storyboard**: the storyboard beside
+the launch film, playing (a tap pauses it, the corner asks for sound), made into one
+example by `scripts/examples.mjs` (`boards/examples/story.jsonl`). Or **from a file…** → `board.jsonl` here, the
 storyboard alone. Either opens as a new board of your own: draw anywhere, scratch a shot out, arrow a new order, double-click to
 type, drag a shot by its title. Then **export → board + pictures** and send the
 file back; its marks can be read with the engine.
@@ -57,8 +57,8 @@ event. The notes are `svg` figures (left-aligned, one size in board units, the
 board's ink colour), because a `text` artifact of eight lines or fewer is fitted
 line by line to its frame and stretches a short line's letters across it.
 Running it prints the outline. It exports `makeStoryboard(MM, session?)`, which
-`scripts/examples.mjs` calls to draw it beside the story board, so the example
-*Story and storyboard* is drift-checked in CI with the other examples (this file's
+`scripts/examples.mjs` calls to draw it beside the film, so the example
+*The film and the storyboard* is drift-checked in CI with the other examples (this file's
 own `board.jsonl` is not).
 
 What making it found:

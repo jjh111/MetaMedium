@@ -57,6 +57,16 @@ node launch-video/render.mjs --url dyna.ink     # the end card's address (defaul
 Every frame is `render(t)`, a pure function of time, so a render is deterministic. It needs Playwright
 (the e2e's or a global install) and ffmpeg.
 
+**The web copies** beside this file — `dynaink-soft-launch.mp4` (H.264), `.webm` (VP9, for a browser
+built without H.264) and `.jpg` (the poster) — are committed, because the example board *The film and
+the storyboard* (`scripts/examples.mjs`) plays them beside the storyboard. Made from a render:
+
+```bash
+ffmpeg -i out/dynaink-soft-launch.mp4 -vf scale=1280:-2 -c:v libx264 -crf 28 -preset slow -pix_fmt yuv420p -c:a aac -b:a 96k -movflags +faststart dynaink-soft-launch.mp4
+ffmpeg -i out/dynaink-soft-launch.mp4 -vf scale=1280:-2 -c:v libvpx-vp9 -crf 42 -b:v 0 -row-mt 1 -cpu-used 4 -c:a libopus -b:a 80k dynaink-soft-launch.webm
+ffmpeg -ss 60 -i out/dynaink-soft-launch.mp4 -frames:v 1 -vf scale=1280:-2 -q:v 4 dynaink-soft-launch.jpg
+```
+
 ## Sound
 
 Synthesised, not sampled, and quiet on purpose — emphasis, not a soundtrack. The page keeps a cue list,

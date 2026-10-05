@@ -31,10 +31,10 @@
     },
     {
       "id": "story",
-      "name": "Story and storyboard",
-      "says": "dyna.ink explained in its own medium, and beside it a shot list for maths, physics, reasoning and design to draw on",
+      "name": "The film and the storyboard",
+      "says": "the launch film playing beside a shot list for maths, physics, reasoning and design to draw on",
       "file": "story.jsonl",
-      "marks": 151
+      "marks": 83
     }
   ]
 }
