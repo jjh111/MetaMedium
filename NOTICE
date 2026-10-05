@@ -16,11 +16,23 @@ otherwise. The full text is in LICENSE.
 THE WHITEPAPER
 
 The whitepaper's prose and figures — the text of index.html and the figures
-it shows, Assets/whitepaper-figures/ among them — are licensed under the
-Creative Commons Attribution 4.0 International License (CC BY 4.0),
+it shows, Assets/whitepaper-figures/ among them, except the works by others
+below — are licensed under the Creative Commons Attribution 4.0
+International License (CC BY 4.0),
 https://creativecommons.org/licenses/by/4.0/. Credit it by its title, its
 author and a link to it. Words and works by others that it quotes or cites
 stay theirs.
+
+Works by others the whitepaper shows, credited in place
+
+  Assets/fig-dynabook.jpg
+      Two drawings by Alan C. Kay — two children using Dynabooks, and the
+      device itself — from his paper "A Personal Computer for Children of
+      All Ages", Proceedings of the ACM National Conference, Boston, August
+      1972 (https://dl.acm.org/doi/10.1145/800193.1971922). The whitepaper
+      shows them in Tools vs. Medium, credited to him in the caption and
+      linked to the paper, for commentary. They are covered by neither
+      LICENSE nor CC BY 4.0; their rights stay with their holder.
 
 
 THE NAMES
@@ -167,14 +179,6 @@ Models fetched when asked for, never committed
   A model a person joins — on their own machine (Ollama, LM Studio) or
   hosted (OpenRouter, Anthropic, an endpoint of their own) — is theirs to
   choose, under its own terms, and no part of dyna.ink.
-
-Not confirmed, in the repository
-
-  Assets/fig-dynabook.jpg
-      A reproduction of Alan Kay's Dynabook drawings (1972). It is not
-      this project's work and is covered by neither LICENSE nor CC BY 4.0;
-      where it was taken from and on what terms is not recorded. No page
-      loads it.
 
 Tools that build and test the code — esbuild, TypeScript, Vite, Vitest,
 ESLint, Playwright, wrangler, ONNX Runtime, the Hugging Face tokenizers —

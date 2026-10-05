@@ -49,6 +49,15 @@ test('the site is what GitHub Pages publishes, less what is not a page', () => {
   }
 });
 
+test('every file the whitepaper loads by a relative address is published — its figures, the drawings it credits, its scripts', () => {
+  const files = new Set(siteFiles(root));
+  const html = read('index.html').replace(/<!--[\s\S]*?-->/g, '');
+  const loaded = [...new Set([...html.matchAll(/\bsrc="([^"]+)"/g)].map((m) => m[1]).filter((s) => !/^(?:[a-z]+:|\/\/|#)/i.test(s))
+    .map((s) => decodeURIComponent(s.replace(/^\.\//, '').split(/[?#]/)[0])))];
+  assert.ok(loaded.includes('Assets/fig-dynabook.jpg'), 'the whitepaper shows Kay\'s Dynabook drawings (NOTICE credits them)');
+  assert.deepEqual(loaded.filter((f) => !files.has(f)), [], 'a file the whitepaper loads that the site would not publish');
+});
+
 test('only what git tracks is published: an untracked key, a committed node_modules and the working parts stay out', () => {
   const repo = mkdtempSync(path.join(tmpdir(), 'dyna-site-'));
   try {
@@ -100,9 +109,10 @@ test('the policy and the source agree on which hosts the app talks to', () => {
   const sources = [...readdirSync(path.join(root, 'Demos/surface')).filter((f) => f.endsWith('.js')).map((f) => 'Demos/surface/' + f),
     ...readdirSync(path.join(root, 'core/src/llm')).filter((f) => f.endsWith('.ts') && !/\.test\./.test(f)).map((f) => 'core/src/llm/' + f),
     'core/src/store/git.ts'];
-  // Hosts named in the source that are no fetch: an xmlns, a link in a sentence — and the two addresses a carry
-  // (RENAME-PLAN N1, 17-carry.js) opens a window at and sends a message to, which no connect-src governs.
-  const NOT_FETCHED = new Set(['www.w3.org', 'jjh111.github.io', 'dyna.ink', 'host']);
+  // Hosts named in the source that are no fetch: an xmlns, a link in a sentence — the two addresses a carry
+  // (RENAME-PLAN N1, 17-carry.js) opens a window at and sends a message to, which no connect-src governs — and the
+  // repository the help pane links as the source (17-boards.js's SOURCE_URL, AGPL-3.0 §13), a page a person opens.
+  const NOT_FETCHED = new Set(['www.w3.org', 'jjh111.github.io', 'dyna.ink', 'host', 'github.com']);
   const named = new Set();
   for (const f of sources) for (const m of read(f).matchAll(/https:\/\/([a-zA-Z0-9.-]+)/g)) if (!NOT_FETCHED.has(m[1])) named.add(m[1]);
   const allowed = new Set([...csp.matchAll(/https:\/\/([a-zA-Z0-9.-]+)/g)].map((m) => m[1]));

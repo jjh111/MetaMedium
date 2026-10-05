@@ -23,6 +23,8 @@
 //   - the help pane says the version, VERSION's — read from <meta name="dynaink-version">, and from
 //     the name that tag had before, <meta name="metamedium-version">, on a page an older worker kept
 //     (RENAME-PLAN N3b);
+//   - the help pane offers the source — "Source code · AGPL-3.0", linking the repository and its LICENSE
+//     (AGPL-3.0 §13) — at /app/ and at the old address, the address 17-boards.js's SOURCE_URL holds;
 //   - a release renames the cache, so after the new release's first network
 //     fetch the old release's shell is never served — beside a control that
 //     shows what a cache that kept its name serves instead;
@@ -107,6 +109,25 @@ const versionSaid = (page) => page.evaluate(() => ({
   meta: (document.querySelector('meta[name="dynaink-version"]') || {}).content || '',
   line: ((document.getElementById('helpVersion') || {}).textContent || '').trim(),
 }));
+
+/** The source's address, read where the surface holds it: 17-boards.js's one constant (AGPL-3.0 §13). */
+const SOURCE_URL = (/const SOURCE_URL = '([^']+)';/.exec(readFileSync(join(root, 'Demos/surface/17-boards.js'), 'utf8')) || [])[1] || null;
+
+/** The help pane's source line: its links (where each goes, its words, how it opens) and whether the line is on screen. */
+const sourceSaid = (page) => page.evaluate(() => {
+  const line = document.getElementById('helpSource');
+  const box = line ? line.getBoundingClientRect() : null;
+  return {
+    text: line ? line.textContent.trim() : '',
+    shown: !!box && box.width > 0 && box.height > 0 && !line.closest('[hidden]'),
+    links: line ? [...line.querySelectorAll('a')].map((a) => ({ text: a.textContent.trim(), href: a.href, target: a.target, rel: a.rel })) : [],
+  };
+});
+/** Whether a source line is the one the constant makes: Source code to the repository, AGPL-3.0 to its LICENSE, each in a new tab. */
+const sourceRight = (s) => !!SOURCE_URL && s.text === 'Source code · AGPL-3.0' && s.links.length === 2
+  && s.links[0].text === 'Source code' && s.links[0].href === SOURCE_URL
+  && s.links[1].text === 'AGPL-3.0' && s.links[1].href === SOURCE_URL + '/blob/master/LICENSE'
+  && s.links.every((l) => l.target === '_blank' && /\bnoopener\b/.test(l.rel));
 
 /** The help pane opened by its tile, the way a hand opens it; resolves to its text once it has loaded (or failed to). */
 async function helpText(page) {
@@ -241,6 +262,18 @@ async function appTest(browser, servers, ctx) {
     check(`A7. the help pane says the version — “${said.line || ''}” (VERSION ${version})`,
       !!version && said.meta === version && typeof said.line === 'string' && said.line.includes(version), said);
 
+    // ---- A7c. …and offers the source (AGPL-3.0 §13) ----------------------------------------------
+    let src7 = {};
+    if (ready) {
+      await page.click('#ccBtn');
+      await page.click('#helpBtn', { timeout: 5000 });
+      await page.waitForSelector('#helpPanel:not([hidden])', { timeout: 5000 }).catch(() => {});
+      src7 = await sourceSaid(page);
+      await page.click('#helpPanel .paneClose').catch(() => {});
+    }
+    check(`A7c. the help pane, opened by its tile, offers the source — “${src7.text || ''}”: ${(src7.links || []).map((l) => l.text + ' → ' + l.href).join(', ') || 'no link'}`,
+      src7.shown && sourceRight(src7), { ...src7, want: SOURCE_URL });
+
     // ---- A8. A request that carries a key is never kept -----------------------------------------
     let keyed = null;
     if (sw.controlled) {
@@ -272,6 +305,11 @@ async function appTest(browser, servers, ctx) {
     check(`A9. the old address opens as it did — Demos/session-engine.html, its own worker ${sw9.script ? sw9.script.slice(origin.length) : '?'} at ${sw9.scope ? sw9.scope.slice(origin.length) : '?'}, the same board (${back9.length} stroke)${failedOld.length ? '; failed: ' + failedOld.join(', ') : ''}`,
       ready9 && sw9.scope === `${origin}/Demos/` && sw9.script === `${origin}/Demos/sw.js` && sw9.controlled && back9.some((s) => sameSig(s, sig(pts))) && failedOld.length === 0,
       { status: r9 && r9.status(), sw: sw9, strokes: back9.length, failed: failedOld });
+
+    // ---- A9b. …its help pane offers the same source --------------------------------------------
+    const src9 = ready9 ? await sourceSaid(page) : {};
+    check(`A9b. the old address's help pane offers the same source — ${(src9.links || []).map((l) => l.text + ' → ' + l.href).join(', ') || 'no link'}`,
+      ready9 && sourceRight(src9), src9);
 
     // ---- A10. …and its worker keeps to its own caches -------------------------------------------
     const held10 = ready9 ? await cachesOf(page) : {};

@@ -1674,6 +1674,11 @@
           margin-bottom: 0.375rem;
           line-height: 1.5;
         }
+        /* A source the timeline links (Kay's 1972 paper) stays quiet: the author
+           line's own colour and the page's hairline underline; the accent only
+           under the pointer. */
+        .tl-author a { color: inherit; }
+        .tl-author a:hover { color: var(--accent-hover); }
         .tl-desc {
           font-size: 0.875rem;
           color: var(--muted);
@@ -1979,7 +1984,7 @@
             
             <blockquote>
                 "The child is a 'verb' rather than a 'noun', an actor rather than an object... We would like to hook into his current modes of thought in order to influence him rather than just trying to replace his model with one of our own."
-                <cite>— Alan Kay, "A Personal Computer for Children of All Ages," 1972</cite>
+                <cite>— Alan Kay, "<a href="https://dl.acm.org/doi/10.1145/800193.1971922" target="_blank" rel="noopener">A Personal Computer for Children of All Ages</a>," 1972</cite>
             </blockquote>
             
             <p>Children already think computationally: in systems, in cause and effect, in <em>what happens if</em>. They do not need to learn to code first. They need an interface that meets them where they are — drawing, playing, exploring. dyna.ink is built for that: a canvas where a child's "bouncy house" already has the beginnings of structural engineering in it, and a doodled spiral is a way into mathematics.</p>
@@ -2043,7 +2048,7 @@
     <div class="tl-pipe">┃</div>
     <div class="tl-content">
       <div class="tl-title">DYNABOOK <span class="tl-badge visions">VISIONS</span></div>
-      <div class="tl-author">Alan Kay — A personal computer for children of all ages</div>
+      <div class="tl-author">Alan Kay — <a href="https://dl.acm.org/doi/10.1145/800193.1971922" target="_blank" rel="noopener">A personal computer for children of all ages</a></div>
       <div class="tl-desc">Dynamic media, end-user programming, learning through building.</div>
       <div class="tl-sig">┗━━ The computer as metamedium</div>
     </div>
@@ -2341,9 +2346,14 @@
             
             <blockquote>
                 "What then is a personal computer? One would hope that it would be both a medium for containing and expressing arbitrary symbolic notions, and also a collection of useful tools for manipulating these structures."
-                <cite>— Alan Kay, "A Personal Computer for Children of All Ages," 1972</cite>
+                <cite>— Alan Kay, "<a href="https://dl.acm.org/doi/10.1145/800193.1971922" target="_blank" rel="noopener">A Personal Computer for Children of All Ages</a>," 1972</cite>
             </blockquote>
             
+            <figure class="half">
+                <img src="./Assets/fig-dynabook.jpg" alt="Two pen-and-ink drawings. Left: two children sit on the grass, each with a Dynabook: one, seen from behind, holds it up and types on its keyboard below a screen showing a drawing; the other leans over one laid flat on the ground. Right: the Dynabook itself, a flat slab 12 by 9 inches and three quarters of an inch thick, a screen above a keyboard, with a stylus and a slot for files at its side.">
+                <figcaption><b>Figure &middot; The Dynabook</b>Alan Kay's drawings from <a href="https://dl.acm.org/doi/10.1145/800193.1971922" target="_blank" rel="noopener"><em>A Personal Computer for Children of All Ages</em></a> (1972): two children with Dynabooks, and the device itself, about 12&nbsp;&times;&nbsp;9 inches with a keyboard and a stylus. Drawings &copy;&nbsp;Alan C. Kay, reproduced here for commentary.</figcaption>
+            </figure>
+
             <p>Most AI interfaces treat the model as a tool: something you call, ask, command. dyna.ink puts it in the medium. You are not using the computer to sketch; you are sketching in a material that can read, and the AI is the part of the material that understands.</p>
 
             <p>Everything interactive in this paper is a recording from the same engine. The surface itself — live, drawable, yours to try — is in <a href="#development">Current Development</a>.</p>

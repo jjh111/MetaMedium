@@ -10600,6 +10600,8 @@
 //   switchPlan (what opening an entry does), boardTitle / boardSearch (the page's title and address),
 //   VERSION_META / VERSION_META_BEFORE / pageVersionOf / versionWords (the version the page says, read from
 //   the tag the build stamps or, on a page an older worker kept, the name that tag had before — RENAME-PLAN N3b),
+//   SOURCE_URL / sourceLine (where this app's source is, and the help pane's line that offers it with its license,
+//   "Source code · AGPL-3.0" — AGPL-3.0 §13),
 //   and the examples (R5) — EXAMPLES_BASE / exampleUrl (where boards/examples stands from the page),
 //   exampleRows (the pane's Examples, read from the index and never trusted), exampleName (what a board
 //   made from one is called), starterOf (which one a first run's tap opens), and what the iPad needs kept
@@ -10982,6 +10984,29 @@
   /** What the help pane leads with: the version this page is. */
   function versionWords(v) {
     return !v ? 'dyna.ink — this page carries no version' : v === '0.0.0' ? 'dyna.ink 0.0.0 — no release has been cut yet' : 'dyna.ink ' + v;
+  }
+  /**
+   * Where this app's source code is: the repository, an ADDRESS — RENAME-PLAN H1 changes it when the repository moves
+   * to an organisation. The one place the surface holds it; the help pane's line is built from it (sourceLine), and a
+   * fork that runs a changed copy changes this line to offer its own source (AGPL-3.0 §13: a person using a modified
+   * copy over a network must be offered its source). DynaInk3D's help names the same address, and
+   * scripts/rights.test.mjs holds the two, and the repository TRADEMARKS.md and CONTRIBUTING.md name, to agree.
+   */
+  const SOURCE_URL = 'https://github.com/jjh111/MetaMedium';
+  /** Where the license stands in the repository: LICENSE at its root, on the branch GitHub shows. */
+  const LICENSE_PATH = '/blob/master/LICENSE';
+  /**
+   * The help pane's source line, as parts — `{ text, href?, title? }` — for the adapter to render (20-controls.js):
+   * "Source code · AGPL-3.0", the first linking the repository at `url` (SOURCE_URL when none is given), the second
+   * its LICENSE. Text, never markup, so the adapter sets it as text.
+   */
+  function sourceLine(url) {
+    const base = String(url || SOURCE_URL).replace(/\/+$/, '') || SOURCE_URL;
+    return [
+      { text: 'Source code', href: base, title: 'This app\'s source code — yours to read, change and share under the AGPL-3.0' },
+      { text: ' · ' },
+      { text: 'AGPL-3.0', href: base + LICENSE_PATH, title: 'Its license: the GNU Affero General Public License, version 3 only' },
+    ];
   }
   /**
    * The page's address on board `id`: `board=` set (in the place it had, or last), everything else
@@ -15374,7 +15399,8 @@
 // Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
 //   boardOnScreenName, resetBoard), models (agents, deciderHost), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude); the page's
 //   version (folder's pageVersion: its <meta name="dynaink-version">, V1-PLAN R7, or on a page an older worker kept the
-//   tag's old name, RENAME-PLAN N3b; boards' versionWords), said at the head of the help pane.
+//   tag's old name, RENAME-PLAN N3b; boards' versionWords), said at the head of the help pane, and under it the
+//   source line (boards' sourceLine: "Source code · AGPL-3.0", linking SOURCE_URL and its LICENSE — AGPL-3.0 §13).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -15474,6 +15500,22 @@
   // page an older worker kept, carrying the tag under its old name, still says its own (RENAME-PLAN N3b).
   const helpVersion = document.getElementById('helpVersion');
   if (helpVersion) helpVersion.textContent = versionWords(pageVersion());
+  // Under it, where this app's source is and its license (AGPL-3.0 §13): one quiet line, built from the one address
+  // 17-boards.js holds, so a fork that changes SOURCE_URL offers its own source. Each part is set as text.
+  const helpSource = document.getElementById('helpSource');
+  if (helpSource) {
+    helpSource.textContent = '';
+    for (const part of sourceLine()) {
+      if (!part.href) { helpSource.appendChild(document.createTextNode(part.text)); continue; }
+      const a = document.createElement('a');
+      a.href = part.href;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      if (part.title) a.title = part.title;
+      a.textContent = part.text;
+      helpSource.appendChild(a);
+    }
+  }
   let helpLoaded = false;
   tiles.help.onclick = () => {
     togglePanel(helpPanel, tiles.help);
@@ -15492,20 +15534,24 @@
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
     const out = [];
     let list = null; // 'ul' | 'ol'
+    // A paragraph's lines and a list item's are kept raw and rendered when they end, so emphasis or a link may wrap
+    // across lines: rendered a line at a time, a *…* that wrapped showed its asterisks.
+    let item = null; // the list item being read
     let para = [];   // the lines of a paragraph, joined at the next blank line
-    const closeList = () => { if (list) { out.push('</' + list + '>'); list = null; } };
-    const closePara = () => { if (para.length) { out.push('<p>' + para.join(' ') + '</p>'); para = []; } };
+    const closeItem = () => { if (item !== null) { out.push('<li>' + inline(item) + '</li>'); item = null; } };
+    const closeList = () => { closeItem(); if (list) { out.push('</' + list + '>'); list = null; } };
+    const closePara = () => { if (para.length) { out.push('<p>' + inline(para.join(' ')) + '</p>'); para = []; } };
     for (const raw of md.split('\n')) {
       const line = raw.replace(/\s+$/, '');
       const h = /^(#{1,3})\s+(.*)$/.exec(line);
       const li = /^\s*(?:[-*]|\d+\.)\s+(.*)$/.exec(line);
       const cont = /^\s{2,}(\S.*)$/.exec(line);
       if (h) { closeList(); closePara(); out.push('<h' + (h[1].length + 1) + '>' + inline(h[2]) + '</h' + (h[1].length + 1) + '>'); }
-      else if (li) { closePara(); const kind = /^\s*\d+\./.test(line) ? 'ol' : 'ul'; if (list !== kind) { closeList(); list = kind; out.push('<' + kind + '>'); } out.push('<li>' + inline(li[1]) + '</li>'); }
-      else if (cont && list) { out[out.length - 1] = out[out.length - 1].replace(/<\/li>$/, ' ' + inline(cont[1]) + '</li>'); }
+      else if (li) { closePara(); const kind = /^\s*\d+\./.test(line) ? 'ol' : 'ul'; if (list !== kind) { closeList(); list = kind; out.push('<' + kind + '>'); } else closeItem(); item = li[1]; }
+      else if (cont && list) { item = (item === null ? '' : item + ' ') + cont[1]; }
       else if (!line.trim()) { closeList(); closePara(); }
       else if (/^---+$/.test(line)) { closeList(); closePara(); out.push('<hr>'); }
-      else { closeList(); para.push(inline(line)); }
+      else { closeList(); para.push(line); }
     }
     closeList(); closePara();
     return out.join('\n');
