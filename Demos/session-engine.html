@@ -67,9 +67,9 @@
     <button id="helpBtn"></button>
   </div></div>
   <!-- Pictures come in by one of two inputs, never one with both: a single input that asks for the camera too may open the camera alone. photos: the library, several at once; camera: one shot. The third is every other kind of file. -->
-  <input id="photosInput" type="file" accept="image/*,.svg" multiple hidden>
-  <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden>
-  <input id="importInput" type="file" accept=".svg,.html,.htm,.js,.mjs,.json,.md,.txt,.mmd,.mermaid" multiple hidden>
+  <input id="photosInput" class="fileIn" type="file" accept="image/*,.svg" multiple tabindex="-1" aria-hidden="true">
+  <input id="cameraInput" class="fileIn" type="file" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true">
+  <input id="importInput" class="fileIn" type="file" accept=".svg,.html,.htm,.js,.mjs,.json,.md,.txt,.mmd,.mermaid" multiple tabindex="-1" aria-hidden="true">
 </div>
 
 <div id="teachPanel" hidden>
@@ -140,7 +140,7 @@
 <div id="boardsPanel" hidden>
   <div class="bdList"></div>
   <div id="boardsStatus" class="hint" aria-live="polite"></div>
-  <input id="boardsFile" type="file" accept=".zip,.jsonl,.ndjson,.json,.txt,application/zip,application/x-zip-compressed,application/json" hidden>
+  <input id="boardsFile" class="fileIn" type="file" tabindex="-1" aria-hidden="true">
 </div>
 <div id="findPanel" hidden>
   <input id="findInput" type="text" placeholder="find a word on any board" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search" aria-label="find a word on any board">

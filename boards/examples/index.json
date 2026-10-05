@@ -28,6 +28,13 @@
       "says": "a right triangle with 24 and 8 on its legs says its long side, and a page of steps checks itself",
       "file": "pattern-page.jsonl",
       "marks": 4
+    },
+    {
+      "id": "story",
+      "name": "The film and the storyboard",
+      "says": "the launch film playing beside a shot list for maths, physics, reasoning and design to draw on",
+      "file": "story.jsonl",
+      "marks": 83
     }
   ]
 }

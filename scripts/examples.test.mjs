@@ -24,7 +24,9 @@ const MM = await import(pathToFileURL(join(root, 'Demos', 'dynaink-core.node.mjs
 const gen = existsSync(join(here, 'examples.mjs')) ? await import('./examples.mjs') : {};
 
 const DIR = join(root, 'boards', 'examples');
-const IDS = ['flowchart', 'class-diagram', 'molecule', 'pattern-page'];
+const IDS = ['flowchart', 'class-diagram', 'molecule', 'pattern-page', 'story'];
+/** The examples whose maths is meant: the pattern page, and the storyboard's maths shots (a triangle that solves itself, a page of steps). */
+const MATHS = ['pattern-page', 'story'];
 const readIndex = () => JSON.parse(readFileSync(join(DIR, 'index.json'), 'utf8'));
 const linesOf = (id) => readFileSync(join(DIR, id + '.jsonl'), 'utf8');
 /** An example replayed into a session of its own, as the page loads a board's log. */
@@ -142,13 +144,38 @@ test('the pattern page says its sizes: 25.30 beside the long side of a right tri
   assert.equal(chips.filter((c) => c.kind === 'conflict').length, 0, 'nothing on this page disagrees');
 });
 
-test('a note is not a measurement: no example but the pattern page has anything the maths says, and the page has nothing that disagrees or is not on its sheet', () => {
+test('a note is not a measurement: no example but the pattern page and the storyboard has anything the maths says, and theirs has nothing that disagrees or is not on its sheet', () => {
   for (const id of IDS) {
     const board = MM.boardMaths(open(id).state);
     const chips = board ? MM.mathsChips(board) : [];
-    if (id === 'pattern-page') assert.ok(chips.length && chips.every((c) => !c.text.startsWith('?')), JSON.stringify(chips.map((c) => c.text)));
+    if (MATHS.includes(id)) assert.ok(chips.length && chips.every((c) => !c.text.startsWith('?') && c.kind !== 'conflict'), JSON.stringify(chips.map((c) => c.text)));
     else assert.deepEqual(chips.map((c) => c.text), [], `${id}: no note reads as a step`);
   }
+});
+
+test('the film and the storyboard: the launch film plays in a place of its own beside the storyboard, every shot a region, and the live shots live', () => {
+  const { s, state } = open('story');
+  const outline = MM.regionOutline(state);
+  const top = outline.filter((e) => e.depth === 0).map((e) => e.name);
+  assert.match(top[0], /^The film/, 'the film is its own place, first in reading order');
+  assert.deepEqual(top.slice(1, 6).map((n) => n.split(' ')[0]), ['Read', 'Maths', 'Physics', 'Reasoning', 'Design']);
+  assert.equal(outline.filter((e) => /^Shot \d+ · /.test(e.name)).length, 16, 'sixteen shots');
+  // The film is a program that plays when the board opens, and the file it asks for is in the repository.
+  const film = [...state.nodes.values()].find((n) => MM.wordOf(n) === 'the launch film');
+  assert.ok(film && state.clocks[film.id] && state.clocks[film.id].playing, 'the film plays');
+  const code = MM.codeOf ? MM.codeOf(film) : null;
+  const src = String(code ? code.data.code : JSON.stringify(s.getEvents().find((e) => e.kind === 'run')));
+  const asked = /\.\.\/(launch-video\/[\w.-]+\.(?:mp4|webm|jpg))/g;
+  let m, files = 0;
+  while ((m = asked.exec(src))) { files++; assert.ok(existsSync(join(root, m[1])), m[1] + ' is in the repository'); }
+  assert.ok(files >= 3, 'the film twice over and its poster');
+  // Live: the triangle says its long side, the molecule is the pack's.
+  const chips = MM.mathsChips(MM.boardMaths(state));
+  assert.ok(chips.some((c) => c.kind === 'side' && /^25\.30/.test(c.text)), JSON.stringify(chips.map((c) => c.text)));
+  assert.ok(state.clusterCandidates.some((c) => c.matches.some((m) => m.name === 'molecule' && m.pack === 'basics@1')));
+  // The film stands left of the storyboard, apart from it.
+  const place = outline.find((e) => /^The film/.test(e.name)), first = outline.find((e) => /^Read me/.test(e.name));
+  assert.ok(place.bounds.maxX < first.bounds.minX, 'side by side, not over each other');
 });
 
 test('the service worker keeps the examples for offline: the index and every file', () => {

@@ -12,6 +12,7 @@ at once, and the example itself is never written.
 | `class-diagram.jsonl` | three classes, a composition and an association, read as a UML class diagram (D4) |
 | `molecule.jsonl` | the Basics pack in use (`basics@1`): two molecules and a lone bubble, matched by the pack with nothing taught (B3) |
 | `pattern-page.jsonl` | a right triangle with 24 and 8 on its legs, whose long side the maths says, and a page of steps that check themselves (M5) |
+| `story.jsonl` | **The film and the storyboard**: the launch film (`launch-video/dynaink-soft-launch.mp4`, a WebM beside it, a web copy of what `launch-video/render.mjs` makes) playing as a program in a region of its own — muted so it plays by itself, a tap pauses it, the corner asks for sound — and beside it the storyboard (`boards/storyboard`: sixteen shots of maths, physics, reasoning and design, each a region with a live sketch and room to draw) — its triangle says 25.30″, its page checks itself, its molecule is the Basics pack's |
 | `index.json` | what the pane lists — name, what it shows, file, marks — and the starter |
 
 Each file is a **log**, one event per line under a version 1 header (R2,

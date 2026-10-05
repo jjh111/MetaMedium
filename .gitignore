@@ -17,6 +17,9 @@ manim-explainer/media/
 manim-explainer/__pycache__/
 manim-explainer/*.mp4
 
+# launch-video: the MP4 and stills are build output of `node launch-video/render.mjs`.
+launch-video/out/
+
 # Secrets never enter git: keys are typed into the surface that uses them
 # or read by a process from its environment (SURFACE-v9-PLAN.md D9).
 .env

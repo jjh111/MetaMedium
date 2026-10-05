@@ -118,7 +118,13 @@ Loaded by a page from a CDN, never committed
       SIL Open Font License 1.1. Copyright © 2017 IBM Corp., with Reserved
       Font Name "Plex".
       From Google Fonts, by the whitepaper (index.html) and brand/tokens.css
-      (the styleguide).
+      (the styleguide); vendored as TTF files in launch-video/fonts/ by the
+      soft-launch film.
+
+  Caveat (a typeface)
+      SIL Open Font License 1.1. Copyright 2014 The Caveat Project Authors.
+      Vendored as a TTF file in launch-video/fonts/, for the hand's writing in
+      the soft-launch film.
 
   DM Sans, Space Grotesk, JetBrains Mono, Cinzel and Raleway (typefaces)
       SIL Open Font License 1.1, each copyright its project's authors
