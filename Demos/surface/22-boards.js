@@ -5,7 +5,8 @@
 //   said plainly before it happens; the folders, repositories and sites opened lately, by kind;
 //   and the examples (V1-PLAN R5): a few boards made by the engine, each opened as a NEW board of
 //   your own, a copy — the example is never written — and the empty board's panel start (the
-//   starter, one tap; *more examples* opens this pane).
+//   starter, one tap; *more examples* opens this pane), and the example an address names (?example=<id>:
+//   exampleFromAddress — put on the canvas in place in an embed, a board of your own anywhere that keeps boards).
 //   renderBoardsPane (the adapter calls it when the list changes), and at its foot how much room this browser
 //   holds and has left and whether it may clear it (PLAN-IPAD-NOTES I3: loadRoom, roomChanged).
 //   And carrying (RENAME-PLAN N1): *Every board out* and, where this page can carry, *Carry my boards to dyna.ink*,
@@ -16,7 +17,8 @@
 //   sizeWords, storageWords, isKept), folder (the boards adapter: boards, board, onBoardHere, switchBoard, newBoard,
 //   renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash, emptyTrash, boardFromFile,
 //   rereadBoards, boardEntryName, exportLogNow, readLogText), input (flash, say), the
-//   inspector's element (the panel's start), boards list (exampleUrl, exampleRows, exampleName, starterOf).
+//   inspector's element (the panel's start), boards list (exampleUrl, exampleRows, exampleName, starterOf),
+//   core (params, EMBED, session), folder (boardMode), view (fitAll).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -292,6 +294,42 @@
       const events = read.events;
       return await newBoard({ name: exampleName([...boards.entries.values()], row), events: events, force: !!o.force, said: o.said || ((v) => say(v.words)) });
     } finally { examples.opening = false; }
+  }
+  /**
+   * The example an address names, `?example=<id>` (the whitepaper's reference surface names `story`, so the
+   * app it embeds shows the film and the storyboard). A figure — an embed — keeps no board, so the example's
+   * log is put on the canvas in place and nothing is written anywhere; a page that keeps boards makes one of
+   * its own from it, as the pane's tap does, and the address lets go of the name first so a reload makes no
+   * second copy. Anywhere else (a room, a folder, a replay, ?fresh=1) the name is said and left alone.
+   */
+  async function exampleFromAddress() {
+    const id = params.get('example');
+    if (!id) return;
+    if (EMBED && !params.has('live') && !params.has('folder') && !params.has('git') && !params.has('replay')) {
+      await loadExamples();
+      const row = examples.rows.find((r) => r.id === id);
+      if (!row) { say('no example called “' + id + '” here'); return; }
+      let read = null;
+      try {
+        const res = await fetch(exampleUrl(row.file), { cache: 'no-cache' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        read = readLogText(await res.text(), row.name);
+      } catch (err) { say('could not read the “' + row.name + '” example (' + ((err && err.message) || err) + ')'); return; }
+      if (!read.events) { say(read.refused || 'the “' + row.name + '” example is not a board’s log'); return; }
+      // Unless the reader has drawn on the figure before the log arrived: theirs stands.
+      if (session.getEvents().length) return;
+      session.load(read.events);
+      fitAll();
+      return;
+    }
+    if (boardMode() !== 'restore') { say('“?example=' + id + '” opens an example on a board of its own — not here'); return; }
+    try {
+      const url = new URL(location.href);
+      url.searchParams.delete('example');
+      history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+    } catch (err) { /* an address that cannot be rewritten still opens the example once */ }
+    const made = await openExample(id);
+    if (made) flash('“' + made.name + '” — a board of your own, made from the example; the example is as it was');
   }
   async function exampleFromPane(id, force) {
     paneSay(null);

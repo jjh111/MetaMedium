@@ -194,6 +194,8 @@
       rejoinRemembered();
       const others = [...boards.entries.values()].filter((e) => isKept(e) && !e.trashed && e.id !== board.id).length;
       if (restored && !board.saidAtOpen) flash('“' + boardOnScreenName() + '” is back' + (others ? ' — ' + others + ' more in boards' : ''));
+      // An example the address names (?example=<id>): after the board is open, so a copy is made beside it.
+      exampleFromAddress();
     };
     if (mode === 'restore') openBoard(mode).then(settle, () => settle(false));
     else {
