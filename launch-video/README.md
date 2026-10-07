@@ -57,9 +57,21 @@ node launch-video/render.mjs --url dyna.ink     # the end card's address (defaul
 Every frame is `render(t)`, a pure function of time, so a render is deterministic. It needs Playwright
 (the e2e's or a global install) and ffmpeg.
 
-**The web copies** beside this file — `dynaink-soft-launch.mp4` (H.264), `.webm` (VP9, for a browser
-built without H.264) and `.jpg` (the poster) — are committed, because the example board *The film and
-the storyboard* (`scripts/examples.mjs`) plays them beside the storyboard. Made from a render:
+**The film is code, and plays live.** `film.js` is the composition with no page in it —
+`dynaFilm({ url }).frame(t)` returns the SVG for any moment, in about 2 ms — and `synth.js` makes the sound
+from the film's cues (`dynaSynth`; `sound.mjs` writes it as the WAV render.mjs lays under the picture, byte for
+byte as before). `index.html` is a player: play, pause, scrub, and the sound built in a worker
+(`synth-worker.js`) on the first play, since a browser gives sound only after a tap. `?embed` fills its frame
+with the bar under it (the whitepaper's film dialog), `?poster=166` is the frame it rests on until played. The
+example board *The film and the storyboard* (`scripts/examples.mjs`) inlines `film.js` into a program on the
+canvas, which plays it silent: a frame on the board is never handed the tap a browser needs before sound. Its
+faces come from `fonts/` across origins (the program's frame is opaque), which GitHub Pages allows and
+`cloudflare/pages/headers.template` allows on Cloudflare; without that it draws the words in the browser's
+own faces.
+
+**The web copies** beside this file — `dynaink-soft-launch.mp4` (H.264), `.webm` (VP9) and `.jpg` (a poster)
+— are kept for sharing the film off the site; the whitepaper's dialog offers the MP4 as a download. Made
+from a render:
 
 ```bash
 ffmpeg -i out/dynaink-soft-launch.mp4 -vf scale=1280:-2 -c:v libx264 -crf 28 -preset slow -pix_fmt yuv420p -c:a aac -b:a 96k -movflags +faststart dynaink-soft-launch.mp4

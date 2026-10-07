@@ -19,7 +19,7 @@
 //   class-diagram.jsonl  three classes, a composition and an association (D4)
 //   molecule.jsonl       the Basics pack in use: two molecules and a bubble, nothing taught (B3)
 //   pattern-page.jsonl   a right triangle with 24 and 8 on its legs, a page of steps (M5)
-//   story.jsonl          the launch film (launch-video/dynaink-soft-launch.mp4, a web copy of its render) playing as a
+//   story.jsonl          the launch film (launch-video/film.js, drawn live, frame by frame) playing as a
 //                        program, and beside it the storyboard (boards/storyboard: sixteen shots of maths, physics,
 //                        reasoning and design, each a region with a live sketch) — one board to open and draw on
 //   index.json           what the boards pane lists: name, what it shows, file, marks; the starter
@@ -132,65 +132,65 @@ function molecule(MM) {
   return h.s;
 }
 
-/** The story board's log moved `dx` across: a stroke's points and a figure's box — nothing else of its events holds a place. */
-/** The launch film, served beside the app: `launch-video/` from `/app/` and from `/Demos/` alike. */
-const FILM = '../launch-video/dynaink-soft-launch.mp4';
-const FILM_WEBM = '../launch-video/dynaink-soft-launch.webm';
-const FILM_POSTER = '../launch-video/dynaink-soft-launch.jpg';
+/** The launch film's fonts, served beside the app: `launch-video/` from `/app/` and from `/Demos/` alike. */
+const FILM_FONTS = '../launch-video/fonts/';
 
 /**
- * The film as a program (a `run` artifact): a video in the program's own frame, muted so the
- * browser lets it play by itself, looping. A page could not show it — its sandbox runs no
- * script and plays nothing by itself, and the canvas keeps the pointer from it — while a
- * playing program is handed the hand: a tap pauses or plays it, a tap on the corner asks for
- * the sound. The frame is an opaque origin; the video is fetched from the site as any page's is.
+ * The film as a program (a `run` artifact): film.js drawn live into an SVG in the program's own frame,
+ * a frame a tick — no video, sharp at any zoom, the source it was rendered from. A playing program is
+ * handed the hand: a tap pauses or plays it, a press along its foot scrubs. Its faces are fetched from
+ * the site (the frame is an opaque origin, so that is a cross-origin fetch: GitHub Pages allows it; a
+ * server that does not draws the words in the browser's own mono and cursive). It plays silent: a frame
+ * on the board is never handed the tap a browser needs before it gives sound — the film's own page,
+ * launch-video/index.html, plays it with its sound.
  */
-const FILM_PROGRAM = `// The launch film, playing beside the storyboard. Tap it: pause or play. Tap the corner: sound.
+// The film itself is launch-video/film.js, a pure function of time — the same file the film's own page plays.
+const filmProgram = () => readFileSync(join(root, 'launch-video', 'film.js'), 'utf8') + `
+// ---- the player: film.js above, drawn live into the program's frame ----
 var W = mm.width, H = mm.height;
-var v = document.createElement('video');
-// H.264 first (Safari, Chrome, Edge), VP9 for a browser built without it (Chromium, some Firefox builds).
-[[${JSON.stringify(FILM)}, 'video/mp4'], [${JSON.stringify(FILM_WEBM)}, 'video/webm']].forEach(function (f) {
-  var src = document.createElement('source'); src.src = f[0]; src.type = f[1]; v.appendChild(src);
-});
-v.poster = ${JSON.stringify(FILM_POSTER)};
-v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true; v.setAttribute('playsinline', '');
-v.style.cssText = 'position:absolute;left:0;top:0;width:' + W + 'px;height:' + H + 'px;object-fit:contain;background:#111';
-document.body.insertBefore(v, document.body.firstChild);
-var said = '', saidAt = 0, failed = '';
-function say(t) { said = t; saidAt = performance.now(); }
-// A <source> that fails says so on itself; the last one failing is the film not loading.
-v.lastChild.addEventListener('error', function () { failed = 'the film could not be loaded here'; });
-v.play().catch(function () { say('tap to play'); });
-var corner = Math.min(W, H) * 0.14;
+var film = dynaFilm({});
+var NS = 'http://www.w3.org/2000/svg';
+var style = document.createElement('style');
+style.textContent = [['Caveat', 600, 'Caveat-600'], ['IBM Plex Mono', 400, 'IBMPlexMono-400'], ['IBM Plex Mono', 500, 'IBMPlexMono-500'], ['IBM Plex Mono', 600, 'IBMPlexMono-600']]
+  .map(function (f) { return "@font-face{font-family:'" + f[0] + "';font-weight:" + f[1] + ";src:url('${FILM_FONTS}" + f[2] + ".ttf') format('truetype');}"; }).join('');
+document.head.appendChild(style);
+var svg = document.createElementNS(NS, 'svg');
+svg.setAttribute('viewBox', '0 0 ' + film.W + ' ' + film.H);
+svg.setAttribute('text-rendering', 'geometricPrecision');
+svg.style.cssText = 'position:absolute;left:0;top:0;width:' + W + 'px;height:' + H + 'px;background:#f8f5ef';
+document.body.insertBefore(svg, document.body.firstChild);
+var t = 0, playing = true, said = '', saidAt = -9, scrubbing = false;
+var BAND = Math.max(28, H * 0.08);
+function show() { svg.innerHTML = film.frame(t); }
+function say(s) { said = s; saidAt = performance.now(); }
+Promise.all([document.fonts.load("600 40px Caveat"), document.fonts.load("400 20px 'IBM Plex Mono'"), document.fonts.load("500 20px 'IBM Plex Mono'")])
+  .then(function () { film.remeasure(); show(); }, function () { /* the browser's own faces stand in */ });
 mm.report('film', 0, 0, W, H);
 mm.onPointer(function (p) {
-  if (p.type !== 'up') return;
-  if (p.x > W - corner && p.y > H - corner) {
-    v.muted = !v.muted;
-    v.play().then(function () { say(v.muted ? 'sound off' : 'sound on'); }, function () {
-      v.muted = true; v.play().catch(function () {});
-      say('this browser will not give a frame sound — open the film on its own for it');
-    });
-    return;
+  if (p.type === 'down' && p.y > H - BAND) scrubbing = true;
+  if (scrubbing && (p.type === 'down' || p.type === 'move')) { t = Math.max(0, Math.min(film.DURATION, p.x / W * film.DURATION)); show(); }
+  if (p.type === 'up' || p.type === 'cancel') {
+    if (scrubbing) { scrubbing = false; return; }
+    if (p.type === 'up') { playing = !playing; say(playing ? 'playing' : 'paused · press along the foot to scrub'); }
   }
-  if (v.paused) v.play().catch(function () { say('this browser will not play it here'); }); else v.pause();
-  say(v.paused ? 'paused' : 'playing');
 });
-mm.onFrame(function () {
+mm.onFrame(function (_, dt) {
+  if (playing && !scrubbing) { t += dt; if (t > film.DURATION) t = 0; show(); }
   var c = mm.ctx; c.clearRect(0, 0, W, H);
-  var u = Math.max(12, Math.round(H / 34));
-  c.font = u + 'px "IBM Plex Mono", ui-monospace, monospace';
-  // The corner that asks for sound, always there.
-  c.fillStyle = 'rgba(0,0,0,0.45)'; c.fillRect(W - corner, H - corner, corner, corner);
-  c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.fillText(v.muted ? 'sound' : 'mute', W - corner / 2, H - corner / 2);
-  var msg = failed || (performance.now() - saidAt < 2500 ? said : '');
-  if (msg) {
-    var tw = c.measureText(msg).width + u * 2;
-    c.fillStyle = 'rgba(0,0,0,0.6)'; c.fillRect((W - tw) / 2, H / 2 - u, tw, u * 2);
-    c.fillStyle = '#fff'; c.fillText(msg, W / 2, H / 2);
+  var u = Math.max(12, Math.round(H / 40));
+  c.font = u + "px 'IBM Plex Mono', ui-monospace, monospace"; c.textBaseline = 'middle';
+  if (!playing || scrubbing) {   // the foot: where the film stands, and the band that scrubs it
+    c.fillStyle = 'rgba(12,26,36,0.55)'; c.fillRect(0, H - BAND, W, BAND);
+    c.fillStyle = '#3fa3ae'; c.fillRect(0, H - BAND, W * t / film.DURATION, 4);
+    c.fillStyle = '#fff'; c.textAlign = 'left'; c.fillText(t.toFixed(1) + ' / ' + film.DURATION.toFixed(0) + ' s  · silent here — the film’s own page has its sound', u, H - BAND / 2);
+  }
+  if (performance.now() - saidAt < 1800) {
+    var tw = c.measureText(said).width + u * 2;
+    c.fillStyle = 'rgba(12,26,36,0.6)'; c.fillRect((W - tw) / 2, H / 2 - u, tw, u * 2);
+    c.fillStyle = '#fff'; c.textAlign = 'center'; c.fillText(said, W / 2, H / 2);
   }
 });
+show();
 `;
 
 function story(MM) {
@@ -199,7 +199,7 @@ function story(MM) {
   const x0 = -3960, y0 = 0, w = 3600, h = Math.round(w * 9 / 16);
   const at = T0 - 4 * GAP; // before the storyboard's first event (its clock starts on 4 Oct)
   s.region({ name: 'The film — the soft launch, beside the shots it is made of', bounds: { minX: x0 - 80, minY: y0 - 160, maxX: x0 + w + 80, maxY: y0 + h + 80 }, at });
-  const id = s.import({ kind: 'run', path: 'launch-video/film.run.js', name: 'the launch film', bounds: { minX: x0, minY: y0, maxX: x0 + w, maxY: y0 + h }, code: FILM_PROGRAM, at: at + GAP });
+  const id = s.import({ kind: 'run', path: 'launch-video/film.run.js', name: 'the launch film', bounds: { minX: x0, minY: y0, maxX: x0 + w, maxY: y0 + h }, code: filmProgram(), at: at + GAP });
   // It plays when the board opens: the example is the film shown, and play is in the log like any clock.
   s.clock({ nodeId: id, op: 'play', at: at + 2 * GAP });
   // … and the storyboard drawn beside it.

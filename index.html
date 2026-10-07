@@ -427,24 +427,10 @@
             overflow: hidden;
             box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
         }
-        .film-frame video { display: block; width: 100%; height: 100%; background: #f8f5ef; }
-        .film-play {
-            position: absolute;
-            inset: 0;
-            margin: auto;
-            width: 5.5rem;
-            height: 5.5rem;
-            display: grid;
-            place-items: center;
-            border-radius: 50%;
-            border: 1px solid rgba(111, 179, 184, 0.7);
-            background: rgba(19, 19, 21, 0.88);
-            color: #93cbcf;
-            cursor: pointer;
-        }
-        .film-play:hover { background: rgba(19, 19, 21, 0.96); border-color: #93cbcf; }
-        .film-play svg { width: 2.1rem; height: 2.1rem; margin-left: 0.3rem; }
-        .film-play[hidden] { display: none; }
+        .film-frame { aspect-ratio: 1920 / 1132; }   /* the picture, and the player's bar under it */
+        .film-frame iframe { display: block; width: 100%; height: 100%; border: 0; background: #f8f5ef; }
+        .film-links { display: flex; align-items: center; gap: 0.9rem; }
+        .film-links a { color: rgba(111, 179, 184, 0.95); font-size: var(--text-sm); }
         .film-bar {
             display: flex;
             justify-content: space-between;
@@ -2077,19 +2063,14 @@
         </div>
         <dialog class="film" id="film" aria-labelledby="filmTitle">
             <div class="film-frame">
-                <video id="filmVideo" controls playsinline preload="none" poster="launch-video/dynaink-soft-launch.jpg"
-                       aria-label="dyna.ink, the soft-launch film">
-                    <source src="launch-video/dynaink-soft-launch.mp4" type="video/mp4">
-                    <source src="launch-video/dynaink-soft-launch.webm" type="video/webm">
-                    <a href="launch-video/dynaink-soft-launch.mp4">Download the film (MP4)</a>
-                </video>
-                <button class="film-play" id="filmPlay" type="button" aria-label="Play the film">
-                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z"/></svg>
-                </button>
+                <!-- Not a video: the film's own code (launch-video/film.js) drawing each frame, its sound made from
+                     its cues on the first play. Loaded when the dialog opens and let go when it closes. -->
+                <iframe id="filmPlayer" title="dyna.ink, the soft-launch film, drawn live" data-src="launch-video/index.html?embed&amp;poster=166" allow="autoplay"></iframe>
             </div>
             <div class="film-bar">
                 <p id="filmTitle"><span class="meta">dyna</span>.ink — the soft-launch film · 2:50, with sound</p>
-                <button class="film-close" id="filmClose" type="button">close ×</button>
+                <span class="film-links"><a href="launch-video/dynaink-soft-launch.mp4" download>MP4</a>
+                <button class="film-close" id="filmClose" type="button">close ×</button></span>
             </div>
         </dialog>
         <a href="#abstract" class="scroll-indicator" aria-label="Scroll to content">
@@ -3591,8 +3572,7 @@
         // asked for the film, not for sound to start. Each pair offers once;
         // draw another and it offers again.
         const film = document.getElementById('film');
-        const filmVideo = document.getElementById('filmVideo');
-        const filmPlay = document.getElementById('filmPlay');
+        const filmPlayer = document.getElementById('filmPlayer');
         const filmTaken = new Set();
         let filmFrom = null;        // what to give the focus back to
 
@@ -3606,8 +3586,9 @@
             if (!film || film.open) return;
             filmFrom = document.activeElement;
             if (typeof film.showModal === 'function') film.showModal(); else film.setAttribute('open', '');
-            filmPlay.hidden = !filmVideo.paused;
-            (filmVideo.paused ? filmPlay : filmVideo).focus({ preventScroll: true });
+            // The player is loaded now and let go on close: nothing is fetched or drawn until the film is asked for.
+            if (filmPlayer.getAttribute('src') !== filmPlayer.dataset.src) filmPlayer.src = filmPlayer.dataset.src;
+            filmPlayer.focus({ preventScroll: true });
             window.dynaCount?.('film/open-' + how);
             // Grown out of the box the hand drew: the frame starts where the
             // box stood and takes its place in the middle.
@@ -3627,18 +3608,16 @@
 
         function closeFilm() {
             if (!film || !film.open) return;
-            filmVideo.pause();
             if (typeof film.close === 'function') film.close(); else film.removeAttribute('open');
         }
 
         if (film) {
             document.getElementById('heroFilm')?.addEventListener('click', () => openFilm('button', null));
             document.getElementById('filmClose').addEventListener('click', closeFilm);
-            filmPlay.addEventListener('click', () => { filmVideo.play().catch(() => {}); });
             // A click on the backdrop is a click on the dialog itself.
             film.addEventListener('click', (e) => { if (e.target === film) closeFilm(); });
             film.addEventListener('close', () => {
-                filmVideo.pause();
+                filmPlayer.src = 'about:blank';   // the film, its frames and its sound stop with the dialog
                 // Back to what opened it; a drawn play button has no focus of
                 // its own, so the hero's film button stands in for it.
                 const back = filmFrom && document.contains(filmFrom) && filmFrom !== document.body && !film.contains(filmFrom)
@@ -3646,13 +3625,12 @@
                 back?.focus({ preventScroll: true });
                 filmFrom = null;
             });
-            let counted = false;
-            filmVideo.addEventListener('play', () => {
-                filmPlay.hidden = true;
-                if (!counted) { counted = true; window.dynaCount?.('film/play'); }
+            // The player says its first play, and hands over Esc, which the focused frame keeps from the dialog.
+            window.addEventListener('message', (e) => {
+                if (e.origin !== location.origin || e.source !== filmPlayer.contentWindow || !e.data) return;
+                if (e.data.dynaFilm === 'play') window.dynaCount?.('film/play');
+                if (e.data.dynaFilm === 'close') closeFilm();
             });
-            filmVideo.addEventListener('pause', () => { if (!filmVideo.ended && !filmVideo.seeking) filmPlay.hidden = false; });
-            filmVideo.addEventListener('ended', () => { filmPlay.hidden = false; });
         }
 
         /** After a mark lands: did it complete a play button? */

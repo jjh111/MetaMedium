@@ -52,3 +52,9 @@
   Cache-Control: no-cache
 /Demos/sw.js
   Cache-Control: no-cache
+
+# The launch film's faces. The example board plays launch-video/film.js inside a program, whose frame
+# is an opaque origin, so its @font-face fetch is cross-origin and needs this (GitHub Pages sends it for
+# every file). Without it the film still plays, in the browser's own mono and cursive.
+/launch-video/fonts/*
+  Access-Control-Allow-Origin: *

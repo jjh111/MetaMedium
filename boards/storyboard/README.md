@@ -10,7 +10,7 @@ Find finds any word on it.
 
 The app (`https://jjh111.github.io/MetaMedium/app/`) → the control centre's
 **boards** tile → *examples* → **The film and the storyboard**: the storyboard beside
-the launch film, playing (a tap pauses it, the corner asks for sound), made into one
+the launch film, drawn live by its own code (a tap pauses it, a press along its foot scrubs), made into one
 example by `scripts/examples.mjs` (`boards/examples/story.jsonl`). Or **from a file…** → `board.jsonl` here, the
 storyboard alone. Either opens as a new board of your own: draw anywhere, scratch a shot out, arrow a new order, double-click to
 type, drag a shot by its title. Then **export → board + pictures** and send the

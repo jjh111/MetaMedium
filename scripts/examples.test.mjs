@@ -160,15 +160,15 @@ test('the film and the storyboard: the launch film plays in a place of its own b
   assert.match(top[0], /^The film/, 'the film is its own place, first in reading order');
   assert.deepEqual(top.slice(1, 6).map((n) => n.split(' ')[0]), ['Read', 'Maths', 'Physics', 'Reasoning', 'Design']);
   assert.equal(outline.filter((e) => /^Shot \d+ · /.test(e.name)).length, 16, 'sixteen shots');
-  // The film is a program that plays when the board opens, and the file it asks for is in the repository.
+  // The film is a program that plays when the board opens: film.js itself, drawn live, with the faces it asks for in the repository.
   const film = [...state.nodes.values()].find((n) => MM.wordOf(n) === 'the launch film');
   assert.ok(film && state.clocks[film.id] && state.clocks[film.id].playing, 'the film plays');
-  const code = MM.codeOf ? MM.codeOf(film) : null;
-  const src = String(code ? code.data.code : JSON.stringify(s.getEvents().find((e) => e.kind === 'run')));
-  const asked = /\.\.\/(launch-video\/[\w.-]+\.(?:mp4|webm|jpg))/g;
-  let m, files = 0;
-  while ((m = asked.exec(src))) { files++; assert.ok(existsSync(join(root, m[1])), m[1] + ' is in the repository'); }
-  assert.ok(files >= 3, 'the film twice over and its poster');
+  const src = String(s.getEvents().find((e) => e.type === 'import' && e.kind === 'run').code);
+  assert.ok(src.startsWith(readFileSync(join(root, 'launch-video', 'film.js'), 'utf8')), 'the program is film.js, as committed, and a player');
+  assert.ok(!/\.mp4|\.webm/.test(src), 'no video: the film is drawn');
+  for (const face of ['Caveat-600', 'IBMPlexMono-400', 'IBMPlexMono-500', 'IBMPlexMono-600']) {
+    assert.ok(src.includes(face) && existsSync(join(root, 'launch-video', 'fonts', face + '.ttf')), face);
+  }
   // Live: the triangle says its long side, the molecule is the pack's.
   const chips = MM.mathsChips(MM.boardMaths(state));
   assert.ok(chips.some((c) => c.kind === 'side' && /^25\.30/.test(c.text)), JSON.stringify(chips.map((c) => c.text)));
