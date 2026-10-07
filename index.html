@@ -264,9 +264,12 @@
             border: 0;
         }
         
+        /* The wordmark's size, one value: the tagline is sized from it and
+           tracked so its line is exactly as wide as the wordmark's. */
+        .hero { --hero-title: clamp(3rem, 10vw, 5.5rem); }
         .hero h1 {
             font-family: var(--face);
-            font-size: clamp(3rem, 10vw, 5.5rem);
+            font-size: var(--hero-title);
             font-weight: 500;
             letter-spacing: -0.035em;
             line-height: 1;
@@ -279,12 +282,21 @@
            before the rename (brand/README.md). */
         .hero h1 .meta { color: #6fb3b8; }
         
+        /* AI BEYOND CHAT, as wide as dyna.ink above it: a quarter of the
+           wordmark's size, tracked out to its width. IBM Plex Mono sets every
+           glyph 0.6em wide, so the widths are arithmetic (the wordmark's eight
+           at -0.035em; fourteen here) — measured in the browser to the pixel.
+           The trailing tracking is taken back by the negative margin, so the
+           line centres on its letters, not on the space after its last one. */
         .hero .tagline {
+            --track: 0.7554em;
             font-family: var(--face);
-            font-size: var(--text-base);
+            font-size: calc(var(--hero-title) * 0.25);
             font-weight: 500;
             color: rgba(111, 179, 184, 0.85);
-            letter-spacing: 0.4em;
+            letter-spacing: var(--track);
+            margin-right: calc(-1 * var(--track));
+            white-space: nowrap;
             text-transform: uppercase;
             margin-bottom: var(--space-sm);
         }
@@ -310,19 +322,6 @@
             font-weight: 400;
             margin-left: 0.25em;
         }
-        /* The way in: hero to the loop. The hero content deliberately lets
-           drawing through, so the link re-enables its own pointer events. */
-        .hero-loop-link {
-            margin-top: var(--space-sm);
-            font-size: var(--text-sm);
-            font-weight: 500;
-            color: rgba(111, 179, 184, 0.9);
-            text-decoration: underline;
-            text-underline-offset: 3px;
-            pointer-events: auto;
-        }
-        .hero-loop-link:hover { color: #93cbcf; }
-
         /* An affordance the canvas offers where the hand left off. The hero
            keeps every touch for drawing, so on a phone a swipe cannot carry
            you past it; two lines drawn near each other — the shape of a swipe
@@ -368,7 +367,7 @@
            case it grows out of the box that was drawn. The hero is the
            canvas ground in either theme, so the film's chrome is too. */
         .hero-film {
-            margin-top: var(--space-sm);
+            margin: var(--space-xs) 0 var(--space-sm);
             display: inline-flex;
             align-items: center;
             gap: 0.55rem;
@@ -393,10 +392,12 @@
         }
         /* The hint and the scroll arrow stand at fixed heights from the
            hero's foot, the content in its middle; on a laptop's short
-           screen they met the film's button. Under 900px the arrow goes
-           (see the loop ↓ is the same way down) and the hint keeps to the
-           foot; on a screen too short for even that, the hint goes too. */
-        @media (min-width: 601px) and (max-height: 900px) {
+           screen they met the film's button (at 800px tall the arrow clears
+           it by 7px, and gains half of every pixel more). Under 840px the
+           arrow goes — the page still scrolls, and the bar comes in — and
+           the hint keeps to the foot; on a screen too short for even that,
+           the hint goes too. */
+        @media (min-width: 601px) and (max-height: 840px) {
             .hero .scroll-indicator { display: none; }
             .hero .hero-hint { bottom: 2.5rem; }
         }
@@ -601,7 +602,9 @@
                the right, in that order — the menu stays where a thumb expects
                it, on the edge. */
             .nav-title { order: 1; }
-            .theme-toggle { order: 2; margin-left: auto; }
+            /* `nav ul + .theme-toggle` (the wide bar's spacing) outranks a bare
+               class, and left the control floating mid-bar on a phone. */
+            .theme-toggle, nav ul + .theme-toggle { order: 2; margin-left: auto; }
             .nav-toggle { order: 3; margin-left: var(--space-xs); }
             nav ul { order: 4; margin-left: 0; }
 
@@ -1076,6 +1079,15 @@
             font-size: var(--text-sm);
             opacity: 0.9;
             font-weight: 400;
+        }
+        /* The header is a title and a link: the link never breaks (on a
+           phone "OPEN IT →" broke a letter or two a line), the title takes
+           what is left, and on a narrow screen the pair wraps instead. */
+        .demo-header { gap: var(--space-xs) var(--space-sm); }
+        .demo-header > span:first-child { flex: 1 1 auto; min-width: 0; }
+        .demo-header > span:last-child { flex: none; white-space: nowrap; }
+        @media (max-width: 600px) {
+            .demo-header { flex-wrap: wrap; letter-spacing: 0.08em; padding: var(--space-sm); }
         }
         .demo-container iframe {
             width: 100%;
@@ -1792,7 +1804,7 @@
             html { font-size: 14px; }
             nav { height: 34px; }
             .nav-title { font-size: 0.875rem; }
-            .hero h1 { font-size: clamp(2.5rem, 14vw, 4rem); }
+            .hero { --hero-title: clamp(2.5rem, 14vw, 4rem); }
         }
         
         @media (min-width: 1200px) { main { max-width: 780px; } }
@@ -2055,14 +2067,13 @@
         
         <div class="hero-content">
             <h1><span class="meta">dyna</span>.ink</h1>
-            <p class="tagline">beyond chat</p>
-            <p class="subtitle">Semantic Drawing as AI Interface</p>
-            <p class="byline">John Hanacek <span class="role">Product Designer</span></p>
+            <p class="tagline">AI beyond chat</p>
+            <p class="subtitle">Semantic &amp; Mathematic Drawing Interface</p>
             <button class="hero-film" id="heroFilm" type="button" aria-haspopup="dialog" aria-controls="film">
                 <svg viewBox="0 0 20 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="1" width="18" height="14" rx="1.5"/><path d="M8 5l5 3-5 3z"/></svg>
-                <span>watch the film · 2:50 <span class="how">— or draw a triangle in a box</span></span>
+                <span>view film · 2:50 <span class="how">— or draw a triangle in a box</span></span>
             </button>
-            <a class="hero-loop-link" href="#loop">see the loop ↓</a>
+            <p class="byline">John Hanacek <span class="role">Product Designer</span></p>
         </div>
         <dialog class="film" id="film" aria-labelledby="filmTitle">
             <div class="film-frame">
@@ -2097,8 +2108,6 @@
                 <p>dyna.ink (formerly MetaMedium) is a way of working with AI by drawing. You sketch on a canvas and the canvas reads what you drew — a circle is a circle, two boxes side by side are a row, a word beside a shape is its name — and offers its reading back where you can see it and argue with it. Name a pattern and the canvas learns your vocabulary. A model can join, reading with you and drawing back. The drawing stays yours.</p>
 
                 <p>The idea underneath: AI as a <em>meta-word</em>, a new part of language that turns rough marks into meaning from their context. Drawing becomes something a person and a machine can do together, with a seven-year-old's sketch and an engineer's diagram on the same canvas, each read at its own level.</p>
-
-                <p>The loop it describes is <a href="#loop">replayed just below</a> — then the argument for it.</p>
             </div>
 
         </section>

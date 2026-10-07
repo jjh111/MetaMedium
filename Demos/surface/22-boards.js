@@ -18,7 +18,7 @@
 //   renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash, emptyTrash, boardFromFile,
 //   rereadBoards, boardEntryName, exportLogNow, readLogText), input (flash, say), the
 //   inspector's element (the panel's start), boards list (exampleUrl, exampleRows, exampleName, starterOf),
-//   core (params, EMBED, session), folder (boardMode), view (fitAll).
+//   core (params, EMBED, session), folder (boardMode), view (fitAll, fitTo), render (union, viewportWorld).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -320,6 +320,14 @@
       if (session.getEvents().length) return;
       session.load(read.events);
       fitAll();
+      // A board too big for a narrow frame (a phone's) stops at the least zoom and is cut wherever the fit
+      // lands; its first region, whole, reads better — on the storyboard, the film.
+      const st = session.getState();
+      const boxes = st.contentIds.map((cid) => MM.boundsOf(st.nodes.get(cid))).filter(Boolean);
+      const all = boxes.length ? union(boxes) : null, vw = viewportWorld();
+      const cut = all && (all.minX < vw.minX || all.maxX > vw.maxX || all.minY < vw.minY || all.maxY > vw.maxY);
+      const first = st.regions.length ? MM.boundsOf(st.nodes.get(st.regions[0])) : null;
+      if (cut && first) fitTo(first);
       return;
     }
     if (boardMode() !== 'restore') { say('“?example=' + id + '” opens an example on a board of its own — not here'); return; }
