@@ -121,6 +121,11 @@ jobs:
       # same holder, and no published page still gives GPL as its license.
       - name: The rights
         run: node --test ../scripts/rights.test.mjs
+      # The whitepaper's scenario stories (stories/): the renderer escapes what a
+      # file says, each story has its front matter and says dyna.ink, and the
+      # card that names it is the scenario its front matter says.
+      - name: The scenario stories
+        run: node --test ../stories/reader.test.mjs
       # The example boards a first-time hand opens from the boards pane (V1-PLAN R5)
       # are logs the engine makes, never drawn: what is committed under
       # boards/examples must be what scripts/examples.mjs makes today — and the
