@@ -22,54 +22,55 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 
     <style>
+        /* The whitepaper's hero, on the page a broken link lands on: the canvas
+           ground, IBM Plex Mono, the wordmark with *dyna* in the teal and *.ink*
+           in the ink, and AI BEYOND CHAT tracked to the wordmark's width (the
+           same rule as index.html's .hero .tagline). Its values are the hero's;
+           brand/tokens.css is where they come from. */
         :root {
-            --ink: #1a1a2e;
-            --paper: #f8f6f1;
-            --muted: #6b7280;
-            --sketch-blue: #3b82f6;
+            --ground: #131315;
+            --ink: #e7e5e0;
+            --muted: rgba(181, 179, 173, 0.95);
+            --quiet: rgba(134, 132, 126, 0.95);
+            --teal: #6fb3b8;
+            --teal-soft: rgba(111, 179, 184, 0.85);
+            --teal-line: rgba(111, 179, 184, 0.55);
+            --teal-hover: #93cbcf;
+            --face: 'IBM Plex Mono', 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+            --title: clamp(3rem, 10vw, 5.5rem);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
+        html { font-size: 17px; }
         body {
-            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: #0a1628;
-            color: #fff;
+            font-family: var(--face);
+            background: var(--ground);
+            color: var(--ink);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 2rem;
+            padding: 2rem 1rem;
             text-align: center;
             position: relative;
-            overflow: hidden;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* Blueprint grid background matching hero */
+        /* The hero's blueprint grid, faint. */
         body::before {
             content: '';
             position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
+            inset: 0;
             background-image:
-                linear-gradient(rgba(59, 130, 246, 0.06) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(59, 130, 246, 0.06) 1px, transparent 1px);
+                linear-gradient(rgba(111, 179, 184, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(111, 179, 184, 0.05) 1px, transparent 1px);
             background-size: 40px 40px;
-            pointer-events: none;
-        }
-
-        /* Subtle radial glow behind content */
-        body::after {
-            content: '';
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 600px;
-            height: 600px;
-            background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
             pointer-events: none;
         }
 
@@ -77,56 +78,54 @@
             max-width: 600px;
             position: relative;
             z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         .title {
-            font-family: 'Space Grotesk', -apple-system, sans-serif;
-            font-size: clamp(2.5rem, 8vw, 4rem);
-            font-weight: 700;
-            letter-spacing: -0.03em;
-            line-height: 1;
-            margin-bottom: 0.5rem;
-            color: #ebebeb;
-        }
-
-        .title .meta {
-            background: linear-gradient(135deg, #f97316 0%, #a855f7 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .tagline {
-            font-family: 'DM Sans', sans-serif;
-            font-size: 0.9375rem;
+            font-size: var(--title);
             font-weight: 500;
-            color: rgba(147, 197, 253, 0.7);
-            letter-spacing: 0.45em;
+            letter-spacing: -0.035em;
+            line-height: 1;
+            margin-bottom: 0.75rem;
+            color: var(--ink);
+        }
+        .title .meta { color: var(--teal); }
+
+        /* A quarter of the wordmark, tracked to its width; the trailing
+           tracking taken back so it centres on its letters. */
+        .tagline {
+            --track: 0.7554em;
+            font-size: calc(var(--title) * 0.25);
+            font-weight: 500;
+            color: var(--teal-soft);
+            letter-spacing: var(--track);
+            margin-right: calc(-1 * var(--track));
+            white-space: nowrap;
             text-transform: uppercase;
             margin-bottom: 2.5rem;
         }
 
         .error-code {
-            font-family: 'Space Grotesk', sans-serif;
             font-size: 6rem;
-            font-weight: 700;
-            color: rgba(255, 255, 255, 0.06);
+            font-weight: 600;
+            color: rgba(231, 229, 224, 0.06);
             line-height: 1;
             margin-bottom: -1rem;
             letter-spacing: 0.1em;
         }
 
         h2 {
-            font-family: 'Space Grotesk', sans-serif;
-            font-size: 1.5rem;
-            font-weight: 600;
+            font-size: 1.4rem;
+            font-weight: 500;
             margin-bottom: 1rem;
-            color: rgba(255, 255, 255, 0.9);
+            color: var(--ink);
         }
 
         p {
-            font-size: 1rem;
-            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.95rem;
+            color: var(--muted);
             margin-bottom: 2rem;
             line-height: 1.7;
         }
@@ -139,94 +138,70 @@
         }
 
         a {
-            display: inline-block;
-            padding: 0.875rem 1.75rem;
-            font-size: 1rem;
-            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            min-height: 44px;
+            padding: 0.6rem 1.4rem;
+            font-size: 0.9rem;
+            font-weight: 500;
             text-decoration: none;
-            border-radius: 8px;
-            transition: all 0.2s ease;
+            border-radius: 999px;
+            transition: color 0.2s, border-color 0.2s, background 0.2s;
         }
 
         .primary {
-            background: var(--sketch-blue);
-            color: white;
+            background: rgba(111, 179, 184, 0.14);
+            color: var(--teal-hover);
+            border: 1px solid var(--teal-line);
         }
-
-        .primary:hover {
-            background: #2563eb;
-            transform: translateY(-2px);
-        }
+        .primary:hover { border-color: var(--teal-hover); background: rgba(111, 179, 184, 0.22); }
 
         .secondary {
-            background: rgba(255, 255, 255, 0.08);
-            color: rgba(255, 255, 255, 0.85);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(19, 19, 21, 0.6);
+            color: var(--teal-soft);
+            border: 1px solid var(--teal-line);
         }
-
-        .secondary:hover {
-            background: rgba(255, 255, 255, 0.14);
-            transform: translateY(-2px);
-        }
+        .secondary:hover { border-color: var(--teal-hover); color: var(--teal-hover); }
 
         .external-links {
             margin-top: 3rem;
             display: flex;
-            gap: 2rem;
+            gap: 1.5rem;
             justify-content: center;
             flex-wrap: wrap;
         }
-
         .external-links a {
+            min-height: 0;
             padding: 0.5rem;
-            color: rgba(147, 197, 253, 0.5);
-            font-weight: 500;
-            font-size: 0.875rem;
+            color: var(--quiet);
+            font-size: 0.85rem;
         }
+        .external-links a:hover { color: var(--teal-hover); }
 
-        .external-links a:hover {
-            color: rgba(147, 197, 253, 0.9);
-        }
+        a:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
 
-        /* Decorative sketch elements */
+        /* Decorative sketch elements, in the teal of a reading. */
         .sketch-elements {
             position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
+            inset: 0;
             pointer-events: none;
             overflow: hidden;
         }
-
         .sketch-elements svg {
             position: absolute;
-            opacity: 0.07;
-            stroke: var(--sketch-blue);
+            opacity: 0.12;
+            stroke: var(--teal);
             fill: none;
             stroke-width: 1.5;
             stroke-linecap: round;
         }
-
-        .sketch-circle {
-            width: 120px; height: 120px;
-            top: 15%; left: 8%;
-        }
-
-        .sketch-rect {
-            width: 80px; height: 80px;
-            bottom: 20%; right: 10%;
-        }
-
-        .sketch-line {
-            width: 100px; height: 60px;
-            top: 25%; right: 12%;
-        }
-
-        .sketch-squiggle {
-            width: 140px; height: 40px;
-            bottom: 30%; left: 5%;
-        }
+        .sketch-circle { width: 120px; height: 120px; top: 15%; left: 8%; }
+        .sketch-rect { width: 80px; height: 80px; bottom: 20%; right: 10%; }
+        .sketch-line { width: 100px; height: 60px; top: 25%; right: 12%; }
+        .sketch-squiggle { width: 140px; height: 40px; bottom: 30%; left: 5%; }
 
         @media (max-width: 640px) {
-            .sketch-elements svg { opacity: 0.04; }
+            .sketch-elements svg { opacity: 0.07; }
             .error-code { font-size: 4rem; }
         }
     </style>
@@ -249,7 +224,7 @@
 
     <div class="container">
         <div class="title"><span class="meta">dyna</span>.ink</div>
-        <p class="tagline">beyond chat</p>
+        <p class="tagline">AI beyond chat</p>
 
         <div class="error-code">404</div>
         <h2>Page Not Found</h2>
@@ -262,7 +237,7 @@
             <a href="https://jjh111.github.io/MetaMedium/" class="primary">
                 Read the Whitepaper
             </a>
-            <a href="https://jjh111.github.io/MetaMedium/doodle2-canvas.html" class="secondary">
+            <a href="https://jjh111.github.io/MetaMedium/app/" class="secondary">
                 Try the Demo
             </a>
         </div>

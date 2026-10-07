@@ -117,8 +117,8 @@ Loaded by a page from a CDN, never committed
   IBM Plex Mono (a typeface)
       SIL Open Font License 1.1. Copyright © 2017 IBM Corp., with Reserved
       Font Name "Plex".
-      From Google Fonts, by the whitepaper (index.html) and brand/tokens.css
-      (the styleguide); vendored as TTF files in launch-video/fonts/ by the
+      From Google Fonts, by the whitepaper (index.html), 404.html and
+      brand/tokens.css (the styleguide); vendored as TTF files in launch-video/fonts/ by the
       soft-launch film.
 
   Caveat (a typeface)
@@ -131,8 +131,8 @@ Loaded by a page from a CDN, never committed
       (The DM Sans Project Authors; The Space Grotesk Project Authors;
       The JetBrains Mono Project Authors; The Cinzel Project Authors;
       The Raleway Project Authors, with Reserved Font Name "Raleway").
-      From Google Fonts: DM Sans and Space Grotesk by 404.html and the 2025
-      demos (doodle2-canvas.html, metadoodle1.html); JetBrains Mono by the
+      From Google Fonts: DM Sans and Space Grotesk by the 2025 demos
+      (doodle2-canvas.html, metadoodle1.html); JetBrains Mono by the
       2025 demos, lens-canvas/ and playground.html; Cinzel and Raleway by
       playground.html.
 
