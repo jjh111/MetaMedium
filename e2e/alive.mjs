@@ -29,6 +29,7 @@
 //   AL13  a second tab opens the same board: it too runs nothing until played there
 //   AL14  a pendulum whose marks were named swings inside its artifact, the pivot never moved
 //   AL15  a run that ran out of its step budget stops and says so; Play starts it again from the top
+//   AL16  a long run is kept while its inputs stand — a stroke elsewhere builds no stepper, a length written beside the rod builds one, taken to where the run was
 
 import { waitReady } from './keep.mjs';
 
@@ -359,6 +360,37 @@ export async function runAlive(browser, servers, { freshContext }) {
     const again = await page.evaluate(() => window.__mmRun.runs().map((r) => ({ running: r.running, t: r.t, stopped: r.stopped })));
     check(`AL15b. Play after that starts it again from the top (running ${again[0] && again[0].running}, t = ${again[0] && again[0].t.toFixed(2)} s, ${again[0] && again[0].stopped ? 'still stopped' : 'not stopped'})`,
       again[0] && again[0].running && again[0].t < 5 && !again[0].stopped, { again });
+    await dismissAll(page);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+  });
+
+  await record('AL16', async () => {
+    // A long run is not re-derived from t = 0 at every change to the log: a stroke drawn elsewhere makes no new stepper, and
+    // a length written beside the rod (new inputs) makes one, taken to the time the run had reached — and the swing goes on.
+    await hold(page, geo.bob.x - geo.r, geo.bob.y);
+    await pill(page, 'Reset the pendulum').click();
+    await page.waitForTimeout(300);
+    await pill(page, 'Play the pendulum').click();
+    await page.waitForTimeout(900);
+    await dismissAll(page);
+    const b0 = await page.evaluate(() => window.__mmRun.built());
+    const t1 = (await runKeys(page))[0].t;
+    await draw(page, lerp({ x: 200, y: 700 }, { x: 420, y: 720 }, 20));
+    await page.waitForTimeout(300);
+    const b1 = await page.evaluate(() => window.__mmRun.built());
+    const t2 = (await runKeys(page))[0].t;
+    await page.evaluate(([r, g]) => {
+      const mid = { x: (r.x + g.x) / 2, y: (r.y + g.y) / 2 };
+      window.__mm.session.import({ kind: 'text', path: 'text/L.txt', name: '2 m', bounds: { minX: mid.x + 24, minY: mid.y - 12, maxX: mid.x + 84, maxY: mid.y + 12 }, code: '2 m', at: Date.now() });
+    }, [geo.pivot, geo.bob]);
+    await page.waitForTimeout(500);
+    const b2 = await page.evaluate(() => window.__mmRun.built());
+    const after = (await runKeys(page))[0];
+    const L = await page.evaluate(() => window.__mmRun.runs()[0].inputs.L);
+    const chips = await page.evaluate(() => window.__mmRun.chips().map((c) => c.text));
+    check(`AL16. a long run is kept while its inputs stand: a stroke drawn elsewhere builds no stepper (${b0} → ${b1}) and time goes on (${t1.toFixed(2)} → ${t2.toFixed(2)} s); a length written beside the rod builds one (${b1} → ${b2}), taken to where the run was (t = ${after.t.toFixed(2)} s, still running ${after.running}), and the chip says ${chips[0]}`,
+      b1 === b0 && t2 > t1 && b2 === b1 + 1 && after.running && after.t >= t2 && L.from === 'written' && L.value === 2 && /^T = 2\.86 s$/.test(chips[0] || ''), { b0, b1, b2, t1, t2, after, L, chips });
     await dismissAll(page);
     await page.keyboard.press('Escape');
     await page.waitForTimeout(200);

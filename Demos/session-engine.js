@@ -9863,6 +9863,7 @@
   let aliveKept = { key: null, runs: [] };// the runs read for this log, kept while it stands
   let aliveRaf = 0, aliveLast = 0;
   let aliveDrawn = [];                    // this paint's chips, for tests: { quantity, text, x, y }
+  let aliveBuilt = 0;                     // steppers made, for tests: a stroke drawn elsewhere makes none
 
   /** Is the run keyed by this mark running in this sitting? The tools ask (core's `ToolHost.running`). */
   function aliveIsRunning(key) {
@@ -9913,6 +9914,7 @@
         // New, or its inputs changed: derived again, to the time it had reached.
         const t0 = st ? st.t : 0;
         st = MM.createStepper(run);
+        aliveBuilt++;
         if (t0 > 0) st.seek(Math.min(t0, ALIVE_REDERIVE_MAX_S));
         aliveSteppers.set(k, st);
       } else st.rebase(run);
@@ -10081,6 +10083,7 @@
       };
     }),
     running: () => [...aliveArmed],
+    built: () => aliveBuilt,
     placements: () => [...alivePlaced.values()].map((p) => Object.assign({}, p)),
     chips: () => aliveDrawn.map((c) => Object.assign({}, c)),
     /** The pivot, the rod's top end and the bob's centre as the paint draws them now — the same placements, applied to the points. */
