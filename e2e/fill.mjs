@@ -21,6 +21,8 @@
 //   F10  the hand's paint of the board with ghosts showing is what the whole-board read draws (paintCheck)
 //   F11  a tap on a ghost with nothing held writes it and leaves no dot
 //   F12  a mark fill-in (a stand-in source) is dashed, tapped along its line, writes its ink in the tool's name, one undo
+//   F13  a coordinate plane drawn with the pointer and a rough parabola on it (MATHS-SPEC lane C, T4's first line): held, y = x²
+//        stands beside it and its clean curve lies dashed beneath the ink, one colour; a tap along the curve draws it, one act, one undo
 
 import { waitReady } from './keep.mjs';
 
@@ -40,6 +42,14 @@ async function draw(page, pts) {
 }
 async function hold(page, x, y) {
   await page.mouse.move(x, y); await page.mouse.down(); await page.waitForTimeout(900); await page.mouse.up(); await page.waitForTimeout(400);
+}
+
+
+/** An arrow drawn with the pointer: the shaft, then back along one wing, to the tip and out along the other. */
+function arrowPoints(a, b, head = 18) {
+  const L = Math.hypot(b.x - a.x, b.y - a.y), u = { x: (b.x - a.x) / L, y: (b.y - a.y) / L };
+  const wing = (s) => ({ x: b.x - u.x * head * Math.cos(0.5) - s * -u.y * head * Math.sin(0.5), y: b.y - u.y * head * Math.cos(0.5) - s * u.x * head * Math.sin(0.5) });
+  return join2(lerp(a, b, 36), lerp(b, wing(1), 6), lerp(wing(1), b, 6), lerp(b, wing(-1), 6));
 }
 
 /** A right triangle ruled with the pointer — right angle at `r`, legs `la` along x and `lb` up — its square drawn in the corner. */
@@ -463,6 +473,49 @@ export async function runFill(browser, servers, { freshContext }) {
       await undo(p);
       const undone = await state(p);
       check('F12c. …and one undo takes the ink away', undone.types.filter((t) => t === 'stroke').length === before.types.filter((t) => t === 'stroke').length, { before: before.types.length, undone: undone.types.length });
+    } finally { await p.close().catch(() => {}); }
+  });
+
+  // A coordinate plane drawn with the pointer — two arrows, the numbers by their ticks — and Jake's rough parabola on it.
+  // Held, the curve says what it is where the eye already is: y = x² beside it, its clean curve dashed beneath the ink,
+  // both in one colour; a tap along the curve draws it as ink in the tool's name, one act, one undo (MATHS-SPEC lane C).
+  await record('F13', async () => {
+    const p = await open();
+    try {
+      const O = { x: 520, y: 540 }, U = 100;
+      await draw(p, arrowPoints({ x: 180, y: O.y }, { x: 880, y: O.y }));
+      await draw(p, arrowPoints({ x: O.x, y: O.y + 24 }, { x: O.x, y: 150 }));
+      for (const i of [-3, -2, -1, 1, 2, 3]) await written(p, (i < 0 ? '\u2212' : '') + Math.abs(i), { x: O.x + i * U, y: O.y + 24 }, i < 0 ? 26 : 16, 16);
+      for (const i of [1, 2, 3]) await written(p, String(i), { x: O.x - 26, y: O.y - i * U }, 16, 16);
+      const parab = Array.from({ length: 64 }, (_, k) => {
+        const x = -1.8 + (3.6 * k) / 63;
+        return { x: O.x + x * U + 1.5 * Math.sin(k / 5), y: O.y - x * x * U + 1.5 * Math.cos(k / 4) };
+      });
+      await draw(p, parab);
+      await hold(p, O.x + 1.2 * U, O.y - 1.44 * U);
+      const before = await state(p);
+      const gs = await ghosts(p);
+      const eq = gs.find((g) => g.text === 'y = x\u00b2' && !g.mark);
+      const curve = gs.find((g) => g.mark && g.text === 'y = x\u00b2');
+      const fills = await p.evaluate(() => window.__mmGhosts.fills().filter((f) => /^plane:/.test(f.key)).map((f) => ({ key: f.key, kind: f.kind, quantity: f.quantity, take: f.take })));
+      check(`F13. held, the rough parabola says y = x\u00b2 beside it and its clean curve lies beneath the ink, in one colour (${fills.map((f) => f.kind + ':' + f.take).join(', ')})`,
+        before.summon && !!eq && !!curve && eq.hue === curve.hue && eq.hue !== undefined && fills.length === 2 && fills.some((f) => f.kind === 'expression' && f.take === 'text') && fills.some((f) => f.kind === 'mark' && f.take === 'strokes'),
+        { gs, fills, summon: before.summon });
+      const hit = await p.evaluate(() => window.__mmGhosts.hits().find((h) => h.pts && h.pts.length > 3) || null);
+      const mid = hit ? hit.pts[Math.floor(hit.pts.length / 2)] : null;
+      const s = mid ? await screenOf(p, mid) : null;
+      if (s) { await p.mouse.click(s.x, s.y); await p.waitForTimeout(400); }
+      const after = await state(p);
+      const wrote = after.types.slice(before.events).filter((t) => t !== 'dismiss' && t !== 'deselect');
+      const stroke = await p.evaluate(() => { const ev = window.__mm.session.getEvents().filter((e) => e.type === 'stroke'); const e = ev[ev.length - 1]; return e ? { tool: e.tool, offer: e.offer, n: (e.points || []).length } : null; });
+      check(`F13b. a tap along the clean curve draws it as ink, one act stamped with the tool and the offer (${wrote.join(', ')}), and it is not offered a second time`,
+        wrote.join() === 'stroke' && stroke && stroke.tool === 'fill' && /^plane:.*:curve$/.test(stroke.offer) && stroke.n > 20
+          && !(await p.evaluate(() => window.__mmGhosts.fills().some((f) => f.kind === 'mark' && /^plane:/.test(f.key)))),
+        { wrote, stroke });
+      await undo(p);
+      const undone = await state(p);
+      check('F13c. …and one undo takes the curve away, and its ghost comes back', undone.types.filter((t) => t === 'stroke').length === before.types.filter((t) => t === 'stroke').length
+        && (await p.evaluate(() => window.__mmGhosts.fills().some((f) => f.kind === 'mark' && /^plane:/.test(f.key)))), { before: before.types.length, undone: undone.types.length });
     } finally { await p.close().catch(() => {}); }
   });
 
