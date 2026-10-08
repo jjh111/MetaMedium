@@ -172,6 +172,13 @@ describe('the grammar of fn.ts', () => {
     expect(at('sin^-1(x)', 0.5)).toBeCloseTo(Math.asin(0.5), 12);
   });
 
+  it('a function of a function, with or without brackets', () => {
+    expect(at('√sin(x)', Math.PI / 2)).toBeCloseTo(1, 12);
+    expect(at('sin cos x', 0)).toBeCloseTo(Math.sin(1), 12);
+    expect(at('√√x', 16)).toBe(2);
+    expect(at('ln exp x', 3)).toBeCloseTo(3, 12);
+  });
+
   it('degrees: sin 30° is a half', () => {
     expect(at('sin 30°', 0)).toBeCloseTo(0.5, 12);
     expect(at('sin(30°)', 0)).toBeCloseTo(0.5, 12);

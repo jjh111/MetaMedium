@@ -46,9 +46,10 @@
 //   - **A bare number in a trig function is plural.** `sin(30)` is radians by its
 //     face and degrees as the second reading, said as such; with a name or a
 //     degree sign in it there is no second reading, and the radians are noted.
-//   - **A hyphen between two bare numbers is a minus first** (`3-5` is −2, the
-//     range still offered); with a length on either side, or an en dash, it stays
-//     a range.
+//   - **A hyphen between two bare numbers, in a sum typed after `=`, is a minus
+//     first** (`= 3-5` is −2, the range still offered, `ReadOptions.typed`); with
+//     a length on either side, or an en dash, or on a line of a page, it stays a
+//     range, as it always was.
 //
 // The function table is `fn.ts`'s, so `sin` means one thing on a sheet and in a plot.
 
@@ -272,10 +273,10 @@ function scan(s: string): Tok[] {
   return out;
 }
 
-/** A single Latin or Greek letter: a name an equation uses (x, θ, L), as opposed to a word a page uses (Bust). */
+/** A single letter: a name an equation uses (x, t, L), as opposed to a word a page uses (Bust). */
 const isLetterName = (name: string) => [...name].length === 1 && LETTER.test(name);
 
-/** A word that is a single Latin or Greek letter. */
+/** A word that is a single letter. */
 const isLetterWord = (w: string) => [...w].length === 1 && LETTER.test(w);
 
 /** Is this word one the function table spells, aliases included? Lower case only: `Log` may be a name. */
@@ -833,26 +834,37 @@ interface DashPlan {
 
 const MAX_CHOICES = 3;
 
-function readSegment(toks: Tok[], src: string): { readings: ExprReading[]; error?: string } {
+/** How a text is to be read, when it matters who is writing it. */
+export interface ReadOptions {
+  /** Typed as a sum (`= 3-5`): the keyboard's hyphen between two bare numbers in plain arithmetic is a minus, not the range a page might mean. */
+  typed?: boolean;
+}
+
+function readSegment(toks: Tok[], src: string, typed = false): { readings: ExprReading[]; error?: string } {
   const junk = toks.find((t) => t.t === 'junk');
   if (junk && junk.t === 'junk') return { readings: [], error: `cannot read “${junk.text}”` };
   if (toks.some((t) => t.t === 'eq')) return { readings: [], error: 'more than one expression' };
 
   const plans: DashPlan[] = [];
+  // A line of a page, or a formula with names in it, is the drafter's, where a hyphen between bare numbers is as likely a
+  // range as a minus; a sum typed after `=` with numbers alone is arithmetic, and the keyboard's hyphen in it is a minus.
+  const arithmetic = typed && !toks.some((t) => t.t === 'name' || t.t === 'ref');
   toks.forEach((t, k) => {
     if (t.t !== 'dash') return;
-    const prev = toks[k - 1], next = toks[k + 1];
+    const prev = toks[k - 1], next = toks[k + 1], after = toks[k + 2];
     if (!operandEnd(prev)) return plans.push({ index: k, mode: 'unary' });
     if (t.glyph === 'to') return plans.push({ index: k, mode: 'range' });
+    // 3-5x, 3-5², 3-5° are 3 minus a product, a power, an angle — a range of numbers would leave the x behind
+    const tight = after?.t === 'pow' || (after?.t === 'op' && after.implicit);
     if (
       prev.t === 'num' && next?.t === 'num' && !isRange(prev.q) && !isRange(next.q) && prev.q.lo < next.q.lo &&
-      !prev.q.angle && !next.q.angle && toks[k - 2]?.t !== 'pow' &&
+      !prev.q.angle && !next.q.angle && toks[k - 2]?.t !== 'pow' && !tight &&
       (prev.q.unit === null || next.q.unit === null || prev.q.unit === next.q.unit)
     ) {
-      // A typed minus sign is a minus, and so is the keyboard's hyphen between two bare numbers (3-5);
+      // A typed minus sign is a minus; so is the keyboard's hyphen between two bare numbers in arithmetic (3-5);
       // a length on either side, or an en dash, is a range — a length is not negative.
       const bare = prev.q.unit === null && next.q.unit === null && prev.q.dim === 0 && next.q.dim === 0;
-      return plans.push({ index: k, mode: 'choice', plain: t.glyph === '−' || (t.glyph === '-' && bare) ? 'minus' : 'range', glyph: t.glyph });
+      return plans.push({ index: k, mode: 'choice', plain: t.glyph === '−' || (t.glyph === '-' && bare && arithmetic) ? 'minus' : 'range', glyph: t.glyph });
     }
     plans.push({ index: k, mode: 'minus' });
   });
@@ -1070,13 +1082,13 @@ function withDegrees(e: Expr, flip: ReadonlySet<Expr>): Expr {
  * reading first. Empty when the text is not one expression (it has an `=`, or
  * two expressions side by side, or something the grammar cannot read).
  */
-export function parseExpression(text: string): ExprReading[] {
+export function parseExpression(text: string, options: ReadOptions = {}): ExprReading[] {
   const s = text.replace(SPACES, ' ');
   const toks = refine(scan(s));
   if (!toks.length || toks.some((t) => t.t === 'eq')) return [];
   const segs = splitSegments(toks);
   if (segs.length !== 1) return [];
-  return readSegment(segs[0].toks, s).readings;
+  return readSegment(segs[0].toks, s, !!options.typed).readings;
 }
 
 // ===== Chains: a line split at =, at a result written beside it, at a worked line =====
@@ -1123,12 +1135,12 @@ function splitSegments(toks: Tok[]): { toks: Tok[]; join?: SegmentJoin }[] {
   return segs.filter((s) => s.toks.length > 0);
 }
 
-export function parseChain(text: string): ExprChain {
+export function parseChain(text: string, options: ReadOptions = {}): ExprChain {
   const s = text.replace(SPACES, ' ');
   const toks = refine(scan(s));
   const segments = splitSegments(toks).map((seg): ChainSegment => {
     const first = seg.toks[0], last = seg.toks[seg.toks.length - 1];
-    const { readings, error } = readSegment(seg.toks, s);
+    const { readings, error } = readSegment(seg.toks, s, !!options.typed);
     return {
       text: s.slice(first.at, last.end),
       ...(seg.join ? { join: seg.join } : {}),
@@ -1199,10 +1211,10 @@ function loneQuantity(seg: ChainSegment): Quantity | null {
   return null;
 }
 
-export function parseLine(text: string): LineParse {
+export function parseLine(text: string, options: ReadOptions = {}): LineParse {
   const s = text.replace(SPACES, ' ').trim();
   const { label, body } = splitLabel(s);
-  const chain = parseChain(body);
+  const chain = parseChain(body, options);
   const segs = chain.segments;
   const base = { text: s, ...(label ? { label } : {}), body: body.trim(), chain };
   if (!segs.length) return { ...base, shape: 'empty' };

@@ -248,7 +248,7 @@ function headingWords(p: LineParse): string {
 }
 
 function classify(src: Source, line: number): Draft {
-  const parse = parseLine(src.text);
+  const parse = parseLine(src.text, { typed: !!src.maths });
   const d: Draft = { line, src, parse, kind: 'note' };
   const L = parse.label;
   const unreadable = () => (parse.shape === 'empty' ? `${L ? `${L.text} with nothing after it` : 'an empty line'}` : `cannot read “${parse.body}”`);

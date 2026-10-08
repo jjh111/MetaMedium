@@ -28,7 +28,8 @@ function page(...lines: string[]) {
 
 const q = (t: string): Quantity => parseQuantity(t)!.quantity;
 const fmt = (x: Quantity | null) => (x ? formatQuantity(x) : null);
-const valueOf = (t: string, scope = {}) => fmt(evaluateExpr(parseExpression(t)[0].expr, scope).value);
+/** The first reading's value, as a sum typed after `=` is read. */
+const valueOf = (t: string, scope = {}) => fmt(evaluateExpr(parseExpression(t, { typed: true })[0].expr, scope).value);
 
 describe('the table of lines the grammar read silently wrong (MATHS-SPEC §2)', () => {
   it('= 2x was `2 = 2`: with no x on the page it is refused, with x it is twice x', () => {
@@ -66,8 +67,18 @@ describe('the table of lines the grammar read silently wrong (MATHS-SPEC §2)', 
   it('= 3-5 was a range: a hyphen between two bare numbers is a minus first, the range still offered', () => {
     const r = evaluateTyped('= 3-5', null);
     expect(r).toMatchObject({ ok: true, result: '−2', also: '3–5 = 3–5' });
+    // …only typed: a line of a page that says 72-74 is a range, as it always was
+    expect(parseExpression('72-74').map((x) => x.formula)).toEqual(['72–74', '72 − 74']);
+    expect(parseLine('72-74').shape).toBe('value');
+    expect(parseExpression('72-74', { typed: true }).map((x) => x.formula)).toEqual(['72 − 74', '72–74']);
     // …and with a length on either side the dash stays a range, since a length is not negative
     expect(parseExpression('3-6"').map((x) => x.formula)).toEqual(['3–6″', '3 − 6″']);
+    // …and in a formula with names in it, as off a pattern page, a hyphen between bare numbers is still a range first
+    expect(parseExpression('Fist + 2-4')[0].formula).toBe('Fist + 2–4');
+    // 3-5x is 3 minus 5x: there is no range to read, and the x is not left behind
+    expect(parseExpression('3-5x')).toHaveLength(1);
+    expect(formatExpr(parseExpression('3-5x')[0].expr)).toBe('3 − 5x');
+    expect(valueOf('3-5x', scopeOf({ x: '2' }))).toBe('−7');
   });
 
   it('= 2 × a = 10 with a undefined was accepted as 10: it is refused, saying a is not on the sheet', () => {

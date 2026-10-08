@@ -1221,3 +1221,6 @@ export type { Rat, Poly, ParsedPoly, Expanded, Factor, Factored, FactorResult, R
 // numerically from both sides with the approach given; one-sided and infinite limits are said.
 export { limit as limitOf, limitFromText, readLimit } from './maths/limit';
 export type { LimitResult, LimitStep, LimitSide, Approach, Approaches, ApproachPoint, ReadLimit } from './maths/limit';
+
+// How a text is read when it matters who is writing it (`typed`: a sum typed after `=`, where a keyboard hyphen between bare numbers is a minus).
+export type { ReadOptions } from './maths/expr';

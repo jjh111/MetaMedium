@@ -247,7 +247,7 @@ function tokenize(s: string, options: FnOptions): Tok[] {
   };
   while (i < s.length) {
     const c = s[i];
-    if (c === ' ' || c === ' ' || c === ' ' || c === ' ' || c === ',' || c === ';') { space += 1; i++; continue; }
+    if (c === ' ' || c === ',' || c === ';') { space += 1; i++; continue; }
     if (c === '\t' || c === '\n' || c === '\r') { space += 4; i++; continue; }
     if (isDigit(c) || (c === '.' && isDigit(s[i + 1])) || c in VULGAR) {
       let j = i;
@@ -579,7 +579,7 @@ class Parser {
       const a = this.tight(t);
       return first.ch === '-' ? { k: 'neg', a } : a;
     }
-    if (first.t !== 'num' && first.t !== 'var' && first.t !== 'const' && first.t !== 'lp' && first.t !== 'bar') {
+    if (first.t !== 'num' && first.t !== 'var' && first.t !== 'const' && first.t !== 'lp' && first.t !== 'bar' && first.t !== 'fn') {
       return refuse(`${t.text} has nothing it can take after it`);
     }
     let a = this.power();
