@@ -529,7 +529,11 @@ export function destination(out, name, format) {
   const repo = realOf(REPO_ROOT) || REPO_ROOT;
   if (inside(real, repo)) return { error: 'refused: ' + target + ' is inside the repository (' + repo + ') — an export is never written there; name a place outside it, or leave out out to have it in the OS temp directory' };
   if (!isDir && !target.toLowerCase().endsWith(EXT[format])) return { error: 'out names a file, and ' + format + ' is written as ' + EXT[format] + ' — name a file that ends so, or a folder' };
-  return { file: isDir ? path.join(target, name) : target };
+  // A file that already stands there is written over only if it is not a link into the repository.
+  const file = isDir ? path.join(target, name) : target;
+  const standing = existsSync(file) ? realOf(file) : null;
+  if (standing && inside(standing, repo)) return { error: 'refused: ' + file + ' is a link into the repository (' + standing + ') — an export is never written there' };
+  return { file };
 }
 
 /**
@@ -566,6 +570,7 @@ export async function exportBoard(ctx, args) {
   }
   const s = session.getState();
   const events = session.getEvents();
+  const out = args.out === undefined || args.out === null || args.out === '' ? undefined : String(args.out);
   const named = Array.isArray(args.ids) ? args.ids.map(String) : [];
   const ids = named.filter((id) => s.nodes.has(id));
   const gone = named.filter((id) => !s.nodes.has(id));
@@ -576,11 +581,11 @@ export async function exportBoard(ctx, args) {
 
   // What a text export comes back as: inline when it fits, else — or when asked — a file.
   const text = async (name, body, sentence) => {
-    if (args.out === undefined && body.length <= INLINE_MAX) return { content: [{ type: 'text', text: sentence }, { type: 'text', text: body }] };
-    const dest = destination(args.out, name, format);
+    if (out === undefined && body.length <= INLINE_MAX) return { content: [{ type: 'text', text: sentence }, { type: 'text', text: body }] };
+    const dest = destination(out, name, format);
     if (dest.error) return { text: dest.error };
     writeFileSync(dest.file, body);
-    const why = args.out === undefined ? ' — too big to come back inline (' + body.length + ' characters; an answer carries up to ' + INLINE_MAX + '), so it is written to a file' : '';
+    const why = out === undefined ? ' — too big to come back inline (' + body.length + ' characters; an answer carries up to ' + INLINE_MAX + '), so it is written to a file' : '';
     return { text: sentence + why + '\npath: ' + dest.file + '\nsize: ' + Buffer.byteLength(body) + ' bytes' };
   };
 
@@ -601,7 +606,7 @@ export async function exportBoard(ctx, args) {
     const log = MM.encodeLog(events, { ...(app ? { app } : {}), ...(got.length ? { assets: got.length } : {}) });
     const z = B.bundleBuild({ log, assets: got, time: Date.now() });
     const name = B.bundleName(ctx.room);
-    const dest = destination(args.out, name, 'bundle');
+    const dest = destination(out, name, 'bundle');
     if (dest.error) return { text: dest.error };
     writeFileSync(dest.file, Buffer.concat(z.parts.map((p) => Buffer.from(p.buffer, p.byteOffset, p.byteLength))));
     const entries = (await B.zipRead(new Uint8Array(readFileSync(dest.file)), {})).entries.map((e) => e.name + ' (' + e.data.length + ' bytes)');
@@ -660,21 +665,26 @@ export const IMPORT_LOOK_DEFAULT = 200;
 
 /**
  * Whether some bytes are a board file this hand reads — a zip, or text that is a log. A cheap test (no replay): the zip's magic,
- * or text whose first line is a JSON value with a string `type`, or begins as the old JSON array does.
+ * or text whose first line is a JSON value with a string `type` (a version 0 log may begin with a stroke of thousands of points,
+ * so the whole first line is read), or begins as the old JSON array does.
  */
 export function looksLikeBoard(bytes) {
   const B = bundleFragment();
   if (B.isZipBytes(bytes)) return true;
-  const head = Buffer.from(bytes.subarray(0, 4096)).toString('utf8').replace(/^\uFEFF/, '').trimStart();
-  if (head.startsWith('[')) return true;
-  const first = head.split('\n')[0];
+  let at = 0;
+  while (at < bytes.length && (bytes[at] === 0x20 || bytes[at] === 0x0a || bytes[at] === 0x0d || bytes[at] === 0x09)) at++;
+  if (bytes[at] === 0x5b) return true;
+  let end = bytes.indexOf(0x0a, at);
+  if (end < 0) end = bytes.length;
+  const first = Buffer.from(bytes.subarray(at, end)).toString('utf8').replace(/^\uFEFF/, '');
   try { const v = JSON.parse(first); return !!v && typeof v === 'object' && typeof v.type === 'string'; } catch { return false; }
 }
 
 /**
  * Read a board file — a log (`.jsonl`, version 0 or 1, or the old JSON array) or a bundle (`.dyna.zip`) — into a SCRATCH session:
- * the room is never touched. `ctx`: `{ MM, session, describeBoard, thingLines, roomName }`, where `describeBoard(state, { limit, holds })` says a
- * board in words as canvas_look does and `thingLines(state, holds)` says every thing on it in a line each, to compare. Returns `{ text }`.
+ * the room is never touched. `ctx`: `{ MM, session, describeBoard, thingLines, authorsOf }` — `describeBoard(state, { limit, holds })` says a
+ * board in words as canvas_look does, `thingLines(state, holds, author)` says every thing on it in a line each (to compare readings), and
+ * `authorsOf(state)` says who made each. Returns `{ text }`.
  */
 export async function importBoard(ctx, bytes, given, opts = {}) {
   const { MM } = ctx;
@@ -702,7 +712,7 @@ export async function importBoard(ctx, bytes, given, opts = {}) {
   try { const d = MM.decodeLog(text); header = { version: d.version, app: d.app, assets: d.assets }; } catch { /* read already said */ }
   const scratch = MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG });
   try { scratch.load(events); } catch (err) { return refuse('the engine could not replay “' + name + '” — ' + ((err && err.message) || err)); }
-  const fs = scratch.getState();
+  const fileState = scratch.getState();
 
   // The pictures it names, and which of them the file carries.
   const info = new Map();
@@ -714,9 +724,9 @@ export async function importBoard(ctx, bytes, given, opts = {}) {
   lines.push(kind + ' — “' + name + '”, read into a scratch session: nothing was written to the room, and nothing here changes it');
   lines.push('events: ' + plural(events.length, 'event') + ' · log version ' + header.version + (header.version === 0 ? ' (no header — a log kept before R2)' : '') + (header.app ? ' · written by dyna.ink ' + header.app : '') +
     (header.assets !== undefined ? ' · its header says ' + plural(header.assets, 'picture') + (header.assets === 1 ? ' sits' : ' sit') + ' beside it' : ''));
-  const marks = fs.contentIds.filter((id) => !fs.artifacts.includes(id));
-  const cards = fs.explanations.filter((id) => !MM.isSeatTraffic(fs.nodes.get(id), fs.nodes)).length;
-  lines.push('the board: ' + plural(marks.length, 'mark') + ' · ' + plural(fs.artifacts.length, 'artifact') + ' · ' + plural(fs.regions.length, 'region') + ' · ' + plural(cards, 'answer card'));
+  const marks = fileState.contentIds.filter((id) => !fileState.artifacts.includes(id));
+  const cards = fileState.explanations.filter((id) => !MM.isSeatTraffic(fileState.nodes.get(id), fileState.nodes)).length;
+  lines.push('the board: ' + plural(marks.length, 'mark') + ' · ' + plural(fileState.artifacts.length, 'artifact') + ' · ' + plural(fileState.regions.length, 'region') + ' · ' + plural(cards, 'answer card'));
   if (kind === 'a bundle') {
     const bits = [];
     bits.push(plural(have.size, 'picture') + ' carried and checked against ' + (have.size === 1 ? 'its' : 'their') + ' hash' + (have.size === 1 ? '' : 'es'));
@@ -729,7 +739,7 @@ export async function importBoard(ctx, bytes, given, opts = {}) {
 
   // Whatever reads differently from the board in the room, thing by thing, by id.
   const roomState = ctx.session.getState();
-  const inFile = ctx.thingLines(fs, () => '', false);
+  const inFile = ctx.thingLines(fileState, () => '', false);
   const inRoom = ctx.thingLines(roomState, () => '', false);
   let both = 0, same = 0, onlyFile = 0;
   const differ = [];
@@ -744,12 +754,12 @@ export async function importBoard(ctx, bytes, given, opts = {}) {
   for (const id of differ.slice(0, 5)) lines.push('  differs: ' + id + ' — here: ' + inFile.get(id).slice(0, 160) + ' · in the room: ' + inRoom.get(id).slice(0, 160));
   if (differ.length > 5) lines.push('  and ' + (differ.length - 5) + ' more');
   // Who made a thing is the one reading a log carries from a point of view: its writer's own marks are "me", the others' are "by <name>".
-  const whoFile = ctx.authorsOf(fs), whoRoom = ctx.authorsOf(roomState);
+  const whoFile = ctx.authorsOf(fileState), whoRoom = ctx.authorsOf(roomState);
   let flipped = 0;
   for (const [id, who] of whoFile) if (whoRoom.has(id) && whoRoom.get(id) !== who) flipped++;
   if (flipped) lines.push('  who made them reads from the writer\'s side: ' + plural(flipped, 'thing') + ' ' + (flipped === 1 ? 'has' : 'have') + ' another maker here than in the room — a log is written from one hand\'s point of view, where its own marks are “me” and the others\' are “by <name>”');
   lines.push('', 'the board, as canvas_look says it (a scratch board: canvas_look, canvas_see and the rest speak only of the room\'s):');
   const holds = (pic) => (pic.asset && have.has(pic.asset) ? ' · its pixels are in the file' : pic.asset ? ' · its pixels are not in the file — it stands as its name' : ' · no pixels were kept for it');
-  lines.push(...ctx.describeBoard(fs, { limit: opts.limit || IMPORT_LOOK_DEFAULT, holds }));
+  lines.push(...ctx.describeBoard(fileState, { limit: opts.limit || IMPORT_LOOK_DEFAULT, holds }));
   return { text: lines.join('\n') };
 }

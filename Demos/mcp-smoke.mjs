@@ -1080,6 +1080,13 @@ try {
     writeFileSync(v0File, logParts[1].split('\n').slice(1).join('\n'));
     const impV0 = textOf(await dcall('canvas_import', { path: v0File }));
     check('a version 0 log — no header, every log kept before R2 — is read and said to be version 0', /version 0/.test(impV0) && new RegExp('\\b' + logDec.events.length + ' events\\b').test(impV0) && /all read the same/.test(impV0), impV0.slice(0, 300));
+    // …and a version 0 log whose first line is a stroke of a thousand points, far past the head of any file: still known for a log.
+    const longFirst = MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG });
+    longFirst.addStroke(Array.from({ length: 1000 }, (_, i) => ({ x: i, y: 50 + 30 * Math.sin(i / 9) })), Date.now(), undefined, 1);
+    const v0Long = path.join(dir, 'v0-long.jsonl');
+    writeFileSync(v0Long, MM.encodeLogTail(longFirst.getEvents()));
+    const impV0Long = textOf(await dcall('canvas_import', { path: v0Long }));
+    check('a version 0 log whose first line is one long stroke is read as a log all the same — a log is known by its first line, however long', statSync(v0Long).size > 20000 && /version 0/.test(impV0Long) && /\b1 event\b/.test(impV0Long) && /1 mark\b/.test(impV0Long), impV0Long.slice(0, 200));
     // An example from the repository: a log the examples script wrote, never drawn.
     const exampleFile = path.join(repoRoot, 'boards', 'examples', 'flowchart.jsonl');
     const impExample = textOf(await dcall('canvas_import', { path: exampleFile }));
