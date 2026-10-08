@@ -11,6 +11,7 @@ import type { Session } from '../session/session';
 import { boardMaths, evaluateTyped } from './board';
 import { parseExpression, evaluateExpr, evaluateChain, parseLine, formatExpr, scopeOf } from './expr';
 import { readSheet } from './sheet';
+import { readNumber } from './dimension';
 import { formatQuantity, parseQuantity, quantity, formatNumber } from './quantity';
 import type { Quantity } from './quantity';
 
@@ -216,6 +217,13 @@ describe('the new grammar, read both ways or refused', () => {
     expect(parseLine('π').shape).toBe('formula');
     expect(parseLine('30').shape).toBe('value');
     expect(parseLine('r = 30').shape).toBe('definition');
+    // …nor is an area: 24 in² stood beside a rectangle must not be attached to a side as a length
+    expect(parseLine('24 in²').shape).toBe('formula');
+    expect(readNumber('24 in²')).toBeNull();
+    expect(readNumber('A = 24 cm²')).toBeNull();
+    expect(readNumber('θ = 30°')).toBeNull();
+    expect(readNumber('2π')).toBeNull();
+    expect(readNumber('24"')).not.toBeNull();
   });
 
   it('the plural trig reading: sin(30) is radians by its face, degrees the second reading', () => {

@@ -1184,16 +1184,17 @@ function splitLabel(s: string): { label?: LineLabel; body: string } {
 }
 
 /**
- * The one number a segment is, when it is only that. An angle (30°) and a symbol (π) are
- * numbers of a kind a page's lines do not mean by "a value" — a measurement to attach to a
- * side, a definition of a name — so they are formulas, and a text holding one is not read
- * as a length.
+ * The one number a segment is, when it is only that. An angle (30°), a symbol (π) and an area
+ * (24 in²) are numbers of a kind a page's lines do not mean by "a value" — a measurement to
+ * attach to a side, a definition of a name — so they are formulas, and a text holding one is
+ * not read as a length.
  */
 function loneQuantity(seg: ChainSegment): Quantity | null {
   const e = seg.readings[0]?.expr;
   if (!e) return null;
-  if (e.k === 'num') return e.q.angle || e.sym ? null : e.q;
-  if (e.k === 'neg' && e.a.k === 'num') return e.a.q.angle || e.a.sym ? null : negateQuantity(e.a.q);
+  const plain = (n: Extract<Expr, { k: 'num' }>) => !n.q.angle && !n.sym && n.q.dim <= 1;
+  if (e.k === 'num') return plain(e) ? e.q : null;
+  if (e.k === 'neg' && e.a.k === 'num') return plain(e.a) ? negateQuantity(e.a.q) : null;
   return null;
 }
 
