@@ -503,6 +503,9 @@ export function evaluateTyped(text: string, board: BoardMaths | null): TypedMath
     const why = top ? [...top.notes, ...top.unknowns.map((u) => `${u} is not on this sheet`)].filter((x, i, xs) => xs.indexOf(x) === i) : [];
     return { ok: false, reason: why[0] ?? `cannot read “${body}” as a sum` };
   }
+  // A name nothing here defines leaves a written result carried forward (`2 × a = 10` is 10, whatever a is):
+  // on a page that is a step worked by hand, and said; typed as a sum it is a sum that cannot be worked, and refused.
+  if (top.unknowns.length) return { ok: false, reason: top.unknowns.map((u) => `${u} is not on this sheet`).join('; ') };
   const off = top.checks.find((c) => c.status === 'off');
   if (off) return { ok: false, reason: `${top.formula} is ${fmt(top.value)}, not ${fmt(off.written)}` };
   const result = fmt(top.value);

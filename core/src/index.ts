@@ -1323,3 +1323,58 @@ export type {
 export { toTikz as feynmanTikz } from './notations/feynman-tikz';
 export type { FeynmanTikz } from './notations/feynman-tikz';
 export { FEYNMAN_FILL, feynmanFillIns, FEYNMAN_FILL_RANK, NAME_OFF as FEYNMAN_NAME_OFF, NAME_SIZE as FEYNMAN_NAME_SIZE } from './maths/fill-feynman';
+// Maths with a variable (MATHS-SPEC lane B, M11): what a person writes of a function — `y = (x²−4)/(x−2)`,
+// `2π√(L/g)`, `sin x / x` — read by hand into a tree, printed back as it was read, and compiled into a function of
+// one variable (`compileFunction`, C0's shape: null where it is undefined, a reason where it cannot be read). An
+// angle is a quantity of its own (30°, 1.2 rad), and a quantity can be raised to a power.
+export {
+  compileFunction,
+  parseFn,
+  formatFn,
+  evalFn,
+  freeVariables,
+  functionNamed,
+  FUNCTIONS as MATHS_FUNCTIONS,
+} from './maths/fn';
+export type { FnName, FnSpec, FnNode, FnParse, CompiledFn, FnOptions } from './maths/fn';
+export { isAngle, convertAngle, inRadians, powQuantity, angleSuffix, scanAngle } from './maths/quantity';
+export type { AngleUnit, ScannedAngle } from './maths/quantity';
+
+// Polynomials and rational functions (MATHS-SPEC lane B, M12): exact over the rationals — expanded, divided,
+// factored (`factor('x^3-1')` is `(x − 1)(x² + x + 1)`: rational roots, then Kronecker's method, and where it was
+// too large to be sure it says so), and a ratio of polynomials cancelled into its holes, its poles and its end.
+export {
+  factor as factorPolynomial,
+  expand as expandPolynomial,
+  analyseRational,
+  rationalParts,
+  parsePoly,
+  factorPoly,
+  realRoots,
+  rat,
+  ratText,
+  ratFromNumber,
+  ratToNumber,
+  polyFromNumbers,
+  polyText,
+  polyDegree,
+  polyAdd,
+  polySub,
+  polyMul,
+  polyPow,
+  polyDivide,
+  polyGcd,
+  polyDerivative,
+  polyEvalRat,
+  polyEvalNumber,
+} from './maths/poly';
+export type { Rat, Poly, ParsedPoly, Expanded, Factor, Factored, FactorResult, RationalParts, RationalAnalysis, Hole, Pole, EndBehaviour } from './maths/poly';
+
+// Limits (MATHS-SPEC lane B, M13): Jake's limit and the ones like it — by substitution, then by factoring
+// (the common factor struck, step by step), then the known limits (sin x / x …, confirmed by the numbers), then
+// numerically from both sides with the approach given; one-sided and infinite limits are said.
+export { limit as limitOf, limitFromText, readLimit } from './maths/limit';
+export type { LimitResult, LimitStep, LimitSide, Approach, Approaches, ApproachPoint, ReadLimit } from './maths/limit';
+
+// How a text is read when it matters who is writing it (`typed`: a sum typed after `=`, where a keyboard hyphen between bare numbers is a minus).
+export type { ReadOptions } from './maths/expr';

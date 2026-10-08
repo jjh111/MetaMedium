@@ -17,12 +17,20 @@
 //   - **Mixed units convert, and say so.** Every conversion leaves a note, so
 //     a number never changes unit silently.
 //
+//   - **An angle is its own thing** (MATHS-SPEC M11): 30° or 1.2 rad carries its
+//     unit, is neither a length nor a bare number, and does not add to either —
+//     `30° + 15` is refused, not guessed. It scales by a count and divides by an
+//     angle to a count; an angle times an angle is nothing a page means.
+//
 // Tier 1: pure functions, no dependencies, no `eval`. The engine does the
 // arithmetic; no model ever computes a number (DIRECTOR-PLAN-W2 §1).
 
 export type LengthUnit = 'in' | 'ft' | 'cm' | 'mm' | 'm';
 
 export const LENGTH_UNITS: readonly LengthUnit[] = ['in', 'ft', 'cm', 'mm', 'm'];
+
+/** An angle's unit: degrees (30°) or radians (1.2 rad). */
+export type AngleUnit = 'deg' | 'rad';
 
 export interface Quantity {
   /** The value; for a range, its low end. */
@@ -33,6 +41,8 @@ export interface Quantity {
   unit: LengthUnit | null;
   /** 0 a bare number, 1 a length, 2 an area: what × and ÷ of lengths make. */
   dim: number;
+  /** An angle written in this unit (`30°`, `1.2 rad`): unit null and dim 0, and not a bare number. */
+  angle?: AngleUnit;
   /** Written with a ~ or ≈, or computed from something that was. It stays approximate. */
   approx: boolean;
   /**
@@ -56,10 +66,11 @@ const UNIT_WORD: Record<LengthUnit, [string, string]> = {
 export function quantity(
   value: number,
   unit: LengthUnit | null = null,
-  opts: { approx?: boolean; precision?: number; dim?: number } = {}
+  opts: { approx?: boolean; precision?: number; dim?: number; angle?: AngleUnit } = {}
 ): Quantity {
   const q: Quantity = { lo: value, hi: value, unit, dim: opts.dim ?? (unit ? 1 : 0), approx: !!opts.approx };
   if (opts.precision !== undefined) q.precision = opts.precision;
+  if (opts.angle && !unit && !q.dim) q.angle = opts.angle;
   return q;
 }
 
@@ -67,7 +78,7 @@ export function rangeOf(
   lo: number,
   hi: number,
   unit: LengthUnit | null = null,
-  opts: { approx?: boolean; precision?: number; dim?: number } = {}
+  opts: { approx?: boolean; precision?: number; dim?: number; angle?: AngleUnit } = {}
 ): Quantity {
   const q = quantity(Math.min(lo, hi), unit, opts);
   q.hi = Math.max(lo, hi);
@@ -89,21 +100,47 @@ export function holds(q: Quantity, v: number): boolean {
   return v >= q.lo - t && v <= q.hi + t;
 }
 
-/** A bare number that could still be anything's: no unit and no dimension. */
+/** A bare number that could still be anything's: no unit, no dimension, and not an angle. */
 export function isBare(q: Quantity): boolean {
-  return q.unit === null && q.dim === 0;
+  return q.unit === null && q.dim === 0 && !q.angle;
+}
+
+/** An angle written with its unit. */
+export function isAngle(q: Quantity): boolean {
+  return !!q.angle;
 }
 
 // ===== Formatting =====
 
-/** A number for people: at most `digits` decimals, trailing zeros dropped, a real minus sign. */
+/** A nonzero value smaller than this is arithmetic noise (0.1 + 0.2 − 0.3), and shows as 0. */
+const NOISE = 1e-6;
+/** The most decimals a number is ever shown with. */
+const MOST_DIGITS = 8;
+
+/**
+ * A number for people: at most `digits` decimals, trailing zeros dropped, a real
+ * minus sign. A value that is not zero is never shown as zero: when `digits`
+ * would round it away it gets two significant figures instead (0.004, not 0),
+ * unless it is below the noise arithmetic leaves behind.
+ */
 export function formatNumber(v: number, digits = 2): string {
   if (!Number.isFinite(v)) return Number.isNaN(v) ? '?' : v > 0 ? '∞' : '−∞';
-  const f = 10 ** digits;
-  const r = Math.round(v * f) / f;
+  let d = digits;
+  let r = Math.round(v * 10 ** d) / 10 ** d;
+  if (r === 0 && v !== 0 && Math.abs(v) >= NOISE) {
+    d = Math.min(MOST_DIGITS, 1 - Math.floor(Math.log10(Math.abs(v))));
+    r = Math.round(v * 10 ** d) / 10 ** d;
+  }
   if (r === 0) return '0';
-  const s = digits > 0 ? r.toFixed(digits).replace(/\.?0+$/, '') : r.toFixed(0);
+  const s = d > 0 ? r.toFixed(d).replace(/\.?0+$/, '') : r.toFixed(0);
   return s.startsWith('-') ? '−' + s.slice(1) : s;
+}
+
+/** How an angle is written after a number: 30°, 1.2 rad. */
+export function angleSuffix(angle: AngleUnit | undefined, words = false): string {
+  if (!angle) return '';
+  if (angle === 'deg') return words ? ' degrees' : '°';
+  return words ? ' radians' : ' rad';
 }
 
 /** How a unit is written after a number: 36″, 2′, 61 cm, 192 in². */
@@ -150,12 +187,15 @@ function asFraction(v: number, den: number): string | null {
 export function formatQuantity(q: Quantity, opts: { digits?: number; words?: boolean; fractions?: number } = {}): string {
   const written = q.precision && q.precision < 1 ? Math.round(1 / q.precision) : 0;
   const den = opts.fractions ?? (FRACTION_DENOMINATORS.includes(written) && Math.abs(1 / q.precision! - written) < 1e-9 ? written : 0);
-  const n = (v: number) => (den ? asFraction(v, den) : null) ?? formatNumber(v, opts.digits ?? 2);
+  // A number is shown with the places it was WRITTEN with: 0.0001 is not 0 and 1.9999 is not 2.
+  const places = q.precision && q.precision < 0.01 ? Math.min(MOST_DIGITS, Math.ceil(-Math.log10(q.precision) - 1e-9)) : 0;
+  const digits = opts.digits ?? Math.max(2, places);
+  const n = (v: number) => (den ? asFraction(v, den) : null) ?? formatNumber(v, digits);
   let body: string;
   if (!isRange(q)) body = n(q.lo);
   else if (q.lo < 0 || q.hi < 0) body = `${n(q.lo)} to ${n(q.hi)}`;
   else body = `${n(q.lo)}–${n(q.hi)}`;
-  return (q.approx ? '~' : '') + body + unitSuffix(q.unit, q.dim, opts.words);
+  return (q.approx ? '~' : '') + body + (q.angle ? angleSuffix(q.angle, opts.words) : unitSuffix(q.unit, q.dim, opts.words));
 }
 
 function unitName(unit: LengthUnit, plural: boolean): string {
@@ -272,12 +312,42 @@ export function scanUnit(s: string, i: number): ScannedUnit | null {
   return { unit, text: s.slice(i, k + word.length), end: k + word.length };
 }
 
-/** A number with its unit, and feet followed by inches (5′ 4″) as one length in inches. */
-export function scanMeasure(s: string, i: number): { value: number; precision: number; unit: LengthUnit | null; text: string; end: number } | null {
+const ANGLE_MARKS = ['°', 'º', '˚'];
+const ANGLE_WORDS: Record<string, AngleUnit> = {
+  deg: 'deg', degs: 'deg', degree: 'deg', degrees: 'deg',
+  rad: 'rad', rads: 'rad', radian: 'rad', radians: 'rad',
+};
+
+export interface ScannedAngle {
+  angle: AngleUnit;
+  text: string;
+  end: number;
+}
+
+/**
+ * An angle's unit right after a number: the degree mark with no space (30°), or a
+ * whole word after at most one space (30 deg, 1.2 rad, 2 radians). "3 radius" is not
+ * radians, as "2 mid" is not metres.
+ */
+export function scanAngle(s: string, i: number): ScannedAngle | null {
+  if (ANGLE_MARKS.includes(s[i])) return { angle: 'deg', text: s[i], end: i + 1 };
+  const k = s[i] === ' ' ? i + 1 : i;
+  const m = /^[A-Za-z]+/.exec(s.slice(k));
+  if (!m) return null;
+  const angle = ANGLE_WORDS[m[0].toLowerCase()];
+  return angle ? { angle, text: s.slice(i, k + m[0].length), end: k + m[0].length } : null;
+}
+
+/** A number with its unit, and feet followed by inches (5′ 4″) as one length in inches; or with an angle's. */
+export function scanMeasure(s: string, i: number): { value: number; precision: number; unit: LengthUnit | null; angle?: AngleUnit; text: string; end: number } | null {
   const n = scanNumber(s, i);
   if (!n) return null;
   const u = scanUnit(s, n.end);
-  if (!u) return { value: n.value, precision: n.precision, unit: null, text: n.text, end: n.end };
+  if (!u) {
+    const a = scanAngle(s, n.end);
+    if (a) return { value: n.value, precision: n.precision, unit: null, angle: a.angle, text: s.slice(i, a.end), end: a.end };
+    return { value: n.value, precision: n.precision, unit: null, text: n.text, end: n.end };
+  }
   if (u.unit === 'ft') {
     const k = s[u.end] === ' ' ? u.end + 1 : u.end;
     const n2 = isDigit(s[k]) || isVulgar(s[k]) ? scanNumber(s, k) : null;
@@ -325,6 +395,7 @@ export function parseQuantity(text: string): QuantityParse | null {
   let lo = sign * a.value;
   let hi = lo;
   let unit = a.unit;
+  let angle = a.angle;
   let precision = a.precision;
   let isRangeWritten = false;
   const note: string[] = [];
@@ -334,6 +405,8 @@ export function parseQuantity(text: string): QuantityParse | null {
     if (!b) return null;
     if (b.value <= lo) return null;
     const bv = b.value;
+    // A range of angles is of angles; a length and an angle make no range.
+    if ((angle && b.unit) || (unit && b.angle) || (angle && b.angle && angle !== b.angle)) return null;
     if (unit && b.unit && unit !== b.unit) {
       // 1 ft–18 in: the second end's unit wins; say so.
       const c = convertQuantity(quantity(lo, unit), b.unit);
@@ -342,16 +415,18 @@ export function parseQuantity(text: string): QuantityParse | null {
       if (bv <= lo) return null;
     }
     unit = b.unit ?? unit;
+    angle = b.angle ?? angle;
     hi = bv;
     precision = Math.min(precision, b.precision);
     isRangeWritten = true;
     i = b.end;
   }
   if (s.slice(i).trim().length > 0) return null;
-  const q = rangeOf(lo, hi, unit, { approx, precision });
-  const unitWords = unit ? ` ${unitName(unit, true)}` : '';
+  const q = rangeOf(lo, hi, unit, { approx, precision, ...(angle ? { angle } : {}) });
+  const unitWords = unit ? ` ${unitName(unit, true)}` : angle ? angleSuffix(angle, true) : '';
   let reason: string;
   if (isRangeWritten) reason = `a range, from ${formatNumber(lo)} to ${formatNumber(hi)}${unitWords}`;
+  else if (angle) reason = `${formatNumber(lo)}${angleSuffix(angle, true)}, an angle`;
   else reason = unit ? `${formatNumber(lo)} ${unitName(unit, lo !== 1)}` : `the number ${formatNumber(lo)}, no unit written`;
   if (approx) reason = `approximate: ${reason}`;
   if (a.text.includes('/') || a.text.includes('⁄') || Object.keys(VULGAR).some((v) => a.text.includes(v))) reason += `, written as a fraction`;
@@ -375,6 +450,22 @@ export function convertQuantity(q: Quantity, unit: LengthUnit): Converted {
   return { quantity: out, note: `${formatQuantity(q)} is ${formatQuantity(out)}` };
 }
 
+const RAD_PER_DEG = Math.PI / 180;
+
+/** An angle in the other unit, with the note that it changed. A quantity that is no angle comes back as it was. */
+export function convertAngle(q: Quantity, angle: AngleUnit): Converted {
+  if (!q.angle || q.angle === angle) return { quantity: q };
+  const f = angle === 'rad' ? RAD_PER_DEG : 1 / RAD_PER_DEG;
+  const out: Quantity = { ...q, lo: q.lo * f, hi: q.hi * f, angle };
+  delete out.precision;
+  return { quantity: out, note: `${formatQuantity(q)} is ${formatQuantity(out)}` };
+}
+
+/** A single angle, or a bare number read as radians, in radians. */
+export function inRadians(q: Quantity): number {
+  return q.angle === 'deg' ? q.lo * RAD_PER_DEG : q.lo;
+}
+
 // ===== Arithmetic =====
 
 export type ArithOp = '+' | '-' | '*' | '/';
@@ -387,10 +478,65 @@ export interface Arith {
   error?: string;
 }
 
-const dimName = (q: Quantity) => (q.dim === 0 ? 'a number' : q.dim === 1 ? 'a length' : q.dim === 2 ? 'an area' : `a quantity of dimension ${q.dim}`);
+const dimName = (q: Quantity) => (q.angle ? 'an angle' : q.dim === 0 ? 'a number' : q.dim === 1 ? 'a length' : q.dim === 2 ? 'an area' : `a quantity of dimension ${q.dim}`);
 
 function computed(lo: number, hi: number, unit: LengthUnit | null, dim: number, approx: boolean): Quantity {
   return { lo: Math.min(lo, hi), hi: Math.max(lo, hi), unit: dim === 0 ? null : unit, dim, approx };
+}
+
+const angled = (lo: number, hi: number, angle: AngleUnit, approx: boolean): Quantity => ({
+  lo: Math.min(lo, hi), hi: Math.max(lo, hi), unit: null, dim: 0, angle, approx,
+});
+
+/**
+ * An angle in a sum: an angle and an angle add (30° + 15°, converted if their
+ * units differ); an angle scales by a count and divides by a count or by an angle,
+ * which makes a count. Everything else — a number beside an angle, a length, an
+ * angle times an angle — is refused with the reason, never read as the nearest
+ * thing (`30° + 15` is not 45°; the page did not say degrees).
+ */
+function angleArithmetic(op: ArithOp, a: Quantity, b: Quantity): Arith {
+  const notes: string[] = [];
+  const approx = a.approx || b.approx;
+  const fail = (error: string): Arith => ({ quantity: null, notes, error });
+  if (op === '+' || op === '-') {
+    if (!a.angle || !b.angle) {
+      return fail(`cannot ${op === '+' ? 'add' : 'subtract'} ${dimName(b)} ${op === '+' ? 'to' : 'from'} ${dimName(a)} — write the angle's unit, as in 30° + 15°`);
+    }
+    let y = b;
+    if (b.angle !== a.angle) {
+      const c = convertAngle(b, a.angle);
+      if (c.note) notes.push(c.note);
+      y = c.quantity;
+    }
+    return op === '+'
+      ? { quantity: angled(a.lo + y.lo, a.hi + y.hi, a.angle, approx), notes }
+      : { quantity: angled(a.lo - y.hi, a.hi - y.lo, a.angle, approx), notes };
+  }
+  if (op === '*') {
+    if (a.angle && b.angle) return fail('an angle times an angle is not an angle');
+    const [ang, other] = a.angle ? [a, b] : [b, a];
+    if (!isBare(other)) return fail(`cannot multiply an angle by ${dimName(other)}`);
+    const p = [ang.lo * other.lo, ang.lo * other.hi, ang.hi * other.lo, ang.hi * other.hi];
+    return { quantity: angled(Math.min(...p), Math.max(...p), ang.angle!, approx), notes };
+  }
+  if (!b.angle && isBare(b)) {
+    if (b.lo <= 0 && b.hi >= 0) return fail(isRange(b) ? `cannot divide by ${formatQuantity(b)}: it holds zero` : 'cannot divide by zero');
+    const p = [a.lo / b.lo, a.lo / b.hi, a.hi / b.lo, a.hi / b.hi];
+    return { quantity: angled(Math.min(...p), Math.max(...p), a.angle!, approx), notes };
+  }
+  if (a.angle && b.angle) {
+    let y = b;
+    if (b.angle !== a.angle) {
+      const c = convertAngle(b, a.angle);
+      if (c.note) notes.push(c.note);
+      y = c.quantity;
+    }
+    if (y.lo <= 0 && y.hi >= 0) return fail(isRange(y) ? `cannot divide by ${formatQuantity(y)}: it holds zero` : 'cannot divide by zero');
+    const p = [a.lo / y.lo, a.lo / y.hi, a.hi / y.lo, a.hi / y.hi];
+    return { quantity: computed(Math.min(...p), Math.max(...p), null, 0, approx), notes: [...notes, 'an angle over an angle is a plain number'] };
+  }
+  return fail(`cannot divide ${dimName(a)} by ${dimName(b)}`);
 }
 
 export function negateQuantity(q: Quantity): Quantity {
@@ -405,6 +551,7 @@ export function negateQuantity(q: Quantity): Quantity {
  * comes back as an error sentence and no number.
  */
 export function arithmetic(op: ArithOp, a: Quantity, b: Quantity): Arith {
+  if (a.angle || b.angle) return angleArithmetic(op, a, b);
   const notes: string[] = [];
   const approx = a.approx || b.approx;
   if (op === '+' || op === '-') {
@@ -442,6 +589,48 @@ export function arithmetic(op: ArithOp, a: Quantity, b: Quantity): Arith {
   return { quantity: computed(Math.min(...p), Math.max(...p), unit, a.dim - y.dim, approx), notes };
 }
 
+/**
+ * A quantity to a power. The exponent is a plain number written once, not a range
+ * and not a length; an integer power of a length is a length to that power (3″² is
+ * 9 in²), a fractional one needs the dimension to come out whole (√(9 in²) is 3″,
+ * √(3″) is nothing a page means); an even power of a range that holds zero starts
+ * at zero. Refused, never guessed: 0⁰, a negative number to a fractional power, a
+ * negative power of something that may be zero, an angle to any power.
+ */
+export function powQuantity(base: Quantity, exponent: Quantity): Arith {
+  const notes: string[] = [];
+  const fail = (error: string): Arith => ({ quantity: null, notes, error });
+  if (!isBare(exponent) || isRange(exponent)) return fail('an exponent has to be one plain number');
+  if (base.angle) return fail('cannot raise an angle to a power');
+  const n = exponent.lo;
+  const approx = base.approx || exponent.approx;
+  const dim = base.dim * n;
+  if (!Number.isInteger(dim)) return fail(`a power of ${n} of ${dimName(base)} would be of dimension ${formatNumber(dim)}, which is not a quantity here`);
+  const result = (lo: number, hi: number): Arith => {
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return fail('that power is too large to be a number');
+    return { quantity: computed(lo, hi, dim === 0 ? null : base.unit, dim, approx), notes };
+  };
+  if (n === 0) {
+    if (base.lo <= 0 && base.hi >= 0) return fail('0 to the power 0 is not defined');
+    return result(1, 1);
+  }
+  if (!Number.isInteger(n)) {
+    if (base.lo < 0) return fail(`cannot take a power of ${formatNumber(n, 4)} of a negative number`);
+    if (n < 0 && base.lo <= 0) return fail('cannot divide by zero');
+    return result(base.lo ** n, base.hi ** n);
+  }
+  if (n < 0) {
+    if (base.lo <= 0 && base.hi >= 0) return fail(isRange(base) ? `cannot divide by ${formatQuantity(base)}: it holds zero` : 'cannot divide by zero');
+    const p = [base.lo ** n, base.hi ** n];
+    return result(Math.min(...p), Math.max(...p));
+  }
+  if (n % 2 === 0) {
+    const p = [base.lo ** n, base.hi ** n];
+    return result(base.lo <= 0 && base.hi >= 0 ? 0 : Math.min(...p), Math.max(...p));
+  }
+  return result(base.lo ** n, base.hi ** n);
+}
+
 // ===== Checking a written result =====
 
 /**
@@ -474,21 +663,30 @@ export function compareQuantities(computedQ: Quantity | null, written: Quantity)
     c = conv.quantity;
     note = conv.note;
   }
-  // A bare written number is read in the computed value's unit: 14 written for 14″.
-  const shown = isBare(written) && c.unit ? { ...written, unit: c.unit, dim: c.dim } : written;
+  if (written.angle && c.angle && written.angle !== c.angle) {
+    const conv = convertAngle(c, written.angle);
+    c = conv.quantity;
+    note = conv.note;
+  }
+  // A bare written number is read in the computed value's unit: 14 written for 14″, 30 for 30°.
+  const shown = isBare(written) && (c.unit || c.angle) ? { ...written, unit: c.unit, dim: c.dim, ...(c.angle ? { angle: c.angle } : {}) } : written;
   const ws = formatQuantity(shown);
   const cs = formatQuantity(c);
   const base = { written, computed: computedQ, ...(note ? { note } : {}) };
+  if (!!written.angle !== !!c.angle && (written.angle || c.angle)) {
+    return { ...base, status: 'off', reason: `written ${ws} is ${dimName(written)}, computed ${cs} is ${dimName(c)}` };
+  }
   if (written.unit && c.unit && written.dim !== c.dim) {
     return { ...base, status: 'off', reason: `written ${ws} is ${dimName(written)}, computed ${cs} is ${dimName(c)}` };
   }
   const t = tolFor(c.lo, c.hi, written.lo, written.hi);
   const wRange = isRange(written), cRange = isRange(c);
+  const suffix = c.angle ? angleSuffix(c.angle) : unitSuffix(c.unit ?? written.unit, c.unit ? c.dim : written.dim);
   const off = (d: number) => ({
     ...base,
     status: 'off' as const,
     difference: d,
-    reason: `written ${ws}, computed ${cs}: ${formatNumber(Math.abs(d))}${unitSuffix(c.unit ?? written.unit, c.unit ? c.dim : written.dim)} ${d > 0 ? 'more' : 'less'} than computed`,
+    reason: `written ${ws}, computed ${cs}: ${formatNumber(Math.abs(d))}${suffix} ${d > 0 ? 'more' : 'less'} than computed`,
   });
   if (!wRange && !cRange) {
     const d = written.lo - c.lo;
