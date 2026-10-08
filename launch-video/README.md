@@ -45,6 +45,7 @@ not yet built — a teaser's promise, drawn as the spec says it will look.
 
 ```bash
 open launch-video/index.html                    # scrub it: the bar under the stage, space to play
+node launch-video/build.mjs                     # after editing film.js or synth.js: inline them into index.html
 node launch-video/render.mjs                    # → launch-video/out/dynaink-soft-launch.mp4, with sound (about 6 min)
 node launch-video/render.mjs --silent           # the picture alone
 node launch-video/sound.mjs                     # out/cues.json → out/sound.wav (render.mjs writes the cues)
@@ -60,8 +61,11 @@ Every frame is `render(t)`, a pure function of time, so a render is deterministi
 **The film is code, and plays live.** `film.js` is the composition with no page in it —
 `dynaFilm({ url }).frame(t)` returns the SVG for any moment, in about 2 ms — and `synth.js` makes the sound
 from the film's cues (`dynaSynth`; `sound.mjs` writes it as the WAV render.mjs lays under the picture, byte for
-byte as before). `index.html` is a player: play, pause, scrub, and the sound built in a worker
-(`synth-worker.js`) on the first play, since a browser gives sound only after a tap. `?embed` fills its frame
+byte as before). `index.html` is a player: play, pause, scrub, and the sound built in a worker on the first
+play, since a browser gives sound only after a tap. **Both files are inlined into it** — `node launch-video/build.mjs`
+after editing either, `--check` in CI — so the page is one file and plays wherever it is opened: a preview of the
+file alone once said `dynaFilm is not defined`. Where `fonts/` cannot be reached it draws in the browser's own faces
+rather than waiting on them. `?embed` fills its frame
 with the bar under it (the whitepaper's film dialog), `?poster=166` is the frame it rests on until played. The
 example board *The film and the storyboard* (`scripts/examples.mjs`) inlines `film.js` into a program on the
 canvas, which plays it silent: a frame on the board is never handed the tap a browser needs before sound. Its

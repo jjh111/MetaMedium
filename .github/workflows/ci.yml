@@ -132,6 +132,9 @@ jobs:
       # test replays each and asks the engine what it reads.
       - name: The example boards, in sync and read as what they are
         run: node ../scripts/examples.mjs --check && node --test ../scripts/examples.test.mjs
+      # The launch film's page is one file: film.js and synth.js inlined into it, so it plays opened alone.
+      - name: The launch film's page, in sync with film.js and synth.js
+        run: node ../launch-video/build.mjs --check
 
   shard:
     name: dynaink-3d (DynaInk3D) — typecheck, test, build
