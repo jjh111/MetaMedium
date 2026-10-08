@@ -553,9 +553,9 @@ function simplifyStroke(points, tolerance = 2) {
     const start = pts[0];
     const end = pts[pts.length - 1];
     for (let i = 1; i < pts.length - 1; i++) {
-      const dist12 = perpendicularDistance(pts[i], start, end);
-      if (dist12 > maxDist) {
-        maxDist = dist12;
+      const dist13 = perpendicularDistance(pts[i], start, end);
+      if (dist13 > maxDist) {
+        maxDist = dist13;
         maxIndex = i;
       }
     }
@@ -642,10 +642,10 @@ function detectLine(fp, points, scale = 1, even2 = evenBowOf(fp, points, scale),
   if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
   const straight = ramp(fp.straightness, 0.55, 0.95);
   const corners = fit(fp.corners, 0, 3);
-  const seen2 = head?.by === "seen" ? head : null;
-  const confidence = (straight * 0.7 + corners * 0.3) * (1 - even2.evidence) * (1 - (seen2?.fit ?? 0));
+  const seen3 = head?.by === "seen" ? head : null;
+  const confidence = (straight * 0.7 + corners * 0.3) * (1 - even2.evidence) * (1 - (seen3?.fit ?? 0));
   const bows = even2.bow && even2.evidence >= 0.05 ? `, but it bows evenly like an arc of ${Math.round(even2.bow.sweep)}\xB0` : "";
-  const headed = seen2 && seen2.fit >= 0.05 ? `, but its ${seen2.head} draws back like an arrow's head` : "";
+  const headed = seen3 && seen3.fit >= 0.05 ? `, but its ${seen3.head} draws back like an arrow's head` : "";
   return result(
     "line",
     "Line",
@@ -744,8 +744,8 @@ function readHead(fp, points, scale) {
   if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
   const corners = headByCorners(fp, points, scale);
   if (corners && (corners.share ?? 0) >= HEAD_SHARE_SEEN) return { ...corners, by: "corners" };
-  const seen2 = headSeenOf(fp, points, scale);
-  if (seen2 && (!corners || seen2.fit > corners.fit)) return { ...seen2, by: "seen" };
+  const seen3 = headSeenOf(fp, points, scale);
+  if (seen3 && (!corners || seen3.fit > corners.fit)) return { ...seen3, by: "seen" };
   return corners ? { ...corners, by: "corners" } : null;
 }
 function headByCorners(fp, points, scale) {
@@ -801,7 +801,7 @@ function headSeenOf(fp, points, scale) {
   const step2 = Math.max(2 * scale, total / HEAD_SEEN_POINTS);
   const dense = resampleByArcLength(points, Math.max(8, Math.round(total / step2) + 1));
   const near = HAND_RESOLUTION_PX * scale;
-  const seen2 = (head) => {
+  const seen3 = (head) => {
     const pts = head === "end" ? dense : dense.slice().reverse();
     const tail = pts[0];
     let farAt = 0, farD = 0;
@@ -836,7 +836,7 @@ function headSeenOf(fp, points, scale) {
     const fit3 = (ramp(straight, 0.72, 0.95) * 0.5 + ramp(sharpest, BARB_TURN[0], BARB_TURN[1]) * 0.35 + shortHead * 0.15) * shortBarb(barb, scale);
     return fit3 > 0 ? { fit: fit3, head, tip, straight, sharpest, barb } : null;
   };
-  return [seen2("end"), seen2("start")].filter((x) => !!x).sort((a, b) => b.fit - a.fit)[0] ?? null;
+  return [seen3("end"), seen3("start")].filter((x) => !!x).sort((a, b) => b.fit - a.fit)[0] ?? null;
 }
 var BARB_OF_SHAFT = [0.3, 0.45];
 var BARB_FLICK_PX = [16, 32];
@@ -1675,12 +1675,12 @@ function circumcircle(a, b, c) {
   const cy2 = (a2 * (c.x - b.x) + b2 * (a.x - c.x) + c2 * (b.x - a.x)) / d;
   return { cx: cx2, cy: cy2, r: Math.hypot(a.x - cx2, a.y - cy2) };
 }
-function arcThrough(a, mid11, c) {
-  const cc = circumcircle(a, mid11, c);
+function arcThrough(a, mid12, c) {
+  const cc = circumcircle(a, mid12, c);
   if (!cc) return null;
   const a0 = Math.atan2(a.y - cc.cy, a.x - cc.cx);
   const a1 = Math.atan2(c.y - cc.cy, c.x - cc.cx);
-  const am = Math.atan2(mid11.y - cc.cy, mid11.x - cc.cx);
+  const am = Math.atan2(mid12.y - cc.cy, mid12.x - cc.cx);
   const norm3 = (x) => (x % TAU + TAU) % TAU;
   const viaCcw = norm3(am - a0) < norm3(a1 - a0);
   const sweep = viaCcw ? norm3(a1 - a0) : -norm3(a0 - a1);
@@ -1807,15 +1807,15 @@ function idealize(node, shape) {
     }
     case "arc": {
       const a = fp.start, c = fp.end;
-      let mid11 = raw[Math.floor(raw.length / 2)], best = -1;
+      let mid12 = raw[Math.floor(raw.length / 2)], best = -1;
       for (const p of raw) {
         const d = Math.abs(sideOf(a, c, p));
         if (d > best) {
           best = d;
-          mid11 = p;
+          mid12 = p;
         }
       }
-      const arc = arcThrough(a, mid11, c);
+      const arc = arcThrough(a, mid12, c);
       if (!arc) return { shape: "line", closed: false, points: [a, c], reasoning: "too flat to bow; drawn straight" };
       return { shape, closed: false, points: arc.points, reasoning: `a circular arc of radius ${Math.round(arc.r)} through its ends and its bulge` };
     }
@@ -2122,13 +2122,13 @@ var UNIT_WORD = {
   mm: ["millimetre", "millimetres"],
   m: ["metre", "metres"]
 };
-function quantity(value, unit7 = null, opts = {}) {
-  const q = { lo: value, hi: value, unit: unit7, dim: opts.dim ?? (unit7 ? 1 : 0), approx: !!opts.approx };
+function quantity(value, unit8 = null, opts = {}) {
+  const q = { lo: value, hi: value, unit: unit8, dim: opts.dim ?? (unit8 ? 1 : 0), approx: !!opts.approx };
   if (opts.precision !== void 0) q.precision = opts.precision;
   return q;
 }
-function rangeOf(lo, hi, unit7 = null, opts = {}) {
-  const q = quantity(Math.min(lo, hi), unit7, opts);
+function rangeOf(lo, hi, unit8 = null, opts = {}) {
+  const q = quantity(Math.min(lo, hi), unit8, opts);
   q.hi = Math.max(lo, hi);
   return q;
 }
@@ -2153,16 +2153,16 @@ function formatNumber(v, digits = 2) {
   const s = digits > 0 ? r.toFixed(digits).replace(/\.?0+$/, "") : r.toFixed(0);
   return s.startsWith("-") ? "\u2212" + s.slice(1) : s;
 }
-function unitSuffix(unit7, dim, words = false) {
-  if (!unit7 || dim === 0) return "";
+function unitSuffix(unit8, dim, words = false) {
+  if (!unit8 || dim === 0) return "";
   if (dim === 1) {
-    if (!words && unit7 === "in") return "\u2033";
-    if (!words && unit7 === "ft") return "\u2032";
-    return " " + unit7;
+    if (!words && unit8 === "in") return "\u2033";
+    if (!words && unit8 === "ft") return "\u2032";
+    return " " + unit8;
   }
   const sup = { 2: "\xB2", 3: "\xB3" };
-  if (dim > 0) return " " + unit7 + (sup[dim] ?? `^${dim}`);
-  return " per " + unit7 + (dim < -1 ? sup[-dim] ?? `^${-dim}` : "");
+  if (dim > 0) return " " + unit8 + (sup[dim] ?? `^${dim}`);
+  return " per " + unit8 + (dim < -1 ? sup[-dim] ?? `^${-dim}` : "");
 }
 var FRACTION_GLYPH = {
   "1/2": "\xBD",
@@ -2205,8 +2205,8 @@ function formatQuantity(q, opts = {}) {
   else body = `${n2(q.lo)}\u2013${n2(q.hi)}`;
   return (q.approx ? "~" : "") + body + unitSuffix(q.unit, q.dim, opts.words);
 }
-function unitName(unit7, plural2) {
-  return UNIT_WORD[unit7][plural2 ? 1 : 0];
+function unitName(unit8, plural2) {
+  return UNIT_WORD[unit8][plural2 ? 1 : 0];
 }
 var VULGAR = {
   "\xBD": [1, 2],
@@ -2308,13 +2308,13 @@ function scanUnit(s, i) {
   const m = /^[A-Za-z]+\.?/.exec(s.slice(k));
   if (!m) return null;
   let word = m[0];
-  let unit7 = UNIT_WORDS[word.toLowerCase()];
-  if (!unit7 && word.endsWith(".")) {
+  let unit8 = UNIT_WORDS[word.toLowerCase()];
+  if (!unit8 && word.endsWith(".")) {
     word = word.slice(0, -1);
-    unit7 = UNIT_WORDS[word.toLowerCase()];
+    unit8 = UNIT_WORDS[word.toLowerCase()];
   }
-  if (!unit7) return null;
-  return { unit: unit7, text: s.slice(i, k + word.length), end: k + word.length };
+  if (!unit8) return null;
+  return { unit: unit8, text: s.slice(i, k + word.length), end: k + word.length };
 }
 function scanMeasure(s, i) {
   const n2 = scanNumber(s, i);
@@ -2351,7 +2351,7 @@ function parseQuantity(text) {
   i = a.end;
   let lo = sign * a.value;
   let hi = lo;
-  let unit7 = a.unit;
+  let unit8 = a.unit;
   let precision = a.precision;
   let isRangeWritten = false;
   const note = [];
@@ -2361,39 +2361,39 @@ function parseQuantity(text) {
     if (!b) return null;
     if (b.value <= lo) return null;
     const bv = b.value;
-    if (unit7 && b.unit && unit7 !== b.unit) {
-      const c = convertQuantity(quantity(lo, unit7), b.unit);
+    if (unit8 && b.unit && unit8 !== b.unit) {
+      const c = convertQuantity(quantity(lo, unit8), b.unit);
       note.push(c.note ?? "");
       lo = c.quantity.lo;
       if (bv <= lo) return null;
     }
-    unit7 = b.unit ?? unit7;
+    unit8 = b.unit ?? unit8;
     hi = bv;
     precision = Math.min(precision, b.precision);
     isRangeWritten = true;
     i = b.end;
   }
   if (s.slice(i).trim().length > 0) return null;
-  const q = rangeOf(lo, hi, unit7, { approx, precision });
-  const unitWords = unit7 ? ` ${unitName(unit7, true)}` : "";
+  const q = rangeOf(lo, hi, unit8, { approx, precision });
+  const unitWords = unit8 ? ` ${unitName(unit8, true)}` : "";
   let reason;
   if (isRangeWritten) reason = `a range, from ${formatNumber(lo)} to ${formatNumber(hi)}${unitWords}`;
-  else reason = unit7 ? `${formatNumber(lo)} ${unitName(unit7, lo !== 1)}` : `the number ${formatNumber(lo)}, no unit written`;
+  else reason = unit8 ? `${formatNumber(lo)} ${unitName(unit8, lo !== 1)}` : `the number ${formatNumber(lo)}, no unit written`;
   if (approx) reason = `approximate: ${reason}`;
   if (a.text.includes("/") || a.text.includes("\u2044") || Object.keys(VULGAR).some((v) => a.text.includes(v))) reason += `, written as a fraction`;
   if (note.length) reason += ` (${note.filter(Boolean).join("; ")})`;
   return { quantity: q, text: s, reason };
 }
-function convertQuantity(q, unit7) {
-  if (!q.unit || q.dim === 0 || q.unit === unit7) return { quantity: q };
-  const f = (MM_PER[q.unit] / MM_PER[unit7]) ** q.dim;
-  const out = { ...q, lo: q.lo * f, hi: q.hi * f, unit: unit7 };
+function convertQuantity(q, unit8) {
+  if (!q.unit || q.dim === 0 || q.unit === unit8) return { quantity: q };
+  const f = (MM_PER[q.unit] / MM_PER[unit8]) ** q.dim;
+  const out = { ...q, lo: q.lo * f, hi: q.hi * f, unit: unit8 };
   delete out.precision;
   return { quantity: out, note: `${formatQuantity(q)} is ${formatQuantity(out)}` };
 }
 var dimName = (q) => q.dim === 0 ? "a number" : q.dim === 1 ? "a length" : q.dim === 2 ? "an area" : `a quantity of dimension ${q.dim}`;
-function computed(lo, hi, unit7, dim, approx) {
-  return { lo: Math.min(lo, hi), hi: Math.max(lo, hi), unit: dim === 0 ? null : unit7, dim, approx };
+function computed(lo, hi, unit8, dim, approx) {
+  return { lo: Math.min(lo, hi), hi: Math.max(lo, hi), unit: dim === 0 ? null : unit8, dim, approx };
 }
 function negateQuantity(q) {
   const out = { ...q, lo: -q.hi, hi: -q.lo };
@@ -2413,9 +2413,9 @@ function arithmetic(op, a, b) {
       if (c.note) notes.push(c.note);
       y2 = c.quantity;
     }
-    const unit8 = x.unit ?? y2.unit;
-    if (op === "+") return { quantity: computed(x.lo + y2.lo, x.hi + y2.hi, unit8, x.dim, approx), notes };
-    return { quantity: computed(x.lo - y2.hi, x.hi - y2.lo, unit8, x.dim, approx), notes };
+    const unit9 = x.unit ?? y2.unit;
+    if (op === "+") return { quantity: computed(x.lo + y2.lo, x.hi + y2.hi, unit9, x.dim, approx), notes };
+    return { quantity: computed(x.lo - y2.hi, x.hi - y2.lo, unit9, x.dim, approx), notes };
   }
   let y = b;
   if (a.unit && y.unit && a.unit !== y.unit && y.dim !== 0) {
@@ -2423,17 +2423,17 @@ function arithmetic(op, a, b) {
     if (c.note) notes.push(c.note);
     y = c.quantity;
   }
-  const unit7 = a.unit ?? y.unit;
+  const unit8 = a.unit ?? y.unit;
   if (op === "*") {
     const p3 = [a.lo * y.lo, a.lo * y.hi, a.hi * y.lo, a.hi * y.hi];
-    return { quantity: computed(Math.min(...p3), Math.max(...p3), unit7, a.dim + y.dim, approx), notes };
+    return { quantity: computed(Math.min(...p3), Math.max(...p3), unit8, a.dim + y.dim, approx), notes };
   }
   if (y.lo <= 0 && y.hi >= 0) {
     const error = isRange(y) ? `cannot divide by ${formatQuantity(y)}: it holds zero` : "cannot divide by zero";
     return { quantity: null, notes, error };
   }
   const p = [a.lo / y.lo, a.lo / y.hi, a.hi / y.lo, a.hi / y.hi];
-  return { quantity: computed(Math.min(...p), Math.max(...p), unit7, a.dim - y.dim, approx), notes };
+  return { quantity: computed(Math.min(...p), Math.max(...p), unit8, a.dim - y.dim, approx), notes };
 }
 function compareQuantities(computedQ, written2) {
   const w2 = formatQuantity(written2);
@@ -2751,8 +2751,8 @@ function opOf(e) {
   return null;
 }
 var leafText = (e) => e.k === "num" ? formatQuantity(e.q) : e.k === "name" ? e.name : e.k === "ref" ? e.text : "";
-function fmtExpr(e, sub14) {
-  const own = sub14?.(e);
+function fmtExpr(e, sub15) {
+  const own = sub15?.(e);
   if (own !== void 0) return own;
   switch (e.k) {
     case "num":
@@ -2760,13 +2760,13 @@ function fmtExpr(e, sub14) {
     case "ref":
       return leafText(e);
     case "carry":
-      return fmtExpr(e.a, sub14);
+      return fmtExpr(e.a, sub15);
     case "neg": {
-      const inner = fmtExpr(e.a, sub14);
+      const inner = fmtExpr(e.a, sub15);
       return "\u2212" + (opOf(e.a) ? `(${inner})` : inner);
     }
     case "op": {
-      const la = fmtExpr(e.a, sub14), lb = fmtExpr(e.b, sub14);
+      const la = fmtExpr(e.a, sub15), lb = fmtExpr(e.b, sub15);
       const oa = opOf(e.a), ob = opOf(e.b);
       return `${oa && oa !== e.op ? `(${la})` : la} ${GLYPH[e.op]} ${ob ? `(${lb})` : lb}`;
     }
@@ -3072,14 +3072,14 @@ function parseLine(text) {
   }
   return { ...base, shape: "formula" };
 }
-function scopeOf(names = {}, steps = {}, unit7 = null) {
+function scopeOf(names = {}, steps = {}, unit8 = null) {
   const toQ2 = (v) => typeof v === "string" ? parseQuantity(v)?.quantity ?? null : v;
   const table = /* @__PURE__ */ new Map();
   for (const [k, v] of Object.entries(names)) {
     table.set(normName(k), Array.isArray(v) ? v : [{ value: toQ2(v), key: k }]);
   }
   return {
-    unit: unit7,
+    unit: unit8,
     name: (n2) => table.get(normName(n2)),
     step: (n2) => steps[n2] !== void 0 ? { value: toQ2(steps[n2]), key: String(n2) } : void 0
   };
@@ -3664,8 +3664,8 @@ function readSheet(input, options = {}) {
   );
   const drafts = sources3.map((src, line) => classify(src, line));
   proseToNotes(drafts);
-  const { unit: unit7, reason: unitReason } = options.unit !== void 0 ? { unit: options.unit, reason: options.unit ? `${UNIT_NAMES[options.unit]}, as given` : "no unit, as given" } : inferUnit(drafts.map((d) => d.parse));
-  const withUnit = (q) => isBare(q) && unit7 ? { ...q, unit: unit7, dim: 1 } : q;
+  const { unit: unit8, reason: unitReason } = options.unit !== void 0 ? { unit: options.unit, reason: options.unit ? `${UNIT_NAMES[options.unit]}, as given` : "no unit, as given" } : inferUnit(drafts.map((d) => d.parse));
+  const withUnit = (q) => isBare(q) && unit8 ? { ...q, unit: unit8, dim: 1 } : q;
   const nameIndex = /* @__PURE__ */ new Map();
   const defByKey = /* @__PURE__ */ new Map();
   const stepByKey = /* @__PURE__ */ new Map();
@@ -3708,7 +3708,7 @@ function readSheet(input, options = {}) {
     if (d.kind !== "check" || !above || above.kind !== "step" || above.conflict || above.workedLine !== void 0 || hasNames2(d.chain)) return;
     if (above.chain.segments.some((g) => g.join === "gap")) return;
     const joined = parseChain(`${above.parse.body}   ${d.parse.body}`);
-    if (!evaluateChain(joined, { unit: unit7 }).some((r) => r.restated > 0)) return;
+    if (!evaluateChain(joined, { unit: unit8 }).some((r) => r.restated > 0)) return;
     above.chain = joined;
     above.workedLine = d.line;
     d.kind = "worked";
@@ -3732,7 +3732,7 @@ function readSheet(input, options = {}) {
     const values = /* @__PURE__ */ new Map();
     const readings2 = /* @__PURE__ */ new Map();
     const scopeFor = (allowance) => ({
-      unit: unit7,
+      unit: unit8,
       describeUnknown: (name) => `${name} is not on this sheet`,
       name: (n2) => {
         const key2 = nameIndex.get(normName(n2));
@@ -3785,16 +3785,16 @@ function readSheet(input, options = {}) {
       allowances.set(h2.line, { amount: amount2, label, from: [], reason: `${h2.title}: ${fmt(amount2)}, as the heading says` });
       continue;
     }
-    const seen2 = [];
+    const seen3 = [];
     for (const d of drafts) {
       if (d.kind !== "step" || d.under !== h2.line || d.conflict) continue;
       const e = plain.readings.get(d.key)?.[0]?.expr;
-      if (e && e.k === "op" && e.op === "+" && e.b.k === "num" && !isRange(e.b.q) && e.a.k !== "num") seen2.push({ key: d.key, k: withUnit(e.b.q) });
+      if (e && e.k === "op" && e.op === "+" && e.b.k === "num" && !isRange(e.b.q) && e.a.k !== "num") seen3.push({ key: d.key, k: withUnit(e.b.q) });
     }
-    if (!seen2.length) continue;
-    const tally2 = seen2.map((s) => ({ ...s, n: seen2.filter((o) => compareQuantities(o.k, s.k).status === "ok").length }));
+    if (!seen3.length) continue;
+    const tally2 = seen3.map((s) => ({ ...s, n: seen3.filter((o) => compareQuantities(o.k, s.k).status === "ok").length }));
     const top = tally2.reduce((a, b) => b.n > a.n ? b : a);
-    const from = seen2.filter((s) => compareQuantities(s.k, top.k).status === "ok").map((s) => s.key);
+    const from = seen3.filter((s) => compareQuantities(s.k, top.k).status === "ok").map((s) => s.key);
     allowances.set(h2.line, { amount: top.k, label, from, reason: `${h2.title}: ${fmt(top.k)}, as ${stepsPhrase(from)} ${from.length === 1 ? "adds" : "add"} it` });
   }
   const alternatives2 = /* @__PURE__ */ new Map();
@@ -3821,7 +3821,7 @@ function readSheet(input, options = {}) {
       case "definition": {
         const value = d.value ? withUnit(d.value) : null;
         const head = [d.letter, d.name].filter(Boolean).join(" \xB7 ");
-        const reason = d.conflict ? d.conflict : value ? `${head} = ${fmt(value)}${d.value && isBare(d.value) && unit7 ? `, in the ${UNIT_NAMES[unit7]} this page writes` : ""}` : `${head}: a measurement with no number yet`;
+        const reason = d.conflict ? d.conflict : value ? `${head} = ${fmt(value)}${d.value && isBare(d.value) && unit8 ? `, in the ${UNIT_NAMES[unit8]} this page writes` : ""}` : `${head}: a measurement with no number yet`;
         return { ...base, kind: "definition", key: d.key, ...d.letter ? { letter: d.letter } : {}, ...d.name ? { name: d.name } : {}, value, ...d.conflict ? { conflict: d.conflict } : {}, reason };
       }
       case "step": {
@@ -3869,7 +3869,7 @@ function readSheet(input, options = {}) {
         return { ...base, kind: "note", reason: d.note ?? `cannot read \u201C${d.parse.body}\u201D` };
     }
   });
-  return { entries, unit: unit7, unitReason };
+  return { entries, unit: unit8, unitReason };
 }
 function nameOf(r, readings2) {
   return r.label ?? (readings2.some((x) => x.label) ? "from the measurements" : `as ${r.formula}`);
@@ -4272,7 +4272,7 @@ function ownSitesOf(node, nodes) {
   const centre3 = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
   const out = [];
   const counts = {};
-  const add7 = (kind, point2, why) => {
+  const add8 = (kind, point2, why) => {
     const index = counts[kind] ?? 0;
     counts[kind] = index + 1;
     out.push({ nodeId: node.id, shape: form.shape, kind, index, point: point2, reasoning: why });
@@ -4286,25 +4286,25 @@ function ownSitesOf(node, nodes) {
       const ends = arrow?.tail && arrow.tip && form.shape === "arrow" ? placed(node, [arrow.tail, arrow.tip]) : null;
       const tail = ends ? ends[0] : form.points[0];
       const tip = ends ? ends[1] : form.held && form.shape === "arrow" && form.points.length > 1 ? form.points[1] : form.points[form.points.length - 1];
-      add7("tail", tail, `the ${form.shape}'s tail \u2014 where it begins`);
-      add7("tip", tip, `the ${form.shape}'s tip \u2014 where it ends`);
-      add7("middle", mid2(tail, tip), "halfway along it");
+      add8("tail", tail, `the ${form.shape}'s tail \u2014 where it begins`);
+      add8("tip", tip, `the ${form.shape}'s tip \u2014 where it ends`);
+      add8("middle", mid2(tail, tip), "halfway along it");
       break;
     }
     case "rectangle": {
       const v = form.points.slice(0, 4);
       if (v.length === 4) {
-        v.forEach((p) => add7("corner", p, "a corner of the rectangle"));
-        for (let i = 0; i < 4; i++) add7("middle", mid2(v[i], v[(i + 1) % 4]), "the middle of an edge");
+        v.forEach((p) => add8("corner", p, "a corner of the rectangle"));
+        for (let i = 0; i < 4; i++) add8("middle", mid2(v[i], v[(i + 1) % 4]), "the middle of an edge");
       } else {
-        boundsSites(add7, b);
+        boundsSites(add8, b);
       }
-      add7("centre", form.held && v.length === 4 ? mid2(v[0], v[2]) : centre3, "the centre of the rectangle");
+      add8("centre", form.held && v.length === 4 ? mid2(v[0], v[2]) : centre3, "the centre of the rectangle");
       break;
     }
     case "circle": {
       const own = form.held ? circleSites(node, form.held) : null;
-      add7("centre", own ? own[0] : centre3, "the centre of the circle");
+      add8("centre", own ? own[0] : centre3, "the centre of the circle");
       const rx = w2 / 2, ry = h2 / 2;
       const cardinals = [
         ["north", own ? own[1] : { x: centre3.x, y: centre3.y - ry }],
@@ -4312,35 +4312,35 @@ function ownSitesOf(node, nodes) {
         ["south", own ? own[3] : { x: centre3.x, y: centre3.y + ry }],
         ["west", own ? own[4] : { x: centre3.x - rx, y: centre3.y }]
       ];
-      for (const [name, p] of cardinals) add7("cardinal", p, `the ${name} of the circle`);
+      for (const [name, p] of cardinals) add8("cardinal", p, `the ${name} of the circle`);
       break;
     }
     case "triangle": {
       const v = form.points.slice(0, 3);
       if (v.length === 3) {
-        v.forEach((p) => add7("corner", p, "a corner of the triangle"));
-        add7("centre", { x: (v[0].x + v[1].x + v[2].x) / 3, y: (v[0].y + v[1].y + v[2].y) / 3 }, "the centroid");
+        v.forEach((p) => add8("corner", p, "a corner of the triangle"));
+        add8("centre", { x: (v[0].x + v[1].x + v[2].x) / 3, y: (v[0].y + v[1].y + v[2].y) / 3 }, "the centroid");
       } else {
-        boundsSites(add7, b);
+        boundsSites(add8, b);
       }
       break;
     }
     case "arc": {
-      add7("tail", form.points[0], "where the arc begins");
-      add7("tip", form.points[form.points.length - 1], "where the arc ends");
-      add7("centre", heldCentre ?? centre3, "the middle of the arc\u2019s span");
+      add8("tail", form.points[0], "where the arc begins");
+      add8("tip", form.points[form.points.length - 1], "where the arc ends");
+      add8("centre", heldCentre ?? centre3, "the middle of the arc\u2019s span");
       break;
     }
     case "dot":
-      add7("point", heldCentre ?? centre3, "the dot");
+      add8("point", heldCentre ?? centre3, "the dot");
       break;
     default:
       if (form.corners) {
-        form.corners.forEach((p) => add7("corner", p, "a corner of the mark\u2019s outline \u2014 its four corners hold it"));
-        add7("centre", mid2(form.corners[0], form.corners[2]), "the centre of the mark\u2019s four corners");
+        form.corners.forEach((p) => add8("corner", p, "a corner of the mark\u2019s outline \u2014 its four corners hold it"));
+        add8("centre", mid2(form.corners[0], form.corners[2]), "the centre of the mark\u2019s four corners");
       } else {
-        boundsSites(add7, b);
-        add7("centre", centre3, "the centre of the mark\u2019s bounds");
+        boundsSites(add8, b);
+        add8("centre", centre3, "the centre of the mark\u2019s bounds");
       }
       break;
   }
@@ -4352,11 +4352,11 @@ function circleSites(node, clean) {
   const rx = (b.maxX - b.minX) / 2, ry = (b.maxY - b.minY) / 2;
   return placed(node, [{ x: cx2, y: cy2 }, { x: cx2, y: cy2 - ry }, { x: cx2 + rx, y: cy2 }, { x: cx2, y: cy2 + ry }, { x: cx2 - rx, y: cy2 }]);
 }
-function boundsSites(add7, b) {
-  add7("corner", { x: b.minX, y: b.minY }, "a corner of the mark\u2019s bounds");
-  add7("corner", { x: b.maxX, y: b.minY }, "a corner of the mark\u2019s bounds");
-  add7("corner", { x: b.maxX, y: b.maxY }, "a corner of the mark\u2019s bounds");
-  add7("corner", { x: b.minX, y: b.maxY }, "a corner of the mark\u2019s bounds");
+function boundsSites(add8, b) {
+  add8("corner", { x: b.minX, y: b.minY }, "a corner of the mark\u2019s bounds");
+  add8("corner", { x: b.maxX, y: b.minY }, "a corner of the mark\u2019s bounds");
+  add8("corner", { x: b.maxX, y: b.maxY }, "a corner of the mark\u2019s bounds");
+  add8("corner", { x: b.minX, y: b.maxY }, "a corner of the mark\u2019s bounds");
 }
 function nearestMagnet(at2, sites, radius) {
   let best = null;
@@ -4618,7 +4618,7 @@ function crossings(a, b, max = 4) {
 }
 function relate(marks, config = DEFAULT_RELATE_CONFIG) {
   const out = [];
-  const add7 = (kind, from, to, strength, reasoning) => {
+  const add8 = (kind, from, to, strength, reasoning) => {
     if (strength > 0) out.push({ kind, from, to, strength: Math.min(1, strength), reasoning });
   };
   for (let i = 0; i < marks.length; i++) {
@@ -4631,65 +4631,65 @@ function relate(marks, config = DEFAULT_RELATE_CONFIG) {
       if (boundsContain(ab, bb)) {
         const margin = Math.min(bb.minX - ab.minX, bb.minY - ab.minY, ab.maxX - bb.maxX, ab.maxY - bb.maxY);
         const strength = Math.min(1, 0.5 + margin / Math.max(1, sizeOf(ab)));
-        add7("contains", a.id, b.id, strength, `${b.id} sits wholly inside ${a.id}`);
-        add7("inside", b.id, a.id, strength, `${b.id} sits wholly inside ${a.id}`);
+        add8("contains", a.id, b.id, strength, `${b.id} sits wholly inside ${a.id}`);
+        add8("inside", b.id, a.id, strength, `${b.id} sits wholly inside ${a.id}`);
         continue;
       }
       if (boundsContain(bb, ab)) {
         const margin = Math.min(ab.minX - bb.minX, ab.minY - bb.minY, bb.maxX - ab.maxX, bb.maxY - ab.maxY);
         const strength = Math.min(1, 0.5 + margin / Math.max(1, sizeOf(bb)));
-        add7("contains", b.id, a.id, strength, `${a.id} sits wholly inside ${b.id}`);
-        add7("inside", a.id, b.id, strength, `${a.id} sits wholly inside ${b.id}`);
+        add8("contains", b.id, a.id, strength, `${a.id} sits wholly inside ${b.id}`);
+        add8("inside", a.id, b.id, strength, `${a.id} sits wholly inside ${b.id}`);
         continue;
       }
       const gap = boundingBoxDistance(ab, bb);
       if (a.points && b.points && boundsOverlap(ab, bb)) {
         const n2 = crossings(a.points, b.points);
         if (n2 > 0) {
-          add7("crossing", a.id, b.id, Math.min(1, 0.5 + n2 * 0.15), `their strokes cross ${n2 === 4 ? "4 or more" : n2} time(s)`);
-          add7("crossing", b.id, a.id, Math.min(1, 0.5 + n2 * 0.15), `their strokes cross ${n2 === 4 ? "4 or more" : n2} time(s)`);
+          add8("crossing", a.id, b.id, Math.min(1, 0.5 + n2 * 0.15), `their strokes cross ${n2 === 4 ? "4 or more" : n2} time(s)`);
+          add8("crossing", b.id, a.id, Math.min(1, 0.5 + n2 * 0.15), `their strokes cross ${n2 === 4 ? "4 or more" : n2} time(s)`);
         }
       }
       if (boundsOverlap(ab, bb)) {
         const depth2 = overlapFraction(ab.minX, ab.maxX, bb.minX, bb.maxX) * overlapFraction(ab.minY, ab.maxY, bb.minY, bb.maxY);
-        add7("touching", a.id, b.id, 0.5 + depth2 * 0.5, "their areas overlap");
-        add7("touching", b.id, a.id, 0.5 + depth2 * 0.5, "their areas overlap");
+        add8("touching", a.id, b.id, 0.5 + depth2 * 0.5, "their areas overlap");
+        add8("touching", b.id, a.id, 0.5 + depth2 * 0.5, "their areas overlap");
       }
       const nearLimit = nearLimitOf(ab, bb, config);
       if (gap < nearLimit) {
         const strength = 1 - gap / nearLimit;
         const pct9 = Math.round(gap / ref * 100);
-        add7("near", a.id, b.id, strength, `${Math.round(gap)}px apart \u2014 ${pct9}% of the smaller mark`);
-        add7("near", b.id, a.id, strength, `${Math.round(gap)}px apart \u2014 ${pct9}% of the smaller mark`);
+        add8("near", a.id, b.id, strength, `${Math.round(gap)}px apart \u2014 ${pct9}% of the smaller mark`);
+        add8("near", b.id, a.id, strength, `${Math.round(gap)}px apart \u2014 ${pct9}% of the smaller mark`);
       }
       const vOverlap = overlapFraction(ab.minY, ab.maxY, bb.minY, bb.maxY);
       const hOverlap = overlapFraction(ab.minX, ab.maxX, bb.minX, bb.maxX);
       if (vOverlap >= config.directionOverlap) {
         const [left, right2] = cx(ab) <= cx(bb) ? [a, b] : [b, a];
-        add7("left-of", left.id, right2.id, vOverlap, `they share a horizontal band (${Math.round(vOverlap * 100)}%)`);
-        add7("right-of", right2.id, left.id, vOverlap, `they share a horizontal band (${Math.round(vOverlap * 100)}%)`);
+        add8("left-of", left.id, right2.id, vOverlap, `they share a horizontal band (${Math.round(vOverlap * 100)}%)`);
+        add8("right-of", right2.id, left.id, vOverlap, `they share a horizontal band (${Math.round(vOverlap * 100)}%)`);
       }
       if (hOverlap >= config.directionOverlap) {
         const [top, bottom2] = cy(ab) <= cy(bb) ? [a, b] : [b, a];
-        add7("above", top.id, bottom2.id, hOverlap, `they share a vertical band (${Math.round(hOverlap * 100)}%)`);
-        add7("below", bottom2.id, top.id, hOverlap, `they share a vertical band (${Math.round(hOverlap * 100)}%)`);
+        add8("above", top.id, bottom2.id, hOverlap, `they share a vertical band (${Math.round(hOverlap * 100)}%)`);
+        add8("below", bottom2.id, top.id, hOverlap, `they share a vertical band (${Math.round(hOverlap * 100)}%)`);
       }
       const dy = Math.abs(cy(ab) - cy(bb));
       const dx = Math.abs(cx(ab) - cx(bb));
       const rowTol = config.alignRatio * Math.max(1, Math.min(h(ab), h(bb)));
       const colTol = config.alignRatio * Math.max(1, Math.min(w(ab), w(bb)));
       if (dy < rowTol) {
-        add7("same-row", a.id, b.id, 1 - dy / rowTol, `centres within ${Math.round(dy)}px vertically`);
-        add7("same-row", b.id, a.id, 1 - dy / rowTol, `centres within ${Math.round(dy)}px vertically`);
+        add8("same-row", a.id, b.id, 1 - dy / rowTol, `centres within ${Math.round(dy)}px vertically`);
+        add8("same-row", b.id, a.id, 1 - dy / rowTol, `centres within ${Math.round(dy)}px vertically`);
       }
       if (dx < colTol) {
-        add7("same-column", a.id, b.id, 1 - dx / colTol, `centres within ${Math.round(dx)}px horizontally`);
-        add7("same-column", b.id, a.id, 1 - dx / colTol, `centres within ${Math.round(dx)}px horizontally`);
+        add8("same-column", a.id, b.id, 1 - dx / colTol, `centres within ${Math.round(dx)}px horizontally`);
+        add8("same-column", b.id, a.id, 1 - dx / colTol, `centres within ${Math.round(dx)}px horizontally`);
       }
       const ratio = Math.min(sizeOf(ab), sizeOf(bb)) / Math.max(1, Math.max(sizeOf(ab), sizeOf(bb)));
       if (ratio > config.peerRatio) {
-        add7("same-size", a.id, b.id, ratio, `within ${Math.round((1 - ratio) * 100)}% of each other in size`);
-        add7("same-size", b.id, a.id, ratio, `within ${Math.round((1 - ratio) * 100)}% of each other in size`);
+        add8("same-size", a.id, b.id, ratio, `within ${Math.round((1 - ratio) * 100)}% of each other in size`);
+        add8("same-size", b.id, a.id, ratio, `within ${Math.round((1 - ratio) * 100)}% of each other in size`);
       }
     }
   }
@@ -4712,18 +4712,18 @@ function clusters(marks, relations) {
     linked.get(r.from)?.add(r.to);
     linked.get(r.to)?.add(r.from);
   }
-  const seen2 = /* @__PURE__ */ new Set();
+  const seen3 = /* @__PURE__ */ new Set();
   const out = [];
   for (const m of marks) {
-    if (seen2.has(m.id)) continue;
+    if (seen3.has(m.id)) continue;
     const group2 = [];
     const stack = [m.id];
     while (stack.length) {
       const id = stack.pop();
-      if (seen2.has(id)) continue;
-      seen2.add(id);
+      if (seen3.has(id)) continue;
+      seen3.add(id);
       group2.push(id);
-      for (const other of linked.get(id) ?? []) if (!seen2.has(other)) stack.push(other);
+      for (const other of linked.get(id) ?? []) if (!seen3.has(other)) stack.push(other);
     }
     out.push(group2);
   }
@@ -5433,18 +5433,18 @@ function isLengthKey(key2) {
   return !/^angle\d+$/.test(key2) && key2 !== "area" && key2 !== "piece";
 }
 var UNIT_NAMES2 = { in: "inches", ft: "feet", cm: "centimetres", mm: "millimetres", m: "metres" };
-function scaleOf(labels, unit7) {
+function scaleOf(labels, unit8) {
   const ratios = [];
   const counted2 = /* @__PURE__ */ new Set();
   for (const { figure, label } of labels) {
-    if (label.declared || !isLengthKey(label.key) || isRange(label.value) || label.value.dim !== (unit7 ? 1 : label.value.dim)) continue;
+    if (label.declared || !isLengthKey(label.key) || isRange(label.value) || label.value.dim !== (unit8 ? 1 : label.value.dim)) continue;
     if (label.number) {
       if (counted2.has(label.number)) continue;
       counted2.add(label.number);
     }
     const ink = inkMeasure(figure, label.key);
     if (!ink || ink <= 0) continue;
-    const v = unit7 && label.value.unit && label.value.unit !== unit7 ? convertQuantity(label.value, unit7).quantity : label.value;
+    const v = unit8 && label.value.unit && label.value.unit !== unit8 ? convertQuantity(label.value, unit8).quantity : label.value;
     if (!(v.lo > 0)) continue;
     ratios.push({ figure: figure.id, key: label.key, text: label.text, r: v.lo / ink });
   }
@@ -5461,14 +5461,14 @@ function scaleOf(labels, unit7) {
     }
   }
   const px2 = 1 / scale;
-  const one = `1${unit7 ? unitSuffix(unit7, 1) : ""} \u2248 ${formatNumber(px2)} px`;
+  const one = `1${unit8 ? unitSuffix(unit8, 1) : ""} \u2248 ${formatNumber(px2)} px`;
   const toScale = spread2 <= TO_SCALE_WITHIN;
   let reason;
   if (ratios.length === 1) reason = `one label sets the scale, ${one}; nothing to check it against`;
   else if (toScale) reason = `${one}, to scale within ${Math.max(1, Math.ceil(spread2 * 100 - 1e-9))}%`;
   else reason = `${one}; not to scale; the labels rule (${worst.text} on ${worst.key} is ${pct(spread2)} off the ink)`;
   return {
-    unit: unit7,
+    unit: unit8,
     unitsPerCanvasUnit: scale,
     pxPerUnit: px2,
     labels: ratios.length,
@@ -5596,13 +5596,13 @@ function dimensionsOf(state, options = {}) {
     for (const f of members) for (const l of raw.get(f.id) ?? []) if (!l.declared && l.value.unit && l.value.dim >= 1) count9.set(l.value.unit, (count9.get(l.value.unit) ?? 0) + 1);
     let written2 = null;
     for (const [u, n2] of count9) if (!written2 || n2 > count9.get(written2)) written2 = u;
-    const unit7 = written2 ?? fallback;
-    const unitReason = written2 ? `${UNIT_NAMES2[written2]}, written on ${count9.get(written2)} of its labels` : unit7 ? `${UNIT_NAMES2[unit7]}, the unit the page speaks` : "no unit written, so its numbers stay bare";
+    const unit8 = written2 ?? fallback;
+    const unitReason = written2 ? `${UNIT_NAMES2[written2]}, written on ${count9.get(written2)} of its labels` : unit8 ? `${UNIT_NAMES2[unit8]}, the unit the page speaks` : "no unit written, so its numbers stay bare";
     const given2 = [];
     for (const f of members) {
       const ls = (raw.get(f.id) ?? []).map((l) => {
-        if (l.declared || /^angle\d+$/.test(l.key) || l.value.unit || !unit7) return l;
-        return { ...l, value: { ...l.value, unit: unit7, dim: l.key === "area" ? 2 : 1 } };
+        if (l.declared || /^angle\d+$/.test(l.key) || l.value.unit || !unit8) return l;
+        return { ...l, value: { ...l.value, unit: unit8, dim: l.key === "area" ? 2 : 1 } };
       });
       if (ls.length) labels.set(f.id, ls);
       for (const l of ls) given2.push({ figure: f, label: l });
@@ -5612,9 +5612,9 @@ function dimensionsOf(state, options = {}) {
       id: `drawing:${first.id}`,
       figures: members.map((f) => f.id),
       ids: [...new Set(members.flatMap((f) => f.ids))],
-      unit: unit7,
+      unit: unit8,
       unitReason,
-      scale: scaleOf(given2, unit7)
+      scale: scaleOf(given2, unit8)
     });
   }
   return { figures, numbers, attachments, labels, rightAngles, underlines, drawings, numberIds };
@@ -6108,11 +6108,11 @@ function sideModels(f, facts) {
   }
   return out;
 }
-function toQ(iv, unit7, dim, approx = false) {
-  return { lo: iv.lo, hi: iv.hi, unit: dim === 0 ? null : unit7, dim: unit7 ? dim : 0, approx };
+function toQ(iv, unit8, dim, approx = false) {
+  return { lo: iv.lo, hi: iv.hi, unit: dim === 0 ? null : unit8, dim: unit8 ? dim : 0, approx };
 }
 var dimOf = (key2) => /^angle\d$/.test(key2) || key2 === "sweep" ? 0 : key2 === "area" ? 2 : 1;
-function check(model, facts, unit7) {
+function check(model, facts, unit8) {
   const kept2 = [...model.basis];
   const conflicts = [];
   const used = new Set(model.basis.map((x) => x.group));
@@ -6125,7 +6125,7 @@ function check(model, facts, unit7) {
     for (const x of alts) {
       const v = model.vals.get(x.key);
       if (!v) continue;
-      const cmp = compareQuantities(toQ(v.iv, unit7, dimOf(x.key)), x.q);
+      const cmp = compareQuantities(toQ(v.iv, unit8, dimOf(x.key)), x.q);
       if (cmp.status === "ok" || cmp.status === "rounded" || cmp.status === "within") {
         hit = x;
         break;
@@ -6168,7 +6168,7 @@ function numText(x) {
   if (x.parts) return fmtIv(x.iv);
   return formatQuantity({ ...x.q, unit: null, dim: 0 });
 }
-function factsOf(f, labels, unit7, notes) {
+function factsOf(f, labels, unit8, notes) {
   const facts = [];
   const keyOf = (k) => {
     if (/^angle\d+$/.test(k)) return f.kind === "triangle" ? k : null;
@@ -6185,10 +6185,10 @@ function factsOf(f, labels, unit7, notes) {
   };
   const inUnit = (q, dim) => {
     if (dim === 0) return q.unit ? null : { ...q, dim: 0 };
-    if (!q.unit) return unit7 ? { ...q, unit: unit7, dim } : { ...q, dim: 0 };
-    if (!unit7) return q;
-    if (q.unit === unit7) return q;
-    const c = convertQuantity({ ...q, dim }, unit7);
+    if (!q.unit) return unit8 ? { ...q, unit: unit8, dim } : { ...q, dim: 0 };
+    if (!unit8) return q;
+    if (q.unit === unit8) return q;
+    const c = convertQuantity({ ...q, dim }, unit8);
     if (c.note) notes.push(c.note);
     return c.quantity;
   };
@@ -6256,25 +6256,25 @@ function labelOf2(f, key2, right2) {
   }
   return key2 === "arc" ? "the arc length" : `the ${key2}`;
 }
-function textOf2(iv, key2, unit7, approx = false) {
+function textOf2(iv, key2, unit8, approx = false) {
   const d = dimOf(key2);
-  const suffix = d === 0 ? "\xB0" : unitSuffix(unit7, d);
+  const suffix = d === 0 ? "\xB0" : unitSuffix(unit8, d);
   return `${approx ? "~" : ""}${fmtIv(iv)}${suffix}`;
 }
 var lengthWord = (key2, more) => dimOf(key2) === 1 ? more ? "longer" : "shorter" : more ? "larger" : "smaller";
-function conflictOf(f, c, reading7, unit7, right2) {
+function conflictOf(f, c, reading7, unit8, right2) {
   const x = c.fact;
   const model = c.against ?? reading7;
   const d = c.derived.lo - x.iv.lo;
   const share = Math.abs(d) / Math.max(TOL, Math.abs(x.iv.lo));
   const verb = model.basis.length > 1 || /\band\b/.test(model.how) ? "make" : "makes";
-  const head = x.parts ? `${x.text} make ${textOf2(x.iv, x.key, unit7)}` : `labelled ${x.text}`;
+  const head = x.parts ? `${x.text} make ${textOf2(x.iv, x.key, unit8)}` : `labelled ${x.text}`;
   const reason = `${head}; ${model.how} ${verb} it ${fmtIv(c.derived)}, ${fmtV(Math.abs(d))} ${lengthWord(x.key, d > 0)} (${Math.round(share * 100)}%)`;
   return {
     key: x.key,
     label: labelOf2(f, x.key, right2),
     written: x.q,
-    derived: toQ(c.derived, unit7, dimOf(x.key)),
+    derived: toQ(c.derived, unit8, dimOf(x.key)),
     difference: d,
     share,
     text: x.text,
@@ -6285,8 +6285,8 @@ function conflictOf(f, c, reading7, unit7, right2) {
 function solveFigure(figure, labels, options = {}) {
   const notes = [];
   const written2 = labels.find((l) => !l.declared && l.value.unit && l.value.dim >= 1)?.value.unit ?? null;
-  const unit7 = options.unit !== void 0 && options.unit !== null ? options.unit : written2;
-  const { facts, partChecks, partLabels } = factsOf(figure, labels, unit7, notes);
+  const unit8 = options.unit !== void 0 && options.unit !== null ? options.unit : written2;
+  const { facts, partChecks, partLabels } = factsOf(figure, labels, unit8, notes);
   const f = figure;
   let models = [];
   if (f.kind === "triangle") {
@@ -6315,14 +6315,14 @@ function solveFigure(figure, labels, options = {}) {
   else if (f.kind === "arc") models = arcModels(f, facts);
   else models = sideModels(f, facts);
   const checked = models.map((m) => {
-    const c = check(m, facts, unit7);
+    const c = check(m, facts, unit8);
     c.ink = inkDistance(f, m);
     return c;
   });
   const sig2 = (c) => c.kept.map((x) => x.i).sort((a, b) => a - b).join(",") + (c.model.assumed ? "?" : "") + (c.model.branch !== void 0 ? `#${c.model.branch}` : "");
-  const seen2 = /* @__PURE__ */ new Map();
-  for (const c of checked) if (!seen2.has(sig2(c))) seen2.set(sig2(c), c);
-  let distinct = [...seen2.values()];
+  const seen3 = /* @__PURE__ */ new Map();
+  for (const c of checked) if (!seen3.has(sig2(c))) seen3.set(sig2(c), c);
+  let distinct = [...seen3.values()];
   distinct = distinct.filter((c) => !distinct.some((o) => o !== c && o.kept.length > c.kept.length && c.kept.every((x) => o.kept.includes(x))));
   if ((f.kind === "quadrilateral" || f.kind === "polygon") && distinct.length > 1) distinct = mergeSides(distinct);
   distinct.sort(
@@ -6334,18 +6334,20 @@ function solveFigure(figure, labels, options = {}) {
   };
   const readings2 = distinct.map((c) => {
     const right2 = f.kind === "triangle" ? rightOf(c.model) : null;
-    const values = valuesOf(f, c, unit7, right2, partLabels);
-    const conflicts = c.conflicts.map((x) => conflictOf(f, x, c.model, unit7, right2));
+    const values = valuesOf(f, c, unit8, right2, partLabels);
+    const conflicts = c.conflicts.map((x) => conflictOf(f, x, c.model, unit8, right2));
     const verb = c.model.basis.filter((x) => !x.assumed).length > 1 || /\band\b/.test(c.model.how) ? "make" : "makes";
+    const isLeg = (k) => right2 !== null && k.startsWith("side") && oppVertex(Number(k.slice(-1))) !== right2;
+    const legsMade = c.model.makes.filter(isLeg).length;
     const made = c.model.makes.map((k) => {
       const v = values.find((x) => x.key === k);
       if (!v) return null;
-      const label = right2 !== null && k.startsWith("side") && oppVertex(Number(k.slice(-1))) !== right2 && c.model.basis.some((x) => x.key === `side${oppSide(right2)}`) ? "the other leg" : v.label;
+      const label = right2 !== null && isLeg(k) && legsMade === 1 && c.model.basis.some((x) => x.key === `side${oppSide(right2)}`) ? "the other leg" : v.label;
       return `${label} ${v.text}`;
     }).filter((x) => !!x);
     const assumes = c.model.assumed ? [c.model.assumed] : void 0;
     const lead = c.model.assumed ? `if the corner at ${V[Number(c.model.basis.find((x) => x.assumed).key.slice(-1))]} is right, ` : "";
-    const sentence = made.length ? `${lead}${c.model.how} ${verb} ${joinAnd(made)}` : `${lead}${c.model.basis.map((x) => `${labelOf2(f, x.key, right2)} ${textOf2(x.iv, x.key, unit7)}`).join(", ")}, as labelled`;
+    const sentence = made.length ? `${lead}${c.model.how} ${verb} ${joinAnd(made)}` : `${lead}${c.model.basis.map((x) => `${labelOf2(f, x.key, right2)} ${textOf2(x.iv, x.key, unit8)}`).join(", ")}, as labelled`;
     return {
       values,
       keeps: c.kept.filter((x) => !x.assumed).map((x) => x.text),
@@ -6361,7 +6363,7 @@ function solveFigure(figure, labels, options = {}) {
     for (const pc of partChecks) {
       if (!top.kept.includes(pc.fact)) continue;
       const whole = top.kept.find((x) => x !== pc.fact && x.key === pc.fact.key);
-      if (whole) checks.push(`${pc.fact.text} make ${textOf2(pc.fact.iv, pc.fact.key, unit7)} \u2713`);
+      if (whole) checks.push(`${pc.fact.text} make ${textOf2(pc.fact.iv, pc.fact.key, unit8)} \u2713`);
     }
   }
   if (f.kind === "triangle" && f.angles) {
@@ -6375,7 +6377,7 @@ function solveFigure(figure, labels, options = {}) {
     }
     const declared = facts.filter((x) => x.fixed && !x.assumed);
     if (declared.length) {
-      const free = triangleModels(facts.filter((x) => !x.fixed)).map((m) => check(m, facts.filter((x) => !x.fixed), unit7)).filter((c) => !c.conflicts.length);
+      const free = triangleModels(facts.filter((x) => !x.fixed)).map((m) => check(m, facts.filter((x) => !x.fixed), unit8)).filter((c) => !c.conflicts.length);
       for (const c of free) {
         for (const d of declared) {
           const v = c.model.vals.get(d.key);
@@ -6403,13 +6405,13 @@ function solveFigure(figure, labels, options = {}) {
     ink.push({
       key: key2,
       label: labelOf2(f, key2, null),
-      value: toQ(iv, scale?.unit ?? unit7, d),
+      value: toQ(iv, scale?.unit ?? unit8, d),
       from: "ink",
       text,
       reason: d === 0 ? `drawn, it measures ${text} \u2014 the ink\u2019s, not the thing\u2019s` : `drawn to scale this would be ${text} \u2014 the ink\u2019s, not the thing\u2019s (${scale.reason})`
     });
   }
-  return { figure: f, unit: unit7, readings: readings2, conflicts: readings2[0]?.conflicts ?? [], checks, ink, notes };
+  return { figure: f, unit: unit8, readings: readings2, conflicts: readings2[0]?.conflicts ?? [], checks, ink, notes };
 }
 function joinAnd(xs) {
   return xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
@@ -6434,7 +6436,7 @@ function keysOf(f) {
       return f.sides.map((s) => s.key);
   }
 }
-function valuesOf(f, c, unit7, right2, parts) {
+function valuesOf(f, c, unit8, right2, parts) {
   const out = [];
   const keys = keysOf(f);
   const all = [...keys, ...[...c.model.vals.keys()].filter((k) => !keys.includes(k))];
@@ -6443,8 +6445,8 @@ function valuesOf(f, c, unit7, right2, parts) {
     if (!v) continue;
     const approx = !!v.fact?.q.approx;
     const labelled2 = v.from === "labelled" || v.from === "declared" || v.from === "assumed";
-    const value = labelled2 && v.fact && !v.fact.parts ? { ...v.fact.q, ...dimOf(key2) === 0 ? { unit: null, dim: 0 } : {} } : toQ(v.iv, unit7, dimOf(key2), approx);
-    const text = labelled2 && v.fact && !v.fact.parts && dimOf(key2) > 0 && v.fact.q.unit === unit7 ? formatQuantity(v.fact.q) : textOf2(v.iv, key2, unit7, approx);
+    const value = labelled2 && v.fact && !v.fact.parts ? { ...v.fact.q, ...dimOf(key2) === 0 ? { unit: null, dim: 0 } : {} } : toQ(v.iv, unit8, dimOf(key2), approx);
+    const text = labelled2 && v.fact && !v.fact.parts && dimOf(key2) > 0 && v.fact.q.unit === unit8 ? formatQuantity(v.fact.q) : textOf2(v.iv, key2, unit8, approx);
     const label = labelOf2(f, key2, right2);
     const formula = v.formula ? bracketRanges(v.formula) : void 0;
     const reason = v.from === "derived" ? `${label} ${text}${formula ? ` = ${formula}` : ""}` : v.from === "declared" ? `${label} is right: a square in the corner declares it` : v.from === "assumed" ? v.fact?.assumed ?? `${label}, assumed` : `${label} ${text}, as labelled`;
@@ -6465,9 +6467,9 @@ function valuesOf(f, c, unit7, right2, parts) {
     const hi = whole.iv.hi - known2.reduce((a, w2) => a + w2.q.lo, 0);
     if (!(hi > TOL)) continue;
     const iv = { lo: Math.max(0, lo), hi };
-    const text = textOf2(iv, side.key, unit7);
+    const text = textOf2(iv, side.key, unit8);
     const formula = bracketRanges([fmtIv(whole.iv), ...known2.map((w2) => formatQuantity({ ...w2.q, unit: null, dim: 0 }))].join(" \u2212 "));
-    out.push({ key: open[0].key, label: open[0].label, value: toQ(iv, unit7, 1), from: "derived", formula, text, reason: `${open[0].label} ${text} = ${formula}` });
+    out.push({ key: open[0].key, label: open[0].label, value: toQ(iv, unit8, 1), from: "derived", formula, text, reason: `${open[0].label} ${text} = ${formula}` });
   }
   return out;
 }
@@ -6501,18 +6503,18 @@ function solveBoard(state, options = {}) {
     pages.push(sheet2);
     return sheet2;
   };
-  const unit7 = options.unit !== void 0 ? options.unit : (except) => readPage(except).unit;
-  const dimensions = dimensionsOf(state, { unit: unit7, ...options.figures ? { figures: options.figures } : {} });
+  const unit8 = options.unit !== void 0 ? options.unit : (except) => readPage(except).unit;
+  const dimensions = dimensionsOf(state, { unit: unit8, ...options.figures ? { figures: options.figures } : {} });
   const sheet = pages[0] ?? readPage(dimensions.numberIds);
   const figures = dimensions.figures.map((figure) => {
     const labels = dimensions.labels.get(figure.id) ?? [];
     const drawing = dimensions.drawings.find((d) => d.figures.includes(figure.id)) ?? null;
     const solution = solveFigure(figure, labels, { unit: drawing?.unit ?? null, scale: drawing?.scale ?? null });
-    const seen2 = /* @__PURE__ */ new Set();
+    const seen3 = /* @__PURE__ */ new Set();
     const steps = [];
     for (const l of labels) {
-      if (l.step === void 0 || l.declared || seen2.has(l.number ?? l.text)) continue;
-      seen2.add(l.number ?? l.text);
+      if (l.step === void 0 || l.declared || seen3.has(l.number ?? l.text)) continue;
+      seen3.add(l.number ?? l.text);
       const check2 = checkWritten(sheet, String(l.step), l.value);
       if (check2) steps.push(check2);
     }
@@ -6714,11 +6716,11 @@ function figuresAmong(nodes, ids) {
     if (u !== v) edges.push({ stroke: i, u, v });
   });
   const figures = [];
-  const seen2 = /* @__PURE__ */ new Set();
+  const seen3 = /* @__PURE__ */ new Set();
   for (const cycle of simpleCycles(edges)) {
     const key2 = cycle.map((k) => ruled[edges[k].stroke].id).sort().join("+");
-    if (seen2.has(key2)) continue;
-    seen2.add(key2);
+    if (seen3.has(key2)) continue;
+    seen3.add(key2);
     const f = figureOfCycle(cycle.map((k) => edges[k]), ruled, meetings, find, pairKey);
     if (!f) continue;
     const corners = new Set(cycle.flatMap((k) => [edges[k].u, edges[k].v]));
@@ -6968,8 +6970,8 @@ function wrap(text, width, size2) {
 function unitFactor(from, to) {
   return from === to ? 1 : convertQuantity(quantity(1, from), to).quantity.lo;
 }
-function systemOf(unit7) {
-  return unit7 === "in" || unit7 === "ft" ? "imperial" : "metric";
+function systemOf(unit8) {
+  return unit8 === "in" || unit8 === "ft" ? "imperial" : "metric";
 }
 function unionBounds(boxes) {
   return {
@@ -7554,11 +7556,11 @@ function readEnd(conn, e, state) {
     }
   }
   heads.sort((a, b) => b.confidence - a.confidence);
-  const seen2 = /* @__PURE__ */ new Set();
+  const seen3 = /* @__PURE__ */ new Set();
   const readings2 = heads.filter((h2) => {
     const k = `${h2.kind}:${h2.filled}`;
-    if (seen2.has(k)) return false;
-    seen2.add(k);
+    if (seen3.has(k)) return false;
+    seen3.add(k);
     return true;
   });
   const reason = readings2.length ? readings2[0].reason : writing ? `writing sits at its ${e.end} \u2014 a label, not a head` : near.length ? `a mark touches its ${e.end} but reads as no head` : `a plain ${e.end}: nothing sits there`;
@@ -8317,8 +8319,8 @@ function writingLines(words) {
       rest = rest.slice(line.length);
     }
   }
-  const mid11 = (l) => l.reduce((n2, m) => n2 + (m.bounds.minY + m.bounds.maxY) / 2, 0) / l.length;
-  return lines.sort((a, b) => mid11(a) - mid11(b) || a[0].bounds.minX - b[0].bounds.minX);
+  const mid12 = (l) => l.reduce((n2, m) => n2 + (m.bounds.minY + m.bounds.maxY) / 2, 0) / l.length;
+  return lines.sort((a, b) => mid12(a) - mid12(b) || a[0].bounds.minX - b[0].bounds.minX);
 }
 var BUILTIN_CONCEPTS = [
   {
@@ -8814,10 +8816,10 @@ function pictureOf(node) {
 // src/session/manipulate.ts
 function manipulableOf(nodes, ids) {
   const out = [];
-  const seen2 = /* @__PURE__ */ new Set();
+  const seen3 = /* @__PURE__ */ new Set();
   const visit = (id) => {
-    if (seen2.has(id)) return;
-    seen2.add(id);
+    if (seen3.has(id)) return;
+    seen3.add(id);
     const n2 = nodes.get(id);
     if (!n2 || getRep(n2, "erased")) return;
     if (getRep(n2, "stroke") || pictureOf(n2) || regionRepOf(n2)) {
@@ -9227,12 +9229,12 @@ function search(a, b, blockers, stub) {
   const turn2 = 4 * stub + 0.2 * (Math.abs(p1.x - p22.x) + Math.abs(p1.y - p22.y));
   const state = (i, j, d) => (i * ny + j) * 4 + d;
   const total = nx * ny * 4;
-  const dist12 = new Float64Array(total).fill(Infinity);
+  const dist13 = new Float64Array(total).fill(Infinity);
   const prev = new Int32Array(total).fill(-1);
   const done = new Uint8Array(total);
   const heap = new Heap();
   const start = state(ix1, iy1, da), goal = state(ix2, iy2, opposite(db));
-  dist12[start] = 0;
+  dist13[start] = 0;
   heap.push(0, start);
   while (heap.size) {
     const { cost, item } = heap.pop();
@@ -9241,8 +9243,8 @@ function search(a, b, blockers, stub) {
     if (item === goal) break;
     const d = item % 4, cell = (item - d) / 4, j = cell % ny, i = (cell - j) / ny;
     const relax = (to2, c) => {
-      if (c < dist12[to2] - 1e-9) {
-        dist12[to2] = c;
+      if (c < dist13[to2] - 1e-9) {
+        dist13[to2] = c;
         prev[to2] = item;
         heap.push(c, to2);
       }
@@ -9276,8 +9278,8 @@ function direct(a, b, stub) {
   const p1 = { x: a.point.x + VEC[da].x * la, y: a.point.y + VEC[da].y * la };
   const p22 = { x: b.point.x + VEC[db].x * lb, y: b.point.y + VEC[db].y * lb };
   const horizontal = (d) => d === 0 || d === 2;
-  const mid11 = horizontal(da) && horizontal(db) ? [{ x: (p1.x + p22.x) / 2, y: p1.y }, { x: (p1.x + p22.x) / 2, y: p22.y }] : !horizontal(da) && !horizontal(db) ? [{ x: p1.x, y: (p1.y + p22.y) / 2 }, { x: p22.x, y: (p1.y + p22.y) / 2 }] : horizontal(da) ? [{ x: p22.x, y: p1.y }] : [{ x: p1.x, y: p22.y }];
-  return simplify([a.point, p1, ...mid11, p22, b.point]);
+  const mid12 = horizontal(da) && horizontal(db) ? [{ x: (p1.x + p22.x) / 2, y: p1.y }, { x: (p1.x + p22.x) / 2, y: p22.y }] : !horizontal(da) && !horizontal(db) ? [{ x: p1.x, y: (p1.y + p22.y) / 2 }, { x: p22.x, y: (p1.y + p22.y) / 2 }] : horizontal(da) ? [{ x: p22.x, y: p1.y }] : [{ x: p1.x, y: p22.y }];
+  return simplify([a.point, p1, ...mid12, p22, b.point]);
 }
 var sayTurns = (n2) => n2 === 0 ? "straight across" : n2 === 1 ? "one turn" : `${n2} turns`;
 var sayList = (ids) => ids.length <= 3 ? ids.join(", ") : `${ids.slice(0, 3).join(", ")} and ${ids.length - 3} more`;
@@ -9369,20 +9371,20 @@ function deriveRoute(node, nodes, near) {
   const pad = Math.max(4 * STUB_PX * scale, WINDOW_SHARE * Math.max(hi.x - lo.x, hi.y - lo.y));
   const window = { minX: Math.min(lo.x, first.box.minX, last.box.minX) - pad, minY: Math.min(lo.y, first.box.minY, last.box.minY) - pad, maxX: Math.max(hi.x, first.box.maxX, last.box.maxX) + pad, maxY: Math.max(hi.y, first.box.maxY, last.box.maxY) + pad };
   const blocks = [];
-  const seen2 = [];
+  const seen3 = [];
   const minSide = MIN_OBSTACLE_PX * scale;
   for (const id of near(window)) {
     if (id === node.id || id === bs.nodeId || id === be.nodeId) continue;
     const m = nodes.get(id);
     if (!m || getRep(m, "erased") || !getRep(m, "stroke")) continue;
-    seen2.push(id);
+    seen3.push(id);
     if (bindingsOf(m).length || !standsClosed(m)) continue;
     const box2 = boundsOf(m);
     if (!box2 || box2.maxX - box2.minX < minSide || box2.maxY - box2.minY < minSide) continue;
     if (within(boxS, box2) || within(boxE, box2) || within(box2, boxS) || within(box2, boxE)) continue;
     blocks.push({ id, box: box2 });
   }
-  seen2.sort();
+  seen3.sort();
   const path = routeBetween(a, b, blocks, scale);
   const head = arrow ? headOf2(path.points, getRep(node, "reading:arrow")?.data?.barb ?? 18 * scale) : void 0;
   const all = path.points;
@@ -9400,7 +9402,7 @@ function deriveRoute(node, nodes, near) {
     avoided: path.avoided,
     blocked: path.blocked,
     window: box,
-    seen: seen2,
+    seen: seen3,
     reasoning: path.reasoning
   };
 }
@@ -9709,6 +9711,25 @@ function regionOutline(board2) {
   return out;
 }
 
+// src/session/settings.ts
+var SETTING_VALUES = {
+  answers: ["show", "wait"],
+  colour: ["pointed", "always"]
+};
+var DEFAULT_SETTINGS = Object.freeze({ answers: "show", colour: "pointed" });
+var SETTING_KEYS = Object.keys(SETTING_VALUES);
+function isSettingKey(key2) {
+  return typeof key2 === "string" && Object.prototype.hasOwnProperty.call(SETTING_VALUES, key2);
+}
+function isSettingValue(key2, value) {
+  return typeof value === "string" && SETTING_VALUES[key2].includes(value);
+}
+function settingRefusal(key2, value) {
+  if (!isSettingKey(key2)) return `\u201C${String(key2)}\u201D is not a setting a board has \u2014 it has ${SETTING_KEYS.join(" and ")}`;
+  if (!isSettingValue(key2, value)) return `\u201C${String(value)}\u201D is not a way to set ${key2} \u2014 it is ${SETTING_VALUES[key2].join(" or ")}`;
+  return null;
+}
+
 // src/session/words.ts
 var LETTER_MAX_HEIGHT_PX = 150;
 var LETTER_MAX_WIDTH_PX = 150;
@@ -9787,7 +9808,7 @@ function structuralSignature(ids, nodes, typeOf) {
     types.set(id, t);
     shapes[t] = (shapes[t] ?? 0) + 1;
   }
-  const seen2 = /* @__PURE__ */ new Set();
+  const seen3 = /* @__PURE__ */ new Set();
   for (const id of ids) {
     const node = nodes.get(id);
     if (!node) continue;
@@ -9802,8 +9823,8 @@ function structuralSignature(ids, nodes, typeOf) {
         key2 = `${x}-${e.rel}-${y}`;
       } else continue;
       const pair = [id, e.to].sort().join("|") + "|" + e.rel;
-      if (seen2.has(pair)) continue;
-      seen2.add(pair);
+      if (seen3.has(pair)) continue;
+      seen3.add(pair);
       links[key2] = (links[key2] ?? 0) + 1;
     }
   }
@@ -10459,6 +10480,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   let packs = [];
   let library = [];
   let packNotices = [];
+  let settings = { ...DEFAULT_SETTINGS };
   const packSource = config.packs ?? shippedPack;
   let gestures = /* @__PURE__ */ new Map();
   let markHands = /* @__PURE__ */ new Map();
@@ -10546,6 +10568,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       packs: packs.slice(),
       library: library.slice(),
       packNotices: packNotices.slice(),
+      settings: { ...settings },
       derived: copyDerived({
         order: order2,
         nextOrder,
@@ -10585,6 +10608,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     packs = s.packs.slice();
     library = s.library.slice();
     packNotices = s.packNotices.slice();
+    settings = { ...DEFAULT_SETTINGS, ...s.settings ?? {} };
     if (!s.derived) {
       rebuildDerived();
       return;
@@ -10699,6 +10723,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     packs = [];
     library = [];
     packNotices = [];
+    settings = { ...DEFAULT_SETTINGS };
     gestures = /* @__PURE__ */ new Map();
     markHands = /* @__PURE__ */ new Map();
     lastAt = 0;
@@ -10918,15 +10943,15 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     }
   }
   function gather3(start) {
-    const seen2 = /* @__PURE__ */ new Set([start]);
+    const seen3 = /* @__PURE__ */ new Set([start]);
     const stack = [start];
     let first = start;
     while (stack.length) {
       const id = stack.pop();
       if (order2.get(id) < order2.get(first)) first = id;
       for (const o of linked.get(id)) {
-        if (seen2.has(o)) continue;
-        seen2.add(o);
+        if (seen3.has(o)) continue;
+        seen3.add(o);
         stack.push(o);
       }
     }
@@ -10936,7 +10961,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       for (const id of ids) if (!own || !own.has(id)) out.push(id);
       return out;
     };
-    let members = [...seen2];
+    let members = [...seen3];
     let strokeIds = strokesOf2(members);
     const ordered2 = definitionSizes.some((m) => mayMatchBySize(strokeIds.length, m));
     if (ordered2) {
@@ -10958,14 +10983,14 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   }
   function walkFrom(first) {
     const out = [];
-    const seen2 = /* @__PURE__ */ new Set();
+    const seen3 = /* @__PURE__ */ new Set();
     const stack = [first];
     while (stack.length) {
       const id = stack.pop();
-      if (seen2.has(id)) continue;
-      seen2.add(id);
+      if (seen3.has(id)) continue;
+      seen3.add(id);
       out.push(id);
-      for (const o of [...linked.get(id)].sort(byOrder)) if (!seen2.has(o)) stack.push(o);
+      for (const o of [...linked.get(id)].sort(byOrder)) if (!seen3.has(o)) stack.push(o);
     }
     return out;
   }
@@ -11692,12 +11717,12 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       const start = axis === "row" ? span.minX : span.minY;
       const end = axis === "row" ? span.maxX : span.maxY;
       const gap = ordered2.length > 1 ? (end - start - total) / (ordered2.length - 1) : 0;
-      const cross9 = ordered2.reduce((acc, t) => acc + (axis === "row" ? (t.bounds.minY + t.bounds.maxY) / 2 : (t.bounds.minX + t.bounds.maxX) / 2), 0) / ordered2.length;
+      const cross10 = ordered2.reduce((acc, t) => acc + (axis === "row" ? (t.bounds.minY + t.bounds.maxY) / 2 : (t.bounds.minX + t.bounds.maxX) / 2), 0) / ordered2.length;
       let cursor = start;
       placed2 = ordered2.map((t, i) => {
         const size2 = sizes[i];
         const half2 = (axis === "row" ? h2(t.bounds) : w2(t.bounds)) / 2;
-        const to = axis === "row" ? { minX: cursor, maxX: cursor + size2, minY: cross9 - half2, maxY: cross9 + half2 } : { minX: cross9 - half2, maxX: cross9 + half2, minY: cursor, maxY: cursor + size2 };
+        const to = axis === "row" ? { minX: cursor, maxX: cursor + size2, minY: cross10 - half2, maxY: cross10 + half2 } : { minX: cross10 - half2, maxX: cross10 + half2, minY: cursor, maxY: cursor + size2 };
         cursor += size2 + gap;
         return { id: t.id, to };
       });
@@ -11999,7 +12024,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       const hb = boundsOf(h2);
       return id !== n2.id && !!hb && boundsContain(hb, nb) && (artifacts.includes(id) || (standsClosed(h2) ?? false)) && nonWriting(h2);
     });
-    const meets2 = { closed: false, open: [false, false] };
+    const meets3 = { closed: false, open: [false, false] };
     ends.forEach((e, k) => {
       for (const id of reach.around(e.point, (cell) => magnetRadius(cell, scale))) {
         if (id === n2.id || run2.includes(id)) continue;
@@ -12036,11 +12061,11 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         if (!q || d > r) continue;
         if (d > touch && ((q.x - e.point.x) * e.out.x + (q.y - e.point.y) * e.out.y) / d < 0.5) continue;
         if (run2.some((l) => l !== n2.id && letterMeets(l, m, mb, r))) continue;
-        if (closed) meets2.closed = true;
-        else meets2.open[k] = true;
+        if (closed) meets3.closed = true;
+        else meets3.open[k] = true;
       }
     });
-    return meets2.closed || meets2.open[0] && meets2.open[1];
+    return meets3.closed || meets3.open[0] && meets3.open[1];
   }
   function longAgainstRun(n2, run2) {
     const letters = run2.filter((id) => id !== n2.id).map((id) => nodes.get(id)).filter((l) => !!l);
@@ -12479,6 +12504,10 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     recomputeClusterCandidates();
     rereadSummonMatches();
   }
+  function applySetting(ev) {
+    if (settingRefusal(ev.key, ev.value) !== null || !isSettingKey(ev.key)) return;
+    settings = { ...settings, [ev.key]: ev.value };
+  }
   function codeVersion(nodeId) {
     const node = nodes.get(nodeId);
     return node ? node.reps.filter((r) => r.modality === "code").length : 0;
@@ -12628,6 +12657,9 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         return null;
       case "unuse":
         applyUnuse(ev);
+        return null;
+      case "setting":
+        applySetting(ev);
         return null;
       case "correct":
         applyCorrect(ev);
@@ -12858,7 +12890,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       clocks: { ...clocks },
       selection: [...reader.selection],
       packs: [...packs],
-      packNotices: packNotices.map((n2) => ({ ...n2 }))
+      packNotices: packNotices.map((n2) => ({ ...n2 })),
+      settings: { ...settings }
     };
   }
   function subscribe(listener) {
@@ -12892,6 +12925,13 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       const ref = typeof pack === "string" ? pack.trim() : String(pack);
       if (!packs.includes(ref) && !packNotices.some((n2) => n2.pack === ref)) return;
       dispatch({ type: "unuse", pack: ref, at: at2, ...participantId !== void 0 ? { participantId } : {} });
+    },
+    setting: (key2, value, at2, participantId) => {
+      const why = settingRefusal(key2, value);
+      if (why !== null) return why;
+      if (isSettingKey(key2) && settings[key2] === value) return null;
+      dispatch({ type: "setting", key: key2, value, at: at2, ...participantId !== void 0 ? { participantId } : {} });
+      return null;
     },
     correct: (args) => void dispatch({ type: "correct", ...args }),
     clock: (args) => void dispatch({ type: "clock", ...args }),
@@ -13225,12 +13265,12 @@ function endsMeet(a, ea, ties, b) {
   const eb = endsOf(b);
   if (!eb) return { start: false, end: false };
   const reach = 1.5 * magnetRadius(Math.min(sizeOf2(a), sizeOf2(b)), Math.max(scaleOf2(a), scaleOf2(b)));
-  const meets2 = (p, end) => eb.some((q) => Math.hypot(p.x - q.x, p.y - q.y) <= reach) || ties.some((t) => t.to === b.id && (!t.end || t.end === end));
-  return { start: meets2(ea[0], "start"), end: meets2(ea[1], "end") };
+  const meets3 = (p, end) => eb.some((q) => Math.hypot(p.x - q.x, p.y - q.y) <= reach) || ties.some((t) => t.to === b.id && (!t.end || t.end === end));
+  return { start: meets3(ea[0], "start"), end: meets3(ea[1], "end") };
 }
 function sideCluster(node, nodes, max = 12) {
   const out = [node.id];
-  const seen2 = new Set(out);
+  const seen3 = new Set(out);
   let start = false, end = false;
   for (let i = 0; i < out.length && out.length < max; i++) {
     const a = nodes.get(out[i]);
@@ -13238,14 +13278,14 @@ function sideCluster(node, nodes, max = 12) {
     if (!ea) continue;
     const ties = tiesOf(a);
     for (const [id, n2] of nodes) {
-      if (seen2.has(id) || out.length >= max) continue;
+      if (seen3.has(id) || out.length >= max) continue;
       const m = endsMeet(a, ea, ties, n2);
       if (!m.start && !m.end || !mayBeSide(n2)) continue;
       if (i === 0) {
         start ||= m.start;
         end ||= m.end;
       }
-      seen2.add(id);
+      seen3.add(id);
       out.push(id);
     }
     if (i === 0 && !(start && end)) return [node.id];
@@ -13706,15 +13746,15 @@ function naturalCompare(a, b) {
 var centre = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
 function inReadingOrder(items, boundsOf2, keyOf, across2 = false) {
   const main = (b) => across2 ? centre(b).x : centre(b).y;
-  const cross9 = (b) => across2 ? centre(b).y : centre(b).x;
+  const cross10 = (b) => across2 ? centre(b).y : centre(b).x;
   const extent = (b) => across2 ? [b.minX, b.maxX] : [b.minY, b.maxY];
   const placed2 = items.filter((t) => !!boundsOf2(t)).map((t) => ({ t, b: boundsOf2(t), k: keyOf(t) }));
   const loose = items.filter((t) => !boundsOf2(t)).sort((p, q) => naturalCompare(keyOf(p), keyOf(q)));
-  placed2.sort((p, q) => main(p.b) - main(q.b) || cross9(p.b) - cross9(q.b) || naturalCompare(p.k, q.k));
+  placed2.sort((p, q) => main(p.b) - main(q.b) || cross10(p.b) - cross10(q.b) || naturalCompare(p.k, q.k));
   const out = [];
   let band = [];
   const close = () => {
-    band.sort((p, q) => cross9(p.b) - cross9(q.b) || naturalCompare(p.k, q.k));
+    band.sort((p, q) => cross10(p.b) - cross10(q.b) || naturalCompare(p.k, q.k));
     out.push(...band.map((x) => x.t));
     band = [];
   };
@@ -14746,7 +14786,7 @@ function strokesOf(state, scopeIds) {
   const ids = scopeIds ? [...new Set(scopeIds)] : state.contentIds.filter((id) => !artifacts.has(id));
   const strokes = [];
   const nodes = /* @__PURE__ */ new Map();
-  const add7 = (id, mark) => {
+  const add8 = (id, mark) => {
     const n2 = state.nodes.get(id);
     if (!n2 || getRep(n2, "erased") || getRep(n2, "gesture") || !getRep(n2, "stroke")) return;
     const ink = strokePointsOf(n2);
@@ -14758,8 +14798,8 @@ function strokesOf(state, scopeIds) {
   for (const id of ids) {
     const n2 = state.nodes.get(id);
     if (!n2 || artifacts.has(id) || getRep(n2, "erased") || getRep(n2, "gesture")) continue;
-    if (isWord(n2)) for (const l of lettersOf(n2)) add7(l, id);
-    else add7(id, id);
+    if (isWord(n2)) for (const l of lettersOf(n2)) add8(l, id);
+    else add8(id, id);
   }
   return { strokes, nodes };
 }
@@ -14836,25 +14876,25 @@ function rowsOf(dashes) {
   keep.forEach((ks, i) => {
     for (const j of ks) if (j > i && keep[j].includes(i)) links[i].push(j), links[j].push(i);
   });
-  const seen2 = /* @__PURE__ */ new Set();
+  const seen3 = /* @__PURE__ */ new Set();
   const rows = [];
   const walk2 = (start) => {
     const row = [];
     let prev = -1, at2 = start;
-    while (at2 >= 0 && !seen2.has(at2)) {
-      seen2.add(at2);
+    while (at2 >= 0 && !seen3.has(at2)) {
+      seen3.add(at2);
       row.push(at2);
-      const next = links[at2].find((j) => j !== prev && !seen2.has(j));
+      const next = links[at2].find((j) => j !== prev && !seen3.has(j));
       prev = at2;
       at2 = next ?? -1;
     }
     if (row.length >= MIN_DASHES) rows.push(row.map((k) => dashes[k]));
   };
   dashes.forEach((_, i) => {
-    if (!seen2.has(i) && links[i].length <= 1) walk2(i);
+    if (!seen3.has(i) && links[i].length <= 1) walk2(i);
   });
   dashes.forEach((_, i) => {
-    if (!seen2.has(i)) walk2(i);
+    if (!seen3.has(i)) walk2(i);
   });
   return rows;
 }
@@ -16310,14 +16350,14 @@ function statePortsOf(node, nodes) {
     const spot = blobCandidate(node);
     if (spot && spot.shapes[0].score >= 0.5) {
       const b = spot.outline.bounds;
-      const mid11 = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
+      const mid12 = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
       return {
         symbol: "initial",
         ports: [
-          { name: "top", at: { x: mid11.x, y: b.minY }, reasoning: "the dot\u2019s top" },
-          { name: "right", at: { x: b.maxX, y: mid11.y }, reasoning: "the dot\u2019s right" },
-          { name: "bottom", at: { x: mid11.x, y: b.maxY }, reasoning: "the dot\u2019s bottom" },
-          { name: "left", at: { x: b.minX, y: mid11.y }, reasoning: "the dot\u2019s left" }
+          { name: "top", at: { x: mid12.x, y: b.minY }, reasoning: "the dot\u2019s top" },
+          { name: "right", at: { x: b.maxX, y: mid12.y }, reasoning: "the dot\u2019s right" },
+          { name: "bottom", at: { x: mid12.x, y: b.maxY }, reasoning: "the dot\u2019s bottom" },
+          { name: "left", at: { x: b.minX, y: mid12.y }, reasoning: "the dot\u2019s left" }
         ]
       };
     }
@@ -16797,8 +16837,8 @@ function readEr(state, scopeIds) {
     if (!r) continue;
     const P = r.ends.from.point, Q = r.ends.to.point;
     const len4 = Math.max(1e-6, Math.hypot(Q.x - P.x, Q.y - P.y));
-    const mid11 = centreOf3(l.bounds);
-    const t = ((mid11.x - P.x) * (Q.x - P.x) + (mid11.y - P.y) * (Q.y - P.y)) / (len4 * len4);
+    const mid12 = centreOf3(l.bounds);
+    const t = ((mid12.x - P.x) * (Q.x - P.x) + (mid12.y - P.y) * (Q.y - P.y)) / (len4 * len4);
     const middle = t > 0.5 - MIDDLE_SHARE / 2 && t < 0.5 + MIDDLE_SHARE / 2;
     const atEnd = t <= END_SHARE2 || t >= 1 - END_SHARE2;
     const shortEnough = sizeOf3(l.bounds) <= MULTIPLICITY_SHARE * len4;
@@ -17057,11 +17097,11 @@ function readMindMap(state, scopeIds) {
   };
   const linked = candidates.filter((c) => neighbours.get(c.id).size > 0);
   const groups = [];
-  const seen2 = /* @__PURE__ */ new Set();
+  const seen3 = /* @__PURE__ */ new Set();
   for (const c of linked) {
-    if (seen2.has(c.id)) continue;
+    if (seen3.has(c.id)) continue;
     const g = [...distancesFrom(c.id).keys()];
-    g.forEach((id) => seen2.add(id));
+    g.forEach((id) => seen3.add(id));
     groups.push(g.map((id) => byId.get(id)));
   }
   groups.sort((a, b) => b.length - a.length);
@@ -17529,18 +17569,18 @@ function readGarment(state, scopeIds) {
       ...extra
     });
   };
-  const meets2 = (p, b) => {
+  const meets3 = (p, b) => {
     const grow2 = Math.max(FOLD_NEAR * p.short, NEAR_PX * p.scale) + tolOf(p), pb = p.outline.bounds;
     return b.maxX >= pb.minX - grow2 && b.minX <= pb.maxX + grow2 && b.maxY >= pb.minY - grow2 && b.minY <= pb.maxY + grow2;
   };
-  const nearby = (b) => pieces.some((p) => meets2(p, b));
+  const nearby = (b) => pieces.some((p) => meets3(p, b));
   const shafts = [];
   const rest = [];
   for (const o of open) {
     const pts = strokePointsOf(o.node);
     if (!pts || !nearby(boxOf3(pts))) continue;
     const m = mid6(pts[0], pts[pts.length - 1]), mb = { minX: m.x, maxX: m.x, minY: m.y, maxY: m.y };
-    const stands = pieces.some((p) => meets2(p, mb) && (outside(m, p.hull) === 0 || distToPath(m, p.ring) <= Math.max(FOLD_NEAR * p.short, NEAR_PX * p.scale)));
+    const stands = pieces.some((p) => meets3(p, mb) && (outside(m, p.hull) === 0 || distToPath(m, p.ring) <= Math.max(FOLD_NEAR * p.short, NEAR_PX * p.scale)));
     const sh = stands ? shaftOf(state, o.id, o.node, o.scale) : null;
     if (sh && sh.dev <= STRAIGHT_DEV) shafts.push(sh);
     else rest.push(o);
@@ -17624,7 +17664,7 @@ function readGarment(state, scopeIds) {
     }
   }
   for (const c of closed) {
-    if (owned.has(c.id) || !pieces.some((p) => p.id !== c.id && p.size > c.outline.size && meets2(p, c.outline.bounds))) continue;
+    if (owned.has(c.id) || !pieces.some((p) => p.id !== c.id && p.size > c.outline.size && meets3(p, c.outline.bounds))) continue;
     const pts = strokePointsOf(c.node) ?? [];
     const tri = biggestTriangle(c.outline.hull);
     if (!tri || c.outline.three < 0.75) continue;
@@ -17998,8 +18038,8 @@ function labelled(fm) {
 }
 function frameOf2(fm) {
   const reading7 = fm.solution.readings[0];
-  const unit7 = fm.solution.unit;
-  if (!reading7 || !unit7) return null;
+  const unit8 = fm.solution.unit;
+  if (!reading7 || !unit8) return null;
   const val = (key2) => {
     const v = reading7.values.find((x) => x.key === key2)?.value;
     return v && !isRange(v) && v.lo > 0 ? v.lo : NaN;
@@ -18011,7 +18051,7 @@ function frameOf2(fm) {
     if (lengths.some((x) => !(x > 0))) return null;
     const truth = [{ x: 0, y: 0 }, { x: lengths[0], y: 0 }, { x: lengths[0], y: lengths[1] }, { x: 0, y: lengths[1] }];
     const map = affineFit(f.vertices, truth);
-    return map ? { fm, kind: "rectangle", unit: unit7, lengths, truth, ink: f.vertices, map } : null;
+    return map ? { fm, kind: "rectangle", unit: unit8, lengths, truth, ink: f.vertices, map } : null;
   }
   if (f.kind === "triangle" && f.vertices.length === 3) {
     const lengths = [0, 1, 2].map((k) => val(`side${k}`));
@@ -18020,13 +18060,13 @@ function frameOf2(fm) {
     const x = (l0 * l0 + l2 * l2 - l1 * l1) / (2 * l0), y = Math.sqrt(Math.max(0, l2 * l2 - x * x));
     const truth = [{ x: 0, y: 0 }, { x: l0, y: 0 }, { x, y }];
     const map = affineFit(f.vertices, truth);
-    return map ? { fm, kind: "triangle", unit: unit7, lengths, truth, ink: f.vertices, map } : null;
+    return map ? { fm, kind: "triangle", unit: unit8, lengths, truth, ink: f.vertices, map } : null;
   }
   return null;
 }
 var num = (v) => formatNumber(v, 2);
-var dims = (d, unit7) => `${num(d.width)} \xD7 ${num(d.height)}${unitSuffix(unit7, 1)}`;
-var len3 = (v, unit7) => `${num(v)}${unitSuffix(unit7, 1)}`;
+var dims = (d, unit8) => `${num(d.width)} \xD7 ${num(d.height)}${unitSuffix(unit8, 1)}`;
+var len3 = (v, unit8) => `${num(v)}${unitSuffix(unit8, 1)}`;
 function sideName2(frame, k) {
   return `${len3(frame.lengths[k], frame.unit)} side`;
 }
@@ -18063,7 +18103,7 @@ function garmentMaths(state, board2, read4 = garmentOf(state)) {
     const fmP = figureOf3(piece.id), fmS = seamMark ? figureOf3(seamMark.id) : void 0;
     const numbers = labelled(fmP) ? { fm: fmP, on: "sewing" } : labelled(fmS) ? { fm: fmS, on: "cutting" } : null;
     const frame = numbers ? frameOf2(numbers.fm) : null;
-    const unit7 = numbers?.fm.solution.unit ?? null;
+    const unit8 = numbers?.fm.solution.unit ?? null;
     const lines = [];
     const rows = [];
     const result2 = {
@@ -18071,7 +18111,7 @@ function garmentMaths(state, board2, read4 = garmentOf(state)) {
       ids,
       ...piece.name?.text ? { name: piece.name.text } : {},
       ...numbers ? { figure: { id: numbers.fm.figure.id, kind: numbers.fm.figure.kind, on: numbers.on } } : {},
-      unit: unit7,
+      unit: unit8,
       notches: [],
       darts: [],
       lines,
@@ -18083,11 +18123,11 @@ function garmentMaths(state, board2, read4 = garmentOf(state)) {
       const fm = numbers.fm;
       const scale = fm.drawing?.scale?.unitsPerCanvasUnit;
       const ink = seamMark.offset !== void 0 && scale ? seamMark.offset * scale : void 0;
-      const page = allowance ? allowance.amount.unit && allowance.amount.unit !== unit7 && unit7 ? convertQuantity(allowance.amount, unit7).quantity : allowance.amount : null;
+      const page = allowance ? allowance.amount.unit && allowance.amount.unit !== unit8 && unit8 ? convertQuantity(allowance.amount, unit8).quantity : allowance.amount : null;
       const amount2 = page ? page.lo : ink;
       if (amount2 !== void 0 && amount2 > 0) {
         const from = page ? "page" : "ink";
-        const said3 = page ? formatQuantity(page) : len3(amount2, unit7);
+        const said3 = page ? formatQuantity(page) : len3(amount2, unit8);
         const seam = { id: seamMark.id, amount: amount2, from, ...ink !== void 0 ? { ink } : {}, reason: "" };
         if (frame?.kind === "rectangle") {
           const w2 = frame.lengths[widePair(fm.figure)[0]], h2 = frame.lengths[widePair(fm.figure)[0] === 0 ? 1 : 0];
@@ -18098,23 +18138,23 @@ function garmentMaths(state, board2, read4 = garmentOf(state)) {
           } else {
             seam.cut = { width: w2, height: h2 };
             seam.sewn = grown(-amount2);
-            seam.or = `or, if ${dims(seam.cut, unit7)} is the finished size, cut at ${dims(grown(amount2), unit7)}`;
+            seam.or = `or, if ${dims(seam.cut, unit8)} is the finished size, cut at ${dims(grown(amount2), unit8)}`;
           }
         }
         const because = from === "page" ? ", as the page says" : ", as the ink draws it";
-        seam.reason = from === "page" ? `${said3} \u2014 the page's allowance` : `${len3(amount2, unit7)} \u2014 the ink's own offset at the drawing's scale`;
+        seam.reason = from === "page" ? `${said3} \u2014 the page's allowance` : `${len3(amount2, unit8)} \u2014 the ink's own offset at the drawing's scale`;
         result2.seam = seam;
         if (seam.cut && seam.sewn) {
-          lines.push(`cut at ${dims(seam.cut, unit7)}, sewn at ${dims(seam.sewn, unit7)} \u2014 ${said3} of seam allowance all round${because}`);
-          rows.push({ k: "cutting size", v: dims(seam.cut, unit7), why: numbers.on === "cutting" ? "the numbers written on the cutting line" : `the sewing size and ${said3} either side` });
-          rows.push({ k: "sewing size", v: dims(seam.sewn, unit7), why: numbers.on === "sewing" ? "the numbers written on the piece" : `the cutting size less ${said3} either side` });
+          lines.push(`cut at ${dims(seam.cut, unit8)}, sewn at ${dims(seam.sewn, unit8)} \u2014 ${said3} of seam allowance all round${because}`);
+          rows.push({ k: "cutting size", v: dims(seam.cut, unit8), why: numbers.on === "cutting" ? "the numbers written on the cutting line" : `the sewing size and ${said3} either side` });
+          rows.push({ k: "sewing size", v: dims(seam.sewn, unit8), why: numbers.on === "sewing" ? "the numbers written on the piece" : `the cutting size less ${said3} either side` });
           if (seam.or) rows.push({ k: "or", v: seam.or.replace(/^or, /, "") });
         } else {
           lines.push(`the cutting line stands ${said3} off the piece all round${because}`);
         }
         rows.push({ k: "seam allowance", v: said3, why: seam.reason });
         if (page && ink !== void 0 && Math.abs(ink - page.lo) > INK_AGREES * page.lo) {
-          lines.push(`the ink stands ${len3(ink, unit7)} off at this scale; the page says ${said3} and rules`);
+          lines.push(`the ink stands ${len3(ink, unit8)} off at this scale; the page says ${said3} and rules`);
         }
       }
     }
@@ -18127,8 +18167,8 @@ function garmentMaths(state, board2, read4 = garmentOf(state)) {
       if (frame?.kind === "rectangle" && at2) {
         fold2.drawn = frame.lengths[(at2.side + 1) % 4];
         fold2.opened = 2 * fold2.drawn;
-        lines.push(`cut on the fold: opened, ${len3(fold2.opened, unit7)} across (${len3(fold2.drawn, unit7)} as drawn)`);
-        rows.push({ k: "on the fold", v: `${len3(fold2.opened, unit7)} across opened`, why: `the piece is drawn as one half, ${len3(fold2.drawn, unit7)} across the fold` });
+        lines.push(`cut on the fold: opened, ${len3(fold2.opened, unit8)} across (${len3(fold2.drawn, unit8)} as drawn)`);
+        rows.push({ k: "on the fold", v: `${len3(fold2.opened, unit8)} across opened`, why: `the piece is drawn as one half, ${len3(fold2.drawn, unit8)} across the fold` });
       } else {
         lines.push("cut on the fold: the piece is drawn as one half");
       }
@@ -18145,7 +18185,7 @@ function garmentMaths(state, board2, read4 = garmentOf(state)) {
         const k = angles.indexOf(Math.min(...angles));
         if (angles[k] <= PARALLEL_DEG) {
           along2 = k;
-          text = frame.kind === "rectangle" ? `the grain runs along the ${len3(frame.lengths[k], unit7)} sides` : `the grain runs along the ${len3(frame.lengths[k], unit7)} side`;
+          text = frame.kind === "rectangle" ? `the grain runs along the ${len3(frame.lengths[k], unit8)} sides` : `the grain runs along the ${len3(frame.lengths[k], unit8)} side`;
         }
       }
       result2.grain = { id: grainMark.id, text, ...along2 !== void 0 ? { along: along2 } : {} };
@@ -18163,9 +18203,9 @@ function garmentMaths(state, board2, read4 = garmentOf(state)) {
     if (result2.notches.length && frame) {
       const bySide = /* @__PURE__ */ new Map();
       for (const n2 of result2.notches) bySide.set(n2.side, [...bySide.get(n2.side) ?? [], n2]);
-      const said3 = [...bySide].map(([side, ns]) => `${ns.map((n2) => len3(n2.along, unit7)).join(" and ")} in from the nearer corner of the ${sideName2(frame, side)}`);
+      const said3 = [...bySide].map(([side, ns]) => `${ns.map((n2) => len3(n2.along, unit8)).join(" and ")} in from the nearer corner of the ${sideName2(frame, side)}`);
       lines.push(`${result2.notches.length} ${result2.notches.length === 1 ? "notch" : "notches"}: ${said3.join("; ")}`);
-      for (const n2 of result2.notches) rows.push({ k: "notch", v: `${len3(n2.along, unit7)} from the nearer corner`, why: `${num(n2.at * 100)}% of the way along the ${sideName2(frame, n2.side)}` });
+      for (const n2 of result2.notches) rows.push({ k: "notch", v: `${len3(n2.along, unit8)} from the nearer corner`, why: `${num(n2.at * 100)}% of the way along the ${sideName2(frame, n2.side)}` });
     }
     for (const d of of("dart")) {
       if (!d.base || !d.apex) continue;
@@ -18175,9 +18215,9 @@ function garmentMaths(state, board2, read4 = garmentOf(state)) {
       result2.darts.push({ id: d.id, side: sideNear(frame.ink, mid7(d.base[0], d.base[1])).side, width: dist10(a, b), depth: dist10(p, mid7(a, b)) });
     }
     if (result2.darts.length) {
-      const said3 = result2.darts.map((d) => `a dart ${len3(d.width, unit7)} wide and ${len3(d.depth, unit7)} long`);
+      const said3 = result2.darts.map((d) => `a dart ${len3(d.width, unit8)} wide and ${len3(d.depth, unit8)} long`);
       lines.push(result2.darts.length === 1 ? said3[0] : `${result2.darts.length} darts: ${said3.join(", ")}`);
-      for (const d of result2.darts) rows.push({ k: "dart", v: `${len3(d.width, unit7)} wide, ${len3(d.depth, unit7)} long`, why: "measured on the piece\u2019s true sides, from the ink\u2019s corners" });
+      for (const d of result2.darts) rows.push({ k: "dart", v: `${len3(d.width, unit8)} wide, ${len3(d.depth, unit8)} long`, why: "measured on the piece\u2019s true sides, from the ink\u2019s corners" });
     }
     if (lines.length || result2.seam || result2.fold) out.push(result2);
     else if (numbers || own.length) out.push(result2);
@@ -18198,13 +18238,13 @@ function garmentDecor(piece, truth, opts) {
   const texts = [];
   const notes = [];
   let title;
-  const unit7 = piece.unit;
+  const unit8 = piece.unit;
   if (piece.seam) {
     const d = piece.seam.amount * opts.factor * (piece.figure.on === "sewing" ? 1 : -1);
     const ring2 = offsetPolygon(truth, d);
     marks.push({ kind: "seam", points: ring2, closed: true, dashed: true });
     const top = ring2.reduce((b, p) => p.y < b.y ? p : b, ring2[0]);
-    texts.push({ text: piece.figure.on === "sewing" ? `cutting line +${len3(piece.seam.amount, unit7)}` : `sewing line \u2212${len3(piece.seam.amount, unit7)}`, at: { x: top.x, y: top.y - opts.gap }, angle: 0, key: "seam" });
+    texts.push({ text: piece.figure.on === "sewing" ? `cutting line +${len3(piece.seam.amount, unit8)}` : `sewing line \u2212${len3(piece.seam.amount, unit8)}`, at: { x: top.x, y: top.y - opts.gap }, angle: 0, key: "seam" });
   }
   if (piece.ink.grain) {
     const a = at2(piece.ink.grain.from), b = at2(piece.ink.grain.to);
@@ -18230,14 +18270,14 @@ function garmentDecor(piece, truth, opts) {
     marks.push({ kind: "fold", points: [p, q], heads: [chevron(p, q, opts.head), chevron(q, p, opts.head)] });
     texts.push({ text: "fold", at: add2(mid7(p, q), mul2(out, opts.gap * 1.6)), angle: 0, key: "fold" });
     if (piece.fold.opened !== void 0 && piece.fold.drawn !== void 0) {
-      notes.push(`cut on the fold \u2014 opened it is ${len3(piece.fold.opened, unit7)} across (${len3(piece.fold.drawn, unit7)} as drawn, half of it)`);
-      title = `cut on the fold, opened ${len3(piece.fold.opened, unit7)} across`;
+      notes.push(`cut on the fold \u2014 opened it is ${len3(piece.fold.opened, unit8)} across (${len3(piece.fold.drawn, unit8)} as drawn, half of it)`);
+      title = `cut on the fold, opened ${len3(piece.fold.opened, unit8)} across`;
     } else {
       notes.push("cut on the fold \u2014 the piece is drawn as one half");
       title = "cut on the fold";
     }
   }
-  if (piece.seam && piece.figure.on === "cutting") notes.push(`the numbers are on the cutting line; the sewing line is ${len3(piece.seam.amount, unit7)} in from it${piece.seam.or ? ` (${piece.seam.or})` : ""}`);
+  if (piece.seam && piece.figure.on === "cutting") notes.push(`the numbers are on the cutting line; the sewing line is ${len3(piece.seam.amount, unit8)} in from it${piece.seam.or ? ` (${piece.seam.or})` : ""}`);
   return { marks, texts, notes, ...title ? { title } : {} };
 }
 function pieceOfFigure(board2, figureId) {
@@ -18252,9 +18292,9 @@ function garmentOwned(board2) {
 // src/maths/truesize.ts
 var IMPERIAL = { margin: 0.25, gap: 1, block: 0.3, label: 0.16, title: 0.2, note: 0.12, caption: 0.14, stroke: 0.02, thin: 0.01, labelGap: 0.1, corner: 0.15, minWidth: 6.5 };
 var METRIC = { margin: 6, gap: 25, block: 8, label: 4, title: 5, note: 3, caption: 3.5, stroke: 0.5, thin: 0.25, labelGap: 2.5, corner: 4, minWidth: 160 };
-function furniture(unit7) {
-  const imperial = systemOf(unit7) === "imperial";
-  const k = unitFactor(imperial ? "in" : "mm", unit7);
+function furniture(unit8) {
+  const imperial = systemOf(unit8) === "imperial";
+  const k = unitFactor(imperial ? "in" : "mm", unit8);
   const base = imperial ? IMPERIAL : METRIC;
   const out = {};
   for (const key2 of Object.keys(base)) out[key2] = base[key2] * k;
@@ -18295,13 +18335,13 @@ function derivedNumber(v, p) {
   if ("fractions" in form) return formatQuantity(quantity(Math.round(v * form.fractions) / form.fractions), { fractions: form.fractions });
   return formatNumber(v, form.places);
 }
-function derivedText(q, p, unit7) {
+function derivedText(q, p, unit8) {
   const body = isRange(q) ? `${derivedNumber(q.lo, p)}\u2013${derivedNumber(q.hi, p)}` : derivedNumber(q.lo, p);
-  return (q.approx ? "~" : "") + body + unitSuffix(unit7, q.dim || 1);
+  return (q.approx ? "~" : "") + body + unitSuffix(unit8, q.dim || 1);
 }
-function valueText(v, p, unit7) {
-  if (v.from === "labelled" && v.value.precision !== void 0 && v.value.unit === unit7) return formatQuantity(v.value);
-  return derivedText(v.value, p, unit7);
+function valueText(v, p, unit8) {
+  if (v.from === "labelled" && v.value.precision !== void 0 && v.value.unit === unit8) return formatQuantity(v.value);
+  return derivedText(v.value, p, unit8);
 }
 function figurePrecision(reading7) {
   const labelled2 = reading7.values.filter((v) => v.from === "labelled");
@@ -18649,12 +18689,12 @@ function trueSize(solved, options = {}) {
   const entries = entriesOf(solved).filter((e) => !(board2 && e.figure.ids.every((id) => owned.has(id)) && !pieceOfFigure(board2, e.figure.id))).map((e) => ({ e, b: inkBounds(e.figure) })).sort((p, q2) => p.b.minX - q2.b.minX || p.b.minY - q2.b.minY || (p.e.figure.id < q2.e.figure.id ? -1 : p.e.figure.id > q2.e.figure.id ? 1 : 0)).map((x2) => x2.e);
   const count9 = /* @__PURE__ */ new Map();
   for (const e of entries) count9.set(e.figure.kind, (count9.get(e.figure.kind) ?? 0) + 1);
-  const seen2 = /* @__PURE__ */ new Map();
+  const seen3 = /* @__PURE__ */ new Map();
   const nameOf4 = /* @__PURE__ */ new Map();
   for (const e of entries) {
     const k = e.figure.kind;
-    const i = (seen2.get(k) ?? 0) + 1;
-    seen2.set(k, i);
+    const i = (seen3.get(k) ?? 0) + 1;
+    seen3.set(k, i);
     nameOf4.set(e.figure.id, options.names?.[e.figure.id] ?? ((count9.get(k) ?? 0) > 1 ? `${k} ${i}` : k));
   }
   const drawable = [];
@@ -18856,9 +18896,9 @@ function rowName(r) {
   for (let n2 = r + 1; n2 > 0; n2 = Math.floor((n2 - 1) / 26)) s = String.fromCharCode(65 + (n2 - 1) % 26) + s;
   return s;
 }
-function amount(v, unit7) {
-  const q = quantity(v, unit7);
-  return systemOf(unit7) === "imperial" ? formatQuantity(q, { fractions: 16, words: true }) : formatQuantity(q, { words: true });
+function amount(v, unit8) {
+  const q = quantity(v, unit8);
+  return systemOf(unit8) === "imperial" ? formatQuantity(q, { fractions: 16, words: true }) : formatQuantity(q, { words: true });
 }
 function tidy2(v, places) {
   return Number(fmt2(v, places));
@@ -19078,29 +19118,29 @@ function drawingsBeside(state, numbers) {
     grid.set(id, b);
     order2.set(id, i);
   });
-  const seen2 = /* @__PURE__ */ new Set();
+  const seen3 = /* @__PURE__ */ new Set();
   const queue = [];
   for (const id of order2.keys()) {
     const b = grid.boundsOf(id);
     const size2 = Math.max(1, b.maxX - b.minX, b.maxY - b.minY);
     for (const num3 of numbers) {
       if (boundingBoxDistance(num3.bounds, b) <= ATTACH_REACH * size2) {
-        seen2.add(id);
+        seen3.add(id);
         queue.push(id);
         break;
       }
     }
   }
-  for (let q = 0; q < queue.length && seen2.size < BESIDE_MAX; q++) {
+  for (let q = 0; q < queue.length && seen3.size < BESIDE_MAX; q++) {
     const b = grid.boundsOf(queue[q]);
     const r = reachAround(b);
     for (const o of grid.query({ minX: b.minX - r, minY: b.minY - r, maxX: b.maxX + r, maxY: b.maxY + r })) {
-      if (seen2.has(o) || !withinReach(b, grid.boundsOf(o))) continue;
-      seen2.add(o);
+      if (seen3.has(o) || !withinReach(b, grid.boundsOf(o))) continue;
+      seen3.add(o);
       queue.push(o);
     }
   }
-  return [...seen2].sort((a, b) => order2.get(a) - order2.get(b));
+  return [...seen3].sort((a, b) => order2.get(a) - order2.get(b));
 }
 function emptyDimensions() {
   return { figures: [], numbers: [], attachments: [], labels: /* @__PURE__ */ new Map(), rightAngles: [], underlines: [], drawings: [], numberIds: /* @__PURE__ */ new Set() };
@@ -19162,6 +19202,22 @@ function outwardFrom(fm, place2) {
     return n2;
   }
   return n2.y > 0 || n2.y === 0 && n2.x > 0 ? { x: -n2.x, y: -n2.y } : n2;
+}
+var quantityKeyOf = (figureId, valueKey) => `fig:${figureId}:${valueKey}`;
+function marksOfValue(fm, key2) {
+  const f = fm.figure;
+  const side = /^side(\d+)(?:\.part\d+)?$/.exec(key2);
+  if (side) return [...f.sides[Number(side[1])]?.ids ?? f.ids];
+  const angle = /^angle(\d+)$/.exec(key2);
+  if (angle && f.sides.length >= 2) {
+    const k = Number(angle[1]), n2 = f.sides.length;
+    return [.../* @__PURE__ */ new Set([...f.sides[(k - 1 + n2) % n2]?.ids ?? [], ...f.sides[k % n2]?.ids ?? []])];
+  }
+  if (f.kind === "rectangle" && (key2 === "width" || key2 === "height")) {
+    const pair = rectanglePairs(f);
+    return [...new Set((key2 === "width" ? pair.width : pair.height).flatMap((k) => f.sides.find((s) => s.key === k)?.ids ?? []))];
+  }
+  return [...f.ids];
 }
 var SAID_BELOW = /* @__PURE__ */ new Set(["diagonal", "circumference", "arc"]);
 var derivedReason = (v) => v.reason;
@@ -19324,11 +19380,11 @@ function garmentChips(board2) {
   for (const g of board2.garment ?? []) {
     const cx2 = (g.bounds.minX + g.bounds.maxX) / 2;
     let row = 0;
-    const unit7 = g.unit ? unitSuffix(g.unit, 1) : "";
+    const unit8 = g.unit ? unitSuffix(g.unit, 1) : "";
     const n2 = (v) => formatNumber(v, 2);
     const say2 = (key2, text, reason) => out.push({ key: `garment:${g.id}:${key2}`, kind: "garment", text, ids: g.ids.slice(), at: { x: cx2, y: g.bounds.maxY + CHIP_OFFSET * ++row }, align: "centre", standing: false, reason });
-    if (g.seam?.cut && g.seam.sewn) say2("seam", `cut ${n2(g.seam.cut.width)} \xD7 ${n2(g.seam.cut.height)}${unit7} \xB7 sewn ${n2(g.seam.sewn.width)} \xD7 ${n2(g.seam.sewn.height)}${unit7}`, g.lines.join(" \u2014 "));
-    if (g.fold?.opened !== void 0) say2("fold", `cut on the fold \xB7 ${n2(g.fold.opened)}${unit7} across opened`, g.fold.reason);
+    if (g.seam?.cut && g.seam.sewn) say2("seam", `cut ${n2(g.seam.cut.width)} \xD7 ${n2(g.seam.cut.height)}${unit8} \xB7 sewn ${n2(g.seam.sewn.width)} \xD7 ${n2(g.seam.sewn.height)}${unit8}`, g.lines.join(" \u2014 "));
+    if (g.fold?.opened !== void 0) say2("fold", `cut on the fold \xB7 ${n2(g.fold.opened)}${unit8} across opened`, g.fold.reason);
   }
   return out;
 }
@@ -19499,36 +19555,1130 @@ function fillInsOfSession(session) {
   return fillInsReportOfSession(session).fillIns;
 }
 
+// src/colour/oklch.ts
+var clamp01 = (v) => Math.min(1, Math.max(0, v));
+var srgbToLinear = (c) => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+var linearToSrgb = (c) => c <= 31308e-7 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+var HEX = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i;
+function parseHex(hex) {
+  const m = HEX.exec((hex || "").trim());
+  if (!m) return null;
+  const h2 = m[1].length === 3 ? m[1].split("").map((x) => x + x).join("") : m[1];
+  const n2 = parseInt(h2, 16);
+  return [n2 >> 16 & 255, n2 >> 8 & 255, n2 & 255];
+}
+function hexToLinear(hex) {
+  const bytes = parseHex(hex) ?? [0, 0, 0];
+  return bytes.map((v) => srgbToLinear(v / 255));
+}
+var linearToHex = (rgb) => "#" + rgb.map((c) => Math.round(clamp01(linearToSrgb(clamp01(c))) * 255).toString(16).padStart(2, "0")).join("");
+function linearToOklab([r, g, b]) {
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s
+  ];
+}
+function oklabToLinear([L, a, b]) {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  return [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s
+  ];
+}
+var normHue = (h2) => (h2 % 360 + 360) % 360;
+var oklabToLch = ([L, a, b]) => [L, Math.hypot(a, b), normHue(Math.atan2(b, a) * 180 / Math.PI)];
+var lchToOklab = (L, C, h2) => [L, C * Math.cos(h2 * Math.PI / 180), C * Math.sin(h2 * Math.PI / 180)];
+function hueDistance(a, b) {
+  const d = Math.abs(normHue(a) - normHue(b));
+  return d > 180 ? 360 - d : d;
+}
+var GAMUT_EPS = 1e-7;
+var inGamut = (rgb) => rgb.every((c) => c >= -GAMUT_EPS && c <= 1 + GAMUT_EPS);
+function maxChroma(L, h2) {
+  let lo = 0, hi = 0.4;
+  for (let i = 0; i < 28; i++) {
+    const mid12 = (lo + hi) / 2;
+    if (inGamut(oklabToLinear(lchToOklab(L, mid12, h2)))) lo = mid12;
+    else hi = mid12;
+  }
+  return lo;
+}
+function inSrgb(L, C, h2) {
+  const c = Math.min(C, maxChroma(L, h2));
+  return { L, C: c, h: h2, rgb: oklabToLinear(lchToOklab(L, c, h2)).map(clamp01) };
+}
+var relativeLuminance = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+var contrastRatio = (y1, y2) => (Math.max(y1, y2) + 0.05) / (Math.min(y1, y2) + 0.05);
+
+// src/colour/scale.ts
+var GROUND_NAMES = ["paper", "dark"];
+var OFFERED_SHARE = 0.38;
+var WORDS_CONTRAST = 4.5;
+var MARKS_CONTRAST = 3;
+var DEPTHS_DRAWN = 2;
+var MOVE_STEP = 5e-3;
+var MOVE_MAX = 0.3;
+var HEX6 = /^#[0-9a-f]{6}$/i;
+var hueOfHex = (hex) => oklabToLch(linearToOklab(hexToLinear(hex)))[2];
+function build(grounds, signals) {
+  const frozen = {};
+  for (const g of GROUND_NAMES) frozen[g] = Object.freeze({ ...grounds[g], L: Object.freeze([...grounds[g].L]) });
+  return Object.freeze({
+    grounds: Object.freeze(frozen),
+    signals: Object.freeze(signals.map((s) => Object.freeze({ name: s.name, hex: s.hex, hue: hueOfHex(s.hex) })))
+  });
+}
+var DEFAULT_PALETTE = build(
+  {
+    paper: { ground: "#f8f5ef", ink: "#0c1a24", L: [0.44, 0.505, 0.57], C: 0.15, toward: 1 },
+    dark: { ground: "#131315", ink: "#e3edf1", L: [0.8, 0.735, 0.67], C: 0.13, toward: -1 }
+  },
+  [
+    { name: "read", hex: "#1c5fb8" },
+    { name: "confident", hex: "#0b6f7d" },
+    { name: "unsure", hex: "#a3761c" },
+    { name: "broken", hex: "#a8493c" },
+    { name: "a model", hex: "#6b4fa8" }
+  ]
+);
+var isBand = (L) => Array.isArray(L) && L.length === 3 && L.every((v) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1);
+var isChroma = (C) => typeof C === "number" && Number.isFinite(C) && C >= 0 && C <= 0.4;
+function makePalette(input = {}, base = DEFAULT_PALETTE) {
+  const grounds = {};
+  for (const g of GROUND_NAMES) {
+    const was = base.grounds[g], got = input.grounds?.[g];
+    grounds[g] = {
+      ground: got && HEX6.test(got.ground ?? "") ? got.ground.toLowerCase() : was.ground,
+      ink: got && HEX6.test(got.ink ?? "") ? got.ink.toLowerCase() : was.ink,
+      L: got && isBand(got.L) ? got.L : was.L,
+      C: got && isChroma(got.C) ? got.C : was.C,
+      toward: was.toward
+    };
+  }
+  const named2 = (input.signals || []).filter((s) => s && HEX6.test(s.hex || "")).map((s) => ({ name: s.name, hex: s.hex.toLowerCase() }));
+  return build(grounds, named2.length ? named2 : base.signals);
+}
+var drawnLight = (rgb) => relativeLuminance(hexToLinear(linearToHex(rgb)));
+function colourOf(kind, ground, certainty = "said", palette = DEFAULT_PALETTE) {
+  const g = palette.grounds[ground];
+  const depth2 = Math.min(kind.depth, DEPTHS_DRAWN);
+  const groundLight = relativeLuminance(hexToLinear(g.ground));
+  const reads2 = (rgb) => contrastRatio(relativeLuminance(rgb), groundLight) >= WORDS_CONTRAST && contrastRatio(drawnLight(rgb), groundLight) >= WORDS_CONTRAST;
+  let L = g.L[depth2], moved2 = 0;
+  let said3 = inSrgb(L, g.C, kind.hue);
+  while (!reads2(said3.rgb) && moved2 < MOVE_MAX) {
+    L -= MOVE_STEP * g.toward;
+    moved2 += MOVE_STEP;
+    said3 = inSrgb(L, g.C, kind.hue);
+  }
+  let c = certainty === "said" ? said3 : inSrgb(L, said3.C * OFFERED_SHARE, kind.hue);
+  while (!reads2(c.rgb) && moved2 < MOVE_MAX) {
+    L -= MOVE_STEP * g.toward;
+    moved2 += MOVE_STEP;
+    c = inSrgb(L, said3.C * (certainty === "said" ? 1 : OFFERED_SHARE), kind.hue);
+  }
+  const hex = linearToHex(c.rgb);
+  return { ...c, hex, contrast: contrastRatio(relativeLuminance(hexToLinear(hex)), groundLight), moved: Math.round(moved2 * 1e3) / 1e3, depth: depth2 };
+}
+function movedWords(c) {
+  if (!c.moved) return "";
+  const said3 = `lightness moved ${c.moved} to read`;
+  return c.contrast >= WORDS_CONTRAST ? said3 : `${said3}, and still reads only ${c.contrast.toFixed(1)}:1`;
+}
+
+// src/colour/access.ts
+var VISIONS = ["typical", "protan", "deutan", "tritan"];
+var MACHADO = Object.freeze({
+  protan: [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-3882e-6, -0.048116, 1.051998]],
+  deutan: [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.01182, 0.04294, 0.968881]],
+  tritan: [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [4733e-6, 0.691367, 0.3039]]
+});
+var WHO = Object.freeze({ typical: "everyone", protan: "protanopes", deutan: "deuteranopes", tritan: "tritanopes" });
+function simulateVision(rgb, vision) {
+  if (vision === "typical") return [rgb[0], rgb[1], rgb[2]];
+  return MACHADO[vision].map((r) => Math.min(1, Math.max(0, r[0] * rgb[0] + r[1] * rgb[1] + r[2] * rgb[2])));
+}
+function oklabDistance(p, q) {
+  const A = linearToOklab(p), B = linearToOklab(q);
+  return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]);
+}
+var LOOK_ALIKE = 0.06;
+var inOrder = (kinds) => [...kinds].sort((x, y) => x.order - y.order);
+function distinctness(kinds, palette = DEFAULT_PALETTE) {
+  const ks = inOrder(kinds);
+  const drawn = ks.map((k) => GROUND_NAMES.map((g) => colourOf(k, g, "said", palette).rgb));
+  const pairs = [];
+  for (let i = 0; i < ks.length; i++) {
+    for (let j = i + 1; j < ks.length; j++) {
+      const by = {};
+      for (const v of VISIONS) {
+        let min = Infinity;
+        for (let gi = 0; gi < GROUND_NAMES.length; gi++) min = Math.min(min, oklabDistance(simulateVision(drawn[i][gi], v), simulateVision(drawn[j][gi], v)));
+        by[v] = min;
+      }
+      pairs.push({ a: ks[i].name, b: ks[j].name, by, min: Math.min(...Object.values(by)) });
+    }
+  }
+  return pairs;
+}
+var CHANNELS = ["solid", "dashed", "dotted", "dash-dot", "long", "dash-dot-dot", "short", "sparse"];
+function channels(kinds, pairs, palette = DEFAULT_PALETTE) {
+  const measured = pairs ?? distinctness(kinds, palette);
+  const out = /* @__PURE__ */ new Map();
+  for (const k of inOrder(kinds)) {
+    const alike = measured.filter((p) => p.min < LOOK_ALIKE && (p.a === k.name || p.b === k.name)).map((p) => ({ other: p.a === k.name ? p.b : p.a, p })).filter((x) => out.has(x.other));
+    const taken = new Set(alike.map((x) => out.get(x.other).channel));
+    const free = CHANNELS.find((c) => !taken.has(c));
+    const worst = alike.sort((x, y) => x.p.min - y.p.min)[0];
+    out.set(k.name, {
+      channel: free ?? CHANNELS[CHANNELS.length - 1],
+      alike: worst ? worst.other : null,
+      who: worst ? VISIONS.filter((v) => worst.p.by[v] < LOOK_ALIKE).map((v) => WHO[v]) : [],
+      repeats: free === void 0
+    });
+  }
+  return out;
+}
+
+// src/colour/names.ts
+var COLOUR_WORDS = Object.freeze({
+  red: 29,
+  scarlet: 33,
+  crimson: 20,
+  rose: 5,
+  pink: 355,
+  magenta: 330,
+  fuchsia: 335,
+  purple: 305,
+  violet: 298,
+  lavender: 300,
+  plum: 320,
+  indigo: 280,
+  blue: 264,
+  navy: 264,
+  cobalt: 262,
+  azure: 245,
+  sky: 240,
+  cyan: 215,
+  teal: 195,
+  turquoise: 185,
+  aqua: 190,
+  green: 145,
+  emerald: 160,
+  forest: 145,
+  mint: 165,
+  lime: 130,
+  chartreuse: 125,
+  olive: 110,
+  yellow: 105,
+  gold: 92,
+  mustard: 95,
+  amber: 80,
+  ochre: 75,
+  orange: 62,
+  tangerine: 58,
+  coral: 40,
+  salmon: 35,
+  peach: 50,
+  brown: 55,
+  rust: 40,
+  copper: 48,
+  tan: 70
+});
+var GREY_BELOW = 0.02;
+var HEX2 = /^#?[0-9a-f]{6}$|^#?[0-9a-f]{3}$/;
+function hueOfWord(word) {
+  const w2 = (word || "").trim().toLowerCase();
+  if (HEX2.test(w2)) {
+    const [, C, hue] = oklabToLch(linearToOklab(hexToLinear(w2.startsWith("#") ? w2 : "#" + w2)));
+    return C < GREY_BELOW ? null : { hue, word: w2.startsWith("#") ? w2 : "#" + w2 };
+  }
+  return Object.prototype.hasOwnProperty.call(COLOUR_WORDS, w2) ? { hue: COLOUR_WORDS[w2], word: w2 } : null;
+}
+
+// src/colour/harmony.ts
+var emptyLens = () => ({ kinds: /* @__PURE__ */ new Map(), rels: [], order: 0 });
+var kindsOf = (lens) => [...lens.kinds.values()].sort((x, y) => x.order - y.order);
+var VISION_WEIGHT = { typical: 1, protan: 0.35, deutan: 0.35, tritan: 0.15 };
+var SIGNAL_REACH = 12;
+var SIGNAL_WEIGHT = 0.02;
+var TIE = 2e-3;
+var SIGNAL_NEAR = 14;
+var PALE_ON_PAPER = { from: 80, to: 135 };
+var KIN_FROM = 26;
+var KIN_TO = 45;
+var KIN_IDEAL = 32;
+var KIN_COST = 1e-3;
+var OPPOSE_SPREAD = 20;
+var OPPOSE_COST = 15e-4;
+var PAIR_STEP = 2;
+var PAIR_KIN = [-40, -32, -26, 26, 32, 40];
+var PAIR_OPPOSE = [164, 172, 180, 188, 196];
+var PAIR_COST = 15e-4;
+var PAIR_TIE = 1e-9;
+var FAN = [0, 28, -28, 56, -56, 84, -84];
+var READS_AS_KIN = 45;
+var READS_AS_OPPOSITES = 150;
+function nameHue(name) {
+  let x = 2166136261;
+  for (const ch of name) {
+    x ^= ch.charCodeAt(0);
+    x = Math.imul(x, 16777619);
+  }
+  return (x >>> 0) % 360;
+}
+var signalPenalty = (hue, palette = DEFAULT_PALETTE) => palette.signals.reduce((p, s) => p + Math.max(0, SIGNAL_REACH - hueDistance(hue, s.hue)) / SIGNAL_REACH * SIGNAL_WEIGHT, 0);
+var SEEN_MAX = 2e4;
+var seenBy = /* @__PURE__ */ new WeakMap();
+function seen(hue, depth2, palette) {
+  let cache = seenBy.get(palette);
+  if (!cache) seenBy.set(palette, cache = /* @__PURE__ */ new Map());
+  const d = Math.min(depth2, DEPTHS_DRAWN);
+  const key2 = hue + ":" + d;
+  let colours = cache.get(key2);
+  if (!colours) {
+    colours = GROUND_NAMES.map((g) => colourOf({ hue, depth: d }, g, "said", palette).rgb);
+    if (cache.size >= SEEN_MAX) cache.clear();
+    cache.set(key2, colours);
+  }
+  return colours;
+}
+function apartness(A, B, v) {
+  let min = Infinity;
+  for (let gi = 0; gi < A.length; gi++) min = Math.min(min, oklabDistance(simulateVision(A[gi], v), simulateVision(B[gi], v)));
+  return min;
+}
+function placeHue(candidates, others, prefer, depth2 = 0, palette = DEFAULT_PALETTE) {
+  const theirs = others.map((o) => seen(o.hue, o.depth, palette));
+  let best = null;
+  for (const c of candidates) {
+    const mine = seen(c.hue, depth2, palette);
+    let room = 0;
+    for (const v of VISIONS) room += VISION_WEIGHT[v] * (theirs.length ? Math.min(...theirs.map((t) => apartness(mine, t, v))) : 1);
+    const score2 = room - signalPenalty(c.hue, palette) - (c.cost || 0);
+    if (!best || score2 > best.score + TIE || Math.abs(score2 - best.score) <= TIE && hueDistance(c.hue, prefer) < hueDistance(best.hue, prefer)) best = { ...c, score: score2, room };
+  }
+  return best;
+}
+function resolveHue(lens, k, seenNames = /* @__PURE__ */ new Set()) {
+  if (k.source !== "relative") return k.hue;
+  if (seenNames.has(k.name)) return k.hue;
+  seenNames.add(k.name);
+  const a = lens.kinds.get(k.anchor);
+  return a ? normHue(resolveHue(lens, a, seenNames) + k.offset) : k.hue;
+}
+function refresh(lens) {
+  for (const k of lens.kinds.values()) k.hue = resolveHue(lens, k);
+  for (const k of lens.kinds.values()) {
+    let d = 0, p = k.parent;
+    const seenNames = /* @__PURE__ */ new Set([k.name]);
+    while (p && !seenNames.has(p)) {
+      seenNames.add(p);
+      d++;
+      p = lens.kinds.get(p)?.parent ?? null;
+    }
+    k.depth = d;
+  }
+}
+function dependsOn(lens, k, target) {
+  const seenNames = /* @__PURE__ */ new Set();
+  while (k && k.source === "relative" && !seenNames.has(k.name)) {
+    if (k.anchor === target) return true;
+    seenNames.add(k.name);
+    k = lens.kinds.get(k.anchor);
+  }
+  return false;
+}
+var familyOf = (lens, name) => [...lens.kinds.values()].filter((k) => k.name === name || dependsOn(lens, k, name));
+var othersThan = (lens, names) => [...lens.kinds.values()].filter((k) => !names.has(k.name));
+function newKind(lens, name) {
+  return { name, hue: 0, source: "placed", depth: 0, order: lens.order++, parent: null, anchor: null, offset: 0, rel: null };
+}
+function make(lens, name, palette) {
+  const held2 = lens.kinds.get(name);
+  if (held2) return { k: held2, made: false, why: "" };
+  const k = newKind(lens, name);
+  const others = [...lens.kinds.values()];
+  const wheel = [];
+  for (let h2 = 0; h2 < 360; h2 += 1) wheel.push({ hue: h2 });
+  const best = placeHue(wheel, others, nameHue(name), 0, palette);
+  k.hue = best.hue;
+  lens.kinds.set(name, k);
+  const near = others.length ? others.reduce((a, o) => hueDistance(o.hue, best.hue) < hueDistance(a.hue, best.hue) ? o : a) : null;
+  const gap = near ? `the most distinct place left (${Math.round(hueDistance(near.hue, best.hue))}\xB0 from ${near.name})` : "the first kind; its name leans it there";
+  return { k, made: true, why: `${name} \u2192 ${Math.round(k.hue)}\xB0, ${gap}` };
+}
+function say(lens, name, word, palette) {
+  const named2 = hueOfWord(word);
+  if (named2) {
+    let k = lens.kinds.get(name);
+    if (!k) lens.kinds.set(name, k = newKind(lens, name));
+    k.source = "said";
+    k.hue = named2.hue;
+    k.word = named2.word;
+    k.anchor = null;
+    k.offset = 0;
+    refresh(lens);
+    const sig2 = palette.signals.find((s) => hueDistance(s.hue, named2.hue) < SIGNAL_NEAR);
+    const pale = named2.hue > PALE_ON_PAPER.from && named2.hue < PALE_ON_PAPER.to;
+    return `${name} \u2192 ${Math.round(named2.hue)}\xB0, your ${named2.word}` + (pale ? "; on paper a yellow is drawn as dark as words need, ochre or olive, and on the dark ground it is yellow" : "") + (sig2 ? `; it stands by the chrome's colour for ${sig2.name} (${Math.round(hueDistance(sig2.hue, named2.hue))}\xB0 away) \u2014 on ink it means ${name}` : "");
+  }
+  const { made, why } = make(lens, name, palette);
+  if (!word) return made ? why : `${name} is already a kind`;
+  return `${made ? why + "; " : ""}\u201C${word}\u201D is no colour this space knows${/gr[ae]y|black|white/.test(word) ? " \u2014 a kind takes a hue, and grey, black and white have none" : ""}`;
+}
+function relate2(lens, a, b, rel, palette) {
+  const A = make(lens, a, palette), B = make(lens, b, palette);
+  const ka = A.k, kb = B.k;
+  if (a === b) return { said: `${a} cannot be related to itself` };
+  if (rel === "sub") {
+    if (dependsOn(lens, kb, a) || kb.parent === a) return { said: `${b} already hangs from ${a}` };
+    ka.parent = b;
+    if (ka.source === "said") {
+      refresh(lens);
+      return { said: `${a} keeps your ${ka.word}; as a kind of ${b} it is drawn a step toward the ground` };
+    }
+    const siblings = [...lens.kinds.values()].filter((k) => k.parent === b && k !== ka && k.anchor === b && k.rel === "sub");
+    const used = new Set(siblings.map((s) => Math.round(s.offset)));
+    const offset = FAN.find((o) => !used.has(o)) ?? 0;
+    Object.assign(ka, { source: "relative", anchor: b, offset, rel: "sub" });
+    refresh(lens);
+    return { said: `${a} is a kind of ${b}: ${b}'s hue${offset ? ` ${offset > 0 ? "+" : "\u2212"}${Math.abs(offset)}\xB0` : ""}, a step toward the ground` };
+  }
+  lens.rels = lens.rels.filter((r) => !(r.a === a && r.b === b || r.a === b && r.b === a));
+  const related = { a, b, rel };
+  lens.rels.push({ ...related });
+  let mover = kb, anchor = ka;
+  if (kb.source === "said" && ka.source !== "said") {
+    mover = ka;
+    anchor = kb;
+  } else if (ka.source !== "said" && kb.source !== "said" && ka.order > kb.order) {
+    mover = ka;
+    anchor = kb;
+  }
+  const apart = Math.round(hueDistance(ka.hue, kb.hue));
+  if (mover.source === "said") {
+    return { said: `you gave ${a} and ${b} their colours; they stand ${apart}\xB0 apart, so they read as ${apart >= READS_AS_OPPOSITES ? "opposites" : apart <= READS_AS_KIN ? "kin" : "neither kin nor opposites"}`, related };
+  }
+  if (dependsOn(lens, anchor, mover.name)) return { said: `${anchor.name}'s hue already follows ${mover.name}'s; nothing moved`, related };
+  const fam = new Set(familyOf(lens, mover.name).map((k) => k.name));
+  fam.add(anchor.name);
+  for (const k of familyOf(lens, anchor.name)) fam.add(k.name);
+  const others = othersThan(lens, fam);
+  if (A.made && B.made) {
+    const offs = rel === "kin" ? PAIR_KIN : PAIR_OPPOSE;
+    const ideal = rel === "kin" ? KIN_IDEAL : 180;
+    let best2 = null;
+    for (let h2 = 0; h2 < 360; h2 += PAIR_STEP) {
+      for (const off of offs) {
+        const one = placeHue([{ hue: h2 }], others, nameHue(anchor.name), 0, palette);
+        const two = placeHue([{ hue: normHue(h2 + off) }], others, nameHue(mover.name), 0, palette);
+        const score2 = Math.min(one.score, two.score) - Math.abs(Math.abs(off) - ideal) * PAIR_COST;
+        if (!best2 || score2 > best2.score + PAIR_TIE) best2 = { h: h2, off, score: score2 };
+      }
+    }
+    const at2 = best2;
+    anchor.hue = at2.h;
+    Object.assign(mover, { source: "relative", anchor: anchor.name, offset: at2.off, rel });
+    refresh(lens);
+    return {
+      said: rel === "kin" ? `${a} is kin to ${b}: placed together, ${Math.abs(at2.off)}\xB0 apart, where both stand most distinct` : `${a} opposes ${b}: placed together across the wheel, ${Math.round(hueDistance(mover.hue, anchor.hue))}\xB0 apart`,
+      related
+    };
+  }
+  const cands = [];
+  if (rel === "kin") {
+    for (let d = KIN_FROM; d <= KIN_TO; d++) for (const s of [1, -1]) cands.push({ hue: normHue(anchor.hue + s * d), off: s * d, cost: Math.abs(d - KIN_IDEAL) * KIN_COST });
+  } else {
+    for (let e = -OPPOSE_SPREAD; e <= OPPOSE_SPREAD; e++) cands.push({ hue: normHue(anchor.hue + 180 + e), off: 180 + e, cost: Math.abs(e) * OPPOSE_COST });
+  }
+  const best = placeHue(cands, [...others, anchor], nameHue(mover.name), mover.depth, palette);
+  Object.assign(mover, { source: "relative", anchor: anchor.name, offset: best.off, rel });
+  refresh(lens);
+  return {
+    said: rel === "kin" ? `${a} is kin to ${b}: ${mover.name} ${Math.abs(Math.round(best.off))}\xB0 beside ${anchor.name}, on the side that stays most distinct` : `${a} opposes ${b}: ${mover.name} across the wheel from ${anchor.name}, ${Math.round(hueDistance(mover.hue, anchor.hue))}\xB0 apart`,
+    related
+  };
+}
+var decisionOf = (k) => JSON.stringify([k.source, k.source === "relative" ? null : k.hue, k.word ?? null, k.parent, k.anchor, k.offset, k.rel, k.order]);
+function holdOf(k) {
+  const h2 = { name: k.name, source: k.source, hue: k.hue, parent: k.parent, anchor: k.anchor, offset: k.offset, rel: k.rel, order: k.order };
+  if (k.word !== void 0) h2.word = k.word;
+  return h2;
+}
+function applyAct(lens, act, palette = DEFAULT_PALETTE) {
+  const before = new Map(kindsOf(lens).map((k) => [k.name, { hue: k.hue, decision: decisionOf(k) }]));
+  const r = act.act === "say" ? { said: say(lens, act.a, act.word, palette), related: void 0 } : relate2(lens, act.a, act.b, act.act, palette);
+  const held2 = [], moved2 = [];
+  for (const k of kindsOf(lens)) {
+    const was = before.get(k.name);
+    if (!was || was.decision !== decisionOf(k)) held2.push(holdOf(k));
+    if (was && was.hue !== k.hue) moved2.push(k.name);
+  }
+  return { said: r.said, held: held2, related: r.related ?? null, moved: moved2 };
+}
+function holdKind(lens, h2) {
+  const k = lens.kinds.get(h2.name) ?? { name: h2.name, hue: h2.hue, source: h2.source, depth: 0, order: h2.order, parent: null, anchor: null, offset: 0, rel: null };
+  k.source = h2.source;
+  k.hue = h2.hue;
+  k.parent = h2.parent;
+  k.anchor = h2.anchor;
+  k.offset = h2.offset;
+  k.rel = h2.rel;
+  k.order = h2.order;
+  if (h2.word !== void 0) k.word = h2.word;
+  else delete k.word;
+  lens.kinds.set(h2.name, k);
+  lens.order = Math.max(lens.order, h2.order + 1);
+  refresh(lens);
+}
+function holdRelation(lens, r) {
+  lens.rels = lens.rels.filter((x) => !(x.a === r.a && x.b === r.b || x.a === r.b && x.b === r.a));
+  lens.rels.push({ ...r });
+}
+
+// src/colour/meaning.ts
+var KIN_READS = 50;
+var OPPOSITES_READ = 140;
+var SIGNAL_NEAR2 = 14;
+var list2 = (xs) => xs.join(", ").replace(/, ([^,]*)$/, " and $1");
+function meaning(lens, pairs, palette = DEFAULT_PALETTE) {
+  const ks = kindsOf(lens);
+  const measured = pairs ?? distinctness(ks, palette);
+  const lines = [];
+  const rootOf2 = (k) => {
+    const seen3 = /* @__PURE__ */ new Set();
+    while (k.parent && !seen3.has(k.name)) {
+      seen3.add(k.name);
+      k = lens.kinds.get(k.parent) || k;
+    }
+    return k.name;
+  };
+  for (const root of ks.filter((k) => !k.parent)) {
+    const fam = ks.filter((k) => k.parent && rootOf2(k) === root.name).sort((x, y) => x.depth - y.depth || x.order - y.order);
+    if (!fam.length) continue;
+    const own = fam.filter((k) => k.source === "said").map((k) => `${k.name} keeps your ${k.word}`);
+    lines.push(`${list2([root.name, ...fam.map((k) => k.name)])} are one family: ${root.name}'s hue, each kind below it a step toward the ground` + (own.length ? ` (${list2(own)})` : ""));
+  }
+  for (const r of lens.rels) {
+    const A = lens.kinds.get(r.a), B = lens.kinds.get(r.b);
+    if (!A || !B) continue;
+    const d = Math.round(hueDistance(A.hue, B.hue));
+    if (r.rel === "kin") lines.push(d <= KIN_READS ? `${r.a} stands beside ${r.b}, ${d}\xB0 along the wheel: kin` : `${r.a} and ${r.b} are said to be kin, but your colours stand ${d}\xB0 apart`);
+    else lines.push(d >= OPPOSITES_READ ? `${r.a} and ${r.b} are drawn as opposites, ${d}\xB0 apart` : `${r.a} and ${r.b} are said to oppose, but your colours stand ${d}\xB0 apart`);
+  }
+  const tied = /* @__PURE__ */ new Set();
+  for (const k of ks) if (k.parent) {
+    tied.add(k.name);
+    tied.add(k.parent);
+  }
+  for (const r of lens.rels) {
+    tied.add(r.a);
+    tied.add(r.b);
+  }
+  const alone = ks.filter((k) => !tied.has(k.name));
+  if (alone.length && ks.length > 1) lines.push(`${list2(alone.map((k) => k.name))} ${alone.length > 1 ? "stand" : "stands"} apart from the rest`);
+  for (const k of ks) {
+    const s = palette.signals.find((x) => hueDistance(x.hue, k.hue) < SIGNAL_NEAR2);
+    if (s && k.source === "said") lines.push(`${k.name}'s ${k.word} stands near the chrome's colour for ${s.name}: on the ink it means ${k.name}, and the chrome's colours never touch the ink`);
+  }
+  const ch = channels(ks, measured, palette);
+  for (const k of ks) {
+    const c = ch.get(k.name);
+    if (c.repeats) {
+      lines.push(`${k.name} is drawn ${c.channel}, which a kind it looks alike to already holds: all ${CHANNELS.length} patterns are in use, so beside ${c.alike} it looks alike in colour and in pattern to ${list2(c.who)}`);
+    } else if (c.channel !== "solid") {
+      lines.push(`${k.name} is drawn ${c.channel}: beside ${c.alike} it looks alike to ${list2(c.who)}`);
+    }
+  }
+  return lines;
+}
+
+// src/maths/hues.ts
+var ROLES2 = ["opposite", "adjacent", "hypotenuse", "angle"];
+var ROLE_HUES = Object.freeze({ opposite: 191, adjacent: 111, hypotenuse: 8, angle: 314 });
+var ROLE_SIGNAL_MARGIN = 18;
+var CLASH = LOOK_ALIKE;
+var ROLE_FLOOR = 0.05;
+var NUDGE_MAX = 60;
+var PLACE_STEP = 6;
+var PLACE_REFINE = PLACE_STEP - 1;
+var PLACE_MAX = 32;
+var ROLE_PREFIX = "role:";
+var roleKey = (role) => ROLE_PREFIX + role;
+var roleOfKey = (key2) => {
+  if (!key2.startsWith(ROLE_PREFIX)) return null;
+  const r = key2.slice(ROLE_PREFIX.length);
+  return ROLES2.includes(r) ? r : null;
+};
+function boardKinds(_state) {
+  return [];
+}
+var seenBy2 = /* @__PURE__ */ new WeakMap();
+function seen2(hue, depth2, palette) {
+  let cache = seenBy2.get(palette);
+  if (!cache) seenBy2.set(palette, cache = /* @__PURE__ */ new Map());
+  const key2 = `${hue}:${depth2}`;
+  let got = cache.get(key2);
+  if (!got) {
+    got = GROUND_NAMES.map((g) => colourOf({ hue, depth: depth2 }, g, "said", palette).rgb);
+    cache.set(key2, got);
+  }
+  return got;
+}
+function apartness2(a, b, palette = DEFAULT_PALETTE) {
+  const A = seen2(a.hue, a.depth ?? 0, palette), B = seen2(b.hue, b.depth ?? 0, palette);
+  let least = Infinity;
+  for (const v of VISIONS) for (let g = 0; g < A.length; g++) least = Math.min(least, oklabDistance(simulateVision(A[g], v), simulateVision(B[g], v)));
+  return least;
+}
+function typicalApartness(a, b, palette = DEFAULT_PALETTE) {
+  const A = seen2(a.hue, a.depth ?? 0, palette), B = seen2(b.hue, b.depth ?? 0, palette);
+  let least = Infinity;
+  for (let g = 0; g < A.length; g++) least = Math.min(least, oklabDistance(A[g], B[g]));
+  return least;
+}
+function obstaclesFor(role, kinds) {
+  return [
+    ...kinds.map((k) => ({ name: k.name, hue: k.hue, depth: k.depth ?? 0, isRole: false })),
+    ...ROLES2.filter((r) => r !== role).map((r) => ({ name: r, hue: ROLE_HUES[r], depth: 0, isRole: true }))
+  ];
+}
+function roleHue(role, kinds = [], palette = DEFAULT_PALETTE) {
+  const usual = ROLE_HUES[role];
+  const against = obstaclesFor(role, kinds);
+  const clashing = (h2) => against.find((o) => typicalApartness({ hue: h2 }, o, palette) < CLASH);
+  const nearest2 = kinds.map((k) => ({ k, d: typicalApartness({ hue: usual }, k, palette) })).filter((x) => x.d < CLASH).sort((a, b) => a.d - b.d)[0]?.k;
+  if (!nearest2) return { role, hue: usual, usual };
+  const beside = nearest2.name;
+  for (let d = 1; d <= NUDGE_MAX; d++) {
+    for (const sign of [1, -1]) {
+      const h2 = normHue(usual + sign * d);
+      if (!clashing(h2)) {
+        return { role, hue: h2, usual, nudged: { by: sign * d, beside, said: `${role}, moved from its usual hue beside \u201C${beside}\u201D` } };
+      }
+    }
+  }
+  return { role, hue: usual, usual, nudged: { by: 0, beside, said: `${role}, looks like \u201C${beside}\u201D and could not be moved clear of it` } };
+}
+function naturalCompare2(a, b) {
+  const pa = a.split(/(\d+)/), pb = b.split(/(\d+)/);
+  for (let i = 0; i < Math.min(pa.length, pb.length); i++) {
+    if (pa[i] === pb[i]) continue;
+    if (i % 2 === 1) return Number(pa[i]) - Number(pb[i]) || (pa[i] < pb[i] ? -1 : 1);
+    return pa[i] < pb[i] ? -1 : 1;
+  }
+  return pa.length - pb.length;
+}
+function quantityHues(keys, opts = {}) {
+  const palette = opts.palette ?? DEFAULT_PALETTE;
+  const kinds = opts.kinds ?? [];
+  const sorted = [...new Set(keys)].sort(naturalCompare2);
+  const out = /* @__PURE__ */ new Map();
+  const roleHues = ROLES2.map((r) => roleHue(r, kinds, palette));
+  const reserved = roleHues.map((r) => ({ hue: r.hue, depth: 0 }));
+  const held2 = [...kinds.map((k) => ({ hue: k.hue, depth: k.depth ?? 0 })), ...reserved];
+  const wheel = [];
+  for (let h2 = 0; h2 < 360; h2 += PLACE_STEP) wheel.push({ hue: h2 });
+  const place2 = (key2) => {
+    const prefer = nameHue(key2);
+    const coarse = placeHue(wheel, held2, prefer, 0, palette);
+    const fine = [];
+    for (let d = -PLACE_REFINE; d <= PLACE_REFINE; d++) fine.push({ hue: normHue(coarse.hue + d) });
+    return placeHue(fine, held2, prefer, 0, palette).hue;
+  };
+  let searched = 0;
+  for (const key2 of sorted) {
+    const role = opts.roles?.get(key2) ?? roleOfKey(key2);
+    if (role) {
+      const r = roleHues.find((x) => x.role === role);
+      out.set(key2, { key: key2, hue: r.hue, depth: 0, source: "role", role, ...r.nudged ? { nudged: r.nudged } : {}, channel: "solid" });
+      continue;
+    }
+    const hue = searched++ < PLACE_MAX ? place2(key2) : nameHue(key2);
+    held2.push({ hue, depth: 0 });
+    out.set(key2, { key: key2, hue, depth: 0, source: "placed", channel: "solid" });
+  }
+  const order2 = [
+    ...roleHues.map((r) => ({ name: roleKey(r.role), hue: r.hue, depth: 0 })),
+    ...sorted.map((k) => out.get(k)).filter((q) => q.source === "placed").map((q) => ({ name: q.key, hue: q.hue, depth: q.depth }))
+  ].map((k, i) => ({ ...k, order: i }));
+  const patterns = channels(order2, void 0, palette);
+  for (const q of out.values()) q.channel = patterns.get(q.role ? roleKey(q.role) : q.key)?.channel ?? "solid";
+  return out;
+}
+function roleChannels(kinds = [], palette = DEFAULT_PALETTE) {
+  const hues = ROLES2.map((r) => ({ r, h: roleHue(r, kinds, palette) }));
+  const got = channels(hues.map((x, i) => ({ name: x.r, order: i, hue: x.h.hue, depth: 0 })), void 0, palette);
+  return new Map(hues.map((x) => [x.r, got.get(x.r).channel]));
+}
+function quantityColour(q, ground, certainty = "offered", palette = DEFAULT_PALETTE) {
+  return colourOf({ hue: q.hue, depth: q.depth }, ground, certainty, palette);
+}
+
+// src/maths/fill-figure.ts
+var FILL_SOURCE_ID = "figure";
+var FILL_TEXT_PX = 13;
+var RANK = Object.freeze({ conflict: 0.9, side: 0.8, angle: 0.7, measure: 0.5, ink: 0.45, assumed: 0.85 });
+var CHAR_W = 0.62;
+var FIT = 0.78;
+var GAP = 0.55;
+var hypot = (p) => Math.hypot(p.x, p.y);
+var sub12 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
+var add4 = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
+var mul4 = (a, k) => ({ x: a.x * k, y: a.y * k });
+var dist11 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+var unit4 = (p) => {
+  const l = hypot(p);
+  return l > 1e-12 ? { x: p.x / l, y: p.y / l } : { x: 1, y: 0 };
+};
+var cross9 = (a, b) => a.x * b.y - a.y * b.x;
+var mid10 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+function textBoxOf(text, fontSize) {
+  return { w: Math.max(1, [...text].length) * CHAR_W * fontSize, h: fontSize / FIT };
+}
+var boundsAround = (c, w2, h2) => ({ minX: c.x - w2 / 2, maxX: c.x + w2 / 2, minY: c.y - h2 / 2, maxY: c.y + h2 / 2 });
+function fontSizeOf(state, f) {
+  const scales = [];
+  for (const id of f.ids) {
+    const n2 = state.nodes.get(id);
+    const st = n2 && getRep(n2, "stroke");
+    const sc = st && st.data.scale;
+    if (typeof sc === "number" && sc > 0 && Number.isFinite(sc)) scales.push(sc);
+  }
+  scales.sort((a, b) => a - b);
+  return FILL_TEXT_PX * (scales.length ? scales[Math.floor(scales.length / 2)] : 1);
+}
+function fillFontSize(state, fill) {
+  if (fill.take.kind === "text") return (fill.take.bounds.maxY - fill.take.bounds.minY) * FIT;
+  const scales = [];
+  for (const id of fill.about) {
+    const st = state.nodes.get(id) && getRep(state.nodes.get(id), "stroke");
+    const sc = st && st.data.scale;
+    if (typeof sc === "number" && sc > 0 && Number.isFinite(sc)) scales.push(sc);
+  }
+  scales.sort((a, b) => a - b);
+  return FILL_TEXT_PX * (scales.length ? scales[Math.floor(scales.length / 2)] : 1);
+}
+var figureBox = (f) => {
+  const pts = f.outline.length ? f.outline : f.vertices;
+  return { minX: Math.min(...pts.map((p) => p.x)), maxX: Math.max(...pts.map((p) => p.x)), minY: Math.min(...pts.map((p) => p.y)), maxY: Math.max(...pts.map((p) => p.y)) };
+};
+var centroidOf2 = (v) => ({ x: v.reduce((a, p) => a + p.x, 0) / v.length, y: v.reduce((a, p) => a + p.y, 0) / v.length });
+function standOff(from, away, w2, h2, gap) {
+  const reach = Math.abs(away.x) * w2 / 2 + Math.abs(away.y) * h2 / 2 + gap;
+  return add4(from, mul4(away, reach));
+}
+var meets2 = (a, b) => a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY;
+function sideForPair(fm, keys, numbers, w2, h2, gap) {
+  let best = keys[0], bestScore = -Infinity;
+  for (const key2 of keys) {
+    const there = placeOf(fm, key2);
+    if (!there) continue;
+    const away = outwardFrom(fm, there);
+    const c = standOff(there.at, away, w2, h2, gap);
+    const nearest2 = numbers.length ? Math.min(...numbers.map((n2) => dist11(c, n2.centre))) : Infinity;
+    const score2 = nearest2 * 1e3 + c.y + c.x * 1e-3;
+    if (score2 > bestScore) {
+      bestScore = score2;
+      best = key2;
+    }
+  }
+  return best;
+}
+function spotsOf(fm, key2, text, fs, numbers, rows) {
+  const f = fm.figure;
+  const { w: w2, h: h2 } = textBoxOf(text, fs);
+  const gap = fs * GAP;
+  const side = (k, away) => {
+    const there = placeOf(fm, k);
+    if (!there) return null;
+    const n2 = away ?? outwardFrom(fm, there);
+    return [1, 0.6, 0.25].map((share) => ({ at: standOff(there.at, n2, w2, h2, gap * share), from: there.at, away: n2 }));
+  };
+  const below = () => {
+    const b = figureBox(f);
+    const row = rows.n++;
+    const x = (b.minX + b.maxX) / 2;
+    let y = b.maxY + gap + h2 / 2 + row * (h2 + gap * 0.5);
+    for (let i = 0; i < 8 && numbers.some((n2) => meets2(boundsAround({ x, y }, w2, h2), n2.bounds)); i++) y += h2 + gap * 0.5;
+    return [{ at: { x, y } }];
+  };
+  const angle = /^angle(\d+)$/.exec(key2);
+  if (angle && f.kind === "triangle") return angleSpots(f, Number(angle[1]), w2, h2, fs);
+  if (/^side\d+(?:\.part\d+)?$/.test(key2)) return side(key2);
+  if (f.kind === "line" && key2 === "length") return side(key2);
+  switch (f.kind) {
+    case "rectangle": {
+      const pair = rectanglePairs(f);
+      if (key2 === "width") return side(sideForPair(fm, pair.width, numbers, w2, h2, gap));
+      if (key2 === "height") return side(sideForPair(fm, pair.height, numbers, w2, h2, gap));
+      if (key2 === "area") return [{ at: centroidOf2(f.vertices) }];
+      return below();
+    }
+    case "triangle":
+    case "quadrilateral":
+    case "polygon":
+      if (key2 === "area") return [{ at: centroidOf2(f.vertices) }];
+      return below();
+    // perimeter
+    case "circle": {
+      if (!f.centre || !f.radius) return below();
+      if (key2 === "radius") return side("radius", { x: 0, y: -1 });
+      if (key2 === "diameter") return side("diameter", { x: 0, y: 1 });
+      return below();
+    }
+    case "arc":
+      if (key2 === "chord") return side("chord");
+      if (key2 === "rise") return side("rise");
+      return below();
+    // radius, sweep, arc length
+    default:
+      return below();
+  }
+}
+function angleSpots(f, k, w2, h2, fs) {
+  const n2 = f.vertices.length;
+  const v = f.vertices[k], p = f.vertices[(k - 1 + n2) % n2], q = f.vertices[(k + 1) % n2];
+  const a1 = unit4(sub12(p, v)), a2 = unit4(sub12(q, v));
+  const bis = unit4(add4(a1, a2));
+  const shorter = Math.min(dist11(v, p), dist11(v, q));
+  const reach = 0.7 * shorter;
+  const wedge = cross9(a1, a2);
+  const air = fs * 0.3;
+  const fits = (c) => {
+    for (const dx of [-w2 / 2, w2 / 2]) {
+      for (const dy of [-h2 / 2, h2 / 2]) {
+        const r = sub12({ x: c.x + dx, y: c.y + dy }, v);
+        if (cross9(a1, r) * Math.sign(wedge) < air || cross9(r, a2) * Math.sign(wedge) < air) return false;
+      }
+    }
+    return true;
+  };
+  const spots = [];
+  const push = (d) => {
+    const at2 = add4(v, mul4(bis, d));
+    if (!spots.some((s) => dist11(s.at, at2) < 1e-9)) spots.push({ at: at2 });
+  };
+  let first = null;
+  for (let d = fs * 1.2; d <= reach; d += fs * 0.25) {
+    if (fits(add4(v, mul4(bis, d)))) {
+      first = d;
+      break;
+    }
+  }
+  if (first !== null) for (const grow2 of [1, 1.15, 1.3, 1.5]) push(Math.min(first * grow2, Math.max(first, reach)));
+  for (const share of [1, 0.85, 0.7, 0.55]) push(Math.max(fs * 1.2, reach * share));
+  return spots;
+}
+function landingKeys(f, key2) {
+  if (f.kind === "rectangle" && (key2 === "width" || key2 === "height")) {
+    const pair = rectanglePairs(f);
+    return key2 === "width" ? pair.width : pair.height;
+  }
+  return [key2];
+}
+function probe(text, bounds, centre3) {
+  const reading7 = readNumber(text);
+  return reading7 ? { id: "fill:probe", ids: ["fill:probe"], from: "text", text, bounds, centre: centre3, reading: reading7 } : null;
+}
+function lands(board2, figureId, key2, text, bounds, centre3) {
+  const f = board2.dimensions.figures.find((x) => x.id === figureId);
+  const num3 = probe(text, bounds, centre3);
+  if (!f || !num3) return false;
+  const a = attachNumber(num3, board2.dimensions.figures);
+  return (a.as === "dimension" || a.as === "angle") && a.figure === figureId && !!a.key && landingKeys(f, key2).includes(a.key);
+}
+function fillLandsOnBoard(board2, fill, centre3) {
+  if (fill.source !== FILL_SOURCE_ID || fill.take.kind !== "text") return true;
+  if (!board2) return false;
+  const m = /^fig:(.*):([^:]+)$/.exec(fill.quantity);
+  if (!m) return false;
+  const { w: w2, h: h2 } = { w: fill.take.bounds.maxX - fill.take.bounds.minX, h: fill.take.bounds.maxY - fill.take.bounds.minY };
+  return lands(board2, m[1], m[2], fill.take.text, boundsAround(centre3, w2, h2), centre3);
+}
+function fillTakeAt(fill, centre3) {
+  const t = fill.take;
+  if (t.kind !== "text") return t;
+  const dx = centre3.x - fill.at.x, dy = centre3.y - fill.at.y;
+  return { kind: "text", text: t.text, bounds: { minX: t.bounds.minX + dx, maxX: t.bounds.maxX + dx, minY: t.bounds.minY + dy, maxY: t.bounds.maxY + dy } };
+}
+var NAMED2 = {
+  area: (n2) => `area ${n2}`,
+  perimeter: (n2) => `perimeter ${n2}`,
+  diagonal: (n2) => `diagonal ${n2}`,
+  circumference: (n2) => `circumference ${n2}`,
+  chord: (n2) => `chord ${n2}`,
+  rise: (n2) => `rise ${n2}`,
+  arc: (n2) => `arc ${n2}`
+};
+function writtenAs(fm, key2, v) {
+  const f = fm.figure;
+  const isAngle = /^angle\d+$/.test(key2);
+  if (key2 === "sweep") return null;
+  const writesUnit = !!fm.drawing?.unit && /written on/.test(fm.drawing.unitReason);
+  const n2 = isAngle ? v.text : writesUnit ? v.text : v.text.replace(/\s*[^\d.\s][^\d]*$/, "");
+  if (isAngle) return n2;
+  if (f.kind === "circle") {
+    if (key2 === "radius") return `r = ${n2}`;
+    if (key2 === "diameter") return `\u2300 ${n2}`;
+  }
+  if (f.kind === "arc" && key2 === "radius") return `radius ${n2}`;
+  if (NAMED2[key2]) {
+    const bare = v.text.replace(/\s*[^\d.\s][^\d]*$/, "");
+    return NAMED2[key2](writesUnit && key2 !== "area" ? n2 : bare);
+  }
+  return n2;
+}
+function geometryOf(fm, key2, spot) {
+  const f = fm.figure;
+  const seg2 = (a, b) => ({ points: [a, b], closed: false });
+  const side = /^side(\d+)(?:\.part\d+)?$/.exec(key2);
+  if (side) {
+    const there = placeOf(fm, key2);
+    const s = f.sides[Number(side[1])];
+    if (key2.includes(".") && there) {
+      const part = s?.parts?.find((x) => x.key === key2);
+      if (part) return seg2(part.from, part.to);
+    }
+    if (s) return seg2(s.from, s.to);
+  }
+  const angle = /^angle(\d+)$/.exec(key2);
+  if (angle) {
+    const k = Number(angle[1]), n2 = f.vertices.length;
+    return { points: [f.vertices[(k - 1 + n2) % n2], f.vertices[k], f.vertices[(k + 1) % n2]], closed: false };
+  }
+  if (f.kind === "rectangle" && (key2 === "width" || key2 === "height")) {
+    const pair = rectanglePairs(f);
+    const keys = key2 === "width" ? pair.width : pair.height;
+    const near = spot ? keys.slice().sort((a, b) => dist11(spot.at, mid10(f.sides.find((s2) => s2.key === a).from, f.sides.find((s2) => s2.key === a).to)) - dist11(spot.at, mid10(f.sides.find((s2) => s2.key === b).from, f.sides.find((s2) => s2.key === b).to)))[0] : keys[0];
+    const s = f.sides.find((x) => x.key === near);
+    return seg2(s.from, s.to);
+  }
+  if (f.kind === "rectangle" && key2 === "diagonal") return seg2(f.vertices[0], f.vertices[2]);
+  if (f.kind === "circle" && f.centre && f.radius) {
+    if (key2 === "radius" || key2 === "diameter") {
+      const s = f.sides.find((x) => x.key === key2);
+      if (s) return seg2(s.from, s.to);
+    }
+  }
+  if (f.kind === "arc") {
+    if (key2 === "chord" || key2 === "rise") {
+      const s = f.sides.find((x) => x.key === key2);
+      if (s) return seg2(s.from, s.to);
+    }
+    if (key2 === "sweep" && f.centre) return { points: [f.vertices[0], f.centre, f.vertices[1]], closed: false };
+    return { points: f.outline.slice(), closed: false };
+  }
+  return { points: f.outline.length ? f.outline.slice() : f.vertices.slice(), closed: f.closed };
+}
+function rightVertexOf(fm) {
+  if (fm.figure.kind !== "triangle") return null;
+  const top = fm.solution.readings[0];
+  if (!top) return null;
+  for (const v of top.values) {
+    const m = /^angle(\d)$/.exec(v.key);
+    if (m && Math.abs(v.value.lo - 90) < 1e-4 && Math.abs(v.value.hi - 90) < 1e-4) return Number(m[1]);
+  }
+  return null;
+}
+function roleQuantities(board2) {
+  const out = /* @__PURE__ */ new Map();
+  for (const fm of board2?.figures ?? []) {
+    const right2 = rightVertexOf(fm);
+    if (right2 !== null) out.set(quantityKeyOf(fm.figure.id, `side${(right2 + 1) % 3}`), "hypotenuse");
+  }
+  return out;
+}
+var writtenUnder = (f, key2) => f.kind === "rectangle" && (key2 === "width" || key2 === "height") ? [...landingKeys(f, key2), key2] : [key2];
+function figureQuantities(board2) {
+  const out = [];
+  const roles = roleQuantities(board2);
+  for (const fm of board2?.figures ?? []) {
+    const top = fm.solution.readings[0];
+    const f = fm.figure;
+    const push = (v) => {
+      const g = geometryOf(fm, v.key, null);
+      const numberIds = fm.labels.filter((l) => !l.declared && writtenUnder(f, v.key).includes(l.key)).flatMap((l) => l.ids);
+      const quantity2 = quantityKeyOf(f.id, v.key);
+      out.push({
+        quantity: quantity2,
+        figure: f.id,
+        key: v.key,
+        label: v.label,
+        from: v.from,
+        text: v.text,
+        points: g.points,
+        closed: g.closed,
+        about: marksOfValue(fm, v.key),
+        numberIds: [...new Set(numberIds)],
+        ...roles.has(quantity2) ? { role: roles.get(quantity2) } : {}
+      });
+    };
+    if (top) for (const v of top.values) push(v);
+    for (const v of fm.solution.ink) push(v);
+  }
+  return out;
+}
+var inkWords = (key2) => /^angle\d+$/.test(key2) || key2 === "sweep" ? "as the ink draws it" : "at the drawing\u2019s scale";
+function rankOf(key2) {
+  if (/^side\d+/.test(key2) || key2 === "length" || key2 === "width" || key2 === "height" || key2 === "chord" || key2 === "rise") return RANK.side;
+  if (/^angle\d+$/.test(key2)) return RANK.angle;
+  return RANK.measure;
+}
+function reasonOf(v) {
+  return v.formula ? `${v.formula} = ${v.text}` : v.reason;
+}
+function figureFillIns(state, board2) {
+  const out = [];
+  const numbers = board2.dimensions.numbers;
+  const roles = roleQuantities(board2);
+  const kinds = boardKinds(state);
+  const hypotenuse = roleHue("hypotenuse", kinds);
+  for (const fm of board2.figures) {
+    const top = fm.solution.readings[0];
+    const f = fm.figure;
+    const fs = fontSizeOf(state, f);
+    const rows = { n: 0 };
+    const contested = new Set((top?.conflicts ?? []).map((c) => c.key));
+    const make2 = (v, how, conflict) => {
+      const key2 = v.key;
+      const written2 = writtenAs(fm, key2, v);
+      const shown2 = written2 ?? v.text;
+      const spots = spotsOf(fm, key2, shown2, fs, numbers, rows);
+      if (!spots || !spots.length) return;
+      const quantity2 = quantityKeyOf(f.id, key2);
+      const geometry = geometryOf(fm, key2, spots[0]);
+      const { w: w2, h: h2 } = textBoxOf(shown2, fs);
+      let spot = spots[0];
+      let take;
+      let rank2 = how === "ink" ? rankOf(key2) * RANK.ink : rankOf(key2);
+      let reason = how === "ink" ? `${v.label} ${v.text} ${inkWords(key2)} \u2014 the ink\u2019s, not the thing\u2019s` : reasonOf(v);
+      if (top?.assumes?.length && how === "derived") {
+        reason += ` \u2014 ${top.assumes[0]}`;
+        rank2 *= RANK.assumed;
+      }
+      if (roles.get(quantity2) === "hypotenuse" && hypotenuse.nudged) reason += ` \u2014 ${hypotenuse.nudged.said}`;
+      if (conflict) {
+        const num3 = numbers.find((n2) => n2.ids.some((id) => conflict.ids.includes(id)));
+        const there = placeOf(fm, key2);
+        if (num3 && there) {
+          const away = outwardFrom(fm, there);
+          const nb = num3.bounds;
+          const edge = add4(num3.centre, mul4(away, Math.abs(away.x) * (nb.maxX - nb.minX) / 2 + Math.abs(away.y) * (nb.maxY - nb.minY) / 2));
+          spot = { at: standOff(edge, away, w2, h2, fs * GAP * 0.4), from: edge, away };
+        }
+        rank2 = RANK.conflict;
+        reason = conflict.reason;
+        take = { kind: "none", why: `change the ${conflict.text} you wrote to ${v.text} to make it agree \u2014 it stays as written until you do` };
+      } else if (written2 === null) {
+        take = { kind: "none", why: `${v.label} is shown, not written: no number written beside the drawing is read back as ${v.label}` };
+      } else {
+        const landed = spots.find((s) => lands(board2, f.id, key2, written2, boundsAround(s.at, w2, h2), s.at));
+        if (landed) {
+          spot = landed;
+          take = { kind: "text", text: written2, bounds: boundsAround(landed.at, w2, h2) };
+        } else {
+          take = { kind: "none", why: `\u201C${written2}\u201D written here would not be read as ${v.label} \u2014 write it beside the ${/^angle/.test(key2) ? "corner" : "side"} yourself` };
+        }
+      }
+      out.push({
+        key: `${FILL_SOURCE_ID}:${f.id}:${key2}`,
+        kind: "value",
+        source: FILL_SOURCE_ID,
+        text: shown2,
+        points: geometry.points,
+        closed: geometry.closed,
+        at: spot.at,
+        ...spot.from ? { from: spot.from } : {},
+        ...spot.away ? { away: spot.away } : {},
+        about: marksOfValue(fm, key2),
+        quantity: quantity2,
+        reason,
+        answer: true,
+        rank: rank2,
+        take
+      });
+    };
+    const writtenKeys = new Set(fm.labels.filter((l) => !l.declared).map((l) => l.key));
+    const isWritten = (key2) => writtenUnder(f, key2).some((k) => writtenKeys.has(k));
+    if (top) {
+      for (const v of top.values) {
+        if (v.from !== "derived") continue;
+        const conflict = top.conflicts.find((c) => c.key === v.key);
+        if (!conflict && isWritten(v.key)) continue;
+        make2(v, "derived", conflict);
+      }
+      for (const c of top.conflicts) {
+        if (!contested.has(c.key) || out.some((o) => o.quantity === quantityKeyOf(f.id, c.key))) continue;
+        const v = top.values.find((x) => x.key === c.key);
+        if (v) make2(v, "derived", c);
+      }
+    }
+    for (const v of fm.solution.ink) make2(v, "ink");
+  }
+  return out;
+}
+var FIGURE_SOURCE = {
+  id: FILL_SOURCE_ID,
+  fillIns(state, ctx) {
+    const board2 = ctx.board();
+    return board2 ? figureFillIns(state, board2) : [];
+  }
+};
+var memo3 = null;
+function quantityHuesOfSession(session) {
+  const events = session.getEvents();
+  const last = events.length ? events[events.length - 1] : void 0;
+  const sources3 = fillSourcesVersion();
+  if (memo3 && memo3.events === events && memo3.length === events.length && memo3.last === last && memo3.sources === sources3) return memo3.hues;
+  const board2 = boardMathsOf(session);
+  const keys = new Set(figureQuantities(board2).map((q) => q.quantity));
+  for (const f of fillInsOfSession(session)) keys.add(f.quantity);
+  const hues = quantityHues(keys, { roles: roleQuantities(board2), kinds: boardKinds(session.getState()) });
+  memo3 = { events, length: events.length, last, sources: sources3, hues };
+  return hues;
+}
+
 // src/maths/fill-builtin.ts
-var BUILTIN_FILL_SOURCES = [];
+var BUILTIN_FILL_SOURCES = [
+  FIGURE_SOURCE
+];
 for (const s of BUILTIN_FILL_SOURCES) registerFillSource(s);
 
 // src/session/hand-moves.ts
 var live2 = (n2) => !!n2 && !getRep(n2, "erased");
 function movedThings(board2, ids) {
   const out = [];
-  const seen2 = /* @__PURE__ */ new Set();
-  const add7 = (id) => {
-    if (!seen2.has(id) && live2(board2.nodes.get(id))) {
-      seen2.add(id);
+  const seen3 = /* @__PURE__ */ new Set();
+  const add8 = (id) => {
+    if (!seen3.has(id) && live2(board2.nodes.get(id))) {
+      seen3.add(id);
       out.push(id);
     }
   };
   for (const id of ids) {
-    add7(id);
+    add8(id);
     const carried = regionCarries(board2, [id]);
-    carried.forEach(add7);
-    manipulableOf(board2.nodes, carried).forEach((n2) => add7(n2.id));
+    carried.forEach(add8);
+    manipulableOf(board2.nodes, carried).forEach((n2) => add8(n2.id));
   }
   return out;
 }
 function handMoves(board2, ids) {
   const allowed = [];
   const refused = [];
-  const seen2 = /* @__PURE__ */ new Set();
+  const seen3 = /* @__PURE__ */ new Set();
   for (const id of ids) {
-    if (seen2.has(id)) continue;
-    seen2.add(id);
+    if (seen3.has(id)) continue;
+    seen3.add(id);
     if (!live2(board2.nodes.get(id))) refused.push({ id, why: "missing", of: id });
     else allowed.push(id);
   }
@@ -19658,7 +20808,7 @@ function decodeLog(text, opts = {}) {
   let version3 = 0;
   let app;
   let assets;
-  let seen2 = false;
+  let seen3 = false;
   for (const line of text.split("\n")) {
     const l = line.trim();
     if (!l) continue;
@@ -19674,10 +20824,10 @@ function decodeLog(text, opts = {}) {
       const theirApp = typeof v.app === "string" ? v.app : void 0;
       if (typeof n2 !== "number" || !Number.isInteger(n2) || n2 < 1) throw new LogFormatError(null, n2, theirApp, opts.source);
       if (n2 > LOG_VERSION) throw new LogFormatError(n2, n2, theirApp, opts.source);
-      if (!seen2) {
+      if (!seen3) {
         version3 = n2;
         app = theirApp;
-        seen2 = true;
+        seen3 = true;
         if (typeof v.assets === "number" && Number.isInteger(v.assets) && v.assets > 0) assets = v.assets;
       }
       continue;
@@ -20392,9 +21542,9 @@ var order = (a, b) => {
 function lowerBound(list6, e) {
   let lo = 0, hi = list6.length;
   while (lo < hi) {
-    const mid11 = lo + hi >> 1;
-    if (order(list6[mid11], e) < 0) lo = mid11 + 1;
-    else hi = mid11;
+    const mid12 = lo + hi >> 1;
+    if (order(list6[mid12], e) < 0) lo = mid12 + 1;
+    else hi = mid12;
   }
   return lo;
 }
@@ -20968,7 +22118,7 @@ function matchBrace(src, open) {
 var DECL = /^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:(function\*?)\s+([A-Za-z_$][\w$]*)|(class)\s+([A-Za-z_$][\w$]*)|(const|let|var)\s+([A-Za-z_$][\w$]*)\s*=)/;
 function functionsOf(src) {
   const out = [];
-  const seen2 = /* @__PURE__ */ new Map();
+  const seen3 = /* @__PURE__ */ new Map();
   let i = 0;
   while (i < src.length) {
     const lineEnd = src.indexOf("\n", i);
@@ -20985,8 +22135,8 @@ function functionsOf(src) {
         end = statementEnd(src, i);
       }
       if (end !== -1) {
-        const n2 = (seen2.get(name) ?? 0) + 1;
-        seen2.set(name, n2);
+        const n2 = (seen3.get(name) ?? 0) + 1;
+        seen3.set(name, n2);
         out.push({ id: `fn:${name}${n2 > 1 ? "#" + n2 : ""}`, label: name, start: i, end, depth: 0 });
         i = end;
         continue;
@@ -21100,7 +22250,7 @@ function headingsOf(src) {
   const heads = [];
   let m;
   while (m = re.exec(src)) heads.push({ level: m[1].length, text: m[2], start: m.index });
-  const seen2 = /* @__PURE__ */ new Map();
+  const seen3 = /* @__PURE__ */ new Map();
   heads.forEach((h2, i) => {
     let end = src.length;
     for (let j = i + 1; j < heads.length; j++) if (heads[j].level <= h2.level) {
@@ -21108,8 +22258,8 @@ function headingsOf(src) {
       break;
     }
     const slug = h2.text.toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") || "section";
-    const n2 = (seen2.get(slug) ?? 0) + 1;
-    seen2.set(slug, n2);
+    const n2 = (seen3.get(slug) ?? 0) + 1;
+    seen3.set(slug, n2);
     out.push({ id: `h:${slug}${n2 > 1 ? "#" + n2 : ""}`, label: h2.text, start: h2.start, end, depth: h2.level - 1 });
   });
   return out;
@@ -21416,7 +22566,7 @@ var TARGETED = /* @__PURE__ */ new Set(["seek", "flee", "home", "school", "consu
 var DEFAULT_SPEED = 120;
 var DEFAULT_MAX_FORCE = 240;
 var sizeOf6 = (b) => Math.max(1, Math.sqrt(Math.max(1, b.w) * Math.max(1, b.h)));
-var dist11 = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
+var dist12 = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
 var num2 = (t, k, d) => typeof t.params?.[k] === "number" ? t.params[k] : d;
 function nearest(world, name, only) {
   if (!name) return null;
@@ -21427,13 +22577,13 @@ function nearest(world, name, only) {
     const s = sizeOf6(o);
     if (only === "bigger" && s < mine * 1.25) continue;
     if (only === "smaller" && s > mine / 1.25) continue;
-    const d = dist11(world.me, o);
+    const d = dist12(world.me, o);
     if (!best || d < best.d) best = { body: o, d };
   }
   return best;
 }
 function toward(world, to, speed, weight) {
-  const d = dist11(world.me, to);
+  const d = dist12(world.me, to);
   if (d < 1e-6) return { fx: 0, fy: 0 };
   const dx = (to.x - world.me.x) / d * speed, dy = (to.y - world.me.y) / d * speed;
   return { fx: (dx - world.me.vx) * weight, fy: (dy - world.me.vy) * weight };
@@ -21476,7 +22626,7 @@ function force(term, world, speed = DEFAULT_SPEED) {
     }
     case "school": {
       const range = num2(term, "range", sizeOf6(me) * 5);
-      const peers = (term.target ? world.named(term.target) : world.others).filter((o) => o.id !== me.id && dist11(me, o) <= range);
+      const peers = (term.target ? world.named(term.target) : world.others).filter((o) => o.id !== me.id && dist12(me, o) <= range);
       if (!peers.length) return none(`no ${term.target ?? "peers"} within ${Math.round(range)}px to school with`);
       let cx2 = 0, cy2 = 0, ax = 0, ay = 0, sx = 0, sy = 0;
       const tooClose = sizeOf6(me) * 1.4;
@@ -21485,7 +22635,7 @@ function force(term, world, speed = DEFAULT_SPEED) {
         cy2 += o.y;
         ax += o.vx;
         ay += o.vy;
-        const d = dist11(me, o);
+        const d = dist12(me, o);
         if (d < tooClose && d > 1e-6) {
           sx += (me.x - o.x) / d * (1 - d / tooClose);
           sy += (me.y - o.y) / d * (1 - d / tooClose);
@@ -21503,7 +22653,7 @@ function force(term, world, speed = DEFAULT_SPEED) {
     case "hold": {
       const o = me.origin ?? { x: me.x, y: me.y };
       const radius = num2(term, "radius", sizeOf6(me) * 3);
-      const d = dist11(me, o);
+      const d = dist12(me, o);
       if (d <= radius) return none(`holding within ${Math.round(radius)}px of where it began`);
       const f = toward(world, o, speed, w2 * Math.min(1, (d - radius) / radius + 0.3));
       return { ...f, reasoning: `${Math.round(d - radius)}px past its ${Math.round(radius)}px hold \u2014 returning` };
@@ -22113,8 +23263,8 @@ function blankPage(index, width = 0, height = 0) {
   return { index, width, height, strokes: [], pictures: [], texts: [], links: [], tags: [] };
 }
 var isHash = (s) => typeof s === "string" && /^[0-9a-f]{64}$/.test(s);
-var HEX = (n2) => Math.max(0, Math.min(255, Math.round(n2))).toString(16).padStart(2, "0");
-var hexColor = (r, g, b) => "#" + HEX(r) + HEX(g) + HEX(b);
+var HEX3 = (n2) => Math.max(0, Math.min(255, Math.round(n2))).toString(16).padStart(2, "0");
+var hexColor = (r, g, b) => "#" + HEX3(r) + HEX3(g) + HEX3(b);
 var DEFAULT_LIMITS = {
   bytes: 128 * 1024 * 1024,
   elements: 15e5,
@@ -22864,7 +24014,7 @@ function flatten(cmds, m, tol, budget) {
 }
 
 // src/ingest/svg-style.ts
-var NAMED2 = {
+var NAMED3 = {
   aliceblue: "f0f8ff",
   antiquewhite: "faebd7",
   aqua: "00ffff",
@@ -23014,25 +24164,25 @@ var NAMED2 = {
   yellow: "ffff00",
   yellowgreen: "9acd32"
 };
-var clamp01 = (v) => Math.max(0, Math.min(1, v));
+var clamp012 = (v) => Math.max(0, Math.min(1, v));
 function channel(s) {
   const t = s.trim();
   if (!t) return null;
   const pct9 = t.endsWith("%");
   const v = Number(pct9 ? t.slice(0, -1) : t);
   if (!Number.isFinite(v)) return null;
-  return pct9 ? clamp01(v / 100) * 255 : Math.max(0, Math.min(255, v));
+  return pct9 ? clamp012(v / 100) * 255 : Math.max(0, Math.min(255, v));
 }
 function alphaOf(s) {
   if (s === void 0) return 1;
   const t = s.trim();
   const pct9 = t.endsWith("%");
   const v = Number(pct9 ? t.slice(0, -1) : t);
-  return Number.isFinite(v) ? clamp01(pct9 ? v / 100 : v) : null;
+  return Number.isFinite(v) ? clamp012(pct9 ? v / 100 : v) : null;
 }
 function hslToHex(h2, s, l) {
   const hh = (h2 % 360 + 360) % 360 / 360;
-  const ss = clamp01(s), ll = clamp01(l);
+  const ss = clamp012(s), ll = clamp012(l);
   const q = ll < 0.5 ? ll * (1 + ss) : ll + ss - ll * ss;
   const p = 2 * ll - q;
   const f = (t0) => {
@@ -23076,7 +24226,7 @@ function parseColor(value) {
     return !Number.isFinite(h2) || s === null || l === null ? null : { hex: hslToHex(h2, s / 255, l / 255), alpha };
   }
   if (v === "transparent") return { hex: "#000000", alpha: 0 };
-  const named2 = NAMED2[v];
+  const named2 = NAMED3[v];
   return named2 ? { hex: "#" + named2, alpha: 1 } : null;
 }
 function parsePaint(value, current) {
@@ -23182,7 +24332,7 @@ function parseSheet(css) {
   const sheet = emptySheet();
   let order2 = 0;
   let i = 0;
-  const add7 = (map, key2, r) => {
+  const add8 = (map, key2, r) => {
     const l = map.get(key2);
     if (l) l.push(r);
     else map.set(key2, [r]);
@@ -23213,9 +24363,9 @@ function parseSheet(css) {
       }
       const rule = { ...parsed, order: order2++, decls };
       sheet.rules.push(rule);
-      if (rule.id) add7(sheet.byId, rule.id, rule);
-      else if (rule.classes.length) add7(sheet.byClass, rule.classes[0], rule);
-      else if (rule.tag) add7(sheet.byTag, rule.tag, rule);
+      if (rule.id) add8(sheet.byId, rule.id, rule);
+      else if (rule.classes.length) add8(sheet.byClass, rule.classes[0], rule);
+      else if (rule.tag) add8(sheet.byTag, rule.tag, rule);
       else sheet.any.push(rule);
     }
   }
@@ -23651,11 +24801,11 @@ function recoverUnit(u, rule, opts) {
   let skel = null;
   let skelM = null;
   const tries = raster.width * raster.height > RETRY_MAX_PX ? SKELETON_SCALES.slice(0, 1) : SKELETON_SCALES;
-  for (const { mul: mul4, x, y } of tries) {
+  for (const { mul: mul5, x, y } of tries) {
     let r = raster;
-    if (mul4 !== 1 || x !== 0 || y !== 0) {
-      if (!charge(raster.width * raster.height * mul4 * mul4)) break;
-      const again = rasterise(rings, rule, raster.scale * mul4, 2, { x, y });
+    if (mul5 !== 1 || x !== 0 || y !== 0) {
+      if (!charge(raster.width * raster.height * mul5 * mul5)) break;
+      const again = rasterise(rings, rule, raster.scale * mul5, 2, { x, y });
       if (!again || again.filled === 0) continue;
       r = again;
     } else if (!charge(raster.width * raster.height)) {
@@ -23831,9 +24981,9 @@ function pairSides(pts, i, j, s) {
   if (a.length < 2 || b.length < 2) return null;
   const M = Math.max(8, Math.round(Math.max(pathLength4(a), pathLength4(b)) / s));
   const ra = resampleOpen(a, M), rb = resampleOpen(b, M);
-  const mid11 = [];
-  for (let k = 0; k < M; k++) mid11.push({ x: (ra[k].x + rb[k].x) / 2, y: (ra[k].y + rb[k].y) / 2 });
-  return mid11;
+  const mid12 = [];
+  for (let k = 0; k < M; k++) mid12.push({ x: (ra[k].x + rb[k].x) / 2, y: (ra[k].y + rb[k].y) / 2 });
+  return mid12;
 }
 function closedRibbon(outer, hole, w2) {
   const lenO = perimeter2(outer), lenH = perimeter2(hole);
@@ -23866,8 +25016,8 @@ function closedRibbon(outer, hole, w2) {
     }
   }
   if (!bestB) return null;
-  const mid11 = A.map((p, k) => ({ x: (p.x + bestB[k].x) / 2, y: (p.y + bestB[k].y) / 2 }));
-  return { points: mid11, closed: true };
+  const mid12 = A.map((p, k) => ({ x: (p.x + bestB[k].x) / 2, y: (p.y + bestB[k].y) / 2 }));
+  return { points: mid12, closed: true };
 }
 var N82 = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
 function prune(skel, W, H, k) {
@@ -24168,7 +25318,7 @@ function inkPoints(pts, closed) {
 function shifted(rec, dx, dy) {
   return { ...rec, strokes: rec.strokes.map((s) => ({ ...s, points: s.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) })) };
 }
-function geometryOf(node, w2, fontPx) {
+function geometryOf2(node, w2, fontPx) {
   const a = node.attrs;
   const len4 = (v, dflt = 0) => v === void 0 ? dflt : parseLength(v, fontPx);
   const bad2 = () => {
@@ -24229,7 +25379,7 @@ function geometryOf(node, w2, fontPx) {
   return null;
 }
 function paintShape(node, st, m, w2) {
-  const geo = geometryOf(node, w2, st.fontSize);
+  const geo = geometryOf2(node, w2, st.fontSize);
   if (!geo) return;
   if (!finiteAffine(m)) return;
   const fill = st.visible && st.opacity > 0 ? resolve(st.fill, w2) : null;
@@ -24583,12 +25733,12 @@ function decodeText(bytes) {
     return null;
   }
   let bad2 = 0;
-  const probe = Math.min(text.length, 2e4);
-  for (let i = 0; i < probe; i++) {
+  const probe2 = Math.min(text.length, 2e4);
+  for (let i = 0; i < probe2; i++) {
     const c = text.charCodeAt(i);
     if (c === 65533 || c === 0) bad2++;
   }
-  return probe > 0 && bad2 / probe > 0.02 ? null : text;
+  return probe2 > 0 && bad2 / probe2 > 0.02 ? null : text;
 }
 function toolOf(comments, root) {
   for (const c of comments) {
@@ -24750,12 +25900,12 @@ function decode(bytes) {
     return null;
   }
   let bad2 = 0;
-  const probe = Math.min(text.length, 2e4);
-  for (let i = 0; i < probe; i++) {
+  const probe2 = Math.min(text.length, 2e4);
+  for (let i = 0; i < probe2; i++) {
     const c = text.charCodeAt(i);
     if (c === 65533 || c === 0 || c < 32 && c !== 9 && c !== 10 && c !== 13 && c !== 12) bad2++;
   }
-  return probe > 0 && bad2 / probe > 0.02 ? null : text;
+  return probe2 > 0 && bad2 / probe2 > 0.02 ? null : text;
 }
 var unquote = (s) => s.trim().replace(/^["']|["']$/g, "").trim();
 var cleanTag = (s) => unquote(s).replace(/^#+/, "").replace(/[-/]+$/, "");
@@ -25227,7 +26377,7 @@ function readMermaid(text) {
     refused.push({
       line: open.header.n,
       text: open.header.text,
-      reason: open.keyword ? `no reader for \u201C${open.keyword}\u201D yet \u2014 the board reads ${list2(mermaidReaders().map((k) => `\u201C${k}\u201D`))}` : "a Mermaid text opens with the kind of diagram it is \u2014 flowchart, graph, \u2026"
+      reason: open.keyword ? `no reader for \u201C${open.keyword}\u201D yet \u2014 the board reads ${list3(mermaidReaders().map((k) => `\u201C${k}\u201D`))}` : "a Mermaid text opens with the kind of diagram it is \u2014 flowchart, graph, \u2026"
     });
   return { keyword: open.keyword, notation: null, direction: "TD", nodes: [], links: [], notes: [], refused };
 }
@@ -25240,8 +26390,8 @@ function drawMermaid(session, text, opts) {
 }
 var COUNT3 = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
 var count6 = (n2) => COUNT3[n2] ?? String(n2);
-var list2 = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
-var some = (xs, max = 4) => xs.length > max ? `${xs.slice(0, max).join(", ")} and ${count6(xs.length - max)} more` : list2(xs);
+var list3 = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+var some = (xs, max = 4) => xs.length > max ? `${xs.slice(0, max).join(", ")} and ${count6(xs.length - max)} more` : list3(xs);
 var SHAPES2 = [
   ...Object.entries(FLOWCHART_TABLE.symbols).map(([symbol, d]) => ({ open: d.mermaid.open, close: d.mermaid.close, symbol })),
   { open: "(", close: ")", symbol: "process", otherwise: "a box with round edges" },
@@ -25328,7 +26478,7 @@ function readNode(c, notes) {
       text = quoted(c, notes);
       c.ws();
       shape = shapes.find((s) => c.peek(s.close));
-      if (!shape) throw new Refuse(`the quoted label is not followed by \u201C${list2(shapes.map((s) => s.close))}\u201D`);
+      if (!shape) throw new Refuse(`the quoted label is not followed by \u201C${list3(shapes.map((s) => s.close))}\u201D`);
       c.take(shape.close);
     } else {
       c.i = lead;
@@ -25566,8 +26716,8 @@ var HEAD_MAX_PX = 24;
 var MERMAID_MAX_NODES = 60;
 var MERMAID_MAX_LINKS = 120;
 var clamp2 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-var add4 = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
-var mid10 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+var add5 = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
+var mid11 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 function inkAround(corners, step2) {
   const ring2 = [...corners, corners[0]];
   const out = [{ x: ring2[0].x, y: ring2[0].y }];
@@ -25598,7 +26748,7 @@ function figureOf2(symbol, text) {
       const lean = h2 * Math.tan(DATA_LEAN_DEG * Math.PI / 180);
       const tl = { x: -body / 2 + lean / 2, y: -h2 / 2 }, tr = { x: body / 2 + lean / 2, y: -h2 / 2 };
       const br = { x: body / 2 - lean / 2, y: h2 / 2 }, bl = { x: -body / 2 - lean / 2, y: h2 / 2 };
-      return { symbol, w: body + lean, h: h2, ink: () => inkAround([tl, tr, br, bl], INK_STEP), ports: { top: mid10(tl, tr), right: mid10(tr, br), bottom: mid10(br, bl), left: mid10(bl, tl) } };
+      return { symbol, w: body + lean, h: h2, ink: () => inkAround([tl, tr, br, bl], INK_STEP), ports: { top: mid11(tl, tr), right: mid11(tr, br), bottom: mid11(br, bl), left: mid11(bl, tl) } };
     }
     case "terminator": {
       const w2 = clamp2(tw + BOX_H * U, CORE_MIN * U, CORE_MAX * U);
@@ -25649,7 +26799,7 @@ function triangleHead(apex, out, size2) {
   const base = { x: apex.x - u.x * size2, y: apex.y - u.y * size2 };
   const half2 = size2 * 0.55;
   const v = { x: -u.y * half2, y: u.x * half2 };
-  return inkAround([apex, add4(base, v), { x: base.x - v.x, y: base.y - v.y }], INK_STEP / 1.5);
+  return inkAround([apex, add5(base, v), { x: base.x - v.x, y: base.y - v.y }], INK_STEP / 1.5);
 }
 function outsideBy(p, hull2) {
   if (hull2.length < 3) return Infinity;
@@ -25693,7 +26843,7 @@ function arcThrough2(P, Q, sweep, side, n2) {
   const th = sweep * Math.PI / 180;
   const R = c / (2 * Math.sin(th / 2));
   const d = R * Math.cos(th / 2);
-  const M = mid10(P, Q);
+  const M = mid11(P, Q);
   const C = { x: M.x - out.x * d, y: M.y - out.y * d };
   const a0 = Math.atan2(P.y - C.y, P.x - C.x);
   const a1 = Math.atan2(Q.y - C.y, Q.x - C.x);
@@ -25810,7 +26960,7 @@ function lexLess(a, b) {
 function connectorInk(route2, P, Q, drawn, scale) {
   const hand = (p) => ({ x: p.x / scale, y: p.y / scale });
   const toWorld = (p) => ({ x: p.x * scale, y: p.y * scale });
-  const unit7 = (v) => {
+  const unit8 = (v) => {
     const l = Math.hypot(v.x, v.y) || 1;
     return { x: v.x / l, y: v.y / l };
   };
@@ -25822,15 +26972,15 @@ function connectorInk(route2, P, Q, drawn, scale) {
     const n2 = clamp2(Math.round(chord * th / (2 * Math.sin(th / 2)) / INK_STEP), 16, 300);
     const points2 = arcThrough2(hand(P), hand(Q), route2.sweep, route2.side, n2).map(toWorld);
     const heads = [];
-    if (drawn !== "---") heads.push(head(Q, unit7({ x: points2[n2].x - points2[n2 - 1].x, y: points2[n2].y - points2[n2 - 1].y })));
-    if (drawn === "<-->") heads.push(head(P, unit7({ x: points2[0].x - points2[1].x, y: points2[0].y - points2[1].y })));
+    if (drawn !== "---") heads.push(head(Q, unit8({ x: points2[n2].x - points2[n2 - 1].x, y: points2[n2].y - points2[n2 - 1].y })));
+    if (drawn === "<-->") heads.push(head(P, unit8({ x: points2[0].x - points2[1].x, y: points2[0].y - points2[1].y })));
     return { points: points2, heads };
   }
   if (drawn === "---") return { points: strokeFor({ shape: "line", from: hand(P), to: hand(Q) }).map(toWorld), heads: [] };
   const k = Math.max(1, chord / ARROW_PROPORTION_PX);
   const f = (p) => ({ x: p.x / (scale * k), y: p.y / (scale * k) });
   const points = strokeFor({ shape: "arrow", from: f(P), to: f(Q) }).map((p) => ({ x: p.x * scale * k, y: p.y * scale * k }));
-  return { points, heads: drawn === "<-->" ? [head(P, unit7({ x: P.x - Q.x, y: P.y - Q.y }))] : [] };
+  return { points, heads: drawn === "<-->" ? [head(P, unit8({ x: P.x - Q.x, y: P.y - Q.y }))] : [] };
 }
 function endsOf4(route2, drawn) {
   if (route2.kind === "arc") return { start: drawn === "<-->" ? 1 : "none", end: drawn === "---" ? "none" : 0 };
@@ -25901,8 +27051,8 @@ function drawFlowchartRead(session, read4, opts) {
     { direction: read4.direction, rankGap: RANK_GAP * U * scale, nodeGap: NODE_GAP * U * scale }
   );
   const origin = opts.origin ?? besideContent(session, CORE_MIN * U * scale);
-  const centreOf10 = (id) => add4(origin, layout.at.get(id));
-  const world = (id, p) => add4(centreOf10(id), { x: p.x * scale, y: p.y * scale });
+  const centreOf10 = (id) => add5(origin, layout.at.get(id));
+  const world = (id, p) => add5(centreOf10(id), { x: p.x * scale, y: p.y * scale });
   const made = /* @__PURE__ */ new Map();
   const first = (n2) => n2.symbol === "process" || n2.symbol === "decision" || n2.symbol === "data" ? 0 : 1;
   for (const n2 of [...nodes].sort((p, q) => first(p) - first(q))) {
@@ -26084,8 +27234,8 @@ for (const keyword of ["flowchart", "graph", "flowchart-elk"]) registerMermaidRe
 var T = UML_CLASS_TABLE;
 var COUNT4 = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
 var count7 = (n2) => COUNT4[n2] ?? String(n2);
-var list3 = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
-var some2 = (xs, max = 4) => xs.length > max ? `${xs.slice(0, max).join(", ")} and ${count7(xs.length - max)} more` : list3(xs);
+var list4 = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+var some2 = (xs, max = 4) => xs.length > max ? `${xs.slice(0, max).join(", ")} and ${count7(xs.length - max)} more` : list4(xs);
 var centre2 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
 var ENTITY2 = {
   "#": "#35;",
@@ -26227,13 +27377,13 @@ function writeUmlClass(reading7, opts = {}) {
     const where = [...new Set(unread.map((u) => u.where))];
     notes.push(`${pieces === 1 ? "one piece of writing has" : `${count7(pieces)} pieces of writing have`} not been read, so ${pieces === 1 ? "its words are" : "their words are"} not known \u2014 written "${UNREAD_WRITING}" (in a member, with its parentheses as entities: its words do not say it is a method, so Mermaid shows it among the attributes): ${some2(where)}`);
   }
-  if (blank2.length) notes.push(`${blank2.length === 1 ? "one class has" : `${count7(blank2.length)} classes have`} no writing in ${blank2.length === 1 ? "its" : "their"} top compartment and ${blank2.length === 1 ? "is" : "are"} written with a blank name: ${list3(blank2)}`);
+  if (blank2.length) notes.push(`${blank2.length === 1 ? "one class has" : `${count7(blank2.length)} classes have`} no writing in ${blank2.length === 1 ? "its" : "their"} top compartment and ${blank2.length === 1 ? "is" : "are"} written with a blank name: ${list4(blank2)}`);
   if (misplaced.length) notes.push(`${misplaced.length === 1 ? "a member stands" : `${count7(misplaced.length)} members stand`} in the other compartment from what ${misplaced.length === 1 ? "its words say it is" : "their words say they are"}, and Mermaid puts ${misplaced.length === 1 ? "it" : "them"} where the words do: ${some2(misplaced)}`);
   const lower = relations.filter((c) => c.readings.length > 1 && c.readings[1].confidence > 0.6 * c.confidence);
   if (lower.length) notes.push(`${lower.length === 1 ? "a relation\u2019s head reads" : `${count7(lower.length)} relations\u2019 heads read`} more than one way, and ${lower.length === 1 ? "it is" : "they are"} written as the likelier: ${some2(lower.map((c) => `${idOf.get(c.from)} \u2014 ${idOf.get(c.to)} as ${c.kind}, or ${c.readings[1].kind}`))}`);
   const saidIds = /* @__PURE__ */ new Set([...classes.flatMap((s) => [s.id, ...s.ids, ...s.labels]), ...relations.flatMap((c) => [...c.ids, ...c.labels])]);
   const alone = r.labels.filter((l) => !saidIds.has(l.id)).map((l) => l.id).sort(naturalCompare);
-  if (alone.length) notes.push(`writing that belongs to no class or relation is left out: ${list3(alone)}`);
+  if (alone.length) notes.push(`writing that belongs to no class or relation is left out: ${list4(alone)}`);
   const left = Object.keys(r.roles).filter((id) => !saidIds.has(id) && !alone.includes(id)).sort(naturalCompare);
   if (left.length) notes.push(`${left.length === 1 ? "one mark" : `${count7(left.length)} marks`} the diagram has no place for ${left.length === 1 ? "is" : "are"} left out: ${some2(left.map((id) => `${id} (${r.roles[id]})`), 8)}`);
   return {
@@ -26499,10 +27649,10 @@ var ARROW_PROPORTION_PX2 = 800;
 var DASH = 0.9;
 var DASH_OFF2 = 0.6;
 var clamp3 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-var add5 = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
+var add6 = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
 var scaled = (a, k) => ({ x: a.x * k, y: a.y * k });
 var sub22 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
-var unit4 = (v) => {
+var unit5 = (v) => {
   const l = Math.hypot(v.x, v.y) || 1;
   return { x: v.x / l, y: v.y / l };
 };
@@ -26526,14 +27676,14 @@ function inkAlong2(points, step2) {
   return out;
 }
 function headInk(kind, tip, out, len4, step2) {
-  const u = unit4(out);
+  const u = unit5(out);
   const v = { x: -u.y, y: u.x };
   const at2 = (along2, side) => ({ x: tip.x - u.x * along2 + v.x * side, y: tip.y - u.y * along2 + v.y * side });
   if (kind === "triangle") return inkAround2([tip, at2(len4, 0.55 * len4), at2(len4, -0.55 * len4)], step2);
   return inkAround2([tip, at2(len4 / 2, len4 / 2), at2(len4, 0), at2(len4 / 2, -len4 / 2)], step2);
 }
 function fillInk(kind, tip, out, len4, step2) {
-  const u = unit4(out);
+  const u = unit5(out);
   const v = { x: -u.y, y: u.x };
   const pts = [];
   const n2 = 9;
@@ -26638,7 +27788,7 @@ function drawClassDiagramRead(session, read4, opts) {
   const origin = opts.origin ?? besideContent2(session, CLASS_MIN * U * scale);
   const standing2 = /* @__PURE__ */ new Map();
   for (const n2 of nodes) {
-    const c = add5(origin, layout.at.get(n2.id));
+    const c = add6(origin, layout.at.get(n2.id));
     const z = sizes.get(n2.id);
     standing2.set(n2.id, { id: n2.id, rank: layout.rank.get(n2.id), box: { minX: c.x - z.w * scale / 2, maxX: c.x + z.w * scale / 2, minY: c.y - z.h * scale / 2, maxY: c.y + z.h * scale / 2 } });
   }
@@ -26798,12 +27948,12 @@ function drawClassDiagramRead(session, read4, opts) {
   });
   const offLines = (p, except) => Math.min(Infinity, ...leavingNear.filter((x) => x.pts.length && !x.pts.some((q) => q.x === except.x && q.y === except.y)).map((x) => distToPolyline2(p, x.pts)));
   for (const d of dashes) {
-    const u = unit4({ x: d.toward.x - d.at.x, y: d.toward.y - d.at.y });
+    const u = unit5({ x: d.toward.x - d.at.x, y: d.toward.y - d.at.y });
     const o = outward2[d.side];
     const h2 = DASH * U;
     const place2 = (n2) => {
       const halfAlong = Math.abs(u.y) * (h2 / 2), halfAcross = Math.abs(n2.y) * (h2 / 2);
-      return add5(hand(d.at), add5(scaled(u, (d.marked ? len4 : 0) + 0.3 * U + halfAlong), scaled(n2, DASH_OFF2 * U + halfAcross)));
+      return add6(hand(d.at), add6(scaled(u, (d.marked ? len4 : 0) + 0.3 * U + halfAlong), scaled(n2, DASH_OFF2 * U + halfAcross)));
     };
     const perp = { x: -u.y, y: u.x };
     const options = [perp, { x: -perp.x, y: -perp.y }].map((n2) => ({ n: n2, c: place2(n2) })).filter((x) => (x.c.x - hand(d.at).x) * o.x + (x.c.y - hand(d.at).y) * o.y > 0.3 * U);
@@ -26866,8 +28016,8 @@ for (const keyword of ["classDiagram", "classDiagram-v2"]) registerMermaidReader
 var T2 = SEQUENCE_TABLE;
 var COUNT5 = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
 var count8 = (n2) => COUNT5[n2] ?? String(n2);
-var list4 = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
-var some3 = (xs, max = 4) => xs.length > max ? `${xs.slice(0, max).join(", ")} and ${count8(xs.length - max)} more` : list4(xs);
+var list5 = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+var some3 = (xs, max = 4) => xs.length > max ? `${xs.slice(0, max).join(", ")} and ${count8(xs.length - max)} more` : list5(xs);
 var ENTITY3 = { "#": "#35;", ";": "#59;", '"': "#quot;", "%": "#37;", "`": "#96;", "<": "#lt;", ">": "#gt;", "&": "#amp;" };
 var BLANK_WORDS = "#32;";
 function sequenceText(text) {
@@ -26936,7 +28086,7 @@ function writeSequence(reading7, opts = {}) {
   const notes = [];
   const pieces = unreadIds.size;
   if (unread.length) notes.push(`${pieces === 1 ? "one piece of writing has" : `${count8(pieces)} pieces of writing have`} not been read, so ${pieces === 1 ? "its words are" : "their words are"} not known \u2014 written "${UNREAD_WRITING}": ${some3([...new Set(unread.map((u) => u.where))])}`);
-  if (blank2.length) notes.push(`${blank2.length === 1 ? "one participant has" : `${count8(blank2.length)} participants have`} no writing for a name and ${blank2.length === 1 ? "is" : "are"} written with a blank one: ${list4(blank2)}`);
+  if (blank2.length) notes.push(`${blank2.length === 1 ? "one participant has" : `${count8(blank2.length)} participants have`} no writing for a name and ${blank2.length === 1 ? "is" : "are"} written with a blank one: ${list5(blank2)}`);
   if (quiet.length) notes.push(`${quiet.length === 1 ? "one message has" : `${count8(quiet.length)} messages have`} no writing above ${quiet.length === 1 ? "it and is" : "them and are"} written with blank words: ${some3(quiet)}`);
   const saidIds = /* @__PURE__ */ new Set([...ps.flatMap((p) => [p.id, ...p.ids, ...p.labels]), ...messages.flatMap((m) => [...m.ids, ...m.labels])]);
   const alone = r.labels.filter((l) => !saidIds.has(l.id)).map((l) => l.id).sort(naturalCompare);
@@ -27129,7 +28279,7 @@ var LOOP_W = 3.2;
 var BARB = 0.9;
 var HEAD2 = 1.2;
 var DASH2 = 1;
-var GAP = 0.6;
+var GAP2 = 0.6;
 var TAIL = 2.5;
 var INK_STEP3 = 3;
 var ARROW_PROPORTION_PX3 = 800;
@@ -27294,11 +28444,11 @@ function drawSequenceRead(session, read4, opts) {
       const endGap = l.head === "none" ? 0 : HEAD2 * U;
       const x0 = P.x + dir * startGap, x1 = Q.x - dir * endGap;
       const span = Math.abs(x1 - x0);
-      const n2 = Math.max(3, Math.round((span + GAP * U) / ((DASH2 + GAP) * U)));
-      const unit7 = (span + GAP * U) / n2;
-      const dash = unit7 - GAP * U;
+      const n2 = Math.max(3, Math.round((span + GAP2 * U) / ((DASH2 + GAP2) * U)));
+      const unit8 = (span + GAP2 * U) / n2;
+      const dash = unit8 - GAP2 * U;
       for (let d = 0; d < n2; d++) {
-        const a = x0 + dir * d * unit7, b = a + dir * dash;
+        const a = x0 + dir * d * unit8, b = a + dir * dash;
         own.push(session.addStroke(strokeFor({ shape: "line", from: hand({ x: a, y: yy }), to: hand({ x: b, y: yy }) }).map(world), next(), pid, scale, { content: true }));
       }
       if (l.head !== "none") own.push(session.addStroke(triangleAt2(Q, { x: dir, y: 0 }, HEAD2 * U, INK_STEP3 * scale / 1.5), next(), pid, scale, { content: true }));
@@ -27349,7 +28499,7 @@ var sideMiddle2 = (b, side) => {
   const [p, q] = sideEnds2(b, side);
   return { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
 };
-var sub12 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
+var sub13 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
 function lexLess3(a, b) {
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] < b[i];
   return false;
@@ -27395,7 +28545,7 @@ function routeBoxes(standing2, links, direction, margin, scale) {
     for (const sa of SIDES2) {
       for (const sb of SIDES2) {
         const P = sideMiddle2(a.box, sa), Q = sideMiddle2(b.box, sb);
-        const v = sub12(Q, P);
+        const v = sub13(Q, P);
         const leaves = leavesBoth(sa, v, sb, { x: -v.x, y: -v.y });
         const score2 = [leaves ? 0 : 1, crossesOf([P, Q], others), pref(sa, sb), Math.hypot(v.x, v.y)];
         if (!best || lexLess3(score2, best.score)) best = { score: score2, sides: [sa, sb] };
@@ -27411,7 +28561,7 @@ function routeBoxes(standing2, links, direction, margin, scale) {
             if (chord < least) return;
             for (const side of [1, -1]) {
               const pts = arcThrough2(P, Q, sweep, side, 24);
-              if (!leavesBoth(sa, sub12(pts[1], P), sb, sub12(pts[23], Q))) continue;
+              if (!leavesBoth(sa, sub13(pts[1], P), sb, sub13(pts[23], Q))) continue;
               const score2 = [crossesOf(pts, others), k, pref(sa, sb), chord];
               if (!bow || lexLess3(score2, bow.score)) bow = { score: score2, sides: [sa, sb], sweep, side };
             }
@@ -27438,7 +28588,7 @@ function routeBoxes(standing2, links, direction, margin, scale) {
   for (const [key2, list6] of onSide) {
     const [id, side] = key2.split("\0");
     const [p, q] = sideEnds2(standing2.get(id).box, side);
-    const d = sub12(q, p);
+    const d = sub13(q, p);
     const along2 = (x) => ((x.x - p.x) * d.x + (x.y - p.y) * d.y) / (d.x * d.x + d.y * d.y);
     list6.sort((m, n2) => along2(m.toward) - along2(n2.toward) || m.index - n2.index);
     list6.forEach((e, i) => {
@@ -27718,8 +28868,8 @@ var ARROW_PROPORTION_PX4 = 800;
 var HEAD3 = 1.2;
 var clamp5 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 var scaled3 = (a, k) => ({ x: a.x * k, y: a.y * k });
-var sub13 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
-var unit5 = (v) => {
+var sub14 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
+var unit6 = (v) => {
   const l = Math.hypot(v.x, v.y);
   return l > 1e-12 ? { x: v.x / l, y: v.y / l } : { x: 1, y: 0 };
 };
@@ -27755,7 +28905,7 @@ function spiralIn(cx2, cy2, r, pitch, step2) {
   return out;
 }
 function triangleAt3(apex, dir, len4, step2) {
-  const u = unit5(dir);
+  const u = unit6(dir);
   const base = { x: apex.x - u.x * len4, y: apex.y - u.y * len4 };
   const v = { x: -u.y * len4 * 0.55, y: u.x * len4 * 0.55 };
   return inkAlong4([apex, { x: base.x + v.x, y: base.y + v.y }, { x: base.x - v.x, y: base.y - v.y }], step2, true);
@@ -27930,10 +29080,10 @@ function drawStateRead(session, read4, opts) {
       const b = standing2.get(l.from).box;
       const n2 = outwardOf2(side);
       const tangent = { x: -n2.y, y: n2.x };
-      const mid11 = { x: side === "right" ? b.maxX : (b.minX + b.maxX) / 2, y: side === "top" ? b.minY : (b.minY + b.maxY) / 2 };
+      const mid12 = { x: side === "right" ? b.maxX : (b.minX + b.maxX) / 2, y: side === "top" ? b.minY : (b.minY + b.maxY) / 2 };
       const w2 = LOOP_W2 * U, h2 = LOOP_H2 * U, bb = BARB2 * U;
-      const a2 = endAt(l.from, { x: mid11.x - tangent.x * w2 / 2, y: mid11.y - tangent.y * w2 / 2 }, side);
-      const z2 = endAt(l.from, { x: mid11.x + tangent.x * w2 / 2, y: mid11.y + tangent.y * w2 / 2 }, side);
+      const a2 = endAt(l.from, { x: mid12.x - tangent.x * w2 / 2, y: mid12.y - tangent.y * w2 / 2 }, side);
+      const z2 = endAt(l.from, { x: mid12.x + tangent.x * w2 / 2, y: mid12.y + tangent.y * w2 / 2 }, side);
       const S = a2.end.point, E = z2.end.point;
       const out = (p) => ({ x: p.x + n2.x * h2, y: p.y + n2.y * h2 });
       const wing = (s) => ({ x: E.x + n2.x * bb * Math.cos(Math.PI / 6) + tangent.x * s * bb * Math.sin(Math.PI / 6), y: E.y + n2.y * bb * Math.cos(Math.PI / 6) + tangent.y * s * bb * Math.sin(Math.PI / 6) });
@@ -27962,7 +29112,7 @@ function drawStateRead(session, read4, opts) {
     if (!a.bound || !z.bound) unbound.push(`${l.from} --> ${l.to}`);
     if (arc) {
       const back2 = scaled3(arc[Math.max(0, arc.length - 4)], scale);
-      own.push(session.addStroke(triangleAt3(Q, sub13(Q, back2), HEAD3 * U, step2 / 1.5), next(), pid, scale, { content: true }));
+      own.push(session.addStroke(triangleAt3(Q, sub14(Q, back2), HEAD3 * U, step2 / 1.5), next(), pid, scale, { content: true }));
     }
     if (label) session.label({ nodeId: id, text: label, participantId: pid, at: next() });
     if (label === UNREAD_WRITING) placeholder.push(`${l.from} --> ${l.to}`);
@@ -28469,7 +29619,7 @@ function hostOf(url) {
 function isOpenRouter(baseUrl) {
   return /^openrouter\.ai$/i.test(hostOf(baseUrl));
 }
-var NAMED3 = [
+var NAMED4 = [
   [/^openrouter\.ai$/i, "OpenRouter"],
   [/^api\.anthropic\.com$/i, "Anthropic"],
   [/^api\.openai\.com$/i, "OpenAI"],
@@ -28478,7 +29628,7 @@ var NAMED3 = [
 ];
 function whereOf(baseUrl) {
   const host = hostOf(baseUrl);
-  const named2 = NAMED3.find(([re]) => re.test(host));
+  const named2 = NAMED4.find(([re]) => re.test(host));
   return named2 ? { name: named2[1], on: "on " + named2[1] } : { name: host, on: "at " + host };
 }
 function modelWords(config) {
@@ -29005,15 +30155,15 @@ function isFlat(answer, margin = FLAT_MARGIN) {
     why: `${order2[0].of} ${p2(order2[0].p)} leads ${order2[1].of} ${p2(order2[1].p)} by ${p2(lead)}`
   };
 }
-function reasonOf(question, answer) {
-  const dist12 = ranked(answer).map((d) => `${d.of} ${p2(d.p)}`).join(" \xB7 ");
-  if (answer.kind === "noul") return `asked \u201C${question.ask}\u201D \u2014 ${dist12}`;
+function reasonOf2(question, answer) {
+  const dist13 = ranked(answer).map((d) => `${d.of} ${p2(d.p)}`).join(" \xB7 ");
+  if (answer.kind === "noul") return `asked \u201C${question.ask}\u201D \u2014 ${dist13}`;
   if (answer.kind === "score") {
     const levels = answer.levels.join(" < ");
-    return `asked \u201C${question.ask}\u201D (score over ${levels}) \u2014 ${dist12}; expectation ${answer.expectation.toFixed(2)}, confidence ${p2(answer.confidence)}`;
+    return `asked \u201C${question.ask}\u201D (score over ${levels}) \u2014 ${dist13}; expectation ${answer.expectation.toFixed(2)}, confidence ${p2(answer.confidence)}`;
   }
   const offered2 = question.candidates.map((c) => c.id).join(", ");
-  return `asked \u201C${question.ask}\u201D (choice among ${offered2}) \u2014 ${dist12}; confidence ${p2(answer.confidence)}`;
+  return `asked \u201C${question.ask}\u201D (choice among ${offered2}) \u2014 ${dist13}; confidence ${p2(answer.confidence)}`;
 }
 function levelOf2(answer) {
   const i = Math.max(0, Math.min(answer.levels.length - 1, Math.round(answer.expectation)));
@@ -29066,7 +30216,7 @@ function createDecideParticipant(session, transport, at2 = 0, options = {}) {
       }
       const { flat, why } = isFlat(answer, margin);
       const below = !flat && takeAt > 0 && leadOf(answer) < takeAt;
-      rows.push({ question: q, answer, flat, flatWhy: why, reason: reasonOf(q, answer), held: false, ...below ? { below: true } : {} });
+      rows.push({ question: q, answer, flat, flatWhy: why, reason: reasonOf2(q, answer), held: false, ...below ? { below: true } : {} });
     }
     const state = session.getState();
     if (state.generation !== snapshot) {
@@ -29126,7 +30276,7 @@ function spread(outcomes, lead, p) {
   const each = rest.length ? Math.max(0, 1 - p) / rest.length : 0;
   return outcomes.map((of) => ({ of, p: of === lead ? p : each }));
 }
-var expectationOf = (levels, dist12) => dist12.reduce((n2, d) => n2 + levels.indexOf(d.of) * d.p, 0);
+var expectationOf = (levels, dist13) => dist13.reduce((n2, d) => n2 + levels.indexOf(d.of) * d.p, 0);
 function createStubDecideTransport(book, options = {}) {
   const unscripted = options.unscripted ?? "flat";
   return async (questions) => {
@@ -29141,26 +30291,26 @@ function createStubDecideTransport(book, options = {}) {
         continue;
       }
       if (q.kind === "score") {
-        const dist13 = "level" in entry ? spread(q.levels, entry.level, entry.p) : even(q.levels);
+        const dist14 = "level" in entry ? spread(q.levels, entry.level, entry.p) : even(q.levels);
         answers.push({
           kind: "score",
           questionId: q.id,
           levels: q.levels,
-          distribution: dist13,
-          expectation: expectationOf(q.levels, dist13),
+          distribution: dist14,
+          expectation: expectationOf(q.levels, dist14),
           confidence: "confidence" in entry && entry.confidence !== void 0 ? entry.confidence : "level" in entry ? entry.p : 0
         });
         continue;
       }
       const ids = q.candidates.map((c) => c.id);
-      const dist12 = "pick" in entry && ids.includes(entry.pick) ? spread(ids, entry.pick, entry.p) : even(ids);
-      const order2 = [...dist12].sort((a, b) => b.p - a.p);
+      const dist13 = "pick" in entry && ids.includes(entry.pick) ? spread(ids, entry.pick, entry.p) : even(ids);
+      const order2 = [...dist13].sort((a, b) => b.p - a.p);
       const lead = order2.length > 1 && order2[0].p - order2[1].p < FLAT_MARGIN ? null : order2[0]?.of ?? null;
       answers.push({
         kind: "choice",
         questionId: q.id,
         pick: lead,
-        distribution: dist12,
+        distribution: dist13,
         confidence: "confidence" in entry && entry.confidence !== void 0 ? entry.confidence : "pick" in entry ? entry.p : 0
       });
     }
@@ -29205,9 +30355,9 @@ var CHAT_DECIDE_WIRE = {
       const id = raw?.id;
       const q = typeof id === "string" ? asked.get(id) : void 0;
       if (!q || answers.some((a) => a.questionId === q.id)) continue;
-      const dist12 = distributionOf(wireQuestion(q), raw?.probabilities);
-      if (!dist12) continue;
-      answers.push(answerOf(q, dist12));
+      const dist13 = distributionOf(wireQuestion(q), raw?.probabilities);
+      if (!dist13) continue;
+      answers.push(answerOf(q, dist13));
     }
     return { ok: true, answers };
   }
@@ -29233,22 +30383,22 @@ function distributionOf(wq, raw) {
   if (!(sum > 0)) return null;
   return wq.options.map((o) => ({ of: o.id, p: (given.get(o.id) ?? 0) / sum }));
 }
-function answerOf(q, dist12) {
-  const order2 = [...dist12].sort((a, b) => b.p - a.p);
+function answerOf(q, dist13) {
+  const order2 = [...dist13].sort((a, b) => b.p - a.p);
   const confidence = order2[0]?.p ?? 0;
-  if (q.kind === "noul") return { kind: "noul", questionId: q.id, yes: dist12.find((d) => d.of === "yes")?.p ?? 0 };
+  if (q.kind === "noul") return { kind: "noul", questionId: q.id, yes: dist13.find((d) => d.of === "yes")?.p ?? 0 };
   if (q.kind === "score") {
     return {
       kind: "score",
       questionId: q.id,
       levels: q.levels,
-      distribution: dist12,
-      expectation: dist12.reduce((n2, d) => n2 + q.levels.indexOf(d.of) * d.p, 0),
+      distribution: dist13,
+      expectation: dist13.reduce((n2, d) => n2 + q.levels.indexOf(d.of) * d.p, 0),
       confidence
     };
   }
   const pick3 = order2.length > 1 && order2[0].p - order2[1].p < FLAT_MARGIN ? null : order2[0]?.of ?? null;
-  return { kind: "choice", questionId: q.id, pick: pick3, distribution: dist12, confidence };
+  return { kind: "choice", questionId: q.id, pick: pick3, distribution: dist13, confidence };
 }
 function jsonOf2(text) {
   const t = String(text ?? "").trim();
@@ -30369,10 +31519,10 @@ function runsOf2(nodes, node) {
 }
 function writingLinesIn(state, ids) {
   const marks = [];
-  const seen2 = /* @__PURE__ */ new Set();
+  const seen3 = /* @__PURE__ */ new Set();
   for (const id of ids) {
-    if (seen2.has(id)) continue;
-    seen2.add(id);
+    if (seen3.has(id)) continue;
+    seen3.add(id);
     const node = state.nodes.get(id);
     if (!node || isErased(node)) continue;
     if (!(isWord(node) || isWritingMark(node, state.nodes))) continue;
@@ -30449,7 +31599,7 @@ Transcribe its text, top to bottom, one text for each line of the page, in the h
 
 Reply with ONLY a JSON object, no prose, no code fences:
 {"lines":["the first line","the second line"]}`;
-var clamp012 = (v) => {
+var clamp013 = (v) => {
   const n2 = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n2) ? Math.max(0, Math.min(1, n2)) : 0.5;
 };
@@ -30472,7 +31622,7 @@ function parseLineReadings(text, count9) {
   const put = (line, t, confidence) => {
     if (!Number.isInteger(line) || line < 1 || line > count9) return;
     const said3 = typeof t === "string" ? t.trim() : "";
-    if (said3) out[line - 1].push({ text: said3, confidence: clamp012(confidence) });
+    if (said3) out[line - 1].push({ text: said3, confidence: clamp013(confidence) });
   };
   const parsed = jsonIn(clean);
   let items = null;
@@ -30819,7 +31969,7 @@ function standing(scope, text) {
     return !!rep && rep.data.kind === "mermaid" && rep.data.code === text;
   });
 }
-var reasonOf2 = (reading7) => `${describeNotation(reading7)} \u2014 as Mermaid text beside it; the drawing stays`;
+var reasonOf3 = (reading7) => `${describeNotation(reading7)} \u2014 as Mermaid text beside it; the drawing stays`;
 var MERMAID = {
   id: "mermaid",
   name: "Mermaid",
@@ -30832,7 +31982,7 @@ var MERMAID = {
     return [{
       key: "mermaid",
       label: "Make it Mermaid",
-      reason: reasonOf2(m.reading),
+      reason: reasonOf3(m.reading),
       base: 0.35,
       tool: "mermaid",
       verbs: ["mermaid", "mmd", "as mermaid"],
@@ -30907,7 +32057,7 @@ function diagramOf(state, ids) {
   }
   return null;
 }
-var reasonOf3 = (reading7) => `${describeNotation(reading7)} \u2014 connectors at right angles between their ports; your ink stays faint beneath`;
+var reasonOf4 = (reading7) => `${describeNotation(reading7)} \u2014 connectors at right angles between their ports; your ink stays faint beneath`;
 var centreOf8 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
 function tidyDiagram(session, reading7, at2) {
   let ranks = 0;
@@ -30947,7 +32097,7 @@ var ROUTE = {
       out.push({
         key: "tidy-diagram",
         label: "Tidy the diagram",
-        reason: reasonOf3(d.reading),
+        reason: reasonOf4(d.reading),
         base: 0.32,
         tool: "route",
         verbs: ["tidy the diagram", "tidy diagram", "tidy up the diagram"],
@@ -30958,7 +32108,7 @@ var ROUTE = {
       out.push({
         key: "route",
         label: "Route the connectors",
-        reason: reasonOf3(d.reading),
+        reason: reasonOf4(d.reading),
         base: 0.28,
         tool: "route",
         verbs: ["route", "orthogonal", "right angles"],
@@ -31008,8 +32158,8 @@ var WHICH = {
     const matches = scope.summon.suggestions.filter((s) => s.kind === "match").map((s) => ({ artifactId: s.artifactId ?? s.id, name: s.label, score: s.score ?? 0, reasoning: s.reasoning ?? "", ...s.pack ? { pack: s.pack } : {} }));
     const tied = tiedMatches(matches);
     if (tied.length < 2) return [];
-    const seen2 = /* @__PURE__ */ new Set();
-    const candidates = tied.filter((m) => !seen2.has(m.name) && !!seen2.add(m.name)).map((m) => ({ id: m.name, text: m.reasoning ? `${m.name} \u2014 ${m.reasoning}` : m.name }));
+    const seen3 = /* @__PURE__ */ new Set();
+    const candidates = tied.filter((m) => !seen3.has(m.name) && !!seen3.add(m.name)).map((m) => ({ id: m.name, text: m.reasoning ? `${m.name} \u2014 ${m.reasoning}` : m.name }));
     if (candidates.length < 2) return [];
     return [{
       key: "which",
@@ -31261,10 +32411,10 @@ function searchEntriesOf(state, only) {
     const lab = labelOf(node);
     if (lab) out.push({ id: node.id, kind: "label", text: lab.text, what: "label on " + (isArtifact ? ARTIFACT_NOUN[codeOf(node)?.kind || ""] || "a thing" : nounOf(node)), ...box ? { box } : {} });
     if (!isArtifact) {
-      const seen2 = /* @__PURE__ */ new Set();
+      const seen3 = /* @__PURE__ */ new Set();
       for (const t of transcriptsOf(node)) {
-        if (seen2.has(t.text)) continue;
-        seen2.add(t.text);
+        if (seen3.has(t.text)) continue;
+        seen3.add(t.text);
         out.push({ id: node.id, kind: "transcript", text: t.text, what: "read writing", ...box ? { box } : {} });
       }
     }
@@ -31337,8 +32487,131 @@ var LIKE = {
   take: () => ({ host: "like" })
 };
 
+// src/tools/fill.ts
+var FILL_TOOL = "fill";
+function writeFillIn(session, fill, at2, centre3, index = 0) {
+  const take = centre3 ? fillTakeAt(fill, centre3) : fill.take;
+  if (take.kind === "text") {
+    return session.import({ kind: "text", path: `text/fill-${at2}-${index}.txt`, name: take.text, bounds: take.bounds, code: take.text, at: at2 });
+  }
+  if (take.kind === "strokes") {
+    let first = null;
+    take.strokes.forEach((points, i) => {
+      const id = session.addStroke(points, at2 + i, void 0, 1, { content: true });
+      if (first === null) first = id;
+    });
+    return first;
+  }
+  return null;
+}
+var FILL = {
+  id: FILL_TOOL,
+  name: "fill in",
+  describe: () => "fill-ins: what the maths implies about a drawing \u2014 a side, an angle, a result \u2014 stands faint beside it and is written as text by a tap, or by typing write; a board can be set so the answer waits, and so the maths is coloured",
+  offers(scope) {
+    const settings = scope.state.settings;
+    const board2 = boardMathsOf(scope.session);
+    const maths = board2 !== null;
+    const out = [];
+    if (maths) {
+      const held2 = new Set(scope.summon.enclosedIds);
+      const fills = fillInsOfSession(scope.session).filter((f) => f.take.kind === "text" && f.about.some((id) => held2.has(id)));
+      if (fills.length) {
+        const top = fills[0];
+        out.push({
+          key: "fill:write",
+          label: `Write ${top.text}`,
+          reason: `${top.reason} \u2014 written as text beside the drawing, which the maths reads back and checks from then on`,
+          base: 0.3,
+          tool: FILL_TOOL,
+          hidden: true,
+          verbs: ["write", "write it", "write it in", "fill", "fill in", "fill it in", "write the answer"],
+          data: { act: "write", keys: [top.key] }
+        });
+        if (fills.length > 1) {
+          out.push({
+            key: "fill:write-all",
+            label: `Write all ${fills.length}`,
+            reason: `${fills.map((f) => f.text).join(", ")} \u2014 each written as text where it stands, in one act`,
+            base: 0.25,
+            tool: FILL_TOOL,
+            hidden: true,
+            verbs: ["write all", "write them all", "fill in all", "fill them all in", "fill all"],
+            data: { act: "write", keys: fills.map((f) => f.key) }
+          });
+        }
+      }
+    }
+    if (settings.answers === "show" && maths) {
+      out.push({
+        key: "fill:answers-wait",
+        label: "The answer waits",
+        reason: "sets this board to teach: each answer stands as a ? in its colour \u2014 the first tap shows it, the second writes it",
+        base: 0.2,
+        tool: FILL_TOOL,
+        hidden: true,
+        verbs: ["the answer waits", "answer waits", "the answers wait", "hide the answers", "hide the answer", "hide answers", "answers wait", "teach"],
+        data: { act: "setting", key: "answers", value: "wait" }
+      });
+    }
+    if (settings.answers === "wait") {
+      out.push({
+        key: "fill:answers-show",
+        label: "Show the answers",
+        reason: "this board is set to teach, so each answer stands as a ? until it is tapped \u2014 this sets it to show them again",
+        base: 0.2,
+        tool: FILL_TOOL,
+        hidden: true,
+        verbs: ["show the answers", "show the answer", "show answers", "reveal the answers", "reveal answers", "answers show"],
+        data: { act: "setting", key: "answers", value: "show" }
+      });
+    }
+    if (settings.colour === "pointed" && maths) {
+      out.push({
+        key: "fill:colour-always",
+        label: "Colour the maths",
+        reason: "sets this board to colour the maths: every quantity shows its colour on its figure at rest, not only while its marks are held or pointed at",
+        base: 0.2,
+        tool: FILL_TOOL,
+        hidden: true,
+        verbs: ["colour the maths", "color the maths", "colour maths", "color maths", "colour the figures", "color the figures"],
+        data: { act: "setting", key: "colour", value: "always" }
+      });
+    }
+    if (settings.colour === "always") {
+      out.push({
+        key: "fill:colour-pointed",
+        label: "Colour the maths when pointed at",
+        reason: "this board colours the maths at rest \u2014 this sets it back to showing a quantity\u2019s colour only while its marks are held or pointed at",
+        base: 0.2,
+        tool: FILL_TOOL,
+        hidden: true,
+        verbs: ["colour the maths when pointed at", "color the maths when pointed at", "stop colouring the maths", "stop coloring the maths", "stop colouring", "stop coloring"],
+        data: { act: "setting", key: "colour", value: "pointed" }
+      });
+    }
+    return out;
+  },
+  take(offer, _scope, session, at2) {
+    const d = offer.data;
+    if (d.act === "setting") {
+      session.setting(d.key, d.value, at2);
+      return {};
+    }
+    const fills = fillInsOfSession(session);
+    let made = null;
+    d.keys.forEach((key2, i) => {
+      const f = fills.find((x) => x.key === key2);
+      if (!f) return;
+      const id = writeFillIn(session, f, at2 + i, void 0, i);
+      if (made === null) made = id;
+    });
+    return { made };
+  }
+};
+
 // src/tools/builtin.ts
-var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH, TRACE, REGION, LIKE];
+var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH, TRACE, REGION, LIKE, FILL];
 registerTool(CORRECT);
 registerTool(TEXT);
 registerTool(NAME2);
@@ -31364,6 +32637,7 @@ registerTool(WHICH);
 registerTool(TRACE);
 registerTool(REGION);
 registerTool(LIKE);
+registerTool(FILL);
 
 // src/search/tokens.ts
 var SPECIAL = { "\xDF": "ss", "\xE6": "ae", "\u0153": "oe", "\xF8": "o", "\u0111": "d", "\u0142": "l", "\u0131": "i" };
@@ -31420,7 +32694,7 @@ function cosine(a, b) {
   if (!na || !nb) return 0;
   return dot8 / Math.sqrt(na * nb);
 }
-function unit6(v) {
+function unit7(v) {
   const out = new Float32Array(v.length);
   let n2 = 0;
   for (let i = 0; i < v.length; i++) n2 += v[i] * v[i];
@@ -31498,7 +32772,7 @@ function createStubEmbedTransport(opts = {}) {
       return texts.map((text) => {
         const v = new Float32Array(dimension);
         for (const t of tokenize(text)) v[fnv(placeOf2(t.text)) % dimension] += 1;
-        return unit6(v);
+        return unit7(v);
       });
     }
   };
@@ -31575,18 +32849,18 @@ function searchBoards(boards, query, options = {}) {
   const groups = [];
   for (const b of boards) {
     const hits = [];
-    const add7 = (e, lex, sem) => {
+    const add8 = (e, lex, sem) => {
       if (!lex && sem < SEMANTIC_FLOOR) return;
       const score2 = (lex ? lex.score : 0) * KIND_WEIGHT[e.kind] + sem * SEMANTIC_WEIGHT;
       const ex = excerptOf(e.text, lex ? lex.spans : []);
       hits.push({ board: b.id, boardName: b.name, id: e.id, kind: e.kind, what: e.what, text: ex.text, spans: ex.spans, ...e.box ? { box: e.box } : {}, score: score2, ...sem > 0 ? { meaning: sem } : {} });
     };
     const nameLex = lexical(q, tokenize(b.name));
-    if (nameLex) add7({ id: null, kind: "board", text: b.name, what: "board name" }, nameLex, 0);
+    if (nameLex) add8({ id: null, kind: "board", text: b.name, what: "board name" }, nameLex, 0);
     for (const e of b.entries) {
       const lex = lexical(q, wordsOf2(e));
       const sem = options.semantic ? Math.max(0, Math.min(1, options.semantic(query, e, b) || 0)) : 0;
-      add7(e, lex, sem);
+      add8(e, lex, sem);
     }
     if (!hits.length) continue;
     hits.sort((x, y) => y.score - x.score);
@@ -32226,11 +33500,11 @@ function packBench(pack, opts = {}) {
       const d = defs.find((x) => x.id === defId);
       return !!d && [d.signature, ...d.accepted].some((x) => compareSignatures(sig2, x).score >= SAME);
     };
-    const judge = (c, ids, as, seen2) => {
+    const judge = (c, ids, as, seen3) => {
       const sig2 = signatureIn(nodes, ids);
       for (const m of s.matchesOf(ids)) {
-        if (m.pack !== ref || m.score < MATCH_FLOOR || seen2.has(m.artifactId + as)) continue;
-        seen2.add(m.artifactId + as);
+        if (m.pack !== ref || m.score < MATCH_FLOOR || seen3.has(m.artifactId + as)) continue;
+        seen3.add(m.artifactId + as);
         const r = { label: c.label, definition: m.name, score: m.score, reasoning: m.reasoning, as };
         if (c.is === m.name) expected.push(r);
         else if (sameAs(sig2, m.artifactId)) same.push(r);
@@ -32241,10 +33515,10 @@ function packBench(pack, opts = {}) {
     corpus.forEach((c, i) => {
       const ids = laid[i];
       if (!ids.length) return;
-      const seen2 = /* @__PURE__ */ new Set();
-      judge(c, ids, "held", seen2);
+      const seen3 = /* @__PURE__ */ new Set();
+      judge(c, ids, "held", seen3);
       const mine = new Set(ids);
-      for (const cand of candidates) if (cand.nodeIds.every((id) => mine.has(id))) judge(c, cand.nodeIds, "chipped", seen2);
+      for (const cand of candidates) if (cand.nodeIds.every((id) => mine.has(id))) judge(c, cand.nodeIds, "chipped", seen3);
       if (c.is && idOf.has(c.is) && !expected.some((r) => r.label === c.label)) {
         const top = s.matchesOf(ids)[0];
         missed.push({ label: c.label, is: c.is, top: top ? top.name : null, score: top ? top.score : 0 });
@@ -32404,7 +33678,7 @@ function describeReading(reading7, options = {}) {
     lines.push("", `WHAT EACH ${noun.toUpperCase()} PLAYS:`);
     for (const l of roleLines) lines.push(`  ${l}`);
   }
-  const seen2 = /* @__PURE__ */ new Set();
+  const seen3 = /* @__PURE__ */ new Set();
   const sits = [];
   for (const c of reading7.concepts) {
     const members = [...new Set(Object.values(c.roles ?? {}).flat())].map(name).filter((x) => !!x);
@@ -32416,8 +33690,8 @@ function describeReading(reading7, options = {}) {
     const a = name(r.from), b = name(r.to);
     if (!a || !b) continue;
     const key2 = r.kind === "contains" ? `${r.kind}:${a}:${b}` : `${r.kind}:${[a, b].sort().join(":")}`;
-    if (seen2.has(key2)) continue;
-    seen2.add(key2);
+    if (seen3.has(key2)) continue;
+    seen3.add(key2);
     const verb = r.kind === "contains" ? "contains" : r.kind === "near" ? "is near" : r.kind === "touching" ? "touches" : "crosses";
     sits.push(`${a} ${verb} ${b} (${r.strength.toFixed(2)})`);
   }
@@ -32604,11 +33878,11 @@ function parseTranscripts(text) {
     const rec = item;
     const t = typeof rec.text === "string" ? rec.text : typeof rec.label === "string" ? rec.label : "";
     if (!t.trim()) continue;
-    out.push({ text: t.trim(), confidence: clamp013(rec.confidence) });
+    out.push({ text: t.trim(), confidence: clamp014(rec.confidence) });
   }
   return out.sort((a, b) => b.confidence - a.confidence);
 }
-function clamp013(v) {
+function clamp014(v) {
   const n2 = typeof v === "number" ? v : Number(v);
   if (!Number.isFinite(n2)) return 0.5;
   return Math.max(0, Math.min(1, n2));
@@ -32634,7 +33908,7 @@ function parseReadings(text) {
     if (!label) continue;
     readings2.push({
       label,
-      confidence: clamp013(rec.confidence),
+      confidence: clamp014(rec.confidence),
       reasoning: typeof rec.reasoning === "string" ? rec.reasoning.trim() : ""
     });
   }
@@ -33239,8 +34513,8 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
       return { ok: !!local.behaviour, behaviour: local.behaviour, via: local.behaviour ? "table" : "none", unread: local.unparsed, error: result2.error };
     }
     const reply = parseBehaviourReply(result2.text);
-    const seen2 = new Set(local.terms.map((t) => `${t.verb}:${t.target ?? ""}`));
-    const terms = [...local.terms, ...reply.terms.filter((t) => !seen2.has(`${t.verb}:${t.target ?? ""}`))];
+    const seen3 = new Set(local.terms.map((t) => `${t.verb}:${t.target ?? ""}`));
+    const terms = [...local.terms, ...reply.terms.filter((t) => !seen3.has(`${t.verb}:${t.target ?? ""}`))];
     if (terms.length === 0) return { ok: false, behaviour: null, via: "none", unread: reply.unread.length ? reply.unread : local.unparsed, error: "nothing in the reply maps onto a verb", raw: result2.text };
     const behaviour = { terms, source: "model" };
     session.behave({ nodeId: args.nodeId, behaviour, participantId: id, at: args.at });
@@ -33934,7 +35208,7 @@ var NODE_GAP4 = 5;
 var INK_STEP5 = 3;
 var DASH3 = 0.9;
 var DASH_OFF3 = 0.6;
-var add6 = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
+var add7 = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
 function drawErRead(session, read4, opts) {
   const r = read4;
   const scale = opts.scale && opts.scale > 0 ? opts.scale : 1;
@@ -34068,12 +35342,12 @@ function drawErRead(session, read4, opts) {
   });
   const offLines = (p, except) => Math.min(Infinity, ...leavingNear.filter((pts) => pts.length && !pts.some((q) => q.x === except.x && q.y === except.y)).map((pts) => distToPolyline3(p, pts)));
   for (const d of dashes) {
-    const u = unit5({ x: d.toward.x - d.at.x, y: d.toward.y - d.at.y });
+    const u = unit6({ x: d.toward.x - d.at.x, y: d.toward.y - d.at.y });
     const o = outward3[d.side];
     const h2 = DASH3 * U;
     const place2 = (n2) => {
       const halfAlong = Math.abs(u.y) * (h2 / 2), halfAcross = Math.abs(n2.y) * (h2 / 2);
-      return add6(d.at, add6(scaled3(u, 0.3 * U + halfAlong), scaled3(n2, DASH_OFF3 * U + halfAcross)));
+      return add7(d.at, add7(scaled3(u, 0.3 * U + halfAlong), scaled3(n2, DASH_OFF3 * U + halfAcross)));
     };
     const perp = { x: -u.y, y: u.x };
     const options = [perp, { x: -perp.x, y: -perp.y }].map((n2) => ({ n: n2, c: place2(n2) })).filter((x) => (x.c.x - d.at.x) * o.x + (x.c.y - d.at.y) * o.y > 0.3 * U);
@@ -34524,7 +35798,7 @@ function thumbFit(box, w2, h2, pad = 8) {
 }
 
 // src/semantic/scorer.ts
-var clamp014 = (x) => x < 0 ? 0 : x > 1 ? 1 : x;
+var clamp015 = (x) => x < 0 ? 0 : x > 1 ? 1 : x;
 async function semanticScorer(transport, query, entries, opts = {}) {
   const cache = opts.cache ?? createEmbedCache();
   if (!tokenize(query).length) return () => 0;
@@ -34533,7 +35807,7 @@ async function semanticScorer(transport, query, entries, opts = {}) {
   return (asked, entry) => {
     const qv = cache.get(transport.name, asked.trim());
     const ev = cache.get(transport.name, entry.text);
-    return qv && ev ? clamp014(cosine(qv, ev)) : 0;
+    return qv && ev ? clamp015(cosine(qv, ev)) : 0;
   };
 }
 var FUNCTION_WORDS = /* @__PURE__ */ new Set(["a", "an", "and", "the", "of", "for", "to", "in", "on", "at", "is", "it", "or", "by", "with", "as", "be"]);
@@ -34543,7 +35817,7 @@ function sharedWords(a, b) {
   for (const t of tokenize(b)) if (mine.has(t.text) && !FUNCTION_WORDS.has(t.text) && !out.includes(t.text)) out.push(t.text);
   return out;
 }
-function reasonOf4(score2, transport, source, text) {
+function reasonOf5(score2, transport, source, text) {
   const band = score2 >= 0.85 ? "says nearly the same thing" : score2 >= 0.7 ? "is about the same thing" : "is near in meaning";
   const shared2 = sharedWords(source, text).slice(0, 3);
   return `${band} \u2014 ${score2.toFixed(2)} by ${transport}; ` + (shared2.length ? "shares " + shared2.map((w2) => `\u201C${w2}\u201D`).join(", ") : "no word in common");
@@ -34567,7 +35841,7 @@ async function notesLike(transport, boards, source, opts = {}) {
   const sv = cache.get(transport.name, said3);
   if (!sv) return [];
   const floor = opts.floor ?? SEMANTIC_FLOOR;
-  const found = candidates.map((c) => ({ c, score: clamp014(cosine(sv, cache.get(transport.name, c.entry.text) ?? new Float32Array(0))) })).filter((x) => x.score >= floor).sort((x, y) => y.score - x.score || y.c.board.recency - x.c.board.recency || x.c.order - y.c.order).slice(0, Math.max(1, opts.limit ?? 20));
+  const found = candidates.map((c) => ({ c, score: clamp015(cosine(sv, cache.get(transport.name, c.entry.text) ?? new Float32Array(0))) })).filter((x) => x.score >= floor).sort((x, y) => y.score - x.score || y.c.board.recency - x.c.board.recency || x.c.order - y.c.order).slice(0, Math.max(1, opts.limit ?? 20));
   return found.map(({ c, score: score2 }) => {
     const ex = excerptOf(c.entry.text, []);
     return {
@@ -34581,7 +35855,7 @@ async function notesLike(transport, boards, source, opts = {}) {
       ...c.entry.box ? { box: c.entry.box } : {},
       score: score2,
       meaning: score2,
-      reason: reasonOf4(score2, transport.name, said3, c.entry.text)
+      reason: reasonOf5(score2, transport.name, said3, c.entry.text)
     };
   });
 }
@@ -34798,7 +36072,7 @@ function createStaticTransport(files) {
         }
         if (!n2) return sum;
         for (let d = 0; d < dim; d++) sum[d] /= n2;
-        return unit6(sum);
+        return unit7(sum);
       });
     }
   };
@@ -34839,10 +36113,10 @@ function buildStaticModel(o) {
     return own_.map((x, d) => (base ? base[d] : 0) + own * x / n2);
   };
   rows.push(new Array(dim).fill(0));
-  const seen2 = /* @__PURE__ */ new Set(["[UNK]"]);
-  const add7 = (w2, vec) => {
-    if (!seen2.has(w2)) {
-      seen2.add(w2);
+  const seen3 = /* @__PURE__ */ new Set(["[UNK]"]);
+  const add8 = (w2, vec) => {
+    if (!seen3.has(w2)) {
+      seen3.add(w2);
       vocab.push(w2);
       rows.push(vec);
     }
@@ -34850,10 +36124,10 @@ function buildStaticModel(o) {
   o.groups.forEach((g, gi) => {
     const rand = mulberry322(seed * 7919 + gi * 104729);
     const base = row(rand, null, 1);
-    for (const w2 of g) add7(w2.toLowerCase(), row(mulberry322(seed * 31 + gi * 977 + fnv2(w2) | 0), base, 0.3));
+    for (const w2 of g) add8(w2.toLowerCase(), row(mulberry322(seed * 31 + gi * 977 + fnv2(w2) | 0), base, 0.3));
   });
-  (o.extra ?? []).forEach((w2, i) => add7(w2.toLowerCase(), row(mulberry322(seed * 131 + fnv2(w2) + i | 0), null, 0.2)));
-  add7("##s", row(mulberry322(seed * 17), null, 0.05));
+  (o.extra ?? []).forEach((w2, i) => add8(w2.toLowerCase(), row(mulberry322(seed * 131 + fnv2(w2) + i | 0), null, 0.2)));
+  add8("##s", row(mulberry322(seed * 17), null, 0.05));
   const count9 = rows.length * dim;
   const width = dtype === "F16" ? 2 : 4;
   const head = JSON.stringify({ embeddings: { dtype, shape: [rows.length, dim], data_offsets: [0, count9 * width] }, __metadata__: { format: "pt" } });
@@ -34880,552 +36154,6 @@ function buildStaticModel(o) {
     model: { type: "WordPiece", unk_token: "[UNK]", continuing_subword_prefix: "##", max_input_chars_per_word: 100, vocab: Object.fromEntries(vocab.map((w2, i) => [w2, i])) }
   };
   return { tokenizer, weights: bytes, vocab };
-}
-
-// src/colour/oklch.ts
-var clamp015 = (v) => Math.min(1, Math.max(0, v));
-var srgbToLinear = (c) => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-var linearToSrgb = (c) => c <= 31308e-7 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
-var HEX2 = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i;
-function parseHex(hex) {
-  const m = HEX2.exec((hex || "").trim());
-  if (!m) return null;
-  const h2 = m[1].length === 3 ? m[1].split("").map((x) => x + x).join("") : m[1];
-  const n2 = parseInt(h2, 16);
-  return [n2 >> 16 & 255, n2 >> 8 & 255, n2 & 255];
-}
-function hexToLinear(hex) {
-  const bytes = parseHex(hex) ?? [0, 0, 0];
-  return bytes.map((v) => srgbToLinear(v / 255));
-}
-var linearToHex = (rgb) => "#" + rgb.map((c) => Math.round(clamp015(linearToSrgb(clamp015(c))) * 255).toString(16).padStart(2, "0")).join("");
-function linearToOklab([r, g, b]) {
-  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
-  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
-  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
-  return [
-    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
-    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
-    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s
-  ];
-}
-function oklabToLinear([L, a, b]) {
-  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
-  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
-  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
-  return [
-    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s
-  ];
-}
-var normHue = (h2) => (h2 % 360 + 360) % 360;
-var oklabToLch = ([L, a, b]) => [L, Math.hypot(a, b), normHue(Math.atan2(b, a) * 180 / Math.PI)];
-var lchToOklab = (L, C, h2) => [L, C * Math.cos(h2 * Math.PI / 180), C * Math.sin(h2 * Math.PI / 180)];
-function hueDistance(a, b) {
-  const d = Math.abs(normHue(a) - normHue(b));
-  return d > 180 ? 360 - d : d;
-}
-var GAMUT_EPS = 1e-7;
-var inGamut = (rgb) => rgb.every((c) => c >= -GAMUT_EPS && c <= 1 + GAMUT_EPS);
-function maxChroma(L, h2) {
-  let lo = 0, hi = 0.4;
-  for (let i = 0; i < 28; i++) {
-    const mid11 = (lo + hi) / 2;
-    if (inGamut(oklabToLinear(lchToOklab(L, mid11, h2)))) lo = mid11;
-    else hi = mid11;
-  }
-  return lo;
-}
-function inSrgb(L, C, h2) {
-  const c = Math.min(C, maxChroma(L, h2));
-  return { L, C: c, h: h2, rgb: oklabToLinear(lchToOklab(L, c, h2)).map(clamp015) };
-}
-var relativeLuminance = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
-var contrastRatio = (y1, y2) => (Math.max(y1, y2) + 0.05) / (Math.min(y1, y2) + 0.05);
-
-// src/colour/scale.ts
-var GROUND_NAMES = ["paper", "dark"];
-var OFFERED_SHARE = 0.38;
-var WORDS_CONTRAST = 4.5;
-var MARKS_CONTRAST = 3;
-var DEPTHS_DRAWN = 2;
-var MOVE_STEP = 5e-3;
-var MOVE_MAX = 0.3;
-var HEX6 = /^#[0-9a-f]{6}$/i;
-var hueOfHex = (hex) => oklabToLch(linearToOklab(hexToLinear(hex)))[2];
-function build(grounds, signals) {
-  const frozen = {};
-  for (const g of GROUND_NAMES) frozen[g] = Object.freeze({ ...grounds[g], L: Object.freeze([...grounds[g].L]) });
-  return Object.freeze({
-    grounds: Object.freeze(frozen),
-    signals: Object.freeze(signals.map((s) => Object.freeze({ name: s.name, hex: s.hex, hue: hueOfHex(s.hex) })))
-  });
-}
-var DEFAULT_PALETTE = build(
-  {
-    paper: { ground: "#f8f5ef", ink: "#0c1a24", L: [0.44, 0.505, 0.57], C: 0.15, toward: 1 },
-    dark: { ground: "#131315", ink: "#e3edf1", L: [0.8, 0.735, 0.67], C: 0.13, toward: -1 }
-  },
-  [
-    { name: "read", hex: "#1c5fb8" },
-    { name: "confident", hex: "#0b6f7d" },
-    { name: "unsure", hex: "#a3761c" },
-    { name: "broken", hex: "#a8493c" },
-    { name: "a model", hex: "#6b4fa8" }
-  ]
-);
-var isBand = (L) => Array.isArray(L) && L.length === 3 && L.every((v) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1);
-var isChroma = (C) => typeof C === "number" && Number.isFinite(C) && C >= 0 && C <= 0.4;
-function makePalette(input = {}, base = DEFAULT_PALETTE) {
-  const grounds = {};
-  for (const g of GROUND_NAMES) {
-    const was = base.grounds[g], got = input.grounds?.[g];
-    grounds[g] = {
-      ground: got && HEX6.test(got.ground ?? "") ? got.ground.toLowerCase() : was.ground,
-      ink: got && HEX6.test(got.ink ?? "") ? got.ink.toLowerCase() : was.ink,
-      L: got && isBand(got.L) ? got.L : was.L,
-      C: got && isChroma(got.C) ? got.C : was.C,
-      toward: was.toward
-    };
-  }
-  const named2 = (input.signals || []).filter((s) => s && HEX6.test(s.hex || "")).map((s) => ({ name: s.name, hex: s.hex.toLowerCase() }));
-  return build(grounds, named2.length ? named2 : base.signals);
-}
-var drawnLight = (rgb) => relativeLuminance(hexToLinear(linearToHex(rgb)));
-function colourOf(kind, ground, certainty = "said", palette = DEFAULT_PALETTE) {
-  const g = palette.grounds[ground];
-  const depth2 = Math.min(kind.depth, DEPTHS_DRAWN);
-  const groundLight = relativeLuminance(hexToLinear(g.ground));
-  const reads2 = (rgb) => contrastRatio(relativeLuminance(rgb), groundLight) >= WORDS_CONTRAST && contrastRatio(drawnLight(rgb), groundLight) >= WORDS_CONTRAST;
-  let L = g.L[depth2], moved2 = 0;
-  let said3 = inSrgb(L, g.C, kind.hue);
-  while (!reads2(said3.rgb) && moved2 < MOVE_MAX) {
-    L -= MOVE_STEP * g.toward;
-    moved2 += MOVE_STEP;
-    said3 = inSrgb(L, g.C, kind.hue);
-  }
-  let c = certainty === "said" ? said3 : inSrgb(L, said3.C * OFFERED_SHARE, kind.hue);
-  while (!reads2(c.rgb) && moved2 < MOVE_MAX) {
-    L -= MOVE_STEP * g.toward;
-    moved2 += MOVE_STEP;
-    c = inSrgb(L, said3.C * (certainty === "said" ? 1 : OFFERED_SHARE), kind.hue);
-  }
-  const hex = linearToHex(c.rgb);
-  return { ...c, hex, contrast: contrastRatio(relativeLuminance(hexToLinear(hex)), groundLight), moved: Math.round(moved2 * 1e3) / 1e3, depth: depth2 };
-}
-function movedWords(c) {
-  if (!c.moved) return "";
-  const said3 = `lightness moved ${c.moved} to read`;
-  return c.contrast >= WORDS_CONTRAST ? said3 : `${said3}, and still reads only ${c.contrast.toFixed(1)}:1`;
-}
-
-// src/colour/access.ts
-var VISIONS = ["typical", "protan", "deutan", "tritan"];
-var MACHADO = Object.freeze({
-  protan: [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-3882e-6, -0.048116, 1.051998]],
-  deutan: [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.01182, 0.04294, 0.968881]],
-  tritan: [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [4733e-6, 0.691367, 0.3039]]
-});
-var WHO = Object.freeze({ typical: "everyone", protan: "protanopes", deutan: "deuteranopes", tritan: "tritanopes" });
-function simulateVision(rgb, vision) {
-  if (vision === "typical") return [rgb[0], rgb[1], rgb[2]];
-  return MACHADO[vision].map((r) => Math.min(1, Math.max(0, r[0] * rgb[0] + r[1] * rgb[1] + r[2] * rgb[2])));
-}
-function oklabDistance(p, q) {
-  const A = linearToOklab(p), B = linearToOklab(q);
-  return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]);
-}
-var LOOK_ALIKE = 0.06;
-var inOrder = (kinds) => [...kinds].sort((x, y) => x.order - y.order);
-function distinctness(kinds, palette = DEFAULT_PALETTE) {
-  const ks = inOrder(kinds);
-  const drawn = ks.map((k) => GROUND_NAMES.map((g) => colourOf(k, g, "said", palette).rgb));
-  const pairs = [];
-  for (let i = 0; i < ks.length; i++) {
-    for (let j = i + 1; j < ks.length; j++) {
-      const by = {};
-      for (const v of VISIONS) {
-        let min = Infinity;
-        for (let gi = 0; gi < GROUND_NAMES.length; gi++) min = Math.min(min, oklabDistance(simulateVision(drawn[i][gi], v), simulateVision(drawn[j][gi], v)));
-        by[v] = min;
-      }
-      pairs.push({ a: ks[i].name, b: ks[j].name, by, min: Math.min(...Object.values(by)) });
-    }
-  }
-  return pairs;
-}
-var CHANNELS = ["solid", "dashed", "dotted", "dash-dot", "long", "dash-dot-dot", "short", "sparse"];
-function channels(kinds, pairs, palette = DEFAULT_PALETTE) {
-  const measured = pairs ?? distinctness(kinds, palette);
-  const out = /* @__PURE__ */ new Map();
-  for (const k of inOrder(kinds)) {
-    const alike = measured.filter((p) => p.min < LOOK_ALIKE && (p.a === k.name || p.b === k.name)).map((p) => ({ other: p.a === k.name ? p.b : p.a, p })).filter((x) => out.has(x.other));
-    const taken = new Set(alike.map((x) => out.get(x.other).channel));
-    const free = CHANNELS.find((c) => !taken.has(c));
-    const worst = alike.sort((x, y) => x.p.min - y.p.min)[0];
-    out.set(k.name, {
-      channel: free ?? CHANNELS[CHANNELS.length - 1],
-      alike: worst ? worst.other : null,
-      who: worst ? VISIONS.filter((v) => worst.p.by[v] < LOOK_ALIKE).map((v) => WHO[v]) : [],
-      repeats: free === void 0
-    });
-  }
-  return out;
-}
-
-// src/colour/names.ts
-var COLOUR_WORDS = Object.freeze({
-  red: 29,
-  scarlet: 33,
-  crimson: 20,
-  rose: 5,
-  pink: 355,
-  magenta: 330,
-  fuchsia: 335,
-  purple: 305,
-  violet: 298,
-  lavender: 300,
-  plum: 320,
-  indigo: 280,
-  blue: 264,
-  navy: 264,
-  cobalt: 262,
-  azure: 245,
-  sky: 240,
-  cyan: 215,
-  teal: 195,
-  turquoise: 185,
-  aqua: 190,
-  green: 145,
-  emerald: 160,
-  forest: 145,
-  mint: 165,
-  lime: 130,
-  chartreuse: 125,
-  olive: 110,
-  yellow: 105,
-  gold: 92,
-  mustard: 95,
-  amber: 80,
-  ochre: 75,
-  orange: 62,
-  tangerine: 58,
-  coral: 40,
-  salmon: 35,
-  peach: 50,
-  brown: 55,
-  rust: 40,
-  copper: 48,
-  tan: 70
-});
-var GREY_BELOW = 0.02;
-var HEX3 = /^#?[0-9a-f]{6}$|^#?[0-9a-f]{3}$/;
-function hueOfWord(word) {
-  const w2 = (word || "").trim().toLowerCase();
-  if (HEX3.test(w2)) {
-    const [, C, hue] = oklabToLch(linearToOklab(hexToLinear(w2.startsWith("#") ? w2 : "#" + w2)));
-    return C < GREY_BELOW ? null : { hue, word: w2.startsWith("#") ? w2 : "#" + w2 };
-  }
-  return Object.prototype.hasOwnProperty.call(COLOUR_WORDS, w2) ? { hue: COLOUR_WORDS[w2], word: w2 } : null;
-}
-
-// src/colour/harmony.ts
-var emptyLens = () => ({ kinds: /* @__PURE__ */ new Map(), rels: [], order: 0 });
-var kindsOf = (lens) => [...lens.kinds.values()].sort((x, y) => x.order - y.order);
-var VISION_WEIGHT = { typical: 1, protan: 0.35, deutan: 0.35, tritan: 0.15 };
-var SIGNAL_REACH = 12;
-var SIGNAL_WEIGHT = 0.02;
-var TIE = 2e-3;
-var SIGNAL_NEAR = 14;
-var PALE_ON_PAPER = { from: 80, to: 135 };
-var KIN_FROM = 26;
-var KIN_TO = 45;
-var KIN_IDEAL = 32;
-var KIN_COST = 1e-3;
-var OPPOSE_SPREAD = 20;
-var OPPOSE_COST = 15e-4;
-var PAIR_STEP = 2;
-var PAIR_KIN = [-40, -32, -26, 26, 32, 40];
-var PAIR_OPPOSE = [164, 172, 180, 188, 196];
-var PAIR_COST = 15e-4;
-var PAIR_TIE = 1e-9;
-var FAN = [0, 28, -28, 56, -56, 84, -84];
-var READS_AS_KIN = 45;
-var READS_AS_OPPOSITES = 150;
-function nameHue(name) {
-  let x = 2166136261;
-  for (const ch of name) {
-    x ^= ch.charCodeAt(0);
-    x = Math.imul(x, 16777619);
-  }
-  return (x >>> 0) % 360;
-}
-var signalPenalty = (hue, palette = DEFAULT_PALETTE) => palette.signals.reduce((p, s) => p + Math.max(0, SIGNAL_REACH - hueDistance(hue, s.hue)) / SIGNAL_REACH * SIGNAL_WEIGHT, 0);
-var SEEN_MAX = 2e4;
-var seenBy = /* @__PURE__ */ new WeakMap();
-function seen(hue, depth2, palette) {
-  let cache = seenBy.get(palette);
-  if (!cache) seenBy.set(palette, cache = /* @__PURE__ */ new Map());
-  const d = Math.min(depth2, DEPTHS_DRAWN);
-  const key2 = hue + ":" + d;
-  let colours = cache.get(key2);
-  if (!colours) {
-    colours = GROUND_NAMES.map((g) => colourOf({ hue, depth: d }, g, "said", palette).rgb);
-    if (cache.size >= SEEN_MAX) cache.clear();
-    cache.set(key2, colours);
-  }
-  return colours;
-}
-function apartness(A, B, v) {
-  let min = Infinity;
-  for (let gi = 0; gi < A.length; gi++) min = Math.min(min, oklabDistance(simulateVision(A[gi], v), simulateVision(B[gi], v)));
-  return min;
-}
-function placeHue(candidates, others, prefer, depth2 = 0, palette = DEFAULT_PALETTE) {
-  const theirs = others.map((o) => seen(o.hue, o.depth, palette));
-  let best = null;
-  for (const c of candidates) {
-    const mine = seen(c.hue, depth2, palette);
-    let room = 0;
-    for (const v of VISIONS) room += VISION_WEIGHT[v] * (theirs.length ? Math.min(...theirs.map((t) => apartness(mine, t, v))) : 1);
-    const score2 = room - signalPenalty(c.hue, palette) - (c.cost || 0);
-    if (!best || score2 > best.score + TIE || Math.abs(score2 - best.score) <= TIE && hueDistance(c.hue, prefer) < hueDistance(best.hue, prefer)) best = { ...c, score: score2, room };
-  }
-  return best;
-}
-function resolveHue(lens, k, seenNames = /* @__PURE__ */ new Set()) {
-  if (k.source !== "relative") return k.hue;
-  if (seenNames.has(k.name)) return k.hue;
-  seenNames.add(k.name);
-  const a = lens.kinds.get(k.anchor);
-  return a ? normHue(resolveHue(lens, a, seenNames) + k.offset) : k.hue;
-}
-function refresh(lens) {
-  for (const k of lens.kinds.values()) k.hue = resolveHue(lens, k);
-  for (const k of lens.kinds.values()) {
-    let d = 0, p = k.parent;
-    const seenNames = /* @__PURE__ */ new Set([k.name]);
-    while (p && !seenNames.has(p)) {
-      seenNames.add(p);
-      d++;
-      p = lens.kinds.get(p)?.parent ?? null;
-    }
-    k.depth = d;
-  }
-}
-function dependsOn(lens, k, target) {
-  const seenNames = /* @__PURE__ */ new Set();
-  while (k && k.source === "relative" && !seenNames.has(k.name)) {
-    if (k.anchor === target) return true;
-    seenNames.add(k.name);
-    k = lens.kinds.get(k.anchor);
-  }
-  return false;
-}
-var familyOf = (lens, name) => [...lens.kinds.values()].filter((k) => k.name === name || dependsOn(lens, k, name));
-var othersThan = (lens, names) => [...lens.kinds.values()].filter((k) => !names.has(k.name));
-function newKind(lens, name) {
-  return { name, hue: 0, source: "placed", depth: 0, order: lens.order++, parent: null, anchor: null, offset: 0, rel: null };
-}
-function make(lens, name, palette) {
-  const held2 = lens.kinds.get(name);
-  if (held2) return { k: held2, made: false, why: "" };
-  const k = newKind(lens, name);
-  const others = [...lens.kinds.values()];
-  const wheel = [];
-  for (let h2 = 0; h2 < 360; h2 += 1) wheel.push({ hue: h2 });
-  const best = placeHue(wheel, others, nameHue(name), 0, palette);
-  k.hue = best.hue;
-  lens.kinds.set(name, k);
-  const near = others.length ? others.reduce((a, o) => hueDistance(o.hue, best.hue) < hueDistance(a.hue, best.hue) ? o : a) : null;
-  const gap = near ? `the most distinct place left (${Math.round(hueDistance(near.hue, best.hue))}\xB0 from ${near.name})` : "the first kind; its name leans it there";
-  return { k, made: true, why: `${name} \u2192 ${Math.round(k.hue)}\xB0, ${gap}` };
-}
-function say(lens, name, word, palette) {
-  const named2 = hueOfWord(word);
-  if (named2) {
-    let k = lens.kinds.get(name);
-    if (!k) lens.kinds.set(name, k = newKind(lens, name));
-    k.source = "said";
-    k.hue = named2.hue;
-    k.word = named2.word;
-    k.anchor = null;
-    k.offset = 0;
-    refresh(lens);
-    const sig2 = palette.signals.find((s) => hueDistance(s.hue, named2.hue) < SIGNAL_NEAR);
-    const pale = named2.hue > PALE_ON_PAPER.from && named2.hue < PALE_ON_PAPER.to;
-    return `${name} \u2192 ${Math.round(named2.hue)}\xB0, your ${named2.word}` + (pale ? "; on paper a yellow is drawn as dark as words need, ochre or olive, and on the dark ground it is yellow" : "") + (sig2 ? `; it stands by the chrome's colour for ${sig2.name} (${Math.round(hueDistance(sig2.hue, named2.hue))}\xB0 away) \u2014 on ink it means ${name}` : "");
-  }
-  const { made, why } = make(lens, name, palette);
-  if (!word) return made ? why : `${name} is already a kind`;
-  return `${made ? why + "; " : ""}\u201C${word}\u201D is no colour this space knows${/gr[ae]y|black|white/.test(word) ? " \u2014 a kind takes a hue, and grey, black and white have none" : ""}`;
-}
-function relate2(lens, a, b, rel, palette) {
-  const A = make(lens, a, palette), B = make(lens, b, palette);
-  const ka = A.k, kb = B.k;
-  if (a === b) return { said: `${a} cannot be related to itself` };
-  if (rel === "sub") {
-    if (dependsOn(lens, kb, a) || kb.parent === a) return { said: `${b} already hangs from ${a}` };
-    ka.parent = b;
-    if (ka.source === "said") {
-      refresh(lens);
-      return { said: `${a} keeps your ${ka.word}; as a kind of ${b} it is drawn a step toward the ground` };
-    }
-    const siblings = [...lens.kinds.values()].filter((k) => k.parent === b && k !== ka && k.anchor === b && k.rel === "sub");
-    const used = new Set(siblings.map((s) => Math.round(s.offset)));
-    const offset = FAN.find((o) => !used.has(o)) ?? 0;
-    Object.assign(ka, { source: "relative", anchor: b, offset, rel: "sub" });
-    refresh(lens);
-    return { said: `${a} is a kind of ${b}: ${b}'s hue${offset ? ` ${offset > 0 ? "+" : "\u2212"}${Math.abs(offset)}\xB0` : ""}, a step toward the ground` };
-  }
-  lens.rels = lens.rels.filter((r) => !(r.a === a && r.b === b || r.a === b && r.b === a));
-  const related = { a, b, rel };
-  lens.rels.push({ ...related });
-  let mover = kb, anchor = ka;
-  if (kb.source === "said" && ka.source !== "said") {
-    mover = ka;
-    anchor = kb;
-  } else if (ka.source !== "said" && kb.source !== "said" && ka.order > kb.order) {
-    mover = ka;
-    anchor = kb;
-  }
-  const apart = Math.round(hueDistance(ka.hue, kb.hue));
-  if (mover.source === "said") {
-    return { said: `you gave ${a} and ${b} their colours; they stand ${apart}\xB0 apart, so they read as ${apart >= READS_AS_OPPOSITES ? "opposites" : apart <= READS_AS_KIN ? "kin" : "neither kin nor opposites"}`, related };
-  }
-  if (dependsOn(lens, anchor, mover.name)) return { said: `${anchor.name}'s hue already follows ${mover.name}'s; nothing moved`, related };
-  const fam = new Set(familyOf(lens, mover.name).map((k) => k.name));
-  fam.add(anchor.name);
-  for (const k of familyOf(lens, anchor.name)) fam.add(k.name);
-  const others = othersThan(lens, fam);
-  if (A.made && B.made) {
-    const offs = rel === "kin" ? PAIR_KIN : PAIR_OPPOSE;
-    const ideal = rel === "kin" ? KIN_IDEAL : 180;
-    let best2 = null;
-    for (let h2 = 0; h2 < 360; h2 += PAIR_STEP) {
-      for (const off of offs) {
-        const one = placeHue([{ hue: h2 }], others, nameHue(anchor.name), 0, palette);
-        const two = placeHue([{ hue: normHue(h2 + off) }], others, nameHue(mover.name), 0, palette);
-        const score2 = Math.min(one.score, two.score) - Math.abs(Math.abs(off) - ideal) * PAIR_COST;
-        if (!best2 || score2 > best2.score + PAIR_TIE) best2 = { h: h2, off, score: score2 };
-      }
-    }
-    const at2 = best2;
-    anchor.hue = at2.h;
-    Object.assign(mover, { source: "relative", anchor: anchor.name, offset: at2.off, rel });
-    refresh(lens);
-    return {
-      said: rel === "kin" ? `${a} is kin to ${b}: placed together, ${Math.abs(at2.off)}\xB0 apart, where both stand most distinct` : `${a} opposes ${b}: placed together across the wheel, ${Math.round(hueDistance(mover.hue, anchor.hue))}\xB0 apart`,
-      related
-    };
-  }
-  const cands = [];
-  if (rel === "kin") {
-    for (let d = KIN_FROM; d <= KIN_TO; d++) for (const s of [1, -1]) cands.push({ hue: normHue(anchor.hue + s * d), off: s * d, cost: Math.abs(d - KIN_IDEAL) * KIN_COST });
-  } else {
-    for (let e = -OPPOSE_SPREAD; e <= OPPOSE_SPREAD; e++) cands.push({ hue: normHue(anchor.hue + 180 + e), off: 180 + e, cost: Math.abs(e) * OPPOSE_COST });
-  }
-  const best = placeHue(cands, [...others, anchor], nameHue(mover.name), mover.depth, palette);
-  Object.assign(mover, { source: "relative", anchor: anchor.name, offset: best.off, rel });
-  refresh(lens);
-  return {
-    said: rel === "kin" ? `${a} is kin to ${b}: ${mover.name} ${Math.abs(Math.round(best.off))}\xB0 beside ${anchor.name}, on the side that stays most distinct` : `${a} opposes ${b}: ${mover.name} across the wheel from ${anchor.name}, ${Math.round(hueDistance(mover.hue, anchor.hue))}\xB0 apart`,
-    related
-  };
-}
-var decisionOf = (k) => JSON.stringify([k.source, k.source === "relative" ? null : k.hue, k.word ?? null, k.parent, k.anchor, k.offset, k.rel, k.order]);
-function holdOf(k) {
-  const h2 = { name: k.name, source: k.source, hue: k.hue, parent: k.parent, anchor: k.anchor, offset: k.offset, rel: k.rel, order: k.order };
-  if (k.word !== void 0) h2.word = k.word;
-  return h2;
-}
-function applyAct(lens, act, palette = DEFAULT_PALETTE) {
-  const before = new Map(kindsOf(lens).map((k) => [k.name, { hue: k.hue, decision: decisionOf(k) }]));
-  const r = act.act === "say" ? { said: say(lens, act.a, act.word, palette), related: void 0 } : relate2(lens, act.a, act.b, act.act, palette);
-  const held2 = [], moved2 = [];
-  for (const k of kindsOf(lens)) {
-    const was = before.get(k.name);
-    if (!was || was.decision !== decisionOf(k)) held2.push(holdOf(k));
-    if (was && was.hue !== k.hue) moved2.push(k.name);
-  }
-  return { said: r.said, held: held2, related: r.related ?? null, moved: moved2 };
-}
-function holdKind(lens, h2) {
-  const k = lens.kinds.get(h2.name) ?? { name: h2.name, hue: h2.hue, source: h2.source, depth: 0, order: h2.order, parent: null, anchor: null, offset: 0, rel: null };
-  k.source = h2.source;
-  k.hue = h2.hue;
-  k.parent = h2.parent;
-  k.anchor = h2.anchor;
-  k.offset = h2.offset;
-  k.rel = h2.rel;
-  k.order = h2.order;
-  if (h2.word !== void 0) k.word = h2.word;
-  else delete k.word;
-  lens.kinds.set(h2.name, k);
-  lens.order = Math.max(lens.order, h2.order + 1);
-  refresh(lens);
-}
-function holdRelation(lens, r) {
-  lens.rels = lens.rels.filter((x) => !(x.a === r.a && x.b === r.b || x.a === r.b && x.b === r.a));
-  lens.rels.push({ ...r });
-}
-
-// src/colour/meaning.ts
-var KIN_READS = 50;
-var OPPOSITES_READ = 140;
-var SIGNAL_NEAR2 = 14;
-var list5 = (xs) => xs.join(", ").replace(/, ([^,]*)$/, " and $1");
-function meaning(lens, pairs, palette = DEFAULT_PALETTE) {
-  const ks = kindsOf(lens);
-  const measured = pairs ?? distinctness(ks, palette);
-  const lines = [];
-  const rootOf2 = (k) => {
-    const seen2 = /* @__PURE__ */ new Set();
-    while (k.parent && !seen2.has(k.name)) {
-      seen2.add(k.name);
-      k = lens.kinds.get(k.parent) || k;
-    }
-    return k.name;
-  };
-  for (const root of ks.filter((k) => !k.parent)) {
-    const fam = ks.filter((k) => k.parent && rootOf2(k) === root.name).sort((x, y) => x.depth - y.depth || x.order - y.order);
-    if (!fam.length) continue;
-    const own = fam.filter((k) => k.source === "said").map((k) => `${k.name} keeps your ${k.word}`);
-    lines.push(`${list5([root.name, ...fam.map((k) => k.name)])} are one family: ${root.name}'s hue, each kind below it a step toward the ground` + (own.length ? ` (${list5(own)})` : ""));
-  }
-  for (const r of lens.rels) {
-    const A = lens.kinds.get(r.a), B = lens.kinds.get(r.b);
-    if (!A || !B) continue;
-    const d = Math.round(hueDistance(A.hue, B.hue));
-    if (r.rel === "kin") lines.push(d <= KIN_READS ? `${r.a} stands beside ${r.b}, ${d}\xB0 along the wheel: kin` : `${r.a} and ${r.b} are said to be kin, but your colours stand ${d}\xB0 apart`);
-    else lines.push(d >= OPPOSITES_READ ? `${r.a} and ${r.b} are drawn as opposites, ${d}\xB0 apart` : `${r.a} and ${r.b} are said to oppose, but your colours stand ${d}\xB0 apart`);
-  }
-  const tied = /* @__PURE__ */ new Set();
-  for (const k of ks) if (k.parent) {
-    tied.add(k.name);
-    tied.add(k.parent);
-  }
-  for (const r of lens.rels) {
-    tied.add(r.a);
-    tied.add(r.b);
-  }
-  const alone = ks.filter((k) => !tied.has(k.name));
-  if (alone.length && ks.length > 1) lines.push(`${list5(alone.map((k) => k.name))} ${alone.length > 1 ? "stand" : "stands"} apart from the rest`);
-  for (const k of ks) {
-    const s = palette.signals.find((x) => hueDistance(x.hue, k.hue) < SIGNAL_NEAR2);
-    if (s && k.source === "said") lines.push(`${k.name}'s ${k.word} stands near the chrome's colour for ${s.name}: on the ink it means ${k.name}, and the chrome's colours never touch the ink`);
-  }
-  const ch = channels(ks, measured, palette);
-  for (const k of ks) {
-    const c = ch.get(k.name);
-    if (c.repeats) {
-      lines.push(`${k.name} is drawn ${c.channel}, which a kind it looks alike to already holds: all ${CHANNELS.length} patterns are in use, so beside ${c.alike} it looks alike in colour and in pattern to ${list5(c.who)}`);
-    } else if (c.channel !== "solid") {
-      lines.push(`${k.name} is drawn ${c.channel}: beside ${c.alike} it looks alike to ${list5(c.who)}`);
-    }
-  }
-  return lines;
 }
 export {
   ALONG_STEPS,
@@ -35491,6 +36219,7 @@ export {
   DEFAULT_PALETTE,
   DEFAULT_RELATE_CONFIG,
   DEFAULT_SESSION_CONFIG,
+  DEFAULT_SETTINGS,
   DEFAULT_SIMPLIFY_PX,
   DEFAULT_SPEED,
   DEFAULT_TIMEOUT_MS,
@@ -35516,10 +36245,16 @@ export {
   EVIDENCE,
   EmbedError,
   FAITHFUL_AT,
+  FIGURE_SOURCE,
+  FILL,
   FILLED_AT,
   FILLED_PATH,
   FILL_CORE,
+  RANK as FILL_RANK,
   FILL_REACH,
+  FILL_SOURCE_ID,
+  FILL_TEXT_PX,
+  FILL_TOOL,
   FILL_UNSURE,
   FINAL_ID,
   FLAT_MARGIN,
@@ -35642,6 +36377,7 @@ export {
   NOTATION_FLOOR,
   NO_CONTEXT,
   NO_MATCH,
+  NUDGE_MAX,
   OFFERED_SHARE,
   ONE_BEND,
   OPENROUTER_APP,
@@ -35653,6 +36389,7 @@ export {
   PAPERS,
   PEN_ELONGATION,
   PHRASES,
+  PLACE_MAX,
   PLAIN_CLASS,
   PLAIN_SHARE,
   PRESETS,
@@ -35671,6 +36408,11 @@ export {
   REGION_MIN_HELD,
   RIGHT_ANGLE_TOLERANCE,
   ROLES,
+  CLASH as ROLE_CLASH,
+  ROLE_FLOOR,
+  ROLE_HUES,
+  ROLE_PREFIX,
+  ROLE_SIGNAL_MARGIN,
   ROUNDED_BY,
   ROUNDED_EXTENT,
   ROUNDED_UPRIGHT,
@@ -35689,6 +36431,8 @@ export {
   SEQUENCE,
   SEQUENCE_READER,
   SEQUENCE_TABLE,
+  SETTING_KEYS,
+  SETTING_VALUES,
   SETTLED_CONFIDENCE,
   SHEET_MAX_PX,
   SITS_EXACTLY,
@@ -35721,6 +36465,7 @@ export {
   TIE_MARGIN,
   TO_SCALE_WITHIN,
   TREMOR_OF_SIZE,
+  ROLES2 as TRIANGLE_ROLES,
   UML_CLASS,
   UML_CLASS_TABLE,
   UNREAD_WRITING,
@@ -35772,6 +36517,7 @@ export {
   binarize,
   bindingsOf,
   blessedBehaviourOf,
+  boardKinds,
   boardMaths,
   boardMathsOf,
   boundByIndex,
@@ -35904,14 +36650,18 @@ export {
   explanationOf,
   exportFrame,
   figureOfMark,
+  figureQuantities,
   figuresAmong,
   figuresOf,
+  fillFontSize,
   fillInsOf,
   fillInsOfSession,
   fillInsReport,
   fillInsReportOfSession,
+  fillLandsOnBoard,
   fillSources,
   fillSourcesVersion,
+  fillTakeAt,
   findCorners,
   findCornersWithSeparation,
   fingerprintOf,
@@ -35961,8 +36711,10 @@ export {
   holds,
   holdsSaid,
   hostIntentOf,
+  apartness2 as hueApartness,
   hueDistance,
   hueOfWord,
+  typicalApartness as hueTypicalApartness,
   idealize,
   inSrgb,
   ingest,
@@ -36003,6 +36755,8 @@ export {
   isPictureKind,
   isRange,
   isSeatTraffic,
+  isSettingKey,
+  isSettingValue,
   isShapeRungReading,
   isHash as isSourceHash,
   isSpecific,
@@ -36055,6 +36809,7 @@ export {
   manipulatedReps,
   manipulationMap,
   markFrameOf,
+  marksOfValue,
   matchBrace,
   matchConcepts,
   matchDefinition,
@@ -36084,6 +36839,7 @@ export {
   movesWhole,
   nameHue,
   nameMarks,
+  naturalCompare2 as naturalCompare,
   nearLimitOf,
   nearestIntent,
   nearestMagnet,
@@ -36157,6 +36913,10 @@ export {
   providerLocality,
   providerTier,
   quantity,
+  quantityColour,
+  quantityHues,
+  quantityHuesOfSession,
+  quantityKeyOf,
   rangeOf,
   rank,
   rankOffers,
@@ -36184,7 +36944,7 @@ export {
   readUmlClass,
   readingsFor,
   readingsToEdges,
-  reasonOf,
+  reasonOf2 as reasonOf,
   recoverFill,
   refusalOf,
   regionAt,
@@ -36221,6 +36981,11 @@ export {
   reshapedClean,
   resolveFrame,
   resolvesLasso,
+  roleChannels,
+  roleHue,
+  roleKey,
+  roleOfKey,
+  roleQuantities,
   routable,
   route,
   routeAffectedBy,
@@ -36249,9 +37014,10 @@ export {
   segmentsIntersect,
   cosine as semanticCosine,
   semanticScorer,
-  unit6 as semanticUnit,
+  unit7 as semanticUnit,
   sequencePortsOf,
   sequenceText,
+  settingRefusal,
   sha256Hex,
   shapeExtent,
   shapeTokens,
@@ -36264,6 +37030,8 @@ export {
   shippedPack,
   shippedPacks,
   shownSize,
+  outwardFrom as sideOutward,
+  placeOf as sidePlaceOf,
   signalPenalty,
   simplifyStroke,
   simulateVision,
@@ -36300,6 +37068,7 @@ export {
   strokesIntersect,
   structuralSignature,
   takeOffer,
+  textBoxOf,
   textOf4 as textOf,
   theirMarks,
   thin,
@@ -36346,6 +37115,7 @@ export {
   wordsOfMarks,
   worldOf,
   writeEr,
+  writeFillIn,
   writeMindMap,
   writeSequence,
   writeState,

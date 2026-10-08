@@ -5,8 +5,10 @@
 
 import { registerFillSource } from './fill';
 import type { FillSource } from './fill';
+import { FIGURE_SOURCE } from './fill-figure';
 
 export const BUILTIN_FILL_SOURCES: readonly FillSource[] = [
+  FIGURE_SOURCE,
 ];
 
 for (const s of BUILTIN_FILL_SOURCES) registerFillSource(s);

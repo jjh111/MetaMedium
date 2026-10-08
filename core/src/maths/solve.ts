@@ -738,7 +738,8 @@ function inkKeyOf(f: Figure, key: string): string {
   return key;
 }
 
-function rectanglePairs(f: Figure): { width: string[]; height: string[] } {
+/** Which pair of a rectangle's sides is its width and which its height: the pair that runs the more level is the width. */
+export function rectanglePairs(f: Figure): { width: string[]; height: string[] } {
   const horizontal = (k: number) => Math.abs(f.sides[k].to.x - f.sides[k].from.x) >= Math.abs(f.sides[k].to.y - f.sides[k].from.y);
   const evenWide = horizontal(0) || (!horizontal(1) && f.sides[0].length >= f.sides[1].length);
   return evenWide ? { width: ['side0', 'side2'], height: ['side1', 'side3'] } : { width: ['side1', 'side3'], height: ['side0', 'side2'] };

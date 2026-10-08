@@ -151,6 +151,17 @@
     if (hoverId) held.add(hoverId);
     for (const c of m.chips) {
       if (!mathsShown(c, held, m.sig)) continue;
+      // An answer chip gives way to the fill-in that says the same thing (M16, 25-ghosts.js): the ghost stands in
+      // its place, in its quantity's colour, and a tap on it writes it — what is recorded here is what stands
+      // beside the figure, whichever it is drawn as. On a board that waits an answer is never a pill.
+      const gh = fgCovers(s, c);
+      if (gh) {
+        if (gh.drawn) {
+          mathsDrawn.push({ key: c.key, kind: c.kind, text: gh.drawn.text, x: gh.drawn.cx, y: gh.drawn.cy, w: gh.drawn.w, standing: c.standing, ids: c.ids.slice(), as: 'ghost' });
+          continue;
+        }
+        if (s.settings.answers === 'wait') continue;
+      }
       // Where it stands is measured in the chrome's size; it is drawn when it reaches the screen.
       const size = chipRect(c.text, 0, 0);
       // Beside a side, just clear of it: off the point on the figure by as much as the chip reaches that way, and a little more.
@@ -174,6 +185,10 @@
     const m = mathsFor(s);
     const said = m.board ? MM.mathsSaid(m.board, ids) : null;
     if (!said) return null;
+    // A board set so lets its answers wait (M18): the panel does not say them either — the lines are the answer — until the board shows its answers.
+    if (s.settings.answers === 'wait' && fgHasAnswers(s, ids)) {
+      return { top: '<div class="row"><span class="k">maths</span><span class="v">the answers wait — tap a ghost to see one, or show the answers</span></div>', details: '' };
+    }
     let top = '';
     said.lines.forEach((l, i) => { top += '<div class="row"><span class="k">' + (i ? '' : 'maths') + '</span><span class="v">' + esc(l) + '</span></div>'; });
     let details = '';
@@ -264,7 +279,7 @@
     // What the last paint drew: each chip, where it stands (its anchor in world units), whether it stands at rest.
     chipsDrawn: () => mathsDrawn.map((c) => Object.assign({}, c, { ids: c.ids.slice() })),
     // The moment is over: only what stands, what the hand is on and what was asked for shows.
-    settle: () => { mathsChangedAt.clear(); mathsPin = null; render(session.getState()); },
+    settle: () => { mathsChangedAt.clear(); mathsPin = null; fgSettle(); render(session.getState()); },
     board: () => mathsFor(session.getState()).board,
     trueSizeSvg: () => { const d = mathsTrueSize(); return d ? d.svg : null; },
     printJob: () => { const j = mathsPrintJob(); return j ? { pages: j.pages.length, paper: j.paper, testSquare: j.testSquare.text, error: j.error || null } : null; },

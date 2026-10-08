@@ -73,6 +73,8 @@
   function showPanel(html) {
     // The board's outline stands at the foot of every panel the board has regions for (12-regions.js).
     html += regionOutlineHtml(session.getState());
+    // And its own line — what it does with answers and colour — where it has maths and nothing is held (M18; 25-ghosts.js).
+    html += boardSettingsHtml(session.getState());
     if (html === panelSaid) return;
     panelSaid = html;
     inspectorEl.innerHTML = html;

@@ -42,7 +42,7 @@ import { sheetLines } from './gather';
 import { checkWritten, readSheet } from './sheet';
 import type { CheckEntry, Sheet, StepEntry } from './sheet';
 import type { ChainReading } from './expr';
-import { solveBoard } from './solve';
+import { rectanglePairs, solveBoard } from './solve';
 import { garmentMaths, garmentNotFigures, garmentOf } from './garment';
 import type { BoardMaths, Conflict, FigureMaths, SolvedValue } from './solve';
 import { formatNumber, formatQuantity, unitSuffix } from './quantity';
@@ -206,7 +206,7 @@ export function marksOfFigure(fm: FigureMaths): string[] {
 }
 
 /** Where a key stands on a figure: the middle of its side (or of the part of a side), and which way that side runs. */
-function placeOf(fm: FigureMaths, key: string): { at: Point; dir: Point } | null {
+export function placeOf(fm: FigureMaths, key: string): { at: Point; dir: Point } | null {
   const [base, part] = key.split('.');
   const side = fm.figure.sides.find((s) => s.key === base);
   if (!side) return null;
@@ -222,7 +222,7 @@ function placeOf(fm: FigureMaths, key: string): { at: Point; dir: Point } | null
  * side's middle, which on a long low triangle points along the figure and off its side. A line
  * has no inside: it stands on the upper side of the screen.
  */
-function outwardFrom(fm: FigureMaths, place: { at: Point; dir: Point }): Point {
+export function outwardFrom(fm: FigureMaths, place: { at: Point; dir: Point }): Point {
   const f = fm.figure;
   let n = { x: place.dir.y, y: -place.dir.x };
   const inside = f.kind === 'circle' && f.centre ? f.centre : f.kind === 'arc' && f.vertices[2] ? f.vertices[2] : f.closed && f.vertices.length ? { x: f.vertices.reduce((a, p) => a + p.x, 0) / f.vertices.length, y: f.vertices.reduce((a, p) => a + p.y, 0) / f.vertices.length } : null;
@@ -234,6 +234,34 @@ function outwardFrom(fm: FigureMaths, place: { at: Point; dir: Point }): Point {
     return n;
   }
   return n.y > 0 || (n.y === 0 && n.x > 0) ? { x: -n.x, y: -n.y } : n;
+}
+
+/**
+ * A quantity's key (MATHS-SPEC §4, M17): what a value on a figure is, for its colour and for the fill-in that is
+ * about it — `fig:<figureId>:<valueKey>`, the value key being the solver's own ('side0', 'angle1', 'area', 'radius').
+ */
+export const quantityKeyOf = (figureId: string, valueKey: string): string => `fig:${figureId}:${valueKey}`;
+
+/**
+ * The marks a value on a figure is about (M16): a side's — or a part of one — is the marks that drew that side; an
+ * angle's are the two sides that meet at its corner; a rectangle's width or height is the sides it runs along; and
+ * every other measure (area, perimeter, a diagonal, a circle's or an arc's) is about the figure's marks whole.
+ * Unlike a chip's `ids` (`marksOfFigure`), the numbers written on the figure are not among them.
+ */
+export function marksOfValue(fm: FigureMaths, key: string): string[] {
+  const f = fm.figure;
+  const side = /^side(\d+)(?:\.part\d+)?$/.exec(key);
+  if (side) return [...(f.sides[Number(side[1])]?.ids ?? f.ids)];
+  const angle = /^angle(\d+)$/.exec(key);
+  if (angle && f.sides.length >= 2) {
+    const k = Number(angle[1]), n = f.sides.length;
+    return [...new Set([...(f.sides[(k - 1 + n) % n]?.ids ?? []), ...(f.sides[k % n]?.ids ?? [])])];
+  }
+  if (f.kind === 'rectangle' && (key === 'width' || key === 'height')) {
+    const pair = rectanglePairs(f);
+    return [...new Set((key === 'width' ? pair.width : pair.height).flatMap((k) => f.sides.find((s) => s.key === k)?.ids ?? []))];
+  }
+  return [...f.ids];
 }
 
 /** The measures that belong to no side, said one under another below their figure. */

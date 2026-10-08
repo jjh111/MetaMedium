@@ -255,7 +255,7 @@ export type { Paper, Orientation, PaperSize, PrintOptions, PrintPage, PrintJob }
 // data a surface draws; the panel's words; and `=` typed in the field as a sum
 // read against the page. `boardMathsOf` keeps the board's maths while its log
 // stands. Derived: nothing enters the log.
-export { boardMaths, boardMathsOf, mathsChips, mathsSaid, evaluateTyped, CHIP_OFFSET, STEP_GAP } from './maths/board';
+export { boardMaths, boardMathsOf, mathsChips, mathsSaid, evaluateTyped, CHIP_OFFSET, STEP_GAP, quantityKeyOf, marksOfValue, placeOf as sidePlaceOf, outwardFrom as sideOutward } from './maths/board';
 export type { MathsChip, MathsChipKind, MathsSaid, TypedMaths } from './maths/board';
 // What a pattern piece's marks come to in numbers, and what true size prints of them (M6).
 export { garmentMaths, garmentDecor, offsetPolygon, affineFit, applyAffine, INK_AGREES as GARMENT_INK_AGREES } from './maths/garment';
@@ -275,6 +275,46 @@ export {
 } from './maths/fill';
 export type { FillKind, FillTake, FillIn, FillContext, FillSource, FillRefusal, FillReport } from './maths/fill';
 export { BUILTIN_FILL_SOURCES } from './maths/fill-builtin';
+// The figure source (M16): what a solved figure derives that nobody wrote, as fill-ins — where each stands, what a
+// tap writes (and whether it would land on the side it was offered for), the quantities a board speaks of and the
+// hue of each (M17). Derived, never logged.
+export {
+  FIGURE_SOURCE,
+  FILL_SOURCE_ID,
+  FILL_TEXT_PX,
+  RANK as FILL_RANK,
+  textBoxOf,
+  fillFontSize,
+  fillLandsOnBoard,
+  fillTakeAt,
+  figureQuantities,
+  roleQuantities,
+  quantityHuesOfSession,
+} from './maths/fill-figure';
+export type { FigureQuantity } from './maths/fill-figure';
+// Colour for relations (M17): the roles of a right triangle are one fixed table, nudged (and the nudge said) only
+// beside a kind that looks like one; every other quantity is placed for the board, deterministically.
+export {
+  ROLES as TRIANGLE_ROLES,
+  ROLE_HUES,
+  ROLE_SIGNAL_MARGIN,
+  ROLE_FLOOR,
+  CLASH as ROLE_CLASH,
+  NUDGE_MAX,
+  PLACE_MAX,
+  ROLE_PREFIX,
+  roleKey,
+  roleOfKey,
+  roleHue,
+  roleChannels,
+  quantityHues,
+  quantityColour,
+  apartness as hueApartness,
+  typicalApartness as hueTypicalApartness,
+  naturalCompare,
+  boardKinds,
+} from './maths/hues';
+export type { Role as TriangleRole, RoleHue, HueKind, QuantityHue, HueOptions } from './maths/hues';
 // `compileFunction`'s shape (C0): a text with a variable as a function of it, or a reason.
 export type { CompiledFunction, CompileFunction } from './maths/compile';
 
@@ -722,6 +762,10 @@ export type {
   ProposedRep,
   RebaseReport,
 } from './session/session';
+// A board's settings (MATHS-SPEC M18): the closed set a `setting` event is read against — `answers` (show | wait) and
+// `colour` (pointed | always) — and the sentence for a key or value outside it.
+export { DEFAULT_SETTINGS, SETTING_VALUES, SETTING_KEYS, isSettingKey, isSettingValue, settingRefusal } from './session/settings';
+export type { BoardSettings, SettingKey } from './session/settings';
 
 // Interpretations — the NON-COLLAPSING read path (ARCHITECTURE-v7 §4.1).
 // `topInterpretation` above returns one reading for surfaces that need a
@@ -794,6 +838,7 @@ export type { LabelRefusal } from './tools/label';
 export { REGION, makeRegion, regionFrameOf, regionRound, nextRegionName, REGION_MIN_HELD, REGION_MARGIN_SHARE, REGION_MARGIN_MIN } from './tools/region';
 export type { RegionMade } from './tools/region';
 export { LIKE } from './tools/like';
+export { FILL, FILL_TOOL, writeFillIn } from './tools/fill';
 export { standStructure } from './tools/structure';
 export { shapesSummary } from './tools/clean';
 export { isWritingMark, definitionOf, definitionsIn, artifactsIn, writingLine } from './tools/board';
