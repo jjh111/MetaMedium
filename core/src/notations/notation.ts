@@ -48,6 +48,7 @@ import { ER } from './er';
 import { MINDMAP } from './mindmap';
 import { GARMENT } from './garment';
 import { PENDULUM } from './pendulum';
+import { PLANE } from './plane';
 import { DIAGRAM } from './diagram';
 import { FEYNMAN } from './feynman';
 
@@ -343,6 +344,8 @@ registerNotation(ER);
 registerNotation(MINDMAP);
 registerNotation(GARMENT);
 registerNotation(PENDULUM);
+// The coordinate plane (MATHS-SPEC M19): axes, ticks and numbers, and what is drawn on them.
+registerNotation(PLANE);
 // Last: the class a drawing falls into when nothing above says more (PLAN-FIELD-PAR FP2).
 registerNotation(DIAGRAM);
 // The Feynman diagram (MATHS-SPEC M27): particles as lines meeting at vertices.

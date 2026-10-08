@@ -52,6 +52,7 @@ import { normName, parseLine } from './expr';
 import type { LengthUnit, Quantity } from './quantity';
 import { convertQuantity, formatNumber, formatQuantity, isRange, quantity, unitSuffix } from './quantity';
 import { bandPhrases, boundsOfAll, wordsOnBoard, writingBands } from './writing';
+import { planeWordIds } from '../notations/plane';
 
 // ===== Figures =====
 
@@ -450,6 +451,12 @@ export function numbersOf(state: SessionState): BoardNumber[] {
       const bounds = boundsOfAll(phrase.map((p) => p.bounds));
       out.push({ id: phrase[0].id, ids: phrase.map((p) => p.id), from: 'writing', text, bounds, centre: centreOf(bounds), reading });
     }
+  }
+  // The numbers at a coordinate plane's ticks, and the zero at its crossing, are the plane's own (MATHS-SPEC M19): the 2
+  // by a tick is not the length of the axis it stands by.
+  if (out.length) {
+    const claimed = planeWordIds(state);
+    if (claimed.size) return out.filter((n) => !n.ids.some((id) => claimed.has(id)));
   }
   return out;
 }
