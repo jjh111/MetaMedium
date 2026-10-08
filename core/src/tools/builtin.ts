@@ -30,8 +30,9 @@ import { TRACE } from './trace';
 import { REGION } from './region';
 import { LIKE } from './like';
 import { RUN } from './run';
+import { FILL } from './fill';
 
-export const BUILTIN_TOOLS = [CORRECT, TEXT, NAME, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES, TEXT_EDIT, VERBS, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH, TRACE, REGION, LIKE, RUN] as const;
+export const BUILTIN_TOOLS = [CORRECT, TEXT, NAME, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES, TEXT_EDIT, VERBS, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH, TRACE, REGION, LIKE, RUN, FILL] as const;
 
 registerTool(CORRECT);
 registerTool(TEXT);
@@ -59,3 +60,4 @@ registerTool(TRACE);
 registerTool(REGION);
 registerTool(LIKE);
 registerTool(RUN);
+registerTool(FILL);

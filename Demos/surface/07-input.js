@@ -256,7 +256,8 @@
     // A hand on a control's knob slides it: no selection needed, one move when it lets go.
     if (knobBegin(w0)) return;
     // A press on a region's title takes hold of the region (12-regions.js).
-    const hit = (state.selection.length ? handleAt(w0) : null) || regionTitlePress(w0);
+    // A fill-in's ghost is tapped, not dragged: inside the selection's outline the press is the ghost's (25-ghosts.js).
+    const hit = fgAt(w0) ? null : (state.selection.length ? handleAt(w0) : null) || regionTitlePress(w0);
     // A hand on a body in a running tank is acting it out, not moving ink.
     if (hit && hit.kind === 'move' && demoBegin(state.selection, w0)) return;
     if (hit) { beginDrag(hit, w0); return; }
@@ -448,7 +449,7 @@
     const travel = liveFrom ? Math.max(liveFrom.far, Math.hypot(e.clientX - liveFrom.x, e.clientY - liveFrom.y)) : 0;
     liveFrom = null;
     const s0 = session.getState();
-    const dismissable = !!(s0.summon || s0.selection.length || s0.pendingLassoId);
+    const dismissable = !!(s0.summon || s0.selection.length || s0.pendingLassoId || fgAt(screenToWorld(e.clientX, e.clientY)));
     if (releaseIs({ points: points.length, travelPx: travel, dismissable: dismissable }) === 'tap') { magnetStart = null; magnetHold = null; tapAt(e); return; }
     lastTap = null;
 
@@ -589,6 +590,11 @@
     // needs no mark at all, for a hand that finds the check hard to draw
     // apart from an arrow. The first tap is nothing; the second, close in
     // time and place, is the summon.
+    // A tap on a fill-in's ghost writes it (an answer that waits is shown first): one act, one undo (25-ghosts.js).
+    {
+      const ghost = fgAt(screenToWorld(e.clientX, e.clientY));
+      if (ghost && fgTake(ghost)) { lastTap = null; return; }
+    }
     // A tap on the chip beside a matching group opens the field on it, with the match leading.
     {
       const chip = chipAt(screenToWorld(e.clientX, e.clientY));

@@ -23,6 +23,7 @@ import { RIGHT_ANGLE_TOLERANCE } from '../session/measure';
 import { polygonFigure } from './dimension';
 import type { Figure, FigureLabel } from './dimension';
 import { solveBoard, solveFigure, describeSolution } from './solve';
+import { boardMaths } from './board';
 import type { BoardMaths, Solution } from './solve';
 import { quantity, rangeOf } from './quantity';
 import { TRIANGLE_LABELS, TRIANGLE_CORNERS, TRIANGLE_SQUARE, TRIANGLE_LABEL_BOXES, TRIANGLE_EXPECTED } from './fixtures/triangle';
@@ -366,5 +367,37 @@ describe('a right angle is declared, never measured into a fact', () => {
     solveBoard(s.getState(), { unit: 'in' });
     expect(JSON.stringify(s.getEvents())).toBe(before);
     expect(before).not.toMatch(/25\.3|22\.6/);
+  });
+});
+
+// MATHS-SPEC §2, Lane A: a right triangle given its hypotenuse and an angle said "the other leg 4.00 and the other
+// leg 3.00" — the same words for two different sides. A leg is "the other leg" only where one leg is given and one
+// is made; where both are made, each is named once, by where it stands (the corners it runs between).
+describe('a right triangle given its hypotenuse and an angle names each leg once', () => {
+  const R = { x: 100, y: 300 }, L = { x: 340, y: 300 }, T = { x: 100, y: 120 };
+  function board(labels: [string, Bounds][]) {
+    const s = createSession();
+    [lineStroke(R, L), lineStroke(T, R), lineStroke(L, T)].forEach((p, i) => s.addStroke(p, 1000 + i * 4000));
+    s.addStroke(rectStroke(100, 285, 15, 15, 12), 20000);
+    labels.forEach(([code, b], i) => text(s, code, b, 40000 + i * 1000));
+    return s;
+  }
+
+  it('a hypotenuse of 5 and an angle of 36.87° make two legs, each named once and by a name of its own', () => {
+    const s = board([['5', box(238, 186)], ['36.87°', box(245, 268, 48)]]);
+    const sol = boardMaths(s.getState())!.figures[0].solution;
+    const sentence = sol.readings[0].sentence;
+    expect(sentence).toMatch(/make side BC 4\.00 and side CA 3\.00$/);
+    expect(sentence.match(/other leg/g) ?? []).toHaveLength(0);
+    // Each leg's value is the one the sentence says, under the name the sentence gives it.
+    const legs = sol.readings[0].values.filter((v) => v.from === 'derived' && /^side[12]$/.test(v.key));
+    expect(legs.map((v) => v.label).sort()).toEqual(['side BC', 'side CA']);
+  });
+
+  it('where one leg is given and one is made, "the other leg" is still the words — the legs are not named twice', () => {
+    const s = board([['5', box(238, 186)], ['4', box(220, 322)]]);
+    const sentence = boardMaths(s.getState())!.figures[0].solution.readings[0].sentence;
+    expect(sentence).toBe('5 on the long side and a leg of 4 make the other leg 3');
+    expect(sentence.match(/other leg/g)).toHaveLength(1);
   });
 });

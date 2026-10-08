@@ -953,6 +953,9 @@
       if (st && paintOps) { const pb = MM.boundsOf(pn); recordOp({ kind: 'picture', id: id, text: st === 'drawn' ? 'drawn' : 'standing', box: boxOfRect(pb.minX, pb.minY, pb.maxX - pb.minX, pb.maxY - pb.minY), moved: !!heldPic }); }
     }
 
+    // What the maths implies, faint where it would be written, and the colours of its quantities — beneath the ink (25-ghosts.js).
+    renderFillGhosts(s, ix, vb);
+
     // The ink's raster under everything else this paint draws (inkCacheFor): what it holds is not stroked again.
     inkCached = inkCacheFor(s, ix, order, pv, inkW);
     for (const id of order) {
