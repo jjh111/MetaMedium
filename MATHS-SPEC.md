@@ -445,7 +445,7 @@ B, A, E, C, D, F — or as they finish, so long as C comes after B.
   `renderExplanations` weighs its cards. A taken value that attaches to the wrong
   side, where two sides' middles are close — test the attachment.
 
-*Status, 8 Oct 2026: not started.*
+*Status, 8 Oct 2026: under way (`unit/m16-fill`, from `31b62ef`).*
 
 #### Lane B — M11, M12, M13: functions, polynomials, limits — the Jake engine (core)
 
@@ -491,7 +491,7 @@ B, A, E, C, D, F — or as they finish, so long as C comes after B.
   and send to `fn.ts` only what `expr.ts` could not read or read wrongly. When
   sampling, never evaluate exactly at a removable point.
 
-*Status, 8 Oct 2026: not started.*
+*Status, 8 Oct 2026: under way (`unit/m11-fn`, from `31b62ef`).*
 
 #### Lane C — M19, M20, M21: the coordinate plane, plots, a curve read (core)
 
@@ -570,8 +570,9 @@ B, A, E, C, D, F — or as they finish, so long as C comes after B.
     events. T and the live θ stand beside it as chips, or as fill-ins once A is
     merged. Esc stops it.
 - **Red first:**
-  - **Core.** L = 1 m and θ₀ = 10° give T ≈ 2.0102 s, against 2.0061 s for small
-    angles; energy is conserved within 1e-6 over 100 s; the reading holds for a
+  - **Core.** L = 1 m and θ₀ = 10° give T ≈ 2.0099 s at g = 9.81, against 2.0061 s
+    for small angles (the hand-over's 2.0102 s is g = 9.80665's; lane D found it);
+    energy is conserved within 1e-6 over 100 s; the reading holds for a
     drawn pendulum and is weaker without a pivot; nothing reads a pendulum in the
     corpus or the notation benches.
   - **Gate** (`e2e/alive.mjs`). A pendulum drawn with the pointer reads; *Play*
@@ -585,7 +586,24 @@ B, A, E, C, D, F — or as they finish, so long as C comes after B.
   must stay put. A pendulum inside a blessed artifact. Re-deriving a long run from
   t = 0 on every change to the log — keep a cache.
 
-*Status, 8 Oct 2026: not started.*
+*Status, 8 Oct 2026: **built and merged** (`unit/m23-pendulum`, merged as `09ba264`).
+A rod from a pivot (a ceiling, its hatching, a dot, or the rod's top end alone, the
+weakest) and a bob at the end it points to read as *a pendulum*, 216 of 216 of its own
+drawings at three sizes and none of the corpus or the other notations' boards even at
+the offer floor; without a pivot it stays under the floor. RK4 at a fixed step; T exact
+by the AGM, 2.009893 s for 1 m at 10° (the integrator agrees to 6e-9), the small-angle
+2.006067 s beside it; energy drift about 5e-11 over 100 s. **What Play stands on: (a)** —
+`applyClock` takes a clock on a mark a registered runner holds (`Runner.holds`), so playing
+teaches no definition; a clock on any other stroke is still ignored. The runner contract
+(`core/src/run/runner.ts`): a registry, inputs, a stepper with keyframes and a budget that
+says when it stopped, outputs named `run:<key>:θ`, placements in the tank's shape. *Play*,
+*Pause*, *Reset* and *Pull it aside* (`tools/run.ts`, the twenty-sixth built-in); the
+surface turns rod and bob about the pivot at render time (`14-run.js`), T and the live θ as
+chips (fill-ins once A is merged), Esc stops it, and a reload leaves it paused (a run is
+armed only by a play seen in this sitting). Gate `alive`, 19 records. Left: grabbing the
+swinging bob where it is drawn (wave 2's drag), the minimap and exports show the ink as
+logged, a play from another hand in a room starts this tab from t = 0 (M29), a fill source
+for T and θ (a few lines once A is merged).*
 
 #### Lane E — M27: Feynman diagrams (core; Opus)
 
@@ -632,7 +650,7 @@ B, A, E, C, D, F — or as they finish, so long as C comes after B.
   its amplitude, and writing is neither. A loop's photon is an arc: read the axis
   as a smoothed curve, not only a straight line.
 
-*Status, 8 Oct 2026: not started.*
+*Status, 8 Oct 2026: under way (`unit/m27-feynman`, from `31b62ef`).*
 
 #### Lane F — M8: numerals read at tier 1 (core; Opus)
 
@@ -667,7 +685,7 @@ B, A, E, C, D, F — or as they finish, so long as C comes after B.
   the reader (MATHS-PLAN §5): *13 + 2 = 16* is a doubtful reading before it is a
   wrong sum.
 
-*Status, 8 Oct 2026: not started.*
+*Status, 8 Oct 2026: under way (`unit/m8-numerals`, from `09ba264`, after D merged).*
 
 ### Shared files, and who touches them
 
