@@ -71,6 +71,13 @@ export interface ToolHost {
   nameOf(participantId: string): string;
   /** The text made from writing that ink with these bounds sits on or beside, if any. */
   textNear(bounds: { minX: number; minY: number; maxX: number; maxY: number }): string | null;
+  /**
+   * Whether the run keyed by this mark is running in THIS sitting (M23), which the log alone cannot say: a
+   * `clock` play that was in the log when the board was opened is a bless from an earlier sitting, and nothing
+   * runs unblessed — so the page opened again holds it paused and offers Play, while the log still says played.
+   * A host that does not say is believed by the log (`state.clocks`).
+   */
+  running?(key: string): boolean;
 }
 
 /**

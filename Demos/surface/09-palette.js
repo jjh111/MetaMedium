@@ -65,6 +65,8 @@
       // The board's lines of writing and how many are unread (I8): *Read the board* stands only where there is some.
       writing: () => boardWriting(),
       isFlipped: (id) => flipped.has(id),
+      // Whether the run keyed by this mark runs in THIS sitting: a play already in the log when the board opened is an earlier one's (M23, 14-run.js).
+      running: (key) => aliveIsRunning(key),
       nameOf: nameOfParticipant,
       textNear: (b) => textNear(session.getState(), b),
     };

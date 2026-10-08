@@ -102,6 +102,7 @@ import type { Pack, PackNotice } from '../packs/pack';
 import { describePackNotice, describePackRefusal, libraryId, packOfId, packRef, parsePackRef } from '../packs/pack';
 import { type PackSource, shippedPack } from '../packs/registry';
 import { type LibraryDefinition, libraryDefinitions } from '../packs/definitions';
+import { runnerHolds } from '../run/runner';
 
 // ===== Public state shape =====
 
@@ -3683,7 +3684,10 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
    * board says why a thing went still.
    */
   function applyClock(ev: Extract<SessionEvent, { type: 'clock' }>) {
-    if (!artifacts.includes(ev.nodeId) && !live.includes(ev.nodeId)) return;
+    // A clock also stands on the mark a registered runner reads — a pendulum's rod (M23, run/runner.ts) — so
+    // playing it teaches no definition; once held it can always be paused or reset, even after what it
+    // ran is gone. On any other stroke it is ignored, as it always was.
+    if (!artifacts.includes(ev.nodeId) && !live.includes(ev.nodeId) && !clocks[ev.nodeId] && !runnerHolds({ nodes, contentIds, artifacts }, ev.nodeId)) return;
     const prev = clocks[ev.nodeId] ?? { playing: false, seed: 1, at: ev.at };
     switch (ev.op) {
       case 'play': clocks[ev.nodeId] = { playing: true, seed: prev.seed, at: ev.at }; break;

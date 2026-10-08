@@ -47,6 +47,7 @@ import { STATE } from './state';
 import { ER } from './er';
 import { MINDMAP } from './mindmap';
 import { GARMENT } from './garment';
+import { PENDULUM } from './pendulum';
 import { DIAGRAM } from './diagram';
 
 /** A symbol a notation knows, and which of the six roles it plays. */
@@ -337,5 +338,6 @@ registerNotation(STATE);
 registerNotation(ER);
 registerNotation(MINDMAP);
 registerNotation(GARMENT);
+registerNotation(PENDULUM);
 // Last: the class a drawing falls into when nothing above says more (PLAN-FIELD-PAR FP2).
 registerNotation(DIAGRAM);

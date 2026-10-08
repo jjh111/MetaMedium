@@ -1168,3 +1168,53 @@ export type {
   Candidate as HueCandidate,
   Placed as HuePlaced,
 } from './colour';
+
+// The pendulum is alive (MATHS-SPEC §8 Lane D, M23; V1-SPEC RN4 at its smallest). A runner reads marks as
+// something that can run, takes its inputs from what is drawn and written beside them, and is stepped at a
+// fixed small step: state derived from the log, the inputs and the step count, never logged, every run with a
+// step budget that says when it stopped. The pendulum is the first — a rod from a pivot with a bob, its
+// physics RK4 at a fixed step and its period exact by the arithmetic–geometric mean — and *Play the
+// pendulum* is the hand's own `clock` play on its rod (`applyClock` takes a clock on the mark a runner reads).
+export {
+  registerRunner,
+  runners,
+  runnerById,
+  runnersVersion,
+  runnerHolds,
+  runsIn,
+  runsReport,
+  inputsKeyOf,
+  runQuantity,
+  parseRunQuantity,
+  createStepper,
+  traceOf,
+  RUN_KEYFRAME_EVERY,
+} from './run/runner';
+export type { Runner, Run, RunReading, RunInput, RunInputs, RunOutput, RunOutputs, RunPlacement, RunReadout, RunStepper, RunStop, RunsReport, RunBoard, InputFrom } from './run/runner';
+export { BUILTIN_RUNNERS } from './run/builtin';
+export {
+  GRAVITY,
+  PENDULUM_DT,
+  agm,
+  smallAnglePeriod,
+  pendulumPeriod,
+  pendulumStart,
+  pendulumStep,
+  pendulumEnergy,
+  pendulumPosition,
+} from './physics/pendulum';
+export type { PendulumState } from './physics/pendulum';
+export {
+  PENDULUM,
+  PENDULUM_TABLE,
+  PENDULUM_RUNNER,
+  PENDULUM_OFFER_FLOOR,
+  PULL_ASIDE_DEG,
+  readPendulum,
+  pendulumsIn,
+  periodWords,
+  PLAIN_SHARE as PENDULUM_PLAIN_SHARE,
+  EVIDENCE as PENDULUM_EVIDENCE,
+} from './notations/pendulum';
+export type { PendulumPart, PendulumReading, PendulumRunState, PendulumSymbolName, PivotKind } from './notations/pendulum';
+export { RUN, marksHeld } from './tools/run';
