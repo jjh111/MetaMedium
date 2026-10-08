@@ -409,6 +409,28 @@ describe('the other figures give fill-ins too', () => {
     }
   });
 
+  it('an arc given its chord offers the rise, the radius and the length at the ink’s scale, named so they read back — and its sweep, which no written number can say, only shown', () => {
+    const s = createSession();
+    // 120° of a circle of 100: a chord of 173.2 and a rise of 50.
+    const pts = Array.from({ length: 60 }, (_, i) => { const a = ((-150 + (i / 59) * 120) * Math.PI) / 180; return { x: 300 + 100 * Math.cos(a), y: 300 + 100 * Math.sin(a) }; });
+    s.addStroke(pts, 1000);
+    const mid = { x: (pts[0].x + pts[59].x) / 2, y: (pts[0].y + pts[59].y) / 2 };
+    text(s, 'chord 8', box(mid.x, mid.y + 30, 70));
+    const fills = fillsOf(s);
+    const board = boardMaths(s.getState())!;
+    expect(byQuantity(fills, 'rise')).toMatchObject({ text: 'rise 2.31', answer: true });
+    expect(byQuantity(fills, 'radius')).toMatchObject({ text: 'radius 4.62' });
+    expect(byQuantity(fills, 'arc')).toMatchObject({ text: 'arc 9.67' });
+    const sweep = byQuantity(fills, 'sweep')!;
+    expect(sweep.text).toBe('120°');
+    expect(sweep.take.kind).toBe('none');
+    for (const f of fills) {
+      expect(f.rank, f.text).toBeLessThan(RANK.side);
+      expect(f.reason).toMatch(/at the drawing’s scale|as the ink draws it/);
+      if (f.take.kind === 'text') expect(fillLandsOnBoard(board, f, f.at), f.text).toBe(true);
+    }
+  });
+
   it('a value the ink gives at the drawing’s scale is weaker, and says so', () => {
     const s = createSession();
     s.addStroke(rectStroke(100, 100, 300, 150, 20), 1000);

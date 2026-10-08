@@ -20,6 +20,7 @@
 //   F9   a small triangle: every number a tap writes lands on the side or corner it was offered for, and undo takes each back
 //   F10  the hand's paint of the board with ghosts showing is what the whole-board read draws (paintCheck)
 //   F11  a tap on a ghost with nothing held writes it and leaves no dot
+//   F12  a mark fill-in (a stand-in source) is dashed, tapped along its line, writes its ink in the tool's name, one undo
 
 import { waitReady } from './keep.mjs';
 
@@ -64,7 +65,7 @@ const state = (page) => page.evaluate(() => {
     last: evs.length ? { type: evs[evs.length - 1].type, tool: evs[evs.length - 1].tool, offer: evs[evs.length - 1].offer, code: evs[evs.length - 1].code } : null,
   };
 });
-const ghosts = (page) => page.evaluate(() => window.__mmGhosts.drawn().map((g) => ({ key: g.key, quantity: g.quantity, text: g.text, cx: g.cx, cy: g.cy, w: g.w, h: g.h, hue: g.hue, waiting: g.waiting, why: g.why })));
+const ghosts = (page) => page.evaluate(() => window.__mmGhosts.drawn().map((g) => ({ mark: !!g.mark, key: g.key, quantity: g.quantity, text: g.text, cx: g.cx, cy: g.cy, w: g.w, h: g.h, hue: g.hue, waiting: g.waiting, why: g.why })));
 const board = (page) => page.evaluate(() => {
   const MM = window.__mm.MM, b = MM.boardMathsOf(window.__mm.session);
   if (!b) return null;
@@ -409,6 +410,52 @@ export async function runFill(browser, servers, { freshContext }) {
       const wrong = wrote.filter((r) => r.got !== r.want);
       check(`F9. a small triangle: every number a tap writes lands on the side or corner it was offered for (${wrote.map((r) => r.text + '→' + r.got).join(', ')}), and the figure has the sides and angles to write (${wrote.length} written, ${wrong.length} wrong)`,
         wrote.length >= 3 && wrong.length === 0, { results });
+    } finally { await p.close().catch(() => {}); }
+  });
+
+  // A fill-in that is a mark — a source other than the figure's gives one — is dashed where it lies, beneath the ink,
+  // and taken by a tap along its line: it writes the ink it is, in the tool's name, as one act. (A stand-in source
+  // registered in the page; Lane C's curves and Lane E's lines are the real ones.)
+  await record('F12', async () => {
+    const p = await open();
+    try {
+      await p.evaluate(() => {
+        const MM = window.__mm.MM;
+        MM.registerFillSource({
+          id: 'e2e-mark',
+          fillIns: (state) => {
+            const id = state.contentIds[0];
+            if (!id) return [];
+            return [{
+              key: 'e2e-mark:' + id + ':rule', kind: 'mark', source: 'e2e-mark', text: 'a rule',
+              points: [{ x: 420, y: 380 }, { x: 680, y: 380 }], closed: false, dashed: true, at: { x: 550, y: 370 },
+              about: [id], quantity: 'e2e-mark:' + id + ':rule', reason: 'a stand-in line above the box', answer: false, rank: 0.8,
+              take: { kind: 'strokes', strokes: [[{ x: 420, y: 380 }, { x: 550, y: 380 }, { x: 680, y: 380 }]] },
+            }];
+          },
+        });
+      });
+      await draw(p, box(400, 420, 300, 180));
+      await hold(p, 400, 520);
+      const before = await state(p);
+      const gs = (await ghosts(p)).filter((g) => g.mark);
+      const hit = await p.evaluate(() => window.__mmGhosts.hits().find((h) => h.pts) || null);
+      const onLine = await p.evaluate(() => window.__mmGhosts.at(550, 381));
+      const offLine = await p.evaluate(() => window.__mmGhosts.at(550, 409));
+      const ok = await p.evaluate(() => window.__mm.paintCheck());
+      check(`F12. a mark fill-in stands held and dashed (${gs.length} drawn), is a target along its line and not 28 units off it, and the paint of it is what the whole-board read draws`,
+        gs.length === 1 && !!hit && hit.pts.length === 2 && !!onLine && offLine === null && ok.ok, { gs, hit: !!hit, onLine: !!onLine, offLine, diffs: (ok.diffs || []).slice(0, 3) });
+      const s = await screenOf(p, { x: 550, y: 381 });
+      await p.mouse.click(s.x, s.y);
+      await p.waitForTimeout(350);
+      const after = await state(p);
+      const wrote = after.types.slice(before.events).filter((t) => t !== 'dismiss' && t !== 'deselect');
+      const stroke = await p.evaluate(() => { const ev = window.__mm.session.getEvents().filter((e) => e.type === 'stroke'); const e = ev[ev.length - 1]; return e ? { tool: e.tool, offer: e.offer, n: (e.points || []).length } : null; });
+      check(`F12b. a tap along it draws the ink it is, as one act stamped with the tool and the offer (${wrote.join(', ')})`,
+        wrote.join() === 'stroke' && stroke && stroke.tool === 'fill' && /^e2e-mark:/.test(stroke.offer) && stroke.n >= 3, { wrote, stroke });
+      await undo(p);
+      const undone = await state(p);
+      check('F12c. …and one undo takes the ink away', undone.types.filter((t) => t === 'stroke').length === before.types.filter((t) => t === 'stroke').length, { before: before.types.length, undone: undone.types.length });
     } finally { await p.close().catch(() => {}); }
   });
 

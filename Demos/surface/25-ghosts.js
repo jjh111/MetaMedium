@@ -62,7 +62,7 @@
 
   function fgFor(s) {
     if (paintReference) return fgPack(null, s, MM.fillInsOf(s), MM.boardMaths(s));
-    const key = logKey();
+    const key = logKey() + '|' + MM.fillSourcesVersion();   // a source registered later is read too
     if (fgRead.key === key) return fgRead;
     const fills = MM.fillInsOfSession(session);
     const rd = fgPack(key, s, fills, MM.boardMathsOf(session));
@@ -354,7 +354,17 @@
     const place = fgPlaceAll(s, ix, rd, shown);
     for (const g of shown) {
       const f = g.f;
-      if (f.kind === 'mark') { fgMark(rd, f); continue; }
+      if (f.kind === 'mark') {
+        // A mark is dashed where it lies, beneath the ink, and tapped along its line.
+        fgMark(rd, f);
+        const b = pointsBox(f.points || []);
+        if (b) {
+          const pad = wpx(10);
+          fgDrawn.push({ key: f.key, rest: f.key.slice('figure:'.length), why: g.why, text: f.text || '', cx: (b.minX + b.maxX) / 2, cy: (b.minY + b.maxY) / 2, w: b.maxX - b.minX, h: b.maxY - b.minY, quantity: f.quantity, waiting: false, hue: (rd.hues.get(f.quantity) || {}).hue, mark: true });
+          fgHits.push({ key: f.key, x: b.minX - pad, y: b.minY - pad, w: b.maxX - b.minX + pad * 2, h: b.maxY - b.minY + pad * 2, cx: (b.minX + b.maxX) / 2, cy: (b.minY + b.maxY) / 2, text: f.text || '', waiting: false, pts: f.points, closed: !!f.closed });
+        }
+        continue;
+      }
       const spot = place.get(f.key);
       if (!spot) continue;
       const waiting = waits && f.answer && !fgRevealed.has(f.key) && !(mathsPin && nowMs() < mathsPin.until && f.about.some((id) => mathsPin.ids.has(id)));
@@ -385,11 +395,26 @@
   }
 
   // ----- The tap -----
-  /** The ghost under a world point, else null. */
+  /** How far a point is from a polyline, in world units. */
+  function fgDistToPoly(p, pts, closed) {
+    let best = Infinity;
+    const n = closed ? pts.length : pts.length - 1;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+      const t = l2 < 1e-12 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2));
+      best = Math.min(best, Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy)));
+    }
+    return best;
+  }
+
+  /** The ghost under a world point, else null: a text by its box, a mark along its line. */
   function fgAt(w) {
     for (let i = fgHits.length - 1; i >= 0; i--) {
       const h = fgHits[i];
-      if (w.x >= h.x && w.x <= h.x + h.w && w.y >= h.y && w.y <= h.y + h.h) return h;
+      if (w.x < h.x || w.x > h.x + h.w || w.y < h.y || w.y > h.y + h.h) continue;
+      if (h.pts && fgDistToPoly(w, h.pts, h.closed) > wpx(10)) continue;
+      return h;
     }
     return null;
   }
@@ -405,7 +430,7 @@
     const rd = fgFor(s);
     const f = rd.byKey.get(hit.key);
     if (!f) return false;
-    if (s.settings.answers === 'wait' && f.answer && !fgRevealed.has(f.key)) {
+    if (s.settings.answers === 'wait' && f.answer && f.kind !== 'mark' && !fgRevealed.has(f.key)) {
       fgRevealed.add(f.key);
       fgPlaced = { key: null, map: new Map() };
       say(f.text + ' — ' + f.reason + ' · tap it again to write it');
