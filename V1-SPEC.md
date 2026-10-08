@@ -1188,7 +1188,7 @@ own files on his machine only. It prints numbers, never content (§12).
     one. A sub-kind, kin or opposite is held relative to the kind it was placed
     against, and follows it. Nothing cascades.
   - **Lightness is depth.** Each step down a family keeps the parent's hue
-    (siblings fan a few degrees either side) and moves a step toward the ground,
+    (siblings fan either side of it, far enough to tell apart) and moves a step toward the ground,
     inside the band each theme sets for words at 4.5:1. Two steps are drawn;
     deeper kinds share the second and take a second channel. The theme never
     moves the hue.
@@ -1229,6 +1229,17 @@ own files on his machine only. It prints numbers, never content (§12).
   refuse their colour. And past about eight kinds the checks will always find
   pairs a dichromat cannot tell apart at one lightness. That is what the second
   channel is for. Say so plainly; do not refuse kinds or spend lightness on them.
+
+**KN3a status, 7 Oct 2026: done on `unit/kn3-colour-space`** — the pure half of KN3 is core's `src/colour/`, ported
+from the specimen and held to it by a golden made from the page itself (33 boards: hues to 1e-6, hexes, patterns and
+sentences equal), with 408 colour tests and the engine at 3,078. The palette is a parameter whose defaults a test
+holds to `brand/tokens.css`. `applyAct` returns what each act decided (`held`) and `holdKind` restores it with no
+placing — what KN1's `kind` event will carry. The specimen page now draws with core. Core corrects the specimen on four
+counts: contrast is measured on the drawn hex (the specimen drew 67 of 8,640 deep colours on paper under 4.5:1); eight
+patterns, not five, and a kind that must repeat one says so (twelve kinds need five to seven); the colour cache is per
+palette; an inherited property name is no colour. Open: whether eight patterns read apart on an iPad; a bare hex word
+(*bad*, *fed*), for which KN1's reader should ask the `#`; the bands are not yet in `tokens.css`. Left: KN3b's lens pane
+and its e2e, drawing the patterns (KN2), the field's reader (KN1).
 
 **KN4 — Kinds suggested.**
 - **Owns:** core `session/kind-suggest.ts` (pure, over readings), the semantic
@@ -2089,8 +2100,9 @@ it lands, not only at the end:
     scores from 0 to 1 for the entries a query names, rather than vectors;
   - `participants/listen.ts`: VO1's seat takes a transcript given as heard,
     with timings;
-  - `Demos/mcp.mjs`: `canvas_doors`, `canvas_seat` and `canvas_export`, and
-    `canvas_import` taking a log or a bundle into a scratch board;
+  - `Demos/mcp.mjs` and `Demos/mcp-doors.mjs` (what the doors read from the code):
+    `canvas_doors`, `canvas_seat` and `canvas_export`, and `canvas_import` taking a log
+    or a bundle into a scratch board;
   - the surface `03-seats.js` and `04-seatpane.js`: Claude Code offered in every
     seat, each seat's cost (paid or unpaid), and *as …* said in the row while it
     simulates;
@@ -2127,7 +2139,8 @@ it lands, not only at the end:
     - the room: its relay and its pictures;
     - every format, with the function that writes it and the one that reads it.
   - **Formats in and out.** `canvas_export {format}` returns the board as the app
-    writes it: the log (version 1), the bundle, SVG, PNG, PDF, Mermaid, a lens.
+    writes it: the log (version 1), the bundle, SVG, Mermaid, true size, and a lens once
+    KN6 lands. PNG and PDF are the page's: Node has no canvas.
     `canvas_import` takes a log or a bundle back into a scratch board, read by
     the same parsers.
   - **The walk.** The skill takes a dev session through every door on a scratch
@@ -2155,6 +2168,18 @@ it lands, not only at the end:
   learns how the pipeline handles a misreading, not how a small reader reads.
   Keep `simulating` on everything it touches, and out of every bench and every
   seat's record of real calls.
+
+**CG7a status, 7 Oct 2026: done on `unit/cg7-doors`** — `canvas_doors` lists every way in and out from the running
+code: the pen's shapes, each seat brief with core's contract verbatim (the seat participant run on a scratch session,
+nothing parked in the room) and an example its own parser takes, who sits where, the 3D hand and the client door read
+from their code, the room, and every format with its writer and reader — PNG and PDF said as the page's, a lens (KN6)
+and a notebook directory (IN5) as not built. `canvas_export` writes the log, the bundle, SVG, Mermaid and true size
+through the page's own functions, a bundle only ever to a file outside the repository; `canvas_import` reads a log or
+a bundle into a scratch session and says what reads differently, writing nothing to the room. The walk is
+`skills/dynaink-doors`. Smoke 176 (38 red first); gate `hand` and `seat` 45 passing with the five named skips, H1.29
+new. Found: a log reads authorship from its writer's side, so an import compares readings; `canvas_look` never says the
+notation the page reads; `canvas_see` draws ink only; a brief shows a raw participant id; `canvas_label` on a missing
+mark says *local*. Left for CG7b: the decider, semantic and listener seats, simulation, paid or unpaid.
 
 ### TH — two homes
 
