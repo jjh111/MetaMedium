@@ -34,6 +34,15 @@ ladder (§7) are what is built next, each phase ending in a release on John's wo
 `ARCHITECTURE-v7-PARTICIPANTS-AND-TIERS.md` is the active engine plan; MVP.md
 absorbs and raises its Stage D.
 
+**8 Oct 2026: the maths push begins, handed to a cloud session — read
+`HANDOFF-MATHS-2026-10-08.md` first.** John's direction is maths in reverse: draw
+shapes or write numbers, and what the maths implies stands as ghosts on the page with
+the selection, coloured by relation. The anchors are the whitepaper's Jake story and a
+pendulum that swings, Chalktalk-style; Feynman diagrams are in scope too. Teachers come
+first; the full stack of maths and design in one place is the north star. The handoff
+holds what the code does today (surveyed), the plan to write (`MATHS-SPEC.md`), and
+wave 1's six units with their contracts. Nothing of it is built yet.
+
 **28 Sep 2026: phases 1 and 2 of `V1-PLAN.md` are done and phase 3's cores
 are built, all on `master`.** The backbone: every affordance is an offer from
 a registered tool (B1), ranked by what stands beside it with the reason said
@@ -323,6 +332,11 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   at rest and the field, AR arrange and locate, MP maps and morphisms, RN run the diagram, CG together, TH
   two homes, VO voice; RP in v1.1), acceptance A12–A29, eight phases each ending in a release on John's
   word, and 23 decisions; the colour space's specimen is `brand/colour-space.html`
+- `HANDOFF-MATHS-2026-10-08.md` — **the maths push, handed over, 8 Oct 2026**: John's direction verbatim
+  (maths in reverse, ghosts with the selection, colour for relations, the Jake story, Chalktalk's pendulum,
+  Feynman diagrams, teachers first); three surveys of what the code does today, with file:line; the outline
+  of `MATHS-SPEC.md` (rules 7–14, the fill-in, colour for relations, the map, the teacher's scenes T1–T10,
+  units M8–M31); and wave 1's six units with their contracts, shared files and merge order
 - `RENAME-PLAN.md` — **the rename, 2 Oct 2026**: MetaMedium becomes dyna.ink. §1 is the one home of the
   spellings — read it there, never from a copy; §2 what keeps
   the old name and why (the `mm-*` keys, `mm-boards`, the `mm` contract, `.metamedium/`, the dated documents,
