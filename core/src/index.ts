@@ -384,6 +384,23 @@ export { trace, binarize, thin, otsu, luminance, tracePaths, DEFAULT_SIMPLIFY_PX
 export type { Bitmap, TraceOptions, TraceResult, TracedStroke } from './image/trace';
 export type { Addressable } from './kinds/address';
 
+// Ink from files (V1-SPEC IN1): `ingest(bytes, name)` reads a file into an ink document — pages of strokes in the
+// colours they were drawn in, pictures, text, links and tags, and where it came from — choosing the adapter by
+// sniffing the bytes. A pen stroke stored as a filled outline (OneNote, Wacom Inkspace, a whiteboard, Illustrator)
+// is read back to the line the pen followed by pairing the outline's sides, else by `image/trace`'s own thinning
+// and walk, and says how faithfully (`recall`, `precision`). A result is `{ ok, doc, notes }` or `{ ok: false,
+// reason }`; nothing throws. The fixtures that make the synthetic corpus are not exported (`ingest/fixtures/`).
+export {
+  ingest, ingestSvg, ingestMarkdown, ingestRaster, recoverFill, inkStep, sniffImage, shownSize, sha256Hex, fromBase64,
+  refuse as ingestRefuse, accept as ingestAccept, blankPage as inkBlankPage, isHash as isSourceHash,
+  DEFAULT_LIMITS as INGEST_LIMITS, FAITHFUL_AT, NEAR_AT, RASTER_PEN_PX, DOT_MAX_PX, PEN_ELONGATION, CAP_WINDOW, CAP_TURN, FREEFORM_NODES, MAX_PICTURE_PX,
+} from './ingest';
+export type {
+  IngestResult, IngestLimits, IngestOptions, InkDocument, InkPage, InkStroke, InkPicture, InkText, InkLink,
+  Source as InkSource, SourceFormat as InkSourceFormat, Reading as InkReading, Fidelity as InkFidelity, Recovery as InkRecovery, Box as InkBox,
+  Fill as OutlineFill, FillRule, RecoveredStroke, Attempt as OutlineAttempt, OutlineRecovery, RecoverOptions, ImageInfo,
+} from './ingest';
+
 // Gesture grammar
 export {
   isLassoLike,

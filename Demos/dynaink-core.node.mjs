@@ -63,12 +63,12 @@ function calculateStraightness(points) {
   const bounds = getBounds(points);
   const size2 = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
   const path = simplifyStroke(denoise(points), Math.max(1.2, size2 * 0.012));
-  let pathLength4 = 0;
+  let pathLength5 = 0;
   for (let i = 1; i < path.length; i++) {
-    pathLength4 += calculateDistance(path[i - 1], path[i]);
+    pathLength5 += calculateDistance(path[i - 1], path[i]);
   }
-  if (pathLength4 === 0) return 0;
-  return Math.min(1, directDistance / pathLength4);
+  if (pathLength5 === 0) return 0;
+  return Math.min(1, directDistance / pathLength5);
 }
 function isStrokeClosed(points, threshold = 50) {
   if (points.length < 5) return false;
@@ -152,12 +152,12 @@ function findCorners(points, targetCount) {
 }
 function findCornersWithSeparation(hullPoints, targetCount) {
   if (!hullPoints || hullPoints.length <= targetCount) return hullPoints;
-  let perimeter2 = 0;
+  let perimeter3 = 0;
   for (let i = 0; i < hullPoints.length; i++) {
     const next = (i + 1) % hullPoints.length;
-    perimeter2 += calculateDistance(hullPoints[i], hullPoints[next]);
+    perimeter3 += calculateDistance(hullPoints[i], hullPoints[next]);
   }
-  const minSeparation = perimeter2 / (targetCount * 1.5);
+  const minSeparation = perimeter3 / (targetCount * 1.5);
   const corners = [];
   for (let i = 0; i < hullPoints.length; i++) {
     const prev = hullPoints[(i - 1 + hullPoints.length) % hullPoints.length];
@@ -180,7 +180,7 @@ function findCornersWithSeparation(hullPoints, targetCount) {
       const indexDiff = Math.abs(candidate.index - existing.index);
       const wrapDiff = hullPoints.length - indexDiff;
       const minIndexDiff = Math.min(indexDiff, wrapDiff);
-      const approxDist = minIndexDiff / hullPoints.length * perimeter2;
+      const approxDist = minIndexDiff / hullPoints.length * perimeter3;
       if (approxDist < minSeparation) {
         tooClose = true;
         break;
@@ -241,10 +241,10 @@ function inkTipIndex(points, head, tail, hint, near) {
   const order2 = head === "start" ? points.map((_, i) => points.length - 1 - i) : points.map((_, i) => i);
   let far = -Infinity;
   for (const p of points) far = Math.max(far, along2(p));
-  let at = order2.findIndex((i) => along2(points[i]) >= far - near);
-  if (at < 0) at = order2.length - 1;
-  while (at + 1 < order2.length && along2(points[order2[at + 1]]) >= along2(points[order2[at]])) at++;
-  return order2[at];
+  let at2 = order2.findIndex((i) => along2(points[i]) >= far - near);
+  if (at2 < 0) at2 = order2.length - 1;
+  while (at2 + 1 < order2.length && along2(points[order2[at2 + 1]]) >= along2(points[order2[at2]])) at2++;
+  return order2[at2];
 }
 function arrowTipIndex(points, arrow, near) {
   const head = arrow.head === "start" ? "start" : "end";
@@ -274,11 +274,11 @@ function countCorners(points, optionsOrThreshold = {}, closed) {
   }
   const arm = Math.max(2, Math.round(windowFrac * path.length));
   const sep = Math.max(2, Math.round(sepFrac * path.length));
-  const at = (i) => path[(i % path.length + path.length) % path.length];
+  const at2 = (i) => path[(i % path.length + path.length) % path.length];
   const turn2 = new Array(path.length).fill(0);
   for (let i = 0; i < path.length; i++) {
     if (!isClosed2 && (i < arm || i >= path.length - arm)) continue;
-    const a = at(i - arm), b = at(i), c = at(i + arm);
+    const a = at2(i - arm), b = at2(i), c = at2(i + arm);
     const bx = b.x - a.x, by = b.y - a.y;
     const cx2 = c.x - b.x, cy2 = c.y - b.y;
     const magB = Math.hypot(bx, by), magC = Math.hypot(cx2, cy2);
@@ -729,8 +729,8 @@ function detectText(fp, points, scale = 1) {
 function detectArrow(fp, points, scale = 1, best = readHead(fp, points, scale)) {
   if (!best) return null;
   const end = best.head === "end" ? points[0] : points[points.length - 1];
-  const at = points[inkTipIndex(points, best.head, end, best.tip, HAND_RESOLUTION_PX * scale)];
-  const tail = { x: end.x, y: end.y }, tip = { x: at.x, y: at.y };
+  const at2 = points[inkTipIndex(points, best.head, end, best.tip, HAND_RESOLUTION_PX * scale)];
+  const tail = { x: end.x, y: end.y }, tip = { x: at2.x, y: at2.y };
   return result(
     "arrow",
     "Arrow",
@@ -813,13 +813,13 @@ function headSeenOf(fp, points, scale) {
       }
     }
     if (!(farD > 0)) return null;
-    const at = inkTipIndex(pts, "end", tail, pts[farAt], near);
-    const tip = pts[at];
+    const at2 = inkTipIndex(pts, "end", tail, pts[farAt], near);
+    const tip = pts[at2];
     const shaftLen = Math.hypot(tip.x - tail.x, tip.y - tail.y);
     if (!(shaftLen > 0)) return null;
     const ux = (tip.x - tail.x) / shaftLen, uy = (tip.y - tail.y) / shaftLen;
     let reach = 0, wing = tip, barbPath = 0;
-    for (let i = at + 1; i < pts.length; i++) {
+    for (let i = at2 + 1; i < pts.length; i++) {
       barbPath += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
       const d = Math.hypot(pts[i].x - tip.x, pts[i].y - tip.y);
       if (d > reach) {
@@ -830,7 +830,7 @@ function headSeenOf(fp, points, scale) {
     if (reach / scale < BARB_MIN_PX) return null;
     const back = ((tip.x - wing.x) * ux + (tip.y - wing.y) * uy) / reach;
     const sharpest = Math.PI - Math.acos(Math.max(-1, Math.min(1, back)));
-    const straight = calculateStraightness(pts.slice(0, at + 1));
+    const straight = calculateStraightness(pts.slice(0, at2 + 1));
     const barb = { reach, shaft: shaftLen, ratio: reach / shaftLen };
     const shortHead = 1 - ramp(barbPath / total, 0.3, 0.45);
     const fit3 = (ramp(straight, 0.72, 0.95) * 0.5 + ramp(sharpest, BARB_TURN[0], BARB_TURN[1]) * 0.35 + shortHead * 0.15) * shortBarb(barb, scale);
@@ -972,7 +972,7 @@ function authorOf(node) {
   const e = node.edges.find((x) => x.rel === "made-by");
   return e ? e.to : LOCAL_PARTICIPANT;
 }
-function createParticipantNode(id, kind, name, at, capability = 0, locality) {
+function createParticipantNode(id, kind, name, at2, capability = 0, locality) {
   return {
     id,
     reps: [
@@ -981,10 +981,10 @@ function createParticipantNode(id, kind, name, at, capability = 0, locality) {
     ],
     edges: [],
     capability,
-    createdAt: at
+    createdAt: at2
   };
 }
-function createExplanationNode(id, data, aboutIds, bounds, participantId, capability, at) {
+function createExplanationNode(id, data, aboutIds, bounds, participantId, capability, at2) {
   return {
     id,
     reps: [
@@ -998,7 +998,7 @@ function createExplanationNode(id, data, aboutIds, bounds, participantId, capabi
       { to: participantId, rel: "made-by", blessed: true }
     ],
     capability,
-    createdAt: at
+    createdAt: at2
   };
 }
 function isExplanation(node) {
@@ -1013,17 +1013,17 @@ function aboutIdsOf(node) {
 function isParticipant(node) {
   return getRep(node, "participant") !== void 0;
 }
-function createBootstrapNodes(at) {
+function createBootstrapNodes(at2) {
   return [
     ...BUILTIN_TYPES.map((t) => ({
       id: typeNodeId(t),
       reps: [{ modality: "word", data: t, source: "bootstrap" }],
       edges: [],
       capability: 0,
-      createdAt: at
+      createdAt: at2
     })),
-    createParticipantNode(LOCAL_PARTICIPANT, "human", "local", at),
-    createParticipantNode(TIER0_PARTICIPANT, "engine", ENGINE_NAME, at)
+    createParticipantNode(LOCAL_PARTICIPANT, "human", "local", at2),
+    createParticipantNode(TIER0_PARTICIPANT, "engine", ENGINE_NAME, at2)
   ];
 }
 function getRep(node, modality) {
@@ -1961,8 +1961,8 @@ function boxCorners(node, held2) {
   const box = ink && tightestBox(ink);
   if (!box) return null;
   const { centre: c, axis: u, width: w2, height: h2 } = box;
-  const at = (su, sv) => ({ x: c.x + (u.x * su * w2 - u.y * sv * h2) / 2, y: c.y + (u.y * su * w2 + u.x * sv * h2) / 2 });
-  return [at(-1, -1), at(1, -1), at(1, 1), at(-1, 1)];
+  const at2 = (su, sv) => ({ x: c.x + (u.x * su * w2 - u.y * sv * h2) / 2, y: c.y + (u.y * su * w2 + u.x * sv * h2) / 2 });
+  return [at2(-1, -1), at2(1, -1), at2(1, 1), at2(-1, 1)];
 }
 function angleAt(prev, v, next) {
   const a = Math.atan2(prev.y - v.y, prev.x - v.x);
@@ -2205,8 +2205,8 @@ function formatQuantity(q, opts = {}) {
   else body = `${n2(q.lo)}\u2013${n2(q.hi)}`;
   return (q.approx ? "~" : "") + body + unitSuffix(q.unit, q.dim, opts.words);
 }
-function unitName(unit7, plural) {
-  return UNIT_WORD[unit7][plural ? 1 : 0];
+function unitName(unit7, plural2) {
+  return UNIT_WORD[unit7][plural2 ? 1 : 0];
 }
 var VULGAR = {
   "\xBD": [1, 2],
@@ -3418,7 +3418,7 @@ function evaluateChain(chain, scope = {}) {
     });
     sortRuns(runs);
   }
-  const plural = first.readings.length > 1;
+  const plural2 = first.readings.length > 1;
   return runs.map((run2) => {
     const ev = evaluateExpr(run2.cur, scope, { label: run2.label, bindings: run2.acc.bindings });
     const unknown = (u) => scope.describeUnknown?.(u) ?? `${u} is not defined`;
@@ -3427,7 +3427,7 @@ function evaluateChain(chain, scope = {}) {
     for (const u of ev.unknowns) if (!notes.some((n2) => n2.includes(u))) notes.push(unknown(u));
     const formula = formatExpr(run2.cur);
     const clauses = [];
-    if (plural) clauses.push(run2.reading.reason);
+    if (plural2) clauses.push(run2.reading.reason);
     if (labels.length) {
       const taken = ev.resolved.filter((r) => r.from === "scope" && r.value);
       const alt = taken.filter((r) => r.alternative);
@@ -3476,15 +3476,15 @@ var fmt = (q) => q ? formatQuantity(q) : "no value";
 var ADDS = /^\s*(add|plus)\b/i;
 function unitsWritten(p) {
   const out = [];
-  const walk = (e) => {
+  const walk2 = (e) => {
     if (e.k === "num") {
       if (e.q.unit && e.q.dim === 1) out.push(e.q.unit);
     } else if (e.k === "op") {
-      walk(e.a);
-      walk(e.b);
-    } else if (e.k === "neg" || e.k === "carry") walk(e.a);
+      walk2(e.a);
+      walk2(e.b);
+    } else if (e.k === "neg" || e.k === "carry") walk2(e.a);
   };
-  for (const seg2 of p.chain.segments) if (seg2.readings[0]) walk(seg2.readings[0].expr);
+  for (const seg2 of p.chain.segments) if (seg2.readings[0]) walk2(seg2.readings[0].expr);
   return out;
 }
 var UNIT_NAMES = { in: "inches", ft: "feet", cm: "centimetres", mm: "millimetres", m: "metres" };
@@ -3595,21 +3595,21 @@ function proseToNotes(drafts) {
   }
 }
 function hasNames2(chain) {
-  const walk = (e) => e.k === "name" || e.k === "ref" ? true : e.k === "op" ? walk(e.a) || walk(e.b) : e.k === "neg" || e.k === "carry" ? walk(e.a) : false;
-  return chain.segments.some((g) => g.readings.some((r) => walk(r.expr)));
+  const walk2 = (e) => e.k === "name" || e.k === "ref" ? true : e.k === "op" ? walk2(e.a) || walk2(e.b) : e.k === "neg" || e.k === "carry" ? walk2(e.a) : false;
+  return chain.segments.some((g) => g.readings.some((r) => walk2(r.expr)));
 }
 function mentions(chain) {
   const names = [];
   const steps = [];
-  const walk = (e) => {
+  const walk2 = (e) => {
     if (e.k === "name") names.push(e.name);
     else if (e.k === "ref") steps.push(e.step);
     else if (e.k === "op") {
-      walk(e.a);
-      walk(e.b);
-    } else if (e.k === "neg" || e.k === "carry") walk(e.a);
+      walk2(e.a);
+      walk2(e.b);
+    } else if (e.k === "neg" || e.k === "carry") walk2(e.a);
   };
-  for (const g of chain.segments) for (const r of g.readings) walk(r.expr);
+  for (const g of chain.segments) for (const r of g.readings) walk2(r.expr);
   return { names, steps };
 }
 function addsAmount(e, amount2) {
@@ -3896,8 +3896,8 @@ function checkReadings(key2, readings2, w2) {
   });
   if (!readings2.length) return out("unknown", `${who} has no reading to check ${fmt(w2)} against`);
   if (isRange(w2) && readings2.length >= 2) {
-    const at = (v) => readings2.findIndex((r) => r.value && !isRange(r.value) && compareQuantities(r.value, { ...w2, lo: v, hi: v }).status === "ok");
-    const lo = at(w2.lo), hi = at(w2.hi);
+    const at2 = (v) => readings2.findIndex((r) => r.value && !isRange(r.value) && compareQuantities(r.value, { ...w2, lo: v, hi: v }).status === "ok");
+    const lo = at2(w2.lo), hi = at2(w2.hi);
     if (lo >= 0 && hi >= 0 && lo !== hi) {
       return out("spans", `${fmt(w2)} spans ${who}'s readings: ${fmt(readings2[lo].value)} ${nameOf(readings2[lo], readings2)}, ${fmt(readings2[hi].value)} ${nameOf(readings2[hi], readings2)}`);
     }
@@ -4100,14 +4100,14 @@ function pointAt(span, t) {
   const u = seg2 > 0 ? (target - span.cum[i - 1]) / seg2 : 0;
   return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u };
 }
-function project(span, at) {
+function project(span, at2) {
   let best = Infinity, bestT = 0;
   for (let i = 1; i < span.points.length; i++) {
     const a = span.points[i - 1], b = span.points[i];
     const dx = b.x - a.x, dy = b.y - a.y;
     const l2 = dx * dx + dy * dy;
-    const u = l2 > 0 ? Math.max(0, Math.min(1, ((at.x - a.x) * dx + (at.y - a.y) * dy) / l2)) : 0;
-    const d = Math.hypot(at.x - (a.x + u * dx), at.y - (a.y + u * dy));
+    const u = l2 > 0 ? Math.max(0, Math.min(1, ((at2.x - a.x) * dx + (at2.y - a.y) * dy) / l2)) : 0;
+    const d = Math.hypot(at2.x - (a.x + u * dx), at2.y - (a.y + u * dy));
     if (d < best) {
       best = d;
       bestT = (span.cum[i - 1] + u * (span.cum[i] - span.cum[i - 1])) / span.length;
@@ -4116,20 +4116,20 @@ function project(span, at) {
   return bestT;
 }
 function readingOf(provider, node, nodes) {
-  let read2;
+  let read3;
   try {
-    read2 = provider.portsOf(node, nodes);
+    read3 = provider.portsOf(node, nodes);
   } catch {
     return null;
   }
-  if (!read2 || !Array.isArray(read2.ports)) return null;
-  return { notation: provider.notation, symbol: typeof read2.symbol === "string" ? read2.symbol : provider.notation, ports: read2.ports };
+  if (!read3 || !Array.isArray(read3.ports)) return null;
+  return { notation: provider.notation, symbol: typeof read3.symbol === "string" ? read3.symbol : provider.notation, ports: read3.ports };
 }
 function readings(node, nodes) {
   const out = [];
   for (const provider of registry.values()) {
-    const read2 = readingOf(provider, node, nodes);
-    if (read2) out.push(read2);
+    const read3 = readingOf(provider, node, nodes);
+    if (read3) out.push(read3);
   }
   return out;
 }
@@ -4181,26 +4181,26 @@ function portSites(node, nodes, spacing) {
   }
   return out;
 }
-function reachOf(at, site) {
-  if (!site.span) return { site, distance: Math.hypot(site.point.x - at.x, site.point.y - at.y) };
+function reachOf(at2, site) {
+  if (!site.span) return { site, distance: Math.hypot(site.point.x - at2.x, site.point.y - at2.y) };
   const span = spanOfSite(site.span);
-  if (!span) return { site, distance: Math.hypot(site.point.x - at.x, site.point.y - at.y) };
-  const t = quantised(project(span, at));
+  if (!span) return { site, distance: Math.hypot(site.point.x - at2.x, site.point.y - at2.y) };
+  const t = quantised(project(span, at2));
   const point2 = pointAt(span, t);
   const { ordinal } = alongOf(site.index);
-  return { site: { ...site, index: alongIndex(ordinal, t), point: point2, t }, distance: Math.hypot(point2.x - at.x, point2.y - at.y) };
+  return { site: { ...site, index: alongIndex(ordinal, t), point: point2, t }, distance: Math.hypot(point2.x - at2.x, point2.y - at2.y) };
 }
 function alongSiteOf(node, nodes, notation, index, provider = registry.get(notation)) {
   if (!provider || !Number.isInteger(index) || index < 0) return null;
-  const read2 = readingOf(provider, node, nodes);
-  if (!read2) return null;
+  const read3 = readingOf(provider, node, nodes);
+  if (!read3) return null;
   const { ordinal, t } = alongOf(index);
   let k = 0;
-  for (const port of read2.ports) {
+  for (const port of read3.ports) {
     if (!port || typeof port.name !== "string" || isPointPort(port)) continue;
     const span = continuousSpan(port);
     if (!span) continue;
-    if (k++ === ordinal) return alongSite(node.id, read2.symbol, notation, port, span, ordinal, t);
+    if (k++ === ordinal) return alongSite(node.id, read3.symbol, notation, port, span, ordinal, t);
   }
   return null;
 }
@@ -4211,13 +4211,13 @@ function portSiteOf(node, nodes, kind, index) {
   const provider = known.get(notation) ?? registry.get(notation);
   if (!provider || !Number.isInteger(index) || index < 0) return null;
   if (along2) return alongSiteOf(node, nodes, notation, index, provider);
-  const read2 = readingOf(provider, node, nodes);
-  if (!read2) return null;
+  const read3 = readingOf(provider, node, nodes);
+  if (!read3) return null;
   let k = 0;
-  for (const port of read2.ports) {
+  for (const port of read3.ports) {
     if (!port || typeof port.name !== "string" || !isPointPort(port)) continue;
     if (k++ !== index) continue;
-    return { nodeId: node.id, shape: read2.symbol, kind: `port:${notation}`, index, point: { x: port.at.x, y: port.at.y }, reasoning: said(port, notation), notation, port: port.name };
+    return { nodeId: node.id, shape: read3.symbol, kind: `port:${notation}`, index, point: { x: port.at.x, y: port.at.y }, reasoning: said(port, notation), notation, port: port.name };
   }
   return null;
 }
@@ -4358,7 +4358,7 @@ function boundsSites(add7, b) {
   add7("corner", { x: b.maxX, y: b.maxY }, "a corner of the mark\u2019s bounds");
   add7("corner", { x: b.minX, y: b.maxY }, "a corner of the mark\u2019s bounds");
 }
-function nearestMagnet(at, sites, radius) {
+function nearestMagnet(at2, sites, radius) {
   let best = null;
   const spans = /* @__PURE__ */ new Set();
   for (const site of sites) {
@@ -4366,13 +4366,13 @@ function nearestMagnet(at, sites, radius) {
       if (spans.has(site.span)) continue;
       spans.add(site.span);
     }
-    const hit = reachOf(at, site);
+    const hit = reachOf(at2, site);
     if (hit.distance > radius) continue;
     if (!best || hit.distance < best.distance) best = hit;
   }
   return best;
 }
-function magnetsNear(at, nodes, ids, radius, exclude) {
+function magnetsNear(at2, nodes, ids, radius, exclude) {
   const hits = [];
   for (const id of ids) {
     if (exclude?.has(id)) continue;
@@ -4384,7 +4384,7 @@ function magnetsNear(at, nodes, ids, radius, exclude) {
         if (spans.has(site.span)) continue;
         spans.add(site.span);
       }
-      const hit = reachOf(at, site);
+      const hit = reachOf(at2, site);
       if (hit.distance <= radius) hits.push(hit);
     }
   }
@@ -4514,8 +4514,8 @@ function headOf(points, arrow, near) {
   if (!arrow.tip || !arrow.tail || points.length < 3) return null;
   const { tail } = arrow;
   const order2 = arrow.head === "start" ? points.map((_, i) => points.length - 1 - i) : points.map((_, i) => i);
-  const at = arrowTipIndex(points, { head: arrow.head, tip: arrow.tip, tail }, near);
-  const k = order2.indexOf(at);
+  const at2 = arrowTipIndex(points, { head: arrow.head, tip: arrow.tip, tail }, near);
+  const k = order2.indexOf(at2);
   if (k < 0) return null;
   const tip = points[order2[k]];
   let reach = 0;
@@ -5054,12 +5054,12 @@ function readNumber(text) {
       out.reason = `${formatQuantity(p.value)}, the value of step ${p.label.n}`;
     }
   } else if (p.shape === "definition" && p.value && !p.label && !dia) {
-    const measure2 = MEASURE_WORDS[normName(p.name ?? "")];
+    const measure3 = MEASURE_WORDS[normName(p.name ?? "")];
     out = {
       value: p.value,
       name: p.name,
-      ...measure2 ? { measure: measure2 } : {},
-      reason: `${formatQuantity(p.value)}, named ${p.name}${measure2 ? ` \u2014 ${measure2 === "long" ? "the long side" : `a ${measure2}`}` : ""}`
+      ...measure3 ? { measure: measure3 } : {},
+      reason: `${formatQuantity(p.value)}, named ${p.name}${measure3 ? ` \u2014 ${measure3 === "long" ? "the long side" : `a ${measure3}`}` : ""}`
     };
   }
   if (!out || out.value.lo < 0) return null;
@@ -5200,11 +5200,11 @@ function withParts(f, others) {
     const cuts = [];
     for (const t of interior) if (!cuts.length || (t - cuts[cuts.length - 1]) * L > tol) cuts.push(t);
     if (!cuts.length) return side;
-    const at = (t) => ({ x: side.from.x + (side.to.x - side.from.x) * t, y: side.from.y + (side.to.y - side.from.y) * t });
+    const at2 = (t) => ({ x: side.from.x + (side.to.x - side.from.x) * t, y: side.from.y + (side.to.y - side.from.y) * t });
     const stops = [0, ...cuts, 1];
     const parts = [];
     for (let i = 0; i < stops.length - 1; i++) {
-      const a = at(stops[i]), b = at(stops[i + 1]);
+      const a = at2(stops[i]), b = at2(stops[i + 1]);
       parts.push({ key: `${side.key}.part${i}`, label: `part ${i + 1} of ${stops.length - 1} along ${side.label}`, from: a, to: b, length: dist2(a, b) });
     }
     return { ...side, parts };
@@ -5256,31 +5256,31 @@ function rimCandidates(num3, f) {
     reason: `the ${key2} of the circle: ${base}`
   }));
 }
-function namedKeys(f, measure2) {
+function namedKeys(f, measure3) {
   const side = (k) => f.sides.find((s) => s.key === k);
   const horizontal = (s) => Math.abs(s.to.x - s.from.x) >= Math.abs(s.to.y - s.from.y);
   switch (f.kind) {
     case "circle":
-      if (measure2 === "radius" || measure2 === "diameter") return [{ key: measure2, label: `the ${measure2}` }];
-      if (measure2 === "circumference" || measure2 === "area") return [{ key: measure2, label: `the ${measure2}` }];
+      if (measure3 === "radius" || measure3 === "diameter") return [{ key: measure3, label: `the ${measure3}` }];
+      if (measure3 === "circumference" || measure3 === "area") return [{ key: measure3, label: `the ${measure3}` }];
       return [];
     case "arc":
-      if (measure2 === "chord" || measure2 === "width") return [{ key: "chord", label: "the chord", segment: side("chord") }];
-      if (measure2 === "rise" || measure2 === "height") return [{ key: "rise", label: "the rise", segment: side("rise") }];
-      if (measure2 === "radius") return [{ key: "radius", label: "the radius" }];
-      if (measure2 === "arc" || measure2 === "length") return [{ key: "arc", label: "the arc" }];
+      if (measure3 === "chord" || measure3 === "width") return [{ key: "chord", label: "the chord", segment: side("chord") }];
+      if (measure3 === "rise" || measure3 === "height") return [{ key: "rise", label: "the rise", segment: side("rise") }];
+      if (measure3 === "radius") return [{ key: "radius", label: "the radius" }];
+      if (measure3 === "arc" || measure3 === "length") return [{ key: "arc", label: "the arc" }];
       return [];
     case "line":
       return [{ key: "length", label: "the length", segment: side("length") }];
     case "rectangle": {
-      if (measure2 === "width") return f.sides.filter(horizontal).map((s) => ({ key: s.key, label: s.label, segment: s }));
-      if (measure2 === "height") return f.sides.filter((s) => !horizontal(s)).map((s) => ({ key: s.key, label: s.label, segment: s }));
-      if (measure2 === "diagonal" || measure2 === "area" || measure2 === "perimeter") return [{ key: measure2, label: `the ${measure2}` }];
+      if (measure3 === "width") return f.sides.filter(horizontal).map((s) => ({ key: s.key, label: s.label, segment: s }));
+      if (measure3 === "height") return f.sides.filter((s) => !horizontal(s)).map((s) => ({ key: s.key, label: s.label, segment: s }));
+      if (measure3 === "diagonal" || measure3 === "area" || measure3 === "perimeter") return [{ key: measure3, label: `the ${measure3}` }];
       return [];
     }
     default: {
-      if (measure2 === "area" || measure2 === "perimeter") return [{ key: measure2, label: `the ${measure2}` }];
-      if (measure2 === "long" && f.kind === "triangle") {
+      if (measure3 === "area" || measure3 === "perimeter") return [{ key: measure3, label: `the ${measure3}` }];
+      if (measure3 === "long" && f.kind === "triangle") {
         let long = f.sides[0];
         for (const s of f.sides) if (s.length > long.length) long = s;
         return [{ key: long.key, label: long.label, segment: long }];
@@ -5803,19 +5803,19 @@ function triangleModels(facts) {
     if (new Set(basis.map((x) => x.key)).size !== 3 || new Set(basis.map((x) => x.group)).size !== 3) continue;
     if (!basis.some((x) => x.key.startsWith("side"))) continue;
     const ivs = basis.map((x) => x.iv);
-    const at = (xs) => {
+    const at2 = (xs) => {
       const sides = /* @__PURE__ */ new Map(), angles = /* @__PURE__ */ new Map();
       basis.forEach((x, i) => (x.key.startsWith("side") ? sides : angles).set(Number(x.key.slice(-1)), xs[i]));
       return triangleAt(sides, angles);
     };
     const exact = ivs.map((iv) => iv.lo);
-    const branches = at(exact).length;
+    const branches = at2(exact).length;
     for (let b = 0; b < branches; b++) {
       const sidesIv = [], anglesIv = [];
       let ok = true;
       for (let k = 0; k < 3 && ok; k++) {
-        const s = over(ivs, (xs) => at(xs)[b]?.sides[k] ?? null);
-        const a = over(ivs, (xs) => at(xs)[b]?.angles[k] ?? null);
+        const s = over(ivs, (xs) => at2(xs)[b]?.sides[k] ?? null);
+        const a = over(ivs, (xs) => at2(xs)[b]?.angles[k] ?? null);
         if (!s || !a) ok = false;
         else {
           sidesIv.push(s);
@@ -6577,24 +6577,24 @@ function meet(a, b) {
 function offChord(path, a, b) {
   const p = path[a], q = path[b];
   const L = dist3(p, q);
-  let at = a, off = 0;
+  let at2 = a, off = 0;
   for (let i = a + 1; i < b; i++) {
     const d = L > 1e-9 ? Math.abs(cross2(sub3(q, p), sub3(path[i], p))) / L : dist3(path[i], p);
     if (d > off) {
       off = d;
-      at = i;
+      at2 = i;
     }
   }
-  return { at, off };
+  return { at: at2, off };
 }
 function straightRuns(path, a, b, depth2 = 0) {
   if (b - a < 4) return null;
   if (calculateStraightness(path.slice(a, b + 1)) >= STRAIGHT_RUN) return [[a, b]];
   if (depth2 >= 3) return null;
-  const { at, off } = offChord(path, a, b);
-  if (at - a < 4 || b - at < 4) return null;
-  if (Math.max(offChord(path, a, at).off, offChord(path, at, b).off) > ONE_BEND * off) return null;
-  const left = straightRuns(path, a, at, depth2 + 1), right2 = straightRuns(path, at, b, depth2 + 1);
+  const { at: at2, off } = offChord(path, a, b);
+  if (at2 - a < 4 || b - at2 < 4) return null;
+  if (Math.max(offChord(path, a, at2).off, offChord(path, at2, b).off) > ONE_BEND * off) return null;
+  const left = straightRuns(path, a, at2, depth2 + 1), right2 = straightRuns(path, at2, b, depth2 + 1);
   return left && right2 ? [...left, ...right2] : null;
 }
 function ruledOf(node, nodes) {
@@ -6627,9 +6627,9 @@ function ruledOf(node, nodes) {
   const size2 = Math.max(b.maxX - b.minX, b.maxY - b.minY);
   const bends = [];
   for (let k = 1; k < runs.length; k++) {
-    const at = path[spans[k][0]];
+    const at2 = path[spans[k][0]];
     const m = meet(runs[k - 1], runs[k]);
-    bends.push(m && dist3(m, at) <= magnetRadius(size2, scale) ? m : onLine(runs[k], at));
+    bends.push(m && dist3(m, at2) <= magnetRadius(size2, scale) ? m : onLine(runs[k], at2));
   }
   return {
     id: node.id,
@@ -6733,18 +6733,18 @@ function runMiddles(r) {
 }
 function simpleCycles(edges) {
   const out = [];
-  const at = /* @__PURE__ */ new Map();
+  const at2 = /* @__PURE__ */ new Map();
   edges.forEach((e, k) => {
-    (at.get(e.u) ?? at.set(e.u, []).get(e.u)).push(k);
-    (at.get(e.v) ?? at.set(e.v, []).get(e.v)).push(k);
+    (at2.get(e.u) ?? at2.set(e.u, []).get(e.u)).push(k);
+    (at2.get(e.v) ?? at2.set(e.v, []).get(e.v)).push(k);
   });
   for (let first = 0; first < edges.length && out.length < MAX_CYCLES; first++) {
     const start = edges[first].u;
     const path = [first];
     const visited = /* @__PURE__ */ new Set([start, edges[first].v]);
-    const walk = (node) => {
+    const walk2 = (node) => {
       if (out.length >= MAX_CYCLES) return;
-      for (const k of at.get(node) ?? []) {
+      for (const k of at2.get(node) ?? []) {
         if (k <= first || path.includes(k)) continue;
         const e = edges[k];
         const next = e.u === node ? e.v : e.u;
@@ -6755,12 +6755,12 @@ function simpleCycles(edges) {
         if (visited.has(next) || path.length + 1 >= MAX_FIGURE_STROKES) continue;
         visited.add(next);
         path.push(k);
-        walk(next);
+        walk2(next);
         path.pop();
         visited.delete(next);
       }
     };
-    walk(edges[first].v);
+    walk2(edges[first].v);
   }
   return out;
 }
@@ -6814,16 +6814,16 @@ var WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight
 var count = (n2) => WORDS[n2] ?? String(n2);
 function figureOfCycle(cycle, ruled, meetings, find, pairKey) {
   let junction = cycle[0].u;
-  const walk = [];
+  const walk2 = [];
   for (const e of cycle) {
     const from = find(endIndex(e.stroke, "start")) === junction ? "start" : "end";
-    walk.push({ stroke: e.stroke, from });
+    walk2.push({ stroke: e.stroke, from });
     junction = find(endIndex(e.stroke, from === "start" ? "end" : "start"));
   }
   let corners = [];
   let sides = [];
-  walk.forEach((w2, i) => {
-    const prev = walk[(i - 1 + walk.length) % walk.length];
+  walk2.forEach((w2, i) => {
+    const prev = walk2[(i - 1 + walk2.length) % walk2.length];
     const a = endIndex(prev.stroke, prev.from === "start" ? "end" : "start");
     const b = endIndex(w2.stroke, w2.from);
     const m = meetings.get(pairKey(a, b));
@@ -6863,8 +6863,8 @@ function figureOfCycle(cycle, ruled, meetings, find, pairKey) {
   if (n2 < 3) return null;
   let v = corners.map((c) => c.point);
   const area3 = shoelace(v);
-  const perimeter2 = v.reduce((s, p, i) => s + dist3(p, v[(i + 1) % n2]), 0);
-  if (perimeter2 <= 0 || 4 * Math.PI * Math.abs(area3) / (perimeter2 * perimeter2) < SLIVER) return null;
+  const perimeter3 = v.reduce((s, p, i) => s + dist3(p, v[(i + 1) % n2]), 0);
+  if (perimeter3 <= 0 || 4 * Math.PI * Math.abs(area3) / (perimeter3 * perimeter3) < SLIVER) return null;
   if (selfCrossing(v)) return null;
   if (area3 < 0) {
     corners = corners.slice().reverse();
@@ -6879,7 +6879,7 @@ function figureOfCycle(cycle, ruled, meetings, find, pairKey) {
   sides = sides.map((_, k) => sides[(k + top) % n2]);
   v = corners.map((c) => c.point);
   const angles = interiorAngles(v);
-  const strokes = [...new Set(walk.map((w2) => ruled[w2.stroke].id))];
+  const strokes = [...new Set(walk2.map((w2) => ruled[w2.stroke].id))];
   let shape, kind, fit3 = 1, says;
   const right2 = n2 === 4 && angles.every((a) => Math.abs(a - 90) <= RIGHT_ANGLE_TOLERANCE);
   if (n2 === 3) {
@@ -7516,8 +7516,8 @@ function readEnd(conn, e, state) {
     if (used.has(c.id)) continue;
     const fp = fingerprintOf(c.node);
     if (!fp?.isClosed) continue;
-    const pathLength4 = c.ink.reduce((s, p, i) => i ? s + dist4(p, c.ink[i - 1]) : 0, 0);
-    const oneStroke = pathLength4 > OUTLINE_PATH * perimeter(c.hull);
+    const pathLength5 = c.ink.reduce((s, p, i) => i ? s + dist4(p, c.ink[i - 1]) : 0, 0);
+    const oneStroke = pathLength5 > OUTLINE_PATH * perimeter(c.hull);
     const fills = oneStroke ? [] : fillsIn(c.hull, others.filter((o) => o.id !== c.id && !used.has(o.id) && !isRead(o.node)), 0.1 * c.size);
     used.add(c.id);
     const hull2 = hullOf2([...c.ink, ...fills.flatMap((f) => f.ink)]);
@@ -8942,8 +8942,8 @@ function releasedBy(nodes, ids, m) {
       if (together.has(b.nodeId)) continue;
       const target = nodes.get(b.nodeId);
       const site = target && boundSiteOf(target, nodes, b.site);
-      const at = ends ? b.end === "start" ? ends.start : ends.end : null;
-      if (target && site && at && sitsOn(map(at), site.point, target, n2)) continue;
+      const at2 = ends ? b.end === "start" ? ends.start : ends.end : null;
+      if (target && site && at2 && sitsOn(map(at2), site.point, target, n2)) continue;
       out.push({ strokeId: n2.id, end: b.end });
     }
   }
@@ -8965,8 +8965,8 @@ function reshapeDecision(node, nodes, handle, reshaped, shape, hold) {
     for (const b of bs) {
       const target = nodes.get(b.nodeId);
       const site = target && boundSiteOf(target, nodes, b.site);
-      const at = ends ? b.end === "start" ? ends.start : ends.end : null;
-      if (target && site && at && sitsOn(at, site.point, target, node)) continue;
+      const at2 = ends ? b.end === "start" ? ends.start : ends.end : null;
+      if (target && site && at2 && sitsOn(at2, site.point, target, node)) continue;
       releases.push(b.end);
     }
   }
@@ -8991,16 +8991,16 @@ function heldEnds(node, nodes) {
   return out.sort((p, q) => p.end === q.end ? 0 : p.end === "start" ? -1 : 1);
 }
 function correction(ends, held2, floor) {
-  const at = (e) => e === "start" ? ends.start : ends.end;
+  const at2 = (e) => e === "start" ? ends.start : ends.end;
   if (held2.length === 1) {
     const h3 = held2[0];
-    const E = at(h3.end), S = h3.point, F = at(h3.end === "start" ? "end" : "start");
+    const E = at2(h3.end), S = h3.point, F = at2(h3.end === "start" ? "end" : "start");
     if (dist6(E, S) <= SITS_EXACTLY) return null;
     if (dist6(E, F) < floor || dist6(S, F) < floor) return translation(S.x - E.x, S.y - E.y);
     return pivotMap(F, E, S);
   }
   const [h1, h2] = held2;
-  const E1 = at(h1.end), E2 = at(h2.end);
+  const E1 = at2(h1.end), E2 = at2(h2.end);
   const d1 = { x: h1.point.x - E1.x, y: h1.point.y - E1.y }, d2 = { x: h2.point.x - E2.x, y: h2.point.y - E2.y };
   if (Math.hypot(d1.x, d1.y) <= SITS_EXACTLY && Math.hypot(d2.x, d2.y) <= SITS_EXACTLY) return null;
   const step2 = translation((d1.x + d2.x) / 2, (d1.y + d2.y) / 2);
@@ -9324,12 +9324,12 @@ function routeStands(node) {
 function routable(node, nodes) {
   if (!getRep(node, "stroke") || getRep(node, "erased")) return false;
   const held2 = activeBindingsOf(node, nodes).filter((b) => (b.end === "start" || b.end === "end") && b.nodeId !== node.id);
-  const at = (end) => {
+  const at2 = (end) => {
     const b = held2.find((x) => x.end === end);
     const t = b && nodes.get(b.nodeId);
     return !!t && !!boundSiteOf(t, nodes, b.site) && !!boundsOf(t);
   };
-  return at("start") && at("end");
+  return at2("start") && at2("end");
 }
 var strokeScale2 = (node) => {
   const s = getRep(node, "stroke")?.data?.scale;
@@ -9699,13 +9699,13 @@ function regionOutline(board2) {
     return rows.flatMap((row) => row.sort((a, b) => a.bounds.minX - b.bounds.minX));
   };
   const out = [];
-  const walk = (parent, depth2) => {
+  const walk2 = (parent, depth2) => {
     for (const r of reading7(all.filter((x) => parentOf.get(x.id) === parent))) {
       out.push({ id: r.id, name: r.name, bounds: r.bounds, depth: depth2, parent, holds: describeRegion(board2, r.id).holds });
-      walk(r.id, depth2 + 1);
+      walk2(r.id, depth2 + 1);
     }
   };
-  walk(null, 0);
+  walk2(null, 0);
   return out;
 }
 
@@ -9925,126 +9925,126 @@ var PACK_LIMITS = {
   version: 999999
 };
 var Fault = class {
-  constructor(at, reason) {
-    this.at = at;
+  constructor(at2, reason) {
+    this.at = at2;
     this.reason = reason;
   }
 };
-var bad = (at, reason) => {
-  throw new Fault(at, reason);
+var bad = (at2, reason) => {
+  throw new Fault(at2, reason);
 };
 var isRecord = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 var kindOf2 = (v) => v === void 0 ? "missing" : v === null ? "null" : Array.isArray(v) ? "a list" : typeof v;
-function wantRecord(v, at, what) {
-  if (!isRecord(v)) bad(at, `${what} is ${kindOf2(v)}, not an object`);
+function wantRecord(v, at2, what) {
+  if (!isRecord(v)) bad(at2, `${what} is ${kindOf2(v)}, not an object`);
   return v;
 }
-function wantList(v, at, what, max, min = 0) {
-  if (!Array.isArray(v)) bad(at, `${what} is ${kindOf2(v)}, not a list`);
+function wantList(v, at2, what, max, min = 0) {
+  if (!Array.isArray(v)) bad(at2, `${what} is ${kindOf2(v)}, not a list`);
   const xs = v;
-  if (xs.length > max) bad(at, `${what} holds ${xs.length}, past the ${max} a pack may carry`);
-  if (xs.length < min) bad(at, `${what} holds ${xs.length}, and needs at least ${min}`);
+  if (xs.length > max) bad(at2, `${what} holds ${xs.length}, past the ${max} a pack may carry`);
+  if (xs.length < min) bad(at2, `${what} holds ${xs.length}, and needs at least ${min}`);
   return xs;
 }
-function wantText(v, at, what, max = PACK_LIMITS.textChars) {
-  if (typeof v !== "string") bad(at, `${what} is ${kindOf2(v)}, not text`);
+function wantText(v, at2, what, max = PACK_LIMITS.textChars) {
+  if (typeof v !== "string") bad(at2, `${what} is ${kindOf2(v)}, not text`);
   const s = v.trim();
-  if (!s) bad(at, `${what} is empty`);
-  if (s.length > max) bad(at, `${what} is ${s.length} characters long, past the ${max} it may be`);
+  if (!s) bad(at2, `${what} is empty`);
+  if (s.length > max) bad(at2, `${what} is ${s.length} characters long, past the ${max} it may be`);
   return s;
 }
-function wantNumber(v, at, what) {
-  if (typeof v !== "number") bad(at, `${what} is ${kindOf2(v)}, not a number`);
-  if (!Number.isFinite(v)) bad(at, `${what} is ${String(v)} \u2014 a measurement has to be a finite number`);
-  if (Math.abs(v) > PACK_LIMITS.coordinate) bad(at, `${what} is ${v}, further than ${PACK_LIMITS.coordinate} from the origin`);
+function wantNumber(v, at2, what) {
+  if (typeof v !== "number") bad(at2, `${what} is ${kindOf2(v)}, not a number`);
+  if (!Number.isFinite(v)) bad(at2, `${what} is ${String(v)} \u2014 a measurement has to be a finite number`);
+  if (Math.abs(v) > PACK_LIMITS.coordinate) bad(at2, `${what} is ${v}, further than ${PACK_LIMITS.coordinate} from the origin`);
   return v;
 }
-function wantPoint(v, at, what) {
-  const r = wantRecord(v, at, what);
-  return { x: wantNumber(r.x, `${at}.x`, `${what}'s x`), y: wantNumber(r.y, `${at}.y`, `${what}'s y`) };
+function wantPoint(v, at2, what) {
+  const r = wantRecord(v, at2, what);
+  return { x: wantNumber(r.x, `${at2}.x`, `${what}'s x`), y: wantNumber(r.y, `${at2}.y`, `${what}'s y`) };
 }
-function wantRole(v, at) {
-  if (!ROLES.includes(v)) bad(at, `the role \u201C${String(v)}\u201D is not one of the six \u2014 ${ROLES.join(", ")} \u2014 and a pack adds none`);
+function wantRole(v, at2) {
+  if (!ROLES.includes(v)) bad(at2, `the role \u201C${String(v)}\u201D is not one of the six \u2014 ${ROLES.join(", ")} \u2014 and a pack adds none`);
   return v;
 }
-function wantExport(v, at) {
-  const r = wantRecord(v, at, "what it is said as elsewhere");
+function wantExport(v, at2) {
+  const r = wantRecord(v, at2, "what it is said as elsewhere");
   const keys = Object.keys(r);
-  if (keys.length > PACK_LIMITS.exports) bad(at, `it is said in ${keys.length} formats, past the ${PACK_LIMITS.exports} an entry may name`);
+  if (keys.length > PACK_LIMITS.exports) bad(at2, `it is said in ${keys.length} formats, past the ${PACK_LIMITS.exports} an entry may name`);
   const out = {};
   for (const k of keys) {
-    if (!/^[a-z][a-z0-9-]{0,23}$/.test(k)) bad(`${at}.${k}`, `\u201C${k}\u201D is no format's name`);
-    out[k] = wantText(r[k], `${at}.${k}`, `how it is said in ${k}`);
+    if (!/^[a-z][a-z0-9-]{0,23}$/.test(k)) bad(`${at2}.${k}`, `\u201C${k}\u201D is no format's name`);
+    out[k] = wantText(r[k], `${at2}.${k}`, `how it is said in ${k}`);
   }
   return out;
 }
 var BOX_SHAPES = /* @__PURE__ */ new Set(["rectangle", "circle", "triangle"]);
 var SEGMENT_SHAPES = /* @__PURE__ */ new Set(["line", "arrow"]);
-function wantShape(v, at) {
-  const r = wantRecord(v, at, "a mark");
+function wantShape(v, at2) {
+  const r = wantRecord(v, at2, "a mark");
   const shape = r.shape;
   if (typeof shape === "string" && BOX_SHAPES.has(shape)) {
-    const w2 = wantNumber(r.w, `${at}.w`, "its width");
-    const h2 = wantNumber(r.h, `${at}.h`, "its height");
-    if (!(w2 > 1) || !(h2 > 1)) bad(at, `a ${shape} ${w2} by ${h2} has no size to draw`);
-    return { shape, x: wantNumber(r.x, `${at}.x`, "its x"), y: wantNumber(r.y, `${at}.y`, "its y"), w: w2, h: h2 };
+    const w2 = wantNumber(r.w, `${at2}.w`, "its width");
+    const h2 = wantNumber(r.h, `${at2}.h`, "its height");
+    if (!(w2 > 1) || !(h2 > 1)) bad(at2, `a ${shape} ${w2} by ${h2} has no size to draw`);
+    return { shape, x: wantNumber(r.x, `${at2}.x`, "its x"), y: wantNumber(r.y, `${at2}.y`, "its y"), w: w2, h: h2 };
   }
   if (typeof shape === "string" && SEGMENT_SHAPES.has(shape)) {
-    const from = wantPoint(r.from, `${at}.from`, "where it starts");
-    const to = wantPoint(r.to, `${at}.to`, "where it ends");
-    if (!(Math.hypot(to.x - from.x, to.y - from.y) > 1)) bad(at, `a ${shape} that starts where it ends has no length to draw`);
+    const from = wantPoint(r.from, `${at2}.from`, "where it starts");
+    const to = wantPoint(r.to, `${at2}.to`, "where it ends");
+    if (!(Math.hypot(to.x - from.x, to.y - from.y) > 1)) bad(at2, `a ${shape} that starts where it ends has no length to draw`);
     return { shape, from, to };
   }
-  return bad(`${at}.shape`, `\u201C${String(shape)}\u201D is not a shape the rung reads \u2014 rectangle, circle, triangle, line or arrow`);
+  return bad(`${at2}.shape`, `\u201C${String(shape)}\u201D is not a shape the rung reads \u2014 rectangle, circle, triangle, line or arrow`);
 }
-function wantStroke(v, at) {
-  const pts = wantList(v, at, "a recorded stroke", PACK_LIMITS.points, 2);
-  return pts.map((p, i) => wantPoint(p, `${at}[${i}]`, `point ${i}`));
+function wantStroke(v, at2) {
+  const pts = wantList(v, at2, "a recorded stroke", PACK_LIMITS.points, 2);
+  return pts.map((p, i) => wantPoint(p, `${at2}[${i}]`, `point ${i}`));
 }
-function wantDefinition(v, at) {
-  const r = wantRecord(v, at, "a definition");
-  const name = wantText(r.name, `${at}.name`, "its name", PACK_LIMITS.nameChars);
+function wantDefinition(v, at2) {
+  const r = wantRecord(v, at2, "a definition");
+  const name = wantText(r.name, `${at2}.name`, "its name", PACK_LIMITS.nameChars);
   const out = { name };
-  if (r.describes !== void 0) out.describes = wantText(r.describes, `${at}.describes`, "what it looks like");
+  if (r.describes !== void 0) out.describes = wantText(r.describes, `${at2}.describes`, "what it looks like");
   if (r.samples !== void 0) {
-    out.samples = wantList(r.samples, `${at}.samples`, "its samples", PACK_LIMITS.samples).map(
-      (s, i) => wantList(s, `${at}.samples[${i}]`, `sample ${i}`, PACK_LIMITS.marks, 1).map((m, k) => wantShape(m, `${at}.samples[${i}][${k}]`))
+    out.samples = wantList(r.samples, `${at2}.samples`, "its samples", PACK_LIMITS.samples).map(
+      (s, i) => wantList(s, `${at2}.samples[${i}]`, `sample ${i}`, PACK_LIMITS.marks, 1).map((m, k) => wantShape(m, `${at2}.samples[${i}][${k}]`))
     );
   }
   if (r.strokes !== void 0) {
-    out.strokes = wantList(r.strokes, `${at}.strokes`, "its recorded drawings", PACK_LIMITS.samples).map(
-      (s, i) => wantList(s, `${at}.strokes[${i}]`, `recorded drawing ${i}`, PACK_LIMITS.marks, 1).map((k, j) => wantStroke(k, `${at}.strokes[${i}][${j}]`))
+    out.strokes = wantList(r.strokes, `${at2}.strokes`, "its recorded drawings", PACK_LIMITS.samples).map(
+      (s, i) => wantList(s, `${at2}.strokes[${i}]`, `recorded drawing ${i}`, PACK_LIMITS.marks, 1).map((k, j) => wantStroke(k, `${at2}.strokes[${i}][${j}]`))
     );
   }
-  if (!(out.samples?.length || out.strokes?.length)) bad(at, `\u201C${name}\u201D has no drawing to be matched by \u2014 a definition needs a sample or a recorded drawing`);
-  if (r.role !== void 0) out.role = wantRole(r.role, `${at}.role`);
-  if (r.ports !== void 0) out.ports = wantText(r.ports, `${at}.ports`, "where it takes a connector");
-  if (r.export !== void 0) out.export = wantExport(r.export, `${at}.export`);
+  if (!(out.samples?.length || out.strokes?.length)) bad(at2, `\u201C${name}\u201D has no drawing to be matched by \u2014 a definition needs a sample or a recorded drawing`);
+  if (r.role !== void 0) out.role = wantRole(r.role, `${at2}.role`);
+  if (r.ports !== void 0) out.ports = wantText(r.ports, `${at2}.ports`, "where it takes a connector");
+  if (r.export !== void 0) out.export = wantExport(r.export, `${at2}.export`);
   return out;
 }
-function wantConnector(v, at) {
-  const r = wantRecord(v, at, "a connector");
-  const out = { name: wantText(r.name, `${at}.name`, "its name", PACK_LIMITS.nameChars) };
-  if (r.describes !== void 0) out.describes = wantText(r.describes, `${at}.describes`, "what it looks like");
+function wantConnector(v, at2) {
+  const r = wantRecord(v, at2, "a connector");
+  const out = { name: wantText(r.name, `${at2}.name`, "its name", PACK_LIMITS.nameChars) };
+  if (r.describes !== void 0) out.describes = wantText(r.describes, `${at2}.describes`, "what it looks like");
   if (r.head !== void 0) {
-    if (!PACK_HEADS.includes(r.head)) bad(`${at}.head`, `\u201C${String(r.head)}\u201D is not a head \u2014 ${PACK_HEADS.join(", ")}`);
+    if (!PACK_HEADS.includes(r.head)) bad(`${at2}.head`, `\u201C${String(r.head)}\u201D is not a head \u2014 ${PACK_HEADS.join(", ")}`);
     out.head = r.head;
   }
   if (r.filled !== void 0) {
-    if (typeof r.filled !== "boolean") bad(`${at}.filled`, `whether its head is filled is ${kindOf2(r.filled)}, not yes or no`);
+    if (typeof r.filled !== "boolean") bad(`${at2}.filled`, `whether its head is filled is ${kindOf2(r.filled)}, not yes or no`);
     out.filled = r.filled;
   }
-  if (r.role !== void 0) out.role = wantRole(r.role, `${at}.role`);
-  if (r.export !== void 0) out.export = wantExport(r.export, `${at}.export`);
+  if (r.role !== void 0) out.role = wantRole(r.role, `${at2}.role`);
+  if (r.export !== void 0) out.export = wantExport(r.export, `${at2}.export`);
   return out;
 }
 var AFFINITY_KIND = /^(notation|concept):[a-z][a-z0-9-]{0,39}$/;
 var AFFINITY_TARGET = /^(on|tool|key):\S{1,80}$/;
-function wantAffinity(kind, v, at) {
-  if (!AFFINITY_KIND.test(kind)) bad(at, `\u201C${kind}\u201D is not a context's entry \u2014 a notation:<id> or a concept:<name>`);
-  const xs = wantList(v, at, `what ${kind} lifts`, PACK_LIMITS.targets, 1);
+function wantAffinity(kind, v, at2) {
+  if (!AFFINITY_KIND.test(kind)) bad(at2, `\u201C${kind}\u201D is not a context's entry \u2014 a notation:<id> or a concept:<name>`);
+  const xs = wantList(v, at2, `what ${kind} lifts`, PACK_LIMITS.targets, 1);
   return xs.map((t, i) => {
-    if (typeof t !== "string" || !AFFINITY_TARGET.test(t)) bad(`${at}[${i}]`, `\u201C${String(t)}\u201D lifts nothing a context names \u2014 on:<grounds>, tool:<id> or key:<offer>`);
+    if (typeof t !== "string" || !AFFINITY_TARGET.test(t)) bad(`${at2}[${i}]`, `\u201C${String(t)}\u201D lifts nothing a context names \u2014 on:<grounds>, tool:<id> or key:<offer>`);
     return t;
   });
 }
@@ -10083,9 +10083,9 @@ function validatePack(value) {
     throw err;
   }
   const refused = [];
-  const entry = (read2) => {
+  const entry = (read3) => {
     try {
-      return read2();
+      return read3();
     } catch (err) {
       if (err instanceof Fault) {
         refused.push({ at: err.at, reason: err.reason });
@@ -10096,11 +10096,11 @@ function validatePack(value) {
   };
   const definitions = [];
   raw.definitions.forEach((d, i) => {
-    const at = `definitions[${i}]`;
-    const got = entry(() => wantDefinition(d, at));
+    const at2 = `definitions[${i}]`;
+    const got = entry(() => wantDefinition(d, at2));
     if (!got) return;
     if (definitions.some((x) => x.name === got.name)) {
-      refused.push({ at: `${at}.name`, reason: `\u201C${got.name}\u201D is already a definition of this pack \u2014 a name means one thing in it` });
+      refused.push({ at: `${at2}.name`, reason: `\u201C${got.name}\u201D is already a definition of this pack \u2014 a name means one thing in it` });
       return;
     }
     definitions.push(got);
@@ -10109,11 +10109,11 @@ function validatePack(value) {
   if (raw.connectors !== void 0) {
     const connectors = [];
     raw.connectors.forEach((c, i) => {
-      const at = `connectors[${i}]`;
-      const got = entry(() => wantConnector(c, at));
+      const at2 = `connectors[${i}]`;
+      const got = entry(() => wantConnector(c, at2));
       if (!got) return;
       if (connectors.some((x) => x.name === got.name)) {
-        refused.push({ at: `${at}.name`, reason: `\u201C${got.name}\u201D is already a connector of this pack` });
+        refused.push({ at: `${at2}.name`, reason: `\u201C${got.name}\u201D is already a connector of this pack` });
         return;
       }
       connectors.push(got);
@@ -10123,8 +10123,8 @@ function validatePack(value) {
   if (raw.affinities !== void 0) {
     const affinities = {};
     for (const [kind, v] of Object.entries(raw.affinities)) {
-      const at = `affinities.${kind}`;
-      const got = entry(() => wantAffinity(kind, v, at));
+      const at2 = `affinities.${kind}`;
+      const got = entry(() => wantAffinity(kind, v, at2));
       if (got) affinities[kind] = [...new Set(got)];
     }
     pack.affinities = affinities;
@@ -10371,10 +10371,10 @@ function drawingsOf(def) {
 }
 var AS_DRAWN = { k: 1, dx: 0, dy: 0 };
 function placeShape(s, p) {
-  const at = (q) => ({ x: q.x * p.k + p.dx, y: q.y * p.k + p.dy });
-  if (s.shape === "line" || s.shape === "arrow") return { shape: s.shape, from: at(s.from), to: at(s.to) };
+  const at2 = (q) => ({ x: q.x * p.k + p.dx, y: q.y * p.k + p.dy });
+  if (s.shape === "line" || s.shape === "arrow") return { shape: s.shape, from: at2(s.from), to: at2(s.to) };
   const b = s;
-  const o = at({ x: b.x, y: b.y });
+  const o = at2({ x: b.x, y: b.y });
   return { shape: b.shape, x: o.x, y: o.y, w: b.w * p.k, h: b.h * p.k };
 }
 function drawingStrokes(def, drawing, seed, place2 = AS_DRAWN) {
@@ -11175,7 +11175,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     for (const g of gestures.values()) if (g.pendingLasso?.id === id) return true;
     return false;
   }
-  function buildSummon(ids, source, reasoning, gestureIds, scopeBounds, excludeId, at, g) {
+  function buildSummon(ids, source, reasoning, gestureIds, scopeBounds, excludeId, at2, g) {
     const artifactId = liveArtifactUnder(scopeBounds, excludeId);
     const onArtifact = artifactId ? {
       artifactId,
@@ -11189,16 +11189,16 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       scopeReasoning: reasoning,
       suggestions: makeSuggestions(ids),
       gestureIds,
-      at,
+      at: at2,
       ...onArtifact ? { onArtifact } : {}
     };
   }
-  function recentWithin(at, hand) {
+  function recentWithin(at2, hand) {
     return contentIds.filter((id) => {
       if ((markHands.get(id) ?? LOCAL_PARTICIPANT) !== hand) return false;
       const n2 = nodes.get(id);
       if (!n2 || getRep(n2, "erased")) return false;
-      return at - n2.createdAt <= config.recentWindowMs;
+      return at2 - n2.createdAt <= config.recentWindowMs;
     });
   }
   function markOf(id) {
@@ -11207,7 +11207,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     if (!n2 || !b) return null;
     return { id, bounds: b, points: standingPointsOf(n2) ?? void 0, closed: standsClosed(n2) };
   }
-  function scopeFromMark(points, fp, at, hand) {
+  function scopeFromMark(points, fp, at2, hand) {
     const candidates = contentIds.map(markOf).filter((m) => !!m && !getRep(nodes.get(m.id), "erased"));
     const engaged = candidates.filter((m) => {
       if (m.points && strokesIntersect(points, m.points)) return true;
@@ -11229,7 +11229,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     );
     const scopeSize = Math.max(union3.maxX - union3.minX, union3.maxY - union3.minY);
     if (fp.size > scopeSize) return null;
-    const recent = new Set(recentWithin(at, hand));
+    const recent = new Set(recentWithin(at2, hand));
     const pool = candidates.filter((m) => recent.has(m.id) || engaged.some((e) => e.id === m.id));
     const groups = clusters(pool, relate(pool));
     const ids = new Set(engaged.map((m) => m.id));
@@ -11310,19 +11310,19 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     return false;
   }
   function applyStroke(ev) {
-    const { points, at } = ev;
+    const { points, at: at2 } = ev;
     const pid = ev.participantId ?? LOCAL_PARTICIPANT;
     const scale = ev.scale && ev.scale > 0 ? ev.scale : 1;
     const fp = getFingerprint(points, scale);
     const node = {
       id: nextId("stroke"),
       reps: [
-        { modality: "stroke", data: { points, at, scale }, source: pid },
+        { modality: "stroke", data: { points, at: at2, scale }, source: pid },
         { modality: "fingerprint", data: fp, source: TIER0_PARTICIPANT }
       ],
       edges: [{ to: pid, rel: "made-by" }],
       capability: 0,
-      createdAt: at
+      createdAt: at2
     };
     nodes.set(node.id, node);
     ink.set(node.id, fp.bounds);
@@ -11336,7 +11336,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       const lassoPoints = strokePointsOf(lassoNode) ?? [];
       const gestureConfig = { ...config.gesture, commandMark: g.commandMark };
       const strokePair = { check: points, lasso: lassoPoints };
-      if (resolvesLasso(fp, at, lassoFp, g.pendingLasso.at, gestureConfig, strokePair)) {
+      if (resolvesLasso(fp, at2, lassoFp, g.pendingLasso.at, gestureConfig, strokePair)) {
         node.reps.push({
           modality: "gesture",
           data: { role: g.commandMark ? "command" : "check" },
@@ -11352,7 +11352,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
           [lassoNode.id, node.id],
           lassoFp.bounds,
           lassoNode.id,
-          at,
+          at2,
           g
         );
         g.pendingLasso = null;
@@ -11360,12 +11360,12 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         recomputeClusterCandidates();
         return node.id;
       }
-      g.markMiss = whyNotResolved(fp, at, lassoFp, g.pendingLasso.at, gestureConfig, strokePair);
+      g.markMiss = whyNotResolved(fp, at2, lassoFp, g.pendingLasso.at, gestureConfig, strokePair);
     } else {
       g.markMiss = null;
     }
     if (byHand && matchesCommandMark(fp, g.commandMark ?? BUILTIN_COMMAND_MARK).match) {
-      const scope = scopeFromMark(points, fp, at, hand);
+      const scope = scopeFromMark(points, fp, at2, hand);
       if (scope) {
         node.reps.push({
           modality: "gesture",
@@ -11381,7 +11381,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
             ];
           })
         );
-        g.summon = buildSummon(scope.ids, scope.source, scope.reasoning, [node.id], union3, node.id, at, g);
+        g.summon = buildSummon(scope.ids, scope.source, scope.reasoning, [node.id], union3, node.id, at2, g);
         g.pendingLasso = null;
         g.markMiss = null;
         recomputeClusterCandidates();
@@ -11399,7 +11399,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       });
       g.pendingLasso = null;
       g.summon = null;
-      for (const id of scratched) eraseNode(id, at);
+      for (const id of scratched) eraseNode(id, at2);
       return node.id;
     }
     if (byHand) {
@@ -11422,7 +11422,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     for (const r of results) {
       if (r.meta) node.reps.push({ modality: `reading:${r.type}`, data: r.meta, source: TIER0_PARTICIPANT });
     }
-    if (absorbIntoWord(node, fp, at, scale, hand)) {
+    if (absorbIntoWord(node, fp, at2, scale, hand)) {
       recomputeClusterCandidates();
       return node.id;
     }
@@ -11430,7 +11430,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     inferWire(node, points, scale);
     const enclosed = fp.isClosed && enclosesAny(fp.bounds, node.id) ? 1 : 0;
     const onLive = liveArtifactUnder(fp.bounds, node.id);
-    g.pendingLasso = byHand && (isLassoLike(fp, enclosed) || fp.isClosed && onLive) ? { id: node.id, at } : null;
+    g.pendingLasso = byHand && (isLassoLike(fp, enclosed) || fp.isClosed && onLive) ? { id: node.id, at: at2 } : null;
     recomputeClusterCandidates();
     return node.id;
   }
@@ -11497,18 +11497,18 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     eraseNode(ev.nodeId, ev.at);
     reroute([ev.nodeId]);
   }
-  function eraseNode(nodeId, at) {
+  function eraseNode(nodeId, at2) {
     const node = nodes.get(nodeId);
     if (!node || node.id.startsWith("type:") || isLibraryNode(node.id)) return;
     if (getRep(node, "erased")) return;
     const ri = regions.indexOf(node.id);
     if (ri >= 0) {
-      node.reps.push({ modality: "erased", data: { at }, source: "user" });
+      node.reps.push({ modality: "erased", data: { at: at2 }, source: "user" });
       regions.splice(ri, 1);
       for (const g of gestures.values()) g.selection = g.selection.filter((id) => id !== node.id);
       return;
     }
-    node.reps.push({ modality: "erased", data: { at }, source: "user" });
+    node.reps.push({ modality: "erased", data: { at: at2 }, source: "user" });
     removeFromContent(node.id);
     ink.delete(node.id);
     definitionsChanged = true;
@@ -11537,7 +11537,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       }
     };
     if (isWord(node)) {
-      for (const id of lettersOf(node)) eraseNode(id, at);
+      for (const id of lettersOf(node)) eraseNode(id, at2);
     }
     for (const e of node.edges) {
       if (e.rel === "part-of" && !e.blessed && nodes.get(e.to) && isWord(nodes.get(e.to))) shrinkWord(e.to, node.id);
@@ -12096,7 +12096,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       inferWire(n2, st.points, strokeScaleOf(n2));
     }
   }
-  function absorbIntoWord(node, fp, at, scale, hand) {
+  function absorbIntoWord(node, fp, at2, scale, hand) {
     if (!isLetterLike(fp.bounds, scale) || neverLetter(node)) return false;
     const maker = authorOf(node);
     const mine = (function* () {
@@ -12117,12 +12117,12 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     const prevId = behind(0);
     if (!prevId) return false;
     const prev = nodes.get(prevId);
-    const letter = { bounds: fp.bounds, at };
+    const letter = { bounds: fp.bounds, at: at2 };
     if (isWord(prev)) {
       const letters = lettersOf(prev);
       const last = nodes.get(letters[letters.length - 1]);
       const lastAt2 = (getRep(last, "stroke")?.data).at;
-      if (at - lastAt2 <= WORD_WINDOW_MS && oneDrawing(last, node)) {
+      if (at2 - lastAt2 <= WORD_WINDOW_MS && oneDrawing(last, node)) {
         releaseLetters(prev, [last.id], node.id);
         return false;
       }
@@ -12159,7 +12159,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       bounds = { minX: Math.min(bounds.minX, cand.bounds.minX), minY: Math.min(bounds.minY, cand.bounds.minY), maxX: Math.max(bounds.maxX, cand.bounds.maxX), maxY: Math.max(bounds.maxY, cand.bounds.maxY) };
     }
     const letterIds = run2.map((r) => r.node.id).concat(node.id);
-    const word = { id: nextId("word"), reps: [], edges: [{ to: maker, rel: "made-by" }], capability: 0, createdAt: at };
+    const word = { id: nextId("word"), reps: [], edges: [{ to: maker, rel: "made-by" }], capability: 0, createdAt: at2 };
     nodes.set(word.id, word);
     markHands.set(word.id, hand);
     setWordReps(word, letterIds);
@@ -12290,12 +12290,12 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     if (!participants.includes(pid)) return null;
     if (ev.strokes && ev.strokes.length) {
       let first = null;
-      let at = ev.at;
+      let at2 = ev.at;
       for (const pts of ev.strokes) {
         if (!pts || pts.length < 2) continue;
-        const id = applyStroke({ type: "stroke", points: pts, at, participantId: pid, scale: 1, content: true, ...ev.by ? { by: ev.by } : {} });
+        const id = applyStroke({ type: "stroke", points: pts, at: at2, participantId: pid, scale: 1, content: true, ...ev.by ? { by: ev.by } : {} });
         if (id && !first) first = id;
-        at += 1;
+        at2 += 1;
       }
       return first;
     }
@@ -12401,11 +12401,11 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   function isLibraryNode(id) {
     return id.startsWith("library:");
   }
-  function noticePack(pack, reason, at) {
+  function noticePack(pack, reason, at2) {
     if (packNotices.some((n2) => n2.pack === pack)) return;
-    packNotices = packNotices.concat({ pack, reason, detail: describePackNotice(pack, reason), at });
+    packNotices = packNotices.concat({ pack, reason, detail: describePackNotice(pack, reason), at: at2 });
   }
-  function packNodeOf(pack, ref, at) {
+  function packNodeOf(pack, ref, at2) {
     return {
       id: libraryId(ref),
       reps: [
@@ -12414,10 +12414,10 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       ],
       edges: [],
       capability: 1,
-      createdAt: at
+      createdAt: at2
     };
   }
-  function definitionNodeOf(def, at) {
+  function definitionNodeOf(def, at2) {
     const by = libraryId(def.pack);
     return {
       id: def.id,
@@ -12440,7 +12440,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       ],
       edges: [{ to: by, rel: "made-by" }],
       capability: 1,
-      createdAt: at
+      createdAt: at2
     };
   }
   function applyUse(ev) {
@@ -12470,9 +12470,9 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   function applyUnuse(ev) {
     const ref = typeof ev.pack === "string" ? ev.pack : String(ev.pack);
     if (packNotices.some((n2) => n2.pack === ref)) packNotices = packNotices.filter((n2) => n2.pack !== ref);
-    const at = packs.indexOf(ref);
-    if (at < 0) return;
-    packs.splice(at, 1);
+    const at2 = packs.indexOf(ref);
+    if (at2 < 0) return;
+    packs.splice(at2, 1);
     const prefix = libraryId(ref) + ":";
     library = library.filter((id) => !id.startsWith(prefix));
     definitionsChanged = true;
@@ -12510,22 +12510,22 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         return null;
     }
     const participantId = "participantId" in ev ? ev.participantId : void 0;
-    const at = "at" in ev && typeof ev.at === "number" ? ev.at : lastAt;
+    const at2 = "at" in ev && typeof ev.at === "number" ? ev.at : lastAt;
     const pNode = participantId ? nodes.get(participantId) : void 0;
     const name = pNode ? getRep(pNode, "word")?.data : void 0;
-    const refuse = (reason, nodeId, maker) => ({
+    const refuse2 = (reason, nodeId, maker) => ({
       what,
       reason,
       nodeId,
       participantId,
       detail: describeStale(reason, what, typeof name === "string" ? name : void 0, maker),
-      at
+      at: at2
     });
     if (expect?.generation !== void 0 && expect.generation !== generation) {
-      return refuse("replaced", targets[0] ?? "");
+      return refuse2("replaced", targets[0] ?? "");
     }
     if (participantId !== void 0 && !participants.includes(participantId)) {
-      return refuse("unknown-participant", targets[0] ?? "");
+      return refuse2("unknown-participant", targets[0] ?? "");
     }
     const alive = targets.filter((id) => {
       const n2 = nodes.get(id);
@@ -12534,7 +12534,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     if (alive.length === 0) {
       const id = targets[0] ?? "";
       const n2 = nodes.get(id);
-      return refuse(!n2 ? "missing" : "erased", id);
+      return refuse2(!n2 ? "missing" : "erased", id);
     }
     if (ev.type === "label") {
       const node = nodes.get(targets[0]);
@@ -12543,11 +12543,11 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       if (node && !samePerson(maker, mine)) {
         const makerNode = nodes.get(maker);
         const makerName = makerNode ? getRep(makerNode, "word")?.data : void 0;
-        return refuse("not-your-ink", targets[0], typeof makerName === "string" ? makerName : maker);
+        return refuse2("not-your-ink", targets[0], typeof makerName === "string" ? makerName : maker);
       }
     }
     if (expect?.version !== void 0 && what === "code" && codeVersion(targets[0]) !== expect.version) {
-      return refuse("superseded", targets[0]);
+      return refuse2("superseded", targets[0]);
     }
     return null;
   }
@@ -12768,17 +12768,17 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   }
   const ownAct = (ev) => ev.by === void 0 && ev.type !== "tick";
   function highestUnder(name) {
-    let at = -1;
+    let at2 = -1;
     let best = -1;
     for (let i = 0; i < events.length; i++) {
       const ev = events[i];
       if (!ownAct(ev) || ev.origin !== name || mintKeyOf(ev) === null) continue;
-      if (at < 0 || ev.seq > best) {
-        at = i;
+      if (at2 < 0 || ev.seq > best) {
+        at2 = i;
         best = ev.seq;
       }
     }
-    return at;
+    return at2;
   }
   function lastActAt() {
     let last = myLog !== void 0 ? highestUnder(myLog) : -1;
@@ -12793,12 +12793,12 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     if (last < 0) return [];
     const top = events[last];
     if (typeof top.act !== "number") return [last];
-    const at = [];
+    const at2 = [];
     for (let i = 0; i < events.length; i++) {
       const ev = events[i];
-      if (ownAct(ev) && ev.act === top.act && ev.origin === top.origin) at.push(i);
+      if (ownAct(ev) && ev.act === top.act && ev.origin === top.origin) at2.push(i);
     }
-    return at;
+    return at2;
   }
   function undo() {
     const take = lastActAt();
@@ -12868,8 +12868,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     };
   }
   return {
-    addStroke: (points, at, participantId, scale, options) => dispatch({ type: "stroke", points, at, participantId, scale, content: options?.content }),
-    join: (kind, name, at, capability, locality) => dispatch({ type: "join", kind, name, at, capability, ...locality ? { locality } : {} }),
+    addStroke: (points, at2, participantId, scale, options) => dispatch({ type: "stroke", points, at: at2, participantId, scale, content: options?.content }),
+    join: (kind, name, at2, capability, locality) => dispatch({ type: "join", kind, name, at: at2, capability, ...locality ? { locality } : {} }),
     propose: ({ expect, ...args }) => void guarded({ type: "propose", ...args }, expect),
     answer: ({ expect, ...args }) => guarded({ type: "answer", ...args }, expect),
     label: (args) => guarded({ type: "label", ...args }),
@@ -12877,21 +12877,21 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       const node = nodes.get(nodeId);
       return !!node && samePerson(authorOf(node), participantId ?? LOCAL_PARTICIPANT);
     },
-    teachCommandMark: (mark, at) => void dispatch({ type: "teach", mark, at }),
-    use: (pack, at, participantId) => {
+    teachCommandMark: (mark, at2) => void dispatch({ type: "teach", mark, at: at2 }),
+    use: (pack, at2, participantId) => {
       const ref = typeof pack === "string" ? pack.trim() : String(pack);
-      const refuse = (reason) => ({ pack: ref, reason, detail: describePackRefusal(ref, reason), at });
-      if (!parsePackRef(ref)) return refuse("malformed");
+      const refuse2 = (reason) => ({ pack: ref, reason, detail: describePackRefusal(ref, reason), at: at2 });
+      if (!parsePackRef(ref)) return refuse2("malformed");
       const content = packSource(ref);
-      if (!content || packRef(content) !== ref) return refuse("unknown");
+      if (!content || packRef(content) !== ref) return refuse2("unknown");
       if (packs.includes(ref)) return null;
-      dispatch({ type: "use", pack: ref, at, ...participantId !== void 0 ? { participantId } : {} });
+      dispatch({ type: "use", pack: ref, at: at2, ...participantId !== void 0 ? { participantId } : {} });
       return null;
     },
-    unuse: (pack, at, participantId) => {
+    unuse: (pack, at2, participantId) => {
       const ref = typeof pack === "string" ? pack.trim() : String(pack);
       if (!packs.includes(ref) && !packNotices.some((n2) => n2.pack === ref)) return;
-      dispatch({ type: "unuse", pack: ref, at, ...participantId !== void 0 ? { participantId } : {} });
+      dispatch({ type: "unuse", pack: ref, at: at2, ...participantId !== void 0 ? { participantId } : {} });
     },
     correct: (args) => void dispatch({ type: "correct", ...args }),
     clock: (args) => void dispatch({ type: "clock", ...args }),
@@ -12983,18 +12983,18 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       const scope = { ids: scopeIds, marks, relations, shapes, names, transcripts, roles };
       return { scope, relations, roles, genre, concepts: matchConcepts(scope) };
     },
-    tick: (at) => void dispatch({ type: "tick", at }),
-    summonHeld: (at) => dispatch({ type: "summon", at }),
-    summonMarks: (ids, at) => dispatch({ type: "summon", ids: ids.slice(), at }),
-    splitWord: (nodeId, at) => void dispatch({ type: "split", nodeId, at }),
-    select: (ids, at) => void dispatch({ type: "select", ids, at }),
-    deselect: (at) => void dispatch({ type: "deselect", at }),
+    tick: (at2) => void dispatch({ type: "tick", at: at2 }),
+    summonHeld: (at2) => dispatch({ type: "summon", at: at2 }),
+    summonMarks: (ids, at2) => dispatch({ type: "summon", ids: ids.slice(), at: at2 }),
+    splitWord: (nodeId, at2) => void dispatch({ type: "split", nodeId, at: at2 }),
+    select: (ids, at2) => void dispatch({ type: "select", ids, at: at2 }),
+    deselect: (at2) => void dispatch({ type: "deselect", at: at2 }),
     move: (args) => manipulate({ type: "move", ...args }),
     scale: (args) => manipulate({ type: "scale", ...args }),
     rotate: (args) => manipulate({ type: "rotate", ...args }),
     bless: (args) => dispatch({ type: "bless", ...args }),
-    dismiss: (summonId, at) => void dispatch({ type: "dismiss", summonId, at }),
-    erase: (nodeId, at) => void dispatch({ type: "erase", nodeId, at }),
+    dismiss: (summonId, at2) => void dispatch({ type: "dismiss", summonId, at: at2 }),
+    erase: (nodeId, at2) => void dispatch({ type: "erase", nodeId, at: at2 }),
     undo,
     lastAct: () => lastActAt().map((i) => events[i]),
     withTool: (toolId, fn, offerKey) => {
@@ -13795,10 +13795,10 @@ var COUNT = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight
 var count3 = (n2) => COUNT[n2] ?? String(n2);
 var list = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 var isFlowSymbol = (s) => Object.prototype.hasOwnProperty.call(FLOWCHART_TABLE.symbols, s);
-function flowDirection(connectors, at, symbols) {
+function flowDirection(connectors, at2, symbols) {
   let down = 0, across2 = 0, downward = 0;
   for (const c of connectors) {
-    const a = at(c.from), b = at(c.to);
+    const a = at2(c.from), b = at2(c.to);
     const dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y);
     down += dy;
     across2 += dx;
@@ -13828,7 +13828,7 @@ function writeFlowchart(reading7, opts = {}) {
     const mine = [.../* @__PURE__ */ new Set([...labelIds, ...reading7.labels.filter((l) => l.of === owner).map((l) => l.id)])].map(
       (id) => labels.get(id) ?? { id, of: owner, where: "beside", role: "label", confidence: 0, reason: "writing" }
     );
-    const inOrder2 = (at) => inReadingOrder(mine.filter((l) => l.where === at), (l) => l.bounds, (l) => l.id);
+    const inOrder2 = (at2) => inReadingOrder(mine.filter((l) => l.where === at2), (l) => l.bounds, (l) => l.id);
     const parts = own?.trim() ? [own.trim()] : [];
     const missing = [];
     for (const l of [...inOrder2("inside"), ...inOrder2("beside")]) {
@@ -13849,12 +13849,12 @@ function writeFlowchart(reading7, opts = {}) {
   const lines = [`${T6.mermaid.header} ${direction.value}`];
   const ids = {};
   const marks = {};
-  const blank = [];
+  const blank2 = [];
   for (const s of ordered2) {
     const m = idOf.get(s.id);
     const shape = T6.symbols[s.symbol].mermaid;
     const words = wordsOf3(s.text, s.labels, s.id, "symbol", m);
-    if (words === null) blank.push(m);
+    if (words === null) blank2.push(m);
     const text = words ?? BLANK;
     lines.push(`    ${m}${shape.open}${mermaidString(text, { colons: PREPROCESSED.test(m + text) })}${shape.close}`);
     ids[m] = s.id;
@@ -13879,7 +13879,7 @@ function writeFlowchart(reading7, opts = {}) {
     const where = [onSymbols.length ? `in ${list(onSymbols)}` : "", onFlows.length ? `on the flow${onFlows.length === 1 ? "" : "s"} ${list(onFlows)}` : ""].filter(Boolean).join("; ");
     notes.push(`${n2 === 1 ? "one piece of writing has" : `${count3(n2)} pieces of writing have`} not been read, so ${n2 === 1 ? "its words are" : "their words are"} not known \u2014 written "${UNREAD_WRITING}": ${where}`);
   }
-  if (blank.length) notes.push(`${blank.length === 1 ? "one symbol has" : `${count3(blank.length)} symbols have`} no writing in ${blank.length === 1 ? "it and is" : "them and are"} written blank: ${list(blank)}`);
+  if (blank2.length) notes.push(`${blank2.length === 1 ? "one symbol has" : `${count3(blank2.length)} symbols have`} no writing in ${blank2.length === 1 ? "it and is" : "them and are"} written blank: ${list(blank2)}`);
   const said3 = /* @__PURE__ */ new Set([...symbols.flatMap((s) => [s.id, ...s.ids]), ...connectors.flatMap((c) => c.ids), ...reading7.labels.filter((l) => l.of && (byId.has(l.of) || connectors.some((c) => c.id === l.of))).map((l) => l.id)]);
   const alone = reading7.labels.filter((l) => !said3.has(l.id)).map((l) => l.id).sort(naturalCompare);
   if (alone.length) notes.push(`writing that labels nothing in the chart is left out: ${list(alone)}`);
@@ -14153,14 +14153,14 @@ function inkInside(pts, m, box) {
   return in_ / n2;
 }
 function linesOfWriting(pieces, f) {
-  const at = pieces.map((m) => {
+  const at2 = pieces.map((m) => {
     const c = inFrame(f, m.centre);
     const ext = [m.bounds.minX, m.bounds.maxX].flatMap((x) => [m.bounds.minY, m.bounds.maxY].map((y) => inFrame(f, { x, y }).v));
     return { m, u: c.u, v: c.v, lo: Math.min(...ext), hi: Math.max(...ext) };
   });
-  at.sort((a, b) => a.v - b.v || a.u - b.u || (a.m.id < b.m.id ? -1 : 1));
+  at2.sort((a, b) => a.v - b.v || a.u - b.u || (a.m.id < b.m.id ? -1 : 1));
   const out = [];
-  for (const x of at) {
+  for (const x of at2) {
     const row = out[out.length - 1];
     const first = row?.[0];
     if (first && (x.v >= first.lo && x.v <= first.hi || first.v >= x.lo && first.v <= x.hi)) row.push(x);
@@ -14838,23 +14838,23 @@ function rowsOf(dashes) {
   });
   const seen2 = /* @__PURE__ */ new Set();
   const rows = [];
-  const walk = (start) => {
+  const walk2 = (start) => {
     const row = [];
-    let prev = -1, at = start;
-    while (at >= 0 && !seen2.has(at)) {
-      seen2.add(at);
-      row.push(at);
-      const next = links[at].find((j) => j !== prev && !seen2.has(j));
-      prev = at;
-      at = next ?? -1;
+    let prev = -1, at2 = start;
+    while (at2 >= 0 && !seen2.has(at2)) {
+      seen2.add(at2);
+      row.push(at2);
+      const next = links[at2].find((j) => j !== prev && !seen2.has(j));
+      prev = at2;
+      at2 = next ?? -1;
     }
     if (row.length >= MIN_DASHES) rows.push(row.map((k) => dashes[k]));
   };
   dashes.forEach((_, i) => {
-    if (!seen2.has(i) && links[i].length <= 1) walk(i);
+    if (!seen2.has(i) && links[i].length <= 1) walk2(i);
   });
   dashes.forEach((_, i) => {
-    if (!seen2.has(i)) walk(i);
+    if (!seen2.has(i)) walk2(i);
   });
   return rows;
 }
@@ -14947,8 +14947,8 @@ function clear(run2, others, crossing, heads) {
 function lineOf(run2) {
   const f = fitOf(run2);
   const first = f.placed[0], last = f.placed[f.placed.length - 1];
-  const at = (s) => ({ x: f.centre.x + f.axis.x * s, y: f.centre.y + f.axis.y * s });
-  const from = at(first.s0), to = at(last.s1);
+  const at2 = (s) => ({ x: f.centre.x + f.axis.x * s, y: f.centre.y + f.axis.y * s });
+  const from = at2(first.s0), to = at2(last.s1);
   const gaps = f.placed.slice(1).map((p, k) => p.s0 - f.placed[k].s1);
   const gap = median2(gaps);
   const meanGap = gaps.reduce((a, g) => a + g, 0) / Math.max(1, gaps.length);
@@ -14998,7 +14998,7 @@ function dashedLines(state, scopeIds) {
   for (const r of rows) {
     const l = lineOf(r);
     const host = new Set(l.ids);
-    for (const at of [l.from, l.to]) ends.push({ at, host, size: l.length });
+    for (const at2 of [l.from, l.to]) ends.push({ at: at2, host, size: l.length });
   }
   const heads = (m, run2) => {
     const reach = magnetRadius(m.size, m.scale);
@@ -15040,8 +15040,8 @@ function dashedHeads(state, line, scopeIds) {
     back.set(scratch.addStroke(s.ink.map((p) => ({ x: p.x, y: p.y })), t += 1e4, void 0, s.scale, { content: true }), s.id);
   }
   const h2 = headsOf(scratch.getState(), id);
-  const said3 = (e, end, at) => {
-    if (!e) return { end, point: { ...at }, heads: [], reason: `a plain ${end}: nothing sits there` };
+  const said3 = (e, end, at2) => {
+    if (!e) return { end, point: { ...at2 }, heads: [], reason: `a plain ${end}: nothing sits there` };
     const heads = e.heads.filter((x) => x.ids.every((k) => back.has(k))).map((x) => ({ ...x, ids: x.ids.filter((k) => k !== id).map((k) => back.get(k)), tip: { ...x.tip } }));
     return { end, point: { ...e.point }, heads, reason: e.reason };
   };
@@ -15559,7 +15559,7 @@ function readSequence(state, scopeIds, opts = {}) {
     const reason2 = o.self ? `a loop out from the lifeline of ${P} and back to it${to.head ? `, ${to.head.reason}` : ", with no head where it comes back"}` : direction === "forward" ? `${o.shape} from the lifeline of ${P} to the lifeline of ${Q}, ${to.head.kind === "arrow" ? "its arrowhead" : `its ${to.head.filled ? "filled" : "hollow"} triangle`} at ${Q}` : direction === "both" ? `${o.shape} with a head at both ends, between the lifelines of ${P} and ${Q}` : `${o.shape} with no head, from the lifeline of ${P} to the lifeline of ${Q} in the order it was drawn`;
     const headIds = [...new Set([...from.head?.ids ?? [], ...to.head?.ids ?? []].filter((x) => !o.ids.includes(x)))];
     const said3 = ownWords3(nodes, o.ids);
-    const at = o.self ? Math.min(o.a.point.y, o.b.point.y) : (o.a.point.y + o.b.point.y) / 2;
+    const at2 = o.self ? Math.min(o.a.point.y, o.b.point.y) : (o.a.point.y + o.b.point.y) / 2;
     messages.push({
       id: o.id,
       ids: [...o.ids, ...headIds],
@@ -15576,7 +15576,7 @@ function readSequence(state, scopeIds, opts = {}) {
       ...said3 ? { text: said3 } : {},
       line: o.line,
       arrow,
-      at,
+      at: at2,
       order: 0
     });
     for (const x of [...o.ids, ...headIds]) taken.add(x);
@@ -15588,7 +15588,7 @@ function readSequence(state, scopeIds, opts = {}) {
     for (const l of ls) if (ls.length >= 2 && ls.every((o) => o === l || o.size <= 0.5 * l.size)) letterOf.set(l.id, ls);
   }
   const mayBe = [...loose, ...[...strokes.values()].filter((x) => letterOf.has(x.id))];
-  const endsOf4 = (x) => {
+  const endsOf5 = (x) => {
     const a = x.ink[0], b = x.ink[x.ink.length - 1];
     const reach = magnetRadius(0, x.scale) * 2;
     const wordy = x.mark !== x.id || wordsNear.some((w2) => offBox3(a, w2.bounds) <= reach || offBox3(b, w2.bounds) <= reach);
@@ -15605,7 +15605,7 @@ function readSequence(state, scopeIds, opts = {}) {
     if (!nearAny(a0, reach + 0.5 * length) || !nearAny(b0, reach + 0.5 * length)) continue;
     const level = 1 - ramp2(offLevel2(sub8(b0, a0)), MESSAGE_LEVEL[0], MESSAGE_LEVEL[1]);
     if (level <= 0) continue;
-    const h2 = endsOf4(s);
+    const h2 = endsOf5(s);
     if (!h2) continue;
     const onLifeline = (id) => lifelineStrokes.has(id);
     const [a, b] = [readEnd2(h2.start, onLifeline), readEnd2(h2.end, onLifeline)];
@@ -16033,7 +16033,7 @@ function wordsFor2(reading7, opts) {
     const mine = [.../* @__PURE__ */ new Set([...labelIds, ...reading7.labels.filter((l) => l.of === owner).map((l) => l.id)])].map(
       (id) => labels.get(id) ?? { id, of: owner, where: "beside", role: "label", confidence: 0, reason: "writing" }
     );
-    const inOrder2 = (at) => inReadingOrder(mine.filter((l) => l.where === at), (l) => l.bounds, (l) => l.id);
+    const inOrder2 = (at2) => inReadingOrder(mine.filter((l) => l.where === at2), (l) => l.bounds, (l) => l.id);
     const parts = own?.trim() ? [own.trim()] : [];
     const missing = [];
     for (const l of [...inOrder2("inside"), ...inOrder2("beside")]) {
@@ -16053,13 +16053,13 @@ function wordsFor2(reading7, opts) {
   };
   return { wordsOf: wordsOf3, unread, unreadIds };
 }
-function notesFor(reading7, said3, unread, blank, extra = []) {
+function notesFor(reading7, said3, unread, blank2, extra = []) {
   const notes = [];
   if (unread.length) {
     const n2 = unread.reduce((k, u) => k + u.ids.length, 0);
     notes.push(`${n2 === 1 ? "one piece of writing has" : `${countWord(n2)} pieces of writing have`} not been read, so ${n2 === 1 ? "its words are" : "their words are"} not known \u2014 written "${UNREAD_WRITING}": ${someWords(unread.map((u) => u.where), 6)}`);
   }
-  if (blank.ids.length) notes.push(`${blank.ids.length === 1 ? `one ${blank.what} has` : `${countWord(blank.ids.length)} ${blank.plural} have`} no writing ${blank.ids.length === 1 ? "and is" : "and are"} written blank: ${someWords(blank.ids, 6)}`);
+  if (blank2.ids.length) notes.push(`${blank2.ids.length === 1 ? `one ${blank2.what} has` : `${countWord(blank2.ids.length)} ${blank2.plural} have`} no writing ${blank2.ids.length === 1 ? "and is" : "and are"} written blank: ${someWords(blank2.ids, 6)}`);
   const alone = reading7.labels.filter((l) => !said3.has(l.id)).map((l) => l.id).sort(naturalCompare);
   if (alone.length) notes.push(`writing that labels nothing in the diagram is left out: ${someWords(alone, 6)}`);
   const left = Object.keys(reading7.roles).filter((id) => !said3.has(id) && !alone.includes(id)).sort(naturalCompare);
@@ -16151,9 +16151,9 @@ function spotOf(node) {
   const hull2 = hullOf(pts);
   if (hull2.length < 3) return null;
   const box = tightBox(hull2);
-  const perimeter2 = perimeterOf(hull2);
-  if (!box || !(perimeter2 > 0)) return null;
-  return { pts, aspect: box.long / Math.max(1e-9, box.short), ratio: pathLength(pts) / perimeter2 };
+  const perimeter3 = perimeterOf(hull2);
+  if (!box || !(perimeter3 > 0)) return null;
+  return { pts, aspect: box.long / Math.max(1e-9, box.short), ratio: pathLength(pts) / perimeter3 };
 }
 function blobCandidate(node) {
   const m = spotOf(node);
@@ -16804,15 +16804,15 @@ function readEr(state, scopeIds) {
     const shortEnough = sizeOf3(l.bounds) <= MULTIPLICITY_SHARE * len4;
     const counts2 = l.text !== void 0 && cardinalityOf(l.text) !== null;
     if (middle || !(atEnd && shortEnough || counts2)) continue;
-    const at = t < 0.5 ? "from" : "to";
-    const g = groups.get(`${r.id}:${at}`) ?? { r, at, ids: [] };
+    const at2 = t < 0.5 ? "from" : "to";
+    const g = groups.get(`${r.id}:${at2}`) ?? { r, at: at2, ids: [] };
     g.ids.push(l.id);
-    groups.set(`${r.id}:${at}`, g);
+    groups.set(`${r.id}:${at2}`, g);
   }
   const isMultiplicity = /* @__PURE__ */ new Set();
   for (const g of groups.values()) {
-    const read2 = g.ids.map((id) => labelById.get(id).text).filter((x) => x !== void 0);
-    if (read2.length && cardinalityOf(read2.join("")) === null) continue;
+    const read3 = g.ids.map((id) => labelById.get(id).text).filter((x) => x !== void 0);
+    if (read3.length && cardinalityOf(read3.join("")) === null) continue;
     g.ids.forEach((id) => isMultiplicity.add(id));
     (g.r.sides[g.at].multiplicity ??= { ids: [], unread: [] }).ids.push(...g.ids);
     for (const id of g.ids) labelById.get(id).reason += ` \u2014 near its end at ${g.r.sides[g.at].entity}: a multiplicity`;
@@ -16825,8 +16825,8 @@ function readEr(state, scopeIds) {
   });
   for (const r of relationships) {
     r.labels = r.labels.filter((id) => !isMultiplicity.has(id));
-    for (const at of ["from", "to"]) {
-      const side = r.sides[at];
+    for (const at2 of ["from", "to"]) {
+      const side = r.sides[at2];
       if (!side.multiplicity) continue;
       const ordered2 = inReading(side.multiplicity.ids);
       const w2 = writingWords(nodes, ordered2, "");
@@ -17364,12 +17364,12 @@ function hooksOf(pts, scale) {
   for (let i = 1; i < n2; i++) cum.push(cum[i - 1] + dist9(pts[i - 1], pts[i]));
   const L = cum[n2 - 1];
   if (!(L > 0)) return null;
-  const at = (share) => {
+  const at2 = (share) => {
     let i = 0;
     while (i < n2 - 1 && cum[i] < share * L) i++;
     return i;
   };
-  const u = unit2(sub9(pts[at(0.75)], pts[at(0.25)]));
+  const u = unit2(sub9(pts[at2(0.75)], pts[at2(0.25)]));
   const proj = pts.map((p) => dot6(sub9(p, pts[0]), u));
   let iA = 0, iB = 0;
   for (let i = 1; i < n2; i++) {
@@ -17614,9 +17614,9 @@ function readGarment(state, scopeIds) {
         if (!hit || d < hit.d) hit = { ring: ring2, at: d0 <= d1 ? e0 : e1, d };
       }
       if (!hit || chord < 0.8 * L || deviation(pts, 0, pts.length - 1) > 0.15) continue;
-      const tick = sub9(e1, e0);
+      const tick2 = sub9(e1, e0);
       const anchor = hit.d === 0 ? mid6(e0, e1) : hit.at;
-      if (between3(tick, tangentAt(anchor, hit.ring)) < NOTCH_SQUARE_DEG) continue;
+      if (between3(tick2, tangentAt(anchor, hit.ring)) < NOTCH_SQUARE_DEG) continue;
       const edge = onEdge(anchor, pc.corners);
       mark(pc, "notch", [o.id], o.id, MAX9 * 0.8, `a tick ${px(L)} long ${hit.d === 0 ? "across" : "on"} the outline and square to it \u2014 a mark to match`, [e0, e1], { edge, length: L, from: e0, to: e1 });
       owned.add(o.id);
@@ -18042,8 +18042,8 @@ function garmentNotFigures(reading7) {
   }
   return out;
 }
-function garmentMaths(state, board2, read2 = garmentOf(state)) {
-  const reading7 = read2 && read2.confidence >= NOTATION_FLOOR ? read2 : null;
+function garmentMaths(state, board2, read3 = garmentOf(state)) {
+  const reading7 = read3 && read3.confidence >= NOTATION_FLOOR ? read3 : null;
   if (!reading7) return [];
   const figureOf3 = (id) => board2.figures.find((f) => f.figure.ids.length === 1 && f.figure.ids[0] === id);
   const allowance = (() => {
@@ -18122,10 +18122,10 @@ function garmentMaths(state, board2, read2 = garmentOf(state)) {
     if (foldMark && foldMark.from && foldMark.to) {
       result2.ink.fold = { from: foldMark.from, to: foldMark.to };
       const verts = numbers?.fm.figure.vertices ?? [];
-      const at = verts.length ? sideNear(verts, mid7(foldMark.from, foldMark.to)) : null;
-      const fold2 = { id: foldMark.id, side: at?.side ?? 0, reason: "a line with a head at each end along the edge" };
-      if (frame?.kind === "rectangle" && at) {
-        fold2.drawn = frame.lengths[(at.side + 1) % 4];
+      const at2 = verts.length ? sideNear(verts, mid7(foldMark.from, foldMark.to)) : null;
+      const fold2 = { id: foldMark.id, side: at2?.side ?? 0, reason: "a line with a head at each end along the edge" };
+      if (frame?.kind === "rectangle" && at2) {
+        fold2.drawn = frame.lengths[(at2.side + 1) % 4];
         fold2.opened = 2 * fold2.drawn;
         lines.push(`cut on the fold: opened, ${len3(fold2.opened, unit7)} across (${len3(fold2.drawn, unit7)} as drawn)`);
         rows.push({ k: "on the fold", v: `${len3(fold2.opened, unit7)} across opened`, why: `the piece is drawn as one half, ${len3(fold2.drawn, unit7)} across the fold` });
@@ -18193,7 +18193,7 @@ var chevron = (tip, back, size2) => {
 function garmentDecor(piece, truth, opts) {
   const map = piece.ink.vertices.length === truth.length ? affineFit(piece.ink.vertices, truth) : null;
   if (!map || !piece.figure) return null;
-  const at = (p) => applyAffine2(map, p);
+  const at2 = (p) => applyAffine2(map, p);
   const marks = [];
   const texts = [];
   const notes = [];
@@ -18207,18 +18207,18 @@ function garmentDecor(piece, truth, opts) {
     texts.push({ text: piece.figure.on === "sewing" ? `cutting line +${len3(piece.seam.amount, unit7)}` : `sewing line \u2212${len3(piece.seam.amount, unit7)}`, at: { x: top.x, y: top.y - opts.gap }, angle: 0, key: "seam" });
   }
   if (piece.ink.grain) {
-    const a = at(piece.ink.grain.from), b = at(piece.ink.grain.to);
+    const a = at2(piece.ink.grain.from), b = at2(piece.ink.grain.to);
     marks.push({ kind: "grain", points: [a, b], heads: [chevron(a, b, opts.head), chevron(b, a, opts.head)] });
     const c = mid7(a, b);
     const u = norm(sub10(b, a));
     texts.push({ text: "grain", at: add2(c, { x: -u.y * opts.gap * 1.6, y: u.x * opts.gap * 1.6 }), angle: 0, key: "grain" });
   }
   for (const n2 of piece.ink.notches) {
-    const a = at(n2.from), b = at(n2.to), c = mid7(a, b);
+    const a = at2(n2.from), b = at2(n2.to), c = mid7(a, b);
     const u = norm(sub10(b, a));
     marks.push({ kind: "notch", points: [sub10(c, mul2(u, opts.tick / 2)), add2(c, mul2(u, opts.tick / 2))] });
   }
-  for (const d of piece.ink.darts) marks.push({ kind: "dart", points: [at(d.base[0]), at(d.apex), at(d.base[1])] });
+  for (const d of piece.ink.darts) marks.push({ kind: "dart", points: [at2(d.base[0]), at2(d.apex), at2(d.base[1])] });
   if (piece.ink.fold && piece.fold) {
     const k = piece.fold.side;
     const a = truth[k], b = truth[(k + 1) % truth.length];
@@ -18416,9 +18416,9 @@ function triangleShape(c) {
   for (let k = 0; k < 3; k++) {
     const a = c.vals.get(`angle${k}`)?.value;
     if (!a || Math.abs(a.lo - 90) > 1e-6 || Math.abs(a.hi - 90) > 1e-6) continue;
-    const at = v[k], e1 = unit3(sub11(v[(k + 1) % 3], at)), e2 = unit3(sub11(v[(k + 2) % 3], at));
+    const at2 = v[k], e1 = unit3(sub11(v[(k + 1) % 3], at2)), e2 = unit3(sub11(v[(k + 2) % 3], at2));
     const q = Math.min(c.F.corner, 0.25 * Math.min(L[k], L[(k + 2) % 3]));
-    shape.marks.push({ points: [add3(at, mul3(e1, q)), add3(at, add3(mul3(e1, q), mul3(e2, q))), add3(at, mul3(e2, q))] });
+    shape.marks.push({ points: [add3(at2, mul3(e1, q)), add3(at2, add3(mul3(e1, q), mul3(e2, q))), add3(at2, mul3(e2, q))] });
   }
   return shape;
 }
@@ -18529,12 +18529,12 @@ function lineShape(c) {
   const n2 = { x: d.y, y: -d.x };
   const A = { x: 0, y: 0 }, B = mul3(d, L);
   const value = c.vals.get("length");
-  const tick = (p) => ({ points: [add3(p, mul3(n2, -F.labelGap)), add3(p, mul3(n2, F.labelGap))] });
+  const tick2 = (p) => ({ points: [add3(p, mul3(n2, -F.labelGap)), add3(p, mul3(n2, F.labelGap))] });
   return {
     outline: { type: "line", from: A, to: B },
     vertices: [A, B],
     sides: [{ key: "length", label: value.label, from: A, to: B, length: L, text: sideTextOf(c, "length"), source: value.from }],
-    marks: [tick(A), tick(B)],
+    marks: [tick2(A), tick2(B)],
     texts: [alongSide(c, drawnText(c, "length"), A, B, n2, 1, "length")]
   };
 }
@@ -18625,8 +18625,8 @@ function textEl(w2, t, attrs = "") {
 }
 function markEl(w2, k) {
   const dash = k.dashed ? ` stroke-dasharray="${w2.n(w2.F.labelGap / 2)} ${w2.n(w2.F.labelGap / 2)}"` : "";
-  const tag = k.garment ? ` data-garment="${k.garment}"${k.part ? ` data-part="${k.part}"` : ""}` : "";
-  return `<path${tag} d="${pathOf(w2, k.points, !!k.closed)}" stroke-width="${w2.n(w2.F.thin)}"${dash}/>`;
+  const tag2 = k.garment ? ` data-garment="${k.garment}"${k.part ? ` data-part="${k.part}"` : ""}` : "";
+  return `<path${tag2} d="${pathOf(w2, k.points, !!k.closed)}" stroke-width="${w2.n(w2.F.thin)}"${dash}/>`;
 }
 function outlineEl(w2, o) {
   switch (o.type) {
@@ -18789,8 +18789,8 @@ function trueSize(solved, options = {}) {
   const barName = `${formatNumber(bar.length, 4)} ${U}`;
   for (let i = 0; i <= steps; i += bar.every) {
     const label = i === steps ? barName : formatNumber(i * bar.step, 4);
-    const at = { x: F.margin + i * bar.step, y: barTop + barH + F.labelGap + 0.6 * F.note };
-    barParts.push(textEl(w2, { text: label, at, angle: 0, size: F.note, anchor: i === 0 ? "start" : "middle" }));
+    const at2 = { x: F.margin + i * bar.step, y: barTop + barH + F.labelGap + 0.6 * F.note };
+    barParts.push(textEl(w2, { text: label, at: at2, angle: 0, size: F.note, anchor: i === 0 ? "start" : "middle" }));
   }
   const barBottom = barTop + barH + F.labelGap + 1.2 * F.note;
   const barRight = F.margin + bar.length + textWidth(barName, F.note) / 2;
@@ -19846,7 +19846,7 @@ var LiveStore = class {
   }
   /** Every hand heard from, and when — and whether it answers briefs parked at the seat. */
   presence() {
-    return [...this.seen.entries()].map(([participant, at]) => this.seats.has(participant) ? { participant, at, seat: true } : { participant, at }).sort((a, b) => b.at - a.at);
+    return [...this.seen.entries()].map(([participant, at2]) => this.seats.has(participant) ? { participant, at: at2, seat: true } : { participant, at: at2 }).sort((a, b) => b.at - a.at);
   }
   /**
    * Names heard from two hands at once — two sittings writing under one name,
@@ -20002,9 +20002,9 @@ var LiveStore = class {
     const go = () => {
       for (const name of names) {
         if ((this.fromWriter.get(name) ?? -1) > asked || (this.fromCopy.get(name) ?? -1) > asked) continue;
-        const at = this.applied.get(name);
-        if (at === void 0) continue;
-        const line = { participant: name, events: this.logs[name].slice(), at, full: true, via: this.me };
+        const at2 = this.applied.get(name);
+        if (at2 === void 0) continue;
+        const line = { participant: name, events: this.logs[name].slice(), at: at2, full: true, via: this.me };
         const sid = this.sittings.get(name);
         if (sid) line.sid = sid;
         void this.post(line);
@@ -20082,10 +20082,10 @@ var LiveStore = class {
       return;
     }
     const events = Array.isArray(line.events) ? line.events : [];
-    const at = typeof line.at === "number" ? line.at : Date.now();
+    const at2 = typeof line.at === "number" ? line.at : Date.now();
     if (line.full) {
       const last = this.applied.get(line.participant);
-      if (last !== void 0 && at < last) return;
+      if (last !== void 0 && at2 < last) return;
       const held2 = this.logs[line.participant];
       if (!sid) {
         const i = held2 && held2.length ? divergence(held2, events) : -1;
@@ -20131,7 +20131,7 @@ var LiveStore = class {
       }
       if (added) this.rev++;
     }
-    this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, at));
+    this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, at2));
     this.notify(line.participant, events);
   }
   /**
@@ -20451,15 +20451,15 @@ var LiveMerge = class {
     if (win && !win.standing) this.stand(win);
   }
   stand(e) {
-    const at = lowerBound(this.list, e);
-    this.list.splice(at, 0, e);
+    const at2 = lowerBound(this.list, e);
+    this.list.splice(at2, 0, e);
     e.standing = true;
     if (!this.lowest || order(e, this.lowest) < 0) this.lowest = e;
   }
   fall(e) {
-    let at = lowerBound(this.list, e);
-    while (at < this.list.length && this.list[at] !== e) at++;
-    if (at < this.list.length) this.list.splice(at, 1);
+    let at2 = lowerBound(this.list, e);
+    while (at2 < this.list.length && this.list[at2] !== e) at2++;
+    if (at2 < this.list.length) this.list.splice(at2, 1);
     e.standing = false;
     if (!this.lowest || order(e, this.lowest) < 0) this.lowest = e;
   }
@@ -20940,24 +20940,24 @@ function keysOf2(src, maxDepth = 3) {
   } catch {
     return out;
   }
-  const walk = (obj, path, from, depth2) => {
+  const walk2 = (obj, path, from, depth2) => {
     if (!obj || typeof obj !== "object" || Array.isArray(obj) || depth2 > maxDepth) return from;
     let cursor = from;
     for (const key2 of Object.keys(obj)) {
       const needle = JSON.stringify(key2);
-      const at = src.indexOf(needle + ":", cursor) !== -1 ? src.indexOf(needle + ":", cursor) : src.indexOf(needle, cursor);
-      if (at === -1) continue;
-      const valueStart = src.indexOf(":", at) + 1;
+      const at2 = src.indexOf(needle + ":", cursor) !== -1 ? src.indexOf(needle + ":", cursor) : src.indexOf(needle, cursor);
+      if (at2 === -1) continue;
+      const valueStart = src.indexOf(":", at2) + 1;
       const end = valueEnd(src, valueStart);
       const id = ["key", ...path, key2].join(path.length ? "." : ":").replace(/^key\./, "key:");
-      out.push({ id: path.length ? `key:${[...path, key2].join(".")}` : `key:${key2}`, label: [...path, key2].join("."), start: at, end, depth: depth2 });
+      out.push({ id: path.length ? `key:${[...path, key2].join(".")}` : `key:${key2}`, label: [...path, key2].join("."), start: at2, end, depth: depth2 });
       void id;
-      walk(obj[key2], [...path, key2], valueStart, depth2 + 1);
+      walk2(obj[key2], [...path, key2], valueStart, depth2 + 1);
       cursor = end;
     }
     return cursor;
   };
-  walk(parsed, [], 0, 0);
+  walk2(parsed, [], 0, 0);
   return out;
 }
 function valueEnd(src, from) {
@@ -21025,11 +21025,11 @@ function elementsOf(source) {
   if (rootOpenEnd === -1) return out;
   const counts = /* @__PURE__ */ new Map();
   let i = rootOpenEnd + 1, depth2 = 0;
-  const tag = /<\/?([A-Za-z][\w:-]*)([^>]*?)(\/?)>/g;
-  tag.lastIndex = i;
+  const tag2 = /<\/?([A-Za-z][\w:-]*)([^>]*?)(\/?)>/g;
+  tag2.lastIndex = i;
   let m;
   let openAt = -1, openName = "", openAttrs = "";
-  while (m = tag.exec(src)) {
+  while (m = tag2.exec(src)) {
     const closing = src[m.index + 1] === "/";
     const name = m[1], selfClosing = m[3] === "/";
     if (closing) {
@@ -21141,8 +21141,8 @@ function paramsOf(source) {
     const text = source.slice(f.start, f.end);
     const m = PARAM.exec(text);
     if (!m) continue;
-    const at = text.indexOf(m[2], m[0].indexOf("=")) + f.start;
-    out.push({ name: m[1], value: Number(m[2]), start: at, end: at + m[2].length });
+    const at2 = text.indexOf(m[2], m[0].indexOf("=")) + f.start;
+    out.push({ name: m[1], value: Number(m[2]), start: at2, end: at2 + m[2].length });
   }
   return out;
 }
@@ -21738,9 +21738,9 @@ function parseClause(clause) {
   let best = null;
   for (const verb of VERBS) {
     for (const phrase of PHRASES[verb]) {
-      const at = c.indexOf(" " + phrase + " ");
-      if (at < 0) continue;
-      if (!best || phrase.length > best.phrase.length || phrase.length === best.phrase.length && at < best.at) best = { verb, phrase, at };
+      const at2 = c.indexOf(" " + phrase + " ");
+      if (at2 < 0) continue;
+      if (!best || phrase.length > best.phrase.length || phrase.length === best.phrase.length && at2 < best.at) best = { verb, phrase, at: at2 };
     }
   }
   if (!best) return null;
@@ -21812,6 +21812,7 @@ ${lines.join("\n")}
 // src/image/trace.ts
 var DEFAULT_SIMPLIFY_PX = 1.5;
 var DEFAULT_MIN_LENGTH_PX = 8;
+var DENSIFY_STEP_PX = 2;
 function luminance(bitmap) {
   const n2 = bitmap.width * bitmap.height;
   const out = new Float32Array(n2);
@@ -21864,7 +21865,7 @@ function binarize(bitmap, opts = {}) {
 }
 function thin(mask, width, height) {
   const img = new Uint8Array(mask);
-  const at = (x, y) => x < 0 || y < 0 || x >= width || y >= height ? 0 : img[y * width + x];
+  const at2 = (x, y) => x < 0 || y < 0 || x >= width || y >= height ? 0 : img[y * width + x];
   const toDelete = [];
   let changed2 = true;
   while (changed2) {
@@ -21874,8 +21875,8 @@ function thin(mask, width, height) {
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
           if (!img[y * width + x]) continue;
-          const p22 = at(x, y - 1), p3 = at(x + 1, y - 1), p4 = at(x + 1, y), p5 = at(x + 1, y + 1);
-          const p6 = at(x, y + 1), p7 = at(x - 1, y + 1), p8 = at(x - 1, y), p9 = at(x - 1, y - 1);
+          const p22 = at2(x, y - 1), p3 = at2(x + 1, y - 1), p4 = at2(x + 1, y), p5 = at2(x + 1, y + 1);
+          const p6 = at2(x, y + 1), p7 = at2(x - 1, y + 1), p8 = at2(x - 1, y), p9 = at2(x - 1, y - 1);
           const b = p22 + p3 + p4 + p5 + p6 + p7 + p8 + p9;
           if (b < 2 || b > 6) continue;
           const seq = [p22, p3, p4, p5, p6, p7, p8, p9, p22];
@@ -21911,7 +21912,7 @@ function tracePaths(skeleton, width, height) {
     return d;
   };
   const paths = [];
-  function walk(sx, sy) {
+  function walk2(sx, sy) {
     const points = [{ x: sx, y: sy }];
     visited[sy * width + sx] = 1;
     let x = sx, y = sy, lx = 0, ly = 0;
@@ -21944,12 +21945,12 @@ function tracePaths(skeleton, width, height) {
     return { points, closed };
   }
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-    if (free(x, y) && degree(x, y) === 1) paths.push(walk(x, y));
+    if (free(x, y) && degree(x, y) === 1) paths.push(walk2(x, y));
   }
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
     if (free(x, y) && degree(x, y) > 2) {
       while (freeNeighbours(x, y).length > 0) {
-        const p = walk(x, y);
+        const p = walk2(x, y);
         paths.push(p);
         visited[y * width + x] = 0;
       }
@@ -21957,7 +21958,7 @@ function tracePaths(skeleton, width, height) {
     }
   }
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-    if (free(x, y)) paths.push(walk(x, y));
+    if (free(x, y)) paths.push(walk2(x, y));
   }
   return paths;
 }
@@ -22004,6 +22005,2898 @@ function trace(bitmap, opts = {}) {
     inkFraction,
     reasoning: `ink is ${inverted ? "lighter" : "darker"} than ${threshold} (${(inkFraction * 100).toFixed(1)}% of the picture); thinned and walked into ${strokes.length} stroke${strokes.length === 1 ? "" : "s"} (${closed} closed), ${dropped} fleck${dropped === 1 ? "" : "s"} dropped`
   };
+}
+
+// src/ingest/source.ts
+var ADAPTER_VERSIONS = { svg: 1, markdown: 1, raster: 1 };
+var refuse = (reason) => ({ ok: false, reason });
+var accept = (doc, notes) => ({ ok: true, doc, notes });
+function blankPage(index, width = 0, height = 0) {
+  return { index, width, height, strokes: [], pictures: [], texts: [], links: [], tags: [] };
+}
+var isHash = (s) => typeof s === "string" && /^[0-9a-f]{64}$/.test(s);
+var HEX = (n2) => Math.max(0, Math.min(255, Math.round(n2))).toString(16).padStart(2, "0");
+var hexColor = (r, g, b) => "#" + HEX(r) + HEX(g) + HEX(b);
+var DEFAULT_LIMITS = {
+  bytes: 128 * 1024 * 1024,
+  elements: 15e5,
+  depth: 256,
+  visited: 2e6,
+  clones: 2e5,
+  outlines: 6e4,
+  vertices: 3e7,
+  points: 6e6,
+  rasterPx: 4e8,
+  ms: 6e4
+};
+
+// src/ingest/sha256.ts
+var K = [
+  1116352408,
+  1899447441,
+  3049323471,
+  3921009573,
+  961987163,
+  1508970993,
+  2453635748,
+  2870763221,
+  3624381080,
+  310598401,
+  607225278,
+  1426881987,
+  1925078388,
+  2162078206,
+  2614888103,
+  3248222580,
+  3835390401,
+  4022224774,
+  264347078,
+  604807628,
+  770255983,
+  1249150122,
+  1555081692,
+  1996064986,
+  2554220882,
+  2821834349,
+  2952996808,
+  3210313671,
+  3336571891,
+  3584528711,
+  113926993,
+  338241895,
+  666307205,
+  773529912,
+  1294757372,
+  1396182291,
+  1695183700,
+  1986661051,
+  2177026350,
+  2456956037,
+  2730485921,
+  2820302411,
+  3259730800,
+  3345764771,
+  3516065817,
+  3600352804,
+  4094571909,
+  275423344,
+  430227734,
+  506948616,
+  659060556,
+  883997877,
+  958139571,
+  1322822218,
+  1537002063,
+  1747873779,
+  1955562222,
+  2024104815,
+  2227730452,
+  2361852424,
+  2428436474,
+  2756734187,
+  3204031479,
+  3329325298
+];
+function sha256Hex(bytes) {
+  const n2 = bytes.length;
+  const h2 = [1779033703, 3144134277, 1013904242, 2773480762, 1359893119, 2600822924, 528734635, 1541459225];
+  const w2 = new Uint32Array(64);
+  const rotr = (x, k) => x >>> k | x << 32 - k;
+  const round = (block, off) => {
+    for (let i = 0; i < 16; i++) w2[i] = block.getUint32(off + i * 4, false);
+    for (let i = 16; i < 64; i++) {
+      const s0 = rotr(w2[i - 15], 7) ^ rotr(w2[i - 15], 18) ^ w2[i - 15] >>> 3;
+      const s1 = rotr(w2[i - 2], 17) ^ rotr(w2[i - 2], 19) ^ w2[i - 2] >>> 10;
+      w2[i] = w2[i - 16] + s0 + w2[i - 7] + s1 | 0;
+    }
+    let a = h2[0], b = h2[1], c = h2[2], d = h2[3], e = h2[4], f = h2[5], g = h2[6], hh = h2[7];
+    for (let i = 0; i < 64; i++) {
+      const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+      const ch = e & f ^ ~e & g;
+      const t1 = hh + S1 + ch + K[i] + w2[i] | 0;
+      const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+      const maj = a & b ^ a & c ^ b & c;
+      const t2 = S0 + maj | 0;
+      hh = g;
+      g = f;
+      f = e;
+      e = d + t1 | 0;
+      d = c;
+      c = b;
+      b = a;
+      a = t1 + t2 | 0;
+    }
+    h2[0] = h2[0] + a | 0;
+    h2[1] = h2[1] + b | 0;
+    h2[2] = h2[2] + c | 0;
+    h2[3] = h2[3] + d | 0;
+    h2[4] = h2[4] + e | 0;
+    h2[5] = h2[5] + f | 0;
+    h2[6] = h2[6] + g | 0;
+    h2[7] = h2[7] + hh | 0;
+  };
+  const whole = n2 - n2 % 64;
+  if (whole > 0) {
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, whole);
+    for (let off = 0; off < whole; off += 64) round(dv, off);
+  }
+  const rest = n2 - whole;
+  const tail = new Uint8Array(rest + 9 <= 64 ? 64 : 128);
+  tail.set(bytes.subarray(whole), 0);
+  tail[rest] = 128;
+  const tdv = new DataView(tail.buffer);
+  tdv.setUint32(tail.length - 8, Math.floor(n2 * 8 / 4294967296), false);
+  tdv.setUint32(tail.length - 4, n2 * 8 >>> 0, false);
+  for (let off = 0; off < tail.length; off += 64) round(tdv, off);
+  let out = "";
+  for (let i = 0; i < 8; i++) out += (h2[i] >>> 0).toString(16).padStart(8, "0");
+  return out;
+}
+
+// src/ingest/raster.ts
+var MAX_PICTURE_PX = 268435456;
+var at = (b, i) => i >= 0 && i < b.length ? b[i] : 0;
+var le16 = (b, i) => at(b, i) | at(b, i + 1) << 8;
+var be16 = (b, i) => at(b, i) << 8 | at(b, i + 1);
+var be32 = (b, i) => at(b, i) * 16777216 + (at(b, i + 1) << 16) + (at(b, i + 2) << 8) + at(b, i + 3);
+var tag = (b, i, s) => {
+  if (i < 0 || i + s.length > b.length) return false;
+  for (let k = 0; k < s.length; k++) if (b[i + k] !== s.charCodeAt(k)) return false;
+  return true;
+};
+function exifOrientation(b, i, end) {
+  const little = at(b, i) === 73 && at(b, i + 1) === 73;
+  const big = at(b, i) === 77 && at(b, i + 1) === 77;
+  if (!little && !big) return 1;
+  const r16 = (p) => little ? le16(b, p) : be16(b, p);
+  const r32 = (p) => little ? (le16(b, p) | le16(b, p + 2) << 16) >>> 0 : be32(b, p);
+  if (r16(i + 2) !== 42) return 1;
+  const ifd = i + r32(i + 4);
+  if (ifd < i || ifd + 2 > end) return 1;
+  const count9 = Math.min(r16(ifd), 64);
+  for (let k = 0; k < count9; k++) {
+    const e = ifd + 2 + k * 12;
+    if (e + 12 > end) break;
+    if (r16(e) === 274 && r16(e + 2) === 3) {
+      const v = r16(e + 8);
+      return v >= 1 && v <= 8 ? v : 1;
+    }
+  }
+  return 1;
+}
+function sniffImage(b) {
+  if (!b || b.length < 4) return null;
+  if (b.length >= 24 && b[0] === 137 && tag(b, 1, "PNG") && b[4] === 13 && b[5] === 10 && b[6] === 26 && b[7] === 10 && tag(b, 12, "IHDR")) {
+    return { format: "png", mime: "image/png", w: be32(b, 16), h: be32(b, 20), orientation: 1 };
+  }
+  if (b[0] === 255 && b[1] === 216 && b[2] === 255) {
+    let orientation = 1;
+    let i = 2;
+    while (i + 4 <= b.length) {
+      if (b[i] !== 255) {
+        i++;
+        continue;
+      }
+      const m = b[i + 1];
+      if (m === 255) {
+        i++;
+        continue;
+      }
+      if (m === 216 || m === 1 || m >= 208 && m <= 215 || m === 0) {
+        i += 2;
+        continue;
+      }
+      if (m === 217 || m === 218) break;
+      const len4 = be16(b, i + 2);
+      if (m === 225 && tag(b, i + 4, "Exif\0\0")) orientation = exifOrientation(b, i + 10, Math.min(b.length, i + 2 + len4));
+      if (m >= 192 && m <= 207 && m !== 196 && m !== 200 && m !== 204) {
+        return { format: "jpeg", mime: "image/jpeg", w: be16(b, i + 7), h: be16(b, i + 5), orientation };
+      }
+      i += 2 + Math.max(2, len4);
+    }
+    return { format: "jpeg", mime: "image/jpeg", w: 0, h: 0, orientation };
+  }
+  if (b.length >= 25 && tag(b, 0, "RIFF") && tag(b, 8, "WEBP")) {
+    if (b.length >= 30 && tag(b, 12, "VP8X")) {
+      return { format: "webp", mime: "image/webp", w: 1 + (at(b, 24) | at(b, 25) << 8 | at(b, 26) << 16), h: 1 + (at(b, 27) | at(b, 28) << 8 | at(b, 29) << 16), orientation: 1 };
+    }
+    if (tag(b, 12, "VP8L") && b[20] === 47) {
+      const bits = (at(b, 21) | at(b, 22) << 8 | at(b, 23) << 16 | at(b, 24) * 16777216) >>> 0;
+      return { format: "webp", mime: "image/webp", w: 1 + (bits & 16383), h: 1 + (bits >>> 14 & 16383), orientation: 1 };
+    }
+    if (b.length >= 30 && tag(b, 12, "VP8 ") && b[23] === 157 && b[24] === 1 && b[25] === 42) {
+      return { format: "webp", mime: "image/webp", w: le16(b, 26) & 16383, h: le16(b, 28) & 16383, orientation: 1 };
+    }
+    return null;
+  }
+  if (b.length >= 10 && (tag(b, 0, "GIF87a") || tag(b, 0, "GIF89a"))) {
+    return { format: "gif", mime: "image/gif", w: le16(b, 6), h: le16(b, 8), orientation: 1 };
+  }
+  return null;
+}
+function shownSize(info) {
+  return info.orientation >= 5 ? { w: info.h, h: info.w } : { w: info.w, h: info.h };
+}
+function ingestRaster(bytes, name, hash) {
+  const info = sniffImage(bytes);
+  if (!info) return refuse("those bytes are not a PNG, JPEG or WebP picture");
+  if (info.format === "gif") return refuse("a GIF is not brought in \u2014 save it as a PNG, JPEG or WebP first");
+  if (!(info.w > 0) || !(info.h > 0)) return refuse(`the ${info.format.toUpperCase()}'s size could not be read \u2014 the file may be cut short`);
+  if (info.w * info.h > MAX_PICTURE_PX) return refuse(`the picture is ${info.w.toLocaleString("en")} \xD7 ${info.h.toLocaleString("en")} pixels, more than a browser can be asked to decode`);
+  const { w: w2, h: h2 } = shownSize(info);
+  const page = blankPage(0, w2, h2);
+  page.pictures.push({ order: 0, box: { x: 0, y: 0, w: w2, h: h2 }, bytes, mime: info.mime, w: w2, h: h2, name });
+  const notes = [];
+  if (info.orientation > 1) notes.push(`the picture is stored turned (EXIF orientation ${info.orientation}); its size is given as shown`);
+  const doc = {
+    source: { hash, name, format: info.format },
+    adapter: `raster@${ADAPTER_VERSIONS.raster}`,
+    pages: [page],
+    reading: { as: "picture", evidence: { width: w2, height: h2, bytes: bytes.length }, words: `a ${info.format.toUpperCase()} picture, ${w2} \xD7 ${h2} pixels` }
+  };
+  return accept(doc, notes);
+}
+
+// src/search/entities.ts
+var ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+function decodeEntities(s) {
+  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
+    if (e[0] === "#") {
+      const n2 = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+      return n2 > 0 && n2 < 1114112 ? String.fromCodePoint(n2) : m;
+    }
+    const r = ENTITIES[e.toLowerCase()];
+    return r === void 0 ? m : r;
+  });
+}
+
+// src/ingest/xml.ts
+var NAME_START = /[A-Za-z_:À-￿]/;
+var WS = /\s/;
+var KEEP_SPACE = /* @__PURE__ */ new Set(["text", "tspan", "textPath", "style", "title", "desc"]);
+function lineOf2(text, pos) {
+  let n2 = 1;
+  for (let i = text.indexOf("\n"); i !== -1 && i < pos; i = text.indexOf("\n", i + 1)) n2++;
+  return n2;
+}
+function parseXml(text, limits) {
+  const n2 = text.length;
+  const byId = /* @__PURE__ */ new Map();
+  const comments = [];
+  const stack = [];
+  let root = null;
+  let nodes = 0;
+  let i = 0;
+  const fail = (reason, at2) => ({ ok: false, reason: `${reason} (line ${lineOf2(text, at2)})` });
+  const addText = (s) => {
+    if (!s || stack.length === 0) return;
+    const top = stack[stack.length - 1];
+    if (!KEEP_SPACE.has(top.name) && !/\S/.test(s)) return;
+    top.kids.push(s);
+  };
+  while (i < n2) {
+    const lt = text.indexOf("<", i);
+    if (lt === -1) {
+      if (stack.length === 0) break;
+      addText(decodeEntities(text.slice(i)));
+      i = n2;
+      break;
+    }
+    if (lt > i) addText(text.slice(i, lt).indexOf("&") === -1 ? text.slice(i, lt) : decodeEntities(text.slice(i, lt)));
+    i = lt;
+    if (text.startsWith("<!--", i)) {
+      const end = text.indexOf("-->", i + 4);
+      if (end === -1) return fail("a comment is never closed", i);
+      if (comments.length < 24) comments.push(text.slice(i + 4, Math.min(end, i + 4 + 400)));
+      i = end + 3;
+      continue;
+    }
+    if (text.startsWith("<![CDATA[", i)) {
+      const end = text.indexOf("]]>", i + 9);
+      if (end === -1) return fail("a CDATA section is never closed", i);
+      if (stack.length) stack[stack.length - 1].kids.push(text.slice(i + 9, end));
+      i = end + 3;
+      continue;
+    }
+    if (text.startsWith("<?", i)) {
+      const end = text.indexOf("?>", i + 2);
+      if (end === -1) return fail("a processing instruction is never closed", i);
+      i = end + 2;
+      continue;
+    }
+    if (text.startsWith("<!", i)) {
+      let depth2 = 0;
+      let quote = "";
+      let j2 = i + 2;
+      for (; j2 < n2; j2++) {
+        const c = text[j2];
+        if (quote) {
+          if (c === quote) quote = "";
+          continue;
+        }
+        if (c === '"' || c === "'") quote = c;
+        else if (c === "[") depth2++;
+        else if (c === "]") depth2--;
+        else if (c === ">" && depth2 <= 0) break;
+      }
+      if (j2 >= n2) return fail("a declaration is never closed", i);
+      i = j2 + 1;
+      continue;
+    }
+    if (text[i + 1] === "/") {
+      const end = text.indexOf(">", i + 2);
+      if (end === -1) return fail("a closing tag is never finished", i);
+      let name2 = text.slice(i + 2, end).trim();
+      if (name2.startsWith("svg:")) name2 = name2.slice(4);
+      const top = stack[stack.length - 1];
+      if (!top) return fail(`a closing </${name2}> has nothing open`, i);
+      if (top.name !== name2) return fail(`a </${name2}> closes a <${top.name}> opened at line ${lineOf2(text, top.pos)}`, i);
+      stack.pop();
+      i = end + 1;
+      continue;
+    }
+    if (!NAME_START.test(text[i + 1] ?? "")) return fail("a < that does not start a tag", i);
+    const tagStart = i;
+    let j = i + 1;
+    while (j < n2 && !WS.test(text[j]) && text[j] !== "/" && text[j] !== ">") j++;
+    let name = text.slice(i + 1, j);
+    if (name.startsWith("svg:")) name = name.slice(4);
+    const attrs = {};
+    let selfClose = false;
+    for (; ; ) {
+      while (j < n2 && WS.test(text[j])) j++;
+      if (j >= n2) return fail(`the tag <${name}> is cut off`, tagStart);
+      if (text[j] === ">") {
+        j++;
+        break;
+      }
+      if (text[j] === "/") {
+        if (text[j + 1] !== ">") return fail(`a / inside the tag <${name}> is not followed by >`, tagStart);
+        selfClose = true;
+        j += 2;
+        break;
+      }
+      const a0 = j;
+      while (j < n2 && !WS.test(text[j]) && text[j] !== "=" && text[j] !== ">" && text[j] !== "/") j++;
+      const an3 = text.slice(a0, j);
+      if (!an3) return fail(`the tag <${name}> has an attribute with no name`, tagStart);
+      while (j < n2 && WS.test(text[j])) j++;
+      if (text[j] !== "=") return fail(`the attribute ${an3} of <${name}> has no value`, tagStart);
+      j++;
+      while (j < n2 && WS.test(text[j])) j++;
+      const q = text[j];
+      if (q !== '"' && q !== "'") return fail(`the value of ${an3} in <${name}> is not quoted`, tagStart);
+      const close = text.indexOf(q, j + 1);
+      if (close === -1) return fail(`the value of ${an3} in <${name}> is never closed`, tagStart);
+      const raw = text.slice(j + 1, close);
+      attrs[an3] = raw.indexOf("&") === -1 ? raw : decodeEntities(raw);
+      j = close + 1;
+    }
+    if (++nodes > limits.maxNodes) return { ok: false, reason: `the file has more than ${limits.maxNodes.toLocaleString("en")} elements \u2014 more than is read` };
+    const node = { name, attrs, kids: [], parent: stack[stack.length - 1] ?? null, pos: tagStart, uid: nodes };
+    if (stack.length === 0) {
+      if (root) return fail(`there is a second root element, <${name}>, after <${root.name}>`, tagStart);
+      root = node;
+    } else {
+      stack[stack.length - 1].kids.push(node);
+    }
+    const id = attrs.id;
+    if (id && !byId.has(id)) byId.set(id, node);
+    if (!selfClose) {
+      if (stack.length >= limits.maxDepth) return { ok: false, reason: `the file nests elements more than ${limits.maxDepth} deep` };
+      stack.push(node);
+    }
+    i = j;
+  }
+  if (stack.length) {
+    const open = stack[stack.length - 1];
+    return fail(`the file stops inside <${open.name}>, opened at line ${lineOf2(text, open.pos)}, which is never closed`, open.pos);
+  }
+  if (!root) return { ok: false, reason: "there is no element in the file" };
+  return { ok: true, root, comments, nodes, byId };
+}
+function textOf3(node) {
+  let out = "";
+  const walk2 = (x) => {
+    if (typeof x === "string") out += x;
+    else for (const k of x.kids) walk2(k);
+  };
+  walk2(node);
+  return out.replace(/\s+/g, " ").trim();
+}
+
+// src/ingest/path.ts
+var ARGS = { M: 2, L: 2, H: 1, V: 1, C: 6, S: 4, Q: 4, T: 2, A: 7, Z: 0 };
+var NUMBER = /[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/y;
+function arcCubics(x0, y0, rxIn, ryIn, phiDeg, fa, fs, x, y) {
+  if (x0 === x && y0 === y) return [];
+  let rx = Math.abs(rxIn), ry = Math.abs(ryIn);
+  if (!(rx > 0) || !(ry > 0)) return null;
+  const phi = phiDeg * Math.PI / 180;
+  const cos = Math.cos(phi), sin = Math.sin(phi);
+  const dx2 = (x0 - x) / 2, dy2 = (y0 - y) / 2;
+  const x1p = cos * dx2 + sin * dy2, y1p = -sin * dx2 + cos * dy2;
+  const lambda = x1p * x1p / (rx * rx) + y1p * y1p / (ry * ry);
+  if (lambda > 1) {
+    const s = Math.sqrt(lambda);
+    rx *= s;
+    ry *= s;
+  }
+  const sign = fa === fs ? -1 : 1;
+  const num3 = rx * rx * ry * ry - rx * rx * y1p * y1p - ry * ry * x1p * x1p;
+  const den = rx * rx * y1p * y1p + ry * ry * x1p * x1p;
+  if (!(den > 0)) return null;
+  const coef = sign * Math.sqrt(Math.max(0, num3 / den));
+  const cxp = coef * rx * y1p / ry, cyp = -coef * ry * x1p / rx;
+  const cx2 = cos * cxp - sin * cyp + (x0 + x) / 2, cy2 = sin * cxp + cos * cyp + (y0 + y) / 2;
+  const ang = (ux2, uy2, vx2, vy2) => {
+    const a = Math.atan2(ux2 * vy2 - uy2 * vx2, ux2 * vx2 + uy2 * vy2);
+    return a;
+  };
+  const ux = (x1p - cxp) / rx, uy = (y1p - cyp) / ry;
+  const vx = (-x1p - cxp) / rx, vy = (-y1p - cyp) / ry;
+  const theta = ang(1, 0, ux, uy);
+  let dtheta = ang(ux, uy, vx, vy);
+  if (!fs && dtheta > 0) dtheta -= 2 * Math.PI;
+  else if (fs && dtheta < 0) dtheta += 2 * Math.PI;
+  const segs = Math.max(1, Math.ceil(Math.abs(dtheta) / (Math.PI / 2) - 1e-9));
+  const t = dtheta / segs;
+  const k = 4 / 3 * Math.tan(t / 4);
+  const out = [];
+  const at2 = (a, dxa, dya) => {
+    const px2 = Math.cos(a) + dxa, py = Math.sin(a) + dya;
+    return [cos * rx * px2 - sin * ry * py + cx2, sin * rx * px2 + cos * ry * py + cy2];
+  };
+  for (let s = 0; s < segs; s++) {
+    const a1 = theta + s * t, a2 = a1 + t;
+    const c1 = at2(a1, -k * Math.sin(a1), k * Math.cos(a1));
+    const c2 = at2(a2, k * Math.sin(a2), -k * Math.cos(a2));
+    const e = s === segs - 1 ? [x, y] : at2(a2, 0, 0);
+    out.push([c1[0], c1[1], c2[0], c2[1], e[0], e[1]]);
+  }
+  for (const seg2 of out) for (const v of seg2) if (!Number.isFinite(v)) return null;
+  return out;
+}
+function parsePath(d, maxCmds = 2e6) {
+  const cmds = [];
+  const n2 = d.length;
+  let i = 0;
+  let curved = false;
+  let cx2 = 0, cy2 = 0, sx = 0, sy = 0;
+  let lcx = 0, lcy = 0;
+  let last = "";
+  let cmd = "";
+  let error = null;
+  let capped = false;
+  const skip = () => {
+    while (i < n2) {
+      const c = d.charCodeAt(i);
+      if (c === 32 || c === 44 || c >= 9 && c <= 13) i++;
+      else break;
+    }
+  };
+  const num3 = () => {
+    skip();
+    NUMBER.lastIndex = i;
+    const m = NUMBER.exec(d);
+    if (!m) return null;
+    const v = Number(m[0]);
+    if (!Number.isFinite(v)) return null;
+    i += m[0].length;
+    return v;
+  };
+  const flag = () => {
+    skip();
+    const c = d[i];
+    if (c === "0" || c === "1") {
+      i++;
+      return c === "1";
+    }
+    return null;
+  };
+  skip();
+  if (i >= n2) return { cmds, error: null, curved, capped: false };
+  while (i < n2 && !error) {
+    skip();
+    if (i >= n2) break;
+    const ch = d[i];
+    const up = ch.toUpperCase();
+    if (/[A-Za-z]/.test(ch)) {
+      if (!(up in ARGS)) {
+        error = `path data has an unknown command \u201C${ch}\u201D`;
+        break;
+      }
+      cmd = ch;
+      i++;
+      if (cmds.length === 0 && up !== "M") {
+        error = "path data does not begin with a move";
+        break;
+      }
+    } else if (cmd === "") {
+      error = "path data does not begin with a command";
+      break;
+    } else if (cmd === "Z" || cmd === "z") {
+      error = "path data has numbers after a close";
+      break;
+    } else if (cmd === "M") cmd = "L";
+    else if (cmd === "m") cmd = "l";
+    if (cmds.length >= maxCmds) {
+      error = "path data is longer than is read";
+      capped = true;
+      break;
+    }
+    const rel = cmd === cmd.toLowerCase();
+    const U = cmd.toUpperCase();
+    if (U === "Z") {
+      cmds.push({ c: "Z" });
+      cx2 = sx;
+      cy2 = sy;
+      last = "Z";
+      continue;
+    }
+    const a = [];
+    let ok = true;
+    for (let k = 0; k < ARGS[U] && ok; k++) {
+      let v;
+      if (U === "A" && (k === 3 || k === 4)) {
+        const f = flag();
+        v = f === null ? null : f ? 1 : 0;
+      } else v = num3();
+      if (v === null) ok = false;
+      else a.push(v);
+    }
+    if (!ok) {
+      error = `path data has a \u201C${cmd}\u201D with a missing or unreadable number`;
+      break;
+    }
+    const ox = rel ? cx2 : 0, oy = rel ? cy2 : 0;
+    switch (U) {
+      case "M":
+        cx2 = a[0] + ox;
+        cy2 = a[1] + oy;
+        sx = cx2;
+        sy = cy2;
+        cmds.push({ c: "M", x: cx2, y: cy2 });
+        break;
+      case "L":
+        cx2 = a[0] + ox;
+        cy2 = a[1] + oy;
+        cmds.push({ c: "L", x: cx2, y: cy2 });
+        break;
+      case "H":
+        cx2 = a[0] + ox;
+        cmds.push({ c: "L", x: cx2, y: cy2 });
+        break;
+      case "V":
+        cy2 = a[0] + (rel ? cy2 : 0);
+        cmds.push({ c: "L", x: cx2, y: cy2 });
+        break;
+      case "C": {
+        const x1 = a[0] + ox, y1 = a[1] + oy, x2 = a[2] + ox, y2 = a[3] + oy, x = a[4] + ox, y = a[5] + oy;
+        cmds.push({ c: "C", x1, y1, x2, y2, x, y });
+        lcx = x2;
+        lcy = y2;
+        cx2 = x;
+        cy2 = y;
+        curved = true;
+        break;
+      }
+      case "S": {
+        const x1 = last === "C" || last === "S" ? 2 * cx2 - lcx : cx2, y1 = last === "C" || last === "S" ? 2 * cy2 - lcy : cy2;
+        const x2 = a[0] + ox, y2 = a[1] + oy, x = a[2] + ox, y = a[3] + oy;
+        cmds.push({ c: "C", x1, y1, x2, y2, x, y });
+        lcx = x2;
+        lcy = y2;
+        cx2 = x;
+        cy2 = y;
+        curved = true;
+        break;
+      }
+      case "Q": {
+        const qx = a[0] + ox, qy = a[1] + oy, x = a[2] + ox, y = a[3] + oy;
+        cmds.push({ c: "C", x1: cx2 + 2 / 3 * (qx - cx2), y1: cy2 + 2 / 3 * (qy - cy2), x2: x + 2 / 3 * (qx - x), y2: y + 2 / 3 * (qy - y), x, y });
+        lcx = qx;
+        lcy = qy;
+        cx2 = x;
+        cy2 = y;
+        curved = true;
+        break;
+      }
+      case "T": {
+        const qx = last === "Q" || last === "T" ? 2 * cx2 - lcx : cx2, qy = last === "Q" || last === "T" ? 2 * cy2 - lcy : cy2;
+        const x = a[0] + ox, y = a[1] + oy;
+        cmds.push({ c: "C", x1: cx2 + 2 / 3 * (qx - cx2), y1: cy2 + 2 / 3 * (qy - cy2), x2: x + 2 / 3 * (qx - x), y2: y + 2 / 3 * (qy - y), x, y });
+        lcx = qx;
+        lcy = qy;
+        cx2 = x;
+        cy2 = y;
+        curved = true;
+        break;
+      }
+      case "A": {
+        const x = a[5] + ox, y = a[6] + oy;
+        const arcs = arcCubics(cx2, cy2, a[0], a[1], a[2], a[3] === 1, a[4] === 1, x, y);
+        if (arcs === null) cmds.push({ c: "L", x, y });
+        else {
+          for (const s of arcs) cmds.push({ c: "C", x1: s[0], y1: s[1], x2: s[2], y2: s[3], x: s[4], y: s[5] });
+          curved = true;
+        }
+        cx2 = x;
+        cy2 = y;
+        break;
+      }
+    }
+    last = U === "H" || U === "V" ? "L" : U === "A" ? "A" : U;
+  }
+  return { cmds, error, curved, capped };
+}
+var KAPPA = 0.5522847498307936;
+function ellipseCmds(cx2, cy2, rx, ry) {
+  const ox = rx * KAPPA, oy = ry * KAPPA;
+  return [
+    { c: "M", x: cx2 + rx, y: cy2 },
+    { c: "C", x1: cx2 + rx, y1: cy2 + oy, x2: cx2 + ox, y2: cy2 + ry, x: cx2, y: cy2 + ry },
+    { c: "C", x1: cx2 - ox, y1: cy2 + ry, x2: cx2 - rx, y2: cy2 + oy, x: cx2 - rx, y: cy2 },
+    { c: "C", x1: cx2 - rx, y1: cy2 - oy, x2: cx2 - ox, y2: cy2 - ry, x: cx2, y: cy2 - ry },
+    { c: "C", x1: cx2 + ox, y1: cy2 - ry, x2: cx2 + rx, y2: cy2 - oy, x: cx2 + rx, y: cy2 },
+    { c: "Z" }
+  ];
+}
+function rectCmds(x, y, w2, h2, rxIn = 0, ryIn = 0) {
+  const rx = Math.min(Math.max(0, rxIn), w2 / 2), ry = Math.min(Math.max(0, ryIn), h2 / 2);
+  if (!(rx > 0) || !(ry > 0)) {
+    return [{ c: "M", x, y }, { c: "L", x: x + w2, y }, { c: "L", x: x + w2, y: y + h2 }, { c: "L", x, y: y + h2 }, { c: "Z" }];
+  }
+  const corner = (x0, y0, x1, y1) => (arcCubics(x0, y0, rx, ry, 0, false, true, x1, y1) ?? []).map((s) => ({ c: "C", x1: s[0], y1: s[1], x2: s[2], y2: s[3], x: s[4], y: s[5] }));
+  return [
+    { c: "M", x: x + rx, y },
+    { c: "L", x: x + w2 - rx, y },
+    ...corner(x + w2 - rx, y, x + w2, y + ry),
+    { c: "L", x: x + w2, y: y + h2 - ry },
+    ...corner(x + w2, y + h2 - ry, x + w2 - rx, y + h2),
+    { c: "L", x: x + rx, y: y + h2 },
+    ...corner(x + rx, y + h2, x, y + h2 - ry),
+    { c: "L", x, y: y + ry },
+    ...corner(x, y + ry, x + rx, y),
+    { c: "Z" }
+  ];
+}
+function lineCmds(x1, y1, x2, y2) {
+  return [{ c: "M", x: x1, y: y1 }, { c: "L", x: x2, y: y2 }];
+}
+function pointsCmds(points, close) {
+  const nums = points.match(/[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g);
+  if (!nums || nums.length < 4) return null;
+  const out = [];
+  for (let i = 0; i + 1 < nums.length; i += 2) {
+    const x = Number(nums[i]), y = Number(nums[i + 1]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    out.push({ c: i === 0 ? "M" : "L", x, y });
+  }
+  if (close) out.push({ c: "Z" });
+  return out;
+}
+function segmentsFor(p0, p1, p22, p3, tol) {
+  const d1 = Math.hypot(p0.x - 2 * p1.x + p22.x, p0.y - 2 * p1.y + p22.y);
+  const d2 = Math.hypot(p1.x - 2 * p22.x + p3.x, p1.y - 2 * p22.y + p3.y);
+  const n2 = Math.ceil(Math.sqrt(0.75 * Math.max(d1, d2) / Math.max(tol, 1e-9)));
+  return Math.max(1, Math.min(200, Number.isFinite(n2) ? n2 : 1));
+}
+function flatten(cmds, m, tol, budget) {
+  const out = [];
+  const at2 = (x, y) => ({ x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f });
+  let cur = null;
+  let start = null;
+  let pos = null;
+  const flush = (closed) => {
+    if (cur && cur.length >= 2) out.push({ pts: cur, closed });
+    cur = null;
+  };
+  for (const c of cmds) {
+    if (budget.left <= 0) break;
+    switch (c.c) {
+      case "M":
+        flush(false);
+        pos = at2(c.x, c.y);
+        start = pos;
+        cur = [pos];
+        budget.left--;
+        break;
+      case "L": {
+        if (!cur) {
+          if (!start) break;
+          cur = [start];
+          pos = start;
+        }
+        pos = at2(c.x, c.y);
+        cur.push(pos);
+        budget.left--;
+        break;
+      }
+      case "C": {
+        if (!cur) {
+          if (!start) break;
+          cur = [start];
+          pos = start;
+        }
+        const p0 = pos;
+        const p1 = at2(c.x1, c.y1), p22 = at2(c.x2, c.y2), p3 = at2(c.x, c.y);
+        const k = segmentsFor(p0, p1, p22, p3, tol);
+        for (let s = 1; s <= k; s++) {
+          const t = s / k, u = 1 - t;
+          const w0 = u * u * u, w1 = 3 * u * u * t, w2 = 3 * u * t * t, w3 = t * t * t;
+          cur.push(s === k ? p3 : { x: w0 * p0.x + w1 * p1.x + w2 * p22.x + w3 * p3.x, y: w0 * p0.y + w1 * p1.y + w2 * p22.y + w3 * p3.y });
+        }
+        budget.left -= k;
+        pos = p3;
+        break;
+      }
+      case "Z":
+        if (cur) {
+          const first = cur[0], last = cur[cur.length - 1];
+          if (cur.length > 1 && Math.abs(first.x - last.x) < 1e-9 && Math.abs(first.y - last.y) < 1e-9) cur.pop();
+          flush(true);
+        }
+        pos = start;
+        break;
+    }
+  }
+  flush(false);
+  return out;
+}
+
+// src/ingest/svg-style.ts
+var NAMED2 = {
+  aliceblue: "f0f8ff",
+  antiquewhite: "faebd7",
+  aqua: "00ffff",
+  aquamarine: "7fffd4",
+  azure: "f0ffff",
+  beige: "f5f5dc",
+  bisque: "ffe4c4",
+  black: "000000",
+  blanchedalmond: "ffebcd",
+  blue: "0000ff",
+  blueviolet: "8a2be2",
+  brown: "a52a2a",
+  burlywood: "deb887",
+  cadetblue: "5f9ea0",
+  chartreuse: "7fff00",
+  chocolate: "d2691e",
+  coral: "ff7f50",
+  cornflowerblue: "6495ed",
+  cornsilk: "fff8dc",
+  crimson: "dc143c",
+  cyan: "00ffff",
+  darkblue: "00008b",
+  darkcyan: "008b8b",
+  darkgoldenrod: "b8860b",
+  darkgray: "a9a9a9",
+  darkgreen: "006400",
+  darkgrey: "a9a9a9",
+  darkkhaki: "bdb76b",
+  darkmagenta: "8b008b",
+  darkolivegreen: "556b2f",
+  darkorange: "ff8c00",
+  darkorchid: "9932cc",
+  darkred: "8b0000",
+  darksalmon: "e9967a",
+  darkseagreen: "8fbc8f",
+  darkslateblue: "483d8b",
+  darkslategray: "2f4f4f",
+  darkslategrey: "2f4f4f",
+  darkturquoise: "00ced1",
+  darkviolet: "9400d3",
+  deeppink: "ff1493",
+  deepskyblue: "00bfff",
+  dimgray: "696969",
+  dimgrey: "696969",
+  dodgerblue: "1e90ff",
+  firebrick: "b22222",
+  floralwhite: "fffaf0",
+  forestgreen: "228b22",
+  fuchsia: "ff00ff",
+  gainsboro: "dcdcdc",
+  ghostwhite: "f8f8ff",
+  gold: "ffd700",
+  goldenrod: "daa520",
+  gray: "808080",
+  green: "008000",
+  greenyellow: "adff2f",
+  grey: "808080",
+  honeydew: "f0fff0",
+  hotpink: "ff69b4",
+  indianred: "cd5c5c",
+  indigo: "4b0082",
+  ivory: "fffff0",
+  khaki: "f0e68c",
+  lavender: "e6e6fa",
+  lavenderblush: "fff0f5",
+  lawngreen: "7cfc00",
+  lemonchiffon: "fffacd",
+  lightblue: "add8e6",
+  lightcoral: "f08080",
+  lightcyan: "e0ffff",
+  lightgoldenrodyellow: "fafad2",
+  lightgray: "d3d3d3",
+  lightgreen: "90ee90",
+  lightgrey: "d3d3d3",
+  lightpink: "ffb6c1",
+  lightsalmon: "ffa07a",
+  lightseagreen: "20b2aa",
+  lightskyblue: "87cefa",
+  lightslategray: "778899",
+  lightslategrey: "778899",
+  lightsteelblue: "b0c4de",
+  lightyellow: "ffffe0",
+  lime: "00ff00",
+  limegreen: "32cd32",
+  linen: "faf0e6",
+  magenta: "ff00ff",
+  maroon: "800000",
+  mediumaquamarine: "66cdaa",
+  mediumblue: "0000cd",
+  mediumorchid: "ba55d3",
+  mediumpurple: "9370db",
+  mediumseagreen: "3cb371",
+  mediumslateblue: "7b68ee",
+  mediumspringgreen: "00fa9a",
+  mediumturquoise: "48d1cc",
+  mediumvioletred: "c71585",
+  midnightblue: "191970",
+  mintcream: "f5fffa",
+  mistyrose: "ffe4e1",
+  moccasin: "ffe4b5",
+  navajowhite: "ffdead",
+  navy: "000080",
+  oldlace: "fdf5e6",
+  olive: "808000",
+  olivedrab: "6b8e23",
+  orange: "ffa500",
+  orangered: "ff4500",
+  orchid: "da70d6",
+  palegoldenrod: "eee8aa",
+  palegreen: "98fb98",
+  paleturquoise: "afeeee",
+  palevioletred: "db7093",
+  papayawhip: "ffefd5",
+  peachpuff: "ffdab9",
+  peru: "cd853f",
+  pink: "ffc0cb",
+  plum: "dda0dd",
+  powderblue: "b0e0e6",
+  purple: "800080",
+  rebeccapurple: "663399",
+  red: "ff0000",
+  rosybrown: "bc8f8f",
+  royalblue: "4169e1",
+  saddlebrown: "8b4513",
+  salmon: "fa8072",
+  sandybrown: "f4a460",
+  seagreen: "2e8b57",
+  seashell: "fff5ee",
+  sienna: "a0522d",
+  silver: "c0c0c0",
+  skyblue: "87ceeb",
+  slateblue: "6a5acd",
+  slategray: "708090",
+  slategrey: "708090",
+  snow: "fffafa",
+  springgreen: "00ff7f",
+  steelblue: "4682b4",
+  tan: "d2b48c",
+  teal: "008080",
+  thistle: "d8bfd8",
+  tomato: "ff6347",
+  turquoise: "40e0d0",
+  violet: "ee82ee",
+  wheat: "f5deb3",
+  white: "ffffff",
+  whitesmoke: "f5f5f5",
+  yellow: "ffff00",
+  yellowgreen: "9acd32"
+};
+var clamp01 = (v) => Math.max(0, Math.min(1, v));
+function channel(s) {
+  const t = s.trim();
+  if (!t) return null;
+  const pct9 = t.endsWith("%");
+  const v = Number(pct9 ? t.slice(0, -1) : t);
+  if (!Number.isFinite(v)) return null;
+  return pct9 ? clamp01(v / 100) * 255 : Math.max(0, Math.min(255, v));
+}
+function alphaOf(s) {
+  if (s === void 0) return 1;
+  const t = s.trim();
+  const pct9 = t.endsWith("%");
+  const v = Number(pct9 ? t.slice(0, -1) : t);
+  return Number.isFinite(v) ? clamp01(pct9 ? v / 100 : v) : null;
+}
+function hslToHex(h2, s, l) {
+  const hh = (h2 % 360 + 360) % 360 / 360;
+  const ss = clamp01(s), ll = clamp01(l);
+  const q = ll < 0.5 ? ll * (1 + ss) : ll + ss - ll * ss;
+  const p = 2 * ll - q;
+  const f = (t0) => {
+    let t = t0;
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  return hexColor(f(hh + 1 / 3) * 255, f(hh) * 255, f(hh - 1 / 3) * 255);
+}
+function parseColor(value) {
+  const v = value.trim().toLowerCase();
+  if (!v) return null;
+  if (v[0] === "#") {
+    const h2 = v.slice(1);
+    if (!/^[0-9a-f]+$/.test(h2)) return null;
+    if (h2.length === 3 || h2.length === 4) {
+      const e = (i) => parseInt(h2[i] + h2[i], 16);
+      return { hex: hexColor(e(0), e(1), e(2)), alpha: h2.length === 4 ? e(3) / 255 : 1 };
+    }
+    if (h2.length === 6 || h2.length === 8) {
+      return { hex: "#" + h2.slice(0, 6), alpha: h2.length === 8 ? parseInt(h2.slice(6), 16) / 255 : 1 };
+    }
+    return null;
+  }
+  const fn = /^(rgba?|hsla?)\(\s*([^)]*)\)$/.exec(v);
+  if (fn) {
+    const parts = fn[2].split(/[\s,/]+/).filter(Boolean);
+    if (parts.length < 3 || parts.length > 4) return null;
+    const alpha = alphaOf(parts[3]);
+    if (alpha === null) return null;
+    if (fn[1].startsWith("rgb")) {
+      const r = channel(parts[0]), g = channel(parts[1]), b = channel(parts[2]);
+      return r === null || g === null || b === null ? null : { hex: hexColor(r, g, b), alpha };
+    }
+    const h2 = Number(parts[0].replace(/deg$/, ""));
+    const s = channel(parts[1].endsWith("%") ? parts[1] : parts[1] + "%"), l = channel(parts[2].endsWith("%") ? parts[2] : parts[2] + "%");
+    return !Number.isFinite(h2) || s === null || l === null ? null : { hex: hslToHex(h2, s / 255, l / 255), alpha };
+  }
+  if (v === "transparent") return { hex: "#000000", alpha: 0 };
+  const named2 = NAMED2[v];
+  return named2 ? { hex: "#" + named2, alpha: 1 } : null;
+}
+function parsePaint(value, current) {
+  const v = value.trim();
+  const low = v.toLowerCase();
+  if (low === "none") return { kind: "none" };
+  if (low === "inherit") return "inherit";
+  if (low === "currentcolor") return { kind: "color", hex: current, alpha: 1 };
+  const ref = /^url\(\s*['"]?#([^'")\s]+)['"]?\s*\)\s*(.*)$/i.exec(v);
+  if (ref) {
+    const rest = ref[2].trim();
+    const fb = rest ? parsePaint(rest, current) : null;
+    return { kind: "ref", id: ref[1], fallback: fb && fb !== "inherit" ? fb : null };
+  }
+  const c = parseColor(v);
+  if (!c) return null;
+  return c.alpha === 0 ? { kind: "none" } : { kind: "color", hex: c.hex, alpha: c.alpha };
+}
+var UNITS = { "": 1, px: 1, pt: 96 / 72, pc: 16, mm: 96 / 25.4, cm: 96 / 2.54, in: 96 };
+function parseLength(value, fontPx = 16) {
+  if (value === void 0) return null;
+  const m = /^\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*([a-zA-Z]*)\s*$/.exec(value);
+  if (!m) return null;
+  const n2 = Number(m[1]);
+  if (!Number.isFinite(n2)) return null;
+  const u = m[2].toLowerCase();
+  if (u === "em") return n2 * fontPx;
+  if (u === "ex") return n2 * fontPx / 2;
+  const k = UNITS[u];
+  return k === void 0 ? null : n2 * k;
+}
+function parseNumber(value) {
+  if (value === void 0) return null;
+  const t = value.trim();
+  if (!t) return null;
+  const n2 = Number(t);
+  return Number.isFinite(n2) ? n2 : null;
+}
+function numberList(value) {
+  if (value === void 0) return null;
+  const parts = value.trim().split(/[\s,]+/).filter(Boolean);
+  const out = [];
+  for (const p of parts) {
+    const n2 = Number(p);
+    if (!Number.isFinite(n2)) return null;
+    out.push(n2);
+  }
+  return out;
+}
+function parseDeclarations(text) {
+  const out = {};
+  let depth2 = 0;
+  let quote = "";
+  let start = 0;
+  const take = (end) => {
+    const piece = text.slice(start, end);
+    const colon = piece.indexOf(":");
+    if (colon > 0) {
+      const name = piece.slice(0, colon).trim().toLowerCase();
+      const val = piece.slice(colon + 1).replace(/!important\s*$/i, "").trim();
+      if (name && val) out[name] = val;
+    }
+    start = end + 1;
+  };
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      if (c === quote) quote = "";
+      continue;
+    }
+    if (c === '"' || c === "'") quote = c;
+    else if (c === "(") depth2++;
+    else if (c === ")") depth2 = Math.max(0, depth2 - 1);
+    else if (c === ";" && depth2 === 0) take(i);
+  }
+  take(text.length);
+  return out;
+}
+var MAX_RULES = 5e3;
+var emptySheet = () => ({ rules: [], byClass: /* @__PURE__ */ new Map(), byId: /* @__PURE__ */ new Map(), byTag: /* @__PURE__ */ new Map(), any: [], unsupported: 0, dropped: 0 });
+function simpleSelector(sel) {
+  const s = sel.trim();
+  if (!s || /[\s>+~[\]:()]/.test(s)) return null;
+  let tag2 = null;
+  let id = null;
+  const classes = [];
+  const re = /([.#]?)([A-Za-z_][\w-]*|\*)/y;
+  let pos = 0;
+  while (pos < s.length) {
+    re.lastIndex = pos;
+    const m = re.exec(s);
+    if (!m) return null;
+    if (m[1] === ".") classes.push(m[2]);
+    else if (m[1] === "#") id = m[2];
+    else if (pos === 0) tag2 = m[2] === "*" ? null : m[2];
+    else return null;
+    pos = re.lastIndex;
+  }
+  return { tag: tag2, id, classes, weight: (id ? 100 : 0) + classes.length * 10 + (tag2 ? 1 : 0) };
+}
+function parseSheet(css) {
+  const text = css.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/@(?:import|charset|namespace)[^;{}]*;/gi, " ");
+  const sheet = emptySheet();
+  let order2 = 0;
+  let i = 0;
+  const add7 = (map, key2, r) => {
+    const l = map.get(key2);
+    if (l) l.push(r);
+    else map.set(key2, [r]);
+  };
+  while (i < text.length) {
+    const open = text.indexOf("{", i);
+    if (open === -1) break;
+    const head = text.slice(i, open).trim();
+    let depth2 = 1;
+    let j = open + 1;
+    for (; j < text.length && depth2 > 0; j++) {
+      if (text[j] === "{") depth2++;
+      else if (text[j] === "}") depth2--;
+    }
+    const body = text.slice(open + 1, j - 1);
+    i = j;
+    if (head.startsWith("@")) continue;
+    const decls = parseDeclarations(body);
+    for (const sel of head.split(",")) {
+      const parsed = simpleSelector(sel);
+      if (!parsed) {
+        if (sel.trim()) sheet.unsupported++;
+        continue;
+      }
+      if (sheet.rules.length >= MAX_RULES) {
+        sheet.dropped++;
+        continue;
+      }
+      const rule = { ...parsed, order: order2++, decls };
+      sheet.rules.push(rule);
+      if (rule.id) add7(sheet.byId, rule.id, rule);
+      else if (rule.classes.length) add7(sheet.byClass, rule.classes[0], rule);
+      else if (rule.tag) add7(sheet.byTag, rule.tag, rule);
+      else sheet.any.push(rule);
+    }
+  }
+  return sheet;
+}
+function declarationsFor(sheet, tag2, id, classAttr) {
+  if (sheet.rules.length === 0) return {};
+  const classes = classAttr ? classAttr.split(/\s+/).filter(Boolean) : [];
+  const hits = [];
+  const test = (r) => {
+    if ((r.tag === null || r.tag === tag2) && (r.id === null || r.id === id) && r.classes.every((c) => classes.includes(c))) hits.push(r);
+  };
+  if (id) for (const r of sheet.byId.get(id) ?? []) test(r);
+  for (const c of classes) for (const r of sheet.byClass.get(c) ?? []) test(r);
+  for (const r of sheet.byTag.get(tag2) ?? []) test(r);
+  for (const r of sheet.any) test(r);
+  if (hits.length === 0) return {};
+  const unique = [...new Set(hits)];
+  unique.sort((a, b) => a.weight - b.weight || a.order - b.order);
+  const out = {};
+  for (const h2 of unique) Object.assign(out, h2.decls);
+  return out;
+}
+
+// src/ingest/ring.ts
+var COORD_LIMIT = 1e7;
+var MIN_AREA = 1e-9;
+var MAX_NESTED_RINGS = 6e4;
+function cleanRing(raw) {
+  if (!Array.isArray(raw)) return null;
+  const out = [];
+  for (const p of raw) {
+    if (!p || typeof p !== "object") continue;
+    const x = p.x, y = p.y;
+    if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y) || Math.abs(x) > COORD_LIMIT || Math.abs(y) > COORD_LIMIT) continue;
+    const last = out[out.length - 1];
+    if (last && Math.abs(last.x - x) < 1e-9 && Math.abs(last.y - y) < 1e-9) continue;
+    out.push({ x, y });
+  }
+  while (out.length > 1 && Math.abs(out[0].x - out[out.length - 1].x) < 1e-9 && Math.abs(out[0].y - out[out.length - 1].y) < 1e-9) out.pop();
+  if (out.length < 3) return null;
+  return Math.abs(signedArea3(out)) > MIN_AREA ? out : null;
+}
+function signedArea3(ring2) {
+  let a = 0;
+  for (let i = 0, n2 = ring2.length; i < n2; i++) {
+    const p = ring2[i], q = ring2[i + 1 === n2 ? 0 : i + 1];
+    a += p.x * q.y - q.x * p.y;
+  }
+  return a / 2;
+}
+function perimeter2(ring2) {
+  let len4 = 0;
+  for (let i = 0, n2 = ring2.length; i < n2; i++) {
+    const p = ring2[i], q = ring2[i + 1 === n2 ? 0 : i + 1];
+    len4 += Math.hypot(q.x - p.x, q.y - p.y);
+  }
+  return len4;
+}
+function boundsOfRing(ring2) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of ring2) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { minX, maxX, minY, maxY };
+}
+function pointInRing(p, ring2) {
+  let inside = false;
+  for (let i = 0, j = ring2.length - 1; i < ring2.length; j = i++) {
+    const a = ring2[i], b = ring2[j];
+    if (a.y > p.y !== b.y > p.y && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+function interiorPoint(ring2) {
+  const b = boundsOfRing(ring2);
+  for (const f of [0.5, 0.37, 0.63, 0.25, 0.75, 0.12, 0.88]) {
+    const y = b.minY + (b.maxY - b.minY) * f;
+    const xs = [];
+    for (let i = 0, j = ring2.length - 1; i < ring2.length; j = i++) {
+      const p = ring2[i], q = ring2[j];
+      if (p.y > y !== q.y > y) xs.push(p.x + (y - p.y) * (q.x - p.x) / (q.y - p.y));
+    }
+    xs.sort((m, n2) => m - n2);
+    let best = 0, at2 = -1;
+    for (let k = 0; k + 1 < xs.length; k += 2) {
+      if (xs[k + 1] - xs[k] > best) {
+        best = xs[k + 1] - xs[k];
+        at2 = k;
+      }
+    }
+    if (at2 >= 0 && best > 1e-9) return { x: (xs[at2] + xs[at2 + 1]) / 2, y };
+  }
+  let sx = 0, sy = 0;
+  for (const p of ring2) {
+    sx += p.x;
+    sy += p.y;
+  }
+  return { x: sx / ring2.length, y: sy / ring2.length };
+}
+function unitsOf(rings, rule) {
+  const infos = [];
+  let dropped = 0;
+  for (const raw of rings) {
+    const ring2 = cleanRing(raw);
+    if (!ring2) {
+      dropped++;
+      continue;
+    }
+    infos.push({ ring: ring2, area: signedArea3(ring2), box: boundsOfRing(ring2), inside: interiorPoint(ring2), container: [] });
+  }
+  if (infos.length === 0) return { units: [], dropped, nested: false };
+  if (infos.length > MAX_NESTED_RINGS) {
+    return { units: infos.map((i) => ({ outer: i.ring, holes: [] })), dropped, nested: false };
+  }
+  const sizes = infos.map((i) => Math.max(i.box.maxX - i.box.minX, i.box.maxY - i.box.minY)).sort((a, b) => a - b);
+  const cell = Math.max(1e-3, (sizes[Math.floor(sizes.length / 2)] || 1) * 2);
+  const grid = /* @__PURE__ */ new Map();
+  const big = [];
+  const key2 = (cx2, cy2) => cx2 * 1000003 + cy2;
+  infos.forEach((info, j) => {
+    const x0 = Math.floor(info.box.minX / cell), x1 = Math.floor(info.box.maxX / cell), y0 = Math.floor(info.box.minY / cell), y1 = Math.floor(info.box.maxY / cell);
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 64) {
+      big.push(j);
+      return;
+    }
+    for (let cx2 = x0; cx2 <= x1; cx2++) for (let cy2 = y0; cy2 <= y1; cy2++) {
+      const k = key2(cx2, cy2);
+      const l = grid.get(k);
+      if (l) l.push(j);
+      else grid.set(k, [j]);
+    }
+  });
+  for (let i = 0; i < infos.length; i++) {
+    const p = infos[i].inside;
+    const near = grid.get(key2(Math.floor(p.x / cell), Math.floor(p.y / cell))) ?? [];
+    for (const j of [...near, ...big]) {
+      if (i === j) continue;
+      const b = infos[j].box;
+      if (p.x < b.minX || p.x > b.maxX || p.y < b.minY || p.y > b.maxY) continue;
+      if (Math.abs(infos[j].area) <= Math.abs(infos[i].area)) continue;
+      if (pointInRing(p, infos[j].ring)) infos[i].container.push(j);
+    }
+  }
+  const role = infos.map((info) => {
+    if (rule === "evenodd") return info.container.length % 2 === 0 ? "outer" : "hole";
+    let outside2 = 0;
+    for (const j of info.container) outside2 += Math.sign(infos[j].area);
+    const within2 = outside2 + Math.sign(info.area);
+    if (outside2 === 0) return "outer";
+    return within2 === 0 ? "hole" : "inner";
+  });
+  const units = [];
+  const unitOf = /* @__PURE__ */ new Map();
+  infos.forEach((info, i) => {
+    if (role[i] !== "outer") return;
+    const u = { outer: info.ring, holes: [] };
+    unitOf.set(i, u);
+    units.push(u);
+  });
+  infos.forEach((info, i) => {
+    if (role[i] !== "hole") return;
+    let parent = -1;
+    for (const j of info.container) {
+      if (role[j] !== "outer") continue;
+      if (parent < 0 || Math.abs(infos[j].area) < Math.abs(infos[parent].area)) parent = j;
+    }
+    const u = parent >= 0 ? unitOf.get(parent) : void 0;
+    if (u) u.holes.push(info.ring);
+  });
+  return { units, dropped, nested: true };
+}
+function resampleClosed(ring2, n2) {
+  const m = ring2.length;
+  const cum = new Float64Array(m + 1);
+  for (let i = 0; i < m; i++) {
+    const p = ring2[i], q = ring2[i + 1 === m ? 0 : i + 1];
+    cum[i + 1] = cum[i] + Math.hypot(q.x - p.x, q.y - p.y);
+  }
+  const total = cum[m];
+  const out = [];
+  if (!(total > 0) || n2 < 1) return out;
+  let j = 0;
+  for (let k = 0; k < n2; k++) {
+    const target = k / n2 * total;
+    while (j < m - 1 && cum[j + 1] < target) j++;
+    const span = cum[j + 1] - cum[j];
+    const t = span > 0 ? (target - cum[j]) / span : 0;
+    const p = ring2[j], q = ring2[j + 1 === m ? 0 : j + 1];
+    out.push({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t });
+  }
+  return out;
+}
+function resampleOpen(path, n2) {
+  const m = path.length;
+  if (m === 0) return [];
+  if (m === 1 || n2 < 2) return [{ x: path[0].x, y: path[0].y }];
+  const cum = new Float64Array(m);
+  for (let i = 1; i < m; i++) cum[i] = cum[i - 1] + Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
+  const total = cum[m - 1];
+  if (!(total > 0)) return [{ x: path[0].x, y: path[0].y }];
+  const out = [];
+  let j = 0;
+  for (let k = 0; k < n2; k++) {
+    const target = k / (n2 - 1) * total;
+    while (j < m - 2 && cum[j + 1] < target) j++;
+    const span = cum[j + 1] - cum[j];
+    const t = span > 0 ? Math.min(1, (target - cum[j]) / span) : 0;
+    out.push({ x: path[j].x + (path[j + 1].x - path[j].x) * t, y: path[j].y + (path[j + 1].y - path[j].y) * t });
+  }
+  return out;
+}
+function pathLength4(path) {
+  let len4 = 0;
+  for (let i = 1; i < path.length; i++) len4 += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
+  return len4;
+}
+
+// src/ingest/fill.ts
+var FAITHFUL_AT = 0.9;
+var NEAR_AT = 0.8;
+var MAX_RASTER_PX = 15e5;
+function rasterise(rings, rule, scale, pad = 2, shift = { x: 0, y: 0 }) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const r of rings) for (const p of r) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  if (!(maxX > minX) && !(maxY > minY)) return null;
+  const w2 = Math.max(maxX - minX, 1e-6), h2 = Math.max(maxY - minY, 1e-6);
+  let k = scale;
+  const area3 = (w2 * k + 2 * pad) * (h2 * k + 2 * pad);
+  if (area3 > MAX_RASTER_PX) k *= Math.sqrt(MAX_RASTER_PX / area3) * 0.98;
+  const width = Math.ceil(w2 * k + shift.x) + 2 * pad;
+  const height = Math.ceil(h2 * k + shift.y) + 2 * pad;
+  const x0 = minX - (pad + shift.x) / k, y0 = minY - (pad + shift.y) / k;
+  const data = new Uint8Array(width * height);
+  const xs = Array.from({ length: height }, () => []);
+  const ds = Array.from({ length: height }, () => []);
+  for (const r of rings) {
+    const n2 = r.length;
+    for (let i = 0; i < n2; i++) {
+      const p = r[i], q = r[i + 1 === n2 ? 0 : i + 1];
+      const px2 = (p.x - x0) * k, py = (p.y - y0) * k, qx = (q.x - x0) * k, qy = (q.y - y0) * k;
+      if (py === qy) continue;
+      const up = qy > py;
+      const ya = up ? py : qy, yb = up ? qy : py;
+      let j0 = Math.ceil(ya - 0.5), j1 = Math.ceil(yb - 0.5) - 1;
+      if (j0 < 0) j0 = 0;
+      if (j1 >= height) j1 = height - 1;
+      const slope = (qx - px2) / (qy - py);
+      for (let j = j0; j <= j1; j++) {
+        xs[j].push(px2 + (j + 0.5 - py) * slope);
+        ds[j].push(up ? 1 : -1);
+      }
+    }
+  }
+  let filled = 0;
+  const order2 = [];
+  for (let j = 0; j < height; j++) {
+    const row = xs[j];
+    const m = row.length;
+    if (m < 2) continue;
+    order2.length = m;
+    for (let i = 0; i < m; i++) order2[i] = i;
+    order2.sort((a, b) => row[a] - row[b]);
+    let wind = 0;
+    for (let t = 0; t < m - 1; t++) {
+      const cur = order2[t];
+      wind += ds[j][cur];
+      const inside = rule === "evenodd" ? (t + 1 & 1) === 1 : wind !== 0;
+      if (!inside) continue;
+      let i0 = Math.ceil(row[cur] - 0.5), i1 = Math.ceil(row[order2[t + 1]] - 0.5) - 1;
+      if (i0 < 0) i0 = 0;
+      if (i1 >= width) i1 = width - 1;
+      for (let i = i0; i <= i1; i++) {
+        if (!data[j * width + i]) {
+          data[j * width + i] = 1;
+          filled++;
+        }
+      }
+    }
+  }
+  return { x0, y0, scale: k, width, height, data, filled };
+}
+var toRaster = (r, p) => ({ x: (p.x - r.x0) * r.scale, y: (p.y - r.y0) * r.scale });
+var fromRaster = (r, px2, py) => ({ x: r.x0 + (px2 + 0.5) / r.scale, y: r.y0 + (py + 0.5) / r.scale });
+function measure2(r, lines, width) {
+  if (r.filled === 0) return { recall: 0, precision: 0 };
+  const reach = Math.max(1, width * r.scale / 2 + 1);
+  const covered = new Uint8Array(r.width * r.height);
+  const R = Math.ceil(reach);
+  const reach2 = reach * reach;
+  let samples = 0, onFill = 0;
+  const step2 = 1;
+  for (const line of lines) {
+    if (line.length === 0) continue;
+    let prev = null;
+    for (const raw of line) {
+      const p = toRaster(r, raw);
+      const segs = prev ? Math.max(1, Math.ceil(Math.hypot(p.x - prev.x, p.y - prev.y) / step2)) : 1;
+      for (let s = prev ? 1 : 0; s <= segs; s++) {
+        const t = prev ? s / segs : 1;
+        const cx2 = prev ? prev.x + (p.x - prev.x) * t : p.x;
+        const cy2 = prev ? prev.y + (p.y - prev.y) * t : p.y;
+        samples++;
+        const ix = Math.floor(cx2), iy = Math.floor(cy2);
+        let hit = ix >= 0 && iy >= 0 && ix < r.width && iy < r.height && r.data[iy * r.width + ix] === 1;
+        for (let dy = -1; dy <= 1 && !hit; dy++) {
+          const yy = iy + dy;
+          if (yy < 0 || yy >= r.height) continue;
+          for (let dx = -1; dx <= 1; dx++) {
+            const xx = ix + dx;
+            if (xx >= 0 && xx < r.width && r.data[yy * r.width + xx]) {
+              hit = true;
+              break;
+            }
+          }
+        }
+        if (hit) onFill++;
+        const y0 = Math.max(0, Math.floor(cy2 - R)), y1 = Math.min(r.height - 1, Math.ceil(cy2 + R));
+        for (let yy = y0; yy <= y1; yy++) {
+          const ddy = yy + 0.5 - cy2;
+          const rest = reach2 - ddy * ddy;
+          if (rest < 0) continue;
+          const half2 = Math.sqrt(rest);
+          const a = Math.max(0, Math.ceil(cx2 - half2 - 0.5)), b = Math.min(r.width - 1, Math.floor(cx2 + half2 - 0.5));
+          for (let i = yy * r.width + a, end = yy * r.width + b; i <= end; i++) covered[i] = 1;
+        }
+      }
+      prev = p;
+    }
+  }
+  if (samples === 0) return { recall: 0, precision: 0 };
+  let both = 0;
+  for (let i = 0; i < covered.length; i++) if (covered[i] && r.data[i]) both++;
+  return { recall: both / r.filled, precision: onFill / samples };
+}
+
+// src/ingest/ink-outline.ts
+var RASTER_PEN_PX = 5;
+var DOT_MAX_PX = 12;
+var PEN_ELONGATION = 3;
+var CAP_WINDOW = 1.8;
+var CAP_TURN = 2.2;
+var MAX_CAP_CANDIDATES = 6;
+var MAX_CAP_PAIRS = 8;
+var MAX_WALK = 8e3;
+var RETRY_MAX_PX = 4e5;
+var SCRAP_OF_WIDTH = 1.5;
+var SKELETON_SCALES = [{ mul: 1, x: 0, y: 0 }, { mul: 1, x: 0.5, y: 0.25 }, { mul: 1.31, x: 0.25, y: 0.75 }, { mul: 0.79, x: 0.75, y: 0.5 }];
+var TAU3 = Math.PI * 2;
+var wrapPi = (a) => {
+  let x = a % TAU3;
+  if (x > Math.PI) x -= TAU3;
+  else if (x < -Math.PI) x += TAU3;
+  return x;
+};
+var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+var inkStep = (width) => Math.min(DENSIFY_STEP_PX, Math.max(0.5, width));
+var MAX_STROKE_POINTS = 2e4;
+var stepFor = (len4, step2) => Math.max(step2, len4 / MAX_STROKE_POINTS);
+function recoverFill(fill, opts = {}) {
+  try {
+    if (!fill || typeof fill !== "object" || !Array.isArray(fill.rings)) return [];
+    const rule = fill.rule === "evenodd" ? "evenodd" : "nonzero";
+    const { units } = unitsOf(fill.rings, rule);
+    const out = [];
+    for (const u of units) {
+      try {
+        out.push(recoverUnit(u, rule, opts));
+      } catch (err) {
+        out.push({ kind: "failed", strokes: [], width: 0, tried: [], notes: ["an outline could not be read: " + (err instanceof Error ? err.message : String(err))] });
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+function recoverUnit(u, rule, opts) {
+  const rings = [u.outer, ...u.holes];
+  let area3 = Math.abs(signedArea3(u.outer));
+  let perim = perimeter2(u.outer);
+  for (const h2 of u.holes) {
+    area3 -= Math.abs(signedArea3(h2));
+    perim += perimeter2(h2);
+  }
+  if (!(area3 > 0) || !(perim > 0)) return { kind: "failed", strokes: [], width: 0, tried: [], notes: ["an outline encloses nothing"] };
+  const w2 = 2 * area3 / perim;
+  const box = boundsOfRing(u.outer);
+  const size2 = Math.max(box.maxX - box.minX, box.maxY - box.minY);
+  const elongation = perim / (2 * w2) - 2;
+  const step2 = inkStep(w2);
+  if (elongation < PEN_ELONGATION) {
+    if (size2 <= DOT_MAX_PX) return dotOf(u, w2);
+    return { kind: "blob", strokes: edgesOf(rings, step2), width: 0, tried: [], notes: [] };
+  }
+  const notes = [];
+  const tried = [];
+  const scale = clamp(RASTER_PEN_PX / w2, 0.02, 60);
+  const work = opts.work;
+  const charge = (px2) => {
+    if (!work) return true;
+    if (work.rasterPx < px2) return false;
+    work.rasterPx -= px2;
+    return true;
+  };
+  const estimatePx = (Math.max(1, box.maxX - box.minX) * scale + 4) * (Math.max(1, box.maxY - box.minY) * scale + 4);
+  const candidates = ribbonCandidates(u, w2);
+  if (!charge(Math.min(estimatePx, MAX_RASTER_PX))) {
+    const first = candidates[0];
+    if (!first) return { kind: "failed", strokes: [], width: w2, tried, notes: ["the work on this file ran out before this outline was read"] };
+    notes.push("the work on this file ran out; this outline is a ribbon that was not measured");
+    return { kind: "pen", strokes: [strokeOf(first.points, first.closed, "ribbon", w2, step2)], width: w2, method: "ribbon", tried, notes };
+  }
+  const raster = rasterise(rings, rule, scale);
+  if (!raster || raster.filled === 0) return { kind: "failed", strokes: [], width: w2, tried, notes: ["an outline has no area at this size"] };
+  let best = null;
+  for (const cand of candidates) {
+    const m = measure2(raster, [cand.closed ? [...cand.points, cand.points[0]] : cand.points], w2);
+    if (!best || Math.min(m.recall, m.precision) > Math.min(best.m.recall, best.m.precision)) best = { cand, m };
+  }
+  if (best) tried.push({ method: "ribbon", recall: best.m.recall, precision: best.m.precision });
+  if (best && Math.min(best.m.recall, best.m.precision) >= FAITHFUL_AT) {
+    return penResult(best.cand, "ribbon", best.m, w2, step2, tried, notes);
+  }
+  let skel = null;
+  let skelM = null;
+  const tries = raster.width * raster.height > RETRY_MAX_PX ? SKELETON_SCALES.slice(0, 1) : SKELETON_SCALES;
+  for (const { mul: mul4, x, y } of tries) {
+    let r = raster;
+    if (mul4 !== 1 || x !== 0 || y !== 0) {
+      if (!charge(raster.width * raster.height * mul4 * mul4)) break;
+      const again = rasterise(rings, rule, raster.scale * mul4, 2, { x, y });
+      if (!again || again.filled === 0) continue;
+      r = again;
+    } else if (!charge(raster.width * raster.height)) {
+      notes.push("the work on this file ran out before this outline could be thinned");
+      break;
+    }
+    const lines = skeletonLines(r, w2, step2);
+    if (!lines.length) continue;
+    const m = measure2(r, lines.map((c) => c.closed ? [...c.points, c.points[0]] : c.points), w2);
+    if (!skelM || Math.min(m.recall, m.precision) > Math.min(skelM.recall, skelM.precision)) {
+      skel = lines;
+      skelM = m;
+    }
+    if (Math.min(m.recall, m.precision) >= FAITHFUL_AT) break;
+  }
+  if (skelM) tried.push({ method: "skeleton", recall: skelM.recall, precision: skelM.precision });
+  const ribbonScore = best ? Math.min(best.m.recall, best.m.precision) : -1;
+  const skelScore = skelM ? Math.min(skelM.recall, skelM.precision) : -1;
+  if (skel && skelM && skelScore > ribbonScore + 1e-9) {
+    return {
+      kind: "pen",
+      strokes: skel.map((c) => strokeOf(c.points, c.closed, "skeleton", w2, step2)),
+      width: w2,
+      method: "skeleton",
+      fidelity: fidelityOf(skelM),
+      tried,
+      notes
+    };
+  }
+  if (best) return penResult(best.cand, "ribbon", best.m, w2, step2, tried, notes);
+  if (skel && skelM) {
+    return { kind: "pen", strokes: skel.map((c) => strokeOf(c.points, c.closed, "skeleton", w2, step2)), width: w2, method: "skeleton", fidelity: fidelityOf(skelM), tried, notes };
+  }
+  return { kind: "failed", strokes: [], width: w2, tried, notes: [...notes, "no line could be found for an outline"] };
+}
+var fidelityOf = (m) => ({
+  recall: m.recall,
+  precision: m.precision,
+  faithful: m.recall >= FAITHFUL_AT && m.precision >= FAITHFUL_AT
+});
+function penResult(cand, method, m, w2, step2, tried, notes) {
+  return { kind: "pen", strokes: [strokeOf(cand.points, cand.closed, method, w2, step2)], width: w2, method, fidelity: fidelityOf(m), tried, notes };
+}
+function strokeOf(points, closed, recovery, w2, step2) {
+  const len4 = pathLength4(points) + (closed ? Math.hypot(points[0].x - points[points.length - 1].x, points[0].y - points[points.length - 1].y) : 0);
+  const n2 = Math.max(2, Math.round(len4 / stepFor(len4, step2)) + 1);
+  let out;
+  if (closed) {
+    out = resampleClosed(points, Math.max(3, n2 - 1));
+    out.push({ x: out[0].x, y: out[0].y });
+  } else {
+    out = resampleOpen(points, n2);
+  }
+  const first = out[0], last = out[out.length - 1];
+  const looped = closed || out.length >= 8 && Math.hypot(first.x - last.x, first.y - last.y) <= Math.max(w2, 1e-6) && len4 >= 4 * w2;
+  return { points: out, closed: looped, recovery };
+}
+function dotOf(u, w2) {
+  let a = 0, cx2 = 0, cy2 = 0;
+  const r = u.outer;
+  for (let i = 0, n2 = r.length; i < n2; i++) {
+    const p = r[i], q = r[i + 1 === n2 ? 0 : i + 1];
+    const f = p.x * q.y - q.x * p.y;
+    a += f;
+    cx2 += (p.x + q.x) * f;
+    cy2 += (p.y + q.y) * f;
+  }
+  const b = boundsOfRing(r);
+  const c = Math.abs(a) > 1e-12 ? { x: cx2 / (3 * a), y: cy2 / (3 * a) } : { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
+  const horizontal = b.maxX - b.minX >= b.maxY - b.minY;
+  const h2 = Math.max(0.1, Math.abs(b.maxX - b.minX - (b.maxY - b.minY)) / 2);
+  const points = horizontal ? [{ x: c.x - h2, y: c.y }, c, { x: c.x + h2, y: c.y }] : [{ x: c.x, y: c.y - h2 }, c, { x: c.x, y: c.y + h2 }];
+  return { kind: "dot", strokes: [{ points, closed: false, recovery: "ribbon" }], width: w2, method: "ribbon", fidelity: { recall: 1, precision: 1, faithful: true }, tried: [], notes: [] };
+}
+function edgesOf(rings, step2) {
+  return rings.map((ring2) => {
+    const closedRing = [...ring2, ring2[0]];
+    const simple = simplifyStroke(closedRing, 0.25);
+    const dense = densify(simple, stepFor(perimeter2(ring2), Math.max(step2, 1)));
+    return { points: dense, closed: true, recovery: "stroke" };
+  });
+}
+function ribbonCandidates(u, w2) {
+  if (u.holes.length === 0) return openRibbons(u.outer, w2);
+  if (u.holes.length === 1) {
+    const c = closedRibbon(u.outer, u.holes[0], w2);
+    return c ? [c] : [];
+  }
+  return [];
+}
+function endsOf3(pts, w2, s) {
+  const N = pts.length;
+  const m = Math.max(1, Math.round(0.2 * w2 / s));
+  const k = Math.max(2, Math.round(CAP_WINDOW * w2 / (2 * s)));
+  const heading = new Float64Array(N);
+  for (let j = 0; j < N; j++) {
+    const a = pts[(j - m + N) % N], b = pts[(j + m) % N];
+    heading[j] = Math.atan2(b.y - a.y, b.x - a.x);
+  }
+  const turn2 = new Float64Array(N);
+  for (let i2 = 0; i2 < N; i2++) turn2[i2] = Math.abs(wrapPi(heading[(i2 + k) % N] - heading[(i2 - k + N) % N]));
+  const ends = [];
+  const inRun = (i2) => turn2[(i2 % N + N) % N] >= CAP_TURN;
+  let start = -1;
+  for (let i2 = 0; i2 < N; i2++) if (!inRun(i2)) {
+    start = i2;
+    break;
+  }
+  if (start < 0) return [];
+  let i = start + 1;
+  while (i < start + N) {
+    if (!inRun(i)) {
+      i++;
+      continue;
+    }
+    const i0 = i;
+    while (i < start + N && inRun(i)) i++;
+    const i1 = i - 1;
+    let peak = 0;
+    for (let q = i0; q <= i1; q++) peak = Math.max(peak, turn2[(q % N + N) % N]);
+    let a = -1, b = -1;
+    for (let q = i0; q <= i1; q++) {
+      if (turn2[(q % N + N) % N] >= peak - 0.05) {
+        if (a < 0) a = q;
+        b = q;
+      }
+    }
+    ends.push({ index: (Math.round((a + b) / 2) % N + N) % N, turn: peak });
+  }
+  ends.sort((p, q) => q.turn - p.turn);
+  return ends.slice(0, MAX_CAP_CANDIDATES);
+}
+var circDist = (a, b, N) => {
+  const d = Math.abs(a - b) % N;
+  return Math.min(d, N - d);
+};
+function openRibbons(ring2, w2) {
+  const len4 = perimeter2(ring2);
+  const s = Math.max(w2 / 4, len4 / MAX_WALK);
+  const N = Math.max(24, Math.round(len4 / s));
+  const pts = resampleClosed(ring2, N);
+  if (pts.length < 24) return [];
+  const ends = endsOf3(pts, w2, s);
+  if (ends.length < 2) return [];
+  const pairs = [];
+  for (let i = 0; i < ends.length; i++) {
+    for (let j = i + 1; j < ends.length; j++) {
+      if (circDist(ends[i].index, ends[j].index, N) < N / 4) continue;
+      pairs.push({ a: ends[i].index, b: ends[j].index, score: ends[i].turn + ends[j].turn });
+    }
+  }
+  pairs.sort((p, q) => q.score - p.score);
+  const out = [];
+  for (const pr of pairs.slice(0, MAX_CAP_PAIRS)) {
+    const line = pairSides(pts, pr.a, pr.b, s);
+    if (line) out.push({ points: line, closed: false });
+  }
+  return out;
+}
+function pairSides(pts, i, j, s) {
+  const N = pts.length;
+  const chain = (from, to) => {
+    const out = [];
+    for (let k = from; ; k = (k + 1) % N) {
+      out.push(pts[k]);
+      if (k === to) break;
+      if (out.length > N + 1) return [];
+    }
+    return out;
+  };
+  const a = chain(i, j);
+  const b = chain(j, i).reverse();
+  if (a.length < 2 || b.length < 2) return null;
+  const M = Math.max(8, Math.round(Math.max(pathLength4(a), pathLength4(b)) / s));
+  const ra = resampleOpen(a, M), rb = resampleOpen(b, M);
+  const mid11 = [];
+  for (let k = 0; k < M; k++) mid11.push({ x: (ra[k].x + rb[k].x) / 2, y: (ra[k].y + rb[k].y) / 2 });
+  return mid11;
+}
+function closedRibbon(outer, hole, w2) {
+  const lenO = perimeter2(outer), lenH = perimeter2(hole);
+  const s = Math.max(w2 / 4, Math.max(lenO, lenH) / MAX_WALK);
+  const M = clamp(Math.round(Math.max(lenO, lenH) / s), 24, MAX_WALK);
+  const A = resampleClosed(outer, M);
+  const B0 = resampleClosed(hole, M);
+  if (A.length < 24 || B0.length < 24) return null;
+  let bestCost = Infinity, bestB = null;
+  for (const B of [B0, B0.slice().reverse()]) {
+    let near = 0, nd = Infinity;
+    for (let k = 0; k < M; k++) {
+      const d = Math.hypot(B[k].x - A[0].x, B[k].y - A[0].y);
+      if (d < nd) {
+        nd = d;
+        near = k;
+      }
+    }
+    const span = Math.max(3, Math.round(M / 20));
+    for (let r = -span; r <= span; r++) {
+      let cost = 0;
+      for (let k = 0; k < M; k += 2) {
+        const q = B[((near + r + k) % M + M) % M];
+        cost += Math.hypot(A[k].x - q.x, A[k].y - q.y);
+      }
+      if (cost < bestCost) {
+        bestCost = cost;
+        bestB = Array.from({ length: M }, (_, k) => B[((near + r + k) % M + M) % M]);
+      }
+    }
+  }
+  if (!bestB) return null;
+  const mid11 = A.map((p, k) => ({ x: (p.x + bestB[k].x) / 2, y: (p.y + bestB[k].y) / 2 }));
+  return { points: mid11, closed: true };
+}
+var N82 = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+function prune(skel, W, H, k) {
+  const nb = (a, x, y) => {
+    let n2 = 0;
+    for (const [dx, dy] of N82) {
+      const xx = x + dx, yy = y + dy;
+      if (xx >= 0 && yy >= 0 && xx < W && yy < H && a[yy * W + xx]) n2++;
+    }
+    return n2;
+  };
+  const cur = skel.slice();
+  for (let it = 0; it < k; it++) {
+    const ends = [];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (cur[y * W + x] && nb(cur, x, y) <= 1) ends.push(y * W + x);
+    if (!ends.length) break;
+    for (const e of ends) cur[e] = 0;
+  }
+  let left = 0;
+  for (let i = 0; i < cur.length; i++) left += cur[i];
+  if (left === 0) return skel;
+  let front = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (cur[y * W + x] && nb(cur, x, y) <= 1) front.push(y * W + x);
+  const out = cur.slice();
+  for (let it = 0; it < k && front.length; it++) {
+    const next = [];
+    for (const e of front) {
+      const x = e % W, y = e / W | 0;
+      for (const [dx, dy] of N82) {
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+        const i = yy * W + xx;
+        if (skel[i] && !out[i]) {
+          out[i] = 1;
+          next.push(i);
+        }
+      }
+    }
+    front = next;
+  }
+  return out;
+}
+function skeletonLines(raster, w2, step2) {
+  const wpx = w2 * raster.scale;
+  const skel = prune(thin(raster.data, raster.width, raster.height), raster.width, raster.height, clamp(Math.ceil(0.6 * wpx), 2, 6));
+  const paths = tracePaths(skel, raster.width, raster.height);
+  const minPx = Math.max(2, SCRAP_OF_WIDTH * wpx);
+  const tol = 0.6 / raster.scale;
+  const out = [];
+  const longest = paths.reduce((m, p) => Math.max(m, p.points.length), 0);
+  for (const p of paths) {
+    if (p.points.length < minPx && longest >= minPx) continue;
+    if (p.points.length < 2) continue;
+    const page = p.points.map((q) => fromRaster(raster, q.x, q.y));
+    let pts = simplifyStroke(page, tol);
+    if (p.closed) pts = pts.concat([{ x: pts[0].x, y: pts[0].y }]);
+    pts = densify(pts, stepFor(pathLength4(pts), step2));
+    if (pts.length < 2) continue;
+    out.push({ points: p.closed ? pts.slice(0, -1) : pts, closed: p.closed });
+  }
+  return out;
+}
+
+// src/ingest/svg.ts
+var BLACK = { kind: "color", hex: "#000000", alpha: 1 };
+var ROOT_STYLE = {
+  fill: BLACK,
+  stroke: { kind: "none" },
+  strokeWidth: 1,
+  fillRule: "nonzero",
+  fillOpacity: 1,
+  strokeOpacity: 1,
+  opacity: 1,
+  color: "#000000",
+  fontSize: 16,
+  visible: true
+};
+var FREEFORM_NODES = 6;
+var GROUND_SHARE = 0.9;
+var FLATTEN_TOL = 0.05;
+var newCounters = () => ({
+  masked: 0,
+  clipped: 0,
+  gradients: 0,
+  patterns: 0,
+  dashed: 0,
+  markers: 0,
+  foreign: 0,
+  filters: 0,
+  rotatedText: 0,
+  externalPictures: 0,
+  badPictures: 0,
+  svgPictures: 0,
+  brokenPaths: 0,
+  firstPathError: "",
+  badShapes: 0,
+  badTransforms: 0,
+  cycles: 0,
+  missingUses: 0,
+  externalUses: 0,
+  grounds: 0,
+  failed: 0,
+  unfaithful: 0,
+  pathsStopped: 0,
+  unsupportedCss: 0,
+  droppedCss: 0,
+  zeroLength: 0
+});
+var plural = (n2, one, many = one + "s") => `${n2.toLocaleString("en")} ${n2 === 1 ? one : many}`;
+function stopWith(w2, sentence) {
+  if (!w2.stopped) w2.stopped = sentence;
+}
+function tick(w2) {
+  if (w2.stopped) return false;
+  if (++w2.visited > w2.limits.visited) {
+    stopWith(w2, `stopped after ${plural(w2.limits.visited, "element")} \u2014 the file has more than is read, and the rest is left`);
+    return false;
+  }
+  if ((w2.visited & 15) === 0 && Date.now() >= w2.deadline) return timeUp(w2);
+  return true;
+}
+function timeUp(w2) {
+  stopWith(w2, `stopped after ${Math.max(0, Math.round(w2.limits.ms / 100) / 10)} seconds of reading \u2014 the file takes too long, and what was read is here`);
+  return false;
+}
+function parseTransform(value) {
+  if (value === void 0 || !value.trim()) return void 0;
+  const re = /\s*(matrix|translate|scale|rotate|skewX|skewY)\s*\(([^)]*)\)\s*,?/y;
+  let m = IDENTITY;
+  let pos = 0;
+  while (pos < value.length) {
+    re.lastIndex = pos;
+    const t = re.exec(value);
+    if (!t) return /^\s*$/.test(value.slice(pos)) ? m : null;
+    pos = re.lastIndex;
+    const a = numberList(t[2]);
+    if (!a) return null;
+    let T6;
+    switch (t[1]) {
+      case "matrix":
+        if (a.length !== 6) return null;
+        T6 = { a: a[0], b: a[1], c: a[2], d: a[3], e: a[4], f: a[5] };
+        break;
+      case "translate":
+        if (a.length < 1 || a.length > 2) return null;
+        T6 = translation(a[0], a[1] ?? 0);
+        break;
+      case "scale":
+        if (a.length < 1 || a.length > 2) return null;
+        T6 = { a: a[0], b: 0, c: 0, d: a[1] ?? a[0], e: 0, f: 0 };
+        break;
+      case "rotate": {
+        if (a.length !== 1 && a.length !== 3) return null;
+        const r = a[0] * Math.PI / 180;
+        const cos = Math.cos(r), sin = Math.sin(r);
+        const cx2 = a[1] ?? 0, cy2 = a[2] ?? 0;
+        T6 = { a: cos, b: sin, c: -sin, d: cos, e: cx2 - cos * cx2 + sin * cy2, f: cy2 - sin * cx2 - cos * cy2 };
+        break;
+      }
+      case "skewX":
+        if (a.length !== 1) return null;
+        T6 = { a: 1, b: 0, c: Math.tan(a[0] * Math.PI / 180), d: 1, e: 0, f: 0 };
+        break;
+      default:
+        if (a.length !== 1) return null;
+        T6 = { a: 1, b: Math.tan(a[0] * Math.PI / 180), c: 0, d: 1, e: 0, f: 0 };
+    }
+    m = compose(m, T6);
+  }
+  return m;
+}
+var scaleOf7 = (m) => Math.sqrt(Math.abs(m.a * m.d - m.b * m.c));
+var finiteAffine = (m) => [m.a, m.b, m.c, m.d, m.e, m.f].every(Number.isFinite);
+function viewBoxMap(vb, W, H, par) {
+  const [vx, vy, vw, vh] = vb;
+  const words = (par ?? "").trim().split(/\s+/).filter((s2) => s2 !== "defer");
+  const align = words[0] ?? "xMidYMid";
+  if (align === "none") return { a: W / vw, b: 0, c: 0, d: H / vh, e: -vx * (W / vw), f: -vy * (H / vh) };
+  const slice = words[1] === "slice";
+  const s = slice ? Math.max(W / vw, H / vh) : Math.min(W / vw, H / vh);
+  const fx = /xMin/.test(align) ? 0 : /xMax/.test(align) ? 1 : 0.5;
+  const fy = /YMin/.test(align) ? 0 : /YMax/.test(align) ? 1 : 0.5;
+  return { a: s, b: 0, c: 0, d: s, e: -vx * s + (W - vw * s) * fx, f: -vy * s + (H - vh * s) * fy };
+}
+function frameOf3(root) {
+  const vbAttr = root.attrs.viewBox;
+  let vb = null;
+  if (vbAttr !== void 0) {
+    vb = numberList(vbAttr);
+    if (!vb || vb.length !== 4) return "the viewBox is not four numbers, so the drawing has no scale";
+    if (!(vb[2] > 0) || !(vb[3] > 0)) return `the viewBox is ${vb[2]} \xD7 ${vb[3]} \u2014 a drawing needs a size`;
+  }
+  const wAttr = root.attrs.width, hAttr = root.attrs.height;
+  let W = parseLength(wAttr), H = parseLength(hAttr);
+  if (wAttr !== void 0 && W !== null && !(W > 0)) return `the width is ${wAttr} \u2014 a drawing needs a size`;
+  if (hAttr !== void 0 && H !== null && !(H > 0)) return `the height is ${hAttr} \u2014 a drawing needs a size`;
+  if (vb) {
+    if (W === null && H === null) {
+      W = vb[2];
+      H = vb[3];
+    } else if (W === null) W = H * (vb[2] / vb[3]);
+    else if (H === null) H = W * (vb[3] / vb[2]);
+    return { width: W, height: H, m: viewBoxMap(vb, W, H, root.attrs.preserveAspectRatio), known: true };
+  }
+  if (W !== null && H !== null) return { width: W, height: H, m: IDENTITY, known: true };
+  return { width: W ?? 0, height: H ?? 0, m: IDENTITY, known: false };
+}
+var opacityOf = (v) => {
+  if (v === void 0) return null;
+  const t = v.trim();
+  const n2 = t.endsWith("%") ? parseNumber(t.slice(0, -1)) : parseNumber(t);
+  if (n2 === null) return null;
+  return Math.max(0, Math.min(1, t.endsWith("%") ? n2 / 100 : n2));
+};
+function styleOf2(node, parent, w2) {
+  const css = declarationsFor(w2.sheet, node.name, node.attrs.id, node.attrs.class);
+  const inline = node.attrs.style ? parseDeclarations(node.attrs.style) : null;
+  const get = (p) => (inline && inline[p]) ?? css[p] ?? node.attrs[p];
+  let color = parent.color;
+  const cv = get("color");
+  if (cv !== void 0) {
+    const c = parseColor(cv);
+    if (c) color = c.hex;
+  }
+  const fontSize = parseLength(get("font-size"), parent.fontSize) ?? parent.fontSize;
+  const paint = (name, inherited) => {
+    const v = get(name);
+    if (v === void 0) return inherited;
+    const p = parsePaint(v, color);
+    return p === null || p === "inherit" ? inherited : p;
+  };
+  const vis = get("visibility");
+  const fr = get("fill-rule");
+  const own = opacityOf(get("opacity"));
+  const st = {
+    fill: paint("fill", parent.fill),
+    stroke: paint("stroke", parent.stroke),
+    strokeWidth: parseLength(get("stroke-width"), fontSize) ?? parent.strokeWidth,
+    fillRule: fr === "evenodd" ? "evenodd" : fr === "nonzero" ? "nonzero" : parent.fillRule,
+    fillOpacity: opacityOf(get("fill-opacity")) ?? parent.fillOpacity,
+    strokeOpacity: opacityOf(get("stroke-opacity")) ?? parent.strokeOpacity,
+    opacity: parent.opacity * (own ?? 1),
+    color,
+    fontSize,
+    visible: vis === "hidden" || vis === "collapse" ? false : vis === "visible" ? true : parent.visible
+  };
+  if (get("stroke-dasharray") && get("stroke-dasharray") !== "none") w2.c.dashed++;
+  return { st, shown: (get("display") ?? "").trim().toLowerCase() !== "none" };
+}
+function resolve(p, w2, depth2 = 0) {
+  if (p.kind === "none") return null;
+  if (p.kind === "color") return { hex: p.hex, alpha: p.alpha };
+  const target = w2.byId.get(p.id);
+  if (target && (target.name === "linearGradient" || target.name === "radialGradient")) {
+    const stop = firstStop(target, w2, 0);
+    if (stop) {
+      w2.c.gradients++;
+      return stop;
+    }
+  } else if (target && target.name === "pattern") {
+    w2.c.patterns++;
+  }
+  return p.fallback && depth2 < 2 ? resolve(p.fallback, w2, depth2 + 1) : null;
+}
+function firstStop(g, w2, depth2) {
+  for (const k of g.kids) {
+    if (typeof k === "string" || k.name !== "stop") continue;
+    const decl = k.attrs.style ? parseDeclarations(k.attrs.style) : {};
+    const c = parseColor(decl["stop-color"] ?? k.attrs["stop-color"] ?? "#000000");
+    const o = opacityOf(decl["stop-opacity"] ?? k.attrs["stop-opacity"]);
+    if (c) return { hex: c.hex, alpha: c.alpha * (o ?? 1) };
+  }
+  const href = g.attrs["xlink:href"] ?? g.attrs.href;
+  if (href && href[0] === "#" && depth2 < 4) {
+    const next = w2.byId.get(href.slice(1));
+    if (next && next !== g) return firstStop(next, w2, depth2 + 1);
+  }
+  return null;
+}
+var roundOpacity = (v) => Math.round(v * 1e3) / 1e3;
+function pushStroke(w2, s) {
+  if (w2.points + s.points.length > w2.limits.points) {
+    stopWith(w2, `stopped after ${plural(w2.limits.points, "point")} \u2014 the drawing has more ink than is read, and the rest is left`);
+    return false;
+  }
+  w2.points += s.points.length;
+  w2.page.strokes.push({ ...s, order: w2.order++ });
+  return true;
+}
+var COORD_LIMIT2 = 1e7;
+function inkPoints(pts, closed) {
+  const line = closed && pts.length > 1 ? [...pts, pts[0]] : pts;
+  let len4 = 0;
+  for (const p of line) if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || Math.abs(p.x) > COORD_LIMIT2 || Math.abs(p.y) > COORD_LIMIT2) return null;
+  for (let i = 1; i < line.length; i++) len4 += Math.hypot(line[i].x - line[i - 1].x, line[i].y - line[i - 1].y);
+  return densify(line, stepFor(len4, Math.max(0.5, Math.min(2, len4 / 24))));
+}
+function shifted(rec, dx, dy) {
+  return { ...rec, strokes: rec.strokes.map((s) => ({ ...s, points: s.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) })) };
+}
+function geometryOf(node, w2, fontPx) {
+  const a = node.attrs;
+  const len4 = (v, dflt = 0) => v === void 0 ? dflt : parseLength(v, fontPx);
+  const bad2 = () => {
+    w2.c.badShapes++;
+    return null;
+  };
+  switch (node.name) {
+    case "path": {
+      const d = a.d ?? "";
+      const p = parsePath(d, Math.max(1, w2.vertices.left));
+      if (p.capped) stopWith(w2, `stopped after ${plural(w2.limits.vertices, "point")} of outline \u2014 the drawing is more detailed than is read, and the rest is left`);
+      else if (p.error) {
+        w2.c.pathsStopped++;
+        if (!w2.c.firstPathError) w2.c.firstPathError = p.error;
+      }
+      if (p.cmds.length === 0) {
+        if (d.trim() && !p.error) w2.c.brokenPaths++;
+        return null;
+      }
+      return { cmds: p.cmds, basic: false, nodes: p.cmds.filter((c) => c.c !== "Z").length, curved: p.curved };
+    }
+    case "rect": {
+      const x = len4(a.x), y = len4(a.y), width = len4(a.width), height = len4(a.height);
+      if (x === null || y === null || width === null || height === null || !(width > 0) || !(height > 0)) return bad2();
+      let rx = a.rx !== void 0 ? len4(a.rx) : null, ry = a.ry !== void 0 ? len4(a.ry) : null;
+      if (a.rx !== void 0 && rx === null) return bad2();
+      if (a.ry !== void 0 && ry === null) return bad2();
+      if (rx === null) rx = ry ?? 0;
+      if (ry === null) ry = rx;
+      return { cmds: rectCmds(x, y, width, height, rx, ry), basic: true, nodes: 4, curved: rx > 0 && ry > 0 };
+    }
+    case "circle": {
+      const cx2 = len4(a.cx), cy2 = len4(a.cy), r = len4(a.r);
+      if (cx2 === null || cy2 === null || r === null || !(r > 0)) return bad2();
+      return { cmds: ellipseCmds(cx2, cy2, r, r), basic: true, nodes: 4, curved: true };
+    }
+    case "ellipse": {
+      const cx2 = len4(a.cx), cy2 = len4(a.cy);
+      let rx = len4(a.rx), ry = len4(a.ry);
+      if (cx2 === null || cy2 === null || rx === null || ry === null) return bad2();
+      if (a.rx === void 0) rx = ry;
+      if (a.ry === void 0) ry = rx;
+      if (!(rx > 0) || !(ry > 0)) return bad2();
+      return { cmds: ellipseCmds(cx2, cy2, rx, ry), basic: true, nodes: 4, curved: true };
+    }
+    case "line": {
+      const x1 = len4(a.x1), y1 = len4(a.y1), x2 = len4(a.x2), y2 = len4(a.y2);
+      if (x1 === null || y1 === null || x2 === null || y2 === null) return bad2();
+      return { cmds: lineCmds(x1, y1, x2, y2), basic: true, nodes: 2, curved: false };
+    }
+    case "polyline":
+    case "polygon": {
+      const cmds = pointsCmds(a.points ?? "", node.name === "polygon");
+      if (!cmds) return bad2();
+      return { cmds, basic: node.name === "polygon", nodes: cmds.filter((c) => c.c !== "Z").length, curved: false };
+    }
+  }
+  return null;
+}
+function paintShape(node, st, m, w2) {
+  const geo = geometryOf(node, w2, st.fontSize);
+  if (!geo) return;
+  if (!finiteAffine(m)) return;
+  const fill = st.visible && st.opacity > 0 ? resolve(st.fill, w2) : null;
+  const strokeP = st.visible && st.opacity > 0 && st.strokeWidth > 0 ? resolve(st.stroke, w2) : null;
+  const fillAlpha = fill ? fill.alpha * st.fillOpacity * st.opacity : 0;
+  const strokeAlpha = strokeP ? strokeP.alpha * st.strokeOpacity * st.opacity : 0;
+  const doFill = !!fill && fillAlpha > 0 && node.name !== "line";
+  const doStroke = !!strokeP && strokeAlpha > 0;
+  if (!doFill && !doStroke) return;
+  const s = scaleOf7(m);
+  const cacheKey = w2.cloning > 0 && doFill ? `${node.uid}|${st.fillRule}|${m.a.toFixed(5)}|${m.b.toFixed(5)}|${m.c.toFixed(5)}|${m.d.toFixed(5)}` : "";
+  let recs = null;
+  let polys = null;
+  const flat = () => {
+    if (!polys) {
+      polys = flatten(geo.cmds, m, FLATTEN_TOL, w2.vertices);
+      if (w2.vertices.left <= 0) stopWith(w2, `stopped after ${plural(w2.limits.vertices, "point")} of outline \u2014 the drawing is more detailed than is read, and the rest is left`);
+    }
+    return polys;
+  };
+  let penOutlines = 0, solids = 0;
+  let penColor = "", penWidth = 0;
+  let keptLines = null;
+  if (doFill) {
+    if (cacheKey) {
+      const hit = w2.cache.get(cacheKey);
+      if (hit) {
+        recs = hit.results.map((r) => shifted(r, m.e - hit.e, m.f - hit.f));
+      }
+    }
+    if (!recs) {
+      const rings = flat().filter((p) => p.pts.length >= 3).map((p) => p.pts);
+      if (rings.length) {
+        if (Date.now() >= w2.deadline) {
+          timeUp(w2);
+          return;
+        }
+        if (w2.outlines >= w2.limits.outlines) {
+          stopWith(w2, `stopped after ${plural(w2.limits.outlines, "outline")} read back to lines \u2014 the file has more, and the rest is left`);
+          return;
+        }
+        recs = recoverFill({ rings, rule: st.fillRule }, { work: w2.work });
+        w2.outlines += recs.length;
+        if (cacheKey) w2.cache.set(cacheKey, { results: recs, e: m.e, f: m.f });
+      }
+    }
+    for (const rec of recs ?? []) {
+      if (rec.kind === "failed") {
+        w2.c.failed++;
+        continue;
+      }
+      const outline = w2.outline++;
+      if (rec.kind === "blob") {
+        solids++;
+        const ground = w2.known && isGround(rec, w2);
+        if (ground) {
+          w2.c.grounds++;
+          continue;
+        }
+        if (doStroke) continue;
+        for (const e of rec.strokes) if (!pushStroke(w2, { points: e.points, color: fill.hex, width: 0, recovery: e.recovery, closed: e.closed, outline, ...fillAlpha < 1 ? { opacity: roundOpacity(fillAlpha) } : {} })) return;
+        continue;
+      }
+      penOutlines++;
+      penColor = fill.hex;
+      penWidth = rec.width;
+      if (rec.fidelity && !rec.fidelity.faithful) w2.c.unfaithful++;
+      const kept2 = node.attrs["inkscape:original-d"];
+      if (kept2 && node.attrs["inkscape:path-effect"] && rec.kind === "pen") {
+        if (keptLines === null) {
+          const orig = parsePath(kept2);
+          keptLines = flatten(orig.cmds, m, FLATTEN_TOL, w2.vertices);
+          if (keptLines.length) {
+            for (const l of keptLines) {
+              const pts = inkPoints(l.pts, l.closed);
+              if (!pts) {
+                w2.c.badShapes++;
+                continue;
+              }
+              if (!pushStroke(w2, { points: pts, color: fill.hex, width: rec.width, recovery: "stroke", closed: l.closed, outline, ...fillAlpha < 1 ? { opacity: roundOpacity(fillAlpha) } : {} })) return;
+            }
+          }
+        }
+        if (keptLines.length) continue;
+      }
+      for (const e of rec.strokes) {
+        const fid = rec.kind === "pen" ? rec.fidelity : void 0;
+        if (!pushStroke(w2, { points: e.points, color: fill.hex, width: rec.width, recovery: e.recovery, closed: e.closed, outline, ...fid ? { fidelity: fid } : {}, ...fillAlpha < 1 ? { opacity: roundOpacity(fillAlpha) } : {} })) return;
+      }
+    }
+  }
+  let counted2 = false;
+  if (penOutlines > 0) {
+    w2.ev.penFills += penOutlines;
+    counted2 = true;
+  }
+  if (doStroke) {
+    const width = st.strokeWidth * s;
+    const edge = penOutlines > 0 && (strokeP.hex === penColor || width <= 0.35 * penWidth);
+    const lines = flat();
+    const freeform = !geo.basic && (geo.curved ? geo.nodes >= FREEFORM_NODES - 1 : geo.nodes >= FREEFORM_NODES);
+    if (!edge) {
+      for (const l of lines) {
+        if (l.pts.length < 2) continue;
+        const outline = w2.outline++;
+        let len4 = 0;
+        for (let i = 1; i < l.pts.length; i++) len4 += Math.hypot(l.pts[i].x - l.pts[i - 1].x, l.pts[i].y - l.pts[i - 1].y);
+        if (!(len4 > 1e-9)) {
+          w2.c.zeroLength++;
+          continue;
+        }
+        const pts = inkPoints(l.pts, l.closed);
+        if (!pts) {
+          w2.c.badShapes++;
+          continue;
+        }
+        if (!pushStroke(w2, { points: pts, color: strokeP.hex, width, recovery: "stroke", closed: l.closed, outline, ...strokeAlpha < 1 ? { opacity: roundOpacity(strokeAlpha) } : {} })) return;
+      }
+      if (lines.length) {
+        if (freeform) {
+          w2.ev.penStrokes += lines.length;
+          counted2 = true;
+        } else if (!counted2) {
+          w2.ev.shapes++;
+          counted2 = true;
+        }
+      }
+    }
+  }
+  if (!counted2 && solids > 0) w2.ev.shapes++;
+}
+function isGround(rec, w2) {
+  if (!(w2.page.width > 0) || !(w2.page.height > 0)) return false;
+  const pts = rec.strokes[0]?.points;
+  if (!pts || !pts.length) return false;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of pts) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return maxX - minX >= GROUND_SHARE * w2.page.width && maxY - minY >= GROUND_SHARE * w2.page.height;
+}
+function firstNumberAttr(node, name, fontPx) {
+  const find = (n2) => {
+    if (n2.attrs[name] !== void 0) return n2.attrs[name];
+    for (const k of n2.kids) if (typeof k !== "string") {
+      const v2 = find(k);
+      if (v2 !== void 0) return v2;
+    }
+    return void 0;
+  };
+  const v = find(node);
+  if (v === void 0) return 0;
+  return parseLength(v.trim().split(/[\s,]+/)[0], fontPx);
+}
+function paintText(node, st, m, w2) {
+  if (!st.visible || st.opacity <= 0) return;
+  const text = textOf3(node);
+  if (!text) return;
+  const x = firstNumberAttr(node, "x", st.fontSize), y = firstNumberAttr(node, "y", st.fontSize);
+  if (x === null || y === null || !finiteAffine(m)) {
+    w2.c.badShapes++;
+    return;
+  }
+  if (Math.abs(m.b) > 1e-6 || Math.abs(m.c) > 1e-6) w2.c.rotatedText++;
+  const fill = resolve(st.fill, w2);
+  const run2 = { order: w2.order++, text, x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f, size: st.fontSize * scaleOf7(m), format: "plain", ...fill ? { color: fill.hex } : {} };
+  w2.page.texts.push(run2);
+  w2.ev.texts++;
+}
+var B64 = (() => {
+  const t = new Int16Array(128).fill(-1);
+  const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  for (let i = 0; i < A.length; i++) t[A.charCodeAt(i)] = i;
+  t[45] = 62;
+  t[95] = 63;
+  return t;
+})();
+function fromBase64(s) {
+  const out = new Uint8Array(Math.floor(s.length * 3 / 4));
+  let o = 0, acc = 0, bits = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (c === 61) break;
+    if (c === 32 || c >= 9 && c <= 13) continue;
+    const v = c < 128 ? B64[c] : -1;
+    if (v < 0) return null;
+    acc = acc << 6 | v;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out[o++] = acc >> bits & 255;
+      acc &= (1 << bits) - 1;
+    }
+  }
+  return out.subarray(0, o);
+}
+function paintImage(node, st, m, w2) {
+  if (!st.visible || st.opacity <= 0) return;
+  const a = node.attrs;
+  const href = a["xlink:href"] ?? a.href;
+  if (!href) return;
+  const x = parseLength(a.x ?? "0"), y = parseLength(a.y ?? "0"), width = parseLength(a.width), height = parseLength(a.height);
+  if (x === null || y === null || width === null || height === null || !(width > 0) || !(height > 0) || !finiteAffine(m)) {
+    w2.c.badPictures++;
+    return;
+  }
+  const corners = [[x, y], [x + width, y], [x, y + height], [x + width, y + height]].map(([px2, py]) => ({ x: m.a * px2 + m.c * py + m.e, y: m.b * px2 + m.d * py + m.f }));
+  const box = {
+    x: Math.min(...corners.map((c) => c.x)),
+    y: Math.min(...corners.map((c) => c.y)),
+    w: Math.max(...corners.map((c) => c.x)) - Math.min(...corners.map((c) => c.x)),
+    h: Math.max(...corners.map((c) => c.y)) - Math.min(...corners.map((c) => c.y))
+  };
+  const data = /^data:([^;,]*)((?:;[^;,]*)*),(.*)$/s.exec(href.trim());
+  if (data) {
+    if (!/;base64/i.test(data[2])) {
+      w2.c.svgPictures++;
+      return;
+    }
+    const bytes = fromBase64(data[3]);
+    const info = bytes ? sniffImage(bytes) : null;
+    if (!bytes || !info || info.format === "gif") {
+      if (/svg/i.test(data[1])) w2.c.svgPictures++;
+      else w2.c.badPictures++;
+      return;
+    }
+    const shown2 = shownSize(info);
+    w2.page.pictures.push({ order: w2.order++, box, bytes, mime: info.mime, w: shown2.w || void 0, h: shown2.h || void 0 });
+  } else {
+    w2.c.externalPictures++;
+    w2.page.pictures.push({ order: w2.order++, box, ref: href, name: href.split(/[\\/]/).pop() });
+  }
+  w2.ev.images++;
+}
+var NOT_PAINTED = /* @__PURE__ */ new Set(["defs", "symbol", "clipPath", "mask", "marker", "pattern", "filter", "linearGradient", "radialGradient", "style", "metadata", "title", "desc", "script", "foreignObject"]);
+var SHAPES = /* @__PURE__ */ new Set(["path", "rect", "circle", "ellipse", "line", "polyline", "polygon"]);
+var GROUPS = /* @__PURE__ */ new Set(["g", "a", "switch", "svg"]);
+function walk(node, parent, m, w2, chain) {
+  if (!tick(w2)) return;
+  const name = node.name;
+  if (NOT_PAINTED.has(name)) {
+    if (name === "foreignObject") w2.c.foreign++;
+    return;
+  }
+  if (!SHAPES.has(name) && !GROUPS.has(name) && name !== "use" && name !== "text" && name !== "image") return;
+  const { st, shown: shown2 } = styleOf2(node, parent, w2);
+  if (!shown2) return;
+  const t = parseTransform(node.attrs.transform);
+  if (t === null) w2.c.badTransforms++;
+  const here2 = t ? compose(m, t) : m;
+  if (node.attrs["clip-path"] || /clip-path\s*:/.test(node.attrs.style ?? "")) w2.c.clipped++;
+  if (node.attrs.mask || /mask\s*:/.test(node.attrs.style ?? "")) w2.c.masked++;
+  if (node.attrs.filter) w2.c.filters++;
+  if (node.attrs["marker-end"] || node.attrs["marker-start"] || node.attrs["marker-mid"]) w2.c.markers++;
+  if (SHAPES.has(name)) {
+    paintShape(node, st, here2, w2);
+    return;
+  }
+  if (name === "text") {
+    paintText(node, st, here2, w2);
+    return;
+  }
+  if (name === "image") {
+    paintImage(node, st, here2, w2);
+    return;
+  }
+  if (name === "use") {
+    expandUse(node, st, here2, w2, chain);
+    return;
+  }
+  let inner = here2;
+  if (name === "svg") {
+    const x = parseLength(node.attrs.x ?? "0") ?? 0, y = parseLength(node.attrs.y ?? "0") ?? 0;
+    const vb = node.attrs.viewBox ? numberList(node.attrs.viewBox) : null;
+    const W = parseLength(node.attrs.width), H = parseLength(node.attrs.height);
+    inner = compose(here2, translation(x, y));
+    if (vb && vb.length === 4 && vb[2] > 0 && vb[3] > 0 && W !== null && H !== null && W > 0 && H > 0) inner = compose(inner, viewBoxMap(vb, W, H, node.attrs.preserveAspectRatio));
+  }
+  if (name === "a") {
+    const href = node.attrs["xlink:href"] ?? node.attrs.href;
+    if (href && href[0] !== "#") w2.page.links.push({ kind: "href", target: href });
+  }
+  for (const k of node.kids) {
+    if (typeof k === "string") continue;
+    walk(k, st, inner, w2, chain);
+    if (w2.stopped) return;
+  }
+}
+function expandUse(node, st, m, w2, chain) {
+  const href = node.attrs["xlink:href"] ?? node.attrs.href;
+  if (!href || href[0] !== "#") {
+    if (href) w2.c.externalUses++;
+    return;
+  }
+  const id = href.slice(1);
+  const target = w2.byId.get(id);
+  if (!target) {
+    w2.c.missingUses++;
+    return;
+  }
+  if (chain.includes(id) || target === node) {
+    w2.c.cycles++;
+    return;
+  }
+  if (++w2.clones > w2.limits.clones) {
+    stopWith(w2, `stopped expanding <use> after ${plural(w2.limits.clones, "clone")} \u2014 the file has more, and the rest is left`);
+    return;
+  }
+  if (chain.length >= 64) {
+    w2.c.cycles++;
+    return;
+  }
+  const x = parseLength(node.attrs.x ?? "0") ?? 0, y = parseLength(node.attrs.y ?? "0") ?? 0;
+  const at2 = compose(m, translation(x, y));
+  w2.cloning++;
+  try {
+    if (target.name === "symbol") {
+      const vb = target.attrs.viewBox ? numberList(target.attrs.viewBox) : null;
+      const W = parseLength(node.attrs.width ?? target.attrs.width), H = parseLength(node.attrs.height ?? target.attrs.height);
+      let inner = at2;
+      if (vb && vb.length === 4 && vb[2] > 0 && vb[3] > 0) {
+        const sw = W !== null && W > 0 ? W : vb[2], sh = H !== null && H > 0 ? H : vb[3];
+        inner = compose(at2, viewBoxMap(vb, sw, sh, target.attrs.preserveAspectRatio ?? node.attrs.preserveAspectRatio));
+      }
+      const { st: sst, shown: shown2 } = styleOf2(target, st, w2);
+      if (!shown2) return;
+      for (const k of target.kids) {
+        if (typeof k === "string") continue;
+        walk(k, sst, inner, w2, [...chain, id]);
+        if (w2.stopped) return;
+      }
+    } else {
+      walk(target, st, at2, w2, [...chain, id]);
+    }
+  } finally {
+    w2.cloning--;
+  }
+}
+var fmtBytes = (n2) => n2 < 1024 ? `${n2} bytes` : n2 < 1048576 ? `${(n2 / 1024).toFixed(1)} KB` : `${(n2 / 1048576).toFixed(1)} MB`;
+function decodeText(bytes) {
+  let enc = "utf-8";
+  if (bytes.length >= 2 && bytes[0] === 255 && bytes[1] === 254) enc = "utf-16le";
+  else if (bytes.length >= 2 && bytes[0] === 254 && bytes[1] === 255) enc = "utf-16be";
+  let text;
+  try {
+    text = new TextDecoder(enc).decode(bytes);
+  } catch {
+    return null;
+  }
+  let bad2 = 0;
+  const probe = Math.min(text.length, 2e4);
+  for (let i = 0; i < probe; i++) {
+    const c = text.charCodeAt(i);
+    if (c === 65533 || c === 0) bad2++;
+  }
+  return probe > 0 && bad2 / probe > 0.02 ? null : text;
+}
+function toolOf(comments, root) {
+  for (const c of comments) {
+    const g = /Generator:\s*([^,\n]+)/i.exec(c);
+    if (g) return g[1].trim().replace(/\s+/g, " ");
+  }
+  const inkscape = root.attrs["inkscape:version"];
+  if (inkscape) return "Inkscape " + inkscape.trim().split(/\s+/)[0];
+  for (const c of comments) {
+    const k = /(Illustrator|Inkscape|Sketch|Figma|Wacom|Inkspace|OneNote|Affinity|CorelDRAW|Canva)/i.exec(c);
+    if (k) return k[1];
+  }
+  return void 0;
+}
+function findAll(node, name, out = []) {
+  if (node.name === name) out.push(node);
+  for (const k of node.kids) if (typeof k !== "string") findAll(k, name, out);
+  return out;
+}
+function sentencesOf(c) {
+  const out = [];
+  const say2 = (n2, one, many) => {
+    if (n2 > 0) out.push((n2 === 1 ? one : many).replace("{n}", n2.toLocaleString("en")));
+  };
+  say2(c.clipped, "one element uses a clip path, which was not applied \u2014 ink it hid may show", "{n} elements use clip paths, which were not applied \u2014 ink they hid may show");
+  say2(c.masked, "one element uses a mask, which was not applied \u2014 ink it hid may show", "{n} elements use masks, which were not applied \u2014 ink they hid may show");
+  say2(c.gradients, "one mark is painted with a gradient; its first colour was used", "{n} marks are painted with gradients; their first colours were used");
+  say2(c.patterns, "one mark is painted with a pattern, which is not read", "{n} marks are painted with patterns, which are not read");
+  say2(c.dashed, "one element is dashed; it is drawn solid", "{n} elements are dashed; they are drawn solid");
+  say2(c.markers, "one element has a marker (an arrowhead, a dot), which is not drawn", "{n} elements have markers (arrowheads, dots), which are not drawn");
+  say2(c.filters, "one element has a filter (a blur, a shadow), which is not applied", "{n} elements have filters (blurs, shadows), which are not applied");
+  say2(c.foreign, "one embedded page (foreignObject) was left out", "{n} embedded pages (foreignObject) were left out");
+  say2(c.rotatedText, "one piece of text is turned or skewed; its words are kept, upright", "{n} pieces of text are turned or skewed; their words are kept, upright");
+  say2(c.externalPictures, "one picture lives in another file, which is not part of this one; it is kept as a reference", "{n} pictures live in other files, which are not part of this one; they are kept as references");
+  say2(c.svgPictures, "one picture is an SVG inside this SVG, which is not read", "{n} pictures are SVGs inside this SVG, which are not read");
+  say2(c.badPictures, "one picture could not be read", "{n} pictures could not be read");
+  say2(c.pathsStopped, `one path stopped where its data stops making sense (${c.firstPathError}); what came before is kept`, `{n} paths stopped where their data stops making sense (the first: ${c.firstPathError}); what came before is kept`);
+  say2(c.brokenPaths, "one path had nothing to draw", "{n} paths had nothing to draw");
+  say2(c.badShapes, "one shape had a size or a number that is not one, and was left out", "{n} shapes had a size or a number that is not one, and were left out");
+  say2(c.badTransforms, "one transform could not be read and was ignored", "{n} transforms could not be read and were ignored");
+  say2(c.cycles, "one <use> refers to itself or nests too deeply, and was not expanded", "{n} <use> elements refer to themselves or nest too deeply, and were not expanded");
+  say2(c.missingUses, "one <use> refers to something that is not in the file", "{n} <use> elements refer to something that is not in the file");
+  say2(c.externalUses, "one <use> refers to another file, which is not read", "{n} <use> elements refer to other files, which are not read");
+  say2(c.grounds, "a solid shape fills the page \u2014 a background, not a mark \u2014 and was left out", "{n} solid shapes fill the page \u2014 backgrounds, not marks \u2014 and were left out");
+  say2(c.zeroLength, "one stroked line has no length, and was left out", "{n} stroked lines have no length, and were left out");
+  say2(c.failed, "one outline could not be read back to a line", "{n} outlines could not be read back to lines");
+  say2(c.unfaithful, "one outline comes back only roughly as its pen stroke (the line covers or stays on under 90% of it)", "{n} outlines come back only roughly as their pen strokes (the lines cover or stay on under 90% of them)");
+  say2(c.droppedCss, `one style rule past the first ${MAX_RULES.toLocaleString("en")} was not read`, `{n} style rules past the first ${MAX_RULES.toLocaleString("en")} were not read`);
+  say2(c.unsupportedCss, "one style rule needs a selector that is not read (a descendant, an attribute, a pseudo-class)", "{n} style rules need selectors that are not read (descendants, attributes, pseudo-classes)");
+  return out;
+}
+function readingOf2(ev, work) {
+  const ink = ev.penFills + ev.penStrokes;
+  const design = ev.shapes + ev.texts + ev.images;
+  const total = ink + design;
+  const as = total > 0 && ink / total >= 0.5 ? "ink" : "figure";
+  const parts = (...xs) => xs.filter(([n2]) => n2 > 0).map(([n2, s]) => `${n2.toLocaleString("en")} ${s}`).join(", ");
+  const words = total === 0 ? "a figure with nothing painted in it" : as === "ink" ? `drawn: ${ink.toLocaleString("en")} of ${total.toLocaleString("en")} painted things are pen-shaped (${parts([ev.penFills, ev.penFills === 1 ? "filled outline" : "filled outlines"], [ev.penStrokes, ev.penStrokes === 1 ? "stroked line" : "stroked lines"])})${design ? `, beside ${parts([ev.shapes, ev.shapes === 1 ? "shape" : "shapes"], [ev.texts, ev.texts === 1 ? "word" : "words"], [ev.images, ev.images === 1 ? "picture" : "pictures"])}` : ""}` : `designed: ${design.toLocaleString("en")} of ${total.toLocaleString("en")} painted things are shapes and words (${parts([ev.shapes, ev.shapes === 1 ? "shape" : "shapes"], [ev.texts, ev.texts === 1 ? "piece of text" : "pieces of text"], [ev.images, ev.images === 1 ? "picture" : "pictures"])})${ink ? `, beside ${ink.toLocaleString("en")} pen-shaped` : ""}`;
+  return { as, evidence: { ...ev, clones: work.clones, outlinesRead: work.outlines }, words };
+}
+function ingestSvg(bytes, name, hash, opts = {}) {
+  try {
+    return read2(bytes, name, hash, opts);
+  } catch (err) {
+    return refuse("this SVG could not be read: " + (err instanceof Error ? err.message : String(err)));
+  }
+}
+function read2(bytes, name, hash, opts) {
+  const limits = { ...DEFAULT_LIMITS, ...opts.limits };
+  if (bytes.length > limits.bytes) return refuse(`that file is ${fmtBytes(bytes.length)} \u2014 over the ${fmtBytes(limits.bytes)} limit on what is read`);
+  const text = decodeText(bytes);
+  if (text === null) return refuse("that file is not text, so it is not an SVG");
+  const parsed = parseXml(text, { maxNodes: limits.elements, maxDepth: limits.depth });
+  if (!parsed.ok) return refuse(`this is not a readable SVG: ${parsed.reason}`);
+  const root = parsed.root;
+  if (root.name !== "svg") return refuse(`that is not an SVG \u2014 its first element is <${root.name}>`);
+  const frame = frameOf3(root);
+  if (typeof frame === "string") return refuse(`this SVG cannot be placed: ${frame}`);
+  let sheet = emptySheet();
+  const css = findAll(root, "style").map((s) => textOf3(s)).join("\n");
+  if (css.trim()) sheet = parseSheet(css);
+  const page = blankPage(0, frame.width, frame.height);
+  const w2 = {
+    limits,
+    deadline: Date.now() + limits.ms,
+    byId: parsed.byId,
+    sheet,
+    page,
+    known: frame.known,
+    order: 0,
+    outline: 0,
+    visited: 0,
+    clones: 0,
+    outlines: 0,
+    points: 0,
+    vertices: { left: limits.vertices },
+    work: { rasterPx: limits.rasterPx },
+    stopped: null,
+    c: newCounters(),
+    ev: { penFills: 0, penStrokes: 0, shapes: 0, texts: 0, images: 0 },
+    cache: /* @__PURE__ */ new Map(),
+    cloning: 0
+  };
+  w2.c.unsupportedCss = sheet.unsupported;
+  w2.c.droppedCss = sheet.dropped;
+  const rootStyle = styleOf2(root, ROOT_STYLE, w2);
+  const rt = parseTransform(root.attrs.transform);
+  const base = rt ? compose(frame.m, rt) : frame.m;
+  if (rootStyle.shown) {
+    for (const k of root.kids) {
+      if (typeof k === "string") continue;
+      walk(k, rootStyle.st, base, w2, []);
+      if (w2.stopped) break;
+    }
+  }
+  const notes = sentencesOf(w2.c);
+  if (!frame.known) {
+    let maxX = 0, maxY = 0;
+    for (const s of page.strokes) for (const p of s.points) {
+      if (p.x > maxX) maxX = p.x;
+      if (p.y > maxY) maxY = p.y;
+    }
+    for (const p of page.pictures) {
+      maxX = Math.max(maxX, p.box.x + p.box.w);
+      maxY = Math.max(maxY, p.box.y + p.box.h);
+    }
+    for (const t of page.texts) {
+      maxX = Math.max(maxX, t.x);
+      maxY = Math.max(maxY, t.y);
+    }
+    page.width = frame.width > 0 ? frame.width : Math.max(1, Math.ceil(maxX));
+    page.height = frame.height > 0 ? frame.height : Math.max(1, Math.ceil(maxY));
+    notes.unshift("the file gives no size, so the page is as big as what is drawn on it");
+  }
+  if (w2.stopped) notes.unshift(w2.stopped);
+  const title = findAll(root, "title").find((t) => t.parent === root);
+  const date = findAll(root, "dc:date")[0];
+  const created = date ? textOf3(date) : "";
+  const tool = toolOf(parsed.comments, root);
+  const doc = {
+    source: { hash, name, format: "svg", ...tool ? { tool } : {}, ...created ? { created } : {} },
+    adapter: `svg@${ADAPTER_VERSIONS.svg}`,
+    pages: [page],
+    reading: readingOf2(w2.ev, { clones: w2.clones, outlines: w2.outlines }),
+    ...title && textOf3(title) ? { title: textOf3(title) } : {},
+    ...w2.stopped ? { truncated: w2.stopped } : {}
+  };
+  return accept(doc, notes);
+}
+
+// src/ingest/markdown.ts
+var MAX_LINKS = 5e4;
+var MAX_TAGS = 5e3;
+function decode(bytes) {
+  let text;
+  try {
+    text = new TextDecoder("utf-8").decode(bytes);
+  } catch {
+    return null;
+  }
+  let bad2 = 0;
+  const probe = Math.min(text.length, 2e4);
+  for (let i = 0; i < probe; i++) {
+    const c = text.charCodeAt(i);
+    if (c === 65533 || c === 0 || c < 32 && c !== 9 && c !== 10 && c !== 13 && c !== 12) bad2++;
+  }
+  return probe > 0 && bad2 / probe > 0.02 ? null : text;
+}
+var unquote = (s) => s.trim().replace(/^["']|["']$/g, "").trim();
+var cleanTag = (s) => unquote(s).replace(/^#+/, "").replace(/[-/]+$/, "");
+var isTag = (t) => t.length > 0 && /[^\p{N}]/u.test(t);
+function headerOf(text) {
+  const m = /^---[ \t]*\n([\s\S]{0,20000}?)\n(?:---|\.\.\.)[ \t]*(?:\n|$)/.exec(text);
+  if (!m) return { tags: [], body: text };
+  const out = { tags: [], body: text.slice(m[0].length) };
+  let key2 = "";
+  for (const line of m[1].split("\n")) {
+    const item = /^\s*-\s+(.*)$/.exec(line);
+    if (item && key2 === "tags") {
+      out.tags.push(cleanTag(item[1]));
+      continue;
+    }
+    const kv = /^([A-Za-z_][\w -]{0,40}?)\s*:\s*(.*)$/.exec(line);
+    if (!kv) continue;
+    key2 = kv[1].trim().toLowerCase();
+    const value = kv[2].trim();
+    if (key2 === "tags" || key2 === "tag") {
+      key2 = "tags";
+      if (value.startsWith("[")) out.tags.push(...value.replace(/^\[|\]$/g, "").split(",").map(cleanTag));
+      else if (value) out.tags.push(...value.split(/[\s,]+/).map(cleanTag));
+    } else if (key2 === "title") {
+      out.title = unquote(value) || void 0;
+    } else if ((key2 === "created" || key2 === "date" || key2 === "created_at") && !out.created) {
+      const v = unquote(value);
+      if (/^\d{4}-\d{2}-\d{2}/.test(v)) out.created = v;
+    }
+  }
+  out.tags = out.tags.filter(isTag);
+  return out;
+}
+var WIKI = /(!?)\[\[([^[\]\n]{0,512}?)\]\]/g;
+var WEB = /(!?)\[([^\]\n]{0,300})\]\(\s{0,8}<?([^)\s>]{1,2048})>?(?:\s{1,8}(?:"[^"\n]{0,300}"|'[^'\n]{0,300}'))?\s{0,8}\)/g;
+var TAG = /(^|[\s([{,;:!?"'])#([\p{L}\p{N}_/-]{1,200})/gu;
+var CODE_SPAN = /``[^`\n]{0,2000}``|`[^`\n]{0,2000}`/g;
+function blank(s, ranges) {
+  if (ranges.length === 0) return s;
+  let out = "";
+  let at2 = 0;
+  for (const [a, b] of ranges) {
+    out += s.slice(at2, a) + " ".repeat(b - a);
+    at2 = b;
+  }
+  return out + s.slice(at2);
+}
+function ingestMarkdown(bytes, name, hash, opts = {}) {
+  try {
+    const limits = { ...DEFAULT_LIMITS, ...opts.limits };
+    if (bytes.length > limits.bytes) return refuse(`that note is ${(bytes.length / 1048576).toFixed(1)} MB \u2014 over the ${(limits.bytes / 1048576).toFixed(0)} MB limit on what is read`);
+    const raw = decode(bytes);
+    if (raw === null) return refuse("that file is not text, so it is not a note");
+    const text = raw.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
+    const head = headerOf(text);
+    const body = head.body.replace(/^\n+/, "").replace(/\s+$/, "");
+    const links = [];
+    const seenLinks = /* @__PURE__ */ new Set();
+    const tags = [];
+    const seenTags = /* @__PURE__ */ new Set();
+    const addTag = (t) => {
+      const k = t.toLowerCase();
+      if (!isTag(t) || seenTags.has(k) || tags.length >= MAX_TAGS) return;
+      seenTags.add(k);
+      tags.push(t);
+    };
+    for (const t of head.tags) addTag(t);
+    let title = head.title;
+    let fence = null;
+    for (const line of body.split("\n")) {
+      const f = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+      if (fence) {
+        if (f && f[1][0] === fence[0] && f[1].length >= fence.length) fence = null;
+        continue;
+      }
+      if (f) {
+        fence = f[1];
+        continue;
+      }
+      if (!title) {
+        const h2 = /^#[ \t]+(.+?)[ \t]*#*[ \t]*$/.exec(line);
+        if (h2) title = h2[1].trim();
+      }
+      const code = line.replace(CODE_SPAN, (m) => " ".repeat(m.length));
+      const found = [];
+      const wikiRanges = [];
+      for (const m of code.matchAll(WIKI)) {
+        const [left, ...alias] = m[2].split("|");
+        const hash2 = left.indexOf("#");
+        const target = (hash2 >= 0 ? left.slice(0, hash2) : left).trim();
+        if (!target) continue;
+        const section = hash2 >= 0 ? left.slice(hash2 + 1).trim() : "";
+        const label = alias.join("|").trim();
+        found.push({ at: m.index ?? 0, link: { kind: "wiki", target, ...label ? { label } : {}, ...section ? { section } : {}, ...m[1] ? { embed: true } : {} } });
+        wikiRanges.push([m.index ?? 0, (m.index ?? 0) + m[0].length]);
+      }
+      const afterWiki = blank(code, wikiRanges);
+      const webRanges = [];
+      for (const m of afterWiki.matchAll(WEB)) {
+        const label = m[2].trim();
+        found.push({ at: m.index ?? 0, link: { kind: "href", target: m[3], ...label ? { label } : {}, ...m[1] ? { embed: true } : {} } });
+        webRanges.push([m.index ?? 0, (m.index ?? 0) + m[0].length]);
+      }
+      const rest = blank(afterWiki, webRanges);
+      found.sort((a, b) => a.at - b.at);
+      for (const { link } of found) {
+        const key2 = [link.kind, link.embed ? 1 : 0, link.target, link.section ?? "", link.label ?? ""].join("\0");
+        if (seenLinks.has(key2) || links.length >= MAX_LINKS) continue;
+        seenLinks.add(key2);
+        links.push(link);
+      }
+      for (const m of rest.matchAll(TAG)) addTag(m[2].replace(/[-/]+$/, ""));
+    }
+    const stem = (name.split(/[\\/]/).pop() ?? name).replace(/\.(?:md|markdown|mdown|txt|text)$/i, "");
+    const dated = /^(\d{4}-\d{2}-\d{2})(?![\d])/.exec(stem);
+    const created = head.created ?? (dated ? dated[1] : void 0);
+    const page = blankPage(0, 0, 0);
+    if (body) page.texts.push({ order: 0, text: body, x: 0, y: 0, format: "markdown" });
+    page.links = links;
+    page.tags = tags;
+    const words = (body.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length;
+    const doc = {
+      source: { hash, name, format: "markdown", ...created ? { created } : {} },
+      adapter: `markdown@${ADAPTER_VERSIONS.markdown}`,
+      pages: [page],
+      reading: {
+        as: "text",
+        evidence: { words, links: links.length, tags: tags.length, characters: body.length },
+        words: `a note of ${words.toLocaleString("en")} words, ${links.length === 1 ? "1 link" : links.length + " links"} and ${tags.length === 1 ? "1 tag" : tags.length + " tags"}`
+      },
+      title: title || stem || void 0
+    };
+    return accept(doc, []);
+  } catch (err) {
+    return refuse("this note could not be read: " + (err instanceof Error ? err.message : String(err)));
+  }
+}
+
+// src/ingest/index.ts
+var fmt4 = (n2) => n2 < 1024 ? `${n2} bytes` : n2 < 1048576 ? `${(n2 / 1024).toFixed(1)} KB` : `${(n2 / 1048576).toFixed(1)} MB`;
+var startsWith = (b, ...bytes) => bytes.every((v, i) => b[i] === v);
+var asciiAt = (b, s, from = 0) => {
+  for (let i = 0; i < s.length; i++) if (b[from + i] !== s.charCodeAt(i)) return false;
+  return true;
+};
+function rootOf(head) {
+  let i = head.charCodeAt(0) === 65279 ? 1 : 0;
+  for (; ; ) {
+    while (i < head.length && /\s/.test(head[i])) i++;
+    if (head.startsWith("<?", i)) {
+      const e = head.indexOf("?>", i);
+      if (e < 0) return null;
+      i = e + 2;
+      continue;
+    }
+    if (head.startsWith("<!--", i)) {
+      const e = head.indexOf("-->", i);
+      if (e < 0) return null;
+      i = e + 3;
+      continue;
+    }
+    if (head.startsWith("<!", i)) {
+      let depth2 = 0, quote = "", j = i + 2;
+      for (; j < head.length; j++) {
+        const c = head[j];
+        if (quote) {
+          if (c === quote) quote = "";
+          continue;
+        }
+        if (c === '"' || c === "'") quote = c;
+        else if (c === "[") depth2++;
+        else if (c === "]") depth2--;
+        else if (c === ">" && depth2 <= 0) break;
+      }
+      if (j >= head.length) return null;
+      i = j + 1;
+      continue;
+    }
+    break;
+  }
+  const m = /^<([A-Za-z_][\w:.-]*)/.exec(head.slice(i));
+  return m ? m[1].replace(/^svg:/, "") : null;
+}
+function isPdf(b) {
+  if (asciiAt(b, "%PDF-")) return true;
+  const latin = new TextDecoder("latin1");
+  return latin.decode(b.subarray(0, 1024)).includes("%PDF-") && latin.decode(b.subarray(Math.max(0, b.length - 2048))).includes("%%EOF");
+}
+function bytesOf(input) {
+  if (input instanceof Uint8Array) return input;
+  const tag2 = Object.prototype.toString.call(input);
+  if (tag2 === "[object Uint8Array]") return input;
+  if (tag2 === "[object ArrayBuffer]" || tag2 === "[object SharedArrayBuffer]") return new Uint8Array(input);
+  if (ArrayBuffer.isView(input)) return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+  return null;
+}
+var NOTE_NAMES = /\.(?:md|markdown|mdown|txt|text)$/i;
+function ingest(input, name, opts = {}) {
+  try {
+    const bytes = bytesOf(input);
+    if (!bytes) return refuse("ingest takes a file\u2019s bytes, and was handed something else");
+    const label = typeof name === "string" && name ? name : "untitled";
+    if (bytes.length === 0) return refuse("that file is empty");
+    const limits = { ...DEFAULT_LIMITS, ...opts.limits };
+    if (bytes.length > limits.bytes) return refuse(`that file is ${fmt4(bytes.length)} \u2014 over the ${fmt4(limits.bytes)} limit on what is read`);
+    const hash = opts.hash && isHash(opts.hash) ? opts.hash : sha256Hex(bytes);
+    const image = sniffImage(bytes);
+    if (image) return ingestRaster(bytes, label, hash);
+    if (isPdf(bytes)) return refuse("a PDF is not read yet \u2014 not yet \u2014 IN2 brings a PDF\u2019s ink, pages and words in");
+    if (startsWith(bytes, 31, 139)) return refuse("that file is compressed (gzip, as a .svgz is) \u2014 unpack it first; compressed files are not read");
+    if (startsWith(bytes, 80, 75, 3, 4) || startsWith(bytes, 80, 75, 5, 6)) {
+      return refuse("that is a zip file \u2014 a board\u2019s own bundle opens with From a file\u2026; other archives are not read");
+    }
+    const head = bytes.subarray(0, 8192);
+    let text;
+    if (startsWith(bytes, 255, 254) || startsWith(bytes, 254, 255)) text = new TextDecoder(bytes[0] === 255 ? "utf-16le" : "utf-16be").decode(head);
+    else {
+      let nul = 0, ctl = 0;
+      for (const v of head) {
+        if (v === 0) nul++;
+        else if (v < 9 || v > 13 && v < 32) ctl++;
+      }
+      if (nul > 0 || ctl > head.length * 0.02) return refuse(`those bytes are not a file dyna.ink reads \u2014 not a picture, an SVG or a note (${fmt4(bytes.length)})`);
+      text = new TextDecoder("utf-8").decode(head);
+    }
+    const root = text.trimStart().startsWith("<") || text.charCodeAt(0) === 65279 ? rootOf(text) : null;
+    if (root === "svg") return ingestSvg(bytes, label, hash, opts);
+    if (root && /^ink$/i.test(root.replace(/^.*:/, ""))) return refuse("InkML is not read yet \u2014 not yet \u2014 IN3 brings InkML\u2019s traces, times and pressures in");
+    if (root && root.toLowerCase() === "html") {
+      if (!NOTE_NAMES.test(label)) return refuse(`that is an HTML page, not a drawing or a note${/\.svg$/i.test(label) ? " \u2014 its name says .svg but its root is <html>" : ""}`);
+    } else if (root && !NOTE_NAMES.test(label)) {
+      return refuse(`that is XML whose root is <${root}>, which is not read${/\.svg$/i.test(label) ? " \u2014 its name says .svg but it is not an SVG" : ""}`);
+    }
+    if (NOTE_NAMES.test(label) || !/\.[A-Za-z0-9]{1,8}$/.test(label)) return ingestMarkdown(bytes, label, hash, opts);
+    const ext = /(\.[A-Za-z0-9]{1,8})$/.exec(label)[1];
+    return refuse(`that looks like text, but its name says ${ext} \u2014 only Markdown notes and plain text (.md, .txt) are brought in as notes`);
+  } catch (err) {
+    return refuse("that file could not be read: " + (err instanceof Error ? err.message : String(err)));
+  }
 }
 
 // src/notations/layered.ts
@@ -22169,10 +25062,10 @@ function layoutLayered(nodes, links, opts) {
     maxY = Math.max(maxY, raw[i].y + v.h / 2);
   });
   if (!n2) minX = minY = maxX = maxY = 0;
-  const at = /* @__PURE__ */ new Map();
-  list6.forEach((v, i) => at.set(v.id, { x: raw[i].x - minX, y: raw[i].y - minY }));
+  const at2 = /* @__PURE__ */ new Map();
+  list6.forEach((v, i) => at2.set(v.id, { x: raw[i].x - minX, y: raw[i].y - minY }));
   return {
-    at,
+    at: at2,
     rank: new Map(list6.map((v, i) => [v.id, rank2[i]])),
     ranks: ranks.map((row) => row.map((i) => list6[i].id)),
     back,
@@ -22243,15 +25136,15 @@ function readMermaid(text) {
 function drawMermaid(session, text, opts) {
   const open = openText(text);
   const reader = readers.get(open.keyword) ?? readers.get(open.keyword.toLowerCase());
-  const read2 = reader ? reader.read(text) : readMermaid(text);
-  if (!reader) return { notation: null, ids: {}, links: [], notes: [], refused: read2.refused, bounds: null, lastAt: opts.at - 1 };
-  return reader.draw(session, read2, opts);
+  const read3 = reader ? reader.read(text) : readMermaid(text);
+  if (!reader) return { notation: null, ids: {}, links: [], notes: [], refused: read3.refused, bounds: null, lastAt: opts.at - 1 };
+  return reader.draw(session, read3, opts);
 }
 var COUNT3 = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
 var count6 = (n2) => COUNT3[n2] ?? String(n2);
 var list2 = (xs) => xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 var some = (xs, max = 4) => xs.length > max ? `${xs.slice(0, max).join(", ")} and ${count6(xs.length - max)} more` : list2(xs);
-var SHAPES = [
+var SHAPES2 = [
   ...Object.entries(FLOWCHART_TABLE.symbols).map(([symbol, d]) => ({ open: d.mermaid.open, close: d.mermaid.close, symbol })),
   { open: "(", close: ")", symbol: "process", otherwise: "a box with round edges" },
   { open: "[[", close: "]]", symbol: "process", otherwise: "a subroutine" },
@@ -22262,7 +25155,7 @@ var SHAPES = [
   { open: "[/", close: "\\]", symbol: "process", otherwise: "a trapezoid" },
   { open: "[\\", close: "/]", symbol: "process", otherwise: "a trapezoid upside down" }
 ];
-var OPENS = [...new Set(SHAPES.map((s) => s.open))].sort((a, b) => b.length - a.length);
+var OPENS = [...new Set(SHAPES2.map((s) => s.open))].sort((a, b) => b.length - a.length);
 var ID = /[\p{L}\p{N}_](?:[\p{L}\p{N}_]|-(?=[\p{L}\p{N}_]))*/uy;
 var NOT_DRAWN = [
   [/^subgraph\b/, "a subgraph\u2019s frame is not drawn yet \u2014 the nodes and links inside it are"],
@@ -22328,7 +25221,7 @@ function readNode(c, notes) {
   let ref = { id };
   if (open) {
     c.take(open);
-    const shapes = SHAPES.filter((s) => s.open === open);
+    const shapes = SHAPES2.filter((s) => s.open === open);
     let text;
     let shape;
     const lead = c.i;
@@ -22343,8 +25236,8 @@ function readNode(c, notes) {
       c.i = lead;
       let best = null;
       for (const s of shapes) {
-        const at = c.s.indexOf(s.close, c.i);
-        if (at >= 0 && (!best || at < best.at)) best = { at, shape: s };
+        const at2 = c.s.indexOf(s.close, c.i);
+        if (at2 >= 0 && (!best || at2 < best.at)) best = { at: at2, shape: s };
       }
       if (!best) throw new Refuse(`\u201C${open}\u201D is never closed`);
       text = shown(c.s.slice(c.i, best.at));
@@ -22391,9 +25284,9 @@ function pipeLabel(c, notes) {
   if (!c.take("|")) throw new Refuse("a link\u2019s label is not closed with \u201C|\u201D");
   return text;
 }
-var styleOf2 = (body) => body.includes(".") ? "dotted" : body.includes("=") ? "thick" : "plain";
+var styleOf3 = (body) => body.includes(".") ? "dotted" : body.includes("=") ? "thick" : "plain";
 function readLink(c, notes) {
-  const at = c.i;
+  const at2 = c.i;
   const invisible = c.match(/~{3,}/y);
   if (invisible) return { written: invisible[0], start: "", end: "", style: "plain", invisible: true };
   const opened = c.match(/(<)?(--|==|-\.)(?=\s|")/y);
@@ -22419,7 +25312,7 @@ function readLink(c, notes) {
         return finishTextLink(opened[0], opened[1] ?? "", m2[1], text);
       }
     }
-    c.i = at;
+    c.i = at2;
     throw new Refuse(`a link that opens \u201C${opened[0]}\u201D and a space holds a label, and this one never reaches its end (\u201C${kind === "--" ? "-->" : kind === "==" ? "==>" : ".->"}\u201D)`);
   }
   const m = c.match(/(<|o|x)?(-{2,}|={2,}|-\.+-)(>|o|x)?/y);
@@ -22427,13 +25320,13 @@ function readLink(c, notes) {
   const start = m[1] ?? "", end = m[3] ?? "", body = m[2];
   if (!end && !/^(-{3,}|={3,}|-\.+-)$/.test(body)) throw new Refuse(`\u201C${m[0]}\u201D is not a link`);
   const label = pipeLabel(c, notes);
-  return { written: m[0], start, end, style: styleOf2(body), ...label !== void 0 ? { label } : {} };
+  return { written: m[0], start, end, style: styleOf3(body), ...label !== void 0 ? { label } : {} };
 }
 function finishTextLink(openedText, start, closeText, text) {
   const endMark = closeText[closeText.length - 1];
   const end = endMark === ">" || endMark === "o" || endMark === "x" ? endMark : "";
   const body = openedText.replace(/^</, "") + closeText;
-  return { written: `${openedText.trim()} \u2026 ${closeText.trim()}`, start, end, style: styleOf2(body), label: text };
+  return { written: `${openedText.trim()} \u2026 ${closeText.trim()}`, start, end, style: styleOf3(body), label: text };
 }
 function readStatement(c, notes) {
   const groups = [readGroup(c, notes)];
@@ -22500,10 +25393,10 @@ function readFlowchartText(text) {
         c.ws();
         if (c.take(";")) rest = c.s.slice(c.i);
         else if (!c.done) throw new Refuse(`\u201C${c.s.slice(c.i, c.i + 16)}\u201D follows the statement`);
-        const read2 = st.groups.map((g) => g.map((ref) => node(ref, line.n)));
+        const read3 = st.groups.map((g) => g.map((ref) => node(ref, line.n)));
         st.links.forEach((l, k) => {
-          for (const a of read2[k]) {
-            for (const b of read2[k + 1]) {
+          for (const a of read3[k]) {
+            for (const b of read3[k + 1]) {
               const shownAs = `${a.id} ${l.written} ${b.id}`;
               if (l.invisible) {
                 refused.push({ line: line.n, text: shownAs, reason: "an invisible link (~~~) only spaces mermaid.js\u2019s own layout \u2014 nothing is drawn for it" });
@@ -22548,7 +25441,7 @@ function readFlowchartText(text) {
       `drawn ${direction === "RL" ? "right to left" : "bottom to top"}, as the header asks \u2014 read back, a drawing says ${direction === "RL" ? "LR" : "TD"} by the way its flows run, and lists its nodes as they stand ${direction === "RL" ? "left to right" : "top to bottom"}`
     );
   for (const [what, ids] of otherwise) {
-    const sym = SHAPES.find((s) => s.otherwise === what).symbol;
+    const sym = SHAPES2.find((s) => s.otherwise === what).symbol;
     said3.push(`${what} has no symbol of its own in a flowchart, so ${ids.length === 1 ? "it is" : "they are"} drawn as ${sym === "data" ? "a data symbol" : "a process"}: ${some(ids)}`);
   }
   if (styled.dotted.length) said3.push(`the board has no dotted line: ${styled.dotted.length === 1 ? "a dotted link is" : "dotted links are"} drawn plain \u2014 ${some(styled.dotted)}`);
@@ -22574,7 +25467,7 @@ var HEAD_MIN_PX = 12;
 var HEAD_MAX_PX = 24;
 var MERMAID_MAX_NODES = 60;
 var MERMAID_MAX_LINKS = 120;
-var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+var clamp2 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 var add4 = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
 var mid10 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 function inkAround(corners, step2) {
@@ -22597,21 +25490,21 @@ function figureOf2(symbol, text) {
   const tw = chars * CHAR * U, th = lines * LINE * U;
   switch (symbol) {
     case "decision": {
-      const s = clamp(tw + th + 2 * U, CORE_MIN * U, CORE_MAX * U);
+      const s = clamp2(tw + th + 2 * U, CORE_MIN * U, CORE_MAX * U);
       const v = { top: { x: 0, y: -s / 2 }, right: { x: s / 2, y: 0 }, bottom: { x: 0, y: s / 2 }, left: { x: -s / 2, y: 0 } };
       return { symbol, w: s, h: s, ink: () => inkAround([v.top, v.right, v.bottom, v.left], INK_STEP), ports: v };
     }
     case "data": {
-      const body = clamp(tw + 3 * U, CORE_MIN * U, CORE_MAX * U);
-      const h2 = clamp(th + 2 * U, BOX_H * U, 7 * U);
+      const body = clamp2(tw + 3 * U, CORE_MIN * U, CORE_MAX * U);
+      const h2 = clamp2(th + 2 * U, BOX_H * U, 7 * U);
       const lean = h2 * Math.tan(DATA_LEAN_DEG * Math.PI / 180);
       const tl = { x: -body / 2 + lean / 2, y: -h2 / 2 }, tr = { x: body / 2 + lean / 2, y: -h2 / 2 };
       const br = { x: body / 2 - lean / 2, y: h2 / 2 }, bl = { x: -body / 2 - lean / 2, y: h2 / 2 };
       return { symbol, w: body + lean, h: h2, ink: () => inkAround([tl, tr, br, bl], INK_STEP), ports: { top: mid10(tl, tr), right: mid10(tr, br), bottom: mid10(br, bl), left: mid10(bl, tl) } };
     }
     case "terminator": {
-      const w2 = clamp(tw + BOX_H * U, CORE_MIN * U, CORE_MAX * U);
-      const h2 = clamp(Math.max(th + 2 * U, w2 / STADIUM_MAX), BOX_H * U, w2 / STADIUM_MIN);
+      const w2 = clamp2(tw + BOX_H * U, CORE_MIN * U, CORE_MAX * U);
+      const h2 = clamp2(Math.max(th + 2 * U, w2 / STADIUM_MAX), BOX_H * U, w2 / STADIUM_MIN);
       const r = h2 / 2, half2 = w2 / 2 - r;
       const ink = () => {
         const pts = [];
@@ -22640,8 +25533,8 @@ function figureOf2(symbol, text) {
       };
     }
     default: {
-      const w2 = clamp(tw + 3 * U, CORE_MIN * U, CORE_MAX * U);
-      const h2 = clamp(th + 2 * U, BOX_H * U, 7 * U);
+      const w2 = clamp2(tw + 3 * U, CORE_MIN * U, CORE_MAX * U);
+      const h2 = clamp2(th + 2 * U, BOX_H * U, 7 * U);
       return {
         symbol: "process",
         w: w2,
@@ -22709,8 +25602,8 @@ function arcThrough2(P, Q, sweep, side, n2) {
   const bulge = { x: M.x + out.x * (R - d), y: M.y + out.y * (R - d) };
   let delta = a1 - a0;
   const other = delta > 0 ? delta - 2 * Math.PI : delta + 2 * Math.PI;
-  const at = (dl) => ({ x: C.x + R * Math.cos(a0 + dl / 2), y: C.y + R * Math.sin(a0 + dl / 2) });
-  const off = (dl) => Math.hypot(at(dl).x - bulge.x, at(dl).y - bulge.y);
+  const at2 = (dl) => ({ x: C.x + R * Math.cos(a0 + dl / 2), y: C.y + R * Math.sin(a0 + dl / 2) });
+  const off = (dl) => Math.hypot(at2(dl).x - bulge.x, at2(dl).y - bulge.y);
   if (off(other) < off(delta)) delta = other;
   const pts = [];
   for (let i = 0; i <= n2; i++) {
@@ -22824,11 +25717,11 @@ function connectorInk(route2, P, Q, drawn, scale) {
     return { x: v.x / l, y: v.y / l };
   };
   const chord = Math.hypot(Q.x - P.x, Q.y - P.y) / scale;
-  const size2 = clamp(0.1 * chord, HEAD_MIN_PX, HEAD_MAX_PX);
-  const head = (at, pointing2) => triangleHead(hand(at), pointing2, size2).map(toWorld);
+  const size2 = clamp2(0.1 * chord, HEAD_MIN_PX, HEAD_MAX_PX);
+  const head = (at2, pointing2) => triangleHead(hand(at2), pointing2, size2).map(toWorld);
   if (route2.kind === "arc") {
     const th = route2.sweep * Math.PI / 180;
-    const n2 = clamp(Math.round(chord * th / (2 * Math.sin(th / 2)) / INK_STEP), 16, 300);
+    const n2 = clamp2(Math.round(chord * th / (2 * Math.sin(th / 2)) / INK_STEP), 16, 300);
     const points2 = arcThrough2(hand(P), hand(Q), route2.sweep, route2.side, n2).map(toWorld);
     const heads = [];
     if (drawn !== "---") heads.push(head(Q, unit7({ x: points2[n2].x - points2[n2 - 1].x, y: points2[n2].y - points2[n2 - 1].y })));
@@ -22841,7 +25734,7 @@ function connectorInk(route2, P, Q, drawn, scale) {
   const points = strokeFor({ shape: "arrow", from: f(P), to: f(Q) }).map((p) => ({ x: p.x * scale * k, y: p.y * scale * k }));
   return { points, heads: drawn === "<-->" ? [head(P, unit7({ x: P.x - Q.x, y: P.y - Q.y }))] : [] };
 }
-function endsOf3(route2, drawn) {
+function endsOf4(route2, drawn) {
   if (route2.kind === "arc") return { start: drawn === "<-->" ? 1 : "none", end: drawn === "---" ? "none" : 0 };
   if (drawn === "---") return { start: "none", end: "none" };
   return { start: drawn === "<-->" ? 0 : "none", end: "barb" };
@@ -22857,12 +25750,12 @@ function readsAsDrawn(symbols, conns, scale) {
   }));
   const st = scratch.getState();
   return placed2.every(({ c, id, heads }) => {
-    const read2 = headsOf(st, id);
-    if (!read2) return false;
-    const want = endsOf3(c.route, c.drawn);
+    const read3 = headsOf(st, id);
+    if (!read3) return false;
+    const want = endsOf4(c.route, c.drawn);
     return ["start", "end"].every((end) => {
       if (!c.at[end]) return true;
-      const top = read2[end].heads[0];
+      const top = read3[end].heads[0];
       const w2 = want[end];
       if (w2 === "none") return !top || top.ids.some((x) => symbolIds.has(x));
       if (!top || top.ids.some((x) => symbolIds.has(x))) return false;
@@ -22882,32 +25775,32 @@ function besideContent(session, margin) {
   }
   return Number.isFinite(maxX) ? { x: maxX + margin, y: minY } : { x: 0, y: 0 };
 }
-function drawFlowchartRead(session, read2, opts) {
+function drawFlowchartRead(session, read3, opts) {
   const scale = opts.scale && opts.scale > 0 ? opts.scale : 1;
   const pid = opts.participantId;
   const U = MERMAID_TEXT_PX;
-  const notes = [...read2.notes];
-  const refused = [...read2.refused];
+  const notes = [...read3.notes];
+  const refused = [...read3.refused];
   let t = opts.at;
   const next = () => t++;
-  const nodes = read2.nodes.slice(0, MERMAID_MAX_NODES);
+  const nodes = read3.nodes.slice(0, MERMAID_MAX_NODES);
   const kept2 = new Set(nodes.map((n2) => n2.id));
-  if (read2.nodes.length > nodes.length) {
-    const cut = read2.links.filter((l) => !kept2.has(l.from) || !kept2.has(l.to)).length;
-    notes.push(`the text holds ${read2.nodes.length} nodes and the board draws ${MERMAID_MAX_NODES} at most: the first ${MERMAID_MAX_NODES} are drawn, and the ${read2.nodes.length - MERMAID_MAX_NODES} after them${cut ? ` and the ${cut} link${cut === 1 ? "" : "s"} that touch them are` : " are"} not`);
+  if (read3.nodes.length > nodes.length) {
+    const cut = read3.links.filter((l) => !kept2.has(l.from) || !kept2.has(l.to)).length;
+    notes.push(`the text holds ${read3.nodes.length} nodes and the board draws ${MERMAID_MAX_NODES} at most: the first ${MERMAID_MAX_NODES} are drawn, and the ${read3.nodes.length - MERMAID_MAX_NODES} after them${cut ? ` and the ${cut} link${cut === 1 ? "" : "s"} that touch them are` : " are"} not`);
   }
-  const among = read2.links.filter((l) => kept2.has(l.from) && kept2.has(l.to));
+  const among = read3.links.filter((l) => kept2.has(l.from) && kept2.has(l.to));
   const links = among.slice(0, MERMAID_MAX_LINKS);
   if (among.length > links.length) notes.push(`the text holds ${among.length} links among the nodes drawn and the board draws ${MERMAID_MAX_LINKS} at most: the ${among.length - MERMAID_MAX_LINKS} after the first ${MERMAID_MAX_LINKS} are not drawn`);
   if (!nodes.length) {
     notes.push("nothing to draw: the text names no node");
-    return { notation: read2.notation, direction: read2.direction, ids: {}, links: [], notes, refused, bounds: null, lastAt: t - 1 };
+    return { notation: read3.notation, direction: read3.direction, ids: {}, links: [], notes, refused, bounds: null, lastAt: t - 1 };
   }
   const figures = new Map(nodes.map((n2) => [n2.id, figureOf2(n2.symbol, n2.text)]));
   const layout = layoutLayered(
     nodes.map((n2) => ({ id: n2.id, w: figures.get(n2.id).w * scale, h: figures.get(n2.id).h * scale })),
     links.map((l) => ({ from: l.from, to: l.to })),
-    { direction: read2.direction, rankGap: RANK_GAP * U * scale, nodeGap: NODE_GAP * U * scale }
+    { direction: read3.direction, rankGap: RANK_GAP * U * scale, nodeGap: NODE_GAP * U * scale }
   );
   const origin = opts.origin ?? besideContent(session, CORE_MIN * U * scale);
   const centreOf10 = (id) => add4(origin, layout.at.get(id));
@@ -22939,8 +25832,8 @@ function drawFlowchartRead(session, read2, opts) {
       if (!best || d < best.d) best = { d, site: { kind: s.kind, index: s.index }, point: { x: s.point.x, y: s.point.y } };
     }
     if (best && best.d <= tol) return { nodeId, site: best.site, of: "mark", port, point: best.point };
-    const read3 = flowchartPortsOf(node, st().nodes);
-    const points = (read3?.ports ?? []).filter((p) => p.at && !p.along);
+    const read4 = flowchartPortsOf(node, st().nodes);
+    const points = (read4?.ports ?? []).filter((p) => p.at && !p.along);
     const k = points.findIndex((p) => Math.hypot(p.at.x - want.x, p.at.y - want.y) <= tol);
     if (k >= 0) return { nodeId, site: { kind: `port:${FLOWCHART_TABLE.notation}`, index: k }, of: "notation", port, point: { ...points[k].at } };
     notes.push(`${id}\u2019s ${port} is on no site its mark offers: bound at the nearest (${best ? `${best.site.kind} ${best.site.index}` : "none"})`);
@@ -23006,7 +25899,7 @@ function drawFlowchartRead(session, read2, opts) {
       const c = placedOf(l, r);
       const involved = placed2.filter((d) => c.ends.some((e) => d.marks.some((m) => mayRead(e, m))) || d.ends.some((e) => c.marks.some((m) => mayRead(e, m))));
       const nearSymbols = others.filter((o) => c.ends.some((e) => mayRead(e, symbolWeight.get(o.id))));
-      const want = endsOf3(r, drawn);
+      const want = endsOf4(r, drawn);
       const outranked = [["start", a], ["end", b2]].some(([end, o], k) => typeof want[end] === "number" && mayRead(c.ends[k], symbolWeight.get(o.id)));
       if (!involved.length && !nearSymbols.length && !outranked) return true;
       if (budget-- <= 0) return void 0;
@@ -23015,7 +25908,7 @@ function drawFlowchartRead(session, read2, opts) {
       const conns = [...involved, c].map((d) => ({ ink: d.ink, route: d.route, drawn: d.drawn, at: { start: true, end: true } }));
       return readsAsDrawn([...symbols.values()].map((o) => o.ink), conns, scale);
     };
-    const route2 = routeLink(a, b2, others, read2.direction, taken, 0.5 * U * scale, scale, reads2);
+    const route2 = routeLink(a, b2, others, read3.direction, taken, 0.5 * U * scale, scale, reads2);
     if (route2.misread) notes.push(`no way between ${l.from} and ${l.to} reads as drawn beside the links already there: read back, the link ${l.from} \u2192 ${l.to} or one beside it may say otherwise`);
     routes.set(l, route2);
     placed2.push(placedOf(l, route2));
@@ -23056,8 +25949,8 @@ function drawFlowchartRead(session, read2, opts) {
     const l = links[b2.index];
     notes.push(`the flow ${l.from} \u2192 ${l.to} closes a cycle (${b2.cycle.join(" \u2192 ")}), and runs back against the direction: ${l.to} comes first in the text`);
   }
-  if (layout.stretch > 1) notes.push(`the ranks stand ${layout.stretch.toFixed(1)}\xD7 further apart than the text size asks, so the flows run more ${read2.direction === "LR" || read2.direction === "RL" ? "across" : "down"} than ${read2.direction === "LR" || read2.direction === "RL" ? "down" : "across"}, as the header says`);
-  if (!layout.kept) notes.push(`every flow runs within a rank, so read back the drawing will say ${read2.direction === "LR" || read2.direction === "RL" ? "TD" : "LR"}, not ${read2.direction}`);
+  if (layout.stretch > 1) notes.push(`the ranks stand ${layout.stretch.toFixed(1)}\xD7 further apart than the text size asks, so the flows run more ${read3.direction === "LR" || read3.direction === "RL" ? "across" : "down"} than ${read3.direction === "LR" || read3.direction === "RL" ? "down" : "across"}, as the header says`);
+  if (!layout.kept) notes.push(`every flow runs within a rank, so read back the drawing will say ${read3.direction === "LR" || read3.direction === "RL" ? "TD" : "LR"}, not ${read3.direction}`);
   for (const n2 of nodes) {
     if (n2.symbol !== "start" && n2.symbol !== "end") continue;
     const outs = links.filter((l) => l.from === n2.id && l.head !== "none" || l.to === n2.id && l.head === "both").length;
@@ -23072,8 +25965,8 @@ function drawFlowchartRead(session, read2, opts) {
   if (placeholder.length) notes.push(`\u201C${UNREAD_WRITING}\u201D is what D2 writes for writing nobody has read: it is put on the ink as the words, since the words are not known \u2014 ${some(placeholder)}`);
   const b = layout.bounds;
   return {
-    notation: read2.notation,
-    direction: read2.direction,
+    notation: read3.notation,
+    direction: read3.direction,
     ids,
     links: drawnLinks,
     notes,
@@ -23119,10 +26012,10 @@ function relationLabel(text) {
   return [...String(text).replace(/\s+/g, " ").trim()].map((ch) => ENTITY2[ch] ?? (ch === ":" ? "#58;" : ch)).join("");
 }
 var withoutPlaceholder = (text) => text.split(UNREAD_WRITING).join(" ").replace(/\s+/g, " ").trim();
-function directionOf(relations, at, classes) {
+function directionOf(relations, at2, classes) {
   let down = 0, across2 = 0, downward = 0;
   for (const r of relations) {
-    const a = at(r.from), b = at(r.to);
+    const a = at2(r.from), b = at2(r.to);
     const dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y);
     down += dy;
     across2 += dx;
@@ -23162,12 +26055,12 @@ function writeUmlClass(reading7, opts = {}) {
   if (direction.value === "LR") lines.push("    direction LR");
   const ids = {};
   const marks = {};
-  const blank = [];
+  const blank2 = [];
   const misplaced = [];
   for (const s of ordered2) {
     const m = idOf.get(s.id);
     const name = said3(s.name.text, s.name.unread, `the name of ${m}`);
-    if (name === null) blank.push(m);
+    if (name === null) blank2.push(m);
     const members = [...s.members.filter((x) => x.kind !== "method"), ...s.members.filter((x) => x.kind === "method")];
     const body = [];
     for (const x of members) {
@@ -23202,10 +26095,10 @@ function writeUmlClass(reading7, opts = {}) {
     const a = idOf.get(first.cls), b = idOf.get(second.cls);
     const left2 = first.end.marker ? T.connectors[first.end.marker].mermaid.left : "";
     const right2 = second.end.marker ? T.connectors[second.end.marker].mermaid.right : "";
-    const card = (e, at) => {
+    const card = (e, at2) => {
       const mult = e.end.multiplicity;
       if (!mult) return "";
-      const w2 = said3(mult.text, mult.unread, `the multiplicity at ${at} on ${a} \u2014 ${b}`);
+      const w2 = said3(mult.text, mult.unread, `the multiplicity at ${at2} on ${a} \u2014 ${b}`);
       return w2 === null ? "" : mermaidString(w2);
     };
     const ca = card(first, a), cb = card(second, b);
@@ -23236,7 +26129,7 @@ function writeUmlClass(reading7, opts = {}) {
     const where = [...new Set(unread.map((u) => u.where))];
     notes.push(`${pieces === 1 ? "one piece of writing has" : `${count7(pieces)} pieces of writing have`} not been read, so ${pieces === 1 ? "its words are" : "their words are"} not known \u2014 written "${UNREAD_WRITING}" (in a member, with its parentheses as entities: its words do not say it is a method, so Mermaid shows it among the attributes): ${some2(where)}`);
   }
-  if (blank.length) notes.push(`${blank.length === 1 ? "one class has" : `${count7(blank.length)} classes have`} no writing in ${blank.length === 1 ? "its" : "their"} top compartment and ${blank.length === 1 ? "is" : "are"} written with a blank name: ${list3(blank)}`);
+  if (blank2.length) notes.push(`${blank2.length === 1 ? "one class has" : `${count7(blank2.length)} classes have`} no writing in ${blank2.length === 1 ? "its" : "their"} top compartment and ${blank2.length === 1 ? "is" : "are"} written with a blank name: ${list3(blank2)}`);
   if (misplaced.length) notes.push(`${misplaced.length === 1 ? "a member stands" : `${count7(misplaced.length)} members stand`} in the other compartment from what ${misplaced.length === 1 ? "its words say it is" : "their words say they are"}, and Mermaid puts ${misplaced.length === 1 ? "it" : "them"} where the words do: ${some2(misplaced)}`);
   const lower = relations.filter((c) => c.readings.length > 1 && c.readings[1].confidence > 0.6 * c.confidence);
   if (lower.length) notes.push(`${lower.length === 1 ? "a relation\u2019s head reads" : `${count7(lower.length)} relations\u2019 heads read`} more than one way, and ${lower.length === 1 ? "it is" : "they are"} written as the likelier: ${some2(lower.map((c) => `${idOf.get(c.from)} \u2014 ${idOf.get(c.to)} as ${c.kind}, or ${c.readings[1].kind}`))}`);
@@ -23507,7 +26400,7 @@ var INK_STEP2 = 3;
 var ARROW_PROPORTION_PX2 = 800;
 var DASH = 0.9;
 var DASH_OFF2 = 0.6;
-var clamp2 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+var clamp3 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 var add5 = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
 var scaled = (a, k) => ({ x: a.x * k, y: a.y * k });
 var sub22 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
@@ -23537,9 +26430,9 @@ function inkAlong2(points, step2) {
 function headInk(kind, tip, out, len4, step2) {
   const u = unit4(out);
   const v = { x: -u.y, y: u.x };
-  const at = (along2, side) => ({ x: tip.x - u.x * along2 + v.x * side, y: tip.y - u.y * along2 + v.y * side });
-  if (kind === "triangle") return inkAround2([tip, at(len4, 0.55 * len4), at(len4, -0.55 * len4)], step2);
-  return inkAround2([tip, at(len4 / 2, len4 / 2), at(len4, 0), at(len4 / 2, -len4 / 2)], step2);
+  const at2 = (along2, side) => ({ x: tip.x - u.x * along2 + v.x * side, y: tip.y - u.y * along2 + v.y * side });
+  if (kind === "triangle") return inkAround2([tip, at2(len4, 0.55 * len4), at2(len4, -0.55 * len4)], step2);
+  return inkAround2([tip, at2(len4 / 2, len4 / 2), at2(len4, 0), at2(len4 / 2, -len4 / 2)], step2);
 }
 function fillInk(kind, tip, out, len4, step2) {
   const u = unit4(out);
@@ -23607,8 +26500,8 @@ function besideContent2(session, margin) {
   }
   return Number.isFinite(maxX) ? { x: maxX + margin, y: minY } : { x: 0, y: 0 };
 }
-function drawClassDiagramRead(session, read2, opts) {
-  const r = read2;
+function drawClassDiagramRead(session, read3, opts) {
+  const r = read3;
   const scale = opts.scale && opts.scale > 0 ? opts.scale : 1;
   const pid = opts.participantId;
   const U = MERMAID_TEXT_PX;
@@ -23632,7 +26525,7 @@ function drawClassDiagramRead(session, read2, opts) {
       const methods = n2.members.filter((m) => m.kind === "method").map((m) => m.text);
       const name = n2.text.trim();
       const longest = Math.max(1, ...[name, ...attrs, ...methods].map((x) => [...x].length));
-      const w2 = clamp2(longest * CHAR2 * U + 3 * U, CLASS_MIN * U, CLASS_MAX * U);
+      const w2 = clamp3(longest * CHAR2 * U + 3 * U, CLASS_MIN * U, CLASS_MAX * U);
       const band = (k) => k ? k * LINE2 * U + PAD * U : EMPTY * U;
       const h1 = Math.max(1, name.split("\n").length) * LINE2 * U + 2 * PAD * U;
       const h2 = band(attrs.length), h3 = band(methods.length);
@@ -23792,11 +26685,11 @@ function drawClassDiagramRead(session, read2, opts) {
     const drawn = `${left ? T.connectors[left].mermaid.left : ""}${T.mermaid.line}${right2 ? T.connectors[right2].mermaid.right : ""}`;
     const link = { index: l.index, from: l.left, to: l.right, id, ids: [id], written: drawn, route: arc ? "arc" : "straight", ...words ? { label: words } : {}, start, end };
     drawnLinks.push(link);
-    for (const [marker, at, from, card, side] of [[left, P, leaving[0], l.cardinality.left, start.port], [right2, Q, leaving[1], l.cardinality.right, end.port]]) {
-      if (card?.trim()) dashes.push({ at, toward: from, side, marked: !!marker, said: card.trim() });
-      if (!marker || marker === "association" && (arrowAt === "right" && at === Q || arrowAt === "left" && at === P)) continue;
+    for (const [marker, at2, from, card, side] of [[left, P, leaving[0], l.cardinality.left, start.port], [right2, Q, leaving[1], l.cardinality.right, end.port]]) {
+      if (card?.trim()) dashes.push({ at: at2, toward: from, side, marked: !!marker, said: card.trim() });
+      if (!marker || marker === "association" && (arrowAt === "right" && at2 === Q || arrowAt === "left" && at2 === P)) continue;
       const kind = marker === "inheritance" || marker === "association" ? "triangle" : "diamond";
-      apart.push({ link, kind, filled: marker === "composition" || marker === "association", at, from });
+      apart.push({ link, kind, filled: marker === "composition" || marker === "association", at: at2, from });
     }
     if (words === UNREAD_WRITING || l.cardinality.left === UNREAD_WRITING || l.cardinality.right === UNREAD_WRITING) placeholder.push(`${l.left} \u2014 ${l.right}`);
   }
@@ -23910,11 +26803,11 @@ function writeSequence(reading7, opts = {}) {
   const lines = [T2.mermaid.header];
   const ids = {};
   const marks = {};
-  const blank = [];
+  const blank2 = [];
   for (const p of ps) {
     const m = idOf.get(p.id);
     const name = said3(p.name.text, p.name.unread, `the name of ${m}`);
-    if (name === null) blank.push(m);
+    if (name === null) blank2.push(m);
     lines.push(`    ${T2.symbols[p.symbol].mermaid} ${m} as ${name === null ? BLANK_WORDS : sequenceText(name)}`);
     ids[m] = p.id;
     marks[m] = [...new Set(p.ids.length ? p.ids : [p.id])].sort(naturalCompare);
@@ -23945,7 +26838,7 @@ function writeSequence(reading7, opts = {}) {
   const notes = [];
   const pieces = unreadIds.size;
   if (unread.length) notes.push(`${pieces === 1 ? "one piece of writing has" : `${count8(pieces)} pieces of writing have`} not been read, so ${pieces === 1 ? "its words are" : "their words are"} not known \u2014 written "${UNREAD_WRITING}": ${some3([...new Set(unread.map((u) => u.where))])}`);
-  if (blank.length) notes.push(`${blank.length === 1 ? "one participant has" : `${count8(blank.length)} participants have`} no writing for a name and ${blank.length === 1 ? "is" : "are"} written with a blank one: ${list4(blank)}`);
+  if (blank2.length) notes.push(`${blank2.length === 1 ? "one participant has" : `${count8(blank2.length)} participants have`} no writing for a name and ${blank2.length === 1 ? "is" : "are"} written with a blank one: ${list4(blank2)}`);
   if (quiet.length) notes.push(`${quiet.length === 1 ? "one message has" : `${count8(quiet.length)} messages have`} no writing above ${quiet.length === 1 ? "it and is" : "them and are"} written with blank words: ${some3(quiet)}`);
   const saidIds = /* @__PURE__ */ new Set([...ps.flatMap((p) => [p.id, ...p.ids, ...p.labels]), ...messages.flatMap((m) => [...m.ids, ...m.labels])]);
   const alone = r.labels.filter((l) => !saidIds.has(l.id)).map((l) => l.id).sort(naturalCompare);
@@ -24142,7 +27035,7 @@ var GAP = 0.6;
 var TAIL = 2.5;
 var INK_STEP3 = 3;
 var ARROW_PROPORTION_PX3 = 800;
-var clamp3 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+var clamp4 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 var scaled2 = (a, k) => ({ x: a.x * k, y: a.y * k });
 function inkAlong3(points, step2, closed = false) {
   const ring2 = closed ? [...points, points[0]] : [...points];
@@ -24173,8 +27066,8 @@ function besideContent3(session, margin) {
   }
   return Number.isFinite(maxX) ? { x: maxX + margin, y: minY } : { x: 0, y: 0 };
 }
-function drawSequenceRead(session, read2, opts) {
-  const r = read2;
+function drawSequenceRead(session, read3, opts) {
+  const r = read3;
   const scale = opts.scale && opts.scale > 0 ? opts.scale : 1;
   const pid = opts.participantId;
   const U = MERMAID_TEXT_PX * scale;
@@ -24195,7 +27088,7 @@ function drawSequenceRead(session, read2, opts) {
     return { notation: r.notation, ids: {}, links: [], notes, refused, bounds: null, lastAt: t - 1 };
   }
   const words = (s) => Math.max(...s.split("\n").map((x) => [...x].length), 0);
-  const widths = nodes.map((x) => (x.symbol === "actor" ? Math.max(HEAD_D * 2, words(x.text) * CHAR3 + 1) : clamp3(words(x.text) * CHAR3 + 3, BOX_MIN, BOX_MAX)) * U);
+  const widths = nodes.map((x) => (x.symbol === "actor" ? Math.max(HEAD_D * 2, words(x.text) * CHAR3 + 1) : clamp4(words(x.text) * CHAR3 + 3, BOX_MIN, BOX_MAX)) * U);
   const col = new Map(nodes.map((x, i) => [x.id, i]));
   const gaps = nodes.slice(1).map((_, i) => Math.max(COLUMN_GAP2 * U + (widths[i] + widths[i + 1]) / 2, 0));
   for (const l of links) {
@@ -24243,9 +27136,9 @@ function drawSequenceRead(session, read2, opts) {
   const lowest = Math.max(...foot);
   let y = lowest + FIRST_ROW * U;
   const rows = links.map((l) => {
-    const at = y;
+    const at2 = y;
     y += l.self ? ROW * U + LOOP_H * U : ROW * U;
-    return at;
+    return at2;
   });
   const tallest = Math.max(...nodes.map((x) => x.symbol === "actor" ? actorH : BOX_H2 * U));
   const bottom2 = Math.max(y - ROW * U + TAIL * U + (links.length ? 0 : ROW * U), lowest + 2.5 * tallest);
@@ -24493,11 +27386,11 @@ function writeState(reading7, opts = {}) {
   if (across2) lines.push("    direction LR");
   const ids = {};
   const marks = {};
-  const blank = [];
+  const blank2 = [];
   for (const s of ordered2.filter((x) => x.symbol === "state")) {
     const m = idOf.get(s.id);
     const words = wordsOf3(s.text, s.labels, s.id, `the name of ${m}`);
-    if (words === null) blank.push(m);
+    if (words === null) blank2.push(m);
     const text = words ?? " ";
     lines.push(`    state "${stateText(text, { colons: PREPROCESSED3.test(m + text) })}" as ${m}`);
     ids[m] = s.id;
@@ -24525,7 +27418,7 @@ function writeState(reading7, opts = {}) {
   if (backwards.length) extra.push(`Mermaid reads [*] as the start where a transition leaves it and as the end where one arrives, so ${someWords(backwards)} ${backwards.length === 1 ? "reads" : "read"} the other way there`);
   extra.push(...said3);
   const saidIds = /* @__PURE__ */ new Set([...symbols.flatMap((s) => [s.id, ...s.ids, ...s.labels]), ...transitions.flatMap((k) => [...k.ids, ...k.labels])]);
-  const notes = notesFor(reading7, saidIds, unread, { what: "state", plural: "states", ids: blank }, extra);
+  const notes = notesFor(reading7, saidIds, unread, { what: "state", plural: "states", ids: blank2 }, extra);
   return {
     text: lines.join("\n") + "\n",
     notation: reading7.notation,
@@ -24725,7 +27618,7 @@ var BARB2 = 0.85;
 var INK_STEP4 = 3;
 var ARROW_PROPORTION_PX4 = 800;
 var HEAD3 = 1.2;
-var clamp4 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+var clamp5 = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 var scaled3 = (a, k) => ({ x: a.x * k, y: a.y * k });
 var sub13 = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
 var unit5 = (v) => {
@@ -24788,14 +27681,14 @@ function spanOf3(points) {
   for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
   return { pts, cum, length: cum[cum.length - 1] };
 }
-function shareAt(span, at) {
+function shareAt(span, at2) {
   let best = Infinity, bestT = 0;
   for (let i = 1; i < span.pts.length; i++) {
     const a = span.pts[i - 1], b = span.pts[i];
     const dx = b.x - a.x, dy = b.y - a.y;
     const l2 = dx * dx + dy * dy;
-    const u = l2 > 0 ? Math.max(0, Math.min(1, ((at.x - a.x) * dx + (at.y - a.y) * dy) / l2)) : 0;
-    const d = Math.hypot(at.x - (a.x + u * dx), at.y - (a.y + u * dy));
+    const u = l2 > 0 ? Math.max(0, Math.min(1, ((at2.x - a.x) * dx + (at2.y - a.y) * dy) / l2)) : 0;
+    const d = Math.hypot(at2.x - (a.x + u * dx), at2.y - (a.y + u * dy));
     if (d < best) {
       best = d;
       bestT = (span.cum[i - 1] + u * (span.cum[i] - span.cum[i - 1])) / span.length;
@@ -24812,8 +27705,8 @@ function pointAtShare(span, t) {
   const u = seg2 > 0 ? (target - span.cum[i - 1]) / seg2 : 0;
   return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u };
 }
-function drawStateRead(session, read2, opts) {
-  const r = read2;
+function drawStateRead(session, read3, opts) {
+  const r = read3;
   const scale = opts.scale && opts.scale > 0 ? opts.scale : 1;
   const pid = opts.participantId;
   const U = MERMAID_TEXT_PX * scale;
@@ -24842,7 +27735,7 @@ function drawStateRead(session, read2, opts) {
       if (x.symbol === "initial") return [x.id, { w: DOT * U, h: DOT * U }];
       if (x.symbol === "final") return [x.id, { w: RING * U, h: RING * U }];
       const lines = Math.max(1, x.text.split("\n").length);
-      return [x.id, { w: clamp4(words(x.text) * CHAR4 + 3, STATE_MIN, STATE_MAX) * U, h: Math.max(STATE_H, lines * LINE3 + 2) * U }];
+      return [x.id, { w: clamp5(words(x.text) * CHAR4 + 3, STATE_MIN, STATE_MAX) * U, h: Math.max(STATE_H, lines * LINE3 + 2) * U }];
     })
   );
   const layout = layoutLayered(
@@ -24914,8 +27807,8 @@ function drawStateRead(session, read2, opts) {
       const b = boundsOf(st().nodes.get(nodeId));
       const k = { top: 0, right: 1, bottom: 2, left: 3 }[port] ?? 0;
       if (b) {
-        const at = [{ x: (b.minX + b.maxX) / 2, y: b.minY }, { x: b.maxX, y: (b.minY + b.maxY) / 2 }, { x: (b.minX + b.maxX) / 2, y: b.maxY }, { x: b.minX, y: (b.minY + b.maxY) / 2 }][k];
-        return { end: { nodeId, site: { kind: `port:${T3.notation}`, index: k }, of: "notation", port, point: at }, bound: true };
+        const at2 = [{ x: (b.minX + b.maxX) / 2, y: b.minY }, { x: b.maxX, y: (b.minY + b.maxY) / 2 }, { x: (b.minX + b.maxX) / 2, y: b.maxY }, { x: b.minX, y: (b.minY + b.maxY) / 2 }][k];
+        return { end: { nodeId, site: { kind: `port:${T3.notation}`, index: k }, of: "notation", port, point: at2 }, bound: true };
       }
     }
     const site = near(id, want, 0.3 * U);
@@ -25151,7 +28044,7 @@ function parseLayout(regions, frame, connections = []) {
 }
 function describeLayout(layout) {
   const lines = [];
-  const walk = (n2, depth2) => {
+  const walk2 = (n2, depth2) => {
     const pad = "  ".repeat(depth2 + 1);
     const size2 = `${Math.round(n2.rect.w)}\xD7${Math.round(n2.rect.h)}`;
     const label = n2.region ? `${n2.id} (${n2.region.shape})` : `${n2.id} [${n2.flow}]`;
@@ -25161,10 +28054,10 @@ function describeLayout(layout) {
       const pct9 = n2.fractions.map((f) => `${Math.round(f * 100)}%`).join(" / ");
       if (pct9) lines.push(`${pad}  ${n2.flow} split ${pct9}, gap ${n2.gap}px`);
     }
-    n2.children.forEach((c) => walk(c, depth2 + 1));
+    n2.children.forEach((c) => walk2(c, depth2 + 1));
   };
   lines.push("LAYOUT the drawing describes:");
-  walk(layout.root, 0);
+  walk2(layout.root, 0);
   if (layout.connections.length) {
     lines.push("", "CONNECTIONS drawn between regions:");
     for (const c of layout.connections) lines.push(`  ${c.from} \u2192 ${c.to}`);
@@ -25173,11 +28066,11 @@ function describeLayout(layout) {
 }
 function regionIdsIn(layout) {
   const out = [];
-  const walk = (n2) => {
+  const walk2 = (n2) => {
     if (n2.region) out.push(n2.id);
-    n2.children.forEach(walk);
+    n2.children.forEach(walk2);
   };
-  walk(layout.root);
+  walk2(layout.root);
   return out;
 }
 
@@ -25199,7 +28092,7 @@ var styleAttr = (s) => esc2(s).replace(/\n/g, " ");
 function renderNode(node, content, depth2) {
   const pad = "  ".repeat(depth2);
   const own = node.region ? content[node.id] : void 0;
-  const tag = own?.tag && SAFE_TAGS.has(own.tag) ? own.tag : "div";
+  const tag2 = own?.tag && SAFE_TAGS.has(own.tag) ? own.tag : "div";
   const box = [];
   if (depth2 === 1) box.push("flex:1 1 0", "min-width:0", "min-height:0");
   else if (depth2 > 1) {
@@ -25222,9 +28115,9 @@ function renderNode(node, content, depth2) {
     return `${pad}<div${merged.length ? ` style="${styleAttr(merged.join(";"))}"` : ""}>${node.children.length ? "\n" + node.children.map((c) => renderNode(c, content, depth2 + 1)).join("\n") + `
 ${pad}` : ""}</div>`;
   }
-  return `${pad}<${tag}${attrs}>
+  return `${pad}<${tag2}${attrs}>
 ${pad}  <div style="${styleAttr(fill.join(";"))}">${inner}</div>
-${pad}</${tag}>`;
+${pad}</${tag2}>`;
 }
 function prepare(node, parentFlow = "leaf") {
   const main = (n2) => parentFlow === "row" ? n2.rect.w : n2.rect.h;
@@ -25400,12 +28293,12 @@ function buildGraphScaffold(graph, content, theme = {}) {
   ].join("\n");
   const nodeHtml = graph.nodes.map((n2) => {
     const own = content[n2.id];
-    const tag = own?.tag && SAFE_TAGS2.has(own.tag) ? own.tag : "div";
+    const tag2 = own?.tag && SAFE_TAGS2.has(own.tag) ? own.tag : "div";
     const box = `position:absolute;left:${Math.round(n2.rect.x)}px;top:${Math.round(n2.rect.y)}px;width:${Math.round(n2.rect.w)}px;height:${Math.round(n2.rect.h)}px`;
     const fill = ["box-sizing:border-box", "width:100%", "height:100%", "overflow:hidden", own?.style ?? ""].filter(Boolean).join(";");
-    return `  <${tag} data-region="${n2.id}" style="${styleAttr2(box)}">
+    return `  <${tag2} data-region="${n2.id}" style="${styleAttr2(box)}">
     <div style="${styleAttr2(fill)}">${own?.html ?? ""}</div>
-  </${tag}>`;
+  </${tag2}>`;
   }).join("\n");
   return [
     "<style>",
@@ -25430,7 +28323,7 @@ var PRESETS = {
   openRouter: { kind: "openai-compatible", baseUrl: "https://openrouter.ai/api/v1" },
   anthropic: { kind: "anthropic", baseUrl: "https://api.anthropic.com/v1" }
 };
-function textOf3(content) {
+function textOf4(content) {
   return typeof content === "string" ? content : content.filter((p) => p.type === "text").map((p) => p.text).join("\n");
 }
 function dataUrlParts(dataUrl) {
@@ -25478,7 +28371,7 @@ function hostOf(url) {
 function isOpenRouter(baseUrl) {
   return /^openrouter\.ai$/i.test(hostOf(baseUrl));
 }
-var NAMED2 = [
+var NAMED3 = [
   [/^openrouter\.ai$/i, "OpenRouter"],
   [/^api\.anthropic\.com$/i, "Anthropic"],
   [/^api\.openai\.com$/i, "OpenAI"],
@@ -25487,7 +28380,7 @@ var NAMED2 = [
 ];
 function whereOf(baseUrl) {
   const host = hostOf(baseUrl);
-  const named2 = NAMED2.find(([re]) => re.test(host));
+  const named2 = NAMED3.find(([re]) => re.test(host));
   return named2 ? { name: named2[1], on: "on " + named2[1] } : { name: host, on: "at " + host };
 }
 function modelWords(config) {
@@ -25726,7 +28619,7 @@ async function completeOpenAICompatible(config, messages, timeoutMs, external) {
 }
 async function completeAnthropic(config, messages, timeoutMs, external) {
   if (!config.apiKey) return { ok: false, error: "anthropic requires an API key", reason: "key" };
-  const system = messages.filter((m) => m.role === "system").map((m) => textOf3(m.content)).join("\n\n");
+  const system = messages.filter((m) => m.role === "system").map((m) => textOf4(m.content)).join("\n\n");
   const user = messages.filter((m) => m.role === "user");
   if (user.length === 0) return { ok: false, error: "no user message", reason: "request" };
   const res = await post(
@@ -25961,10 +28854,10 @@ function heldParticipant(state, seating, was) {
   if (was && state.participants.includes(was) && is(was)) return was;
   return state.participants.find(is) ?? null;
 }
-function seatOn(session, seating, was, at) {
+function seatOn(session, seating, was, at2) {
   const held2 = heldParticipant(session.getState(), seating, was);
   if (held2) return held2;
-  return session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
+  return session.join(seating.kind, seating.name, at2, seating.capability, seating.locality);
 }
 
 // src/participants/decide.ts
@@ -26031,14 +28924,14 @@ function levelOf2(answer) {
 function leadOf(answer) {
   return ranked(answer)[0]?.p ?? 0;
 }
-function createDecideParticipant(session, transport, at = 0, options = {}) {
+function createDecideParticipant(session, transport, at2 = 0, options = {}) {
   const name = options.name ?? "decide";
   const tier = options.tier ?? 1.5;
   const margin = options.flatMargin ?? FLAT_MARGIN;
   const takeAt = options.takeAt ?? 0;
   const seating = { kind: "agent", name, capability: tier, locality: options.locality ?? "local" };
-  let id = session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
-  const seat = (now = at) => id = seatOn(session, seating, id, now);
+  let id = session.join(seating.kind, seating.name, at2, seating.capability, seating.locality);
+  const seat = (now = at2) => id = seatOn(session, seating, id, now);
   async function ask(questions, now, signal) {
     seat(now);
     const snapshot = session.getState().generation;
@@ -26287,9 +29180,9 @@ function createChatDecideTransport(config, options = {}) {
     if (!questions.length) return { ok: true, answers: [], via: config.model };
     const res = await send(config, wire.build(questions), { signal });
     if (!res.ok) return { ok: false, error: res.error };
-    const read2 = wire.parse(res.text, questions);
-    if (!read2.ok) return { ok: false, error: read2.error };
-    return { ok: true, answers: read2.answers, via: config.model };
+    const read3 = wire.parse(res.text, questions);
+    if (!read3.ok) return { ok: false, error: read3.error };
+    return { ok: true, answers: read3.answers, via: config.model };
   };
 }
 
@@ -26541,10 +29434,10 @@ function readingsFor(scope) {
   }
   return out;
 }
-function takeOffer(offer, scope, session, at) {
+function takeOffer(offer, scope, session, at2) {
   const tool = registry3.get(offer.tool);
   if (!tool) throw new Error(`no tool "${offer.tool}" is registered to take "${offer.key}"`);
-  return session.withTool(tool.id, () => tool.take(offer, scope, session, at), offer.key) || {};
+  return session.withTool(tool.id, () => tool.take(offer, scope, session, at2), offer.key) || {};
 }
 function describeTools(filter = () => true) {
   return registeredTools().filter(filter).map((tool) => `${tool.name} \u2014 ${tool.describe()}`).join("\n");
@@ -26636,9 +29529,9 @@ var CORRECT = {
       data: { definitionId: sug.artifactId }
     }));
   },
-  take(offer, scope, session, at) {
+  take(offer, scope, session, at2) {
     const { definitionId: definitionId2 } = offer.data;
-    session.correct({ ids: scope.summon.enclosedIds.slice(), definitionId: definitionId2, verdict: "is-not", at });
+    session.correct({ ids: scope.summon.enclosedIds.slice(), definitionId: definitionId2, verdict: "is-not", at: at2 });
   }
 };
 
@@ -26681,13 +29574,13 @@ function writingLine(scope) {
     const n2 = scope.state.nodes.get(id);
     return n2 ? transcriptsOf(n2)[0] : void 0;
   });
-  const read2 = ids.length >= 2 && said3.every((t) => !!t && !!t.text);
+  const read3 = ids.length >= 2 && said3.every((t) => !!t && !!t.text);
   return {
     ids,
     said: said3,
-    read: read2,
-    text: read2 ? said3.map((t) => t.text).join(" ") : "",
-    confidence: read2 ? Math.min(...said3.map((t) => t.confidence)) : 0
+    read: read3,
+    text: read3 ? said3.map((t) => t.text).join(" ") : "",
+    confidence: read3 ? Math.min(...said3.map((t) => t.confidence)) : 0
   };
 }
 function unionOf(boxes) {
@@ -26751,18 +29644,18 @@ var TEXT = {
     }
     return out;
   },
-  take(offer, scope, session, at) {
+  take(offer, scope, session, at2) {
     const data = offer.data;
     const sum = scope.summon;
     switch (data.act) {
       // The field closes first, where it always did; the host does the rest.
       case "fold":
-        session.dismiss(sum.id, at);
-        session.deselect(at);
+        session.dismiss(sum.id, at2);
+        session.deselect(at2);
         return { host: "fold" };
       case "line":
       case "word":
-        session.dismiss(sum.id, at);
+        session.dismiss(sum.id, at2);
         return { host: "text" };
       case "writing":
         return { host: "text" };
@@ -26899,16 +29792,16 @@ var LABEL = {
     if (!acts.label) return [];
     return [{ ...labelOffer(scope, scope.marks.slice(), scope.word, { key: "label-word", verbs: [] }), place: "head", ...acts.differ ? { note: "only the words" } : {} }];
   },
-  take(offer, scope, session, at) {
+  take(offer, scope, session, at2) {
     const { word, targets } = offer.data;
-    return { detail: labelInk(session, { summonId: scope.summon.id, ids: targets, word, at, nameOf: scope.host.nameOf, offer: offer.key }) };
+    return { detail: labelInk(session, { summonId: scope.summon.id, ids: targets, word, at: at2, nameOf: scope.host.nameOf, offer: offer.key }) };
   }
 };
 
 // src/tools/name.ts
 var NAMING_IS = "naming makes one thing of them, a definition the library keeps and the next drawing like it is offered as; it writes no word on the ink";
-function nameMarks(session, summonId, name, at) {
-  return session.withTool(NAME2.id, () => session.bless({ summonId, name, at }), "name-word");
+function nameMarks(session, summonId, name, at2) {
+  return session.withTool(NAME2.id, () => session.bless({ summonId, name, at: at2 }), "name-word");
 }
 var NAME2 = {
   id: "name",
@@ -26934,9 +29827,9 @@ var NAME2 = {
       data: { word: scope.word }
     }];
   },
-  take(offer, scope, session, at) {
+  take(offer, scope, session, at2) {
     const { word } = offer.data;
-    return { made: nameMarks(session, scope.summon.id, word, at) };
+    return { made: nameMarks(session, scope.summon.id, word, at2) };
   }
 };
 
@@ -26976,11 +29869,11 @@ var TIDY = {
   name: "tidy",
   describe: () => "line marks up and space them evenly, or match their sizes; the ink untouched",
   offers: (scope) => conversionOffers(scope, "tidy"),
-  take(offer, scope, session, at) {
+  take(offer, scope, session, at2) {
     const { effect } = offer.data;
     const ids = scope.summon.enclosedIds.slice();
-    if (effect.kind === "tidy") session.tidy({ ids, mode: "align", axis: effect.axis, at });
-    else if (effect.kind === "equalize") session.tidy({ ids, mode: "equalize", at });
+    if (effect.kind === "tidy") session.tidy({ ids, mode: "align", axis: effect.axis, at: at2 });
+    else if (effect.kind === "equalize") session.tidy({ ids, mode: "equalize", at: at2 });
     return { detail: { mode: effect.kind, count: ids.length } };
   }
 };
@@ -26991,10 +29884,10 @@ var CONTROL = {
   name: "drawn controls",
   describe: () => "a line with a dot on it becomes a slider: its value is where the knob sits",
   offers: (scope) => conversionOffers(scope, "control"),
-  take(_offer, scope, session, at) {
-    const id = session.bless({ summonId: scope.summon.id, name: "slider", at });
+  take(_offer, scope, session, at2) {
+    const id = session.bless({ summonId: scope.summon.id, name: "slider", at: at2 });
     if (!id) return { made: null };
-    session.attachCode({ participantId: LOCAL_PARTICIPANT, nodeId: id, kind: "control", code: JSON.stringify({ min: 0, max: 1 }), at: at + 1 });
+    session.attachCode({ participantId: LOCAL_PARTICIPANT, nodeId: id, kind: "control", code: JSON.stringify({ min: 0, max: 1 }), at: at2 + 1 });
     return { made: id };
   }
 };
@@ -27028,9 +29921,9 @@ var CLEAN = {
       data: { ids: cands.map((c) => c.id), summary: shapesSummary(cands) }
     }];
   },
-  take(offer, _scope, session, at) {
+  take(offer, _scope, session, at2) {
     const { ids, summary } = offer.data;
-    if (ids.length) session.snap({ ids, at });
+    if (ids.length) session.snap({ ids, at: at2 });
     return { detail: { ids, summary } };
   }
 };
@@ -27065,15 +29958,15 @@ var GRAPH3D = {
       verbs: ["3d", "show in 3d", "in 3d", "spheres"]
     }];
   },
-  take(_offer, scope, session, at) {
+  take(_offer, scope, session, at2) {
     const sum = scope.summon;
     const match = sum.suggestions.find((x) => x.kind === "match");
-    const made = match ? session.bless({ summonId: sum.id, suggestionId: match.id, at }) : session.bless({ summonId: sum.id, name: "graph in 3d", at });
+    const made = match ? session.bless({ summonId: sum.id, suggestionId: match.id, at: at2 }) : session.bless({ summonId: sum.id, name: "graph in 3d", at: at2 });
     if (!made) return { made: null, detail: { ok: false, error: "could not hold that group" } };
     const built = buildGraph3D(session, made);
     if (!built.ok) return { made, detail: { ok: false, error: built.error } };
-    session.attachCode({ participantId: built.participantId, nodeId: made, kind: "run", code: built.code, prompt: "show it in 3D", at: at + 1 });
-    session.clock({ nodeId: made, op: "play", at: at + 2 });
+    session.attachCode({ participantId: built.participantId, nodeId: made, kind: "run", code: built.code, prompt: "show it in 3D", at: at2 + 1 });
+    session.clock({ nodeId: made, op: "play", at: at2 + 2 });
     return { made, detail: { ok: true, reasoning: built.reasoning } };
   }
 };
@@ -27152,7 +30045,7 @@ var FRAMES2 = {
     }
     return out;
   },
-  take(offer, scope, session, at) {
+  take(offer, scope, session, at2) {
     const s = session.getState();
     const members = artifactsIn(s, scope.summon.enclosedIds);
     const data = offer.data;
@@ -27160,8 +30053,8 @@ var FRAMES2 = {
       if (!members.length) return { made: null };
       const name = scope.text.replace(/^frame\s*:?\s*/i, "");
       const connections2 = bestWiring(members, s.nodes);
-      session.dismiss(scope.summon.id, at);
-      const made = session.frame({ ids: members, name: name || "frame", connections: connections2, at: at + 1 });
+      session.dismiss(scope.summon.id, at2);
+      const made = session.frame({ ids: members, name: name || "frame", connections: connections2, at: at2 + 1 });
       return { made, detail: { members: members.length } };
     }
     const template = s.nodes.get(data.template);
@@ -27174,8 +30067,8 @@ var FRAMES2 = {
       const dst = members.find((id) => id !== src && ifaces.get(id).accepts.some((a) => a.id === c.to.port));
       if (src && dst) connections.push({ from: { id: src, port: c.from.port }, to: { id: dst, port: c.to.port }, reasoning: "as in " + (wordOf(template) || template.id) });
     }
-    session.dismiss(scope.summon.id, at);
-    return { made: session.frame({ ids: members, name: wordOf(template) || "frame", connections, at: at + 1 }) };
+    session.dismiss(scope.summon.id, at2);
+    return { made: session.frame({ ids: members, name: wordOf(template) || "frame", connections, at: at2 + 1 }) };
   }
 };
 
@@ -27215,11 +30108,11 @@ var TEXT_EDIT = {
     }
     return out;
   },
-  take(offer, scope, session, at) {
+  take(offer, scope, session, at2) {
     const { act } = offer.data;
     if (act === "flip") return { host: "flip" };
-    session.dismiss(scope.summon.id, at);
-    session.deselect(at);
+    session.dismiss(scope.summon.id, at2);
+    session.deselect(at2);
     return { host: "edit-text" };
   }
 };
@@ -27314,10 +30207,10 @@ var VERBS3 = {
     }
     return out;
   },
-  take(offer, _scope, session, at) {
+  take(offer, _scope, session, at2) {
     const data = offer.data;
     if (data.model) return { host: "behave-model" };
-    session.behave({ nodeId: data.nodeId, behaviour: data.behaviour, participantId: LOCAL_PARTICIPANT, at });
+    session.behave({ nodeId: data.nodeId, behaviour: data.behaviour, participantId: LOCAL_PARTICIPANT, at: at2 });
     return {};
   }
 };
@@ -27357,9 +30250,9 @@ var CLOCKS = {
     }
     return out;
   },
-  take(offer, _scope, session, at) {
+  take(offer, _scope, session, at2) {
     const { nodeId, op } = offer.data;
-    session.clock({ nodeId, op, at });
+    session.clock({ nodeId, op, at: at2 });
   }
 };
 
@@ -27458,7 +30351,7 @@ Transcribe its text, top to bottom, one text for each line of the page, in the h
 
 Reply with ONLY a JSON object, no prose, no code fences:
 {"lines":["the first line","the second line"]}`;
-var clamp01 = (v) => {
+var clamp012 = (v) => {
   const n2 = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n2) ? Math.max(0, Math.min(1, n2)) : 0.5;
 };
@@ -27481,7 +30374,7 @@ function parseLineReadings(text, count9) {
   const put = (line, t, confidence) => {
     if (!Number.isInteger(line) || line < 1 || line > count9) return;
     const said3 = typeof t === "string" ? t.trim() : "";
-    if (said3) out[line - 1].push({ text: said3, confidence: clamp01(confidence) });
+    if (said3) out[line - 1].push({ text: said3, confidence: clamp012(confidence) });
   };
   const parsed = jsonIn(clean);
   let items = null;
@@ -27701,20 +30594,20 @@ var KEEP = {
       verbs: ["keep", "keep as drawing"]
     }];
   },
-  take(_offer, scope, session, at) {
+  take(_offer, scope, session, at2) {
     const sum = scope.summon;
     const keep = sum.suggestions.find((x) => x.kind === "keep-as-drawing");
-    if (keep) return { made: session.bless({ summonId: sum.id, suggestionId: keep.id, at }) };
-    session.dismiss(sum.id, at);
+    if (keep) return { made: session.bless({ summonId: sum.id, suggestionId: keep.id, at: at2 }) };
+    session.dismiss(sum.id, at2);
     return {};
   }
 };
 
 // src/tools/structure.ts
-function standStructure(session, artifactId, prompt2, at) {
+function standStructure(session, artifactId, prompt2, at2) {
   return session.withTool(STRUCTURE.id, () => {
     const structure = buildStructure(session, artifactId);
-    if (structure.ok) session.attachCode({ participantId: structure.participantId, nodeId: artifactId, kind: "html", code: structure.code, prompt: prompt2, at });
+    if (structure.ok) session.attachCode({ participantId: structure.participantId, nodeId: artifactId, kind: "html", code: structure.code, prompt: prompt2, at: at2 });
     return structure;
   });
 }
@@ -27723,9 +30616,9 @@ var STRUCTURE = {
   name: "the structure",
   describe: () => "a page or a diagram from the drawing \u2014 every region in place, no words \u2014 standing at once while a model writes",
   offers: () => [],
-  take(offer, _scope, session, at) {
+  take(offer, _scope, session, at2) {
     const { artifactId, prompt: prompt2 } = offer.data;
-    const built = standStructure(session, artifactId, prompt2, at);
+    const built = standStructure(session, artifactId, prompt2, at2);
     return { made: built.ok ? artifactId : null, detail: built };
   }
 };
@@ -27848,7 +30741,7 @@ var MERMAID = {
       data: { notation: m.reading.notation }
     }];
   },
-  take(_offer, scope, session, at) {
+  take(_offer, scope, session, at2) {
     const m = mermaidOf(scope);
     if (!m) return { made: null, detail: { ok: false, error: "the marks held no longer read as a diagram" } };
     const box = unionOf(scope.marks.map((id) => boundsOf(scope.state.nodes.get(id))).filter((b) => !!b));
@@ -27857,7 +30750,7 @@ var MERMAID = {
     const h2 = Math.min(MAX_H, Math.max(MIN_H, box.maxY - box.minY));
     const x = box.maxX + Math.max(MIN_GAP, (box.maxX - box.minX) * GAP_SHARE);
     const path = `${m.reading.notation}.mmd`;
-    const made = session.import({ kind: "mermaid", path, name: path, bounds: { minX: x, minY: box.minY, maxX: x + w2, maxY: box.minY + h2 }, code: m.said.text, at });
+    const made = session.import({ kind: "mermaid", path, name: path, bounds: { minX: x, minY: box.minY, maxX: x + w2, maxY: box.minY + h2 }, code: m.said.text, at: at2 });
     return { made, detail: { ok: !!made, notation: m.reading.notation, diagram: m.said.diagram, text: m.said.text, notes: m.said.notes, reading: describeNotation(m.reading) } };
   }
 };
@@ -27882,10 +30775,10 @@ var MERMAID_DRAW = {
     const node = scope.state.nodes.get(id);
     const rep = node && codeRepOf(node);
     if (!rep || rep.data.kind !== "mermaid" || !rep.data.code) return [];
-    const read2 = readMermaid(rep.data.code);
-    if (!read2.notation) return [];
-    const name = notationById(read2.notation)?.name ?? read2.notation;
-    const what = `${counted(read2.nodes.length, THINGS[read2.notation] ?? ["node", "nodes"])} and ${counted(read2.links.length, LINKS[read2.notation] ?? ["link", "links"])} read as ${withArticle(name)}`;
+    const read3 = readMermaid(rep.data.code);
+    if (!read3.notation) return [];
+    const name = notationById(read3.notation)?.name ?? read3.notation;
+    const what = `${counted(read3.nodes.length, THINGS[read3.notation] ?? ["node", "nodes"])} and ${counted(read3.links.length, LINKS[read3.notation] ?? ["link", "links"])} read as ${withArticle(name)}`;
     return [{
       key: "mermaid-draw",
       label: "Draw it",
@@ -27893,7 +30786,7 @@ var MERMAID_DRAW = {
       base: 0.95,
       tool: "mermaid-draw",
       verbs: ["draw it", "ink it"],
-      data: { artifact: id, notation: read2.notation }
+      data: { artifact: id, notation: read3.notation }
     }];
   },
   take(offer) {
@@ -27918,13 +30811,13 @@ function diagramOf(state, ids) {
 }
 var reasonOf3 = (reading7) => `${describeNotation(reading7)} \u2014 connectors at right angles between their ports; your ink stays faint beneath`;
 var centreOf8 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
-function tidyDiagram(session, reading7, at) {
+function tidyDiagram(session, reading7, at2) {
   let ranks = 0;
   const plan = tidyPlanOf(session.getState().nodes, reading7);
   for (const rank2 of plan.ranks) {
     if (rank2.spread <= TIDY_TOLERANCE) continue;
     const before = new Map(rank2.ids.map((id) => [id, centreOf8(boundsOf(session.getState().nodes.get(id)))]));
-    session.tidy({ ids: rank2.ids, mode: "align", axis: rank2.axis, at });
+    session.tidy({ ids: rank2.ids, mode: "align", axis: rank2.axis, at: at2 });
     ranks++;
     const state2 = session.getState();
     for (const id of rank2.ids) {
@@ -27934,12 +30827,12 @@ function tidyDiagram(session, reading7, at) {
       const c = centreOf8(now), dx = c.x - was.x, dy = c.y - was.y;
       if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) continue;
       const words = reading7.labels.filter((l) => l.of === id && l.id !== id && state2.contentIds.includes(l.id)).map((l) => l.id);
-      if (words.length) session.move({ ids: words, dx, dy, at });
+      if (words.length) session.move({ ids: words, dx, dy, at: at2 });
     }
   }
   const state = session.getState();
   const ids = reading7.connectors.map((c) => c.id).filter((id) => state.nodes.get(id) && routable(state.nodes.get(id), state.nodes) && !routeRepOf(state.nodes.get(id)));
-  return { ranks, routed: session.route({ ids, at }) };
+  return { ranks, routed: session.route({ ids, at: at2 }) };
 }
 var ROUTE = {
   id: "route",
@@ -27987,14 +30880,14 @@ var ROUTE = {
     }
     return out;
   },
-  take(offer, scope, session, at) {
+  take(offer, scope, session, at2) {
     const notation = offer.data?.notation;
     const state = session.getState();
     const d = diagramOf(state, scope.marks);
     if (!d || notation && d.reading.notation !== notation) return { detail: { ok: false, error: "the marks held no longer read as a diagram with connectors to route" } };
-    if (offer.key === "unroute") return { detail: { ok: true, unrouted: session.route({ ids: d.routed, mode: "raw", at }) } };
-    if (offer.key === "route") return { detail: { ok: true, routed: session.route({ ids: d.toRoute, at }) } };
-    const done = tidyDiagram(session, d.reading, at);
+    if (offer.key === "unroute") return { detail: { ok: true, unrouted: session.route({ ids: d.routed, mode: "raw", at: at2 }) } };
+    if (offer.key === "route") return { detail: { ok: true, routed: session.route({ ids: d.toRoute, at: at2 }) } };
+    const done = tidyDiagram(session, d.reading, at2);
     return { detail: { ok: true, ...done, notation: d.reading.notation } };
   }
 };
@@ -28147,9 +31040,9 @@ var REGION = {
       data: { ids: scope.marks.slice() }
     }];
   },
-  take(offer, scope, session, at) {
+  take(offer, scope, session, at2) {
     const d = offer.data;
-    const made = makeRegion(session, { ids: d.ids, at, summonId: scope.summon.id, offer: offer.key });
+    const made = makeRegion(session, { ids: d.ids, at: at2, summonId: scope.summon.id, offer: offer.key });
     return made ? { made: made.id, detail: made } : { detail: null };
   }
 };
@@ -28199,17 +31092,6 @@ function nounOf(node) {
   if (!top) return "a mark";
   const t = top.replace(/^type:/, "");
   return NOUN[t] || "a " + t;
-}
-var ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
-function decodeEntities(s) {
-  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
-    if (e[0] === "#") {
-      const n2 = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-      return n2 > 0 && n2 < 1114112 ? String.fromCodePoint(n2) : m;
-    }
-    const r = ENTITIES[e.toLowerCase()];
-    return r === void 0 ? m : r;
-  });
 }
 var squash = (s) => s.replace(/\s+/g, " ").trim();
 function pageWords(html) {
@@ -28546,7 +31428,7 @@ function lexical(q, words) {
   let total = 0, follows = true, last = -1;
   const spans = [];
   for (const t of q) {
-    let best = 0, at = -1, span = null;
+    let best = 0, at2 = -1, span = null;
     for (let i = 0; i < words.length; i++) {
       const w2 = words[i];
       let s = 0;
@@ -28554,15 +31436,15 @@ function lexical(q, words) {
       else if (w2.text.startsWith(t.text)) s = PREFIX;
       if (s > best) {
         best = s;
-        at = i;
+        at2 = i;
         span = s === EXACT ? [w2.start, w2.end] : [w2.start, Math.min(w2.end, w2.start + t.text.length)];
         if (s === EXACT) break;
       }
     }
     if (!best || !span) return null;
     total += best;
-    if (last >= 0 && at !== last + 1) follows = false;
-    last = at;
+    if (last >= 0 && at2 !== last + 1) follows = false;
+    last = at2;
     spans.push(span);
   }
   let score2 = total / q.length;
@@ -28828,11 +31710,11 @@ function fade(gap, limit) {
   const far = limit * CONTEXT_FADE;
   return gap >= far ? 0 : 1 - (gap - limit) / (far - limit);
 }
-var isPoint = (at) => !Array.isArray(at) && typeof at.x === "number" && typeof at.y === "number";
+var isPoint = (at2) => !Array.isArray(at2) && typeof at2.x === "number" && typeof at2.y === "number";
 function lastAtOf(events) {
-  let at = 0;
-  for (let i = events.length - 1, n2 = 0; i >= 0 && n2 < 64; i--, n2++) if (events[i].at > at) at = events[i].at;
-  return at;
+  let at2 = 0;
+  for (let i = events.length - 1, n2 = 0; i >= 0 && n2 < 64; i--, n2++) if (events[i].at > at2) at2 = events[i].at;
+  return at2;
 }
 var article2 = (word) => /^[aeiou]/i.test(word) ? "an" : "a";
 var CONCEPT_NOUN = {
@@ -28841,19 +31723,19 @@ var CONCEPT_NOUN = {
 };
 var conceptNoun = (name) => CONCEPT_NOUN[name] ?? article2(name) + " " + name;
 var shortReason = (reasoning) => reasoning.split(/ \(| — /)[0].trim();
-function emptyContext(scopeIds, at, affinity) {
-  return { scopeIds, notations: [], concepts: [], recent: [], kind: null, key: null, at, affinity };
+function emptyContext(scopeIds, at2, affinity) {
+  return { scopeIds, notations: [], concepts: [], recent: [], kind: null, key: null, at: at2, affinity };
 }
 function isEmptyContext(ctx) {
   return !ctx || !ctx.notations.length && !ctx.concepts.length && !ctx.recent.length;
 }
-function contextAt(board2, at, opts = {}) {
+function contextAt(board2, at2, opts = {}) {
   const state = board2.getState();
   const events = board2.getEvents();
   const now = opts.now ?? lastAtOf(events);
   const affinity = affinityOf(state.packs ?? [], opts.packs ?? shippedPack);
-  const point2 = isPoint(at) ? at : null;
-  const scopeIds = point2 ? [] : [...new Set(at)].filter((id) => state.nodes.has(id));
+  const point2 = isPoint(at2) ? at2 : null;
+  const scopeIds = point2 ? [] : [...new Set(at2)].filter((id) => state.nodes.has(id));
   const scope = new Set(scopeIds);
   const boxes = [];
   for (const id of scopeIds) {
@@ -28927,13 +31809,13 @@ function contextAt(board2, at, opts = {}) {
   const notations = /* @__PURE__ */ new Map();
   const concepts = /* @__PURE__ */ new Map();
   for (const hood of hoods) {
-    let read2 = [];
+    let read3 = [];
     try {
-      read2 = notationsOf(state, hood.ids);
+      read3 = notationsOf(state, hood.ids);
     } catch {
-      read2 = [];
+      read3 = [];
     }
-    for (const r of read2) {
+    for (const r of read3) {
       if (!(r.confidence >= NOTATION_FLOOR)) continue;
       const weight = r.confidence * hood.nearness;
       const had = notations.get(r.notation);
@@ -29053,8 +31935,8 @@ var RECENT_SAME_TOOL = 0.5;
 var STEADY_MARGIN = 0.1;
 var STEADY_MS = 12e4;
 function liftTargets(kind, affinity) {
-  const at = kind.indexOf(":");
-  const type = kind.slice(0, at), name = kind.slice(at + 1);
+  const at2 = kind.indexOf(":");
+  const type = kind.slice(0, at2), name = kind.slice(at2 + 1);
   const own = type === "notation" ? ["on:" + name, "tool:notation:" + name] : ["on:" + name];
   return own.concat(affinity?.[kind] ?? []);
 }
@@ -29186,11 +32068,11 @@ function layOut(s, drawings) {
   const size2 = Math.max(1, ...boxes.map((b) => Math.max(b.maxX - b.minX, b.maxY - b.minY)));
   const cell = size2 * 3;
   const across2 = Math.max(1, Math.ceil(Math.sqrt(drawings.length)));
-  let at = T0;
+  let at2 = T0;
   return drawings.map((d, i) => {
     const b = boxes[i];
     const dx = i % across2 * cell - b.minX, dy = Math.floor(i / across2) * cell - b.minY;
-    return d.map((st) => s.addStroke(st.map((p) => ({ x: p.x + dx, y: p.y + dy })), at += MARK_GAP_MS, void 0, 1, { content: true }));
+    return d.map((st) => s.addStroke(st.map((p) => ({ x: p.x + dx, y: p.y + dy })), at2 += MARK_GAP_MS, void 0, 1, { content: true }));
   });
 }
 function signatureIn(nodes, ids) {
@@ -29220,13 +32102,13 @@ function packBench(pack, opts = {}) {
     const s = boardUsing(pack);
     const laid = layOut(s, jobs.map((j) => j.strokes));
     const misses = [];
-    let read2 = 0;
+    let read3 = 0;
     laid.forEach((ids, i) => {
       const top = s.matchesOf(ids)[0];
-      if (top && top.artifactId === want) read2++;
+      if (top && top.artifactId === want) read3++;
       else misses.push({ drawing: jobs[i].label, top: top ? top.name : null, score: top ? top.score : 0 });
     });
-    own.push({ definition: def.name, drawn: jobs.length, read: read2, rate: jobs.length ? read2 / jobs.length : 1, misses });
+    own.push({ definition: def.name, drawn: jobs.length, read: read3, rate: jobs.length ? read3 / jobs.length : 1, misses });
   }
   const ownDrawn = own.reduce((a, o) => a + o.drawn, 0);
   const ownRead = own.reduce((a, o) => a + o.read, 0);
@@ -29238,9 +32120,9 @@ function packBench(pack, opts = {}) {
   if (prepared && corpus.length) {
     const s = prepared.board;
     const laid = prepared.ids;
-    const at = Math.max(T0, ...s.getEvents().map((e) => e.at)) + MARK_GAP_MS;
+    const at2 = Math.max(T0, ...s.getEvents().map((e) => e.at)) + MARK_GAP_MS;
     prepared.packs.set(ref, pack);
-    s.use(ref, at);
+    s.use(ref, at2);
     const nodes = s.getState().nodes;
     const sameAs = (sig2, defId) => {
       const d = defs.find((x) => x.id === defId);
@@ -29270,7 +32152,7 @@ function packBench(pack, opts = {}) {
         missed.push({ label: c.label, is: c.is, top: top ? top.name : null, score: top ? top.score : 0 });
       }
     });
-    s.unuse(ref, at + 1);
+    s.unuse(ref, at2 + 1);
   }
   return {
     pack: ref,
@@ -29624,11 +32506,11 @@ function parseTranscripts(text) {
     const rec = item;
     const t = typeof rec.text === "string" ? rec.text : typeof rec.label === "string" ? rec.label : "";
     if (!t.trim()) continue;
-    out.push({ text: t.trim(), confidence: clamp012(rec.confidence) });
+    out.push({ text: t.trim(), confidence: clamp013(rec.confidence) });
   }
   return out.sort((a, b) => b.confidence - a.confidence);
 }
-function clamp012(v) {
+function clamp013(v) {
   const n2 = typeof v === "number" ? v : Number(v);
   if (!Number.isFinite(n2)) return 0.5;
   return Math.max(0, Math.min(1, n2));
@@ -29654,7 +32536,7 @@ function parseReadings(text) {
     if (!label) continue;
     readings2.push({
       label,
-      confidence: clamp012(rec.confidence),
+      confidence: clamp013(rec.confidence),
       reasoning: typeof rec.reasoning === "string" ? rec.reasoning.trim() : ""
     });
   }
@@ -29862,12 +32744,12 @@ function parseBehaviourReply(text) {
   unread = (Array.isArray(parsed.unread) ? parsed.unread : []).map((u) => String(u));
   return { terms, unread, dropped };
 }
-function createAgentParticipant(session, config, at = 0, options = {}) {
+function createAgentParticipant(session, config, at2 = 0, options = {}) {
   const send = options.transport ?? ((c, m, o) => complete(c, m, o));
   const name = options.name ?? providerLabel(config);
   const seating = { kind: "agent", name, capability: options.tier ?? providerTier(config), locality: options.locality ?? providerLocality(config) };
-  let id = session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
-  const seat = (now = at) => id = seatOn(session, seating, id, now);
+  let id = session.join(seating.kind, seating.name, at2, seating.capability, seating.locality);
+  const seat = (now = at2) => id = seatOn(session, seating, id, now);
   const staleWhy = (fallback) => session.getState().staleResult?.detail ?? fallback;
   async function interpret(nodeIds, now, signal) {
     seat(now);
@@ -30059,7 +32941,7 @@ ${brief}`, ids: planned.ids, build: planned.build };
       raw: result2.text
     };
   }
-  async function read2(args) {
+  async function read3(args) {
     seat(args.at);
     if (!config.vision) return { ok: false, transcripts: [], error: `${name} cannot see images` };
     const state = session.getState();
@@ -30180,15 +33062,15 @@ The human asks: ${prompt2}` }
     const shapes = parseShapes(result2.text);
     if (shapes.length === 0) return { ok: false, ids: [], shapes: [], error: "nothing drawable in reply", raw: result2.text };
     const ids = [];
-    let at2 = args.at;
+    let at3 = args.at;
     for (const s of shapes) {
       const points = strokeFor(s);
       if (!points) continue;
-      const made = session.addStroke(points, at2, id, 1, { content: true });
+      const made = session.addStroke(points, at3, id, 1, { content: true });
       ids.push(made);
-      at2 += 1;
-      if (s.why) session.answer({ participantId: id, question: prompt2, text: s.why, aboutIds: [made], at: at2 });
-      at2 += 1;
+      at3 += 1;
+      if (s.why) session.answer({ participantId: id, question: prompt2, text: s.why, aboutIds: [made], at: at3 });
+      at3 += 1;
     }
     if (ids.length === 0) return { ok: false, ids: [], shapes, error: "every shape had no size", raw: result2.text };
     return { ok: true, ids, shapes, raw: result2.text };
@@ -30268,11 +33150,11 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
   }
   return { get id() {
     return id;
-  }, seat, name, config, interpret, ask, generate, read: read2, readLines, readPicture, draw, behave, program };
+  }, seat, name, config, interpret, ask, generate, read: read3, readLines, readPicture, draw, behave, program };
 }
 
 // src/participants/bridge.ts
-function createBridgeParticipant(session, at = 0, options = {}) {
+function createBridgeParticipant(session, at2 = 0, options = {}) {
   const name = options.name ?? "bridge";
   const timeoutMs = options.timeoutMs ?? 6e5;
   let waiting = null;
@@ -30282,9 +33164,9 @@ function createBridgeParticipant(session, at = 0, options = {}) {
   function settle(result2) {
     if (!waiting) return;
     clearTimeout(waiting.timer);
-    const { resolve } = waiting;
+    const { resolve: resolve2 } = waiting;
     waiting = null;
-    resolve(result2);
+    resolve2(result2);
     notify();
   }
   const describeForHand = (content) => typeof content === "string" ? content : content.map((p) => p.type === "text" ? p.text : "[an image of the ink is attached]").join("\n");
@@ -30296,13 +33178,13 @@ function createBridgeParticipant(session, at = 0, options = {}) {
       id: `bridge:${++counter2}`,
       // A person answering by hand gets the words; an image the bridge cannot
       // show is said to be there rather than silently dropped.
-      system: textOf3(messages.find((m) => m.role === "system")?.content ?? ""),
+      system: textOf4(messages.find((m) => m.role === "system")?.content ?? ""),
       user: describeForHand(messages.find((m) => m.role === "user")?.content ?? ""),
       at: Date.now()
     };
-    return new Promise((resolve) => {
+    return new Promise((resolve2) => {
       const timer2 = setTimeout(() => settle({ ok: false, error: `no answer within ${timeoutMs}ms` }), timeoutMs);
-      waiting = { request, resolve, timer: timer2 };
+      waiting = { request, resolve: resolve2, timer: timer2 };
       if (opts.signal) {
         if (opts.signal.aborted) settle({ ok: false, error: "cancelled" });
         else opts.signal.addEventListener("abort", () => settle({ ok: false, error: "cancelled" }), { once: true });
@@ -30311,7 +33193,7 @@ function createBridgeParticipant(session, at = 0, options = {}) {
     });
   };
   const config = { kind: "openai-compatible", baseUrl: "bridge://local", model: name };
-  const agent = createAgentParticipant(session, config, at, {
+  const agent = createAgentParticipant(session, config, at2, {
     transport,
     name,
     tier: options.tier ?? 2,
@@ -30388,8 +33270,8 @@ function refusalOf(text) {
   }
 }
 function seatReplyText(p) {
-  const refuse = p.refuse === void 0 || p.refuse === null ? "" : String(p.refuse).trim();
-  if (refuse) return { text: JSON.stringify({ refuse }) };
+  const refuse2 = p.refuse === void 0 || p.refuse === null ? "" : String(p.refuse).trim();
+  if (refuse2) return { text: JSON.stringify({ refuse: refuse2 }) };
   if (typeof p.reply === "string") return p.reply.trim() ? { text: p.reply } : { error: "an empty reply" };
   if (p.reply !== void 0 && p.reply !== null && typeof p.reply === "object") return { text: JSON.stringify(p.reply) };
   return { error: 'an answer is "reply" (what the contract asks for) or "refuse" (one clause saying why)' };
@@ -30415,13 +33297,13 @@ function seatBriefs(state) {
     const text = String(data.text ?? "");
     const maker = makerOf(node, state.nodes);
     if (question === SEAT_QUESTION) {
-      const read2 = readBriefText(text);
+      const read3 = readBriefText(text);
       briefs.push({
         key: id,
-        asked: read2.asked,
-        ask: askOf(read2.asked),
-        contract: read2.contract,
-        brief: read2.brief,
+        asked: read3.asked,
+        ask: askOf(read3.asked),
+        contract: read3.contract,
+        brief: read3.brief,
         about: aboutIdsOf(node),
         from: maker.from,
         who: maker.who,
@@ -30455,7 +33337,7 @@ function isSeatTraffic(node, nodes) {
 function forTheHand(content) {
   return typeof content === "string" ? content : content.map((p) => p.type === "text" ? p.text : SEAT_PICTURE).join("\n");
 }
-function createSeatParticipant(session, at = 0, options = {}) {
+function createSeatParticipant(session, at2 = 0, options = {}) {
   const name = options.name ?? SEAT_NAME;
   const timeoutMs = options.timeoutMs ?? SEAT_WAIT_MS;
   const parker = options.participantId ?? LOCAL_PARTICIPANT;
@@ -30546,14 +33428,14 @@ function createSeatParticipant(session, at = 0, options = {}) {
     const asked = askedLine(call.ask, call.words);
     const text = briefText({
       asked,
-      system: textOf3(messages.find((m) => m.role === "system")?.content ?? ""),
+      system: textOf4(messages.find((m) => m.role === "system")?.content ?? ""),
       user: forTheHand(messages.find((m) => m.role === "user")?.content ?? "")
     });
     const t = now();
     const key2 = session.answer({ participantId: parker, question: SEAT_QUESTION, text, aboutIds: call.about, at: t });
     if (!key2) return Promise.resolve({ ok: false, error: "nothing the brief was about is on the board \u2014 nothing was parked" });
     const node = session.getState().nodes.get(key2);
-    return new Promise((resolve) => {
+    return new Promise((resolve2) => {
       const w2 = {
         key: key2,
         asked,
@@ -30562,7 +33444,7 @@ function createSeatParticipant(session, at = 0, options = {}) {
         at: t,
         text,
         signalled: !!opts.signal,
-        resolve,
+        resolve: resolve2,
         cancelTimer: () => {
         },
         offSignal: () => {
@@ -30583,7 +33465,7 @@ function createSeatParticipant(session, at = 0, options = {}) {
       changed2("parked", w2);
     });
   };
-  const agent = createAgentParticipant(session, config, at, { transport, name, tier: 2, locality: providerLocality(config) });
+  const agent = createAgentParticipant(session, config, at2, { transport, name, tier: 2, locality: providerLocality(config) });
   function via(call, run2) {
     asking = call;
     try {
@@ -30729,7 +33611,7 @@ function writeEr(reading7, opts = {}) {
   const marks = {};
   const unreadIds = /* @__PURE__ */ new Set();
   const unread = [];
-  const blank = [];
+  const blank2 = [];
   for (const s of ordered2) {
     const m = idOf.get(s.id);
     const w2 = saidWriting(s.name, opts);
@@ -30737,7 +33619,7 @@ function writeEr(reading7, opts = {}) {
       unread.push({ where: `the name of ${m}`, ids: w2.unread });
       w2.unread.forEach((id) => unreadIds.add(id));
     }
-    if (w2.text === null) blank.push(m);
+    if (w2.text === null) blank2.push(m);
     lines.push(`    ${m}[${mermaidString(w2.text ?? " ", { colons: PREPROCESSED4.test(m + (w2.text ?? "")) })}]`);
     ids[m] = s.id;
     marks[m] = [...new Set(s.ids.length ? s.ids : [s.id])].sort(naturalCompare);
@@ -30749,20 +33631,20 @@ function writeEr(reading7, opts = {}) {
   const written2 = [...rels].sort((p, q) => place2.get(p.from) - place2.get(q.from) || place2.get(p.to) - place2.get(q.to) || naturalCompare(p.id, q.id));
   for (const k of written2) {
     const a = idOf.get(k.from), b = idOf.get(k.to);
-    const tokens = ["from", "to"].map((at) => {
-      const side = k.sides[at];
+    const tokens = ["from", "to"].map((at2) => {
+      const side = k.sides[at2];
       const w2 = saidWriting(side.multiplicity, opts);
       if (w2.unread.length) {
-        unread.push({ where: `the multiplicity at ${at === "from" ? a : b} on ${a} \u2014 ${b}`, ids: w2.unread });
+        unread.push({ where: `the multiplicity at ${at2 === "from" ? a : b} on ${a} \u2014 ${b}`, ids: w2.unread });
         w2.unread.forEach((id) => unreadIds.add(id));
       }
       const card = side.cardinality ?? T4.unsaid;
       if (!side.cardinality) {
-        if (!side.multiplicity) unsaid.push(`${at === "from" ? a : b} on ${a} \u2014 ${b}`);
-        else if (!w2.text || w2.text === UNREAD_WRITING || w2.unread.length) unsaid.push(`${at === "from" ? a : b} on ${a} \u2014 ${b}`);
-        else notCardinal.push(`\u201C${w2.text}\u201D at ${at === "from" ? a : b} on ${a} \u2014 ${b}`);
+        if (!side.multiplicity) unsaid.push(`${at2 === "from" ? a : b} on ${a} \u2014 ${b}`);
+        else if (!w2.text || w2.text === UNREAD_WRITING || w2.unread.length) unsaid.push(`${at2 === "from" ? a : b} on ${a} \u2014 ${b}`);
+        else notCardinal.push(`\u201C${w2.text}\u201D at ${at2 === "from" ? a : b} on ${a} \u2014 ${b}`);
       }
-      return T4.cardinalities[card][at === "from" ? "left" : "right"];
+      return T4.cardinalities[card][at2 === "from" ? "left" : "right"];
     });
     const v = saidWriting(k.verb, opts);
     if (v.unread.length) {
@@ -30782,7 +33664,7 @@ function writeEr(reading7, opts = {}) {
   if (unsaid.length) notes.push(`nothing says how many at ${someWords(unsaid, 6)} \u2014 written as zero or more, the least a line claims`);
   if (notCardinal.length) notes.push(`writing that is none of one, zero or one, zero or more, one or more \u2014 ${someWords(notCardinal, 4)} \u2014 is written as zero or more`);
   if (verbless.length) notes.push(`${verbless.length === 1 ? "a relationship has" : `${countWord(verbless.length)} relationships have`} no verb, and Mermaid wants one: written "": ${someWords(verbless, 6)}`);
-  if (blank.length) notes.push(`${blank.length === 1 ? "one entity has" : `${countWord(blank.length)} entities have`} no name and ${blank.length === 1 ? "is" : "are"} written blank: ${someWords(blank, 6)}`);
+  if (blank2.length) notes.push(`${blank2.length === 1 ? "one entity has" : `${countWord(blank2.length)} entities have`} no name and ${blank2.length === 1 ? "is" : "are"} written blank: ${someWords(blank2, 6)}`);
   const heads = r.headed;
   if (heads) notes.push(`${heads === 1 ? "a line has" : `${countWord(heads)} lines have`} a head, which a relationship has not \u2014 ignored`);
   if (r.classLike) notes.push(`${r.classLike === 1 ? "a box has" : `${countWord(r.classLike)} boxes have`} compartments, as a class does \u2014 left out`);
@@ -30955,8 +33837,8 @@ var INK_STEP5 = 3;
 var DASH3 = 0.9;
 var DASH_OFF3 = 0.6;
 var add6 = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
-function drawErRead(session, read2, opts) {
-  const r = read2;
+function drawErRead(session, read3, opts) {
+  const r = read3;
   const scale = opts.scale && opts.scale > 0 ? opts.scale : 1;
   const pid = opts.participantId;
   const U = MERMAID_TEXT_PX * scale;
@@ -30985,7 +33867,7 @@ function drawErRead(session, read2, opts) {
     nodes.map((x) => {
       const lines = Math.max(1, x.text.split("\n").length);
       const room = (degree.get(x.id) + 1) * END_ROOM;
-      return [x.id, { w: Math.max(clamp4(words(x.text) * CHAR5 + 3, ENTITY_MIN, ENTITY_MAX), room) * U, h: Math.max(ENTITY_H, lines * LINE4 + 2, room) * U }];
+      return [x.id, { w: Math.max(clamp5(words(x.text) * CHAR5 + 3, ENTITY_MIN, ENTITY_MAX), room) * U, h: Math.max(ENTITY_H, lines * LINE4 + 2, room) * U }];
     })
   );
   const layout = layoutLayered(
@@ -31077,7 +33959,7 @@ function drawErRead(session, read2, opts) {
     for (let i = 1; i < pts.length; i++) {
       const dx = pts[i].x - pts[i - 1].x, dy = pts[i].y - pts[i - 1].y;
       const l2 = dx * dx + dy * dy;
-      const u = l2 > 0 ? clamp4(((p.x - pts[i - 1].x) * dx + (p.y - pts[i - 1].y) * dy) / l2, 0, 1) : 0;
+      const u = l2 > 0 ? clamp5(((p.x - pts[i - 1].x) * dx + (p.y - pts[i - 1].y) * dy) / l2, 0, 1) : 0;
       best = Math.min(best, Math.hypot(p.x - (pts[i - 1].x + u * dx), p.y - (pts[i - 1].y + u * dy)));
     }
     return best;
@@ -31113,8 +33995,8 @@ function drawErRead(session, read2, opts) {
     if (!got) return true;
     const A = entityFor(d.from)?.id, B = entityFor(d.to)?.id;
     if (!A || !B || ![got.from, got.to].every((x) => x === A || x === B) || got.from === got.to) return true;
-    const at = (entity) => got.sides.from.entity === entity ? got.sides.from : got.sides.to;
-    if (at(A).cardinality !== want.cardinality.from || at(B).cardinality !== want.cardinality.to) return true;
+    const at2 = (entity) => got.sides.from.entity === entity ? got.sides.from : got.sides.to;
+    if (at2(A).cardinality !== want.cardinality.from || at2(B).cardinality !== want.cardinality.to) return true;
     return (got.verb?.text ?? "") !== (want.label ?? "");
   });
   if (misread.length) notes.push(`read back, ${misread.length === 1 ? "a relationship does" : `${countWord(misread.length)} relationships do`} not read as written: ${someWords(misread.map((d) => `${d.from} \u2014 ${d.to}`))}`);
@@ -31164,9 +34046,9 @@ function writeMindMap(reading7, opts = {}) {
   const links = [];
   const unread = [];
   const unreadIds = /* @__PURE__ */ new Set();
-  const blank = [];
+  const blank2 = [];
   const branchOf = new Map(r.connectors.filter((k) => k.tree).map((k) => [k.to, k]));
-  const walk = (id, level) => {
+  const walk2 = (id, level) => {
     const s = byId.get(id);
     const m = idOf.get(id);
     const w2 = saidWriting(s.name, opts);
@@ -31174,7 +34056,7 @@ function writeMindMap(reading7, opts = {}) {
       unread.push({ where: `the words of ${m}`, ids: w2.unread });
       w2.unread.forEach((x) => unreadIds.add(x));
     }
-    if (w2.text === null) blank.push(m);
+    if (w2.text === null) blank2.push(m);
     const { open, close } = shapeTokens(s.shape);
     lines.push(`${T5.mermaid.indent.repeat(level)}${m}${open}${mermaidString(w2.text ?? " ", { colons: PREPROCESSED5.test(m + (w2.text ?? "")) })}${close}`);
     ids[m] = s.id;
@@ -31184,15 +34066,15 @@ function writeMindMap(reading7, opts = {}) {
       const k = branchOf.get(id);
       if (k) links.push({ index: links.length, id: k.id, ids: [k.id, ...[...new Set(k.ids)].filter((x) => x !== k.id).sort(naturalCompare)], from: idOf.get(parentId), to: m });
     }
-    for (const kid of s.children) walk(kid, level + 1);
+    for (const kid of s.children) walk2(kid, level + 1);
   };
-  walk(r.root, 1);
+  walk2(r.root, 1);
   const notes = [];
   if (unread.length) {
     const n2 = unread.reduce((a, u) => a + u.ids.length, 0);
     notes.push(`${n2 === 1 ? "one piece of writing has" : `${countWord(n2)} pieces of writing have`} not been read, so ${n2 === 1 ? "its words are" : "their words are"} not known \u2014 written "${UNREAD_WRITING}": ${someWords(unread.map((u) => u.where), 6)}`);
   }
-  if (blank.length) notes.push(`${blank.length === 1 ? "one node has" : `${countWord(blank.length)} nodes have`} no word in ${blank.length === 1 ? "it" : "them"} and ${blank.length === 1 ? "is" : "are"} written blank: ${someWords(blank, 6)}`);
+  if (blank2.length) notes.push(`${blank2.length === 1 ? "one node has" : `${countWord(blank2.length)} nodes have`} no word in ${blank2.length === 1 ? "it" : "them"} and ${blank2.length === 1 ? "is" : "are"} written blank: ${someWords(blank2, 6)}`);
   if (r.loops) notes.push(`${r.loops === 1 ? "a line closes" : `${countWord(r.loops)} lines close`} a loop, which a mind map's tree has not \u2014 left out`);
   if (r.headed) notes.push(`${r.headed === 1 ? "a line has" : `${countWord(r.headed)} lines have`} a head, which a branch has not \u2014 ignored`);
   if (r.written) notes.push(`${r.written === 1 ? "a line has" : `${countWord(r.written)} lines have`} writing beside ${r.written === 1 ? "it" : "them"}, which Mermaid's mind map has no place for \u2014 left out`);
@@ -31304,16 +34186,16 @@ function readMindMapText(text) {
       shape = "";
       notes.add("a node with no shape is drawn as a box");
     }
-    const at = unique(id || words.replace(/\s+/g, " ") || `n${n2}`);
+    const at2 = unique(id || words.replace(/\s+/g, " ") || `n${n2}`);
     while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
     const parent = stack[stack.length - 1]?.node;
     if (!parent && nodes.length) {
       refused.push({ line: n2, text: t, reason: "a second root: a mind map has one" });
       skipping = indent;
-      taken.delete(at);
+      taken.delete(at2);
       continue;
     }
-    const node = { id: at, line: n2, symbol: parent ? "node" : "root", shape, text: words, drawn, depth: parent ? parent.depth + 1 : 0, ...parent ? { parent: parent.id } : {} };
+    const node = { id: at2, line: n2, symbol: parent ? "node" : "root", shape, text: words, drawn, depth: parent ? parent.depth + 1 : 0, ...parent ? { parent: parent.id } : {} };
     nodes.push(node);
     stack.push({ indent, node });
     if (parent) links.push({ index: links.length, line: n2, from: parent.id, to: node.id, head: "none", written: "" });
@@ -31348,18 +34230,18 @@ function fan(tree, root) {
     const total = kids.reduce((a, k) => a + leaves.get(k), 0);
     const shares = kids.map((k) => Math.min(span * leaves.get(k) / total, SPAN_CAP_DEG * DEG11));
     const gap = (span - shares.reduce((a, x) => a + x, 0)) / kids.length;
-    let at = from + gap / 2;
+    let at2 = from + gap / 2;
     kids.forEach((k, i) => {
-      angle.set(k, at + shares[i] / 2);
-      place2(k, at, shares[i]);
-      at += shares[i] + gap;
+      angle.set(k, at2 + shares[i] / 2);
+      place2(k, at2, shares[i]);
+      at2 += shares[i] + gap;
     });
   };
   place2(root, 0, 2 * Math.PI);
   return angle;
 }
-function drawMindMapRead(session, read2, opts) {
-  const r = read2;
+function drawMindMapRead(session, read3, opts) {
+  const r = read3;
   const scale = opts.scale && opts.scale > 0 ? opts.scale : 1;
   const pid = opts.participantId;
   const U = MERMAID_TEXT_PX * scale;
@@ -31385,10 +34267,10 @@ function drawMindMapRead(session, read2, opts) {
     nodes.map((x) => {
       const lines = Math.max(1, x.text.split("\n").length);
       if (x.drawn === "circle") {
-        const d = clamp4(chars(x.text) * CHAR6 + 4, CIRCLE_MIN, CIRCLE_MAX) * U;
+        const d = clamp5(chars(x.text) * CHAR6 + 4, CIRCLE_MIN, CIRCLE_MAX) * U;
         return [x.id, { w: d, h: d }];
       }
-      return [x.id, { w: clamp4(chars(x.text) * CHAR6 + 3, BOX_MIN2, BOX_MAX2) * U, h: Math.max(BOX_H3, lines * LINE5 + 2) * U }];
+      return [x.id, { w: clamp5(chars(x.text) * CHAR6 + 3, BOX_MIN2, BOX_MAX2) * U, h: Math.max(BOX_H3, lines * LINE5 + 2) * U }];
     })
   );
   const big = (id) => Math.max(size2.get(id).w, size2.get(id).h);
@@ -31421,12 +34303,12 @@ function drawMindMapRead(session, read2, opts) {
   }
   const origin = opts.origin ?? besideContent4(session, BOX_MIN2 * U);
   const shift = { x: origin.x - minX, y: origin.y - minY };
-  const at = (id) => ({ x: centre3.get(id).x + shift.x, y: centre3.get(id).y + shift.y });
+  const at2 = (id) => ({ x: centre3.get(id).x + shift.x, y: centre3.get(id).y + shift.y });
   const ids = {};
   const drawnMarks = [];
   const placeholder = [];
   for (const x of nodes) {
-    const c = at(x.id), z = size2.get(x.id);
+    const c = at2(x.id), z = size2.get(x.id);
     const shape = session.addStroke(strokeFor({ shape: x.drawn === "circle" ? "circle" : "rectangle", x: c.x - z.w / 2, y: c.y - z.h / 2, w: z.w, h: z.h }), next(), pid, scale, { content: true });
     ids[x.id] = shape;
     drawnMarks.push(shape);
@@ -31445,7 +34327,7 @@ function drawMindMapRead(session, read2, opts) {
     return spans.get(id);
   };
   const edgeToward = (id, other) => {
-    const c = at(id), o = at(other), z = size2.get(id);
+    const c = at2(id), o = at2(other), z = size2.get(id);
     const len4 = Math.hypot(o.x - c.x, o.y - c.y) || 1;
     const u = { x: (o.x - c.x) / len4, y: (o.y - c.y) / len4 };
     const k = nodes.find((x) => x.id === id).drawn === "circle" ? z.w / 2 : Math.min(Math.abs(u.x) > 1e-9 ? z.w / 2 / Math.abs(u.x) : Infinity, Math.abs(u.y) > 1e-9 ? z.h / 2 / Math.abs(u.y) : Infinity);
@@ -31544,7 +34426,7 @@ function thumbFit(box, w2, h2, pad = 8) {
 }
 
 // src/semantic/scorer.ts
-var clamp013 = (x) => x < 0 ? 0 : x > 1 ? 1 : x;
+var clamp014 = (x) => x < 0 ? 0 : x > 1 ? 1 : x;
 async function semanticScorer(transport, query, entries, opts = {}) {
   const cache = opts.cache ?? createEmbedCache();
   if (!tokenize(query).length) return () => 0;
@@ -31553,7 +34435,7 @@ async function semanticScorer(transport, query, entries, opts = {}) {
   return (asked, entry) => {
     const qv = cache.get(transport.name, asked.trim());
     const ev = cache.get(transport.name, entry.text);
-    return qv && ev ? clamp013(cosine(qv, ev)) : 0;
+    return qv && ev ? clamp014(cosine(qv, ev)) : 0;
   };
 }
 var FUNCTION_WORDS = /* @__PURE__ */ new Set(["a", "an", "and", "the", "of", "for", "to", "in", "on", "at", "is", "it", "or", "by", "with", "as", "be"]);
@@ -31587,7 +34469,7 @@ async function notesLike(transport, boards, source, opts = {}) {
   const sv = cache.get(transport.name, said3);
   if (!sv) return [];
   const floor = opts.floor ?? SEMANTIC_FLOOR;
-  const found = candidates.map((c) => ({ c, score: clamp013(cosine(sv, cache.get(transport.name, c.entry.text) ?? new Float32Array(0))) })).filter((x) => x.score >= floor).sort((x, y) => y.score - x.score || y.c.board.recency - x.c.board.recency || x.c.order - y.c.order).slice(0, Math.max(1, opts.limit ?? 20));
+  const found = candidates.map((c) => ({ c, score: clamp014(cosine(sv, cache.get(transport.name, c.entry.text) ?? new Float32Array(0))) })).filter((x) => x.score >= floor).sort((x, y) => y.score - x.score || y.c.board.recency - x.c.board.recency || x.c.order - y.c.order).slice(0, Math.max(1, opts.limit ?? 20));
   return found.map(({ c, score: score2 }) => {
     const ex = excerptOf(c.entry.text, []);
     return {
@@ -31680,10 +34562,10 @@ function parseSafetensors(bytes, wanted) {
     if (!(from >= 0 && to >= from) || to - from !== count9 * width) throw new StaticModelError(`the tensor \u201C${name}\u201D says ${count9} values of ${t.dtype} at bytes ${from}\u2013${to}, which do not fit`);
     if (start + to > bytes.length) throw new StaticModelError(`the weights end before the table does \u2014 the file is cut off (the table of \u201C${name}\u201D ends at byte ${start + to}, the file at ${bytes.length})`);
     const data = new Float32Array(count9);
-    const at = start + from;
-    if (t.dtype === "F32") for (let i = 0; i < count9; i++) data[i] = dv.getFloat32(at + i * 4, true);
-    else if (t.dtype === "F16") for (let i = 0; i < count9; i++) data[i] = half(dv.getUint16(at + i * 2, true));
-    else for (let i = 0; i < count9; i++) data[i] = bf16(dv.getUint16(at + i * 2, true));
+    const at2 = start + from;
+    if (t.dtype === "F32") for (let i = 0; i < count9; i++) data[i] = dv.getFloat32(at2 + i * 4, true);
+    else if (t.dtype === "F16") for (let i = 0; i < count9; i++) data[i] = half(dv.getUint16(at2 + i * 2, true));
+    else for (let i = 0; i < count9; i++) data[i] = bf16(dv.getUint16(at2 + i * 2, true));
     out[name] = { dtype: t.dtype, shape: t.shape, data };
   }
   return out;
@@ -31697,16 +34579,16 @@ var isPunct = (cp, ch) => cp >= 33 && cp <= 47 || cp >= 58 && cp <= 64 || cp >= 
 var isCjk = (cp) => cp >= 19968 && cp <= 40959 || cp >= 13312 && cp <= 19903 || cp >= 131072 && cp <= 173791 || cp >= 63744 && cp <= 64255 || cp >= 194560 && cp <= 195103;
 function normaliserOf(n2) {
   let lower = false, strip = false;
-  const walk = (x) => {
+  const walk2 = (x) => {
     if (!x) return;
     if (x.type === "BertNormalizer") {
       lower = lower || x.lowercase !== false;
       strip = strip || (x.strip_accents ?? x.lowercase !== false) === true;
     } else if (x.type === "Lowercase") lower = true;
     else if (x.type === "StripAccents") strip = true;
-    else if (Array.isArray(x.normalizers)) x.normalizers.forEach(walk);
+    else if (Array.isArray(x.normalizers)) x.normalizers.forEach(walk2);
   };
-  walk(n2);
+  walk2(n2);
   return { lower, strip };
 }
 function wordPieceOf(file) {
@@ -31759,11 +34641,11 @@ function wordPieceOf(file) {
     const cps = Array.from(word);
     if (cps.length > maxWord) return unkId >= 0 ? [unkId] : [];
     const ids = [];
-    let at = 0;
-    while (at < cps.length) {
+    let at2 = 0;
+    while (at2 < cps.length) {
       let end = cps.length, found = -1;
-      while (end > at) {
-        const piece = (at > 0 ? prefix : "") + cps.slice(at, end).join("");
+      while (end > at2) {
+        const piece = (at2 > 0 ? prefix : "") + cps.slice(at2, end).join("");
         const id = vocab.get(piece);
         if (id !== void 0) {
           found = id;
@@ -31773,7 +34655,7 @@ function wordPieceOf(file) {
       }
       if (found < 0) return unkId >= 0 ? [unkId] : [];
       ids.push(found);
-      at = end;
+      at2 = end;
     }
     return ids;
   };
@@ -31812,8 +34694,8 @@ function createStaticTransport(files) {
           const id = ids[i];
           if (id === tokenize2.unkId || id < 0 || id >= rows) continue;
           const k = scale ? scale[id] : 1;
-          const at = id * dim;
-          for (let d = 0; d < dim; d++) sum[d] += data[at + d] * k;
+          const at2 = id * dim;
+          for (let d = 0; d < dim; d++) sum[d] += data[at2 + d] * k;
           n2++;
         }
         if (!n2) return sum;
@@ -31883,14 +34765,14 @@ function buildStaticModel(o) {
   const dv = new DataView(bytes.buffer);
   dv.setBigUint64(0, BigInt(headBytes.length), true);
   bytes.set(headBytes, 8);
-  let at = 8 + headBytes.length;
+  let at2 = 8 + headBytes.length;
   for (const r of rows) for (const x of r) {
     if (dtype === "F16") {
-      dv.setUint16(at, toHalf(x), true);
-      at += 2;
+      dv.setUint16(at2, toHalf(x), true);
+      at2 += 2;
     } else {
-      dv.setFloat32(at, x, true);
-      at += 4;
+      dv.setFloat32(at2, x, true);
+      at2 += 4;
     }
   }
   const tokenizer = {
@@ -31903,12 +34785,12 @@ function buildStaticModel(o) {
 }
 
 // src/colour/oklch.ts
-var clamp014 = (v) => Math.min(1, Math.max(0, v));
+var clamp015 = (v) => Math.min(1, Math.max(0, v));
 var srgbToLinear = (c) => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
 var linearToSrgb = (c) => c <= 31308e-7 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
-var HEX = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i;
+var HEX2 = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i;
 function parseHex(hex) {
-  const m = HEX.exec((hex || "").trim());
+  const m = HEX2.exec((hex || "").trim());
   if (!m) return null;
   const h2 = m[1].length === 3 ? m[1].split("").map((x) => x + x).join("") : m[1];
   const n2 = parseInt(h2, 16);
@@ -31918,7 +34800,7 @@ function hexToLinear(hex) {
   const bytes = parseHex(hex) ?? [0, 0, 0];
   return bytes.map((v) => srgbToLinear(v / 255));
 }
-var linearToHex = (rgb) => "#" + rgb.map((c) => Math.round(clamp014(linearToSrgb(clamp014(c))) * 255).toString(16).padStart(2, "0")).join("");
+var linearToHex = (rgb) => "#" + rgb.map((c) => Math.round(clamp015(linearToSrgb(clamp015(c))) * 255).toString(16).padStart(2, "0")).join("");
 function linearToOklab([r, g, b]) {
   const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
   const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
@@ -31959,7 +34841,7 @@ function maxChroma(L, h2) {
 }
 function inSrgb(L, C, h2) {
   const c = Math.min(C, maxChroma(L, h2));
-  return { L, C: c, h: h2, rgb: oklabToLinear(lchToOklab(L, c, h2)).map(clamp014) };
+  return { L, C: c, h: h2, rgb: oklabToLinear(lchToOklab(L, c, h2)).map(clamp015) };
 }
 var relativeLuminance = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 var contrastRatio = (y1, y2) => (Math.max(y1, y2) + 0.05) / (Math.min(y1, y2) + 0.05);
@@ -32140,10 +35022,10 @@ var COLOUR_WORDS = Object.freeze({
   tan: 70
 });
 var GREY_BELOW = 0.02;
-var HEX2 = /^#?[0-9a-f]{6}$|^#?[0-9a-f]{3}$/;
+var HEX3 = /^#?[0-9a-f]{6}$|^#?[0-9a-f]{3}$/;
 function hueOfWord(word) {
   const w2 = (word || "").trim().toLowerCase();
-  if (HEX2.test(w2)) {
+  if (HEX3.test(w2)) {
     const [, C, hue] = oklabToLch(linearToOklab(hexToLinear(w2.startsWith("#") ? w2 : "#" + w2)));
     return C < GREY_BELOW ? null : { hue, word: w2.startsWith("#") ? w2 : "#" + w2 };
   }
@@ -32331,12 +35213,12 @@ function relate2(lens, a, b, rel, palette) {
         if (!best2 || score2 > best2.score + PAIR_TIE) best2 = { h: h2, off, score: score2 };
       }
     }
-    const at = best2;
-    anchor.hue = at.h;
-    Object.assign(mover, { source: "relative", anchor: anchor.name, offset: at.off, rel });
+    const at2 = best2;
+    anchor.hue = at2.h;
+    Object.assign(mover, { source: "relative", anchor: anchor.name, offset: at2.off, rel });
     refresh(lens);
     return {
-      said: rel === "kin" ? `${a} is kin to ${b}: placed together, ${Math.abs(at.off)}\xB0 apart, where both stand most distinct` : `${a} opposes ${b}: placed together across the wheel, ${Math.round(hueDistance(mover.hue, anchor.hue))}\xB0 apart`,
+      said: rel === "kin" ? `${a} is kin to ${b}: placed together, ${Math.abs(at2.off)}\xB0 apart, where both stand most distinct` : `${a} opposes ${b}: placed together across the wheel, ${Math.round(hueDistance(mover.hue, anchor.hue))}\xB0 apart`,
       related
     };
   }
@@ -32400,7 +35282,7 @@ function meaning(lens, pairs, palette = DEFAULT_PALETTE) {
   const ks = kindsOf(lens);
   const measured = pairs ?? distinctness(ks, palette);
   const lines = [];
-  const rootOf = (k) => {
+  const rootOf2 = (k) => {
     const seen2 = /* @__PURE__ */ new Set();
     while (k.parent && !seen2.has(k.name)) {
       seen2.add(k.name);
@@ -32409,7 +35291,7 @@ function meaning(lens, pairs, palette = DEFAULT_PALETTE) {
     return k.name;
   };
   for (const root of ks.filter((k) => !k.parent)) {
-    const fam = ks.filter((k) => k.parent && rootOf(k) === root.name).sort((x, y) => x.depth - y.depth || x.order - y.order);
+    const fam = ks.filter((k) => k.parent && rootOf2(k) === root.name).sort((x, y) => x.depth - y.depth || x.order - y.order);
     if (!fam.length) continue;
     const own = fam.filter((k) => k.source === "said").map((k) => `${k.name} keeps your ${k.word}`);
     lines.push(`${list5([root.name, ...fam.map((k) => k.name)])} are one family: ${root.name}'s hue, each kind below it a step toward the ground` + (own.length ? ` (${list5(own)})` : ""));
@@ -32463,6 +35345,8 @@ export {
   BUILTIN_CONCEPTS,
   BUILTIN_TOOLS,
   BUILTIN_TYPES,
+  CAP_TURN,
+  CAP_WINDOW,
   CHAT_DECIDE_WIRE,
   CHIP_OFFSET,
   CLASSLIKE_PENALTY,
@@ -32517,6 +35401,7 @@ export {
   DIAMOND_SLACK,
   DIRECTED_LINKS,
   DOT_FILLED,
+  DOT_MAX_PX,
   EMBED_BATCH,
   END_SHARE,
   ENGAGING_KINDS,
@@ -32531,6 +35416,7 @@ export {
   ER_TABLE,
   EVIDENCE,
   EmbedError,
+  FAITHFUL_AT,
   FILLED_AT,
   FILLED_PATH,
   FILL_CORE,
@@ -32543,6 +35429,7 @@ export {
   FLOWCHART_TABLE,
   FOLLOW_VISITS,
   FOREIGN_PENALTY,
+  FREEFORM_NODES,
   FolderStore,
   GARMENT,
   EVIDENCE4 as GARMENT_EVIDENCE,
@@ -32565,6 +35452,7 @@ export {
   HELD_ARROW,
   HERE,
   HOST_INTENTS,
+  DEFAULT_LIMITS as INGEST_LIMITS,
   INITIAL_ID,
   INNER_CENTRED,
   INNER_SHARE,
@@ -32619,6 +35507,7 @@ export {
   MAX_COMPARTMENT_LINES,
   MAX_DRAWN,
   MAX_FIGURE_STROKES,
+  MAX_PICTURE_PX,
   MAX_READINGS,
   MAX_TIER0_CONFIDENCE,
   MERMAID_MAX_LINKS,
@@ -32649,6 +35538,7 @@ export {
   MarkGrid,
   MemoryStore,
   NAMING_IS,
+  NEAR_AT,
   NEIGHBOURHOOD_MAX,
   NOTATION_FLOOR,
   NO_CONTEXT,
@@ -32662,12 +35552,14 @@ export {
   PACK_ID,
   PACK_LIMITS,
   PAPERS,
+  PEN_ELONGATION,
   PHRASES,
   PLAIN_CLASS,
   PLAIN_SHARE,
   PRESETS,
   RANK_BAND,
   RANK_SPREAD,
+  RASTER_PEN_PX,
   READ_LINES_PROMPT,
   READ_PICTURE_PROMPT,
   RECENT_EVENTS_MAX,
@@ -32933,6 +35825,7 @@ export {
   frameOf,
   frameOfNode,
   frameTemplatesFor,
+  fromBase64,
   functionsOf,
   cornersOfRing as garmentCorners,
   garmentDecor,
@@ -32967,8 +35860,16 @@ export {
   hueOfWord,
   idealize,
   inSrgb,
+  ingest,
+  accept as ingestAccept,
+  ingestMarkdown,
+  ingestRaster,
+  refuse as ingestRefuse,
+  ingestSvg,
+  blankPage as inkBlankPage,
   inkEndsOf,
   inkMeasure,
+  inkStep,
   insideFigure,
   instantFor,
   intentGloss,
@@ -32998,6 +35899,7 @@ export {
   isRange,
   isSeatTraffic,
   isShapeRungReading,
+  isHash as isSourceHash,
   isSpecific,
   isStrokeClosed,
   isTestPack,
@@ -33178,6 +36080,7 @@ export {
   readingsFor,
   readingsToEdges,
   reasonOf,
+  recoverFill,
   refusalOf,
   regionAt,
   regionCarries,
@@ -33243,6 +36146,7 @@ export {
   unit6 as semanticUnit,
   sequencePortsOf,
   sequenceText,
+  sha256Hex,
   shapeExtent,
   shapeTokens,
   shapesSummary,
@@ -33253,6 +36157,7 @@ export {
   sheetValue,
   shippedPack,
   shippedPacks,
+  shownSize,
   signalPenalty,
   simplifyStroke,
   simulateVision,
@@ -33266,6 +36171,7 @@ export {
   slotsIn,
   smoothStroke,
   snapReading,
+  sniffImage,
   solveBoard,
   solveFigure,
   sourcesOf,
@@ -33288,7 +36194,7 @@ export {
   strokesIntersect,
   structuralSignature,
   takeOffer,
-  textOf3 as textOf,
+  textOf4 as textOf,
   theirMarks,
   thin,
   thingKindOf,
