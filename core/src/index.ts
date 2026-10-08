@@ -1215,3 +1215,9 @@ export {
   polyEvalNumber,
 } from './maths/poly';
 export type { Rat, Poly, ParsedPoly, Expanded, Factor, Factored, FactorResult, RationalParts, RationalAnalysis, Hole, Pole, EndBehaviour } from './maths/poly';
+
+// Limits (MATHS-SPEC lane B, M13): Jake's limit and the ones like it — by substitution, then by factoring
+// (the common factor struck, step by step), then the known limits (sin x / x …, confirmed by the numbers), then
+// numerically from both sides with the approach given; one-sided and infinite limits are said.
+export { limit as limitOf, limitFromText, readLimit } from './maths/limit';
+export type { LimitResult, LimitStep, LimitSide, Approach, Approaches, ApproachPoint, ReadLimit } from './maths/limit';
