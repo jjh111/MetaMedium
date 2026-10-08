@@ -10497,6 +10497,11 @@ function parseRunQuantity(q) {
 }
 var RUN_KEYFRAME_EVERY = 1e3;
 var withCommas = (n2) => n2.toLocaleString("en-US");
+function timeWords(seconds) {
+  if (seconds < 120) return `${Math.round(seconds)} s`;
+  if (seconds < 7200) return `${Math.round(seconds / 60)} minutes`;
+  return `${(seconds / 3600).toFixed(1)} hours`;
+}
 function createStepper(start) {
   let run2 = start;
   const { runner } = run2;
@@ -10509,7 +10514,7 @@ function createStepper(start) {
   const budget = () => ({
     steps: runner.maxSteps,
     why: "budget",
-    sentence: `stopped after ${withCommas(runner.maxSteps)} steps (${(runner.maxSteps * runner.dt).toFixed(0)} s of its time) \u2014 a loop? Reset starts it again`
+    sentence: `stopped after ${withCommas(runner.maxSteps)} steps \u2014 ${timeWords(runner.maxSteps * runner.dt)} of its own time, the most a run takes; Play starts it again from the top`
   });
   function advanceSteps(n2) {
     for (let i = 0; i < n2; i++) {
@@ -17993,6 +17998,7 @@ var SYMBOLS5 = Object.keys(PENDULUM_TABLE.symbols);
 var ROD_MIN_PX = 60;
 var STRAIGHT_DEV2 = 0.07;
 var STRAIGHT_BOW_PX = 6;
+var STRAIGHT_MIN = 0.7;
 var BOB_MIN_PX = 12;
 var BOB_MAX_OF_LENGTH = 0.9;
 var BOB_MIN_OF_LENGTH = 0.04;
@@ -18007,8 +18013,8 @@ var CLEAR_RADII = 1.2;
 var HANG_DEG = [70, 100];
 var PLUMB_DEG = 1.5;
 var CEILING_LEVEL_DEG = 20;
-var CEILING_MIN_PX = 50;
-var CEILING_SHARE = 0.35;
+var CEILING_MIN_PX = 36;
+var CEILING_SHARE = 0.2;
 var CEILING_TOUCH = 0.05;
 var CEILING_SPAN_SLACK = 0.1;
 var HATCH_LEN_MIN_PX = 8;
@@ -18050,14 +18056,11 @@ function distToSegment6(p, a, b) {
 }
 function straightOf(id, node, pts, scale) {
   if (pts.length < 3) return null;
-  let p0 = pts[0], p1 = pts[pts.length - 1];
   const first = pts[0];
-  let far = pts[0];
-  for (const p of pts) if (dist(p, first) > dist(far, first)) far = p;
-  p0 = far;
-  let far2 = far;
-  for (const p of pts) if (dist(p, far) > dist(far2, far)) far2 = p;
-  p1 = far2;
+  let p0 = first;
+  for (const p of pts) if (dist(p, first) > dist(p0, first)) p0 = p;
+  let p1 = p0;
+  for (const p of pts) if (dist(p, p0) > dist(p1, p0)) p1 = p;
   const ab = sub10(p1, p0), L = len3(ab);
   if (!(L > 0)) return null;
   const u = { x: ab.x / L, y: ab.y / L };
@@ -18070,7 +18073,7 @@ function straightOf(id, node, pts, scale) {
     if (along2 > hi) hi = along2, b = p;
   }
   const length = dist(a, b);
-  return { id, node, a, b, length, dev: Math.max(dev, 0) / (length || 1), scale };
+  return { id, node, a, b, length, dev: dev / (length || 1), scale };
 }
 function roundOf(id, node, pts, scale) {
   const b = boundsOf(node);
@@ -18158,7 +18161,7 @@ function read2(board2, scopeIds) {
   const empty = { parts: [], writing, marks };
   for (const o of openMarks) {
     const fp = fingerprintOf(o.node);
-    if (fp.size / o.scale < HATCH_LEN_MIN_PX || fp.straightness < 0.8) continue;
+    if (fp.size / o.scale < HATCH_LEN_MIN_PX || fp.straightness < STRAIGHT_MIN) continue;
     const s = straightOf(o.id, o.node, o.pts, o.scale);
     if (s && s.dev * s.length <= Math.max(STRAIGHT_DEV2 * s.length, STRAIGHT_BOW_PX * s.scale)) straights.push(s);
   }
@@ -18453,49 +18456,58 @@ var PENDULUM = {
   connectors: [],
   read: (state, scopeIds) => readPendulum(state, scopeIds)
 };
-function writtenLength(board2, part) {
-  const rodAt = part.pivot;
-  const bobAt = part.bobAt;
+function lengthOf(n2) {
+  const r = n2.reading;
+  if (r.angle || r.step !== void 0 || r.value.dim > 1) return null;
+  if (r.measure && !["length", "long", "height"].includes(r.measure)) return null;
+  const q = r.value;
+  const m = q.unit ? convertQuantity(q, "m").quantity : q;
+  const metres = (m.lo + m.hi) / 2;
+  if (!(metres > 0) || !Number.isFinite(metres)) return null;
+  const asWritten = (q.lo + q.hi) / 2;
+  return { metres, text: formatNumber(asWritten) + (q.unit ? ` ${q.unit}` : ""), unit: q.unit };
+}
+function writtenLength(board2, part, maths) {
+  if (maths) {
+    const rodFigure = maths.dimensions.figures.find((f) => f.kind === "line" && f.ids.length === 1 && f.ids[0] === part.rod);
+    if (!rodFigure) return null;
+    for (const a of maths.dimensions.attachments) {
+      if (a.as !== "dimension" || a.figure !== rodFigure.id || !a.key || !(a.key === "length" || /^side\d+$/.test(a.key))) continue;
+      const w2 = lengthOf(a.number);
+      if (w2) return w2;
+    }
+    return null;
+  }
   const reach = Math.max(0.6 * part.length, 90 * part.scale);
   let best = null;
   for (const n2 of numbersOf(board2)) {
-    const r = n2.reading;
-    if (r.angle || r.step !== void 0) continue;
-    if (r.measure && !["length", "long", "height"].includes(r.measure)) continue;
-    if (r.value.dim > 1) continue;
-    const d = distToSegment6(n2.centre, rodAt, bobAt);
+    const d = distToSegment6(n2.centre, part.pivot, part.bobAt);
     if (d > reach) continue;
-    const q = r.value;
-    const metres = q.unit ? convertQuantity(q, "m").quantity : q;
-    const v = (metres.lo + metres.hi) / 2;
-    if (!(v > 0) || !Number.isFinite(v)) continue;
-    if (!best || d < best.d) best = { n: n2, metres: v, unit: q.unit, d };
+    const w2 = lengthOf(n2);
+    if (w2 && (!best || d < best.d)) best = { w: w2, d };
   }
-  return best;
+  return best ? best.w : null;
 }
-var UNIT_WORDS2 = { m: "m", cm: "cm", mm: "mm", in: "in", ft: "ft" };
-function lengthInput(board2, part, maths) {
-  const w2 = writtenLength(board2, part);
+function lengthInput(board2, part, mathsOf) {
+  let maths = null;
+  try {
+    maths = mathsOf?.() ?? null;
+  } catch {
+  }
+  const w2 = writtenLength(board2, part, maths);
   if (w2) {
-    const asWritten = w2.n.reading.value;
-    const text = formatNumber((asWritten.lo + asWritten.hi) / 2) + (w2.unit ? ` ${UNIT_WORDS2[w2.unit] ?? w2.unit}` : "");
     return {
       value: w2.metres,
       unit: "m",
       from: "written",
-      reason: w2.unit ? `L = ${text}, as written beside the rod` : `L = ${text} as written beside the rod \u2014 no unit, so taken as metres`
+      reason: w2.unit ? `L = ${w2.text}, as written beside the rod` : `L = ${w2.text}, as written beside the rod \u2014 no unit, so taken as metres`
     };
   }
-  try {
-    const m = maths?.();
-    const d = m?.dimensions.drawings.find((dr) => dr.ids.includes(part.rod) || dr.ids.includes(part.bob));
-    if (d?.scale && d.scale.unit) {
-      const px_ = part.length;
-      const inUnit = px_ * d.scale.unitsPerCanvasUnit;
-      const metres = convertQuantity({ lo: inUnit, hi: inUnit, unit: d.scale.unit, dim: 1, approx: false }, "m").quantity.lo;
-      if (metres > 0 && Number.isFinite(metres)) return { value: metres, unit: "m", from: "scale", reason: `L = ${formatNumber(metres)} m, from the drawing\u2019s scale (${d.scale.reason})` };
-    }
-  } catch {
+  const d = maths?.dimensions.drawings.find((dr) => dr.ids.includes(part.rod) || dr.ids.includes(part.bob));
+  if (d?.scale && d.scale.unit) {
+    const inUnit = part.length * d.scale.unitsPerCanvasUnit;
+    const metres = convertQuantity({ lo: inUnit, hi: inUnit, unit: d.scale.unit, dim: 1, approx: false }, "m").quantity.lo;
+    if (metres > 0 && Number.isFinite(metres)) return { value: metres, unit: "m", from: "scale", reason: `L = ${formatNumber(metres)} m, from the drawing\u2019s scale (${d.scale.reason})` };
   }
   return { value: 1, unit: "m", from: "assumed", reason: "L = 1 m assumed \u2014 write a length beside the rod to change it" };
 }
@@ -19088,7 +19100,7 @@ var PAPER = {
   mm: { css: "mm", per: 1 },
   m: { css: "cm", per: 100 }
 };
-var UNIT_WORDS3 = { in: "inches", ft: "feet", cm: "centimetres", mm: "millimetres", m: "metres" };
+var UNIT_WORDS2 = { in: "inches", ft: "feet", cm: "centimetres", mm: "millimetres", m: "metres" };
 var SCALE_BAR = {
   in: { length: 6, step: 1, every: 1 },
   ft: { length: 1, step: 1 / 12, every: 12 },
@@ -19172,7 +19184,7 @@ function widthPair(f) {
   const evenWide = horizontal(0) || !horizontal(1) && f.sides[0].length >= f.sides[1].length;
   return evenWide ? [0, 2] : [1, 3];
 }
-function lengthOf(c, key2) {
+function lengthOf2(c, key2) {
   return c.vals.get(key2).value.lo * c.f;
 }
 function sideTextOf(c, key2) {
@@ -19219,7 +19231,7 @@ function polygonShape(c, v, s, side) {
   return { outline: { type: "polygon", points: v }, vertices: v, sides, marks, texts };
 }
 function triangleShape(c) {
-  const L = [0, 1, 2].map((k) => lengthOf(c, `side${k}`));
+  const L = [0, 1, 2].map((k) => lengthOf2(c, `side${k}`));
   const ink = c.fig.vertices.slice(0, 3);
   const s = Math.sign(signedArea2(ink)) || 1;
   const b = baseSide(ink);
@@ -19243,7 +19255,7 @@ function triangleShape(c) {
   return shape;
 }
 function rectangleShape(c) {
-  const W = lengthOf(c, "width"), H = lengthOf(c, "height");
+  const W = lengthOf2(c, "width"), H = lengthOf2(c, "height");
   const ink = c.fig.vertices.slice(0, 4);
   const s = Math.sign(signedArea2(ink)) || 1;
   const wide = widthPair(c.fig);
@@ -19285,7 +19297,7 @@ function circleNote(c) {
 }
 function circleShape(c) {
   const F = c.F;
-  const r = lengthOf(c, "radius");
+  const r = lengthOf2(c, "radius");
   const o = { x: 0, y: 0 }, east = { x: r, y: 0 }, west = { x: -r, y: 0 };
   const radius = c.vals.get("radius");
   const sides = [{ key: "radius", label: radius.label, from: o, to: east, length: r, text: sideTextOf(c, "radius"), source: radius.from }];
@@ -19304,8 +19316,8 @@ function circleShape(c) {
 }
 function arcShape(c) {
   const F = c.F;
-  const chord = lengthOf(c, "chord"), h2 = lengthOf(c, "rise");
-  const r = c.vals.has("radius") ? lengthOf(c, "radius") : chord * chord / (8 * h2) + h2 / 2;
+  const chord = lengthOf2(c, "chord"), h2 = lengthOf2(c, "rise");
+  const r = c.vals.has("radius") ? lengthOf2(c, "radius") : chord * chord / (8 * h2) + h2 / 2;
   const [a, e, bulge] = c.fig.vertices;
   const u = AXES[nearestAxis(a, e).axis];
   const w2 = turn(u, 1);
@@ -19343,7 +19355,7 @@ function arcShape(c) {
 }
 function lineShape(c) {
   const F = c.F;
-  const L = lengthOf(c, "length");
+  const L = lengthOf2(c, "length");
   const { from, to } = c.fig.sides[0];
   const d = nearestAxis(from, to).axis % 2 === 0 ? { x: 1, y: 0 } : { x: 0, y: -1 };
   const n2 = { x: d.y, y: -d.x };
@@ -19544,7 +19556,7 @@ function trueSize(solved, options = {}) {
       const m = /^the corner at ([A-Z]) measures (\d+)°/.exec(a);
       notes2.push(m ? `the ${name}: drawn as if the corner at ${m[1]} is right \u2014 the ink measures it ${m[2]}\xB0, a reading, not a fact` : `the ${name}: drawn on a reading \u2014 ${a}`);
     }
-    if (figUnit !== U) notes2.push(`the ${name}: labelled in ${UNIT_WORDS3[figUnit]}, drawn in ${UNIT_WORDS3[U]}`);
+    if (figUnit !== U) notes2.push(`the ${name}: labelled in ${UNIT_WORDS2[figUnit]}, drawn in ${UNIT_WORDS2[U]}`);
     if (decor) for (const x2 of decor.notes) notes2.push(`the ${name}: ${x2}`);
     return { e, shape, box, name, notes: notes2, precision, figUnit, reading: reading7, decor };
   });
@@ -19563,7 +19575,7 @@ function trueSize(solved, options = {}) {
   const unlabelled = omitted.filter((o) => !o.labelled);
   if (leftOut.length) clauses.push(`${leftOut.length} figure${leftOut.length > 1 ? "s" : ""} left out`);
   const subject = built.length === 0 ? "Nothing" : one ? `${article(built[0].e.figure.kind)} ${built[0].e.figure.kind}` : `${built.length} figures`;
-  const title = `${subject} at true size, in ${UNIT_WORDS3[U]}${clauses.length ? ` \u2014 ${clauses.join("; ")}` : ""}`;
+  const title = `${subject} at true size, in ${UNIT_WORDS2[U]}${clauses.length ? ` \u2014 ${clauses.join("; ")}` : ""}`;
   const notes = [
     ...built.flatMap((b) => b.notes),
     ...leftOut.map((o) => `left out: the ${o.name} \u2014 ${o.reason}`),
@@ -32178,7 +32190,7 @@ function marksHeld(state, ids) {
 function runsHeld(scope) {
   const marks = marksHeld(scope.state, scope.summon.enclosedIds);
   if (!marks.length) return [];
-  return runsIn(scope.state, marks).filter((r) => r.reading.confidence >= PENDULUM_OFFER_FLOOR);
+  return runsIn(scope.state, marks, () => boardMathsOf(scope.session)).filter((r) => r.reading.confidence >= PENDULUM_OFFER_FLOOR);
 }
 var partOf2 = (run2) => run2.reading.data;
 function runningNow(scope, key2) {
@@ -32187,7 +32199,7 @@ function runningNow(scope, key2) {
 }
 var RUN = {
   id: "run",
-  name: "run",
+  name: "running a pendulum",
   describe: () => "a pendulum \u2014 a rod from a pivot with a bob \u2014 is played, paused or reset by the hand\u2019s own act and swings by physics, its period exact; a rod drawn plumb can be pulled aside; time is never in the log",
   offers(scope) {
     const out = [];

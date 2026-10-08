@@ -28,6 +28,7 @@
 //   AL12  the whole run wrote only what the hand did — strokes, binds, plays, pauses, a reset: no move, turn or scale
 //   AL13  a second tab opens the same board: it too runs nothing until played there
 //   AL14  a pendulum whose marks were named swings inside its artifact, the pivot never moved
+//   AL15  a run that ran out of its step budget stops and says so; Play starts it again from the top
 
 import { waitReady } from './keep.mjs';
 
@@ -336,6 +337,31 @@ export async function runAlive(browser, servers, { freshContext }) {
         made.artifacts === 1 && f && f.affords.includes('Play the pendulum') && Math.hypot(a.bob.x - b.bob.x, a.bob.y - b.bob.y) > 0.5 && Math.hypot(a.pivot.x - g.pivot.x, a.pivot.y - g.pivot.y) < 0.01 && seen.size >= 4, { made, f, a, b, seen: [...seen] });
       await p.keyboard.press('Escape');
     } finally { await p.close(); }
+  });
+
+  await record('AL15', async () => {
+    // Every run has a step budget and says when it stopped: taken to its end, the clock is paused with the reason and the line says it.
+    await hold(page, geo.bob.x - geo.r, geo.bob.y);
+    await pill(page, 'Play the pendulum').click();
+    await page.waitForTimeout(400);
+    await dismissAll(page);
+    await page.evaluate((id) => window.__mmRun.stepBy(id, 1_800_000), rod);
+    await page.waitForTimeout(700);
+    const clock = await page.evaluate((id) => window.__mm.session.getState().clocks[id], rod);
+    const said = await status(page);
+    const keys = await page.evaluate(() => window.__mmRun.runs().map((r) => ({ running: r.running, stopped: r.stopped })));
+    check(`AL15. a run that ran out of steps stops and says so: the clock is paused with “${clock && clock.reason}”, the line says “${said}”, and it runs no more (${keys[0] && keys[0].running})`,
+      clock && clock.playing === false && /^stopped after 1,800,000 steps/.test(clock.reason || '') && /stopped after 1,800,000 steps/.test(said) && keys[0] && !keys[0].running && /stopped after/.test(keys[0].stopped || ''), { clock, said, keys });
+    // Play again starts it from the top.
+    await hold(page, geo.bob.x - geo.r, geo.bob.y);
+    await pill(page, 'Play the pendulum').click();
+    await page.waitForTimeout(600);
+    const again = await page.evaluate(() => window.__mmRun.runs().map((r) => ({ running: r.running, t: r.t, stopped: r.stopped })));
+    check(`AL15b. Play after that starts it again from the top (running ${again[0] && again[0].running}, t = ${again[0] && again[0].t.toFixed(2)} s, ${again[0] && again[0].stopped ? 'still stopped' : 'not stopped'})`,
+      again[0] && again[0].running && again[0].t < 5 && !again[0].stopped, { again });
+    await dismissAll(page);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
   });
 
   try { await page.close(); } catch { /* gone */ }

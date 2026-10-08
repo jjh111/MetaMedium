@@ -15,6 +15,7 @@
 
 import type { Point } from '../types';
 import type { SessionState } from '../session/session';
+import { boardMathsOf } from '../maths/board';
 import { runsIn } from '../run/runner';
 import type { Run } from '../run/runner';
 import { PENDULUM_OFFER_FLOOR, PULL_ASIDE_DEG, periodWords } from '../notations/pendulum';
@@ -45,7 +46,7 @@ export function marksHeld(state: SessionState, ids: readonly string[]): string[]
 function runsHeld(scope: ToolScope): Run[] {
   const marks = marksHeld(scope.state, scope.summon.enclosedIds);
   if (!marks.length) return [];
-  return runsIn(scope.state, marks).filter((r) => r.reading.confidence >= PENDULUM_OFFER_FLOOR);
+  return runsIn(scope.state, marks, () => boardMathsOf(scope.session)).filter((r) => r.reading.confidence >= PENDULUM_OFFER_FLOOR);
 }
 
 const partOf = (run: Run): PendulumPart => run.reading.data as PendulumPart;

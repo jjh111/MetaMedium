@@ -58,6 +58,7 @@ describe('its own drawings, drawn again at other sizes and in other places', () 
         if (Math.abs(q.length - e.length) / e.length > 0.08) misses.push(`${label}: L ${q.length.toFixed(0)}, want ${e.length.toFixed(0)}`);
         if (v.pivot === 'hatched' && q.pivotKind !== 'hatched ceiling') misses.push(`${label}: hangs from ${q.pivotKind}`);
         if (v.pivot === 'ceiling' && q.pivotKind !== 'ceiling') misses.push(`${label}: hangs from ${q.pivotKind}`);
+        if (v.pivot === 'stub' && q.pivotKind !== 'hatched ceiling') misses.push(`${label}: hangs from ${q.pivotKind}`);
         if (v.pivot === 'dot' && q.pivotKind !== 'dot') misses.push(`${label}: hangs from ${q.pivotKind}`);
       }
     }

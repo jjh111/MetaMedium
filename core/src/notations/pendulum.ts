@@ -79,6 +79,8 @@ export const ROD_MIN_PX = 60;
 /** …and straight: no point of it stands off its chord by more than this share of its length — or, for a short stroke, a hand's own bow of this many of its pixels. */
 export const STRAIGHT_DEV = 0.07;
 export const STRAIGHT_BOW_PX = 6;
+/** The shape rung's own straightness (chord over path) a stroke must show before it is measured at all: a short tick bows as far as a long line does, and reads as little as this. */
+export const STRAIGHT_MIN = 0.7;
 /** A bob is at least this across in the hand's space, and no more than this share of the pivot-to-bob length across; at least this share. */
 export const BOB_MIN_PX = 12;
 export const BOB_MAX_OF_LENGTH = 0.9;
@@ -100,10 +102,10 @@ export const CLEAR_RADII = 1.2;
 export const HANG_DEG = [70, 100] as const;
 /** A rod drawn within this many degrees of plumb hangs plumb. */
 export const PLUMB_DEG = 1.5;
-/** A ceiling is level within this many degrees, at least this long in the hand's space and this share of the rod. */
+/** A ceiling — as short as a hatched stub — is level within this many degrees, at least this long in the hand's space and this share of the rod. */
 export const CEILING_LEVEL_DEG = 20;
-export const CEILING_MIN_PX = 50;
-export const CEILING_SHARE = 0.35;
+export const CEILING_MIN_PX = 36;
+export const CEILING_SHARE = 0.2;
 /** The rod hangs from a ceiling when its top end is within this share of the ceiling's length of it (and `TOUCH_PX`), and its projection falls inside the ceiling's span grown by this share each side. */
 export const CEILING_TOUCH = 0.05;
 export const CEILING_SPAN_SLACK = 0.1;
@@ -211,15 +213,13 @@ interface Straight {
 
 function straightOf(id: string, node: MMNode, pts: readonly Point[], scale: number): Straight | null {
   if (pts.length < 3) return null;
-  // The chord between the farthest-apart pair among a handful of candidates is the line's axis; its tips are the extreme projections.
-  let p0 = pts[0], p1 = pts[pts.length - 1];
+  // The line's axis is the chord between the two points farthest from each other (the farthest from the first, then the farthest from that);
+  // its tips are the points the pen reached farthest along that axis, whatever hook it left at liftoff.
   const first = pts[0];
-  let far = pts[0];
-  for (const p of pts) if (dist(p, first) > dist(far, first)) far = p;
-  p0 = far;
-  let far2 = far;
-  for (const p of pts) if (dist(p, far) > dist(far2, far)) far2 = p;
-  p1 = far2;
+  let p0 = first;
+  for (const p of pts) if (dist(p, first) > dist(p0, first)) p0 = p;
+  let p1 = p0;
+  for (const p of pts) if (dist(p, p0) > dist(p1, p0)) p1 = p;
   const ab = sub(p1, p0), L = len(ab);
   if (!(L > 0)) return null;
   const u = { x: ab.x / L, y: ab.y / L };
@@ -232,8 +232,7 @@ function straightOf(id: string, node: MMNode, pts: readonly Point[], scale: numb
     if (along > hi) (hi = along, (b = p));
   }
   const length = dist(a, b);
-  // A short stroke bows as far as a long one does, so what a hand cannot help is allowed in pixels: its deviation as a share of its length is never held to less than that.
-  return { id, node, a, b, length, dev: Math.max(dev, 0) / (length || 1), scale };
+  return { id, node, a, b, length, dev: dev / (length || 1), scale };
 }
 
 /** A round thing — a ring or a spot filled solid — as a bob (or a dot) could be. */
@@ -359,7 +358,7 @@ function read(board: RunBoard, scopeIds?: readonly string[]): { parts: PendulumP
   // The cheap test before the costly ones: a rod is a long straight open stroke, and there must be one.
   for (const o of openMarks) {
     const fp = fingerprintOf(o.node)!;
-    if (fp.size / o.scale < HATCH_LEN_MIN_PX || fp.straightness < 0.8) continue;
+    if (fp.size / o.scale < HATCH_LEN_MIN_PX || fp.straightness < STRAIGHT_MIN) continue;
     const s = straightOf(o.id, o.node, o.pts, o.scale);
     if (s && s.dev * s.length <= Math.max(STRAIGHT_DEV * s.length, STRAIGHT_BOW_PX * s.scale)) straights.push(s);
   }
@@ -701,54 +700,77 @@ export interface PendulumRunState extends PendulumState {
   theta0: number;
 }
 
-/** A number written beside the rod that reads as its length, nearest first. */
-function writtenLength(board: RunBoard, part: PendulumPart): { n: BoardNumber; metres: number; unit: string | null; d: number } | null {
-  const rodAt = part.pivot;
-  const bobAt = part.bobAt;
-  const reach = Math.max(0.6 * part.length, 90 * part.scale);
-  let best: { n: BoardNumber; metres: number; unit: string | null; d: number } | null = null;
-  for (const n of numbersOf(board as Parameters<typeof numbersOf>[0])) {
-    const r = n.reading;
-    if (r.angle || r.step !== undefined) continue;
-    if (r.measure && !['length', 'long', 'height'].includes(r.measure)) continue;
-    if (r.value.dim > 1) continue;
-    const d = distToSegment(n.centre, rodAt, bobAt);
-    if (d > reach) continue;
-    const q = r.value;
-    const metres = q.unit ? convertQuantity(q, 'm').quantity : q;
-    const v = (metres.lo + metres.hi) / 2;
-    if (!(v > 0) || !Number.isFinite(v)) continue;
-    if (!best || d < best.d) best = { n, metres: v, unit: q.unit, d };
-  }
-  return best;
+/** A length a person wrote beside the rod, in metres. */
+interface WrittenLength {
+  metres: number;
+  /** As written: `2.5 m`, `250 cm`, `3`. */
+  text: string;
+  unit: string | null;
 }
 
-const UNIT_WORDS: Record<string, string> = { m: 'm', cm: 'cm', mm: 'mm', in: 'in', ft: 'ft' };
+/** What a number says as a length in metres: a range is taken at its middle; a bare number has no unit. */
+function lengthOf(n: BoardNumber): WrittenLength | null {
+  const r = n.reading;
+  if (r.angle || r.step !== undefined || r.value.dim > 1) return null;
+  if (r.measure && !['length', 'long', 'height'].includes(r.measure)) return null;
+  const q = r.value;
+  const m = q.unit ? convertQuantity(q, 'm').quantity : q;
+  const metres = (m.lo + m.hi) / 2;
+  if (!(metres > 0) || !Number.isFinite(metres)) return null;
+  const asWritten = (q.lo + q.hi) / 2;
+  return { metres, text: formatNumber(asWritten) + (q.unit ? ` ${q.unit}` : ''), unit: q.unit };
+}
 
-function lengthInput(board: RunBoard, part: PendulumPart, maths?: () => BoardMaths | null): RunInputs['L'] {
-  const w = writtenLength(board, part);
+/**
+ * The length written beside the rod. With the board's maths read (`maths`), it is the number the dimensions
+ * attached to the rod as its length — the same reading that ranks a number against every mark it stands
+ * near, so a label for the ceiling is not taken for the rod's. Without it, the nearest number within the
+ * rod's own reach.
+ */
+function writtenLength(board: RunBoard, part: PendulumPart, maths: BoardMaths | null): WrittenLength | null {
+  if (maths) {
+    const rodFigure = maths.dimensions.figures.find((f) => f.kind === 'line' && f.ids.length === 1 && f.ids[0] === part.rod);
+    if (!rodFigure) return null;
+    for (const a of maths.dimensions.attachments) {
+      if (a.as !== 'dimension' || a.figure !== rodFigure.id || !a.key || !(a.key === 'length' || /^side\d+$/.test(a.key))) continue;
+      const w = lengthOf(a.number);
+      if (w) return w;
+    }
+    return null;
+  }
+  const reach = Math.max(0.6 * part.length, 90 * part.scale);
+  let best: { w: WrittenLength; d: number } | null = null;
+  for (const n of numbersOf(board as Parameters<typeof numbersOf>[0])) {
+    const d = distToSegment(n.centre, part.pivot, part.bobAt);
+    if (d > reach) continue;
+    const w = lengthOf(n);
+    if (w && (!best || d < best.d)) best = { w, d };
+  }
+  return best ? best.w : null;
+}
+
+function lengthInput(board: RunBoard, part: PendulumPart, mathsOf?: () => BoardMaths | null): RunInputs['L'] {
+  let maths: BoardMaths | null = null;
+  try {
+    maths = mathsOf?.() ?? null;
+  } catch {
+    /* a board whose maths cannot be read has no length written on it */
+  }
+  const w = writtenLength(board, part, maths);
   if (w) {
-    const asWritten = w.n.reading.value;
-    const text = formatNumber((asWritten.lo + asWritten.hi) / 2) + (w.unit ? ` ${UNIT_WORDS[w.unit] ?? w.unit}` : '');
     return {
       value: w.metres,
       unit: 'm',
       from: 'written',
-      reason: w.unit ? `L = ${text}, as written beside the rod` : `L = ${text} as written beside the rod — no unit, so taken as metres`,
+      reason: w.unit ? `L = ${w.text}, as written beside the rod` : `L = ${w.text}, as written beside the rod — no unit, so taken as metres`,
     };
   }
   // The drawing's scale: a label elsewhere on the drawing says how many metres a pixel is.
-  try {
-    const m = maths?.();
-    const d = m?.dimensions.drawings.find((dr) => dr.ids.includes(part.rod) || dr.ids.includes(part.bob));
-    if (d?.scale && d.scale.unit) {
-      const px_ = part.length;
-      const inUnit = px_ * d.scale.unitsPerCanvasUnit;
-      const metres = convertQuantity({ lo: inUnit, hi: inUnit, unit: d.scale.unit, dim: 1, approx: false }, 'm').quantity.lo;
-      if (metres > 0 && Number.isFinite(metres)) return { value: metres, unit: 'm', from: 'scale', reason: `L = ${formatNumber(metres)} m, from the drawing’s scale (${d.scale.reason})` };
-    }
-  } catch {
-    /* a board whose maths cannot be read has no scale to give */
+  const d = maths?.dimensions.drawings.find((dr) => dr.ids.includes(part.rod) || dr.ids.includes(part.bob));
+  if (d?.scale && d.scale.unit) {
+    const inUnit = part.length * d.scale.unitsPerCanvasUnit;
+    const metres = convertQuantity({ lo: inUnit, hi: inUnit, unit: d.scale.unit, dim: 1, approx: false }, 'm').quantity.lo;
+    if (metres > 0 && Number.isFinite(metres)) return { value: metres, unit: 'm', from: 'scale', reason: `L = ${formatNumber(metres)} m, from the drawing’s scale (${d.scale.reason})` };
   }
   return { value: 1, unit: 'm', from: 'assumed', reason: 'L = 1 m assumed — write a length beside the rod to change it' };
 }

@@ -8,9 +8,9 @@
 //                  │
 //                 ( )             bob        a circle, or a spot filled solid
 //
-// Four ways a hand marks where it hangs from (`pivot`): the ceiling and its
-// hatching, a ceiling alone, a dot at the rod's top end, or nothing at all (the
-// rod's top end alone). Two ways it draws the bob (`bob`): a ring, or a spot
+// Five ways a hand marks where it hangs from (`pivot`): the ceiling and its
+// hatching, a ceiling alone, a short hatched stub no wider than a rod's quarter,
+// a dot at the rod's top end, or nothing at all (the rod's top end alone). Two ways it draws the bob (`bob`): a ring, or a spot
 // scribbled solid. The rod leans `theta` degrees from plumb, positive to the
 // right — a pendulum hangs, so plumb is straight down the page.
 //
@@ -31,14 +31,14 @@ export interface PendulumVariant {
   theta: number;
   /** The rod, pivot to the bob's centre, in px at k = 1. */
   length: number;
-  pivot: 'hatched' | 'ceiling' | 'dot' | 'none';
+  pivot: 'hatched' | 'ceiling' | 'stub' | 'dot' | 'none';
   bob: 'ring' | 'filled';
 }
 
 export const PENDULUM_VARIANTS: PendulumVariant[] = [];
 {
   const thetas = [-32, -20, -8, 0, 6, 14, 20, 28, 41];
-  const pivots = ['hatched', 'ceiling', 'dot', 'hatched'] as const;
+  const pivots = ['hatched', 'ceiling', 'dot', 'hatched', 'stub'] as const;
   for (const seed of [1, 2, 3, 4]) {
     for (const jitter of [1.5, 3]) {
       thetas.forEach((theta, i) => {
@@ -93,7 +93,14 @@ export function drawPendulum(s: Session, v: PendulumVariant, t0 = 1000, o: { at?
   const line = (from: Point, to: Point, n: number) => handLine(from, to, { seed: seed(n), jitter: j * Math.min(1, k) });
 
   const pivot: string[] = [];
-  if (v.pivot === 'hatched' || v.pivot === 'ceiling') {
+  if (v.pivot === 'stub') {
+    // A short line with hatching: the pivot as a drafter draws it when the wall is not the point.
+    pivot.push(draw(line({ x: P.x - 34 * k, y: P.y }, { x: P.x + 34 * k, y: P.y }, 1)));
+    for (let i = 0; i < 4; i++) {
+      const x = P.x - 26 * k + i * 17 * k;
+      pivot.push(draw(line({ x, y: P.y - 3 * k }, { x: x + 12 * k, y: P.y - 19 * k }, 2 + i)));
+    }
+  } else if (v.pivot === 'hatched' || v.pivot === 'ceiling') {
     pivot.push(draw(line({ x: P.x - 95 * k, y: P.y }, { x: P.x + 95 * k, y: P.y }, 1)));
     if (v.pivot === 'hatched') {
       for (let i = 0; i < 7; i++) {

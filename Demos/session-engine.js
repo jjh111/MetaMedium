@@ -9919,7 +9919,8 @@
       if (aliveSeen.get(k) !== c.at) {
         aliveSeen.set(k, c.at);
         if (!fresh) {
-          if (lastClockOp(k) === 'reset') st.reset();
+          // A play after a run stopped by itself (its budget) starts it again from the top, as its sentence says.
+          if (lastClockOp(k) === 'reset' || (c.playing && st.stopped)) st.reset();
           if (c.playing) aliveArmed.add(k); else aliveArmed.delete(k);
         }
       }

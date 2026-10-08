@@ -279,6 +279,13 @@ export interface RunStepper<S = unknown> {
 
 const withCommas = (n: number) => n.toLocaleString('en-US');
 
+/** A run's own time in the person's words: 90 s, 62 minutes, 2.5 hours. */
+function timeWords(seconds: number): string {
+  if (seconds < 120) return `${Math.round(seconds)} s`;
+  if (seconds < 7200) return `${Math.round(seconds / 60)} minutes`;
+  return `${(seconds / 3600).toFixed(1)} hours`;
+}
+
 /** A stepper over a run, from t = 0. */
 export function createStepper<S>(start: Run<S>): RunStepper<S> {
   let run = start;
@@ -294,7 +301,7 @@ export function createStepper<S>(start: Run<S>): RunStepper<S> {
   const budget = (): RunStop => ({
     steps: runner.maxSteps,
     why: 'budget',
-    sentence: `stopped after ${withCommas(runner.maxSteps)} steps (${(runner.maxSteps * runner.dt).toFixed(0)} s of its time) — a loop? Reset starts it again`,
+    sentence: `stopped after ${withCommas(runner.maxSteps)} steps — ${timeWords(runner.maxSteps * runner.dt)} of its own time, the most a run takes; Play starts it again from the top`,
   });
 
   function advanceSteps(n: number) {

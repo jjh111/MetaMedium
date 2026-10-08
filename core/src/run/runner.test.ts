@@ -163,6 +163,15 @@ describe('the stepper', () => {
     expect(st.steps).toBe(0);
   });
 
+  it('says how long that was in the run’s own time, in words, and what starts it again', () => {
+    const short = make({ maxSteps: 30 });
+    short.advance(100);
+    expect(short.stopped!.sentence).toBe('stopped after 30 steps — 3 s of its own time, the most a run takes; Play starts it again from the top');
+    const long = make({ maxSteps: 36_000, dt: 0.1 });
+    long.advance(1e6);
+    expect(long.stopped!.sentence).toBe('stopped after 36,000 steps — 60 minutes of its own time, the most a run takes; Play starts it again from the top');
+  });
+
   it('says a thousand with its comma', () => {
     const st = make({ maxSteps: 1500, dt: 0.001 });
     st.advance(100);
