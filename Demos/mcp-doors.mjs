@@ -17,7 +17,8 @@
 //
 // What it cannot read it says; what is not built it says as such. Nothing here writes into the room: an export
 // is a file in the OS temp directory (or where the caller names, outside the repository), an import is read
-// into a scratch session. No dependency, no network — the engine's own functions and the files on this machine.
+// into a scratch session. No dependency, and the only network is the room's own relay, asked for a picture's bytes
+// by their hash — the engine's own functions and the files on this machine do the rest.
 //
 // A scanner, not a parser: pulling a function out of a fragment needs only to know where a statement ends,
 // which means reading past strings, templates, comments and regular expressions. If the page's code moves
