@@ -64,11 +64,15 @@ describe('two clouds', () => {
     expect(matchClouds(a, b, d * 2)).toBeCloseTo(d, 9);
   });
 
-  it('give a dot of a divided-by sign its points, however short it was drawn', () => {
+  it('give a dot of a divided-by sign its points, the same however it was drawn — a touch or a tiny scribble', () => {
     const bar = line({ x: 0, y: 50 }, { x: 60, y: 50 });
     const tap = (x: number, y: number): Point[] => [{ x, y }, { x: x + 0.1, y }];
-    const divide = cloudOf([bar, tap(30, 30), tap(30, 70)])!;
+    const scribble = (x: number, y: number): Point[] => ring(x, y, 2.5, 30).concat(ring(x, y, 1.5, 30));
+    const tapped = cloudOf([bar, tap(30, 30), tap(30, 70)])!;
+    const scribbled = cloudOf([bar, scribble(30, 30), scribble(30, 70)])!;
     const minus = cloudOf([bar])!;
-    expect(matchClouds(divide, minus)).toBeGreaterThan(0.05);
+    // A tap that kept no points would read as a minus; a scribble that took its points by its length, unlike a tap.
+    expect(matchClouds(tapped, scribbled)).toBeLessThan(matchClouds(tapped, minus) / 2);
+    expect(matchClouds(scribbled, minus)).toBeGreaterThan(matchClouds(tapped, scribbled) * 2);
   });
 });

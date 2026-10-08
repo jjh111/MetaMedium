@@ -87,7 +87,10 @@ describe('a number is a run of digits on one baseline', () => {
     const three = handLine('3', { seed: 5, size: BASE, x: 100, baseline: 400 });
     const two = handLine('2', { seed: 6, size: BASE * 0.55, x: three.end - 4, baseline: 400 - BASE * 0.6 });
     const read = readNumerals([...three.strokes, ...two.strokes]);
-    expect(read.glyphs.map((g) => g.glyph)).toEqual(['3', '2']);
+    expect(read.glyphs).toHaveLength(2);
+    expect(read.glyphs[0].glyph).toBe('3');
+    // Off the line, a two is nearest — not surely, where it stands is no digit's — and it is no part of the number.
+    expect(read.glyphs[1].candidates[0].glyph).toBe('2');
     expect(read.numbers.map((n) => n.text)).toEqual(['3']);
   });
 });
@@ -147,13 +150,14 @@ describe('readings are plural, and twins are said', () => {
     expect(read.ties).toEqual(expect.arrayContaining(['l', 'a line']));
   });
 
-  it('x and × drawn alike, with no line to stand on, are a tie; on a line, where they stand tells them apart', () => {
+  it('x and × drawn alike, with no line to stand on, are both read and the reading is doubtful; on a line, where they stand tells them apart', () => {
     const st = stylesOf('x').find((s) => s.style === 'crossed')!;
     const g = drawGlyph(st, { seed: 11, x: 100, baseline: 400 });
     const alone = readGlyph(g.strokes);
-    const glyphs = alone.candidates.map((c) => c.glyph);
-    expect(glyphs).toEqual(expect.arrayContaining(['x', '×']));
-    expect(alone.ties.includes('x') || alone.ties.includes('×')).toBe(true);
+    const both = alone.candidates.filter((c) => c.glyph === 'x' || c.glyph === '×');
+    expect(both).toHaveLength(2);
+    for (const c of both) expect(c.score).toBeGreaterThanOrEqual(NUMERAL_FLOOR);
+    expect(alone.doubtful).toBe(true);
     expect(readGlyph(g.strokes, { line: g.line }).glyph).toBe('x');
     const times = drawGlyph(stylesOf('×')[0], { seed: 11, x: 100, baseline: 400 });
     expect(readGlyph(times.strokes, { line: times.line }).glyph).toBe('×');

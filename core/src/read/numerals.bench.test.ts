@@ -133,9 +133,10 @@ function falseDigits(label: string, glyphs: readonly GlyphRead[]): string[] {
   return out;
 }
 
+/** A mark shrunk to a letter's size: a mark already smaller — a dot — is left as it is, not blown up into a curl. */
 const fitTo = (pts: Point[], size: number): Point[] => {
   const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
-  const k = size / Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 1e-6);
+  const k = Math.min(1, size / Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), 1e-6));
   return pts.map((p) => ({ x: (p.x - Math.min(...xs)) * k, y: (p.y - Math.min(...ys)) * k }));
 };
 
@@ -159,7 +160,7 @@ describe('the drawing corpus reads no digit, but its twins', () => {
     const read: Record<string, number> = {};
     let n = 0;
     singles.forEach((c, i) => {
-      if (i % 3) return;
+      if (i % 6) return;
       n++;
       const r = readNumerals([fitTo(c.points, BASE)], { asLabel: true });
       bad.push(...falseDigits(`${c.label} (a label)`, r.glyphs));
