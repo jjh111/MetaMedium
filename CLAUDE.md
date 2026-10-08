@@ -41,7 +41,8 @@ the selection, coloured by relation. The anchors are the whitepaper's Jake story
 pendulum that swings, Chalktalk-style; Feynman diagrams are in scope too. Teachers come
 first; the full stack of maths and design in one place is the north star. The handoff
 holds what the code does today (surveyed), the plan to write (`MATHS-SPEC.md`), and
-wave 1's six units with their contracts. Nothing of it is built yet.
+wave 1's six units with their contracts. **`MATHS-SPEC.md` is now the plan** (written
+8 Oct with John's answers to the hand-over's open questions).
 
 **28 Sep 2026: phases 1 and 2 of `V1-PLAN.md` are done and phase 3's cores
 are built, all on `master`.** The backbone: every affordance is an offer from
@@ -337,6 +338,13 @@ Architecture documents (chronological; **read MVP.md, then v7, then v6**):
   Feynman diagrams, teachers first); three surveys of what the code does today, with file:line; the outline
   of `MATHS-SPEC.md` (rules 7–14, the fill-in, colour for relations, the map, the teacher's scenes T1–T10,
   units M8–M31); and wave 1's six units with their contracts, shared files and merge order
+- `MATHS-SPEC.md` — **the maths push, specced, 8 Oct 2026** (written from the hand-over, with John's answers of
+  the same day): rules 7–14 (a fill-in stands where it would be written, a tap writes it as checked text, the
+  answer can wait as a board's setting, one quantity one colour, alive by an act, exact where it can be, both
+  ways, never confidently wrong); the fill-in; colour for relations, the roles of a right triangle fixed and
+  nudged on a clash; the map of the full stack; the teacher's scenes T1–T10 (T3, the trig limit sin x / x, John
+  confirmed); units M8–M31 with wave 1's six lanes in full and their dated status lines; the ladder; John's
+  decisions
 - `RENAME-PLAN.md` — **the rename, 2 Oct 2026**: MetaMedium becomes dyna.ink. §1 is the one home of the
   spellings — read it there, never from a copy; §2 what keeps
   the old name and why (the `mm-*` keys, `mm-boards`, the `mm` contract, `.metamedium/`, the dated documents,
