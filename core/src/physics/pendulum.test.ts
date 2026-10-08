@@ -37,7 +37,9 @@ describe('the period', () => {
 
   it('is the arithmetic–geometric mean: AGM(1, cos(θ₀/2)) divides the small-angle period', () => {
     expect(agm(1, 1)).toBe(1);
-    expect(agm(1, 0.5)).toBeCloseTo(0.7216, 4);
+    // Gauss's constant is 1/AGM(1, √2) = 0.8346…; AGM(1, ½) = 0.72839551552… by the same iteration done by hand.
+    expect(agm(1, 0.5)).toBeCloseTo(0.7283955155, 9);
+    expect(1 / agm(1, Math.SQRT2)).toBeCloseTo(0.8346268416740731, 12);
     const th = rad(60);
     expect(pendulumPeriod(1, th)).toBeCloseTo(smallAnglePeriod(1) / agm(1, Math.cos(th / 2)), 12);
   });

@@ -10,7 +10,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { createSession } from '../session/session';
 import { lineStroke } from '../test/strokes';
-import { createStepper, inputsKeyOf, parseRunQuantity, registerRunner, runQuantity, runnerById, runners, runsOf, runsReport, RUN_KEYFRAME_EVERY } from './runner';
+import { createStepper, inputsKeyOf, parseRunQuantity, registerRunner, runQuantity, runnerById, runners, runsIn, runsReport, RUN_KEYFRAME_EVERY } from './runner';
 import type { Runner } from './runner';
 
 interface Tick { n: number; x: number; rate: number }
@@ -26,6 +26,7 @@ const tick = (over: Partial<Runner<Tick>> = {}): Runner<Tick> => ({
     const scope = ids ? [...ids] : state.contentIds;
     return scope.length ? [{ runner: 'test-tick', key: scope[0], marks: scope.slice(), confidence: 0.9, summary: `${scope.length} marks that count`, reason: 'any marks will do' }] : [];
   },
+  holds: (board, id) => board.contentIds[0] === id,
   inputs: () => ({ rate: { value: 2, unit: '', from: 'drawn', reason: 'two a second' } }),
   init: (inputs) => ({ n: 0, x: 0, rate: inputs.rate.value }),
   step(s, dt) {
@@ -80,7 +81,7 @@ describe('what runs', () => {
     register(tick());
     register(tick({ id: 'test-weak', reads: (_s, ids) => [{ runner: 'test-weak', key: 'k', marks: ids ? [...ids] : [], confidence: 0.3, summary: 'weakly', reason: 'barely' }] }));
     const s = boardWith();
-    const mine = runsOf(s.getState()).filter((r) => r.runner.id.startsWith('test-'));
+    const mine = runsIn(s.getState()).filter((r) => r.runner.id.startsWith('test-'));
     expect(mine.map((r) => r.runner.id)).toEqual(['test-tick', 'test-weak']);
     expect(mine[0].reading.key).toBe(s.getState().contentIds[0]);
     expect(mine[0].inputs.rate.value).toBe(2);
@@ -91,7 +92,7 @@ describe('what runs', () => {
     register(tick());
     const s = boardWith(3);
     const ids = s.getState().contentIds;
-    const r = runsOf(s.getState(), [ids[1]]).filter((x) => x.runner.id === 'test-tick');
+    const r = runsIn(s.getState(), [ids[1]]).filter((x) => x.runner.id === 'test-tick');
     expect(r).toHaveLength(1);
     expect(r[0].reading.marks).toEqual([ids[1]]);
   });
@@ -122,7 +123,7 @@ describe('what runs', () => {
 describe('the stepper', () => {
   const make = (over: Partial<Runner<Tick>> = {}) => {
     register(tick(over));
-    const run = runsOf(boardWith().getState()).find((r) => r.runner.id === 'test-tick')!;
+    const run = runsIn(boardWith().getState()).find((r) => r.runner.id === 'test-tick')!;
     return createStepper(run);
   };
 

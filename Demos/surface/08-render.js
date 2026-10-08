@@ -505,7 +505,7 @@
       // whole: an artifact is made by whoever blessed it, and a hand may bless a group
       // several hands drew (V1-PLAN L2f). A colour the style imposes — a live page's
       // gold, the outline of what was built — holds for every mark in it.
-      inkOf(m, style.byMaker ? Object.assign({}, style, { color: colourOf(m) }) : style);
+      aliveWith(m.id, () => inkOf(m, style.byMaker ? Object.assign({}, style, { color: colourOf(m) }) : style));
     }
   }
 
@@ -719,6 +719,7 @@
     if (pv) for (const id of pv.ids) exempt.push(id);
     if (followShown) for (const id of followShown.keys()) exempt.push(id);
     for (const id of tank.place.keys()) exempt.push(id);
+    for (const id of aliveMovedIds()) exempt.push(id);
     if (drag && drag.mode === 'reshape' && drag.moved && drag.id) exempt.push(drag.id);
     if (exempt.length > INK_CACHE_EXEMPT_MAX) { inkCacheStats.live++; return null; }
     const dpr = window.devicePixelRatio || 1;
@@ -812,6 +813,8 @@
     // What follows a drag is drawn where the drag takes it, wherever that is (V1-PLAN E2).
     if (followers) for (const id of followers.keys()) out.add(ix.contentAt.has(id) ? id : ix.topOf.get(id) || id);
     for (const id of tank.place.keys()) out.add(id);
+    // What a run has turned (a pendulum's rod and bob, 14-run.js) is drawn wherever it is.
+    for (const id of aliveMovedIds()) out.add(id);
     for (const id of ix.artifactsInOrder) {
       if (out.has(id) || !chromeShown(s, id, inspectedId)) continue;
       const node = s.nodes.get(id), b0 = MM.boundsOf(node), pl = bodyPlacement(id);
@@ -974,9 +977,10 @@
       if (held) { ctx.save(); applyPreview(pv); }
       // A body in a running tank is drawn where its behaviour has taken it:
       // the DRAWING moves, translated and turned, never a sprite in its place.
-      const pl = bodyPlacement(id);
+      // A mark a run has turned — the pendulum's rod and bob about their pivot — is drawn the same way (14-run.js).
+      const pl = placementOf(id);
       if (pl) { ctx.save(); ctx.translate(pl.cx + pl.dx, pl.cy + pl.dy); ctx.rotate(pl.angle); ctx.translate(-pl.cx, -pl.cy); }
-      paintMoved = !!(held || pl || follows);
+      paintMoved = !!(held || pl || follows || aliveMoving());
       inkOf(node, {
         color: isLive ? `rgba(${C.goldRGB},0.85)` : color,
         width: id === inspectedId ? inkW * 1.3 : inkW,
@@ -1022,6 +1026,8 @@
     renderLabels(s, inspectedId, ix, vb);
     // What the board's numbers say, beside its figures and its page (M5, 25-maths.js).
     renderMaths(s, ix, vb);
+    // The runs the board's clocks name, and T and the live θ beside them (M23, 14-run.js).
+    renderAlive(s, ix, vb);
 
     if (s.summon) {
       for (const gid of s.summon.gestureIds) {
@@ -1215,7 +1221,7 @@
     const b0 = MM.boundsOf(node);
     if (!b0) return;
     // A body in a running tank, and a held selection mid-drag, carry their words with them.
-    const pl = bodyPlacement(placedBy);
+    const pl = placementOf(placedBy);
     const b = pl ? { minX: b0.minX + pl.dx, maxX: b0.maxX + pl.dx, minY: b0.minY + pl.dy, maxY: b0.maxY + pl.dy } : b0;
     const held = pv && (pv.ids.includes(node.id) || pv.ids.includes(placedBy));
     const size = labelSizeOf(node);

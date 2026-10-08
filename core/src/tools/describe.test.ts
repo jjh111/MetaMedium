@@ -52,6 +52,6 @@ describe('what the tools say of themselves', () => {
     await agent.interpret(s.getState().contentIds, 2000);
     const system = String(seen[0].find((m) => m.role === 'system')!.content);
     expect(system).toContain(HERE);
-    expect(system).toContain('THE CANVAS\'S OWN TOOLS, which need no model: corrections, text, naming, labels, tidy, drawn controls, clean forms, a graph in 3D, wiring, editing text, words into verbs, clocks, duplicate, keep as drawing, the structure, maths, Mermaid, drawing from Mermaid, routing, tracing a picture, regions.');
+    expect(system).toContain('THE CANVAS\'S OWN TOOLS, which need no model: corrections, text, naming, labels, tidy, drawn controls, clean forms, a graph in 3D, wiring, editing text, words into verbs, clocks, duplicate, keep as drawing, the structure, maths, Mermaid, drawing from Mermaid, routing, tracing a picture, regions, running a pendulum.');
   });
 });

@@ -21,11 +21,13 @@
 //   AL6   the swing is the physics: the drawn angle at the run's time is what RK4 gives at that time
 //   AL7   T and the live θ stand beside it as chips
 //   AL8   Esc stops it: it holds still, the clock says paused, one pause event and no more
+//   AL8b  held with the field open, one Esc stops the pendulum the hand is holding
 //   AL9   after a reload it is paused: the log says played, the page runs nothing and offers Play again
 //   AL10  Reset puts the ink back where it was drawn; Play swings it again
 //   AL11  a rod drawn plumb is offered Pull it aside; one act turns it, one undo puts it back
-//   AL12  the whole run wrote only what the hand did: strokes, one play, one pause, one play, one reset…
+//   AL12  the whole run wrote only what the hand did — strokes, binds, plays, pauses, a reset: no move, turn or scale
 //   AL13  a second tab opens the same board: it too runs nothing until played there
+//   AL14  a pendulum whose marks were named swings inside its artifact, the pivot never moved
 
 import { waitReady } from './keep.mjs';
 
@@ -79,7 +81,7 @@ const dismissAll = async (page) => {
   for (let i = 0; i < 4; i++) {
     const held = await page.evaluate(() => { const s = window.__mm.session.getState(); return !!s.summon || s.selection.length > 0; });
     if (!held) return;
-    await page.mouse.click(1250, 760);
+    await page.mouse.click(1000, 650);
     await page.waitForTimeout(250);
   }
 };
@@ -159,7 +161,8 @@ export async function runAlive(browser, servers, { freshContext }) {
   });
 
   await record('AL5', async () => {
-    const grab = () => page.evaluate(() => { const c = document.getElementById('board') || document.querySelector('canvas'); const g = c.getContext('2d'); const d = g.getImageData(0, 0, c.width, c.height).data; let h = 0; for (let i = 0; i < d.length; i += 97) h = (h * 31 + d[i]) | 0; return h; });
+    // The main canvas, the pendulum's own patch of it, every byte: the picture the paint made.
+    const grab = () => page.evaluate(() => { const c = document.getElementById('canvas'); const g = c.getContext('2d'); const d = g.getImageData(560, 140, 420, 330).data; let h = 0; for (let i = 0; i < d.length; i++) h = (h * 31 + d[i]) | 0; return h; });
     const seen = new Set();
     for (let i = 0; i < 8; i++) { seen.add(await grab()); await page.waitForTimeout(90); }
     check(`AL5. the canvas itself changes between frames (${seen.size} different pictures in 8)`, seen.size >= 4, { seen: [...seen] });
@@ -207,6 +210,22 @@ export async function runAlive(browser, servers, { freshContext }) {
       keys[0] && !keys[0].running && Math.hypot(p1.bob.x - p2.bob.x, p1.bob.y - p2.bob.y) < 0.01 && clock && clock.playing === false && after.length - before.length === 1 && after[after.length - 1].op === 'pause', { keys, clock, after });
   });
 
+  await record('AL8b', async () => {
+    // Held, with the field open, one Esc stops the pendulum the hand is holding.
+    await hold(page, geo.bob.x - geo.r, geo.bob.y);
+    await pill(page, 'Play the pendulum').click();
+    await page.waitForTimeout(500);
+    const running = (await runKeys(page))[0].running;
+    const before = (await clockEvents(page)).length;
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    const after = await clockEvents(page);
+    const keys = await runKeys(page);
+    check(`AL8b. holding the pendulum with the field open, one Esc stops it (running ${running} → ${keys[0].running}; ${after.slice(before).map((e) => e.op).join(', ')})`,
+      running && !keys[0].running && after.length - before === 1 && after[after.length - 1].op === 'pause', { running, keys, after });
+    await dismissAll(page);
+  });
+
   await record('AL9', async () => {
     // Played again, then the page closed with the clock saying played.
     await hold(page, geo.bob.x - geo.r, geo.bob.y);
@@ -238,7 +257,9 @@ export async function runAlive(browser, servers, { freshContext }) {
     const p1 = await drawn(page, rod, bob);
     await page.waitForTimeout(150);
     const p2 = await drawn(page, rod, bob);
-    // Reset: the ink back where it was drawn.
+    // Held where it is by Esc, then Reset: the ink back where it was drawn.
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(250);
     await hold(page, geo.bob.x - geo.r, geo.bob.y);
     const f = await fieldNow(page);
     await pill(page, 'Reset the pendulum').click();
@@ -248,9 +269,6 @@ export async function runAlive(browser, servers, { freshContext }) {
     const keys = await runKeys(page);
     check(`AL10. played again it swings (${Math.hypot(p1.bob.x - p2.bob.x, p1.bob.y - p2.bob.y).toFixed(1)} px in 150 ms); Reset (offered: ${f && f.affords.filter((l) => /pendulum/.test(l)).join(' | ')}) puts the ink back where it was drawn (t = ${keys[0] && keys[0].t.toFixed(2)}, bob ${Math.hypot(at.bob.x - geo.bob.x, at.bob.y - geo.bob.y).toFixed(1)} px from where it was drawn)`,
       moving[0] && moving[0].running && Math.hypot(p1.bob.x - p2.bob.x, p1.bob.y - p2.bob.y) > 0.5 && keys[0] && keys[0].t === 0 && Math.hypot(at.bob.x - geo.bob.x, at.bob.y - geo.bob.y) < 3, { moving, keys, at });
-    // Stop what is left running before the next scene.
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(200);
   });
 
   await record('AL11', async () => {
@@ -265,7 +283,7 @@ export async function runAlive(browser, servers, { freshContext }) {
       await p.waitForTimeout(500);
       const aside = await p.evaluate(() => { const r = window.DynaInkCore.readPendulum(window.__mm.session.getState()); return r && r.pendulums[0] ? r.pendulums[0].theta * 180 / Math.PI : null; });
       const acts = await p.evaluate((n) => new Set(window.__mm.session.getEvents().slice(n).filter((e) => e.type !== 'dismiss' && e.type !== 'deselect').map((e) => e.act)).size, n0);
-      await dismissAll(p);
+      // The field a tool leaves open is no act of the tool's: one undo, with it still open, takes the turn back.
       await p.keyboard.press('Control+z');
       await p.waitForTimeout(300);
       const back = await p.evaluate(() => { const r = window.DynaInkCore.readPendulum(window.__mm.session.getState()); return r && r.pendulums[0] ? r.pendulums[0].theta * 180 / Math.PI : null; });
@@ -276,7 +294,8 @@ export async function runAlive(browser, servers, { freshContext }) {
 
   await record('AL12', async () => {
     const types = await page.evaluate(() => window.__mm.session.getEvents().map((e) => e.type));
-    const odd = types.filter((t) => !['stroke', 'clock', 'select', 'deselect', 'dismiss', 'summon', 'hold', 'teach'].includes(t));
+    // A stroke drawn on a magnet is bound there (`bind`); a hold is a `summon`; a tap away is a `dismiss`: what the hand's own pointer writes.
+    const odd = types.filter((t) => !['stroke', 'bind', 'clock', 'select', 'deselect', 'dismiss', 'summon', 'hold', 'teach'].includes(t));
     const moves = types.filter((t) => t === 'move' || t === 'rotate' || t === 'scale' || t === 'transform');
     check(`AL12. the whole run wrote only what the hand did — ${types.length} events, ${types.filter((t) => t === 'clock').length} of them clocks, no move, turn or scale (${moves.length}), nothing else odd (${odd.join(', ') || 'none'})`, moves.length === 0 && odd.length === 0, { types });
   });
@@ -288,6 +307,35 @@ export async function runAlive(browser, servers, { freshContext }) {
       const keys = await runKeys(second);
       check(`AL13. a second tab on the same board runs nothing until played there (running ${keys.some((k) => k.running)})`, !keys.some((k) => k.running), { keys });
     } finally { await second.close(); }
+  });
+
+  await record('AL14', async () => {
+    // The trap: a pendulum whose marks were named is an artifact's parts — drawn under one artifact, never turned about its centre.
+    const p = await open('/app/?fresh=1&nosw=1');
+    try {
+      const g = await drawPendulum(p, { pivot: { x: 760, y: 170 } });
+      await hold(p, g.bob.x - g.r, g.bob.y);
+      await p.locator('#summon input.filter').fill('pendulum');
+      await p.waitForTimeout(250);
+      await p.locator('#summon .pill.item', { hasText: 'Name it' }).first().click();
+      await p.waitForTimeout(500);
+      await dismissAll(p);
+      const made = await p.evaluate(() => { const s = window.__mm.session.getState(); return { artifacts: s.artifacts.length, content: s.contentIds.length }; });
+      await hold(p, g.bob.x - g.r, g.bob.y);
+      const f = await fieldNow(p);
+      const rod = await p.evaluate(() => { const r = window.DynaInkCore.readPendulum(window.__mm.session.getState()); return r && r.pendulums[0] ? { rod: r.pendulums[0].rod, bob: r.pendulums[0].bob } : null; });
+      await pill(p, 'Play the pendulum').click();
+      await p.waitForTimeout(700);
+      const a = await drawn(p, rod.rod, rod.bob);
+      await p.waitForTimeout(160);
+      const b = await drawn(p, rod.rod, rod.bob);
+      const grab = () => p.evaluate(() => { const c = document.getElementById('canvas'); const d = c.getContext('2d').getImageData(560, 140, 420, 330).data; let h = 0; for (let i = 0; i < d.length; i++) h = (h * 31 + d[i]) | 0; return h; });
+      const seen = new Set();
+      for (let i = 0; i < 8; i++) { seen.add(await grab()); await p.waitForTimeout(90); }
+      check(`AL14. a pendulum whose marks were named (${made.artifacts} artifact, ${made.content} thing on the board) is offered Play the pendulum when the artifact is held (${f && f.affords.join(' | ')}) and swings inside it: the bob moves ${Math.hypot(a.bob.x - b.bob.x, a.bob.y - b.bob.y).toFixed(1)} px in 160 ms, the pivot stays put (${Math.hypot(a.pivot.x - g.pivot.x, a.pivot.y - g.pivot.y).toFixed(3)} px off), the canvas changes (${seen.size} pictures in 8)`,
+        made.artifacts === 1 && f && f.affords.includes('Play the pendulum') && Math.hypot(a.bob.x - b.bob.x, a.bob.y - b.bob.y) > 0.5 && Math.hypot(a.pivot.x - g.pivot.x, a.pivot.y - g.pivot.y) < 0.01 && seen.size >= 4, { made, f, a, b, seen: [...seen] });
+      await p.keyboard.press('Escape');
+    } finally { await p.close(); }
   });
 
   try { await page.close(); } catch { /* gone */ }

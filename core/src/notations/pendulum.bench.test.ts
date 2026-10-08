@@ -27,7 +27,7 @@ import { ER_VARIANTS, drawEr } from './fixtures/er';
 import { MINDMAP_VARIANTS, drawMindMap } from './fixtures/mindmap';
 import { GARMENT_VARIANTS, drawGarment } from './fixtures/garment';
 import { PENDULUM_VARIANTS, drawPendulum } from './fixtures/pendulum';
-import { readPendulum } from './pendulum';
+import { PENDULUM_OFFER_FLOOR, readPendulum } from './pendulum';
 
 const SLOW = 180_000;
 const deg = (rad: number) => (rad * 180) / Math.PI;
@@ -90,7 +90,7 @@ describe('the negatives: nothing else reads as a pendulum above the floor', () =
       const s = createSession();
       draw(s);
       const r = readPendulum(s.getState());
-      if (r && r.confidence >= NOTATION_FLOOR) out.push(`${label}: ${r.confidence.toFixed(2)} — ${r.summary}`);
+      if (r && r.confidence >= PENDULUM_OFFER_FLOOR) out.push(`${label}: ${r.confidence.toFixed(2)} — ${r.summary}`);
     }
     return out;
   };
