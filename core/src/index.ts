@@ -1185,3 +1185,33 @@ export {
 export type { FnName, FnSpec, FnNode, FnParse, CompiledFn, FnOptions } from './maths/fn';
 export { isAngle, convertAngle, inRadians, powQuantity, angleSuffix, scanAngle } from './maths/quantity';
 export type { AngleUnit, ScannedAngle } from './maths/quantity';
+
+// Polynomials and rational functions (MATHS-SPEC lane B, M12): exact over the rationals — expanded, divided,
+// factored (`factor('x^3-1')` is `(x − 1)(x² + x + 1)`: rational roots, then Kronecker's method, and where it was
+// too large to be sure it says so), and a ratio of polynomials cancelled into its holes, its poles and its end.
+export {
+  factor as factorPolynomial,
+  expand as expandPolynomial,
+  analyseRational,
+  rationalParts,
+  parsePoly,
+  factorPoly,
+  realRoots,
+  rat,
+  ratText,
+  ratFromNumber,
+  ratToNumber,
+  polyFromNumbers,
+  polyText,
+  polyDegree,
+  polyAdd,
+  polySub,
+  polyMul,
+  polyPow,
+  polyDivide,
+  polyGcd,
+  polyDerivative,
+  polyEvalRat,
+  polyEvalNumber,
+} from './maths/poly';
+export type { Rat, Poly, ParsedPoly, Expanded, Factor, Factored, FactorResult, RationalParts, RationalAnalysis, Hole, Pole, EndBehaviour } from './maths/poly';
