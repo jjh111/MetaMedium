@@ -959,10 +959,14 @@ export function solveFigure(figure: Figure, labels: readonly FigureLabel[], opti
     const values = valuesOf(f, c, unit, right, partLabels);
     const conflicts = c.conflicts.map((x) => conflictOf(f, x, c.model, unit, right));
     const verb = c.model.basis.filter((x) => !x.assumed).length > 1 || /\band\b/.test(c.model.how) ? 'make' : 'makes';
+    // A leg is "the other leg" only when the sentence makes one leg and a leg is already given; where it makes
+    // both (a hypotenuse and an angle), each stands as itself — side BC and side CA — so it names each once.
+    const isLeg = (k: string) => right !== null && k.startsWith('side') && oppVertex(Number(k.slice(-1))) !== right;
+    const legsMade = c.model.makes.filter(isLeg).length;
     const made = c.model.makes.map((k) => {
       const v = values.find((x) => x.key === k);
       if (!v) return null;
-      const label = right !== null && k.startsWith('side') && oppVertex(Number(k.slice(-1))) !== right && c.model.basis.some((x) => x.key === `side${oppSide(right)}`) ? 'the other leg' : v.label;
+      const label = right !== null && isLeg(k) && legsMade === 1 && c.model.basis.some((x) => x.key === `side${oppSide(right)}`) ? 'the other leg' : v.label;
       return `${label} ${v.text}`;
     }).filter((x): x is string => !!x);
     const assumes = c.model.assumed ? [c.model.assumed] : undefined;

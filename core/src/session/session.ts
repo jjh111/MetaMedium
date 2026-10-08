@@ -85,6 +85,7 @@ import { connectorEnds, followed, followThrough, releasedBy, reshapeDecision } f
 import { deriveRoute, routable, routeAffectedBy, routeRepOf } from '../diagram/route';
 import { type Manipulation, manipulableOf, manipulatedReps, markFrameOf } from './manipulate';
 import { regionCarries } from './board-regions';
+import { type BoardSettings, DEFAULT_SETTINGS, isSettingKey, settingRefusal } from './settings';
 
 /** A move, scale or turn event as the manipulation it writes. */
 function manipulationOf(ev: Extract<SessionEvent, { type: 'move' | 'scale' | 'rotate' }>): Manipulation {
@@ -259,6 +260,12 @@ export interface SessionState {
    * loads without them and the surface says it (B3).
    */
   packNotices: PackNotice[];
+  /**
+   * What the board says of itself (MATHS-SPEC M18): whether an answer waits for a tap and whether the maths is
+   * coloured at rest. A board-wide fact in the log (`setting`), like `packs` — whichever hand said it, every
+   * merged board has it; the closed set is `session/settings.ts`.
+   */
+  settings: BoardSettings;
 }
 
 /**
@@ -362,6 +369,13 @@ type SessionEventUnion =
   | { type: 'use'; pack: string; at: number; participantId?: string }
   /** The board stops using a pack: its definitions leave the matching (what corrections taught them is kept for a later use). */
   | { type: 'unuse'; pack: string; at: number; participantId?: string }
+  /**
+   * A board's setting (MATHS-SPEC M18): `answers` ('show' | 'wait') and `colour` ('pointed' | 'always'), a closed
+   * set (`session/settings.ts`). Board-wide like `use`: whichever hand said it, every hand's board has it once the
+   * logs are merged, and it is undone per hand. A key or value outside the set is refused at the door and
+   * ignored on replay.
+   */
+  | { type: 'setting'; key: string; value: string; at: number; participantId?: string }
   /**
    * A behaviour for a definition, held as a rep. From a human it is blessed
    * by the act; from a model or the engine's own fit it is held, attributed,
@@ -712,6 +726,12 @@ export interface Session {
   /** Stop using a pack — one it uses, or one it names that this build lacks: one `unuse` event. Nothing, when the board does not name it. */
   unuse(pack: string, at: number, participantId?: string): void;
   /**
+   * Set one of the board's settings (MATHS-SPEC M18): one `setting` event. Returns null when the board has it so
+   * now — it was already, or from this call — or the sentence saying why it cannot: a key or a value outside the
+   * closed set (`session/settings.ts`). A refusal writes nothing into the log.
+   */
+  setting(key: string, value: string, at: number, participantId?: string): string | null;
+  /**
    * Attach generated code to an artifact — the 'code' rep that makes it live.
    * Several participants may each attach code to the same artifact; every
    * attempt is held and attributed, and the surface renders the chosen one.
@@ -976,6 +996,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   let packs: string[] = [];
   let library: string[] = [];
   let packNotices: PackNotice[] = [];
+  // What the board says of itself (a `setting` event over the closed set).
+  let settings: BoardSettings = { ...DEFAULT_SETTINGS };
   const packSource: PackSource = config.packs ?? shippedPack;
   // Every hand's gestures, keyed by the hand whose acts they are (`handOf`):
   // the board's own under LOCAL_PARTICIPANT, another's under
@@ -1068,7 +1090,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     clusterCandidates: ClusterCandidate[]; participants: string[]; explanations: string[]; regions: string[];
     live: string[]; gestures: Map<string, Gestures>; markHands: Map<string, string>;
     lastAt: number; counter: number; clocks: Record<string, Clock>;
-    packs: string[]; library: string[]; packNotices: PackNotice[];
+    packs: string[]; library: string[]; packNotices: PackNotice[]; settings: BoardSettings;
     /** The index as it stood — kept by the last few checkpoints only. */
     derived?: Derived;
   }
@@ -1136,7 +1158,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       clusterCandidates: clusterCandidates.slice(), participants: participants.slice(),
       explanations: explanations.slice(), regions: regions.slice(), live: live.slice(), gestures: structuredClone(gestures),
       markHands: new Map(markHands), lastAt, counter, clocks: { ...clocks },
-      packs: packs.slice(), library: library.slice(), packNotices: packNotices.slice(),
+      packs: packs.slice(), library: library.slice(), packNotices: packNotices.slice(), settings: { ...settings },
       derived: copyDerived({
         order, nextOrder, inContent, reach, ink, linked, componentOf, matchable, unsettled,
         definitionsSeen, definitionsChanged, definitionSizes, holding, holdingInOrder, holdingMoved, boundBy,
@@ -1151,7 +1173,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     explanations = s.explanations.slice(); regions = (s.regions ?? []).slice(); live = s.live.slice(); gestures = structuredClone(s.gestures);
     markHands = new Map(s.markHands);
     lastAt = s.lastAt; counter = s.counter; clocks = { ...(s.clocks ?? {}) };
-    packs = s.packs.slice(); library = s.library.slice(); packNotices = s.packNotices.slice();
+    packs = s.packs.slice(); library = s.library.slice(); packNotices = s.packNotices.slice(); settings = { ...DEFAULT_SETTINGS, ...(s.settings ?? {}) };
     if (!s.derived) {
       rebuildDerived();
       return;
@@ -1315,6 +1337,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     packs = [];
     library = [];
     packNotices = [];
+    settings = { ...DEFAULT_SETTINGS };
     gestures = new Map();
     markHands = new Map();
     lastAt = 0;
@@ -3972,6 +3995,12 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     rereadSummonMatches();
   }
 
+  /** A board's setting (M18): the latest word in the log is the board's. Read, not trusted — a key or value outside the closed set is left alone. */
+  function applySetting(ev: Extract<SessionEvent, { type: 'setting' }>) {
+    if (settingRefusal(ev.key, ev.value) !== null || !isSettingKey(ev.key)) return;
+    settings = { ...settings, [ev.key]: ev.value };
+  }
+
   /** How many versions of code a node carries. A revision is pinned to one of these. */
   function codeVersion(nodeId: string): number {
     const node = nodes.get(nodeId);
@@ -4165,6 +4194,9 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
         return null;
       case 'unuse':
         applyUnuse(ev);
+        return null;
+      case 'setting':
+        applySetting(ev);
         return null;
       case 'correct':
         applyCorrect(ev);
@@ -4473,6 +4505,7 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       selection: [...reader.selection],
       packs: [...packs],
       packNotices: packNotices.map((n) => ({ ...n })),
+      settings: { ...settings },
     };
   }
 
@@ -4511,6 +4544,14 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
       const ref = typeof pack === 'string' ? pack.trim() : String(pack);
       if (!packs.includes(ref) && !packNotices.some((n) => n.pack === ref)) return;
       dispatch({ type: 'unuse', pack: ref, at, ...(participantId !== undefined ? { participantId } : {}) });
+    },
+    setting: (key, value, at, participantId) => {
+      // Refused at the door, never written: the log holds only settings a board can read.
+      const why = settingRefusal(key, value);
+      if (why !== null) return why;
+      if (isSettingKey(key) && settings[key] === value) return null;
+      dispatch({ type: 'setting', key, value, at, ...(participantId !== undefined ? { participantId } : {}) });
+      return null;
     },
     correct: (args) => void dispatch({ type: 'correct', ...args }),
     clock: (args) => void dispatch({ type: 'clock', ...args }),
