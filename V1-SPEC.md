@@ -959,6 +959,17 @@ own files on his machine only. It prints numbers, never content (§12).
   the clones, skip the masks and say so, and cap the work on one file with a
   sentence, never a frozen page.
 
+**IN1a status, 7 Oct 2026: done on `unit/in1-sources`** — core `ingest/`: the ink document and its provenance; outline
+to centerline, a ring's two sides paired from its caps, else the fill thinned and walked with `image/trace.ts`'s own
+thinning, fidelity deciding and kept on each stroke; the SVG adapter over a tokenizer written by hand (stroked paths
+exact, pen-shaped fills read back, nested transforms, `<use>` read once and moved, units, `inkscape:original-d`, text,
+pictures, links, masks and clips skipped and said, drawn or designed with its evidence); notes and pictures as data;
+`ingest(bytes, name)` by the bytes, never throwing. The synthetic corpus in five styles 100% faithful and reading as its
+source; **John's 31 Inkspace drawings, 3,074 outlines: 91.2% faithful, 98.5% within 80%** (the prototype: 75–96%), 1.05
+ms an outline; a whiteboard-sized synthetic file of 2,146 outlines and 1,797 clones in 0.4 s. Core 3,288 tests with the
+colour space beside it. Not yet: the surface routing every file through `ingest`, the source kept as an asset, source
+colours drawn, the drawn/designed switch (IN1b); PDF (IN2), InkML (IN3); the whiteboard and OneNote pages measured.
+
 **IN2 — PDF: ink, pages and words.**
 - **Owns:** core `ingest/pdf.ts` (over pdf.js's operator list); the surface
   `18-pdf.js` (pdf.js loaded lazily, from a copy the app serves itself);
