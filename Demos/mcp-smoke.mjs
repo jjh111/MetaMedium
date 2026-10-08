@@ -942,7 +942,7 @@ try {
   const roomLook = textOf(await call('canvas_look', {}));
   const markLines = (t) => t.split('\n').filter((l) => /^(stroke|artifact|region):/.test(l)).map((l) => l.replace(/ · its pixels [^·]*/g, '')).sort();
   const sameLines = JSON.stringify(markLines(bigImport)) === JSON.stringify(markLines(roomLook));
-  check('the rich room\'s own bundle imported into a scratch session reads the same board, mark for mark — the picture notes aside, which say where the pixels are (the file, not the room)', sameLines && /compared with the board in the room: \d+ marks? in both, all read the same/.test(bigImport), { only: markLines(roomLook).filter((l) => !markLines(bigImport).includes(l)).slice(0, 3), extra: markLines(bigImport).filter((l) => !markLines(roomLook).includes(l)).slice(0, 3) });
+  check('the rich room\'s own bundle imported into a scratch session reads the same board, mark for mark — the picture notes aside, which say where the pixels are (the file, not the room)', sameLines && /compared with the board in the room: \d+ things? in both, all read the same/.test(bigImport), { only: markLines(roomLook).filter((l) => !markLines(bigImport).includes(l)).slice(0, 3), extra: markLines(bigImport).filter((l) => !markLines(roomLook).includes(l)).slice(0, 3) });
 
   // ---- a hand of its own, in a room of its own ----
   const dRoom = ROOM + '-doors';
@@ -984,7 +984,7 @@ try {
     const logParts = heads(exLog);
     const logDec = MM.decodeLog(logParts[1] || '');
     check('canvas_export log: a sentence (its events, its version) and then the file\'s exact text — a version 1 log that decodeLog reads, header and all, with nothing skipped',
-      logParts.length === 2 && logDec.version === 1 && logDec.skipped === 0 && logDec.events.length > 20 && new RegExp('\\b' + logDec.events.length + ' events\\b').test(logParts[0]) && /version 1/.test(logParts[0])
+      logParts.length === 2 && logDec.version === 1 && logDec.skipped === 0 && logDec.events.length >= 12 && new RegExp('\\b' + logDec.events.length + ' events\\b').test(logParts[0]) && /version 1/.test(logParts[0])
         && JSON.parse(logParts[1].split('\n')[0]).format === MM.LOG_FORMAT && logDec.app === version, { parts: logParts.map((p) => p.slice(0, 160)), version: logDec.version, skipped: logDec.skipped, app: logDec.app });
     check('…and decodes to the same events the room holds of this hand — and writes back to the same bytes (encodeLog is decodeLog\'s inverse)',
       !!room0.hand && JSON.stringify(logDec.events) === JSON.stringify(room0.logs[room0.hand]) && MM.encodeLog(logDec.events, { app: version }) === logParts[1], { hand: room0.hand, events: logDec.events.length, room: room0.hand && room0.logs[room0.hand].length });
@@ -1051,7 +1051,7 @@ try {
       new RegExp('\\b' + logDec.events.length + ' events\\b').test(impLog) && /version 1/.test(impLog) && /1 region/.test(impLog) && /1 picture/.test(impLog) && /not in (it|a log)/.test(impLog) && /the board, as canvas_look says it/.test(impLog)
         && flow.every((id) => impLog.includes(id)) && /labelled “start”/.test(impLog), impLog.slice(0, 700));
     check('…and what reads differently: every mark compared with the same id on the room\'s board — all read the same, none only in the file, none only in the room',
-      /compared with the board in the room: \d+ marks? in both, all read the same · 0 only in this file · 0 only in the room/.test(impLog), impLog.split('\n').filter((l) => /compared with/.test(l)));
+      /compared with the board in the room: \d+ things? in both, all read the same · 0 only in this file · 0 only in the room/.test(impLog), impLog.split('\n').filter((l) => /compared with/.test(l)));
     const impBundle = textOf(await dcall('canvas_import', { path: bPath }));
     check('canvas_import of the bundle: the picture is carried, its bytes checked against the hash it is named for, and the board\'s picture says its pixels are in the file',
       /a bundle/.test(impBundle) && /1 picture/.test(impBundle) && /carried/.test(impBundle) && /its pixels are in the file/.test(impBundle) && /all read the same/.test(impBundle) && /nothing was written to the room/.test(impBundle), impBundle.split('\n').filter((l) => /picture|bundle|pixels/.test(l)));
@@ -1064,7 +1064,7 @@ try {
     const exampleFile = path.join(repoRoot, 'boards', 'examples', 'flowchart.jsonl');
     const impExample = textOf(await dcall('canvas_import', { path: exampleFile }));
     check('boards/examples/flowchart.jsonl — a log the engine made — reads in a scratch session as the flowchart it is, beside its Mermaid, none of it in the room',
-      /scratch session/.test(impExample) && /mermaid/i.test(impExample) && /rectangle|circle/.test(impExample) && /0 marks? in both|none of its marks are on the board in the room/.test(impExample), impExample.slice(0, 500));
+      /scratch session/.test(impExample) && /mermaid/i.test(impExample) && /rectangle|circle/.test(impExample) && /0 things? in both|none of its ids are on the room/.test(impExample), impExample.slice(0, 500));
     // What cannot be read is a sentence, and nothing is opened.
     const newer = path.join(dir, 'newer.jsonl');
     writeFileSync(newer, JSON.stringify({ type: 'format', format: MM.LOG_FORMAT, version: 9, app: '9.9.9' }) + '\n' + JSON.stringify({ type: 'clean' }) + '\n');

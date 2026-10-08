@@ -45,6 +45,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { relayTransport, ensureRelay, checkRelay, roomAssets } from './live-node.mjs';
 import { inkPNG, decodePNG } from './ink-png.mjs';
 import { sniffImage, MAX_ASSET_BYTES, tooLargeWords } from './relay-protocol.mjs';
+import { doorsText, exportBoard, importBoard, looksLikeBoard, fileIsZip, BOARD_FILE_MAX } from './mcp-doors.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const log = (...a) => process.stderr.write(a.join(' ') + '\n');
@@ -203,8 +204,6 @@ async function checkPictures(s, ids) {
   for (const p of picturesAmong(s, ids)) if (p.pic.asset && !roomHolds.has(p.pic.asset)) want.add(p.pic.asset);
   await Promise.all([...want].slice(0, 40).map(async (a) => { if (await assets.has(a.slice('sha256:'.length))) roomHolds.add(a); }));
 }
-/** The innermost region each mark stands in, by name, for the look in progress (PLAN-IPAD-NOTES A2): set by `look`, read by `describeMark`. */
-let regionOf = null;
 /** Which region each mark stands in — the smallest one that holds it by the one rule (`regionMembers`) — as a Map from id to the region's name. */
 function regionsHolding(s) {
   const out = new Map();
@@ -218,7 +217,13 @@ function regionsHolding(s) {
   }
   return out;
 }
-function describeMark(node, s) {
+/** Where a picture's pixels are, said after its size: in the room, in the tab that imported it, or nowhere. */
+const roomPictureNote = (pic) => (pic.asset && roomHolds.has(pic.asset) ? ' · its pixels are in the room — canvas_see draws it' : pic.asset ? ' · its pixels are kept in the tab that imported it — this hand has none to see' : ' · no pixels were kept for it');
+/**
+ * One mark in a line. `view` says what a board read from a file cannot take from the room: `regionOf` (which region each mark stands in, from
+ * `regionsHolding`) and `holds(pic)` (where a picture's pixels are) — with none, the room's own (a brief a seat is asked about names no region).
+ */
+function describeMark(node, s, view = {}) {
   const b = MM.boundsOf(node);
   // Readings are what the engine and the models read; a label is its maker's
   // word and is said on its own, never as one of them (L2b). Whoever read it
@@ -235,7 +240,7 @@ function describeMark(node, s) {
   // their hash, and where the room holds them canvas_see draws it; where it does not, the page that imported it
   // kept them (the browser's asset store) — this hand has none, and says so.
   const pic = MM.pictureOf(node);
-  if (pic) parts.push('a picture ' + pic.name + (pic.w && pic.h ? ' ' + pic.w + '×' + pic.h : '') + (pic.asset && roomHolds.has(pic.asset) ? ' · its pixels are in the room — canvas_see draws it' : pic.asset ? ' · its pixels are kept in the tab that imported it — this hand has none to see' : ' · no pixels were kept for it'));
+  if (pic) parts.push('a picture ' + pic.name + (pic.w && pic.h ? ' ' + pic.w + '×' + pic.h : '') + (view.holds || roomPictureNote)(pic));
   else if (rep) parts.push((rep.data.kind || 'html') + (rep.data.path ? ' ' + rep.data.path : ''));
   if (MM.isWord(node)) parts.push('a word of ' + MM.lettersOf(node).length + ' strokes');
   parts.push(reads.join(', ') || 'unread');
@@ -243,23 +248,38 @@ function describeMark(node, s) {
   if (said) parts.push('says “' + said + '”');
   if (b) parts.push('at ' + r(b.minX) + ',' + r(b.minY) + ' ' + r(b.maxX - b.minX) + '×' + r(b.maxY - b.minY));
   if (s.live.includes(node.id)) parts.push(s.clocks[node.id] && s.clocks[node.id].playing ? 'playing' : 'live');
-  const inside = regionOf && regionOf.get(node.id);
+  const inside = view.regionOf && view.regionOf.get(node.id);
   if (inside) parts.push('in “' + inside + '”');
   if (who && who !== 'me') parts.push('by ' + who);
   return parts.join(' · ');
 }
-async function look(args) {
-  const s = session.getState();
-  await checkPictures(s, args.ids && args.ids.length ? args.ids : s.contentIds);
-  // From here to the return nothing awaits, so the table of which region each mark stands in is this look's alone.
-  regionOf = regionsHolding(s);
-  const t = Date.now();
-  const here = store.presence().filter((p) => t - p.at < 60000).map((p) => label(p.participant));
-  const lines = ['room ' + ROOM + ' · you are ' + label(ME) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far')];
-  // Said before the marks, because it changes what they mean: two hands under
-  // one name are not both on this board, and a room older than the relay
-  // remembers may be missing its beginning.
-  for (const n of store.notices()) lines.push('room says: ' + n);
+/** A region's line in a look: its place in the outline, what it holds, where it stands. */
+function regionLine(s, o, outline) {
+  const d = MM.describeRegion(s, o.id);
+  if (!d) return null;
+  const parent = o.parent && outline.find((x) => x.id === o.parent);
+  return o.id + ' · ' + MM.regionSaid(d) + ' · at ' + r(d.bounds.minX) + ',' + r(d.bounds.minY) + ' ' + r(d.bounds.maxX - d.bounds.minX) + '×' + r(d.bounds.maxY - d.bounds.minY) +
+    (parent ? ' · inside “' + parent.name + '”' : '') +
+    (d.things.length ? ' · holds ' + d.things.slice(0, 12).join(', ') + (d.things.length > 12 ? ' and ' + (d.things.length - 12) + ' more' : '') : '');
+}
+/** Every thing on a board in a line each, by id — marks, artifacts and regions — what a board read from a file is compared with the room's by (canvas_import). */
+function thingLines(s, holds) {
+  const regionOf = regionsHolding(s);
+  const out = new Map();
+  for (const id of s.contentIds) { const n = s.nodes.get(id); if (n) out.set(id, describeMark(n, s, { regionOf, holds })); }
+  const outline = MM.regionOutline(s);
+  for (const o of outline) { const line = regionLine(s, o, outline); if (line) out.set(o.id, line); }
+  return out;
+}
+/**
+ * What a look says of a board, after what it says of the room: the packs it uses, how many marks, each mark, the regions in the outline's
+ * reading order, the handwriting a line at a time, the answers and the briefs. Nothing here awaits, so the table of which region each mark
+ * stands in is this call's alone. `view` is for a board read from a file (canvas_import): `holds` says where a picture's pixels are, `limit`
+ * caps the marks listed, and `scratch` leaves the seat out — a brief parked in a file is not the room's to answer.
+ */
+function boardLines(s, args, view = {}) {
+  const regionOf = regionsHolding(s);
+  const lines = [];
   // The library packs the board uses (V1-PLAN §2.3, B3): what it matches groups by besides what was taught here.
   if (s.packs.length) lines.push('uses ' + s.packs.join(', ') + ' — what they ship is matched here as if taught, attributed to them');
   for (const n of s.packNotices) lines.push('board says: ' + n.detail);
@@ -270,21 +290,16 @@ async function look(args) {
     lines.push(MM.describeSession(s, { nodeIds: args.ids }));
   } else {
     const ids = args.ids && args.ids.length ? args.ids : s.contentIds;
-    for (const id of ids) { const n = s.nodes.get(id); if (n) lines.push(describeMark(n, s)); }
+    const shown = view.limit ? ids.slice(0, view.limit) : ids;
+    for (const id of shown) { const n = s.nodes.get(id); if (n) lines.push(describeMark(n, s, { regionOf, holds: view.holds })); }
+    if (shown.length < ids.length) lines.push('and ' + (ids.length - shown.length) + ' more things — a board read from a file is said up to ' + view.limit + ' (canvas_import takes a limit)');
     if (!ids.length) lines.push('(nothing on the canvas)');
   }
   // The regions (PLAN-IPAD-NOTES I5, A2): named places on the board, in the outline's reading order — top to bottom, left to right,
   // a region under the smaller one that holds it — each with what stands inside it now. What a region holds is derived from where
   // things stand, never written; canvas_region makes one and canvas_move moves what is the hand's own.
   const outline = MM.regionOutline(s);
-  for (const o of outline) {
-    const d = MM.describeRegion(s, o.id);
-    if (!d) continue;
-    const parent = o.parent && outline.find((x) => x.id === o.parent);
-    lines.push(o.id + ' · ' + MM.regionSaid(d) + ' · at ' + r(d.bounds.minX) + ',' + r(d.bounds.minY) + ' ' + r(d.bounds.maxX - d.bounds.minX) + '×' + r(d.bounds.maxY - d.bounds.minY) +
-      (parent ? ' · inside “' + parent.name + '”' : '') +
-      (d.things.length ? ' · holds ' + d.things.slice(0, 12).join(', ') + (d.things.length > 12 ? ' and ' + (d.things.length - 12) + ' more' : '') : ''));
-  }
+  for (const o of outline) { const line = regionLine(s, o, outline); if (line) lines.push(line); }
   if (outline.length) {
     const loose = s.contentIds.filter((id) => !regionOf.has(id) && !s.nodes.get(id).reps.some((x) => x.modality === 'erased'));
     lines.push(loose.length ? loose.length + ' thing' + (loose.length === 1 ? '' : 's') + ' stand in no region: ' + loose.slice(0, 12).join(', ') + (loose.length > 12 ? ' and ' + (loose.length - 12) + ' more' : '') : 'every thing stands in a region');
@@ -310,12 +325,29 @@ async function look(args) {
     lines.push(id + ' · “' + (d.text || '') + '”' + (about.length ? ' about ' + about.join(', ') : '') + (authorOf(n, s) ? ' · by ' + authorOf(n, s) : ''));
   }
   const briefs = MM.seatBriefs(s).filter((b) => !b.withdrawn);
-  for (const b of briefs.filter((x) => !x.reply)) {
-    lines.push('brief ' + b.key + ' · ' + (b.asked || 'a brief') + ' · about ' + (b.about.join(', ') || '(nothing)') + ' · from ' + b.who + ' — waiting for you at the seat: canvas_pending reads it, canvas_answer answers it');
+  if (view.scratch) {
+    if (briefs.length) lines.push(briefs.length + ' brief' + (briefs.length === 1 ? '' : 's') + ' parked in this file for a seat (' + briefs.filter((x) => !x.reply).length + ' unanswered) — they belong to the room it came from; canvas_pending reads only this room\'s');
+  } else {
+    for (const b of briefs.filter((x) => !x.reply)) {
+      lines.push('brief ' + b.key + ' · ' + (b.asked || 'a brief') + ' · about ' + (b.about.join(', ') || '(nothing)') + ' · from ' + b.who + ' — waiting for you at the seat: canvas_pending reads it, canvas_answer answers it');
+    }
+    const answered = briefs.filter((x) => x.reply).length;
+    if (answered) lines.push(answered + ' brief' + (answered === 1 ? '' : 's') + ' at the seat answered');
   }
-  const answered = briefs.filter((x) => x.reply).length;
-  if (answered) lines.push(answered + ' brief' + (answered === 1 ? '' : 's') + ' at the seat answered');
-  regionOf = null;
+  return lines;
+}
+async function look(args) {
+  const s = session.getState();
+  await checkPictures(s, args.ids && args.ids.length ? args.ids : s.contentIds);
+  // From here to the return nothing awaits, so a look is one reading of the board.
+  const t = Date.now();
+  const here = store.presence().filter((p) => t - p.at < 60000).map((p) => label(p.participant));
+  const lines = ['room ' + ROOM + ' · you are ' + label(ME) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far')];
+  // Said before the marks, because it changes what they mean: two hands under
+  // one name are not both on this board, and a room older than the relay
+  // remembers may be missing its beginning.
+  for (const n of store.notices()) lines.push('room says: ' + n);
+  lines.push(...boardLines(s, args));
   return { text: lines.join('\n') };
 }
 
@@ -679,7 +711,9 @@ async function pictureSource(args) {
     let st;
     try { st = await stat(file); } catch { return { error: 'no file at ' + file }; }
     if (!st.isFile()) return { error: file + ' is not a file' };
-    if (st.size > MAX_ASSET_BYTES * 4) return { error: file + ' is ' + Math.round(st.size / 1048576) + ' MB — a picture on the board is up to 12 MB' };
+    // A board bundle carries photographs, so it may be bigger than any picture on the board; nothing else may.
+    const zipped = fileIsZip(file);
+    if (st.size > (zipped ? BOARD_FILE_MAX : MAX_ASSET_BYTES * 4)) return { error: file + ' is ' + Math.round(st.size / 1048576) + ' MB — ' + (zipped ? 'a board bundle is read up to ' + Math.round(BOARD_FILE_MAX / 1048576) + ' MB' : 'a picture on the board is up to 12 MB') };
     try { return { bytes: new Uint8Array(await readFile(file)), name: path.basename(file) }; } catch (err) { return { error: 'could not read ' + file + ' — ' + (err && err.message || err) }; }
   }
   if (typeof args.url === 'string' && args.url) {
@@ -762,9 +796,14 @@ async function importPicture(args) {
     const b = placed.bounds;
     return { text: id + ' placed at ' + r(b.minX) + ',' + r(b.minY) + ' ' + r(b.maxX - b.minX) + '×' + r(b.maxY - b.minY) + ' (svg ' + file + ', ' + code.length + ' characters — drawn from its text, so the room carries it in the log, not as bytes)' + placed.said };
   }
+  // A log or a bundle is a board, not a picture: it is read into a SCRATCH session — the room is never written — and said in words.
+  if (!sniffImage(bytes) && looksLikeBoard(bytes)) {
+    const limit = Math.floor(Number(args.limit)) > 0 ? Math.min(2000, Math.floor(Number(args.limit))) : undefined;
+    return importBoard({ MM, session, thingLines, describeBoard: (st, o) => boardLines(st, {}, { holds: o.holds, limit: o.limit, scratch: true }) }, bytes, given, { limit });
+  }
   if (bytes.length > MAX_ASSET_BYTES) return { text: 'nothing placed: ' + tooLargeWords(bytes.length) };
   const info = sniffImage(bytes);
-  if (!info) return { text: 'nothing placed: those bytes are not a picture — the board takes a PNG, JPEG or WebP (or an SVG), whatever the file is called' };
+  if (!info) return { text: 'nothing placed: those bytes are not a picture, a log or a bundle — the board takes a PNG, JPEG or WebP (or an SVG) onto it, and a log (.jsonl) or a bundle (.dyna.zip) into a scratch session, whatever the file is called' };
   const kind = PICTURE_KINDS[info.mime];
   if (!kind) return { text: 'nothing placed: ' + (info.mime === 'image/gif' ? 'a GIF' : info.mime) + ' is not a picture the board draws — a PNG, JPEG or WebP is' };
   if (!(info.w > 0 && info.h > 0)) return { text: 'nothing placed: could not read the size of that ' + FORMAT_NAMES[info.mime].slice(2) + ' from its header' };
@@ -794,16 +833,34 @@ async function importPicture(args) {
 // parser the page will read it with, so a reply the page could not read is
 // said here and never sent.
 
-/** What the page reads from an answer to this ask, and how it is written. */
+/**
+ * What the page reads from an answer to a brief, and how it is written: for each kind of ask, the parser the page reads a model's reply with
+ * (`parse(text, held)`, true when it reads something), the reply's shape in words, and an example the parser takes — which `canvas_doors` says
+ * beside the contract it reads from core and checks against this very parser. A kind with a variant of its own has an entry of its own
+ * (`read-lines`: a sheet of numbered lines; `build-revise`: a page already filled in), picked by `contractOf`.
+ */
+const linesAsked = (held) => Number((/sheet of (\d+) numbered line/.exec((held && held.brief) || '') || [])[1]) || 99;
 const CONTRACTS = {
-  what: { parse: (t) => MM.parseReadings(t).length > 0, shape: 'a JSON array of 1 to 4 readings: [{"label": "short-name", "confidence": 0.0–1.0, "reasoning": "one sentence citing the evidence"}]' },
-  read: { parse: (t) => MM.parseTranscripts(t).length > 0, shape: 'a JSON array of what the writing says, best first: [{"text": "what it says", "confidence": 0.0–1.0}]' },
-  ask: { parse: (t) => !!t.trim(), shape: '1–3 short sentences of plain prose, as a string' },
-  build: { parse: (t) => !!MM.parseFill(t), shape: 'a JSON object: {"theme": {…}, "regions": {"<region id>": {"tag": "…", "style": "…", "html": "…"}}}' },
-  program: { parse: (t) => !!MM.parseProgram(t), shape: 'a JSON object: {"name": "…", "parts": ["…"], "code": "the function body"} — or {"reuse": "<library name>"}' },
-  draw: { parse: (t) => MM.parseShapes(t).length > 0, shape: 'a JSON array of shapes: [{"shape": "rectangle"|"circle"|"triangle", "x", "y", "w", "h", "why"} or {"shape": "line"|"arrow", "from": {x, y}, "to": {x, y}, "why"}]' },
-  behave: { parse: (t) => MM.parseBehaviourReply(t).terms.length > 0, shape: 'a JSON object: {"terms": [{"verb": "…", "target": "…", "weight": 1, "why": "…"}], "unread": []}' },
+  what: { parse: (t) => MM.parseReadings(t).length > 0, shape: 'a JSON array of 1 to 4 readings: [{"label": "short-name", "confidence": 0.0–1.0, "reasoning": "one sentence citing the evidence"}]',
+    example: [{ label: 'pair of cards', confidence: 0.82, reasoning: 'two boxes of one size, side by side on one band' }, { label: 'two windows', confidence: 0.4, reasoning: 'the same boxes, read as a facade' }] },
+  read: { parse: (t) => MM.parseTranscripts(t).length > 0, shape: 'a JSON array of what the writing says, best first: [{"text": "what it says", "confidence": 0.0–1.0}]',
+    example: [{ text: 'hello', confidence: 0.9 }, { text: 'hallo', confidence: 0.3 }] },
+  'read-lines': { parse: (t, held) => MM.parseLineReadings(t, linesAsked(held)).some((l) => l.length > 0), shape: 'a JSON array, an object a line, numbered as the sheet is: [{"line": 1, "text": "what line 1 says", "confidence": 0.0–1.0}, …] — a line you cannot read at all: {"line": 3, "text": "", "confidence": 0}',
+    example: [{ line: 1, text: 'hello world', confidence: 0.9 }, { line: 2, text: 'a second line', confidence: 0.8 }] },
+  ask: { parse: (t) => !!t.trim(), shape: '1–3 short sentences of plain prose, as a string', example: 'They are one size and sit on one band, a gap apart.' },
+  build: { parse: (t) => !!MM.parseFill(t), shape: 'a JSON object: {"theme": {…}, "regions": {"<region id>": {"tag": "…", "style": "…", "html": "…"}}}',
+    example: { theme: { background: '#fbfaf7', color: '#14140f', accent: '#1f7a74', fontFamily: 'system-ui, sans-serif' }, regions: { r1: { tag: 'header', style: 'padding:24px', html: '<h1>Plans</h1><p>One price, everything in it.</p>' }, r2: { tag: 'section', html: '<h2>Pro</h2><p>For people who draw all day.</p>' } } } },
+  'build-revise': { parse: (t) => !!MM.parseFill(t), shape: 'a JSON object holding ONLY the regions you change: {"regions": {"<region id>": {"tag": "…", "style": "…", "html": "…"}}} — and "theme" only when the request is about the whole page\'s look',
+    example: { regions: { r1: { tag: 'header', style: 'padding:24px', html: '<h1 style="font-size:48px">Plans</h1>' } } } },
+  program: { parse: (t) => !!MM.parseProgram(t), shape: 'a JSON object: {"name": "…", "parts": ["…"], "code": "the function body"} — or {"reuse": "<library name>"}',
+    example: { name: 'dot', parts: ['dot'], code: 'mm.ctx.clearRect(0, 0, mm.width, mm.height); mm.ctx.fillStyle = "teal"; mm.ctx.fillRect(10, 10, 20, 20); mm.report("dot", 10, 10, 20, 20);' } },
+  draw: { parse: (t) => MM.parseShapes(t).length > 0, shape: 'a JSON array of shapes: [{"shape": "rectangle"|"circle"|"triangle", "x", "y", "w", "h", "why"} or {"shape": "line"|"arrow", "from": {x, y}, "to": {x, y}, "why"}]',
+    example: [{ shape: 'rectangle', x: 100, y: 240, w: 160, h: 100, why: 'a box under the first, the same size' }] },
+  behave: { parse: (t) => MM.parseBehaviourReply(t).terms.length > 0, shape: 'a JSON object: {"terms": [{"verb": "…", "target": "…", "weight": 1, "why": "…"}], "unread": []}',
+    example: { terms: [{ verb: 'wander', weight: 1, why: 'drifts about' }, { verb: 'flee', target: 'shark', weight: 1, why: 'runs from sharks' }], unread: [] } },
 };
+/** The entry for a held brief: its variant's when it is one — a lines read is told by its contract, which is core's `READ_LINES_PROMPT` — else its kind's. */
+const contractOf = (b) => (b.ask === 'read' && b.contract === MM.READ_LINES_PROMPT ? CONTRACTS['read-lines'] : CONTRACTS[b.ask] || null);
 
 function pending() {
   const s = session.getState();
@@ -811,7 +868,7 @@ function pending() {
   if (!waiting.length) return { text: 'no brief is parked. A person asks at the *Claude Code (MCP hand)* seat — What is this?, Read the writing, a question typed as ask: … — and it waits here until you answer it.' };
   const content = [];
   waiting.forEach((b, i) => {
-    const c = CONTRACTS[b.ask] || null;
+    const c = contractOf(b);
     const lines = [
       (i ? '========\n\n' : '') + 'brief ' + b.key + ' · ' + (b.asked || 'a brief') + ' · from ' + b.who,
       'about:',
@@ -847,12 +904,12 @@ async function answer(args) {
   const wire = MM.seatReplyText({ reply: args.reply, refuse: args.refuse });
   if (wire.error) return { text: wire.error + ' — nothing was sent' };
   const refused = MM.refusalOf(wire.text);
-  const c = CONTRACTS[held.ask];
+  const c = contractOf(held);
   // A question is answered in prose: an object would reach the page as its JSON, and be placed as the answer.
   if (refused === null && held.ask === 'ask' && typeof args.reply !== 'string') {
     return { text: 'a question is answered in prose — pass "reply" as a string; nothing was sent, and brief ' + key + ' still waits' };
   }
-  if (refused === null && c && !c.parse(wire.text)) {
+  if (refused === null && c && !c.parse(wire.text, held)) {
     return { text: 'the page would read nothing from that: for “' + held.asked + '” it reads ' + c.shape + ' — nothing was sent, and brief ' + key + ' still waits' };
   }
   const id = session.answer({
@@ -869,6 +926,29 @@ async function answer(args) {
   return { text: refused !== null
     ? 'brief ' + key + ' refused: “' + refused + '” — the page says so, and nothing lands'
     : 'brief ' + key + ' answered (' + wire.text.length + ' chars) — the page reads it with the parser a model\'s reply meets, and holds what it reads, attributed to the seat; nothing is blessed' };
+}
+
+// ----- The doors, and the board out (V1-SPEC §3.13, CG7a) --------------------------------------
+// John wants a dev session to use every door first-hand. `canvas_doors` lists them from the running code — see mcp-doors.mjs for what is read
+// from where — `canvas_export` writes the board as the app writes it, and `canvas_import` (above) reads a log or a bundle back into a scratch
+// session. None of the three writes a thing to the room.
+async function doors(args) {
+  const s = session.getState();
+  const t = Date.now();
+  // The pictures the board names, and which of them the room holds: one HEAD each, the held remembered.
+  await checkPictures(s, s.contentIds);
+  const named = new Set(picturesAmong(s, s.contentIds).map((p) => p.pic.asset).filter(Boolean));
+  const text = await doorsText({
+    MM, tools: TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })), contracts: CONTRACTS,
+    room: ROOM, relay: RELAY, keySet: !!KEY, me: label(ME), state: s,
+    presence: store.presence().filter((p) => t - p.at < 60000).map((p) => ({ who: label(p.participant), seat: !!p.seat })),
+    waiting: MM.pendingBriefs(s), notices: store.notices(),
+    picturesNamed: named.size, picturesHeld: [...named].filter((a) => roomHolds.has(a)).length,
+  }, args);
+  return { text };
+}
+async function exportTool(args) {
+  return exportBoard({ MM, session, assets, room: ROOM }, args);
 }
 
 // ----- The tools ------------------------------------------------------------
@@ -889,7 +969,7 @@ const TOOLS = [
   {
     name: 'canvas_draw',
     description: 'Draw on the canvas in the shape rung\'s vocabulary — rectangle, circle, triangle ({shape, x, y, w, h}); line, arrow ({shape, from: {x, y}, to: {x, y}}) — or raw strokes (arrays of {x, y}). Canvas units; the human\'s marks say where things are (canvas_look). Marks are declared content, drawn in your colour, and read by the engine like anyone\'s. "why" is placed beside them.',
-    inputSchema: { type: 'object', properties: { shapes: { type: 'array', items: { type: 'object' } }, strokes: { type: 'array', items: { type: 'array', items: { type: 'object', properties: { x: num, y: num } } } }, why: { type: 'string' } } },
+    inputSchema: { type: 'object', properties: { shapes: { type: 'array', items: { type: 'object' } }, strokes: { type: 'array', items: { type: 'array', items: { type: 'object', properties: { x: num, y: num } } } }, why: { type: 'string' }, gesture: { type: 'boolean', description: 'Raw strokes only: leave them as gestures — ink the engine may read as a lasso, a command mark or a scratch — instead of declared content.' } } },
     run: draw,
   },
   {
@@ -924,8 +1004,8 @@ const TOOLS = [
   },
   {
     name: 'canvas_import',
-    description: 'Put a picture on the board: a file (path), a web address (url) or base64, a PNG, JPEG or WebP (its size is read from its header) — or an SVG, which becomes an svg artifact drawn from its text. The bytes go to the room by their SHA-256 first, then an import event in your log names them, so every hand in the room draws it (a tab fetches the bytes by that hash) — up to 12 MB. Where: at {x, y, w?, h?} in canvas units (the picture is fitted in its own proportions), or place: {in|under|above|right|left: id, w?, h?} relative to a mark as canvas_write places; neither puts it beside what is on the board. canvas_see draws it under the ink.',
-    inputSchema: { type: 'object', properties: { path: { type: 'string' }, url: { type: 'string' }, base64: { type: 'string' }, name: { type: 'string' }, at: { type: 'object', properties: { x: num, y: num, w: num, h: num } }, place: { type: 'object', properties: { in: { type: 'string' }, under: { type: 'string' }, above: { type: 'string' }, right: { type: 'string' }, left: { type: 'string' }, w: num, h: num } } } },
+    description: 'Put a picture on the board: a file (path), a web address (url) or base64, a PNG, JPEG or WebP (its size is read from its header) — or an SVG, which becomes an svg artifact drawn from its text. The bytes go to the room by their SHA-256 first, then an import event in your log names them, so every hand in the room draws it (a tab fetches the bytes by that hash) — up to 12 MB. Where: at {x, y, w?, h?} in canvas units (the picture is fitted in its own proportions), or place: {in|under|above|right|left: id, w?, h?} relative to a mark as canvas_write places; neither puts it beside what is on the board. canvas_see draws it under the ink. A board file is read too: a log (.jsonl, version 0 or 1) or a bundle (.dyna.zip) is read into a SCRATCH session, never the room — nothing is written to it — and the reply is that board in words, as canvas_look says a board, with the round-trip facts: its events, marks and pictures, and whatever reads differently from the board in the room (limit: most things listed, default 200).',
+    inputSchema: { type: 'object', properties: { limit: num, path: { type: 'string' }, url: { type: 'string' }, base64: { type: 'string' }, name: { type: 'string' }, at: { type: 'object', properties: { x: num, y: num, w: num, h: num } }, place: { type: 'object', properties: { in: { type: 'string' }, under: { type: 'string' }, above: { type: 'string' }, right: { type: 'string' }, left: { type: 'string' }, w: num, h: num } } } },
     run: importPicture,
   },
   {
@@ -945,6 +1025,18 @@ const TOOLS = [
     description: 'Move marks or a region, in one act: by dx, dy; or to {x, y} (the marks\' top left); or into a region (its id — centred in it). You may move ANYTHING on the board, a person\'s marks and a region of yours that holds them included (John, 2 Oct 2026: "ya claude can move marks"); a region moved takes what it holds. The reply says WHOSE marks moved — “3 marks — 2 of john’s” — and so should you: the person\'s undo is their own and cannot take back another hand\'s move, and their tab says who moved their marks; their way back is to move them themselves or ask you, and you move them back with the opposite dx, dy. To organise their notes either put a region round them (canvas_region) or move them into one. A list may be half moved: what is on the board moves in one event and each id that is not is said. Labels and renames are not moves: you label only your own ink and rename only a region you made.',
     inputSchema: { type: 'object', required: ['ids'], properties: { ids: { type: 'array', items: { type: 'string' } }, dx: num, dy: num, to: { type: 'object', properties: { x: num, y: num } }, into: { type: 'string' } } },
     run: moveTool,
+  },
+  {
+    name: 'canvas_doors',
+    description: 'List every way in and out of dyna.ink, read from the running code and never from a copy in a document: the pen (the shapes canvas_draw takes, each drawn and read back now), the seats (every brief a page parks for Claude Code — What is this?, Read the writing, ask:, build:, program, draw, behave — with its contract VERBATIM, the shape of the reply, an example this hand\'s own parser accepts, and who sits where in this room), MCP both ways (this hand\'s tools, the 3D hand\'s, the canvas\'s client door, what .mcp.json registers), the room (relay, room, who is heard, notices, the pictures it holds) and every format in and out with the function that writes it and the one that reads it — and what Node cannot make (board.png, board.pdf: the page\'s) and what is not built yet. door narrows it to one of pen, seats, mcp, room, formats, gaps; seat to one brief kind (what, read, read-lines, ask, build, build-revise, program, draw, behave). Writes nothing.',
+    inputSchema: { type: 'object', properties: { door: { type: 'string', enum: ['pen', 'seats', 'mcp', 'room', 'formats', 'gaps'] }, seat: { type: 'string' } } },
+    run: doors,
+  },
+  {
+    name: 'canvas_export',
+    description: 'Write the board — or the marks named by ids — as the app writes it. format: log (a version 1 .jsonl: a header line, then one event a line), bundle (a .dyna.zip: board.jsonl and assets/<sha256>.<ext>, the pictures the room holds), svg (board.svg: pictures, figures, writing and ink in board order), mermaid (the likeliest notation the marks read as, as .mmd text) or truesize (every figure with numbers, drawn at its real size from the numbers). A text format comes back inline — a sentence, then the file\'s exact text in a block of its own — unless it is too big for an answer (then it is a file); a bundle is binary and always a file, under the OS temp directory or at out (a folder, or a path ending in the format\'s extension — never inside the repository), the reply giving its path, size and entries. ids narrow svg, mermaid and truesize; a log and a bundle are the whole board. Reads the room, writes nothing to it; canvas_import reads a log or a bundle back into a scratch session.',
+    inputSchema: { type: 'object', required: ['format'], properties: { format: { type: 'string', enum: ['log', 'bundle', 'svg', 'mermaid', 'truesize'] }, ids: { type: 'array', items: { type: 'string' } }, out: { type: 'string', description: 'A folder that exists, or a file path ending in the format\'s extension, outside the repository.' } } },
+    run: exportTool,
   },
   {
     name: 'canvas_pending',
@@ -982,7 +1074,7 @@ async function handle(line) {
           protocolVersion: (msg.params && msg.params.protocolVersion) || '2025-06-18',
           capabilities: { tools: {} },
           serverInfo: { name: 'dynaink', version: '0.1.0' },
-          instructions: 'You are a hand on a dyna.ink canvas, in room "' + ROOM + '" as "' + label(ME) + '". The human draws; the engine reads every mark (shape, role, concept) and the human names and builds from those readings. Look first (canvas_look), see the ink when it matters (canvas_see), then act with the same verbs a hand has: draw in the shape vocabulary, say a sentence beside marks, propose a reading, label your own marks, transcribe writing, write code, put a picture on the board (canvas_import), find words (canvas_find), make a region round marks (canvas_region) and move marks into place (canvas_move — anything on the board, John said you may; the reply says whose marks you moved, say so in your own words too: his undo does not reach your move, so offer to move them back). Everything you do is held and attributed to you; the human blesses or ignores it. Never claim a reading is settled — offer it with a confidence and a reason. You are also the SEAT: when the human asks *Claude Code (MCP hand)* — What is this?, Read the writing, a question — the brief is parked here; canvas_pending gives you it, the marks and the contract (and for a read, the ink as a picture), and canvas_answer returns your answer in that contract, which the page takes exactly as it takes a model\'s.',
+          instructions: 'You are a hand on a dyna.ink canvas, in room "' + ROOM + '" as "' + label(ME) + '". The human draws; the engine reads every mark (shape, role, concept) and the human names and builds from those readings. Look first (canvas_look), see the ink when it matters (canvas_see), then act with the same verbs a hand has: draw in the shape vocabulary, say a sentence beside marks, propose a reading, label your own marks, transcribe writing, write code, put a picture on the board (canvas_import), find words (canvas_find), list every door from the running code (canvas_doors), write the board as the app does (canvas_export) or read a log or a bundle into a scratch session (canvas_import), make a region round marks (canvas_region) and move marks into place (canvas_move — anything on the board, John said you may; the reply says whose marks you moved, say so in your own words too: his undo does not reach your move, so offer to move them back). Everything you do is held and attributed to you; the human blesses or ignores it. Never claim a reading is settled — offer it with a confidence and a reason. You are also the SEAT: when the human asks *Claude Code (MCP hand)* — What is this?, Read the writing, a question — the brief is parked here; canvas_pending gives you it, the marks and the contract (and for a read, the ink as a picture), and canvas_answer returns your answer in that contract, which the page takes exactly as it takes a model\'s.',
         });
         break;
       case 'notifications/initialized':
