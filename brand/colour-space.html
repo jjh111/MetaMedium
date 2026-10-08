@@ -220,17 +220,17 @@ td .hex { font-size: var(--t-meta); color: var(--ink-3); }
 
   <footer class="foot">
     <div>
-      <h2 style="margin-bottom:var(--s2)">How this becomes KN3</h2>
-      <p>These functions move into <code>core/src/colour/</code> with tests:</p>
+      <h2 style="margin-bottom:var(--s2)">Where this lives</h2>
+      <p>This page draws with <code>core/src/colour/</code>, loaded from <code>Demos/dynaink-core.browser.js</code>. Its tests hold it to what this page said before it moved there:</p>
       <ul style="margin:var(--s1) 0 0;padding-left:1.1rem">
         <li><code>oklch.ts</code>: the colour conversions, and fitting a colour inside sRGB by lowering its chroma.</li>
         <li><code>scale.ts</code>: lightness and chroma for each ground, depth and certainty.</li>
-        <li><code>harmony.ts</code>: where a hue is placed.</li>
+        <li><code>harmony.ts</code>: where a hue is placed, and the act that keeps it.</li>
         <li><code>access.ts</code>: contrast, colour-blindness simulation and second channels.</li>
-        <li><code>names.ts</code>: colour words.</li>
+        <li><code>names.ts</code> and <code>meaning.ts</code>: colour words, and what the colours on a board say.</li>
       </ul>
       <p style="margin-top:var(--s2)">A kind's hue is chosen in the act that makes it or relates it, and that act keeps it. A kind added later never moves an older one. Lightness and chroma are worked out fresh for whichever ground is showing.</p>
-      <p style="margin-top:var(--s2)">The two grounds, their inks and the chrome's signal colours are <code>brand/tokens.css</code>'s. The lightness bands are this page's until KN3 moves them into the tokens.</p>
+      <p style="margin-top:var(--s2)">The two grounds, their inks and the chrome's signal colours are <code>brand/tokens.css</code>'s, which this page hands to core. Core's defaults are the same values, and a test fails if they differ. The lightness bands are core's until they move into the tokens.</p>
     </div>
     <div>
       <h2 style="margin-bottom:var(--s2)">What it found</h2>
@@ -258,288 +258,22 @@ td .hex { font-size: var(--t-meta); color: var(--ink-3); }
   btns.forEach(function (b) { b.addEventListener('click', function () { apply(b.dataset.themeSet); }); });
 })();
 </script>
+<script src="../Demos/dynaink-core.browser.js"></script>
 <script>
 window.DYNAINK_PAPER_FIRST = true;
-// A colour space with meaning — the specimen of V1-SPEC KN3, pure and
-// dependency-free so the same text runs in Node (the test) and in the page.
+// A colour space with meaning (V1-SPEC KN3). The space is core's now: core/src/colour/, loaded here from the
+// engine's browser bundle, and this page draws with it — the colours, where a hue is placed, which kinds look alike
+// to which eyes, the patterns, and the sentences the board says about its colours. What stays on the page is the
+// few sentences a person says to make and relate kinds (the field's reader, KN1's when it lands) and the drawing.
 //
-// Hue is the kind and its kin. Lightness is depth: each step down the tree is
-// a step toward the ground. Chroma is how sure: a said kind full, an offered
-// one muted. Hues are chosen when a kind is made or related and kept in that
+// Hue is the kind and its kin. Lightness is depth: each step down the tree is a step toward the ground. Chroma is
+// how sure: a said kind full, an offered one muted. Hues are chosen when a kind is made or related and kept in that
 // act; lightness and chroma are derived for each ground.
 
-const Space = (() => {
-  // ---- OKLab / OKLCH / sRGB (Björn Ottosson, 2020) ----------------------
-  const toLinear = c => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
-  const toGamma = c => (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
-  const clamp01 = v => Math.min(1, Math.max(0, v));
-
-  function hexToLinear(hex) {
-    let h = hex.replace('#', '');
-    if (h.length === 3) h = h.split('').map(x => x + x).join('');
-    const n = parseInt(h, 16);
-    return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => toLinear(v / 255));
-  }
-  const linearToHex = rgb =>
-    '#' + rgb.map(c => Math.round(clamp01(toGamma(clamp01(c))) * 255).toString(16).padStart(2, '0')).join('');
-
-  function linearToOklab([r, g, b]) {
-    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
-    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
-    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
-    return [
-      0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
-      1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
-      0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
-    ];
-  }
-  function oklabToLinear([L, a, b]) {
-    const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
-    const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
-    const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
-    return [
-      4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-      -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-      -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
-    ];
-  }
-  const norm = h => ((h % 360) + 360) % 360;
-  const toLch = ([L, a, b]) => [L, Math.hypot(a, b), norm((Math.atan2(b, a) * 180) / Math.PI)];
-  const fromLch = (L, C, h) => [L, C * Math.cos((h * Math.PI) / 180), C * Math.sin((h * Math.PI) / 180)];
-  const hdist = (a, b) => {
-    const d = Math.abs(norm(a) - norm(b));
-    return d > 180 ? 360 - d : d;
-  };
-
-  const EPS = 1e-7;
-  const inGamut = rgb => rgb.every(c => c >= -EPS && c <= 1 + EPS);
-  function maxChroma(L, h) {
-    let lo = 0, hi = 0.4;
-    for (let i = 0; i < 28; i++) {
-      const mid = (lo + hi) / 2;
-      if (inGamut(oklabToLinear(fromLch(L, mid, h)))) lo = mid; else hi = mid;
-    }
-    return lo;
-  }
-  // Gamut mapping by reducing chroma: the hue and the lightness are kept.
-  function inSrgb(L, C, h) {
-    const c = Math.min(C, maxChroma(L, h));
-    return { L, C: c, h, rgb: oklabToLinear(fromLch(L, c, h)).map(clamp01) };
-  }
-
-  // ---- what an eye can tell apart ----------------------------------------
-  const luminance = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  const contrast = (y1, y2) => (Math.max(y1, y2) + 0.05) / (Math.min(y1, y2) + 0.05);
-  // Machado, Oliveira & Fernandes (2009), severity 1, in linear RGB.
-  const VISIONS = {
-    typical: null,
-    protan: [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-0.003882, -0.048116, 1.051998]],
-    deutan: [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.01182, 0.04294, 0.968881]],
-    tritan: [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [0.004733, 0.691367, 0.3039]],
-  };
-  const simulate = (rgb, m) => (m ? m.map(r => clamp01(r[0] * rgb[0] + r[1] * rgb[1] + r[2] * rgb[2])) : rgb);
-  const deltaE = (p, q) => {
-    const A = linearToOklab(p), B = linearToOklab(q);
-    return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]);
-  };
-
-  // ---- the grounds, and the bands each allows ------------------------------
-  // The grounds and inks are brand/tokens.css's (--paper and --stroke-hand, light and
-  // dark); a page that can read the tokens hands them in with configure(). The bands
-  // are this specimen's until KN3 moves them into the tokens.
-  // toward: the sign of a step toward the ground (paper is light, the room dark).
-  const GROUNDS = {
-    paper: { ground: '#f8f5ef', ink: '#0c1a24', L: [0.44, 0.505, 0.57], C: 0.15, toward: +1 },
-    dark: { ground: '#131315', ink: '#e3edf1', L: [0.8, 0.735, 0.67], C: 0.13, toward: -1 },
-  };
-  const OFFERED = 0.38;        // an offered kind's chroma, as a share of a said one's
-  const FLOOR = 4.5;           // words, against their ground (marks need only 3)
-  const APART = 0.06;          // OKLab distance under which two kinds read as one
-  const DEPTHS = 2;            // steps drawn; deeper kinds share the last and add a channel
-
-  // The brand's signal hues (tokens.css's --sig-*): the chrome's, never the ink's.
-  const signal = s => ({ ...s, hue: toLch(linearToOklab(hexToLinear(s.hex)))[2] });
-  const SIGNALS = [
-    { name: 'read', hex: '#1c5fb8' }, { name: 'confident', hex: '#0b6f7d' },
-    { name: 'unsure', hex: '#a3761c' }, { name: 'broken', hex: '#a8493c' },
-    { name: 'a model', hex: '#6b4fa8' },
-  ].map(signal);
-
-  // A colour word means a hue. The band decides how light and how strong.
-  const WORDS = {
-    red: 29, scarlet: 33, crimson: 20, rose: 5, pink: 355, magenta: 330, fuchsia: 335,
-    purple: 305, violet: 298, lavender: 300, plum: 320, indigo: 280, blue: 264, navy: 264,
-    cobalt: 262, azure: 245, sky: 240, cyan: 215, teal: 195, turquoise: 185, aqua: 190,
-    green: 145, emerald: 160, forest: 145, mint: 165, lime: 130, chartreuse: 125, olive: 110,
-    yellow: 105, gold: 92, mustard: 95, amber: 80, ochre: 75, orange: 62, tangerine: 58,
-    coral: 40, salmon: 35, peach: 50, brown: 55, rust: 40, copper: 48, tan: 70,
-  };
-  function hueOfWord(word) {
-    const w = (word || '').trim().toLowerCase();
-    if (/^#?[0-9a-f]{6}$|^#?[0-9a-f]{3}$/.test(w)) {
-      const [, C, h] = toLch(linearToOklab(hexToLinear(w.startsWith('#') ? w : '#' + w)));
-      return C < 0.02 ? null : { hue: h, word: w.startsWith('#') ? w : '#' + w };
-    }
-    return w in WORDS ? { hue: WORDS[w], word: w } : null;
-  }
-
-  // ---- placing a hue -------------------------------------------------------
-  // A new hue is placed where it is easiest to tell apart from every kind
-  // already held — for every way of seeing, on both grounds — not merely where
-  // the wheel has the widest gap: at one lightness a deuteranope can lose two
-  // hues 180° apart, so the angle alone is no promise.
-  const nameHue = name => { // a stable lean for ties, so the same name leans the same way
-    let x = 2166136261;
-    for (const ch of name) { x ^= ch.charCodeAt(0); x = Math.imul(x, 16777619); }
-    return (x >>> 0) % 360;
-  };
-  const signalPenalty = h => SIGNALS.reduce((p, s) => p + Math.max(0, 12 - hdist(h, s.hue)) / 12 * 0.02, 0);
-  const seenCache = new Map();
-  function seen(hue, depth) { // the said colour on each ground
-    const key = Math.round(hue * 10) + ':' + depth;
-    if (!seenCache.has(key)) seenCache.set(key, Object.keys(GROUNDS).map(g => colourOf({ hue, depth }, g).rgb));
-    return seenCache.get(key);
-  }
-  // At one lightness a dichromat's colours fall near one line, so no placement
-  // keeps a dozen kinds apart for every eye; the score puts typical eyes first
-  // and colour-blind eyes a strong second, and a second channel does the rest.
-  const WEIGHT = { typical: 1, protan: 0.35, deutan: 0.35, tritan: 0.15 };
-  function apartness(A, B, v) { // the least distance this eye sees, on either ground
-    let min = Infinity;
-    for (let gi = 0; gi < A.length; gi++) min = Math.min(min, deltaE(simulate(A[gi], VISIONS[v]), simulate(B[gi], VISIONS[v])));
-    return min;
-  }
-  function bestHue(candidates, others, prefer, depth = 0) {
-    let best = null;
-    for (const c of candidates) {
-      const mine = seen(c.hue, depth);
-      let room = 0;
-      for (const v of Object.keys(VISIONS)) room += WEIGHT[v] * (others.length ? Math.min(...others.map(o => apartness(mine, seen(o.hue, o.depth), v))) : 1);
-      const score = room - signalPenalty(c.hue) - (c.cost || 0);
-      if (!best || score > best.score + 0.002 ||
-        (Math.abs(score - best.score) <= 0.002 && hdist(c.hue, prefer) < hdist(best.hue, prefer))) best = { ...c, score, room };
-    }
-    return best;
-  }
-
-  // ---- the lens: kinds and the acts that made them ------------------------
-  function emptyLens() { return { kinds: new Map(), rels: [], order: 0 }; }
-
-  function resolveHue(lens, k, seen = new Set()) {
-    if (k.source !== 'relative') return k.hue;
-    if (seen.has(k.name)) return k.hue;
-    seen.add(k.name);
-    const a = lens.kinds.get(k.anchor);
-    return a ? norm(resolveHue(lens, a, seen) + k.offset) : k.hue;
-  }
-  function refresh(lens) {
-    for (const k of lens.kinds.values()) k.hue = resolveHue(lens, k);
-    for (const k of lens.kinds.values()) {
-      let d = 0, p = k.parent;
-      const seen = new Set([k.name]);
-      while (p && !seen.has(p)) { seen.add(p); d++; p = lens.kinds.get(p)?.parent; }
-      k.depth = d;
-    }
-  }
-  const dependsOn = (lens, k, target) => { // does k's hue follow target's?
-    const seen = new Set();
-    while (k && k.source === 'relative' && !seen.has(k.name)) {
-      if (k.anchor === target) return true;
-      seen.add(k.name);
-      k = lens.kinds.get(k.anchor);
-    }
-    return false;
-  };
-  const familyOf = (lens, name) => [...lens.kinds.values()].filter(k => k.name === name || dependsOn(lens, k, name));
-  const othersThan = (lens, names) => [...lens.kinds.values()].filter(k => !names.has(k.name));
-
-  function make(lens, name) {
-    let k = lens.kinds.get(name);
-    if (k) return { k, made: false };
-    k = { name, hue: 0, source: 'placed', depth: 0, order: lens.order++, parent: null, anchor: null, offset: 0, rel: null };
-    const others = othersThan(lens, new Set());
-    const cands = [];
-    for (let h = 0; h < 360; h += 1) cands.push({ hue: h });
-    const best = bestHue(cands, others, nameHue(name));
-    k.hue = best.hue;
-    lens.kinds.set(name, k);
-    const near = others.length ? others.reduce((a, o) => (hdist(o.hue, best.hue) < hdist(a.hue, best.hue) ? o : a)) : null;
-    const gap = near ? `the most distinct place left (${Math.round(hdist(near.hue, best.hue))}° from ${near.name})` : 'the first kind; its name leans it there';
-    return { k, made: true, why: `${name} → ${Math.round(k.hue)}°, ${gap}` };
-  }
-
-  function say(lens, name, word) {
-    const named = hueOfWord(word);
-    const { k, made, why } = make(lens, name);
-    if (!word) return made ? why : `${name} is already a kind`;
-    if (!named) return `${made ? why + '; ' : ''}“${word}” is no colour this space knows${/gr[ae]y|black|white/.test(word) ? ' — a kind takes a hue, and grey, black and white have none' : ''}`;
-    k.source = 'said'; k.hue = named.hue; k.word = named.word; k.anchor = null; k.offset = 0;
-    refresh(lens);
-    const sig = SIGNALS.find(s => hdist(s.hue, named.hue) < 14);
-    const light = named.hue > 80 && named.hue < 135;
-    return `${name} → ${Math.round(named.hue)}°, your ${named.word}` +
-      (light ? '; on paper a yellow is drawn as dark as words need, ochre or olive, and on the dark ground it is yellow' : '') +
-      (sig ? `; it stands by the chrome's colour for ${sig.name} (${Math.round(hdist(sig.hue, named.hue))}° away) — on ink it means ${name}` : '');
-  }
-
-  function relate(lens, a, b, rel) {
-    const A = make(lens, a), B = make(lens, b);
-    const ka = A.k, kb = B.k;
-    if (a === b) return `${a} cannot be related to itself`;
-    if (rel === 'sub') { // a is a kind of b
-      if (dependsOn(lens, kb, a) || kb.parent === a) return `${b} already hangs from ${a}`;
-      ka.parent = b;
-      if (ka.source === 'said') { refresh(lens); return `${a} keeps your ${ka.word}; as a kind of ${b} it is drawn a step toward the ground`; }
-      const siblings = [...lens.kinds.values()].filter(k => k.parent === b && k !== ka && k.anchor === b && k.rel === 'sub');
-      const used = new Set(siblings.map(s => Math.round(s.offset)));
-      const offset = [0, 28, -28, 56, -56, 84, -84].find(o => !used.has(o)) ?? 0;
-      Object.assign(ka, { source: 'relative', anchor: b, offset, rel: 'sub' });
-      refresh(lens);
-      return `${a} is a kind of ${b}: ${b}'s hue${offset ? ` ${offset > 0 ? '+' : '−'}${Math.abs(offset)}°` : ''}, a step toward the ground`;
-    }
-    // kin or opposed: who moves? Never a hue the person said; else the later kind.
-    lens.rels = lens.rels.filter(r => !((r.a === a && r.b === b) || (r.a === b && r.b === a)));
-    lens.rels.push({ a, b, rel });
-    let mover = kb, anchor = ka;
-    if (kb.source === 'said' && ka.source !== 'said') { mover = ka; anchor = kb; }
-    else if (ka.source !== 'said' && kb.source !== 'said' && ka.order > kb.order) { mover = ka; anchor = kb; }
-    const apart = Math.round(hdist(ka.hue, kb.hue));
-    if (mover.source === 'said') {
-      return `you gave ${a} and ${b} their colours; they stand ${apart}° apart, so they read as ${apart >= 150 ? 'opposites' : apart <= 45 ? 'kin' : 'neither kin nor opposites'}`;
-    }
-    if (dependsOn(lens, anchor, mover.name)) return `${anchor.name}'s hue already follows ${mover.name}'s; nothing moved`;
-    const fam = new Set(familyOf(lens, mover.name).map(k => k.name));
-    fam.add(anchor.name);
-    for (const k of familyOf(lens, anchor.name)) fam.add(k.name);
-    const others = othersThan(lens, fam);
-    if (A.made && B.made) { // both new: place the pair together, where both stand most apart
-      const offs = rel === 'kin' ? [-40, -32, -26, 26, 32, 40] : [164, 172, 180, 188, 196];
-      let best = null;
-      for (let h = 0; h < 360; h += 2) for (const off of offs) {
-        const one = bestHue([{ hue: h }], others, nameHue(anchor.name)), two = bestHue([{ hue: norm(h + off) }], others, nameHue(mover.name));
-        const score = Math.min(one.score, two.score) - Math.abs(Math.abs(off) - (rel === 'kin' ? 32 : 180)) * 0.0015;
-        if (!best || score > best.score + 1e-9) best = { h, off, score };
-      }
-      anchor.hue = best.h;
-      Object.assign(mover, { source: 'relative', anchor: anchor.name, offset: best.off, rel });
-      refresh(lens);
-      return rel === 'kin'
-        ? `${a} is kin to ${b}: placed together, ${Math.abs(best.off)}° apart, where both stand most distinct`
-        : `${a} opposes ${b}: placed together across the wheel, ${Math.round(hdist(mover.hue, anchor.hue))}° apart`;
-    }
-    const cands = [];
-    if (rel === 'kin') {
-      for (let d = 26; d <= 45; d++) for (const s of [1, -1]) cands.push({ hue: norm(anchor.hue + s * d), off: s * d, cost: Math.abs(d - 32) * 0.001 });
-    } else {
-      for (let e = -20; e <= 20; e++) cands.push({ hue: norm(anchor.hue + 180 + e), off: 180 + e, cost: Math.abs(e) * 0.0015 });
-    }
-    const best = bestHue(cands, [...others, anchor], nameHue(mover.name), mover.depth);
-    Object.assign(mover, { source: 'relative', anchor: anchor.name, offset: best.off, rel });
-    refresh(lens);
-    return rel === 'kin'
-      ? `${a} is kin to ${b}: ${mover.name} ${Math.abs(Math.round(best.off))}° beside ${anchor.name}, on the side that stays most distinct`
-      : `${a} opposes ${b}: ${mover.name} across the wheel from ${anchor.name}, ${Math.round(hdist(mover.hue, anchor.hue))}° apart`;
-  }
+const Space = window.DynaInkCore ? (() => {
+  const C = window.DynaInkCore;
+  // The palette is brand/tokens.css's, which core cannot read: readTokens() below hands it in with configure().
+  let palette = C.DEFAULT_PALETTE;
 
   // The few sentences a person says to make and relate kinds.
   function read(text) {
@@ -556,137 +290,31 @@ const Space = (() => {
     if ((m = t.match(/^([a-z][a-z -]*?) (?:opposes|oppose|is opposed to|contradicts|against|vs\.?|versus) (?:an? )?([a-z][a-z -]*)$/))) return { act: 'opposes', a: kind(m[1]), b: kind(m[2]) };
     if ((m = t.match(/^([a-z][a-z -]*?) (?:is|are) (?:kin to|like|related to|near|akin to) (?:an? )?([a-z][a-z -]*)$/))) return { act: 'kin', a: kind(m[1]), b: kind(m[2]) };
     if ((m = t.match(/^([a-z][a-z -]*?) (?:relates? to|goes with) (?:an? )?([a-z][a-z -]*)$/))) return { act: 'kin', a: kind(m[1]), b: kind(m[2]) };
-    if ((m = t.match(/^(?:make |colou?r )?([a-z][a-z -]*?) (?:is |are |)(#[0-9a-f]{3,6}|[a-z]+)$/)) && hueOfWord(m[2])) return { act: 'say', a: kind(m[1]), word: m[2] };
+    if ((m = t.match(/^(?:make |colou?r )?([a-z][a-z -]*?) (?:is |are |)(#[0-9a-f]{3,6}|[a-z]+)$/)) && C.hueOfWord(m[2])) return { act: 'say', a: kind(m[1]), word: m[2] };
     if ((m = t.match(/^(?:new kind|kind:?) ([a-z][a-z -]*?)(?:\s*[·,]\s*(#?[0-9a-z]+))?$/))) return { act: 'say', a: kind(m[1]), word: m[2] };
     return null;
   }
 
-  function apply(lens, act) {
-    if (act.act === 'say') return say(lens, act.a, act.word);
-    return relate(lens, act.a, act.b, act.act);
-  }
-
-  // ---- colour, for a ground and a certainty --------------------------------
-  function colourOf(kind, groundName, certainty = 'said') {
-    const g = GROUNDS[groundName];
-    const depth = Math.min(kind.depth, DEPTHS);
-    const gy = luminance(hexToLinear(g.ground));
-    let L = g.L[depth], moved = 0;
-    let said = inSrgb(L, g.C, kind.hue);
-    while (contrast(luminance(said.rgb), gy) < FLOOR && moved < 0.3) {
-      L -= 0.005 * g.toward; moved += 0.005; said = inSrgb(L, g.C, kind.hue);
-    }
-    let c = certainty === 'said' ? said : inSrgb(L, said.C * OFFERED, kind.hue);
-    while (contrast(luminance(c.rgb), gy) < FLOOR && moved < 0.3) {
-      L -= 0.005 * g.toward; moved += 0.005; c = inSrgb(L, said.C * (certainty === 'said' ? 1 : OFFERED), kind.hue);
-    }
-    return { ...c, hex: linearToHex(c.rgb), contrast: contrast(luminance(c.rgb), gy), moved: Math.round(moved * 1000) / 1000, depth };
-  }
-
-  // Which kinds read as one, for each way of seeing, on either ground.
-  function distinctness(lens) {
-    const ks = [...lens.kinds.values()].sort((x, y) => x.order - y.order);
-    const pairs = [];
-    for (let i = 0; i < ks.length; i++) for (let j = i + 1; j < ks.length; j++) {
-      const by = {};
-      for (const v of Object.keys(VISIONS)) {
-        let min = Infinity;
-        for (const g of Object.keys(GROUNDS)) {
-          const p = simulate(colourOf(ks[i], g).rgb, VISIONS[v]), q = simulate(colourOf(ks[j], g).rgb, VISIONS[v]);
-          min = Math.min(min, deltaE(p, q));
-        }
-        by[v] = min;
-      }
-      pairs.push({ a: ks[i].name, b: ks[j].name, by, min: Math.min(...Object.values(by)) });
-    }
-    return pairs;
-  }
-  // A second channel, for kinds some eye cannot tell apart: the later kind
-  // takes the first pattern none of its look-alikes holds.
-  const CHANNELS = ['solid', 'dashed', 'dotted', 'dash-dot', 'long'];
-  const WHO = { typical: 'everyone', protan: 'protanopes', deutan: 'deuteranopes', tritan: 'tritanopes' };
-  function channels(lens, pairs = distinctness(lens)) {
-    const out = new Map();
-    const ks = [...lens.kinds.values()].sort((x, y) => x.order - y.order);
-    for (const k of ks) {
-      const alike = pairs.filter(p => p.min < APART && (p.a === k.name || p.b === k.name))
-        .map(p => ({ other: p.a === k.name ? p.b : p.a, p })).filter(x => out.has(x.other));
-      const taken = new Set(alike.map(x => out.get(x.other).channel));
-      const channel = CHANNELS.find(c => !taken.has(c)) || CHANNELS[CHANNELS.length - 1];
-      const worst = alike.sort((x, y) => x.p.min - y.p.min)[0];
-      out.set(k.name, {
-        channel,
-        alike: worst ? worst.other : null,
-        who: worst ? Object.entries(worst.p.by).filter(([, d]) => d < APART).map(([v]) => WHO[v]) : [],
-      });
-    }
-    return out;
-  }
-
-  const list = xs => xs.join(', ').replace(/, ([^,]*)$/, ' and $1');
-
-  // What the colours on a board mean, in words.
-  function meaning(lens, pairs = distinctness(lens)) {
-    const ks = [...lens.kinds.values()].sort((x, y) => x.order - y.order);
-    const lines = [];
-    const rootOf = k => { const seen = new Set(); while (k.parent && !seen.has(k.name)) { seen.add(k.name); k = lens.kinds.get(k.parent) || k; } return k.name; };
-    for (const root of ks.filter(k => !k.parent)) {
-      const fam = ks.filter(k => k.parent && rootOf(k) === root.name).sort((x, y) => x.depth - y.depth || x.order - y.order);
-      if (!fam.length) continue;
-      const own = fam.filter(k => k.source === 'said').map(k => `${k.name} keeps your ${k.word}`);
-      lines.push(`${list([root.name, ...fam.map(k => k.name)])} are one family: ${root.name}'s hue, each kind below it a step toward the ground` + (own.length ? ` (${list(own)})` : ''));
-    }
-    for (const r of lens.rels) {
-      const A = lens.kinds.get(r.a), B = lens.kinds.get(r.b);
-      if (!A || !B) continue;
-      const d = Math.round(hdist(A.hue, B.hue));
-      if (r.rel === 'kin') lines.push(d <= 50 ? `${r.a} stands beside ${r.b}, ${d}° along the wheel: kin` : `${r.a} and ${r.b} are said to be kin, but your colours stand ${d}° apart`);
-      else lines.push(d >= 140 ? `${r.a} and ${r.b} are drawn as opposites, ${d}° apart` : `${r.a} and ${r.b} are said to oppose, but your colours stand ${d}° apart`);
-    }
-    const tied = new Set();
-    for (const k of ks) if (k.parent) { tied.add(k.name); tied.add(k.parent); }
-    for (const r of lens.rels) { tied.add(r.a); tied.add(r.b); }
-    const alone = ks.filter(k => !tied.has(k.name));
-    if (alone.length && ks.length > 1) lines.push(`${list(alone.map(k => k.name))} ${alone.length > 1 ? 'stand' : 'stands'} apart from the rest`);
-    for (const k of ks) {
-      const s = SIGNALS.find(s => hdist(s.hue, k.hue) < 14);
-      if (s && k.source === 'said') lines.push(`${k.name}'s ${k.word} stands near the chrome's colour for ${s.name}: on the ink it means ${k.name}, and the chrome's colours never touch the ink`);
-    }
-    const ch = channels(lens, pairs);
-    for (const k of ks) {
-      const c = ch.get(k.name);
-      if (c.channel !== 'solid') lines.push(`${k.name} is drawn ${c.channel}: beside ${c.alike} it looks alike to ${list(c.who)}`);
-    }
-    return lines;
-  }
-
-  // Hand in the grounds, inks and signal colours a page read from the tokens.
-  const HEX = /^#[0-9a-f]{6}$/i;
-  function configure({ grounds = {}, signals = null } = {}) {
-    for (const [name, g] of Object.entries(grounds)) {
-      if (!GROUNDS[name] || !g) continue;
-      if (HEX.test(g.ground || '')) GROUNDS[name].ground = g.ground;
-      if (HEX.test(g.ink || '')) GROUNDS[name].ink = g.ink;
-    }
-    const ok = (signals || []).filter(x => x && HEX.test(x.hex || ''));
-    if (ok.length) SIGNALS.splice(0, SIGNALS.length, ...ok.map(signal));
-    seenCache.clear();
-  }
-
   return {
-    configure,
-    toLinear, toGamma, hexToLinear, linearToHex, linearToOklab, oklabToLinear, toLch, fromLch, norm, hdist,
-    maxChroma, inSrgb, luminance, contrast, VISIONS, simulate, deltaE,
-    GROUNDS, OFFERED, FLOOR, APART, DEPTHS, SIGNALS, WORDS, hueOfWord,
-    emptyLens, read, apply, colourOf, distinctness, channels, meaning, CHANNELS, WHO,
+    configure({ grounds = {}, signals = null } = {}) { palette = C.makePalette({ grounds, signals }, palette); },
+    get GROUNDS() { return palette.grounds; },
+    get SIGNALS() { return palette.signals; },
+    FLOOR: C.WORDS_CONTRAST, DEPTHS: C.DEPTHS_DRAWN, norm: C.normHue,
+    emptyLens: C.emptyKindLens, read,
+    apply: (lens, act) => C.applyKindAct(lens, act, palette).said,
+    colourOf: (kind, ground, certainty) => C.colourOf(kind, ground, certainty, palette),
+    distinctness: lens => C.kindDistinctness(C.lensKinds(lens), palette),
+    channels: (lens, pairs) => C.kindChannels(C.lensKinds(lens), pairs, palette),
+    meaning: (lens, pairs) => C.colourMeaning(lens, pairs, palette),
   };
-})();
+})() : null;
 
 </script>
 <script>
 (() => {
   const S = Space;
   const $ = s => document.querySelector(s);
+  if (!S) { $('#reading').textContent = 'This page draws with the engine’s colour space, loaded from ../Demos/dynaink-core.browser.js, and could not find it.'; return; }
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const f = v => (Math.round(v * 10) / 10).toString();
 
@@ -694,7 +322,7 @@ const Space = (() => {
   const SEED = ["it's an idea · purple", "it's a task", "it's a note", 'insight is a kind of idea', 'hunch is a kind of idea', 'question is kin to idea', 'assumption opposes evidence'];
   const EXAMPLES = ["it's a quote · teal", 'risk opposes opportunity', 'todo is a kind of task', 'method is kin to note', 'make idea yellow', "it's a feeling"];
   const STORE = 'dynaink-colour-space-acts';
-  const DASH = { solid: '', dashed: '7 5', dotted: '0.1 4.6', 'dash-dot': '9 4 0.1 4', long: '16 6' };
+  const DASH = { solid: '', dashed: '7 5', dotted: '0.1 4.6', 'dash-dot': '9 4 0.1 4', long: '16 6', 'dash-dot-dot': '9 4 0.1 4 0.1 4', short: '3.5 4.5', sparse: '0.1 8.4' };
   const QUIET = { paper: '#66737c', dark: '#86847e' };   // --ink-3, light and dark
   const GRID = { paper: 'rgba(90,72,44,0.10)', dark: 'rgba(231,229,224,0.08)' };
   const HOW = { typical: 'most eyes', protan: 'protanopia', deutan: 'deuteranopia', tritan: 'tritanopia' };
