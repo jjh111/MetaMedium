@@ -915,6 +915,7 @@ try {
   const refused = kinds.filter((k) => !examples[k] || !accepts[k](examples[k]));
   check('…its reply\'s shape and an example reply each — and every example passes the parser the page reads a model\'s reply with', refused.length === 0 && kinds.every((k) => /^  reply: /m.test((blocks.find((b) => b.head === k) || {}).text || '')), { refused, examples });
   check('…and says canvas_answer\'s own parser accepts each example (it checked them just now)', (doors.match(/canvas_answer's parser: accepts it/g) || []).length === kinds.length, (doors.match(/canvas_answer's parser: [^\n]*/g) || []));
+  check('…and how a session is woken for a brief — the silent watcher, Demos/seat-watch.mjs, with how it is run, read from its own header', /seat-watch\.mjs/.test(doors) && /Monitor/.test(doors) && /^    node Demos\/seat-watch\.mjs/m.test(doors), doors.split('\n').filter((l) => /seat-watch/.test(l)));
   check('…who sits where, from the merged log: the engine at tier 0, Claude Code (MCP hand) a model at tier 2 on this machine, and who was heard in the room — the tab among them',
     /\bengine\b[^\n]*tier 0/.test(doors) && /Claude Code \(MCP hand\)[^\n]*tier 2[^\n]*local/.test(doors) && /heard in the last minute: [^\n]*\btab\b/.test(doors), doors.split('\n').filter((l) => /tier \d|heard in the last/.test(l)));
   check('…and the page\'s own seats — reader, writer, decider, semantic — read from 03-seats.js with what each is for, and which of them this hand cannot take yet (the decider, the semantic seat and the listener: CG7b)',

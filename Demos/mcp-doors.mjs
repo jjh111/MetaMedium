@@ -210,6 +210,15 @@ function clientDoorLines() {
   return lines;
 }
 
+/** How a session is woken for a brief, read from the watcher's own header: an MCP server cannot speak first. */
+function watcherLines() {
+  try {
+    const block = commentBlock(read('Demos/seat-watch.mjs'), /^\/\/ The seat's watcher/);
+    const usage = block.filter((l) => /^\s{2,}(node|MM_)/.test(l)).map((l) => '    ' + l.trim());
+    return ['waking a session — an MCP server cannot speak first, so a silent watcher (Demos/seat-watch.mjs) prints one line per brief parked and writes nothing to the room; put it under a session\'s Monitor tool and each line is the session woken:', ...usage];
+  } catch (err) { return ['waking a session — Demos/seat-watch.mjs could not be read: ' + (err && err.message || err)]; }
+}
+
 /** The servers `.mcp.json` registers for a Claude Code session, as `name → command args`. */
 function registeredServers() {
   try {
@@ -350,7 +359,7 @@ async function seatLines(MM, ctx, only) {
         lines.push('      left alone: ' + F.fallbackWords(seat));
       }
     } catch (err) { lines.push('the page\'s seats (Demos/surface/03-seats.js): could not be read — ' + (err && err.message || err)); }
-    lines.push('', ...sitterLines(MM, ctx), '');
+    lines.push('', ...sitterLines(MM, ctx), '', ...watcherLines(), '');
   }
   const briefs = await seatBriefs(MM);
   let shown = 0;
@@ -406,9 +415,14 @@ function mcpLines(ctx) {
 
 // ----- The room ----------------------------------------------------------------------------------------------------------
 
+/** An address as it may be said: no user, no password, no query — a key must never be printed. */
+function sayable(address) {
+  try { const u = new URL(address); return u.origin + (u.pathname === '/' ? '' : u.pathname.replace(/\/+$/, '')); } catch { return String(address).replace(/[?#].*$/, '').replace(/\/\/[^/@]*@/, '//'); }
+}
+
 function roomLines(ctx) {
   const lines = ['== THE ROOM =='];
-  lines.push('relay: ' + ctx.relay + ' — this hand reached it (Demos/relay.mjs on this machine, or the Worker at cloudflare/relay; the protocol is Demos/relay-protocol.mjs)');
+  lines.push('relay: ' + sayable(ctx.relay) + ' — this hand reached it (Demos/relay.mjs on this machine, or the Worker at cloudflare/relay; the protocol is Demos/relay-protocol.mjs)');
   lines.push('room: ' + ctx.room + ' — the lines its hands send, each hand\'s own log; a hand that joins later is caught up by the hands still here. The relay remembers up to ' + DEFAULT_MAX_LINES + ' lines a room unless told otherwise, and says when a room is older than that.');
   lines.push('key: ' + (ctx.keySet ? 'set' : 'not set') + ' (MM_RELAY_KEY, or --key, for a relay that wants one — never printed here)');
   lines.push('you are ' + ctx.me + ' — one sitting; a restart is a new log under the same name, and the same person');

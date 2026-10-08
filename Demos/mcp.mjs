@@ -17,7 +17,10 @@
 // a page of notes (PLAN-IPAD-NOTES A2), find, region and move. It may move anything on
 // the board — John's ruling of 2 Oct 2026 (A2b: "ya claude can move marks") — and says
 // whose marks it moved; a label and a rename keep their rule (its own ink, its own
-// region). It proposes and never
+// region). And, so that a dev session can use every door first-hand (V1-SPEC §3.13, CG7a),
+// `canvas_doors` lists them from the running code, `canvas_export` writes the board as the
+// app does and `canvas_import` also reads a log or a bundle into a scratch session — all of
+// it in `mcp-doors.mjs`, and none of it writes to the room. It proposes and never
 // blesses; it can write a program and cannot play it; it holds no keys and
 // no truth of its own. Its events reach the tab as its own log, stamped
 // `by` on arrival like any other hand's, and draw in its own colour.
