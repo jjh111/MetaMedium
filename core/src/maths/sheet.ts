@@ -207,7 +207,7 @@ function unitsWritten(p: LineParse): LengthUnit[] {
     } else if (e.k === 'op') {
       walk(e.a);
       walk(e.b);
-    } else if (e.k === 'neg' || e.k === 'carry') walk(e.a);
+    } else if (e.k === 'neg' || e.k === 'carry' || e.k === 'call') walk(e.a);
   };
   for (const seg of p.chain.segments) if (seg.readings[0]) walk(seg.readings[0].expr);
   return out;
@@ -342,7 +342,7 @@ function proseToNotes(drafts: Draft[]): void {
 }
 
 function hasNames(chain: ExprChain): boolean {
-  const walk = (e: Expr): boolean => (e.k === 'name' || e.k === 'ref' ? true : e.k === 'op' ? walk(e.a) || walk(e.b) : e.k === 'neg' || e.k === 'carry' ? walk(e.a) : false);
+  const walk = (e: Expr): boolean => (e.k === 'name' || e.k === 'ref' ? true : e.k === 'op' ? walk(e.a) || walk(e.b) : e.k === 'neg' || e.k === 'carry' || e.k === 'call' ? walk(e.a) : false);
   return chain.segments.some((g) => g.readings.some((r) => walk(r.expr)));
 }
 
@@ -356,7 +356,7 @@ function mentions(chain: ExprChain): { names: string[]; steps: number[] } {
     else if (e.k === 'op') {
       walk(e.a);
       walk(e.b);
-    } else if (e.k === 'neg' || e.k === 'carry') walk(e.a);
+    } else if (e.k === 'neg' || e.k === 'carry' || e.k === 'call') walk(e.a);
   };
   for (const g of chain.segments) for (const r of g.readings) walk(r.expr);
   return { names, steps };

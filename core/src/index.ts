@@ -1168,3 +1168,20 @@ export type {
   Candidate as HueCandidate,
   Placed as HuePlaced,
 } from './colour';
+
+// Maths with a variable (MATHS-SPEC lane B, M11): what a person writes of a function — `y = (x²−4)/(x−2)`,
+// `2π√(L/g)`, `sin x / x` — read by hand into a tree, printed back as it was read, and compiled into a function of
+// one variable (`compileFunction`, C0's shape: null where it is undefined, a reason where it cannot be read). An
+// angle is a quantity of its own (30°, 1.2 rad), and a quantity can be raised to a power.
+export {
+  compileFunction,
+  parseFn,
+  formatFn,
+  evalFn,
+  freeVariables,
+  functionNamed,
+  FUNCTIONS as MATHS_FUNCTIONS,
+} from './maths/fn';
+export type { FnName, FnSpec, FnNode, FnParse, CompiledFn, FnOptions } from './maths/fn';
+export { isAngle, convertAngle, inRadians, powQuantity, angleSuffix, scanAngle } from './maths/quantity';
+export type { AngleUnit, ScannedAngle } from './maths/quantity';
