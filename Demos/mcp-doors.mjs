@@ -729,8 +729,8 @@ export async function importBoard(ctx, bytes, given, opts = {}) {
 
   // Whatever reads differently from the board in the room, thing by thing, by id.
   const roomState = ctx.session.getState();
-  const inFile = ctx.thingLines(fs, () => '');
-  const inRoom = ctx.thingLines(roomState, () => '');
+  const inFile = ctx.thingLines(fs, () => '', false);
+  const inRoom = ctx.thingLines(roomState, () => '', false);
   let both = 0, same = 0, onlyFile = 0;
   const differ = [];
   for (const [id, line] of inFile) {
@@ -743,6 +743,11 @@ export async function importBoard(ctx, bytes, given, opts = {}) {
     ' · ' + onlyFile + ' only in this file · ' + onlyRoom + ' only in the room' + (both === 0 && onlyFile ? ' — this is another board: none of its ids are on the room\'s' : ''));
   for (const id of differ.slice(0, 5)) lines.push('  differs: ' + id + ' — here: ' + inFile.get(id).slice(0, 160) + ' · in the room: ' + inRoom.get(id).slice(0, 160));
   if (differ.length > 5) lines.push('  and ' + (differ.length - 5) + ' more');
+  // Who made a thing is the one reading a log carries from a point of view: its writer's own marks are "me", the others' are "by <name>".
+  const whoFile = ctx.authorsOf(fs), whoRoom = ctx.authorsOf(roomState);
+  let flipped = 0;
+  for (const [id, who] of whoFile) if (whoRoom.has(id) && whoRoom.get(id) !== who) flipped++;
+  if (flipped) lines.push('  who made them reads from the writer\'s side: ' + plural(flipped, 'thing') + ' ' + (flipped === 1 ? 'has' : 'have') + ' another maker here than in the room — a log is written from one hand\'s point of view, where its own marks are “me” and the others\' are “by <name>”');
   lines.push('', 'the board, as canvas_look says it (a scratch board: canvas_look, canvas_see and the rest speak only of the room\'s):');
   const holds = (pic) => (pic.asset && have.has(pic.asset) ? ' · its pixels are in the file' : pic.asset ? ' · its pixels are not in the file — it stands as its name' : ' · no pixels were kept for it');
   lines.push(...ctx.describeBoard(fs, { limit: opts.limit || IMPORT_LOOK_DEFAULT, holds }));

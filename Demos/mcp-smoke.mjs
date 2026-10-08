@@ -1107,6 +1107,21 @@ try {
     check('a bundle with a damaged picture still opens the board and says which picture was left out and why', /damaged/.test(impDamaged) && /checksum/.test(impDamaged) && /1 picture/.test(impDamaged) && flow.every((id) => impDamaged.includes(id)), impDamaged.split('\n').filter((l) => /damaged|picture/.test(l)));
     const impNothing = textOf(await dcall('canvas_import', { base64: Buffer.from('just words').toString('base64'), name: 'words.jsonl' }));
     check('bytes that are no picture, no log and no bundle are refused naming all three', /not a picture/.test(impNothing) && /log/.test(impNothing) && /bundle/.test(impNothing) && !/nothing was written to the room/.test(impNothing), impNothing);
+    // The same file, read by ANOTHER hand in the room: the board reads the same, and who made each thing reads from the writer's side — a log is
+    // written from one hand's point of view, where its own marks are "me" and the others' are "by <name>".
+    const second = spawnHand({ MM_ROOM: dRoom, MM_RELAY: RELAY, MM_NAME: 'second' }, 'second');
+    try {
+      await second.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '0' } });
+      let seen = '';
+      for (let i = 0; i < 40 && !seen.includes(flow[0]); i++) { seen = textOf(await second.call('canvas_look', {})); if (!seen.includes(flow[0])) await wait(100); }
+      const impOther = textOf(await second.call('canvas_import', { path: bPath }));
+      check('the same bundle read by another hand in the room reads the same board, and says who made each thing reads from the writer\'s side — its own marks are "me" in the file and "by doorman" here',
+        /all read the same · 0 only in this file · 0 only in the room/.test(impOther) && /who made them reads from the writer's side: \d+ things?/.test(impOther) && /nothing was written to the room/.test(impOther), impOther.split('\n').filter((l) => /compared|writer/.test(l)));
+    } finally {
+      second.child.stdin.end();
+      await wait(100);
+      second.child.kill();
+    }
     const roomEnd = await settle();
     check('after every import and every export the room is as it was: this hand\'s log has not grown by one event', JSON.stringify(roomEnd.logs[roomEnd.hand]) === JSON.stringify(room0.logs[room0.hand]), { before: room0.logs[room0.hand].length, after: roomEnd.logs[roomEnd.hand].length });
   } finally {

@@ -250,7 +250,7 @@ function describeMark(node, s, view = {}) {
   if (s.live.includes(node.id)) parts.push(s.clocks[node.id] && s.clocks[node.id].playing ? 'playing' : 'live');
   const inside = view.regionOf && view.regionOf.get(node.id);
   if (inside) parts.push('in “' + inside + '”');
-  if (who && who !== 'me') parts.push('by ' + who);
+  if (who && who !== 'me' && view.author !== false) parts.push('by ' + who);
   return parts.join(' · ');
 }
 /** A region's line in a look: its place in the outline, what it holds, where it stands. */
@@ -262,13 +262,22 @@ function regionLine(s, o, outline) {
     (parent ? ' · inside “' + parent.name + '”' : '') +
     (d.things.length ? ' · holds ' + d.things.slice(0, 12).join(', ') + (d.things.length > 12 ? ' and ' + (d.things.length - 12) + ' more' : '') : '');
 }
-/** Every thing on a board in a line each, by id — marks, artifacts and regions — what a board read from a file is compared with the room's by (canvas_import). */
-function thingLines(s, holds) {
+/**
+ * Every thing on a board in a line each, by id — marks, artifacts and regions — what a board read from a file is compared with the room's by (canvas_import).
+ * `author: false` leaves who made it out: a log is written from one hand's point of view, so the same board reads its maker differently from another's.
+ */
+function thingLines(s, holds, author) {
   const regionOf = regionsHolding(s);
   const out = new Map();
-  for (const id of s.contentIds) { const n = s.nodes.get(id); if (n) out.set(id, describeMark(n, s, { regionOf, holds })); }
+  for (const id of s.contentIds) { const n = s.nodes.get(id); if (n) out.set(id, describeMark(n, s, { regionOf, holds, author })); }
   const outline = MM.regionOutline(s);
   for (const o of outline) { const line = regionLine(s, o, outline); if (line) out.set(o.id, line); }
+  return out;
+}
+/** Who made each thing on a board, from this board's side: its id to the name of its maker, `me` for this board's own hand. */
+function authorsOf(s) {
+  const out = new Map();
+  for (const id of s.contentIds) { const n = s.nodes.get(id); if (n) out.set(id, authorOf(n, s) || 'me'); }
   return out;
 }
 /**
@@ -799,7 +808,7 @@ async function importPicture(args) {
   // A log or a bundle is a board, not a picture: it is read into a SCRATCH session — the room is never written — and said in words.
   if (!sniffImage(bytes) && looksLikeBoard(bytes)) {
     const limit = Math.floor(Number(args.limit)) > 0 ? Math.min(2000, Math.floor(Number(args.limit))) : undefined;
-    return importBoard({ MM, session, thingLines, describeBoard: (st, o) => boardLines(st, {}, { holds: o.holds, limit: o.limit, scratch: true }) }, bytes, given, { limit });
+    return importBoard({ MM, session, thingLines, authorsOf, describeBoard: (st, o) => boardLines(st, {}, { holds: o.holds, limit: o.limit, scratch: true }) }, bytes, given, { limit });
   }
   if (bytes.length > MAX_ASSET_BYTES) return { text: 'nothing placed: ' + tooLargeWords(bytes.length) };
   const info = sniffImage(bytes);
