@@ -503,7 +503,11 @@ export async function doorsText(ctx, args = {}) {
     out.push('Narrow it: door is one of ' + doors.join(' | ') + '; seat is one brief kind (what, read, read-lines, ask, build, build-revise, program, draw, behave).', '');
   }
   const sections = [];
-  const add = async (d, make) => { if (want(d)) sections.push((await make()).join('\n')); };
+  // A door that cannot be read says so and leaves the others standing.
+  const add = async (d, make) => {
+    if (!want(d)) return;
+    try { sections.push((await make()).join('\n')); } catch (err) { sections.push('== ' + d.toUpperCase() + ' ==\ncould not be read — ' + ((err && err.message) || err)); }
+  };
   await add('pen', () => penLines(MM, ctx.tools.find((t) => t.name === 'canvas_draw')));
   await add('seats', () => seatLines(MM, ctx, seat));
   await add('mcp', () => mcpLines(ctx));
