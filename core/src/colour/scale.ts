@@ -6,14 +6,15 @@
 // CHROMA is how sure: a said kind is at the ground's full chroma (lowered only where sRGB cannot reach it), an
 // offered kind a fixed share of that, at the same lightness. A suggestion is only a chip and has no colour here.
 //
-// And what is drawn must read. A colour is checked against its ground: words need 4.5:1, so marks, which need 3:1,
-// need no more. If it does not read, lightness moves toward the ink — darker on paper, lighter in the dark room —
-// until it does, the hue untouched, and `moved` says how far. A person's own colour that cannot read as named (a
-// pale yellow on paper) is therefore never refused: it keeps its hue, and is drawn as ochre or olive.
+// And what is drawn must read. A colour is checked against its ground: words need WORDS_CONTRAST, and marks, which
+// need only MARKS_CONTRAST, need no more. If it does not read, lightness moves toward the ink — darker on paper,
+// lighter in the dark room — until it does, the hue untouched, and `moved` says how far. A person's own colour that
+// cannot read as named (a pale yellow on paper) is therefore never refused: it keeps its hue, and is drawn as ochre
+// or olive.
 //
-// The checking is of the DRAWN colour. The specimen measured a colour's contrast before the byte was rounded, and
-// a deep kind on paper could be drawn at 4.47:1 while the page said 4.5; here the light the hex gives is what is
-// measured, and lightness keeps moving until that reads too.
+// The checking is of the DRAWN colour. The specimen measured a colour's contrast before the byte was rounded, so a
+// deep kind on paper could be drawn a hair under the floor while the page said it was on it; here the light the hex
+// gives is what is measured, and lightness keeps moving until that reads too.
 //
 // The palette is handed in. Core cannot read CSS, so the grounds, the hand's ink on each and the chrome's signal
 // colours are a parameter; the defaults are brand/tokens.css's values, and palette.files.test.mjs fails the day a

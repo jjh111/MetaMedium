@@ -150,13 +150,14 @@ export function nameHue(name: string): number {
   return (x >>> 0) % 360;
 }
 
-/** What standing near a colour the chrome keeps costs a hue: nothing 12° away, the most at the colour itself. */
+/** What standing near a colour the chrome keeps costs a hue: nothing SIGNAL_REACH away, SIGNAL_WEIGHT at the colour itself. */
 export const signalPenalty = (hue: number, palette: Palette = DEFAULT_PALETTE): number =>
   palette.signals.reduce((p, s) => p + Math.max(0, SIGNAL_REACH - hueDistance(hue, s.hue)) / SIGNAL_REACH * SIGNAL_WEIGHT, 0);
 
-/** The said colour at a hue and depth on each ground, kept for the palette: placing asks for the same ones again and again. */
+/** The most colours kept for one palette before the memory is let go (placing asks for the same ones again and again). */
 const SEEN_MAX = 20000;
 const seenBy = new WeakMap<Palette, Map<string, Rgb[]>>();
+/** The said colour at a hue and depth on each ground, in GROUND_NAMES order, remembered per palette. */
 function seen(hue: number, depth: number, palette: Palette): Rgb[] {
   let cache = seenBy.get(palette);
   if (!cache) seenBy.set(palette, (cache = new Map()));
