@@ -168,6 +168,40 @@ and have it read) and it is that side's length.
   **Print at true size** prints the cutting line dashed, the grain line, the
   notches and the dart; a piece on the fold is printed as drawn — half — and
   says it is cut on the fold and how wide it opens.
+- **What the maths implies stands faint where it would be written**: draw a
+  right triangle and write 3 and 4 by its legs, and *5* stands by the long side,
+  the angles in their corners and the area in the middle, each in its own colour,
+  which its side or angle takes while you point at it. **Tap one** and it is written there as
+  your text, which the maths then checks like any number you wrote; **undo**
+  takes it back. Typed in the field: **write all**. A right triangle's opposite,
+  adjacent, long side and angle keep the same colours on every board.
+- **For teaching**: type **the answer waits** in the field and every answer
+  stands as a **?** in its colour — the first tap shows it, the second writes
+  it. **Show the answers** puts it back. **Colour the maths** keeps the colours
+  on every figure, not only the one you point at. Both are the board's: they
+  undo, and everyone in a live room sees them.
+- **More of what you write is read**: powers, roots, π and degrees —
+  `= 2(3+1)`, `= 2^10`, `= sin 30°`, `= 2π√(L/g)` with L and g on your page.
+  Something that could be read two ways (`= 1 ÷ 2x`) is not guessed: the field
+  says both ways to write it. A name your page does not give is said, never
+  taken as nothing.
+
+## Things that move and things that read as physics
+
+- **A pendulum**: draw a level line for the ceiling (hatch above it if you
+  like), a straight rod down from it, and a circle or a solid dot at the
+  bottom. Hold it and choose **Play the pendulum**; it swings by physics, its
+  period *T* and its angle beside it. Write a length beside the rod (`50 cm`)
+  and it swings at that length; otherwise it says what length it took.
+  **Pause**, **Reset**, and, for a rod drawn straight down, **Pull it aside**.
+  **Esc** stops it. Nothing in your drawing moves for good: the swing is shown,
+  the ink stays where you drew it.
+- **A Feynman diagram**: solid lines with an arrow for particles, a wavy line
+  for a photon, a curly one for a gluon, a dashed one for the Higgs, meeting at
+  points. Hold it and the field says *a Feynman diagram* and the process it
+  draws (*e⁻ e⁺ → μ⁻ μ⁺*); label the lines and it checks charge at each
+  meeting. A line you have not named has a name standing faint beside it — tap
+  it to write it.
 
 ## Models
 
