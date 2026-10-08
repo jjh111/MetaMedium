@@ -445,7 +445,21 @@ B, A, E, C, D, F — or as they finish, so long as C comes after B.
   `renderExplanations` weighs its cards. A taken value that attaches to the wrong
   side, where two sides' middles are close — test the attachment.
 
-*Status, 8 Oct 2026: under way (`unit/m16-fill`, from `31b62ef`).*
+*Status, 8 Oct 2026: **built and merged** (`unit/m16-fill`, merged as `722af2c`). The figure
+source (`maths/fill-figure.ts`): a solved figure's sides, angles, area, perimeter and a circle's or an arc's
+measures that are not written stand faint where they would be written — sides at the chip's spot, angles on the
+corner's bisector, area at the centroid — each spot proved to attach to the side it was offered for
+(`fillLandsOnBoard`); a value from the ink alone weaker and said *at the drawing's scale*; a conflict's derived value
+beside the written one, shown and not taken. A tap writes it as a one-line text in one act and one undo; the maths
+reads it back and checks it. The ghost layer (`Demos/surface/25-ghosts.js`): faint text in the quantity's hue, marks
+dashed beneath the ink and taken along their line, a halo under the measured marks while held or pointed at, a
+second channel as a dash on the halo. `maths/hues.ts`: the role table (opposite, adjacent, hypotenuse, the angle) and
+its nudge, said; other quantities placed per board, deterministic. The `setting` event (`session/settings.ts`: the
+answer waits, colour the maths), board-wide, undone per hand, a bad key refused; reached by typed offers
+(`tools/fill.ts`, the twenty-seventh built-in: *the answer waits*, *show the answers*, *colour the maths*, *write
+it*, *write all*) and the panel's board line. The other leg named by where it stands. Gate `fill`, 22 records. Open:
+on a waiting board a conflict still shows the derived value (hiding it would hide the disagreement — John's to say);
+role hues are never nudged on a real board until KN1 gives the board kinds.*
 
 #### Lane B — M11, M12, M13: functions, polynomials, limits — the Jake engine (core)
 
@@ -491,7 +505,18 @@ B, A, E, C, D, F — or as they finish, so long as C comes after B.
   and send to `fn.ts` only what `expr.ts` could not read or read wrongly. When
   sampling, never evaluate exactly at a removable point.
 
-*Status, 8 Oct 2026: under way (`unit/m11-fn`, from `31b62ef`).*
+*Status, 8 Oct 2026: **built and merged** (`unit/m11-fn`, merged as `ab823fd`). `fn.ts`:
+maths with a variable read by hand — Latin and Greek names, `^` and superscripts, `√`, π, e, the functions, implicit
+products (`2x`, `x(x+1)`, `2π√(L/g)`), degrees and radians, `y =` and `f(x) =` — printed back as read and compiled
+by `compileFunction` (C0's shape, with an optional `given`); ambiguous writing (`1/2x`, `√4x`, a slash fraction beside
+÷ or ^) refused with both ways to write it. `poly.ts`: exact over the rationals, factored (rational roots, then
+Kronecker's method up to cubic factors, saying when it cannot be sure), a ratio cancelled into its holes, poles and
+end (`analyseRational`). `limit.ts`: substitution, factoring with the common factor struck, the known limits
+confirmed by the numbers, else numerically from both sides with the approach given — Jake's limit 4 *by factoring*,
+1.9, 1.99, 1.999 → 3.9, 3.99, 3.999. Every line of §2's table now read right or refused; an angle is a quantity of
+its own; a written decimal keeps its places and nothing nonzero shows as 0. No existing test changed. Changed
+behaviour no test pinned: a slash fraction beside ÷ or ^ is refused rather than read one way; `x` glued to a bracket
+or name is the letter. Left: TeX printing; Greek names in the sheet's grammar (M10).*
 
 #### Lane C — M19, M20, M21: the coordinate plane, plots, a curve read (core)
 
@@ -530,7 +555,7 @@ B, A, E, C, D, F — or as they finish, so long as C comes after B.
   a garment piece must not read as a plane; bench it. Where the hand doubled
   back, a curve's samples are no function.
 
-*Status, 8 Oct 2026: not started; waits on B's merge.*
+*Status, 8 Oct 2026: under way (`unit/m19-plane`, from `ab823fd`, after B merged).*
 
 #### Lane D — M23: the pendulum is alive, Chalktalk's road (core and surface)
 
@@ -650,7 +675,16 @@ for T and θ (a few lines once A is merged).*
   its amplitude, and writing is neither. A loop's photon is an arc: read the axis
   as a smoothed curve, not only a straight line.
 
-*Status, 8 Oct 2026: under way (`unit/m27-feynman`, from `31b62ef`).*
+*Status, 8 Oct 2026: **built and merged** (`unit/m27-feynman`, merged as `6b1a67d`). `diagram/waves.ts`
+reads a stroke that oscillates — wavy, zigzag or a coil — along a line or an arc (a photon in a loop), regular and
+long against its amplitude, so no writing reads as one (0 of 2,878 strokes). `notations/feynman.ts`: fermions solid
+with an arrow (a barb at an end, or a chevron on the middle), photons, W and Z wavy, gluons curly, the Higgs dashed,
+meeting at vertices; the process, the channel, the order and tree or loops; charge, lepton number by family and baryon
+number checked at each vertex once named, a break said with its sum; `FEYNMAN_TABLE` (18 particles) named by the
+`feynman@1` pack. Bench: 432 of 432 boards (36 hands × 4 diagrams × 3 sizes) read first at 0.92; nothing else above
+0.00. TikZ-Feynman out (`feynman-tikz.ts`), **unverified by a compiler** — the container has no LuaLaTeX. A name
+offered as a fill-in for an unnamed line (`maths/fill-feynman.ts`: γ, W±, g, H, a fermion carried through a neutral
+vertex). Left: a fermion loop drawn as one circle, an arrow on a W line, a line drawn in two pieces; M28.*
 
 #### Lane F — M8: numerals read at tier 1 (core; Opus)
 
