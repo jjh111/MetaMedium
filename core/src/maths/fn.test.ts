@@ -192,6 +192,15 @@ describe('the grammar of fn.ts', () => {
     expect(refusal('x2')).toMatch(/x2/); // refused rather than read two ways
   });
 
+  it('punctuation at the end of a line of writing, x**2 and TeX braces', () => {
+    expect(at('y = 2x + 3.', 2)).toBe(7);
+    expect(at('y = x²,', 3)).toBe(9);
+    expect(at('x**2', 3)).toBe(9);
+    expect(at('e^{x}', 0)).toBe(1);
+    expect(at('x^{2}', 3)).toBe(9);
+    expect(at('5.', 0)).toBe(5);
+  });
+
   it('division, minus and the typed forms ÷ × · *', () => {
     expect(at('x ÷ 2', 8)).toBe(4);
     expect(at('x × 2', 8)).toBe(16);

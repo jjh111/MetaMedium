@@ -162,7 +162,10 @@ function classify(points: ApproachPoint[]): Approach {
   const grows = Math.abs(c) > GROWN_PAST && Math.abs(c) > Math.abs(b) && Math.abs(b) > Math.abs(a) && Math.sign(a) === Math.sign(c) && Math.sign(b) === Math.sign(c) && d2 >= 0.5 * d1;
   if (grows) return { points, behaviour: 'grows', settles: c > 0 ? Infinity : -Infinity };
   const size = Math.max(1, Math.abs(c));
-  if (d2 <= SETTLE_TOL * size || (d2 <= 0.25 * d1 && d2 <= SETTLE_LOOSE * size)) {
+  // settles: the last step is tiny, or the steps keep at least halving (a smooth approach, whatever the size of the numbers)
+  const d0 = n >= 4 ? Math.abs(a - defined[n - 4]) : Infinity;
+  const halving = d2 <= 0.5 * d1 && d1 <= 0.5 * d0;
+  if (d2 <= SETTLE_TOL * size || halving || (d2 <= 0.25 * d1 && d2 <= SETTLE_LOOSE * size)) {
     const est = heading(a, b, c) + 0;
     const s = snap(est);
     return { points, behaviour: 'settles', settles: (s ? s.value : Number(est.toPrecision(6))) + 0 };

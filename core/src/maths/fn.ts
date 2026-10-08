@@ -281,6 +281,7 @@ function tokenize(s: string, options: FnOptions): Tok[] {
     }
     if (c === '+' || c === '＋') { out.push({ t: 'op', ch: '+', at: i, end: i + 1, space: sp() }); i++; continue; }
     if (MINUS.includes(c)) { out.push({ t: 'op', ch: '-', at: i, end: i + 1, space: sp() }); i++; continue; }
+    if (c === '*' && s[i + 1] === '*') { out.push({ t: 'op', ch: '^', at: i, end: i + 2, space: sp() }); i += 2; continue; } // x**2, as a programmer writes it
     if (TIMES.includes(c)) { out.push({ t: 'op', ch: '*', at: i, end: i + 1, space: sp() }); i++; continue; }
     if (DIVIDES.includes(c)) { out.push({ t: 'op', ch: '/', at: i, end: i + 1, space: sp() }); i++; continue; }
     if (c === '^') { out.push({ t: 'op', ch: '^', at: i, end: i + 1, space: sp() }); i++; continue; }
@@ -601,7 +602,8 @@ export type FnParse = { ok: true; node: FnNode } | { ok: false; reason: string }
 
 /** A formula as a tree, or the reason it cannot be read. Nothing is thrown. */
 export function parseFn(text: string, options: FnOptions = {}): FnParse {
-  const s = text.replace(/\s+/g, ' ').trim();
+  // a full stop or a comma at the end of a line of writing is punctuation, not a decimal point with nothing after it
+  const s = text.replace(/\s+/g, ' ').replace(/[.,;:\s]+$/, '').trim();
   if (!s) return { ok: false, reason: 'there is nothing to read' };
   try {
     const toks = tokenize(s, options);

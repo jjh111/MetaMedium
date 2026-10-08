@@ -366,7 +366,7 @@ function refine(toks: Tok[]): Tok[] {
  * or a letter a space from π or a function. A space before a bracket, a number after
  * anything, and a name of several letters keep their old meaning.
  */
-function productBetween(prev: Tok, next: Tok): boolean {
+function productBetween(prev: Tok, next: Tok, after: Tok | undefined): boolean {
   const lets = prev.t === 'name' && isLetterName(prev.name);
   const left = prev.t === 'num' || prev.t === 'rp' || lets;
   const glued = next.space === 0;
@@ -374,7 +374,8 @@ function productBetween(prev: Tok, next: Tok): boolean {
     case 'name':
       // 2x and 2 x are products, and so is a name stuck to the number (2xy); but a name a space away is a word
       // of the line (Add 2″ seam allowance), not a factor.
-      return prev.t === 'num' ? glued || (isLetterName(next.name) && next.space <= 1) : prev.t === 'rp' && glued && isLetterName(next.name);
+      // A table across a line (`A 36 B 30`) is names and numbers taking turns: a letter with a number after it is a name.
+      return prev.t === 'num' ? glued || (isLetterName(next.name) && next.space <= 1 && after?.t !== 'num') : prev.t === 'rp' && glued && isLetterName(next.name);
     case 'fn':
       return left && next.space <= 1;
     case 'num':
@@ -390,9 +391,9 @@ function productBetween(prev: Tok, next: Tok): boolean {
 
 function implicitProducts(toks: Tok[]): Tok[] {
   const out: Tok[] = [];
-  for (const t of toks) {
+  for (const [k, t] of toks.entries()) {
     const prev = out[out.length - 1];
-    if (prev && productBetween(prev, t)) {
+    if (prev && productBetween(prev, t, toks[k + 1])) {
       // 1/2x: the fraction was read as one number, but the slash is a division with a factor stuck to it.
       const fraction = prev.t === 'num' && /^\d+\s*[/⁄]\s*\d+$/.test(prev.text) ? prev.text : undefined;
       out.push({ t: 'op', op: '*', glyph: '', implicit: true, glued: t.space === 0, ...(fraction ? { fraction } : {}), at: t.at, end: t.at, space: 0 });
