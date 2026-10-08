@@ -25,7 +25,7 @@
 import type { FnNode } from './fn';
 import { evalFn, formatFn, freeVariables, parseFn } from './fn';
 import type { Poly } from './poly';
-import { analyseRational, factorPoly, polyDegree, polyEvalRat, polyPow, polyScale, polyText, rat, ratDiv, ratFromNumber, ratIsZero, ratSign, ratText, ratToNumber, rationalParts } from './poly';
+import { analyseRational, factorPoly, realRoots, polyDegree, polyEvalRat, polyPow, polyScale, polyText, rat, ratDiv, ratFromNumber, ratIsZero, ratSign, ratText, ratToNumber, rationalParts } from './poly';
 
 export type LimitSide = 'left' | 'right' | 'both';
 
@@ -37,6 +37,8 @@ export interface LimitStep {
   why: string;
   /** For a cancel: the factors crossed out, as written (`x − 2`). */
   struck?: string[];
+  /** For a cancel: where the cancelled form is not the function — `x ≠ 2`. */
+  excludes?: string;
 }
 
 export interface ApproachPoint {
@@ -259,12 +261,15 @@ function rationalLimit(node: FnNode, v: string, a: number, side: LimitSide): Ok 
     const ft = ratio(factorsText(fn, v), factorsText(fd, v));
     steps.push({ kind: 'factor', text: ft, why: 'factor the top and the bottom' });
     const y = ratDiv(Nr_a, Dr_a);
-    const struck = factorPoly(an.common).factors.flatMap((f) => Array<string>(f.power).fill(f.text));
+    const cf = factorPoly(an.common).factors;
+    const struck = cf.flatMap((f) => Array<string>(f.power).fill(f.text));
+    const places = [...new Set(cf.flatMap((f) => (f.root ? [ratText(f.root)] : realRoots(f.poly).map(show))))];
     steps.push({
       kind: 'cancel',
       text: `${ft} = ${an.reduced}`,
       why: `${[...new Set(struck)].join(' and ')} is on the top and the bottom, and ${v} is never ${show(a)} on the way in, so it cancels`,
       struck,
+      excludes: `${v} ≠ ${places.join(', ')}`,
     });
     steps.push({ kind: 'substitute', text: `${an.reduced} at ${at} is ${ratText(y)}`, why: 'now put the number in' });
     return result({

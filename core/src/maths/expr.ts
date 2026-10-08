@@ -997,7 +997,9 @@ function readSegment(toks: Tok[], src: string, typed = false): { readings: ExprR
       push((byPrecedence ?? leftToRight)!, null, null);
     }
   }
-  if (!out.length) return { readings: [], error: ambiguous || `cannot read “${src.slice(toks[0]?.at ?? 0, toks[toks.length - 1]?.end ?? 0)}” as a formula` };
+  // A line that is ambiguous in any reading is not read in the others: what survives would look like the whole answer.
+  if (ambiguous) return { readings: [], error: ambiguous };
+  if (!out.length) return { readings: [], error: `cannot read “${src.slice(toks[0]?.at ?? 0, toks[toks.length - 1]?.end ?? 0)}” as a formula` };
   // The plain reading first; each departure after it, in the order found.
   const ranked = out.map((r, i) => ({ r, i })).sort((x, y) => x.r.departures - y.r.departures || x.i - y.i).map((x) => x.r);
   return { readings: ranked };

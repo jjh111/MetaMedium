@@ -29,6 +29,7 @@ describe('Jake\'s limit: lim x→2 (x² − 4)/(x − 2) = 4', () => {
       'x + 2 at x = 2 is 4',
     ]);
     expect(r.steps[2].struck).toEqual(['x − 2']);
+    expect(r.steps[2].excludes).toBe('x ≠ 2');
   });
 
   it('gives the approach from both sides, never touching 2', () => {
