@@ -108,7 +108,8 @@ describe('OKLab and OKLCH', () => {
     expect(hueDistance(300, 40)).toBe(100);
     expect(hueDistance(40, 300)).toBe(100);
     expect(hueDistance(123, 123)).toBe(0);
-    expect(hueDistance(-10, 710)).toBe(20);
+    expect(hueDistance(-10, 710)).toBe(0);                // the same hue, a turn apart
+    expect(hueDistance(-10, 30)).toBe(40);
   });
 });
 
@@ -150,9 +151,11 @@ describe('fitting a colour inside sRGB by lowering its chroma', () => {
   });
 
   it('leaves a colour sRGB already holds as it was', () => {
-    const fit = inSrgb(0.5, 0.1, 200);
+    const fit = inSrgb(0.5, 0.1, 305);
     expect(fit.C).toBe(0.1);
     expect(oklabToLch(linearToOklab(fit.rgb))[1]).toBeCloseTo(0.1, 6);
+    // …and chroma is all it gives up: cyan at this lightness holds less than 0.1.
+    expect(inSrgb(0.5, 0.1, 200).C).toBeLessThan(0.1);
   });
 
   it('fits every hue, at any lightness, inside — by chroma, never by clamping', () => {

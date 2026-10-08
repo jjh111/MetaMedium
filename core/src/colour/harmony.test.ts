@@ -118,7 +118,7 @@ describe('what a hue is placed against', () => {
     expect(signalPenalty(model.hue)).toBeCloseTo(0.02, 12);
     expect(signalPenalty(model.hue + 6)).toBeCloseTo(0.01, 12);
     expect(signalPenalty(model.hue + 12)).toBe(0);
-    expect(signalPenalty(model.hue - 40)).toBe(0);
+    expect(signalPenalty(150)).toBe(0);                                    // nowhere near any of the five
   });
 
   it('hashes a name to a degree by FNV-1a, so the same name leans the same way everywhere', () => {
@@ -175,11 +175,11 @@ describe('kin, opposites and a kind of', () => {
   });
 
   it('places a new pair together, where both stand most apart from the rest — kin 26–40° apart', () => {
-    const { lens, said } = play(SEED.slice(0, 3).concat(['frame is kin to lens']));
-    const d = hueDistance(hueOf(lens, 'frame'), hueOf(lens, 'lens'));
+    const { lens, said } = play(SEED.slice(0, 3).concat(['frame is kin to window']));
+    const d = hueDistance(hueOf(lens, 'frame'), hueOf(lens, 'window'));
     expect(d).toBeGreaterThanOrEqual(26);
     expect(d).toBeLessThanOrEqual(40);
-    expect(said[3]).toMatch(/^frame is kin to lens: placed together, \d+° apart, where both stand most distinct$/);
+    expect(said[3]).toMatch(/^frame is kin to window: placed together, \d+° apart, where both stand most distinct$/);
   });
 
   it('moves the later kind, and never a hue its person said', () => {

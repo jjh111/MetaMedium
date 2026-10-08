@@ -125,11 +125,10 @@ describe('the specimen’s golden', () => {
       });
 
       if (overflow.length) {
-        it('where the specimen ran out of patterns, gives the kinds it repeated a pattern of their own and says nothing is repeated', () => {
-          for (const name of overflow) {
-            expect(CHANNELS.indexOf(ch.get(name)!.channel as never), `${name} takes a pattern past the specimen’s five`).toBeGreaterThanOrEqual(5);
-            expect(ch.get(name)!.repeats, name).toBe(false);
-          }
+        it('where the specimen ran out of patterns, gives the first kind it repeated a pattern past its five and repeats none', () => {
+          // The kinds after the first only ran out in the specimen because the first repeated one: with a pattern of its own it leaves them room.
+          expect(CHANNELS.indexOf(ch.get(overflow[0])!.channel), `${overflow[0]} takes a pattern past the specimen’s five`).toBeGreaterThanOrEqual(5);
+          for (const k of kindsOf(lens)) expect(ch.get(k.name)!.repeats, k.name).toBe(false);
         });
       } else {
         it('puts the second channels where the specimen put them, with whom each looks alike to', () => {

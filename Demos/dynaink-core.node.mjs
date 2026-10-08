@@ -642,10 +642,10 @@ function detectLine(fp, points, scale = 1, even2 = evenBowOf(fp, points, scale),
   if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
   const straight = ramp(fp.straightness, 0.55, 0.95);
   const corners = fit(fp.corners, 0, 3);
-  const seen = head?.by === "seen" ? head : null;
-  const confidence = (straight * 0.7 + corners * 0.3) * (1 - even2.evidence) * (1 - (seen?.fit ?? 0));
+  const seen2 = head?.by === "seen" ? head : null;
+  const confidence = (straight * 0.7 + corners * 0.3) * (1 - even2.evidence) * (1 - (seen2?.fit ?? 0));
   const bows = even2.bow && even2.evidence >= 0.05 ? `, but it bows evenly like an arc of ${Math.round(even2.bow.sweep)}\xB0` : "";
-  const headed = seen && seen.fit >= 0.05 ? `, but its ${seen.head} draws back like an arrow's head` : "";
+  const headed = seen2 && seen2.fit >= 0.05 ? `, but its ${seen2.head} draws back like an arrow's head` : "";
   return result(
     "line",
     "Line",
@@ -744,8 +744,8 @@ function readHead(fp, points, scale) {
   if (fp.isClosed || checkOvershoot(points, 50 * scale)) return null;
   const corners = headByCorners(fp, points, scale);
   if (corners && (corners.share ?? 0) >= HEAD_SHARE_SEEN) return { ...corners, by: "corners" };
-  const seen = headSeenOf(fp, points, scale);
-  if (seen && (!corners || seen.fit > corners.fit)) return { ...seen, by: "seen" };
+  const seen2 = headSeenOf(fp, points, scale);
+  if (seen2 && (!corners || seen2.fit > corners.fit)) return { ...seen2, by: "seen" };
   return corners ? { ...corners, by: "corners" } : null;
 }
 function headByCorners(fp, points, scale) {
@@ -801,7 +801,7 @@ function headSeenOf(fp, points, scale) {
   const step2 = Math.max(2 * scale, total / HEAD_SEEN_POINTS);
   const dense = resampleByArcLength(points, Math.max(8, Math.round(total / step2) + 1));
   const near = HAND_RESOLUTION_PX * scale;
-  const seen = (head) => {
+  const seen2 = (head) => {
     const pts = head === "end" ? dense : dense.slice().reverse();
     const tail = pts[0];
     let farAt = 0, farD = 0;
@@ -836,7 +836,7 @@ function headSeenOf(fp, points, scale) {
     const fit3 = (ramp(straight, 0.72, 0.95) * 0.5 + ramp(sharpest, BARB_TURN[0], BARB_TURN[1]) * 0.35 + shortHead * 0.15) * shortBarb(barb, scale);
     return fit3 > 0 ? { fit: fit3, head, tip, straight, sharpest, barb } : null;
   };
-  return [seen("end"), seen("start")].filter((x) => !!x).sort((a, b) => b.fit - a.fit)[0] ?? null;
+  return [seen2("end"), seen2("start")].filter((x) => !!x).sort((a, b) => b.fit - a.fit)[0] ?? null;
 }
 var BARB_OF_SHAFT = [0.3, 0.45];
 var BARB_FLICK_PX = [16, 32];
@@ -1489,7 +1489,7 @@ function byTier(interpretations) {
     if (g) g.push(i);
     else groups.set(i.tier, [i]);
   }
-  return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([key2, list5]) => ({ key: key2, label: `tier ${key2}`, interpretations: list5 }));
+  return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([key2, list6]) => ({ key: key2, label: `tier ${key2}`, interpretations: list6 }));
 }
 function bySource(interpretations) {
   const groups = /* @__PURE__ */ new Map();
@@ -1499,10 +1499,10 @@ function bySource(interpretations) {
     if (g) g.push(i);
     else groups.set(key2, [i]);
   }
-  return [...groups.entries()].map(([key2, list5]) => ({
+  return [...groups.entries()].map(([key2, list6]) => ({
     key: key2,
-    label: list5[0].sourceName,
-    interpretations: list5
+    label: list6[0].sourceName,
+    interpretations: list6
   }));
 }
 function disagreement(interpretations) {
@@ -2813,18 +2813,18 @@ var isCount = (e, n2) => e.k === "num" && isBare(e.q) && !isRange(e.q) && e.q.lo
 function describeExpr(expr) {
   const e = fold(expr);
   if (!hasNames(e) || depth(e) > 2) return void 0;
-  const say = (x, top) => {
+  const say2 = (x, top) => {
     switch (x.k) {
       case "num":
       case "name":
       case "ref":
         return leafText(x);
       case "carry":
-        return say(x.a, top);
+        return say2(x.a, top);
       case "neg":
-        return `minus ${say(x.a, false)}`;
+        return `minus ${say2(x.a, false)}`;
       case "op": {
-        const a = say(x.a, false), b = say(x.b, false);
+        const a = say2(x.a, false), b = say2(x.b, false);
         const simple = x.a.k !== "op" && x.b.k === "num";
         switch (x.op) {
           case "+":
@@ -2844,7 +2844,7 @@ function describeExpr(expr) {
       }
     }
   };
-  return say(e, true);
+  return say2(e, true);
 }
 var MAX_CHOICES = 3;
 function readSegment(toks, src) {
@@ -3785,16 +3785,16 @@ function readSheet(input, options = {}) {
       allowances.set(h2.line, { amount: amount2, label, from: [], reason: `${h2.title}: ${fmt(amount2)}, as the heading says` });
       continue;
     }
-    const seen = [];
+    const seen2 = [];
     for (const d of drafts) {
       if (d.kind !== "step" || d.under !== h2.line || d.conflict) continue;
       const e = plain.readings.get(d.key)?.[0]?.expr;
-      if (e && e.k === "op" && e.op === "+" && e.b.k === "num" && !isRange(e.b.q) && e.a.k !== "num") seen.push({ key: d.key, k: withUnit(e.b.q) });
+      if (e && e.k === "op" && e.op === "+" && e.b.k === "num" && !isRange(e.b.q) && e.a.k !== "num") seen2.push({ key: d.key, k: withUnit(e.b.q) });
     }
-    if (!seen.length) continue;
-    const tally2 = seen.map((s) => ({ ...s, n: seen.filter((o) => compareQuantities(o.k, s.k).status === "ok").length }));
+    if (!seen2.length) continue;
+    const tally2 = seen2.map((s) => ({ ...s, n: seen2.filter((o) => compareQuantities(o.k, s.k).status === "ok").length }));
     const top = tally2.reduce((a, b) => b.n > a.n ? b : a);
-    const from = seen.filter((s) => compareQuantities(s.k, top.k).status === "ok").map((s) => s.key);
+    const from = seen2.filter((s) => compareQuantities(s.k, top.k).status === "ok").map((s) => s.key);
     allowances.set(h2.line, { amount: top.k, label, from, reason: `${h2.title}: ${fmt(top.k)}, as ${stepsPhrase(from)} ${from.length === 1 ? "adds" : "add"} it` });
   }
   const alternatives2 = /* @__PURE__ */ new Map();
@@ -4712,18 +4712,18 @@ function clusters(marks, relations) {
     linked.get(r.from)?.add(r.to);
     linked.get(r.to)?.add(r.from);
   }
-  const seen = /* @__PURE__ */ new Set();
+  const seen2 = /* @__PURE__ */ new Set();
   const out = [];
   for (const m of marks) {
-    if (seen.has(m.id)) continue;
+    if (seen2.has(m.id)) continue;
     const group2 = [];
     const stack = [m.id];
     while (stack.length) {
       const id = stack.pop();
-      if (seen.has(id)) continue;
-      seen.add(id);
+      if (seen2.has(id)) continue;
+      seen2.add(id);
       group2.push(id);
-      for (const other of linked.get(id) ?? []) if (!seen.has(other)) stack.push(other);
+      for (const other of linked.get(id) ?? []) if (!seen2.has(other)) stack.push(other);
     }
     out.push(group2);
   }
@@ -6048,7 +6048,7 @@ function arcModels(f, facts) {
   const C = by("chord"), H = by("rise"), R = by("radius"), L = by("arc");
   const inkMajor = (f.rise ?? 0) > (f.radius ?? Infinity);
   const out = [];
-  const build = (basis, c, h2, r, forms, makes) => {
+  const build2 = (basis, c, h2, r, forms, makes) => {
     const major = h2.lo > r.lo + TOL;
     const sweep = over([c, r], ([cc, rr]) => {
       const s = 2 * Math.asin(Math.min(1, cc / (2 * rr))) / DEG3;
@@ -6075,23 +6075,23 @@ function arcModels(f, facts) {
   for (const c of C) for (const h2 of H) {
     if (c.group === h2.group) continue;
     const r = over([c.iv, h2.iv], ([cc, hh]) => hh > 0 ? cc * cc / (8 * hh) + hh / 2 : null);
-    if (r) build([c, h2], c.iv, h2.iv, r, { radius: `${numText(c)}\xB2 \xF7 (8 \xD7 ${numText(h2)}) + ${numText(h2)} \xF7 2` }, ["radius"]);
+    if (r) build2([c, h2], c.iv, h2.iv, r, { radius: `${numText(c)}\xB2 \xF7 (8 \xD7 ${numText(h2)}) + ${numText(h2)} \xF7 2` }, ["radius"]);
   }
   for (const c of C) for (const r of R) {
     if (c.group === r.group) continue;
     const h2 = over([c.iv, r.iv], ([cc, rr]) => cc <= 2 * rr + TOL ? rr + (inkMajor ? 1 : -1) * Math.sqrt(Math.max(0, rr * rr - cc * cc / 4)) : null);
-    if (h2) build([c, r], c.iv, h2, r.iv, { rise: `${numText(r)} ${inkMajor ? "+" : "\u2212"} \u221A(${numText(r)}\xB2 \u2212 (${numText(c)} \xF7 2)\xB2)` }, ["rise"]);
+    if (h2) build2([c, r], c.iv, h2, r.iv, { rise: `${numText(r)} ${inkMajor ? "+" : "\u2212"} \u221A(${numText(r)}\xB2 \u2212 (${numText(c)} \xF7 2)\xB2)` }, ["rise"]);
   }
   for (const h2 of H) for (const r of R) {
     if (h2.group === r.group) continue;
     const c = over([h2.iv, r.iv], ([hh, rr]) => hh <= 2 * rr + TOL ? 2 * Math.sqrt(Math.max(0, 2 * rr * hh - hh * hh)) : null);
-    if (c) build([h2, r], c, h2.iv, r.iv, { chord: `2 \xD7 \u221A(2 \xD7 ${numText(r)} \xD7 ${numText(h2)} \u2212 ${numText(h2)}\xB2)` }, ["chord"]);
+    if (c) build2([h2, r], c, h2.iv, r.iv, { chord: `2 \xD7 \u221A(2 \xD7 ${numText(r)} \xD7 ${numText(h2)} \u2212 ${numText(h2)}\xB2)` }, ["chord"]);
   }
   for (const r of R) for (const l of L) {
     if (r.group === l.group) continue;
     const c = over([r.iv, l.iv], ([rr, ll]) => 2 * rr * Math.sin(ll / rr / 2));
     const h2 = over([r.iv, l.iv], ([rr, ll]) => rr * (1 - Math.cos(ll / rr / 2)));
-    if (c && h2) build([r, l], c, h2, r.iv, { chord: `2 \xD7 ${numText(r)} \xD7 sin(${numText(l)} \xF7 (2 \xD7 ${numText(r)}))`, rise: `${numText(r)} \xD7 (1 \u2212 cos(${numText(l)} \xF7 (2 \xD7 ${numText(r)})))` }, ["chord"]);
+    if (c && h2) build2([r, l], c, h2, r.iv, { chord: `2 \xD7 ${numText(r)} \xD7 sin(${numText(l)} \xF7 (2 \xD7 ${numText(r)}))`, rise: `${numText(r)} \xD7 (1 \u2212 cos(${numText(l)} \xF7 (2 \xD7 ${numText(r)})))` }, ["chord"]);
   }
   for (const x of facts) {
     if (x.key === "arc" || x.key === "sweep") continue;
@@ -6320,9 +6320,9 @@ function solveFigure(figure, labels, options = {}) {
     return c;
   });
   const sig2 = (c) => c.kept.map((x) => x.i).sort((a, b) => a - b).join(",") + (c.model.assumed ? "?" : "") + (c.model.branch !== void 0 ? `#${c.model.branch}` : "");
-  const seen = /* @__PURE__ */ new Map();
-  for (const c of checked) if (!seen.has(sig2(c))) seen.set(sig2(c), c);
-  let distinct = [...seen.values()];
+  const seen2 = /* @__PURE__ */ new Map();
+  for (const c of checked) if (!seen2.has(sig2(c))) seen2.set(sig2(c), c);
+  let distinct = [...seen2.values()];
   distinct = distinct.filter((c) => !distinct.some((o) => o !== c && o.kept.length > c.kept.length && c.kept.every((x) => o.kept.includes(x))));
   if ((f.kind === "quadrilateral" || f.kind === "polygon") && distinct.length > 1) distinct = mergeSides(distinct);
   distinct.sort(
@@ -6508,11 +6508,11 @@ function solveBoard(state, options = {}) {
     const labels = dimensions.labels.get(figure.id) ?? [];
     const drawing = dimensions.drawings.find((d) => d.figures.includes(figure.id)) ?? null;
     const solution = solveFigure(figure, labels, { unit: drawing?.unit ?? null, scale: drawing?.scale ?? null });
-    const seen = /* @__PURE__ */ new Set();
+    const seen2 = /* @__PURE__ */ new Set();
     const steps = [];
     for (const l of labels) {
-      if (l.step === void 0 || l.declared || seen.has(l.number ?? l.text)) continue;
-      seen.add(l.number ?? l.text);
+      if (l.step === void 0 || l.declared || seen2.has(l.number ?? l.text)) continue;
+      seen2.add(l.number ?? l.text);
       const check2 = checkWritten(sheet, String(l.step), l.value);
       if (check2) steps.push(check2);
     }
@@ -6714,11 +6714,11 @@ function figuresAmong(nodes, ids) {
     if (u !== v) edges.push({ stroke: i, u, v });
   });
   const figures = [];
-  const seen = /* @__PURE__ */ new Set();
+  const seen2 = /* @__PURE__ */ new Set();
   for (const cycle of simpleCycles(edges)) {
     const key2 = cycle.map((k) => ruled[edges[k].stroke].id).sort().join("+");
-    if (seen.has(key2)) continue;
-    seen.add(key2);
+    if (seen2.has(key2)) continue;
+    seen2.add(key2);
     const f = figureOfCycle(cycle.map((k) => edges[k]), ruled, meetings, find, pairKey);
     if (!f) continue;
     const corners = new Set(cycle.flatMap((k) => [edges[k].u, edges[k].v]));
@@ -7404,7 +7404,7 @@ function openBarb(base, fill, push) {
 function withFill(base, fill, push, shown2 = fill.cover) {
   const p = filledShare(fill.cover);
   const said3 = (filled) => filled ? `filled: ink within reach of ${pct2(shown2)} of its inside` : shown2 > 0 ? `hollow: ink covers only ${pct2(shown2)} of its inside` : "hollow: nothing inside its outline";
-  const make = (filled, share) => push({
+  const make2 = (filled, share) => push({
     kind: base.kind,
     filled,
     confidence: MAX_TIER0_CONFIDENCE * base.score * share,
@@ -7413,10 +7413,10 @@ function withFill(base, fill, push, shown2 = fill.cover) {
     tip: base.tip,
     fill: shown2
   });
-  if (p >= 1 || p <= 0) make(p >= 1, 1);
+  if (p >= 1 || p <= 0) make2(p >= 1, 1);
   else {
-    make(true, p);
-    make(false, 1 - p);
+    make2(true, p);
+    make2(false, 1 - p);
   }
 }
 function fillsIn(hull2, cands, grow2) {
@@ -7554,11 +7554,11 @@ function readEnd(conn, e, state) {
     }
   }
   heads.sort((a, b) => b.confidence - a.confidence);
-  const seen = /* @__PURE__ */ new Set();
+  const seen2 = /* @__PURE__ */ new Set();
   const readings2 = heads.filter((h2) => {
     const k = `${h2.kind}:${h2.filled}`;
-    if (seen.has(k)) return false;
-    seen.add(k);
+    if (seen2.has(k)) return false;
+    seen2.add(k);
     return true;
   });
   const reason = readings2.length ? readings2[0].reason : writing ? `writing sits at its ${e.end} \u2014 a label, not a head` : near.length ? `a mark touches its ${e.end} but reads as no head` : `a plain ${e.end}: nothing sits there`;
@@ -7669,9 +7669,9 @@ function indexOf(s) {
   for (const [w2, v] of Object.entries(s.wires)) {
     for (const e of v.ends) {
       x.ended.add(e);
-      const list5 = x.wiredTo.get(e);
-      if (!list5) x.wiredTo.set(e, [w2]);
-      else if (list5[list5.length - 1] !== w2) list5.push(w2);
+      const list6 = x.wiredTo.get(e);
+      if (!list6) x.wiredTo.set(e, [w2]);
+      else if (list6[list6.length - 1] !== w2) list6.push(w2);
     }
   }
   indexes.set(s, x);
@@ -8814,10 +8814,10 @@ function pictureOf(node) {
 // src/session/manipulate.ts
 function manipulableOf(nodes, ids) {
   const out = [];
-  const seen = /* @__PURE__ */ new Set();
+  const seen2 = /* @__PURE__ */ new Set();
   const visit = (id) => {
-    if (seen.has(id)) return;
-    seen.add(id);
+    if (seen2.has(id)) return;
+    seen2.add(id);
     const n2 = nodes.get(id);
     if (!n2 || getRep(n2, "erased")) return;
     if (getRep(n2, "stroke") || pictureOf(n2) || regionRepOf(n2)) {
@@ -9062,9 +9062,9 @@ function boundByIndex(nodes) {
   for (const [id, n2] of nodes) {
     for (const e of n2.edges) {
       if (e.rel !== "bound-to" || typeof e.end !== "string" || !e.site) continue;
-      const list5 = out.get(e.to);
-      if (!list5) out.set(e.to, [id]);
-      else if (!list5.includes(id)) list5.push(id);
+      const list6 = out.get(e.to);
+      if (!list6) out.set(e.to, [id]);
+      else if (!list6.includes(id)) list6.push(id);
     }
   }
   return out;
@@ -9288,7 +9288,7 @@ function routeBetween(a, b, blocks, scale = 1) {
   const own = [a.box, b.box].filter((r) => !!r);
   const ranked2 = blocks.slice().sort((p, q) => dist22(centreOf2(p.box), a.point) + dist22(centreOf2(p.box), b.point) - (dist22(centreOf2(q.box), a.point) + dist22(centreOf2(q.box), b.point)) || (p.id < q.id ? -1 : 1)).slice(0, MAX_BLOCKS);
   const levels = [1, 0.5, 0.25].map((f) => Math.max(base * f, 3 * scale));
-  const say = (points2, blocked) => {
+  const say2 = (points2, blocked) => {
     const turns = points2.length - 2;
     const way = `out of the ${a.dir}, in at the ${b.dir} \u2014 ${sayTurns(turns)}`;
     return {
@@ -9301,15 +9301,15 @@ function routeBetween(a, b, blocks, scale = 1) {
   };
   for (const stub of levels) {
     const found = search(a, b, [...own, ...ranked2.map((r) => r.box)], stub);
-    if (found) return say(found, []);
+    if (found) return say2(found, []);
   }
   const through = (points2) => ranked2.filter((r) => points2.some((p, i) => i > 0 && crosses(points2[i - 1], p, r.box))).map((r) => r.id);
   for (const stub of levels) {
     const found = search(a, b, own, stub);
-    if (found) return say(found, through(found));
+    if (found) return say2(found, through(found));
   }
   const points = direct(a, b, levels[levels.length - 1]);
-  return say(points, through(points));
+  return say2(points, through(points));
 }
 var centreOf2 = (r) => ({ x: (r.minX + r.maxX) / 2, y: (r.minY + r.maxY) / 2 });
 var dist22 = (p, q) => (p.x - q.x) ** 2 + (p.y - q.y) ** 2;
@@ -9369,20 +9369,20 @@ function deriveRoute(node, nodes, near) {
   const pad = Math.max(4 * STUB_PX * scale, WINDOW_SHARE * Math.max(hi.x - lo.x, hi.y - lo.y));
   const window = { minX: Math.min(lo.x, first.box.minX, last.box.minX) - pad, minY: Math.min(lo.y, first.box.minY, last.box.minY) - pad, maxX: Math.max(hi.x, first.box.maxX, last.box.maxX) + pad, maxY: Math.max(hi.y, first.box.maxY, last.box.maxY) + pad };
   const blocks = [];
-  const seen = [];
+  const seen2 = [];
   const minSide = MIN_OBSTACLE_PX * scale;
   for (const id of near(window)) {
     if (id === node.id || id === bs.nodeId || id === be.nodeId) continue;
     const m = nodes.get(id);
     if (!m || getRep(m, "erased") || !getRep(m, "stroke")) continue;
-    seen.push(id);
+    seen2.push(id);
     if (bindingsOf(m).length || !standsClosed(m)) continue;
     const box2 = boundsOf(m);
     if (!box2 || box2.maxX - box2.minX < minSide || box2.maxY - box2.minY < minSide) continue;
     if (within(boxS, box2) || within(boxE, box2) || within(box2, boxS) || within(box2, boxE)) continue;
     blocks.push({ id, box: box2 });
   }
-  seen.sort();
+  seen2.sort();
   const path = routeBetween(a, b, blocks, scale);
   const head = arrow ? headOf2(path.points, getRep(node, "reading:arrow")?.data?.barb ?? 18 * scale) : void 0;
   const all = path.points;
@@ -9400,7 +9400,7 @@ function deriveRoute(node, nodes, near) {
     avoided: path.avoided,
     blocked: path.blocked,
     window: box,
-    seen,
+    seen: seen2,
     reasoning: path.reasoning
   };
 }
@@ -9688,8 +9688,8 @@ function regionOutline(board2) {
     }
     parentOf.set(r.id, best ? best.id : null);
   }
-  const reading7 = (list5) => {
-    const byTop = list5.slice().sort((a, b) => a.bounds.minY - b.bounds.minY || a.bounds.minX - b.bounds.minX);
+  const reading7 = (list6) => {
+    const byTop = list6.slice().sort((a, b) => a.bounds.minY - b.bounds.minY || a.bounds.minX - b.bounds.minX);
     const rows = [];
     for (const r of byTop) {
       const row = rows[rows.length - 1];
@@ -9787,7 +9787,7 @@ function structuralSignature(ids, nodes, typeOf) {
     types.set(id, t);
     shapes[t] = (shapes[t] ?? 0) + 1;
   }
-  const seen = /* @__PURE__ */ new Set();
+  const seen2 = /* @__PURE__ */ new Set();
   for (const id of ids) {
     const node = nodes.get(id);
     if (!node) continue;
@@ -9802,8 +9802,8 @@ function structuralSignature(ids, nodes, typeOf) {
         key2 = `${x}-${e.rel}-${y}`;
       } else continue;
       const pair = [id, e.to].sort().join("|") + "|" + e.rel;
-      if (seen.has(pair)) continue;
-      seen.add(pair);
+      if (seen2.has(pair)) continue;
+      seen2.add(pair);
       links[key2] = (links[key2] ?? 0) + 1;
     }
   }
@@ -10918,15 +10918,15 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     }
   }
   function gather3(start) {
-    const seen = /* @__PURE__ */ new Set([start]);
+    const seen2 = /* @__PURE__ */ new Set([start]);
     const stack = [start];
     let first = start;
     while (stack.length) {
       const id = stack.pop();
       if (order2.get(id) < order2.get(first)) first = id;
       for (const o of linked.get(id)) {
-        if (seen.has(o)) continue;
-        seen.add(o);
+        if (seen2.has(o)) continue;
+        seen2.add(o);
         stack.push(o);
       }
     }
@@ -10936,7 +10936,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       for (const id of ids) if (!own || !own.has(id)) out.push(id);
       return out;
     };
-    let members = [...seen];
+    let members = [...seen2];
     let strokeIds = strokesOf2(members);
     const ordered2 = definitionSizes.some((m) => mayMatchBySize(strokeIds.length, m));
     if (ordered2) {
@@ -10958,14 +10958,14 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   }
   function walkFrom(first) {
     const out = [];
-    const seen = /* @__PURE__ */ new Set();
+    const seen2 = /* @__PURE__ */ new Set();
     const stack = [first];
     while (stack.length) {
       const id = stack.pop();
-      if (seen.has(id)) continue;
-      seen.add(id);
+      if (seen2.has(id)) continue;
+      seen2.add(id);
       out.push(id);
-      for (const o of [...linked.get(id)].sort(byOrder)) if (!seen.has(o)) stack.push(o);
+      for (const o of [...linked.get(id)].sort(byOrder)) if (!seen2.has(o)) stack.push(o);
     }
     return out;
   }
@@ -13230,7 +13230,7 @@ function endsMeet(a, ea, ties, b) {
 }
 function sideCluster(node, nodes, max = 12) {
   const out = [node.id];
-  const seen = new Set(out);
+  const seen2 = new Set(out);
   let start = false, end = false;
   for (let i = 0; i < out.length && out.length < max; i++) {
     const a = nodes.get(out[i]);
@@ -13238,14 +13238,14 @@ function sideCluster(node, nodes, max = 12) {
     if (!ea) continue;
     const ties = tiesOf(a);
     for (const [id, n2] of nodes) {
-      if (seen.has(id) || out.length >= max) continue;
+      if (seen2.has(id) || out.length >= max) continue;
       const m = endsMeet(a, ea, ties, n2);
       if (!m.start && !m.end || !mayBeSide(n2)) continue;
       if (i === 0) {
         start ||= m.start;
         end ||= m.end;
       }
-      seen.add(id);
+      seen2.add(id);
       out.push(id);
     }
     if (i === 0 && !(start && end)) return [node.id];
@@ -13828,10 +13828,10 @@ function writeFlowchart(reading7, opts = {}) {
     const mine = [.../* @__PURE__ */ new Set([...labelIds, ...reading7.labels.filter((l) => l.of === owner).map((l) => l.id)])].map(
       (id) => labels.get(id) ?? { id, of: owner, where: "beside", role: "label", confidence: 0, reason: "writing" }
     );
-    const inOrder = (at) => inReadingOrder(mine.filter((l) => l.where === at), (l) => l.bounds, (l) => l.id);
+    const inOrder2 = (at) => inReadingOrder(mine.filter((l) => l.where === at), (l) => l.bounds, (l) => l.id);
     const parts = own?.trim() ? [own.trim()] : [];
     const missing = [];
-    for (const l of [...inOrder("inside"), ...inOrder("beside")]) {
+    for (const l of [...inOrder2("inside"), ...inOrder2("beside")]) {
       const text = l.text?.trim();
       if (text) parts.push(text);
       else if (opts.readWith?.(l.id)) continue;
@@ -14836,25 +14836,25 @@ function rowsOf(dashes) {
   keep.forEach((ks, i) => {
     for (const j of ks) if (j > i && keep[j].includes(i)) links[i].push(j), links[j].push(i);
   });
-  const seen = /* @__PURE__ */ new Set();
+  const seen2 = /* @__PURE__ */ new Set();
   const rows = [];
   const walk = (start) => {
     const row = [];
     let prev = -1, at = start;
-    while (at >= 0 && !seen.has(at)) {
-      seen.add(at);
+    while (at >= 0 && !seen2.has(at)) {
+      seen2.add(at);
       row.push(at);
-      const next = links[at].find((j) => j !== prev && !seen.has(j));
+      const next = links[at].find((j) => j !== prev && !seen2.has(j));
       prev = at;
       at = next ?? -1;
     }
     if (row.length >= MIN_DASHES) rows.push(row.map((k) => dashes[k]));
   };
   dashes.forEach((_, i) => {
-    if (!seen.has(i) && links[i].length <= 1) walk(i);
+    if (!seen2.has(i) && links[i].length <= 1) walk(i);
   });
   dashes.forEach((_, i) => {
-    if (!seen.has(i)) walk(i);
+    if (!seen2.has(i)) walk(i);
   });
   return rows;
 }
@@ -16033,10 +16033,10 @@ function wordsFor2(reading7, opts) {
     const mine = [.../* @__PURE__ */ new Set([...labelIds, ...reading7.labels.filter((l) => l.of === owner).map((l) => l.id)])].map(
       (id) => labels.get(id) ?? { id, of: owner, where: "beside", role: "label", confidence: 0, reason: "writing" }
     );
-    const inOrder = (at) => inReadingOrder(mine.filter((l) => l.where === at), (l) => l.bounds, (l) => l.id);
+    const inOrder2 = (at) => inReadingOrder(mine.filter((l) => l.where === at), (l) => l.bounds, (l) => l.id);
     const parts = own?.trim() ? [own.trim()] : [];
     const missing = [];
-    for (const l of [...inOrder("inside"), ...inOrder("beside")]) {
+    for (const l of [...inOrder2("inside"), ...inOrder2("beside")]) {
       const text = l.text?.trim();
       if (text) parts.push(text);
       else if (opts.readWith?.(l.id)) continue;
@@ -17057,11 +17057,11 @@ function readMindMap(state, scopeIds) {
   };
   const linked = candidates.filter((c) => neighbours.get(c.id).size > 0);
   const groups = [];
-  const seen = /* @__PURE__ */ new Set();
+  const seen2 = /* @__PURE__ */ new Set();
   for (const c of linked) {
-    if (seen.has(c.id)) continue;
+    if (seen2.has(c.id)) continue;
     const g = [...distancesFrom(c.id).keys()];
-    g.forEach((id) => seen.add(id));
+    g.forEach((id) => seen2.add(id));
     groups.push(g.map((id) => byId.get(id)));
   }
   groups.sort((a, b) => b.length - a.length);
@@ -18568,8 +18568,8 @@ function whyNot(f, sol, labelled2) {
   return null;
 }
 function entriesOf(solved) {
-  const list5 = "dimensions" in solved ? solved.figures : solved;
-  return list5.map((x) => "solution" in x ? { figure: x.figure, solution: x.solution, labels: x.labels } : { figure: x.figure, solution: x, labels: null });
+  const list6 = "dimensions" in solved ? solved.figures : solved;
+  return list6.map((x) => "solution" in x ? { figure: x.figure, solution: x.solution, labels: x.labels } : { figure: x.figure, solution: x, labels: null });
 }
 function inkBounds(f) {
   const pts = f.outline.length ? f.outline : f.vertices;
@@ -18649,12 +18649,12 @@ function trueSize(solved, options = {}) {
   const entries = entriesOf(solved).filter((e) => !(board2 && e.figure.ids.every((id) => owned.has(id)) && !pieceOfFigure(board2, e.figure.id))).map((e) => ({ e, b: inkBounds(e.figure) })).sort((p, q2) => p.b.minX - q2.b.minX || p.b.minY - q2.b.minY || (p.e.figure.id < q2.e.figure.id ? -1 : p.e.figure.id > q2.e.figure.id ? 1 : 0)).map((x2) => x2.e);
   const count9 = /* @__PURE__ */ new Map();
   for (const e of entries) count9.set(e.figure.kind, (count9.get(e.figure.kind) ?? 0) + 1);
-  const seen = /* @__PURE__ */ new Map();
+  const seen2 = /* @__PURE__ */ new Map();
   const nameOf4 = /* @__PURE__ */ new Map();
   for (const e of entries) {
     const k = e.figure.kind;
-    const i = (seen.get(k) ?? 0) + 1;
-    seen.set(k, i);
+    const i = (seen2.get(k) ?? 0) + 1;
+    seen2.set(k, i);
     nameOf4.set(e.figure.id, options.names?.[e.figure.id] ?? ((count9.get(k) ?? 0) > 1 ? `${k} ${i}` : k));
   }
   const drawable = [];
@@ -19078,29 +19078,29 @@ function drawingsBeside(state, numbers) {
     grid.set(id, b);
     order2.set(id, i);
   });
-  const seen = /* @__PURE__ */ new Set();
+  const seen2 = /* @__PURE__ */ new Set();
   const queue = [];
   for (const id of order2.keys()) {
     const b = grid.boundsOf(id);
     const size2 = Math.max(1, b.maxX - b.minX, b.maxY - b.minY);
     for (const num3 of numbers) {
       if (boundingBoxDistance(num3.bounds, b) <= ATTACH_REACH * size2) {
-        seen.add(id);
+        seen2.add(id);
         queue.push(id);
         break;
       }
     }
   }
-  for (let q = 0; q < queue.length && seen.size < BESIDE_MAX; q++) {
+  for (let q = 0; q < queue.length && seen2.size < BESIDE_MAX; q++) {
     const b = grid.boundsOf(queue[q]);
     const r = reachAround(b);
     for (const o of grid.query({ minX: b.minX - r, minY: b.minY - r, maxX: b.maxX + r, maxY: b.maxY + r })) {
-      if (seen.has(o) || !withinReach(b, grid.boundsOf(o))) continue;
-      seen.add(o);
+      if (seen2.has(o) || !withinReach(b, grid.boundsOf(o))) continue;
+      seen2.add(o);
       queue.push(o);
     }
   }
-  return [...seen].sort((a, b) => order2.get(a) - order2.get(b));
+  return [...seen2].sort((a, b) => order2.get(a) - order2.get(b));
 }
 function emptyDimensions() {
   return { figures: [], numbers: [], attachments: [], labels: /* @__PURE__ */ new Map(), rightAngles: [], underlines: [], drawings: [], numberIds: /* @__PURE__ */ new Set() };
@@ -19326,9 +19326,9 @@ function garmentChips(board2) {
     let row = 0;
     const unit7 = g.unit ? unitSuffix(g.unit, 1) : "";
     const n2 = (v) => formatNumber(v, 2);
-    const say = (key2, text, reason) => out.push({ key: `garment:${g.id}:${key2}`, kind: "garment", text, ids: g.ids.slice(), at: { x: cx2, y: g.bounds.maxY + CHIP_OFFSET * ++row }, align: "centre", standing: false, reason });
-    if (g.seam?.cut && g.seam.sewn) say("seam", `cut ${n2(g.seam.cut.width)} \xD7 ${n2(g.seam.cut.height)}${unit7} \xB7 sewn ${n2(g.seam.sewn.width)} \xD7 ${n2(g.seam.sewn.height)}${unit7}`, g.lines.join(" \u2014 "));
-    if (g.fold?.opened !== void 0) say("fold", `cut on the fold \xB7 ${n2(g.fold.opened)}${unit7} across opened`, g.fold.reason);
+    const say2 = (key2, text, reason) => out.push({ key: `garment:${g.id}:${key2}`, kind: "garment", text, ids: g.ids.slice(), at: { x: cx2, y: g.bounds.maxY + CHIP_OFFSET * ++row }, align: "centre", standing: false, reason });
+    if (g.seam?.cut && g.seam.sewn) say2("seam", `cut ${n2(g.seam.cut.width)} \xD7 ${n2(g.seam.cut.height)}${unit7} \xB7 sewn ${n2(g.seam.sewn.width)} \xD7 ${n2(g.seam.sewn.height)}${unit7}`, g.lines.join(" \u2014 "));
+    if (g.fold?.opened !== void 0) say2("fold", `cut on the fold \xB7 ${n2(g.fold.opened)}${unit7} across opened`, g.fold.reason);
   }
   return out;
 }
@@ -19409,10 +19409,10 @@ function evaluateTyped(text, board2) {
 var live2 = (n2) => !!n2 && !getRep(n2, "erased");
 function movedThings(board2, ids) {
   const out = [];
-  const seen = /* @__PURE__ */ new Set();
+  const seen2 = /* @__PURE__ */ new Set();
   const add7 = (id) => {
-    if (!seen.has(id) && live2(board2.nodes.get(id))) {
-      seen.add(id);
+    if (!seen2.has(id) && live2(board2.nodes.get(id))) {
+      seen2.add(id);
       out.push(id);
     }
   };
@@ -19427,10 +19427,10 @@ function movedThings(board2, ids) {
 function handMoves(board2, ids) {
   const allowed = [];
   const refused = [];
-  const seen = /* @__PURE__ */ new Set();
+  const seen2 = /* @__PURE__ */ new Set();
   for (const id of ids) {
-    if (seen.has(id)) continue;
-    seen.add(id);
+    if (seen2.has(id)) continue;
+    seen2.add(id);
     if (!live2(board2.nodes.get(id))) refused.push({ id, why: "missing", of: id });
     else allowed.push(id);
   }
@@ -19560,7 +19560,7 @@ function decodeLog(text, opts = {}) {
   let version2 = 0;
   let app;
   let assets;
-  let seen = false;
+  let seen2 = false;
   for (const line of text.split("\n")) {
     const l = line.trim();
     if (!l) continue;
@@ -19576,10 +19576,10 @@ function decodeLog(text, opts = {}) {
       const theirApp = typeof v.app === "string" ? v.app : void 0;
       if (typeof n2 !== "number" || !Number.isInteger(n2) || n2 < 1) throw new LogFormatError(null, n2, theirApp, opts.source);
       if (n2 > LOG_VERSION) throw new LogFormatError(n2, n2, theirApp, opts.source);
-      if (!seen) {
+      if (!seen2) {
         version2 = n2;
         app = theirApp;
-        seen = true;
+        seen2 = true;
         if (typeof v.assets === "number" && Number.isInteger(v.assets) && v.assets > 0) assets = v.assets;
       }
       continue;
@@ -20144,28 +20144,28 @@ var LiveStore = class {
     const k = authorKey(ev);
     if (k === null) return;
     const mine = { name, i, ev };
-    const list5 = this.numbered.get(k);
-    if (!list5) {
+    const list6 = this.numbered.get(k);
+    if (!list6) {
       this.numbered.set(k, [mine]);
       return;
     }
     const origin = ev.origin;
-    for (const other of list5) {
+    for (const other of list6) {
       if (this.misnumbered.has(origin)) break;
       if (sameEvent(other.ev, ev)) continue;
       const [kept2, dropped] = this.keeps(other, mine) ? [other, mine] : [mine, other];
       this.misnumbered.set(origin, describeAuthorshipCollision({ origin, seq: ev.seq, kept: kept2.name, dropped: dropped.name }));
     }
-    list5.push(mine);
+    list6.push(mine);
   }
   /** A log's events, no longer held under their authorship: it is about to be replaced. */
   unnumber(name) {
     for (const ev of this.logs[name] ?? []) {
       const k = authorKey(ev);
       if (k === null) continue;
-      const list5 = this.numbered.get(k);
-      if (!list5) continue;
-      const rest = list5.filter((x) => x.name !== name);
+      const list6 = this.numbered.get(k);
+      if (!list6) continue;
+      const rest = list6.filter((x) => x.name !== name);
       if (rest.length) this.numbered.set(k, rest);
       else this.numbered.delete(k);
     }
@@ -20291,11 +20291,11 @@ var order = (a, b) => {
   if (a.name !== b.name) return a.name < b.name ? -1 : 1;
   return a.i - b.i;
 };
-function lowerBound(list5, e) {
-  let lo = 0, hi = list5.length;
+function lowerBound(list6, e) {
+  let lo = 0, hi = list6.length;
   while (lo < hi) {
     const mid11 = lo + hi >> 1;
-    if (order(list5[mid11], e) < 0) lo = mid11 + 1;
+    if (order(list6[mid11], e) < 0) lo = mid11 + 1;
     else hi = mid11;
   }
   return lo;
@@ -20870,7 +20870,7 @@ function matchBrace(src, open) {
 var DECL = /^(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:(function\*?)\s+([A-Za-z_$][\w$]*)|(class)\s+([A-Za-z_$][\w$]*)|(const|let|var)\s+([A-Za-z_$][\w$]*)\s*=)/;
 function functionsOf(src) {
   const out = [];
-  const seen = /* @__PURE__ */ new Map();
+  const seen2 = /* @__PURE__ */ new Map();
   let i = 0;
   while (i < src.length) {
     const lineEnd = src.indexOf("\n", i);
@@ -20887,8 +20887,8 @@ function functionsOf(src) {
         end = statementEnd(src, i);
       }
       if (end !== -1) {
-        const n2 = (seen.get(name) ?? 0) + 1;
-        seen.set(name, n2);
+        const n2 = (seen2.get(name) ?? 0) + 1;
+        seen2.set(name, n2);
         out.push({ id: `fn:${name}${n2 > 1 ? "#" + n2 : ""}`, label: name, start: i, end, depth: 0 });
         i = end;
         continue;
@@ -21002,7 +21002,7 @@ function headingsOf(src) {
   const heads = [];
   let m;
   while (m = re.exec(src)) heads.push({ level: m[1].length, text: m[2], start: m.index });
-  const seen = /* @__PURE__ */ new Map();
+  const seen2 = /* @__PURE__ */ new Map();
   heads.forEach((h2, i) => {
     let end = src.length;
     for (let j = i + 1; j < heads.length; j++) if (heads[j].level <= h2.level) {
@@ -21010,8 +21010,8 @@ function headingsOf(src) {
       break;
     }
     const slug = h2.text.toLowerCase().replace(/[^\w]+/g, "-").replace(/^-|-$/g, "") || "section";
-    const n2 = (seen.get(slug) ?? 0) + 1;
-    seen.set(slug, n2);
+    const n2 = (seen2.get(slug) ?? 0) + 1;
+    seen2.set(slug, n2);
     out.push({ id: `h:${slug}${n2 > 1 ? "#" + n2 : ""}`, label: h2.text, start: h2.start, end, depth: h2.level - 1 });
   });
   return out;
@@ -22054,20 +22054,20 @@ function forwardPath(from, to, forward) {
 }
 var mean5 = (xs) => xs.reduce((a, x) => a + x, 0) / xs.length;
 function layoutLayered(nodes, links, opts) {
-  const list5 = [];
+  const list6 = [];
   const index = /* @__PURE__ */ new Map();
   for (const v of nodes) {
     if (index.has(v.id)) continue;
-    index.set(v.id, list5.length);
-    list5.push(v);
+    index.set(v.id, list6.length);
+    list6.push(v);
   }
-  const n2 = list5.length;
+  const n2 = list6.length;
   const across2 = opts.direction === "LR" || opts.direction === "RL";
   const along2 = (v) => across2 ? v.w : v.h;
   const wide = (v) => across2 ? v.h : v.w;
-  const forward = list5.map(() => []);
-  const before = list5.map(() => []);
-  const neighbours = list5.map(() => []);
+  const forward = list6.map(() => []);
+  const before = list6.map(() => []);
+  const neighbours = list6.map(() => []);
   const pairs = [];
   const back = [];
   const loops = [];
@@ -22085,7 +22085,7 @@ function layoutLayered(nodes, links, opts) {
     } else back.push({ index: k, cycle: null });
   });
   for (const f of forward) f.sort((x, y) => x - y);
-  const behind = list5.map(() => []);
+  const behind = list6.map(() => []);
   for (const [a, b] of pairs) if (a > b) behind[a].push(b);
   const ranksOf = (strict) => {
     const out = [];
@@ -22105,9 +22105,9 @@ function layoutLayered(nodes, links, opts) {
   for (const b of back) {
     const l = links[b.index];
     const path = forwardPath(index.get(l.to), index.get(l.from), forward);
-    if (path) b.cycle = [...path, path[0]].map((i) => list5[i].id);
+    if (path) b.cycle = [...path, path[0]].map((i) => list6[i].id);
   }
-  const sep = (i, j) => (wide(list5[i]) + wide(list5[j])) / 2 + opts.nodeGap;
+  const sep = (i, j) => (wide(list6[i]) + wide(list6[j])) / 2 + opts.nodeGap;
   const c = new Array(n2).fill(0);
   for (const row of ranks) {
     const targets = row.map(() => 0);
@@ -22128,7 +22128,7 @@ function layoutLayered(nodes, links, opts) {
       row.forEach((i, k) => c[i] = placed2[k]);
     }
   }
-  const thick = ranks.map((row) => Math.max(0, ...row.map((i) => along2(list5[i]))));
+  const thick = ranks.map((row) => Math.max(0, ...row.map((i) => along2(list6[i]))));
   const base = [];
   thick.forEach((t, r) => base.push(r ? base[r - 1] + (thick[r - 1] + t) / 2 : t / 2));
   let sideways = 0, fixed = 0, spans = 0;
@@ -22148,7 +22148,7 @@ function layoutLayered(nodes, links, opts) {
     } else kept2 = unstretched > sideways;
   }
   const m = base.map((b, r) => b + opts.rankGap * stretch * r);
-  const raw = list5.map((_, i) => {
+  const raw = list6.map((_, i) => {
     const a = m[rank2[i]], x = c[i];
     switch (opts.direction) {
       case "LR":
@@ -22162,7 +22162,7 @@ function layoutLayered(nodes, links, opts) {
     }
   });
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  list5.forEach((v, i) => {
+  list6.forEach((v, i) => {
     minX = Math.min(minX, raw[i].x - v.w / 2);
     maxX = Math.max(maxX, raw[i].x + v.w / 2);
     minY = Math.min(minY, raw[i].y - v.h / 2);
@@ -22170,11 +22170,11 @@ function layoutLayered(nodes, links, opts) {
   });
   if (!n2) minX = minY = maxX = maxY = 0;
   const at = /* @__PURE__ */ new Map();
-  list5.forEach((v, i) => at.set(v.id, { x: raw[i].x - minX, y: raw[i].y - minY }));
+  list6.forEach((v, i) => at.set(v.id, { x: raw[i].x - minX, y: raw[i].y - minY }));
   return {
     at,
-    rank: new Map(list5.map((v, i) => [v.id, rank2[i]])),
-    ranks: ranks.map((row) => row.map((i) => list5[i].id)),
+    rank: new Map(list6.map((v, i) => [v.id, rank2[i]])),
+    ranks: ranks.map((row) => row.map((i) => list6[i].id)),
     back,
     loops,
     unknown,
@@ -23737,21 +23737,21 @@ function drawClassDiagramRead(session, read2, opts) {
     const a = standing2.get(l.left), b = standing2.get(l.right);
     for (const [k, s, other, which] of [[a, sa, b, 0], [b, sb, a, 1]]) {
       const key2 = `${k.id}:${s}`;
-      const list5 = onSide.get(key2) ?? [];
-      list5.push({ l, which, toward: sideMiddle(other.box, which === 0 ? sb : sa) });
-      onSide.set(key2, list5);
+      const list6 = onSide.get(key2) ?? [];
+      list6.push({ l, which, toward: sideMiddle(other.box, which === 0 ? sb : sa) });
+      onSide.set(key2, list6);
     }
   }
   const endPoint = /* @__PURE__ */ new Map();
-  for (const [key2, list5] of onSide) {
+  for (const [key2, list6] of onSide) {
     const [cls, side] = key2.split(/:(?=[a-z]+$)/);
     const [p, q] = sideEnds(standing2.get(cls).box, side);
     const d = { x: q.x - p.x, y: q.y - p.y };
     const along2 = (x) => ((x.x - p.x) * d.x + (x.y - p.y) * d.y) / (d.x * d.x + d.y * d.y);
-    list5.sort((m, n2) => along2(m.toward) - along2(n2.toward) || m.l.index - n2.l.index);
-    list5.forEach((e, i) => {
-      const share = (i + 1) / (list5.length + 1);
-      endPoint.set(`${e.l.index}:${e.which}`, { point: { x: p.x + d.x * share, y: p.y + d.y * share }, share, side, count: list5.length });
+    list6.sort((m, n2) => along2(m.toward) - along2(n2.toward) || m.l.index - n2.l.index);
+    list6.forEach((e, i) => {
+      const share = (i + 1) / (list6.length + 1);
+      endPoint.set(`${e.l.index}:${e.which}`, { point: { x: p.x + d.x * share, y: p.y + d.y * share }, share, side, count: list6.length });
     });
   }
   const st = () => session.getState();
@@ -24438,21 +24438,21 @@ function routeBoxes(standing2, links, direction, margin, scale) {
     const a = standing2.get(l.a), b = standing2.get(l.b);
     for (const [k, s, other, which] of [[a, sa, b, 0], [b, sb, a, 1]]) {
       const key2 = `${k.id}\0${s}`;
-      const list5 = onSide.get(key2) ?? [];
-      list5.push({ index: l.index, which, toward: sideMiddle2(other.box, which === 0 ? sb : sa) });
-      onSide.set(key2, list5);
+      const list6 = onSide.get(key2) ?? [];
+      list6.push({ index: l.index, which, toward: sideMiddle2(other.box, which === 0 ? sb : sa) });
+      onSide.set(key2, list6);
     }
   }
   const ends = /* @__PURE__ */ new Map();
-  for (const [key2, list5] of onSide) {
+  for (const [key2, list6] of onSide) {
     const [id, side] = key2.split("\0");
     const [p, q] = sideEnds2(standing2.get(id).box, side);
     const d = sub12(q, p);
     const along2 = (x) => ((x.x - p.x) * d.x + (x.y - p.y) * d.y) / (d.x * d.x + d.y * d.y);
-    list5.sort((m, n2) => along2(m.toward) - along2(n2.toward) || m.index - n2.index);
-    list5.forEach((e, i) => {
-      const share = (i + 1) / (list5.length + 1);
-      ends.set(`${e.index}:${e.which}`, { point: { x: p.x + d.x * share, y: p.y + d.y * share }, share, side, count: list5.length });
+    list6.sort((m, n2) => along2(m.toward) - along2(n2.toward) || m.index - n2.index);
+    list6.forEach((e, i) => {
+      const share = (i + 1) / (list6.length + 1);
+      ends.set(`${e.index}:${e.which}`, { point: { x: p.x + d.x * share, y: p.y + d.y * share }, share, side, count: list6.length });
     });
   }
   return { routes, ends };
@@ -25130,9 +25130,9 @@ function parseLayout(regions, frame, connections = []) {
     }
     parentOf.set(r.id, best ? best.id : null);
   }
-  const build = (id) => {
+  const build2 = (id) => {
     const region = byId.get(id);
-    const kids = regions.filter((r) => parentOf.get(r.id) === id).map((r) => build(r.id));
+    const kids = regions.filter((r) => parentOf.get(r.id) === id).map((r) => build2(r.id));
     const node = leafOf(region);
     if (kids.length === 0) return node;
     const inner = group(kids, "y");
@@ -25145,7 +25145,7 @@ function parseLayout(regions, frame, connections = []) {
       reasoning: `${node.reasoning}, containing ${kids.length} mark(s): ${inner.reasoning}`
     };
   };
-  const tops = regions.filter((r) => parentOf.get(r.id) === null).map((r) => build(r.id));
+  const tops = regions.filter((r) => parentOf.get(r.id) === null).map((r) => build2(r.id));
   const root = tops.length === 1 ? tops[0] : group(tops, "y");
   return { root, connections };
 }
@@ -26206,11 +26206,11 @@ var CHAT_DECIDE_WIRE = {
   parse(text, questions) {
     const body = jsonOf2(text);
     if (body === void 0) return { ok: false, error: `the decision model\u2019s reply could not be read \u2014 no JSON in \u201C${clip2(text)}\u201D` };
-    const list5 = Array.isArray(body?.answers) ? body.answers : Array.isArray(body) ? body : null;
-    if (!list5) return { ok: false, error: `the decision model\u2019s reply could not be read \u2014 no \u201Canswers\u201D in \u201C${clip2(text)}\u201D` };
+    const list6 = Array.isArray(body?.answers) ? body.answers : Array.isArray(body) ? body : null;
+    if (!list6) return { ok: false, error: `the decision model\u2019s reply could not be read \u2014 no \u201Canswers\u201D in \u201C${clip2(text)}\u201D` };
     const asked = new Map(questions.map((q) => [q.id, q]));
     const answers = [];
-    for (const raw of list5) {
+    for (const raw of list6) {
       const id = raw?.id;
       const q = typeof id === "string" ? asked.get(id) : void 0;
       if (!q || answers.some((a) => a.questionId === q.id)) continue;
@@ -27093,12 +27093,12 @@ function bestWiring(ids, nodes) {
 function frameTemplatesFor(s, ids) {
   const members = artifactsIn(s, ids);
   if (!members.length) return [];
-  const kindsOf = (list5) => list5.map((id) => {
+  const kindsOf2 = (list6) => list6.map((id) => {
     const n2 = s.nodes.get(id);
     const r = n2 && codeRepOf(n2);
     return r && r.data.kind || (n2 && blessedBehaviourOf(n2) ? "behaviour" : "ink");
   }).sort().join(",");
-  const mine = kindsOf(members);
+  const mine = kindsOf2(members);
   const said3 = ids.map((id) => {
     const n2 = s.nodes.get(id);
     return n2 && transcriptOf(n2);
@@ -27112,7 +27112,7 @@ function frameTemplatesFor(s, ids) {
       out.push({ frame: n2, how: "name", why: "you wrote \u201C" + name + "\u201D beside them" });
       continue;
     }
-    if (kindsOf(frameOfNode(n2).members) === mine) out.push({ frame: n2, how: "resemblance", why: "the same kinds of thing, wired the same way" });
+    if (kindsOf2(frameOfNode(n2).members) === mine) out.push({ frame: n2, how: "resemblance", why: "the same kinds of thing, wired the same way" });
   }
   return out;
 }
@@ -27378,10 +27378,10 @@ function runsOf2(nodes, node) {
 }
 function writingLinesIn(state, ids) {
   const marks = [];
-  const seen = /* @__PURE__ */ new Set();
+  const seen2 = /* @__PURE__ */ new Set();
   for (const id of ids) {
-    if (seen.has(id)) continue;
-    seen.add(id);
+    if (seen2.has(id)) continue;
+    seen2.add(id);
     const node = state.nodes.get(id);
     if (!node || isErased(node)) continue;
     if (!(isWord(node) || isWritingMark(node, state.nodes))) continue;
@@ -27519,7 +27519,7 @@ function parsePictureLines(text) {
   if (!text) return [];
   const clean = unfence(text);
   const parsed = jsonIn(clean);
-  const take = (list5) => list5.map((x) => typeof x === "string" ? x : x && typeof x === "object" && typeof x.text === "string" ? x.text : "").map((x) => x.trim()).filter(Boolean);
+  const take = (list6) => list6.map((x) => typeof x === "string" ? x : x && typeof x === "object" && typeof x.text === "string" ? x.text : "").map((x) => x.trim()).filter(Boolean);
   if (Array.isArray(parsed)) return take(parsed);
   if (parsed && typeof parsed === "object" && Array.isArray(parsed.lines)) return take(parsed.lines);
   if (/[[{]/.test(clean)) return [];
@@ -28017,8 +28017,8 @@ var WHICH = {
     const matches = scope.summon.suggestions.filter((s) => s.kind === "match").map((s) => ({ artifactId: s.artifactId ?? s.id, name: s.label, score: s.score ?? 0, reasoning: s.reasoning ?? "", ...s.pack ? { pack: s.pack } : {} }));
     const tied = tiedMatches(matches);
     if (tied.length < 2) return [];
-    const seen = /* @__PURE__ */ new Set();
-    const candidates = tied.filter((m) => !seen.has(m.name) && !!seen.add(m.name)).map((m) => ({ id: m.name, text: m.reasoning ? `${m.name} \u2014 ${m.reasoning}` : m.name }));
+    const seen2 = /* @__PURE__ */ new Set();
+    const candidates = tied.filter((m) => !seen2.has(m.name) && !!seen2.add(m.name)).map((m) => ({ id: m.name, text: m.reasoning ? `${m.name} \u2014 ${m.reasoning}` : m.name }));
     if (candidates.length < 2) return [];
     return [{
       key: "which",
@@ -28281,10 +28281,10 @@ function searchEntriesOf(state, only) {
     const lab = labelOf(node);
     if (lab) out.push({ id: node.id, kind: "label", text: lab.text, what: "label on " + (isArtifact ? ARTIFACT_NOUN[codeOf(node)?.kind || ""] || "a thing" : nounOf(node)), ...box ? { box } : {} });
     if (!isArtifact) {
-      const seen = /* @__PURE__ */ new Set();
+      const seen2 = /* @__PURE__ */ new Set();
       for (const t of transcriptsOf(node)) {
-        if (seen.has(t.text)) continue;
-        seen.add(t.text);
+        if (seen2.has(t.text)) continue;
+        seen2.add(t.text);
         out.push({ id: node.id, kind: "transcript", text: t.text, what: "read writing", ...box ? { box } : {} });
       }
     }
@@ -29246,11 +29246,11 @@ function packBench(pack, opts = {}) {
       const d = defs.find((x) => x.id === defId);
       return !!d && [d.signature, ...d.accepted].some((x) => compareSignatures(sig2, x).score >= SAME);
     };
-    const judge = (c, ids, as, seen) => {
+    const judge = (c, ids, as, seen2) => {
       const sig2 = signatureIn(nodes, ids);
       for (const m of s.matchesOf(ids)) {
-        if (m.pack !== ref || m.score < MATCH_FLOOR || seen.has(m.artifactId + as)) continue;
-        seen.add(m.artifactId + as);
+        if (m.pack !== ref || m.score < MATCH_FLOOR || seen2.has(m.artifactId + as)) continue;
+        seen2.add(m.artifactId + as);
         const r = { label: c.label, definition: m.name, score: m.score, reasoning: m.reasoning, as };
         if (c.is === m.name) expected.push(r);
         else if (sameAs(sig2, m.artifactId)) same.push(r);
@@ -29261,10 +29261,10 @@ function packBench(pack, opts = {}) {
     corpus.forEach((c, i) => {
       const ids = laid[i];
       if (!ids.length) return;
-      const seen = /* @__PURE__ */ new Set();
-      judge(c, ids, "held", seen);
+      const seen2 = /* @__PURE__ */ new Set();
+      judge(c, ids, "held", seen2);
       const mine = new Set(ids);
-      for (const cand of candidates) if (cand.nodeIds.every((id) => mine.has(id))) judge(c, cand.nodeIds, "chipped", seen);
+      for (const cand of candidates) if (cand.nodeIds.every((id) => mine.has(id))) judge(c, cand.nodeIds, "chipped", seen2);
       if (c.is && idOf.has(c.is) && !expected.some((r) => r.label === c.label)) {
         const top = s.matchesOf(ids)[0];
         missed.push({ label: c.label, is: c.is, top: top ? top.name : null, score: top ? top.score : 0 });
@@ -29424,7 +29424,7 @@ function describeReading(reading7, options = {}) {
     lines.push("", `WHAT EACH ${noun.toUpperCase()} PLAYS:`);
     for (const l of roleLines) lines.push(`  ${l}`);
   }
-  const seen = /* @__PURE__ */ new Set();
+  const seen2 = /* @__PURE__ */ new Set();
   const sits = [];
   for (const c of reading7.concepts) {
     const members = [...new Set(Object.values(c.roles ?? {}).flat())].map(name).filter((x) => !!x);
@@ -29436,8 +29436,8 @@ function describeReading(reading7, options = {}) {
     const a = name(r.from), b = name(r.to);
     if (!a || !b) continue;
     const key2 = r.kind === "contains" ? `${r.kind}:${a}:${b}` : `${r.kind}:${[a, b].sort().join(":")}`;
-    if (seen.has(key2)) continue;
-    seen.add(key2);
+    if (seen2.has(key2)) continue;
+    seen2.add(key2);
     const verb = r.kind === "contains" ? "contains" : r.kind === "near" ? "is near" : r.kind === "touching" ? "touches" : "crosses";
     sits.push(`${a} ${verb} ${b} (${r.strength.toFixed(2)})`);
   }
@@ -30259,8 +30259,8 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
       return { ok: !!local.behaviour, behaviour: local.behaviour, via: local.behaviour ? "table" : "none", unread: local.unparsed, error: result2.error };
     }
     const reply = parseBehaviourReply(result2.text);
-    const seen = new Set(local.terms.map((t) => `${t.verb}:${t.target ?? ""}`));
-    const terms = [...local.terms, ...reply.terms.filter((t) => !seen.has(`${t.verb}:${t.target ?? ""}`))];
+    const seen2 = new Set(local.terms.map((t) => `${t.verb}:${t.target ?? ""}`));
+    const terms = [...local.terms, ...reply.terms.filter((t) => !seen2.has(`${t.verb}:${t.target ?? ""}`))];
     if (terms.length === 0) return { ok: false, behaviour: null, via: "none", unread: reply.unread.length ? reply.unread : local.unparsed, error: "nothing in the reply maps onto a verb", raw: result2.text };
     const behaviour = { terms, source: "model" };
     session.behave({ nodeId: args.nodeId, behaviour, participantId: id, at: args.at });
@@ -31859,10 +31859,10 @@ function buildStaticModel(o) {
     return own_.map((x, d) => (base ? base[d] : 0) + own * x / n2);
   };
   rows.push(new Array(dim).fill(0));
-  const seen = /* @__PURE__ */ new Set(["[UNK]"]);
+  const seen2 = /* @__PURE__ */ new Set(["[UNK]"]);
   const add7 = (w2, vec) => {
-    if (!seen.has(w2)) {
-      seen.add(w2);
+    if (!seen2.has(w2)) {
+      seen2.add(w2);
       vocab.push(w2);
       rows.push(vec);
     }
@@ -31901,6 +31901,547 @@ function buildStaticModel(o) {
   };
   return { tokenizer, weights: bytes, vocab };
 }
+
+// src/colour/oklch.ts
+var clamp014 = (v) => Math.min(1, Math.max(0, v));
+var srgbToLinear = (c) => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+var linearToSrgb = (c) => c <= 31308e-7 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+var HEX = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i;
+function parseHex(hex) {
+  const m = HEX.exec((hex || "").trim());
+  if (!m) return null;
+  const h2 = m[1].length === 3 ? m[1].split("").map((x) => x + x).join("") : m[1];
+  const n2 = parseInt(h2, 16);
+  return [n2 >> 16 & 255, n2 >> 8 & 255, n2 & 255];
+}
+function hexToLinear(hex) {
+  const bytes = parseHex(hex) ?? [0, 0, 0];
+  return bytes.map((v) => srgbToLinear(v / 255));
+}
+var linearToHex = (rgb) => "#" + rgb.map((c) => Math.round(clamp014(linearToSrgb(clamp014(c))) * 255).toString(16).padStart(2, "0")).join("");
+function linearToOklab([r, g, b]) {
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s
+  ];
+}
+function oklabToLinear([L, a, b]) {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  return [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s
+  ];
+}
+var normHue = (h2) => (h2 % 360 + 360) % 360;
+var oklabToLch = ([L, a, b]) => [L, Math.hypot(a, b), normHue(Math.atan2(b, a) * 180 / Math.PI)];
+var lchToOklab = (L, C, h2) => [L, C * Math.cos(h2 * Math.PI / 180), C * Math.sin(h2 * Math.PI / 180)];
+function hueDistance(a, b) {
+  const d = Math.abs(normHue(a) - normHue(b));
+  return d > 180 ? 360 - d : d;
+}
+var GAMUT_EPS = 1e-7;
+var inGamut = (rgb) => rgb.every((c) => c >= -GAMUT_EPS && c <= 1 + GAMUT_EPS);
+function maxChroma(L, h2) {
+  let lo = 0, hi = 0.4;
+  for (let i = 0; i < 28; i++) {
+    const mid11 = (lo + hi) / 2;
+    if (inGamut(oklabToLinear(lchToOklab(L, mid11, h2)))) lo = mid11;
+    else hi = mid11;
+  }
+  return lo;
+}
+function inSrgb(L, C, h2) {
+  const c = Math.min(C, maxChroma(L, h2));
+  return { L, C: c, h: h2, rgb: oklabToLinear(lchToOklab(L, c, h2)).map(clamp014) };
+}
+var relativeLuminance = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+var contrastRatio = (y1, y2) => (Math.max(y1, y2) + 0.05) / (Math.min(y1, y2) + 0.05);
+
+// src/colour/scale.ts
+var GROUND_NAMES = ["paper", "dark"];
+var OFFERED_SHARE = 0.38;
+var WORDS_CONTRAST = 4.5;
+var MARKS_CONTRAST = 3;
+var DEPTHS_DRAWN = 2;
+var MOVE_STEP = 5e-3;
+var MOVE_MAX = 0.3;
+var HEX6 = /^#[0-9a-f]{6}$/i;
+var hueOfHex = (hex) => oklabToLch(linearToOklab(hexToLinear(hex)))[2];
+function build(grounds, signals) {
+  const frozen = {};
+  for (const g of GROUND_NAMES) frozen[g] = Object.freeze({ ...grounds[g], L: Object.freeze([...grounds[g].L]) });
+  return Object.freeze({
+    grounds: Object.freeze(frozen),
+    signals: Object.freeze(signals.map((s) => Object.freeze({ name: s.name, hex: s.hex, hue: hueOfHex(s.hex) })))
+  });
+}
+var DEFAULT_PALETTE = build(
+  {
+    paper: { ground: "#f8f5ef", ink: "#0c1a24", L: [0.44, 0.505, 0.57], C: 0.15, toward: 1 },
+    dark: { ground: "#131315", ink: "#e3edf1", L: [0.8, 0.735, 0.67], C: 0.13, toward: -1 }
+  },
+  [
+    { name: "read", hex: "#1c5fb8" },
+    { name: "confident", hex: "#0b6f7d" },
+    { name: "unsure", hex: "#a3761c" },
+    { name: "broken", hex: "#a8493c" },
+    { name: "a model", hex: "#6b4fa8" }
+  ]
+);
+var isBand = (L) => Array.isArray(L) && L.length === 3 && L.every((v) => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1);
+var isChroma = (C) => typeof C === "number" && Number.isFinite(C) && C >= 0 && C <= 0.4;
+function makePalette(input = {}, base = DEFAULT_PALETTE) {
+  const grounds = {};
+  for (const g of GROUND_NAMES) {
+    const was = base.grounds[g], got = input.grounds?.[g];
+    grounds[g] = {
+      ground: got && HEX6.test(got.ground ?? "") ? got.ground.toLowerCase() : was.ground,
+      ink: got && HEX6.test(got.ink ?? "") ? got.ink.toLowerCase() : was.ink,
+      L: got && isBand(got.L) ? got.L : was.L,
+      C: got && isChroma(got.C) ? got.C : was.C,
+      toward: was.toward
+    };
+  }
+  const named2 = (input.signals || []).filter((s) => s && HEX6.test(s.hex || "")).map((s) => ({ name: s.name, hex: s.hex.toLowerCase() }));
+  return build(grounds, named2.length ? named2 : base.signals);
+}
+var drawnLight = (rgb) => relativeLuminance(hexToLinear(linearToHex(rgb)));
+function colourOf(kind, ground, certainty = "said", palette = DEFAULT_PALETTE) {
+  const g = palette.grounds[ground];
+  const depth2 = Math.min(kind.depth, DEPTHS_DRAWN);
+  const groundLight = relativeLuminance(hexToLinear(g.ground));
+  const reads2 = (rgb) => contrastRatio(relativeLuminance(rgb), groundLight) >= WORDS_CONTRAST && contrastRatio(drawnLight(rgb), groundLight) >= WORDS_CONTRAST;
+  let L = g.L[depth2], moved2 = 0;
+  let said3 = inSrgb(L, g.C, kind.hue);
+  while (!reads2(said3.rgb) && moved2 < MOVE_MAX) {
+    L -= MOVE_STEP * g.toward;
+    moved2 += MOVE_STEP;
+    said3 = inSrgb(L, g.C, kind.hue);
+  }
+  let c = certainty === "said" ? said3 : inSrgb(L, said3.C * OFFERED_SHARE, kind.hue);
+  while (!reads2(c.rgb) && moved2 < MOVE_MAX) {
+    L -= MOVE_STEP * g.toward;
+    moved2 += MOVE_STEP;
+    c = inSrgb(L, said3.C * (certainty === "said" ? 1 : OFFERED_SHARE), kind.hue);
+  }
+  const hex = linearToHex(c.rgb);
+  return { ...c, hex, contrast: contrastRatio(relativeLuminance(hexToLinear(hex)), groundLight), moved: Math.round(moved2 * 1e3) / 1e3, depth: depth2 };
+}
+
+// src/colour/access.ts
+var VISIONS = ["typical", "protan", "deutan", "tritan"];
+var MACHADO = Object.freeze({
+  protan: [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216], [-3882e-6, -0.048116, 1.051998]],
+  deutan: [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413], [-0.01182, 0.04294, 0.968881]],
+  tritan: [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602], [4733e-6, 0.691367, 0.3039]]
+});
+var WHO = Object.freeze({ typical: "everyone", protan: "protanopes", deutan: "deuteranopes", tritan: "tritanopes" });
+function simulateVision(rgb, vision) {
+  if (vision === "typical") return [rgb[0], rgb[1], rgb[2]];
+  return MACHADO[vision].map((r) => Math.min(1, Math.max(0, r[0] * rgb[0] + r[1] * rgb[1] + r[2] * rgb[2])));
+}
+function oklabDistance(p, q) {
+  const A = linearToOklab(p), B = linearToOklab(q);
+  return Math.hypot(A[0] - B[0], A[1] - B[1], A[2] - B[2]);
+}
+var LOOK_ALIKE = 0.06;
+var inOrder = (kinds) => [...kinds].sort((x, y) => x.order - y.order);
+function distinctness(kinds, palette = DEFAULT_PALETTE) {
+  const ks = inOrder(kinds);
+  const drawn = ks.map((k) => GROUND_NAMES.map((g) => colourOf(k, g, "said", palette).rgb));
+  const pairs = [];
+  for (let i = 0; i < ks.length; i++) {
+    for (let j = i + 1; j < ks.length; j++) {
+      const by = {};
+      for (const v of VISIONS) {
+        let min = Infinity;
+        for (let gi = 0; gi < GROUND_NAMES.length; gi++) min = Math.min(min, oklabDistance(simulateVision(drawn[i][gi], v), simulateVision(drawn[j][gi], v)));
+        by[v] = min;
+      }
+      pairs.push({ a: ks[i].name, b: ks[j].name, by, min: Math.min(...Object.values(by)) });
+    }
+  }
+  return pairs;
+}
+var CHANNELS = ["solid", "dashed", "dotted", "dash-dot", "long", "dash-dot-dot", "short", "sparse"];
+function channels(kinds, pairs, palette = DEFAULT_PALETTE) {
+  const measured = pairs ?? distinctness(kinds, palette);
+  const out = /* @__PURE__ */ new Map();
+  for (const k of inOrder(kinds)) {
+    const alike = measured.filter((p) => p.min < LOOK_ALIKE && (p.a === k.name || p.b === k.name)).map((p) => ({ other: p.a === k.name ? p.b : p.a, p })).filter((x) => out.has(x.other));
+    const taken = new Set(alike.map((x) => out.get(x.other).channel));
+    const free = CHANNELS.find((c) => !taken.has(c));
+    const worst = alike.sort((x, y) => x.p.min - y.p.min)[0];
+    out.set(k.name, {
+      channel: free ?? CHANNELS[CHANNELS.length - 1],
+      alike: worst ? worst.other : null,
+      who: worst ? VISIONS.filter((v) => worst.p.by[v] < LOOK_ALIKE).map((v) => WHO[v]) : [],
+      repeats: free === void 0
+    });
+  }
+  return out;
+}
+
+// src/colour/names.ts
+var COLOUR_WORDS = Object.freeze({
+  red: 29,
+  scarlet: 33,
+  crimson: 20,
+  rose: 5,
+  pink: 355,
+  magenta: 330,
+  fuchsia: 335,
+  purple: 305,
+  violet: 298,
+  lavender: 300,
+  plum: 320,
+  indigo: 280,
+  blue: 264,
+  navy: 264,
+  cobalt: 262,
+  azure: 245,
+  sky: 240,
+  cyan: 215,
+  teal: 195,
+  turquoise: 185,
+  aqua: 190,
+  green: 145,
+  emerald: 160,
+  forest: 145,
+  mint: 165,
+  lime: 130,
+  chartreuse: 125,
+  olive: 110,
+  yellow: 105,
+  gold: 92,
+  mustard: 95,
+  amber: 80,
+  ochre: 75,
+  orange: 62,
+  tangerine: 58,
+  coral: 40,
+  salmon: 35,
+  peach: 50,
+  brown: 55,
+  rust: 40,
+  copper: 48,
+  tan: 70
+});
+var GREY_BELOW = 0.02;
+var HEX2 = /^#?[0-9a-f]{6}$|^#?[0-9a-f]{3}$/;
+function hueOfWord(word) {
+  const w2 = (word || "").trim().toLowerCase();
+  if (HEX2.test(w2)) {
+    const [, C, hue] = oklabToLch(linearToOklab(hexToLinear(w2.startsWith("#") ? w2 : "#" + w2)));
+    return C < GREY_BELOW ? null : { hue, word: w2.startsWith("#") ? w2 : "#" + w2 };
+  }
+  return Object.prototype.hasOwnProperty.call(COLOUR_WORDS, w2) ? { hue: COLOUR_WORDS[w2], word: w2 } : null;
+}
+
+// src/colour/harmony.ts
+var emptyLens = () => ({ kinds: /* @__PURE__ */ new Map(), rels: [], order: 0 });
+var kindsOf = (lens) => [...lens.kinds.values()].sort((x, y) => x.order - y.order);
+var VISION_WEIGHT = { typical: 1, protan: 0.35, deutan: 0.35, tritan: 0.15 };
+var SIGNAL_REACH = 12;
+var SIGNAL_WEIGHT = 0.02;
+var TIE = 2e-3;
+var SIGNAL_NEAR = 14;
+var PALE_ON_PAPER = { from: 80, to: 135 };
+var KIN_FROM = 26;
+var KIN_TO = 45;
+var KIN_IDEAL = 32;
+var KIN_COST = 1e-3;
+var OPPOSE_SPREAD = 20;
+var OPPOSE_COST = 15e-4;
+var PAIR_STEP = 2;
+var PAIR_KIN = [-40, -32, -26, 26, 32, 40];
+var PAIR_OPPOSE = [164, 172, 180, 188, 196];
+var PAIR_COST = 15e-4;
+var PAIR_TIE = 1e-9;
+var FAN = [0, 28, -28, 56, -56, 84, -84];
+var READS_AS_KIN = 45;
+var READS_AS_OPPOSITES = 150;
+function nameHue(name) {
+  let x = 2166136261;
+  for (const ch of name) {
+    x ^= ch.charCodeAt(0);
+    x = Math.imul(x, 16777619);
+  }
+  return (x >>> 0) % 360;
+}
+var signalPenalty = (hue, palette = DEFAULT_PALETTE) => palette.signals.reduce((p, s) => p + Math.max(0, SIGNAL_REACH - hueDistance(hue, s.hue)) / SIGNAL_REACH * SIGNAL_WEIGHT, 0);
+var SEEN_MAX = 2e4;
+var seenBy = /* @__PURE__ */ new WeakMap();
+function seen(hue, depth2, palette) {
+  let cache = seenBy.get(palette);
+  if (!cache) seenBy.set(palette, cache = /* @__PURE__ */ new Map());
+  const d = Math.min(depth2, DEPTHS_DRAWN);
+  const key2 = hue + ":" + d;
+  let colours = cache.get(key2);
+  if (!colours) {
+    colours = GROUND_NAMES.map((g) => colourOf({ hue, depth: d }, g, "said", palette).rgb);
+    if (cache.size >= SEEN_MAX) cache.clear();
+    cache.set(key2, colours);
+  }
+  return colours;
+}
+function apartness(A, B, v) {
+  let min = Infinity;
+  for (let gi = 0; gi < A.length; gi++) min = Math.min(min, oklabDistance(simulateVision(A[gi], v), simulateVision(B[gi], v)));
+  return min;
+}
+function placeHue(candidates, others, prefer, depth2 = 0, palette = DEFAULT_PALETTE) {
+  const theirs = others.map((o) => seen(o.hue, o.depth, palette));
+  let best = null;
+  for (const c of candidates) {
+    const mine = seen(c.hue, depth2, palette);
+    let room = 0;
+    for (const v of VISIONS) room += VISION_WEIGHT[v] * (theirs.length ? Math.min(...theirs.map((t) => apartness(mine, t, v))) : 1);
+    const score2 = room - signalPenalty(c.hue, palette) - (c.cost || 0);
+    if (!best || score2 > best.score + TIE || Math.abs(score2 - best.score) <= TIE && hueDistance(c.hue, prefer) < hueDistance(best.hue, prefer)) best = { ...c, score: score2, room };
+  }
+  return best;
+}
+function resolveHue(lens, k, seenNames = /* @__PURE__ */ new Set()) {
+  if (k.source !== "relative") return k.hue;
+  if (seenNames.has(k.name)) return k.hue;
+  seenNames.add(k.name);
+  const a = lens.kinds.get(k.anchor);
+  return a ? normHue(resolveHue(lens, a, seenNames) + k.offset) : k.hue;
+}
+function refresh(lens) {
+  for (const k of lens.kinds.values()) k.hue = resolveHue(lens, k);
+  for (const k of lens.kinds.values()) {
+    let d = 0, p = k.parent;
+    const seenNames = /* @__PURE__ */ new Set([k.name]);
+    while (p && !seenNames.has(p)) {
+      seenNames.add(p);
+      d++;
+      p = lens.kinds.get(p)?.parent ?? null;
+    }
+    k.depth = d;
+  }
+}
+function dependsOn(lens, k, target) {
+  const seenNames = /* @__PURE__ */ new Set();
+  while (k && k.source === "relative" && !seenNames.has(k.name)) {
+    if (k.anchor === target) return true;
+    seenNames.add(k.name);
+    k = lens.kinds.get(k.anchor);
+  }
+  return false;
+}
+var familyOf = (lens, name) => [...lens.kinds.values()].filter((k) => k.name === name || dependsOn(lens, k, name));
+var othersThan = (lens, names) => [...lens.kinds.values()].filter((k) => !names.has(k.name));
+function newKind(lens, name) {
+  return { name, hue: 0, source: "placed", depth: 0, order: lens.order++, parent: null, anchor: null, offset: 0, rel: null };
+}
+function make(lens, name, palette) {
+  const held2 = lens.kinds.get(name);
+  if (held2) return { k: held2, made: false, why: "" };
+  const k = newKind(lens, name);
+  const others = [...lens.kinds.values()];
+  const wheel = [];
+  for (let h2 = 0; h2 < 360; h2 += 1) wheel.push({ hue: h2 });
+  const best = placeHue(wheel, others, nameHue(name), 0, palette);
+  k.hue = best.hue;
+  lens.kinds.set(name, k);
+  const near = others.length ? others.reduce((a, o) => hueDistance(o.hue, best.hue) < hueDistance(a.hue, best.hue) ? o : a) : null;
+  const gap = near ? `the most distinct place left (${Math.round(hueDistance(near.hue, best.hue))}\xB0 from ${near.name})` : "the first kind; its name leans it there";
+  return { k, made: true, why: `${name} \u2192 ${Math.round(k.hue)}\xB0, ${gap}` };
+}
+function say(lens, name, word, palette) {
+  const named2 = hueOfWord(word);
+  if (named2) {
+    let k = lens.kinds.get(name);
+    if (!k) lens.kinds.set(name, k = newKind(lens, name));
+    k.source = "said";
+    k.hue = named2.hue;
+    k.word = named2.word;
+    k.anchor = null;
+    k.offset = 0;
+    refresh(lens);
+    const sig2 = palette.signals.find((s) => hueDistance(s.hue, named2.hue) < SIGNAL_NEAR);
+    const pale = named2.hue > PALE_ON_PAPER.from && named2.hue < PALE_ON_PAPER.to;
+    return `${name} \u2192 ${Math.round(named2.hue)}\xB0, your ${named2.word}` + (pale ? "; on paper a yellow is drawn as dark as words need, ochre or olive, and on the dark ground it is yellow" : "") + (sig2 ? `; it stands by the chrome's colour for ${sig2.name} (${Math.round(hueDistance(sig2.hue, named2.hue))}\xB0 away) \u2014 on ink it means ${name}` : "");
+  }
+  const { made, why } = make(lens, name, palette);
+  if (!word) return made ? why : `${name} is already a kind`;
+  return `${made ? why + "; " : ""}\u201C${word}\u201D is no colour this space knows${/gr[ae]y|black|white/.test(word) ? " \u2014 a kind takes a hue, and grey, black and white have none" : ""}`;
+}
+function relate2(lens, a, b, rel, palette) {
+  const A = make(lens, a, palette), B = make(lens, b, palette);
+  const ka = A.k, kb = B.k;
+  if (a === b) return { said: `${a} cannot be related to itself` };
+  if (rel === "sub") {
+    if (dependsOn(lens, kb, a) || kb.parent === a) return { said: `${b} already hangs from ${a}` };
+    ka.parent = b;
+    if (ka.source === "said") {
+      refresh(lens);
+      return { said: `${a} keeps your ${ka.word}; as a kind of ${b} it is drawn a step toward the ground` };
+    }
+    const siblings = [...lens.kinds.values()].filter((k) => k.parent === b && k !== ka && k.anchor === b && k.rel === "sub");
+    const used = new Set(siblings.map((s) => Math.round(s.offset)));
+    const offset = FAN.find((o) => !used.has(o)) ?? 0;
+    Object.assign(ka, { source: "relative", anchor: b, offset, rel: "sub" });
+    refresh(lens);
+    return { said: `${a} is a kind of ${b}: ${b}'s hue${offset ? ` ${offset > 0 ? "+" : "\u2212"}${Math.abs(offset)}\xB0` : ""}, a step toward the ground` };
+  }
+  lens.rels = lens.rels.filter((r) => !(r.a === a && r.b === b || r.a === b && r.b === a));
+  const related = { a, b, rel };
+  lens.rels.push({ ...related });
+  let mover = kb, anchor = ka;
+  if (kb.source === "said" && ka.source !== "said") {
+    mover = ka;
+    anchor = kb;
+  } else if (ka.source !== "said" && kb.source !== "said" && ka.order > kb.order) {
+    mover = ka;
+    anchor = kb;
+  }
+  const apart = Math.round(hueDistance(ka.hue, kb.hue));
+  if (mover.source === "said") {
+    return { said: `you gave ${a} and ${b} their colours; they stand ${apart}\xB0 apart, so they read as ${apart >= READS_AS_OPPOSITES ? "opposites" : apart <= READS_AS_KIN ? "kin" : "neither kin nor opposites"}`, related };
+  }
+  if (dependsOn(lens, anchor, mover.name)) return { said: `${anchor.name}'s hue already follows ${mover.name}'s; nothing moved`, related };
+  const fam = new Set(familyOf(lens, mover.name).map((k) => k.name));
+  fam.add(anchor.name);
+  for (const k of familyOf(lens, anchor.name)) fam.add(k.name);
+  const others = othersThan(lens, fam);
+  if (A.made && B.made) {
+    const offs = rel === "kin" ? PAIR_KIN : PAIR_OPPOSE;
+    const ideal = rel === "kin" ? KIN_IDEAL : 180;
+    let best2 = null;
+    for (let h2 = 0; h2 < 360; h2 += PAIR_STEP) {
+      for (const off of offs) {
+        const one = placeHue([{ hue: h2 }], others, nameHue(anchor.name), 0, palette);
+        const two = placeHue([{ hue: normHue(h2 + off) }], others, nameHue(mover.name), 0, palette);
+        const score2 = Math.min(one.score, two.score) - Math.abs(Math.abs(off) - ideal) * PAIR_COST;
+        if (!best2 || score2 > best2.score + PAIR_TIE) best2 = { h: h2, off, score: score2 };
+      }
+    }
+    const at = best2;
+    anchor.hue = at.h;
+    Object.assign(mover, { source: "relative", anchor: anchor.name, offset: at.off, rel });
+    refresh(lens);
+    return {
+      said: rel === "kin" ? `${a} is kin to ${b}: placed together, ${Math.abs(at.off)}\xB0 apart, where both stand most distinct` : `${a} opposes ${b}: placed together across the wheel, ${Math.round(hueDistance(mover.hue, anchor.hue))}\xB0 apart`,
+      related
+    };
+  }
+  const cands = [];
+  if (rel === "kin") {
+    for (let d = KIN_FROM; d <= KIN_TO; d++) for (const s of [1, -1]) cands.push({ hue: normHue(anchor.hue + s * d), off: s * d, cost: Math.abs(d - KIN_IDEAL) * KIN_COST });
+  } else {
+    for (let e = -OPPOSE_SPREAD; e <= OPPOSE_SPREAD; e++) cands.push({ hue: normHue(anchor.hue + 180 + e), off: 180 + e, cost: Math.abs(e) * OPPOSE_COST });
+  }
+  const best = placeHue(cands, [...others, anchor], nameHue(mover.name), mover.depth, palette);
+  Object.assign(mover, { source: "relative", anchor: anchor.name, offset: best.off, rel });
+  refresh(lens);
+  return {
+    said: rel === "kin" ? `${a} is kin to ${b}: ${mover.name} ${Math.abs(Math.round(best.off))}\xB0 beside ${anchor.name}, on the side that stays most distinct` : `${a} opposes ${b}: ${mover.name} across the wheel from ${anchor.name}, ${Math.round(hueDistance(mover.hue, anchor.hue))}\xB0 apart`,
+    related
+  };
+}
+var decisionOf = (k) => JSON.stringify([k.source, k.source === "relative" ? null : k.hue, k.word ?? null, k.parent, k.anchor, k.offset, k.rel, k.order]);
+function holdOf(k) {
+  const h2 = { name: k.name, source: k.source, hue: k.hue, parent: k.parent, anchor: k.anchor, offset: k.offset, rel: k.rel, order: k.order };
+  if (k.word !== void 0) h2.word = k.word;
+  return h2;
+}
+function applyAct(lens, act, palette = DEFAULT_PALETTE) {
+  const before = new Map(kindsOf(lens).map((k) => [k.name, { hue: k.hue, decision: decisionOf(k) }]));
+  const r = act.act === "say" ? { said: say(lens, act.a, act.word, palette), related: void 0 } : relate2(lens, act.a, act.b, act.act, palette);
+  const held2 = [], moved2 = [];
+  for (const k of kindsOf(lens)) {
+    const was = before.get(k.name);
+    if (!was || was.decision !== decisionOf(k)) held2.push(holdOf(k));
+    if (was && was.hue !== k.hue) moved2.push(k.name);
+  }
+  return { said: r.said, held: held2, related: r.related ?? null, moved: moved2 };
+}
+function holdKind(lens, h2) {
+  const k = lens.kinds.get(h2.name) ?? { name: h2.name, hue: h2.hue, source: h2.source, depth: 0, order: h2.order, parent: null, anchor: null, offset: 0, rel: null };
+  k.source = h2.source;
+  k.hue = h2.hue;
+  k.parent = h2.parent;
+  k.anchor = h2.anchor;
+  k.offset = h2.offset;
+  k.rel = h2.rel;
+  k.order = h2.order;
+  if (h2.word !== void 0) k.word = h2.word;
+  else delete k.word;
+  lens.kinds.set(h2.name, k);
+  lens.order = Math.max(lens.order, h2.order + 1);
+  refresh(lens);
+}
+function holdRelation(lens, r) {
+  lens.rels = lens.rels.filter((x) => !(x.a === r.a && x.b === r.b || x.a === r.b && x.b === r.a));
+  lens.rels.push({ ...r });
+}
+
+// src/colour/meaning.ts
+var KIN_READS = 50;
+var OPPOSITES_READ = 140;
+var SIGNAL_NEAR2 = 14;
+var list5 = (xs) => xs.join(", ").replace(/, ([^,]*)$/, " and $1");
+function meaning(lens, pairs, palette = DEFAULT_PALETTE) {
+  const ks = kindsOf(lens);
+  const measured = pairs ?? distinctness(ks, palette);
+  const lines = [];
+  const rootOf = (k) => {
+    const seen2 = /* @__PURE__ */ new Set();
+    while (k.parent && !seen2.has(k.name)) {
+      seen2.add(k.name);
+      k = lens.kinds.get(k.parent) || k;
+    }
+    return k.name;
+  };
+  for (const root of ks.filter((k) => !k.parent)) {
+    const fam = ks.filter((k) => k.parent && rootOf(k) === root.name).sort((x, y) => x.depth - y.depth || x.order - y.order);
+    if (!fam.length) continue;
+    const own = fam.filter((k) => k.source === "said").map((k) => `${k.name} keeps your ${k.word}`);
+    lines.push(`${list5([root.name, ...fam.map((k) => k.name)])} are one family: ${root.name}'s hue, each kind below it a step toward the ground` + (own.length ? ` (${list5(own)})` : ""));
+  }
+  for (const r of lens.rels) {
+    const A = lens.kinds.get(r.a), B = lens.kinds.get(r.b);
+    if (!A || !B) continue;
+    const d = Math.round(hueDistance(A.hue, B.hue));
+    if (r.rel === "kin") lines.push(d <= KIN_READS ? `${r.a} stands beside ${r.b}, ${d}\xB0 along the wheel: kin` : `${r.a} and ${r.b} are said to be kin, but your colours stand ${d}\xB0 apart`);
+    else lines.push(d >= OPPOSITES_READ ? `${r.a} and ${r.b} are drawn as opposites, ${d}\xB0 apart` : `${r.a} and ${r.b} are said to oppose, but your colours stand ${d}\xB0 apart`);
+  }
+  const tied = /* @__PURE__ */ new Set();
+  for (const k of ks) if (k.parent) {
+    tied.add(k.name);
+    tied.add(k.parent);
+  }
+  for (const r of lens.rels) {
+    tied.add(r.a);
+    tied.add(r.b);
+  }
+  const alone = ks.filter((k) => !tied.has(k.name));
+  if (alone.length && ks.length > 1) lines.push(`${list5(alone.map((k) => k.name))} ${alone.length > 1 ? "stand" : "stands"} apart from the rest`);
+  for (const k of ks) {
+    const s = palette.signals.find((x) => hueDistance(x.hue, k.hue) < SIGNAL_NEAR2);
+    if (s && k.source === "said") lines.push(`${k.name}'s ${k.word} stands near the chrome's colour for ${s.name}: on the ink it means ${k.name}, and the chrome's colours never touch the ink`);
+  }
+  const ch = channels(ks, measured, palette);
+  for (const k of ks) {
+    const c = ch.get(k.name);
+    if (c.repeats) {
+      lines.push(`${k.name} is drawn ${c.channel}, which a kind it looks alike to already holds: all ${CHANNELS.length} patterns are in use, so beside ${c.alike} it looks alike in colour and in pattern to ${list5(c.who)}`);
+    } else if (c.channel !== "solid") {
+      lines.push(`${k.name} is drawn ${c.channel}: beside ${c.alike} it looks alike to ${list5(c.who)}`);
+    }
+  }
+  return lines;
+}
 export {
   ALONG_STEPS,
   ASSET_REF,
@@ -31921,6 +32462,7 @@ export {
   CHIP_OFFSET,
   CLASSLIKE_PENALTY,
   CLASS_DIAGRAM_READER,
+  COLOUR_WORDS,
   COMMAND_MARK_SAMPLES,
   COMPARTMENT_CROSSINGS,
   COMPARTMENT_FLOOR,
@@ -31958,11 +32500,13 @@ export {
   DEFAULT_MAX_FORCE,
   DEFAULT_MAX_TOKENS,
   DEFAULT_MIN_LENGTH_PX,
+  DEFAULT_PALETTE,
   DEFAULT_RELATE_CONFIG,
   DEFAULT_SESSION_CONFIG,
   DEFAULT_SIMPLIFY_PX,
   DEFAULT_SPEED,
   DEFAULT_TIMEOUT_MS,
+  DEPTHS_DRAWN,
   DIAGRAM,
   DIAGRAM_NOTATION,
   DIAMOND_SLACK,
@@ -32003,6 +32547,7 @@ export {
   GARMENT_TABLE,
   GITHUB_API,
   GRAPH3D_MARK,
+  GROUND_NAMES,
   GitStore,
   HAND_RESOLUTION_PX,
   HAND_TREMOR,
@@ -32021,6 +32566,7 @@ export {
   INTENTS,
   KEEP_DIRECTION,
   KINDS,
+  CHANNELS as KIND_CHANNELS,
   LABELLING_IS,
   LABEL_ABOVE,
   LABEL_DIP,
@@ -32046,6 +32592,7 @@ export {
   LOG_EXT,
   LOG_FORMAT,
   LOG_VERSION,
+  LOOK_ALIKE,
   LOOP_OUT,
   LOOP_OUT_PX,
   LOOP_PENALTY,
@@ -32056,9 +32603,11 @@ export {
   LiveStore,
   LocalHub,
   LogFormatError,
+  MACHADO,
   MAGNET_SCREEN_PX,
   MAGNET_SIZE_FRACTION,
   MANIFEST_PATH,
+  MARKS_CONTRAST,
   MARK_GAP_MS,
   MATCH_FLOOR,
   MAX_BLOCKS,
@@ -32089,6 +32638,8 @@ export {
   MIN_REPLY_TOKENS,
   MODEL_DISCOUNT,
   MODEL_LIST_TIMEOUT_MS,
+  MOVE_MAX,
+  MOVE_STEP,
   MULTIPLICITY_SHARE,
   MarkGrid,
   MemoryStore,
@@ -32097,6 +32648,7 @@ export {
   NOTATION_FLOOR,
   NO_CONTEXT,
   NO_MATCH,
+  OFFERED_SHARE,
   ONE_BEND,
   OPENROUTER_APP,
   OPENROUTER_REASONING,
@@ -32179,7 +32731,10 @@ export {
   USE_LIFT_MAX,
   USE_LIFT_RATE,
   VERBS,
+  VISIONS,
+  WHO as VISION_WHO,
   WINDOW_SHARE,
+  WORDS_CONTRAST,
   WORD_GAP_RATIO,
   WORD_WINDOW_MS,
   WRITING_SPAN,
@@ -32199,6 +32754,7 @@ export {
   angleClass,
   appendToLogText,
   applyAffine2 as applyAffine,
+  applyAct as applyKindAct,
   applyWalls,
   arcThrough,
   arithmetic,
@@ -32254,6 +32810,8 @@ export {
   clockwiseFromTop,
   clusters,
   collidesWith,
+  meaning as colourMeaning,
+  colourOf,
   commandMarkFeatures,
   compareQuantities,
   compareSignatures,
@@ -32265,6 +32823,7 @@ export {
   connectorEnds,
   connectorHeads,
   contextAt,
+  contrastRatio,
   controlOf,
   convertQuantity,
   convexHull,
@@ -32336,6 +32895,7 @@ export {
   drawingsOf,
   elementsOf,
   embedAll,
+  emptyLens as emptyKindLens,
   enclosedBy,
   encodeLog,
   encodeLogTail,
@@ -32391,11 +32951,17 @@ export {
   headingsOf,
   headsOf,
   heldParticipant,
+  hexToLinear,
+  holdKind,
   holdReach,
+  holdRelation,
   holds,
   holdsSaid,
   hostIntentOf,
+  hueDistance,
+  hueOfWord,
   idealize,
+  inSrgb,
   inkEndsOf,
   inkMeasure,
   insideFigure,
@@ -32435,13 +33001,18 @@ export {
   joinsRun,
   keepApart,
   keysOf2 as keysOf,
+  channels as kindChannels,
+  distinctness as kindDistinctness,
+  familyOf as kindFamilyOf,
   kindOf,
   labelInk,
   labelOf,
   labelsOf,
   layoutLayered,
+  lchToOklab,
   leadOf,
   learnCommandMark,
+  kindsOf as lensKinds,
   lettersOf,
   lettingGo,
   levelOf2 as levelOf,
@@ -32451,6 +33022,9 @@ export {
   liftTargets,
   likelihoodOf,
   lineIsRead,
+  linearToHex,
+  linearToOklab,
+  linearToSrgb,
   linesBrief,
   listModels,
   listedPacks,
@@ -32462,6 +33036,7 @@ export {
   magnetRadius,
   magnetSites,
   magnetsNear,
+  makePalette,
   makeRegion,
   makersOf,
   manipulableOf,
@@ -32475,6 +33050,7 @@ export {
   matchesCommandMark,
   mathsChips,
   mathsSaid,
+  maxChroma,
   maxTokensFor,
   mayCross,
   measure,
@@ -32493,6 +33069,7 @@ export {
   movedSaid,
   movedThings,
   movesWhole,
+  nameHue,
   nameMarks,
   nearLimitOf,
   nearestIntent,
@@ -32502,6 +33079,7 @@ export {
   negateQuantity,
   nextRegionName,
   nodeIdsIn,
+  normHue,
   normName,
   normalizeStroke,
   notationById,
@@ -32513,6 +33091,9 @@ export {
   offerPorts,
   offersFor,
   offsetPolygon,
+  oklabDistance,
+  oklabToLch,
+  oklabToLinear,
   onToolsChange,
   otherHandMoves,
   otsu,
@@ -32535,6 +33116,7 @@ export {
   parseFill,
   parseGitSpec,
   parseGraph,
+  parseHex,
   parseLayout,
   parseLine,
   parseLineReadings,
@@ -32550,6 +33132,7 @@ export {
   participantOfLog,
   pendingBriefs,
   pictureOf,
+  placeHue,
   placed,
   placementOf,
   planFor,
@@ -32613,6 +33196,7 @@ export {
   registeredTools,
   relate,
   relationsOf,
+  relativeLuminance,
   releasedBy,
   resampleByArcLength,
   resemblances,
@@ -32663,7 +33247,9 @@ export {
   sheetValue,
   shippedPack,
   shippedPacks,
+  signalPenalty,
   simplifyStroke,
+  simulateVision,
   singular,
   siteOf,
   sitsOn,
@@ -32677,6 +33263,7 @@ export {
   solveBoard,
   solveFigure,
   sourcesOf,
+  srgbToLinear,
   stalePlan,
   stanceOf,
   standStructure,

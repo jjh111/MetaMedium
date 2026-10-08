@@ -57,6 +57,10 @@ describe('colour words', () => {
     for (const w of ['#808080', '#000000', '#ffffff', '#fff', '#000', '#777', 'grey', 'gray', 'black', 'white']) expect(hueOfWord(w), w).toBeNull();
   });
 
+  it('are only the words in the table: nothing an object inherits is a colour', () => {
+    for (const w of ['constructor', '__proto__', 'tostring', 'hasownproperty']) expect(hueOfWord(w), w).toBeNull();
+  });
+
   it('say nothing of what they do not know', () => {
     for (const w of ['banana', 'colour', '', '   ', '#', '#12', '#gg0000', 'purple haze']) expect(hueOfWord(w), JSON.stringify(w)).toBeNull();
     expect(hueOfWord(null)).toBeNull();
