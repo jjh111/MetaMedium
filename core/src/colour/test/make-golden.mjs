@@ -54,7 +54,12 @@ function loadSpace(html) {
   return new Function(html.slice(start, end + '\n})();'.length) + '\nreturn Space;')();
 }
 
-const S = loadSpace(pageText());
+// The page's own text, read once; and a fresh Space for every board. The specimen keeps a cache of the colours it has
+// scored (keyed by hue to a tenth of a degree) for the life of the page, so a board's placements could depend on the
+// boards run before it (4 of 600 seeded boards did). Each board here is what a page just loaded says for it.
+const PAGE = pageText();
+let S = loadSpace(PAGE);
+const fresh = () => { S = loadSpace(PAGE); };
 
 // ---- the scenarios ---------------------------------------------------------
 
@@ -128,6 +133,7 @@ const colourRow = c => ({ hex: c.hex, contrast: c.contrast, moved: c.moved });
 
 /** Everything the specimen says about a board, kind by kind. */
 function full(name, texts, withPairs = false) {
+  fresh();
   const acts = texts.map(text => ({ text, act: S.read(text) }));
   const r = run(acts.map(a => a.act || {}));
   if (r.short.length) throw new Error(`${name}: ${r.short.join(', ')} draws under 4.5:1 in the specimen; choose another board`);
@@ -150,6 +156,7 @@ function full(name, texts, withPairs = false) {
 
 /** The same, a row a kind: what a board of seeded acts came to. */
 function compact(name, acts) {
+  fresh();
   const r = run(acts);
   return {
     name, overflow: r.overflow, short: r.short.length, acts: acts.map((a, i) => ({ act: a, answer: r.answers[i] })),
