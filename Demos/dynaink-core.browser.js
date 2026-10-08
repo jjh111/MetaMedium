@@ -25049,6 +25049,7 @@ ${lines.join("\n")}
     };
     let penOutlines = 0, solids = 0;
     let penColor = "", penWidth = 0;
+    let keptLines = null;
     if (doFill) {
       if (cacheKey) {
         const hit = w2.cache.get(cacheKey);
@@ -25095,19 +25096,21 @@ ${lines.join("\n")}
         if (rec.fidelity && !rec.fidelity.faithful) w2.c.unfaithful++;
         const kept2 = node.attrs["inkscape:original-d"];
         if (kept2 && node.attrs["inkscape:path-effect"] && rec.kind === "pen") {
-          const orig = parsePath(kept2);
-          const lines = flatten(orig.cmds, m, FLATTEN_TOL, w2.vertices);
-          if (lines.length) {
-            for (const l of lines) {
-              const pts = inkPoints(l.pts, l.closed);
-              if (!pts) {
-                w2.c.badShapes++;
-                continue;
+          if (keptLines === null) {
+            const orig = parsePath(kept2);
+            keptLines = flatten(orig.cmds, m, FLATTEN_TOL, w2.vertices);
+            if (keptLines.length) {
+              for (const l of keptLines) {
+                const pts = inkPoints(l.pts, l.closed);
+                if (!pts) {
+                  w2.c.badShapes++;
+                  continue;
+                }
+                if (!pushStroke(w2, { points: pts, color: fill.hex, width: rec.width, recovery: "stroke", closed: l.closed, outline, ...fillAlpha < 1 ? { opacity: roundOpacity(fillAlpha) } : {} })) return;
               }
-              if (!pushStroke(w2, { points: pts, color: fill.hex, width: rec.width, recovery: "stroke", closed: l.closed, outline, ...fillAlpha < 1 ? { opacity: roundOpacity(fillAlpha) } : {} })) return;
             }
-            continue;
           }
+          if (keptLines.length) continue;
         }
         for (const e of rec.strokes) {
           const fid = rec.kind === "pen" ? rec.fidelity : void 0;

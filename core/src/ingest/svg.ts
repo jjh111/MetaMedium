@@ -422,6 +422,7 @@ function paintShape(node: XNode, st: Style, m: Affine, w: Walk): void {
 
   let penOutlines = 0, solids = 0;
   let penColor = '', penWidth = 0;
+  let keptLines: Poly[] | null = null;
   if (doFill) {
     if (cacheKey) {
       const hit = w.cache.get(cacheKey);
@@ -455,19 +456,22 @@ function paintShape(node: XNode, st: Style, m: Affine, w: Walk): void {
       penColor = fill!.hex;
       penWidth = rec.width;
       if (rec.fidelity && !rec.fidelity.faithful) w.c.unfaithful++;
-      // Where a path effect kept the line the outline was made from, that line is the stroke.
+      // Where a path effect kept the line the outline was made from, that line is the stroke — once for the element,
+      // whatever number of rings its outline came in.
       const kept = node.attrs['inkscape:original-d'];
       if (kept && node.attrs['inkscape:path-effect'] && rec.kind === 'pen') {
-        const orig = parsePath(kept);
-        const lines = flatten(orig.cmds, m, FLATTEN_TOL, w.vertices);
-        if (lines.length) {
-          for (const l of lines) {
-            const pts = inkPoints(l.pts, l.closed);
-            if (!pts) { w.c.badShapes++; continue; }
-            if (!pushStroke(w, { points: pts, color: fill!.hex, width: rec.width, recovery: 'stroke', closed: l.closed, outline, ...(fillAlpha < 1 ? { opacity: roundOpacity(fillAlpha) } : {}) })) return;
+        if (keptLines === null) {
+          const orig = parsePath(kept);
+          keptLines = flatten(orig.cmds, m, FLATTEN_TOL, w.vertices);
+          if (keptLines.length) {
+            for (const l of keptLines) {
+              const pts = inkPoints(l.pts, l.closed);
+              if (!pts) { w.c.badShapes++; continue; }
+              if (!pushStroke(w, { points: pts, color: fill!.hex, width: rec.width, recovery: 'stroke', closed: l.closed, outline, ...(fillAlpha < 1 ? { opacity: roundOpacity(fillAlpha) } : {}) })) return;
+            }
           }
-          continue;
         }
+        if (keptLines.length) continue;
       }
       for (const e of rec.strokes) {
         const fid = rec.kind === 'pen' ? rec.fidelity : undefined;

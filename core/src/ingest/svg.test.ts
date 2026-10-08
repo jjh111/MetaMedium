@@ -405,6 +405,12 @@ describe('a pen stroke stored as a filled outline comes back as a line, in its c
     expect(near(s.points, 20, 50) && near(s.points, 180, 50)).toBe(true);
   });
 
+  it('a path effect’s source line is one stroke for the element, whatever number of rings its outline came in', () => {
+    const got = strokes(svg('<path inkscape:path-effect="#e" inkscape:original-d="M20 50 L180 50" d="M20 48 L90 48 L90 52 L20 52 Z M110 48 L180 48 L180 52 L110 52 Z" fill="#333333"/>'));
+    expect(got).toHaveLength(1);
+    expect(got[0].recovery).toBe('stroke');
+  });
+
   it('a solid shape no pen made is its edge, as drawn; one that fills the page is a ground and is left out, and said', () => {
     const r = ok(read(svg('<rect width="200" height="100" fill="#ffffff"/><rect x="20" y="20" width="60" height="40" fill="#ccddee"/>')));
     const got = r.doc.pages[0].strokes;
