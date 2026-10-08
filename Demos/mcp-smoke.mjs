@@ -7,7 +7,7 @@
 //
 // Every line it prints is a check; it exits 1 when one fails.
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startRelay } from './relay.mjs';
@@ -15,8 +15,9 @@ import { relayTransport } from './live-node.mjs';
 import { inkPNG, encodePNG, decodePNG } from './ink-png.mjs';
 import { createServer } from 'node:http';
 import { createHash } from 'node:crypto';
-import { writeFileSync, mkdtempSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, readFileSync, existsSync, statSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { inflateRawSync } from 'node:zlib';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const MM = await import(pathToFileURL(path.join(here, 'dynaink-core.node.mjs')).href);
@@ -88,7 +89,11 @@ try {
   // …and the seat's two (V1-PLAN J4): the briefs parked for Claude Code, and the answer to one.
   // …and a ninth verb of a hand's (PLAN-IPAD-NOTES A1): putting a picture on the board.
   // …and three more for organising notes (PLAN-IPAD-NOTES A2): finding words, making a region, moving what is its own.
-  check('fourteen tools: the hand\'s twelve — canvas_import, canvas_find, canvas_region and canvas_move among them — and the seat\'s two, canvas_pending and canvas_answer', names.length === 14 && ['canvas_import', 'canvas_find', 'canvas_region', 'canvas_move', 'canvas_pending', 'canvas_answer'].every((n) => names.includes(n)), names);
+  // …and two for the doors (V1-SPEC CG7a): every way in and out, listed from the running code, and the board out as the app writes it.
+  check('sixteen tools: the hand\'s fourteen — canvas_import, canvas_find, canvas_region, canvas_move, canvas_doors and canvas_export among them — and the seat\'s two, canvas_pending and canvas_answer',
+    names.length === 16 && ['canvas_import', 'canvas_find', 'canvas_region', 'canvas_move', 'canvas_doors', 'canvas_export', 'canvas_pending', 'canvas_answer'].every((n) => names.includes(n)), names);
+  const importTool = (list.result && list.result.tools || []).find((t) => t.name === 'canvas_import') || {};
+  check('canvas_import says it also takes a log or a bundle, into a scratch session and never the room', /\.jsonl/.test(importTool.description || '') && /\.dyna\.zip/.test(importTool.description || '') && /scratch/i.test(importTool.description || '') && /never the room/i.test(importTool.description || ''), importTool.description);
 
   // The tab draws first: a box, in its own log.
   const box = MM.strokeFor({ shape: 'rectangle', x: 100, y: 100, w: 200, h: 120 });
@@ -685,6 +690,23 @@ async function seatCases() {
 
     await wait(400);
     check('the watcher printed one line per brief parked — five — and nothing else', watchLines.length === 5 && watchLines.every((l) => /^brief \S+ · /.test(l)) && new Set(watchLines.map((l) => l.split(' ')[1])).size === 5, watchLines);
+
+    // ---- Read these: a sheet of numbered lines is a contract of its own, with a parser of its own (PLAN-IPAD-NOTES I8; CG7a) ----
+    // The reply is an object a line, numbered as the sheet is; canvas_pending says so, and canvas_answer checks it as the page reads it.
+    const line2 = session.addStroke(cursive.map((p) => ({ x: p.x, y: p.y + 100 })), Date.now(), undefined, 1);
+    const line3 = session.addStroke(cursive.map((p) => ({ x: p.x, y: p.y + 200 })), Date.now(), undefined, 1);
+    const sheet = seat.readLines({ lines: [{ nodeId: line2, ids: [line2] }, { nodeId: line3, ids: [line3] }], image, at: Date.now() });
+    const kSheet = seat.waiting()[0];
+    const pSheet = await pendingText((t) => kSheet && t.includes(kSheet.key));
+    check('Read these parks a sheet: canvas_pending prints the contract of a sheet and a reply shape that is an object a line — numbered, with how to say a line cannot be read',
+      !!kSheet && /sheet of numbered lines/.test(pSheet) && /an object a line, numbered as the sheet is/.test(pSheet) && /"line": 3, "text": ""/.test(pSheet), pSheet.slice(0, 600));
+    const offSheet = await call('canvas_answer', { key: kSheet ? kSheet.key : '', reply: [{ line: 5, text: 'x', confidence: 0.9 }] });
+    check('a reply that names a line the sheet does not have is not sent — the page would read nothing from it — and the brief still waits',
+      /would read nothing/.test(textOf(offSheet)) && /nothing was sent/.test(textOf(offSheet)) && keysIn(textOf(await call('canvas_pending', {}))).includes(kSheet.key), textOf(offSheet));
+    await call('canvas_answer', { key: kSheet ? kSheet.key : '', reply: [{ line: 1, text: 'first line', confidence: 0.9 }, { line: 2, text: 'second line', confidence: 0.8 }] });
+    const gotSheet = await settled(sheet);
+    check('a reply numbered as the sheet is lands a reading on each line, as the page reads it — attributed to the seat, never blessed',
+      gotSheet.ok && gotSheet.lines.length === 2 && gotSheet.lines.every((l) => l.ok) && MM.transcriptOf(session.getState().nodes.get(line2)) === 'first line' && MM.transcriptOf(session.getState().nodes.get(line3)) === 'second line', gotSheet);
   } finally {
     seat.leave();
     store.close();
@@ -797,6 +819,337 @@ async function seatCases() {
   const lm = leaf && [...leaf.rgba.slice(((leaf.height >> 1) * leaf.width + (leaf.width >> 1)) * 4, ((leaf.height >> 1) * leaf.width + (leaf.width >> 1)) * 4 + 3)];
   check('a picture the tab put in the room by its hash is seen by the hand, drawn where it stands', put.status === 204 && !!lm && lm[1] > 140 && lm[0] < 60, { put: put.status, lm });
   web.close();
+  rmSync(dir, { recursive: true, force: true });   // the folder the picture files were made in, which every run used to leave behind
+}
+
+// ===== Every door, listed and walked (V1-SPEC CG7a) ===========================================================
+// A dev session uses every door first-hand: `canvas_doors` lists them from the running code (never from a copy in a
+// document), `canvas_export` writes the board as the app writes it, and `canvas_import` reads a log or a bundle into a
+// SCRATCH session and never the room. The first block asks the hand in the room above, whose board is rich — a tab, a
+// page that seated Claude Code, pictures the room holds and some it does not; the second walks a hand of its own in a
+// room of its own, small enough for a log to come back inline.
+try {
+  const repoRoot = path.resolve(here, '..');
+  const heads = (res) => (res.content || []).filter((c) => c.type === 'text').map((c) => c.text);
+  const frag = (file, wanted) => new Function(readFileSync(path.join(here, 'surface', file), 'utf8') + '\n  return { ' + wanted.map((n) => n + ': typeof ' + n + " === 'undefined' ? undefined : " + n).join(', ') + ' };')();
+  const B = frag('17-bundle.js', ['zipWrite', 'zipRead', 'bundleBuild', 'bundleRead', 'BUNDLE_LOG']);
+  const A = frag('17-assets.js', ['assetsOfEvents']);
+  const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
+  const inflate = async (raw) => new Uint8Array(inflateRawSync(Buffer.from(raw)));
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const version = readFileSync(path.join(repoRoot, 'VERSION'), 'utf8').trim();
+  // Well-formed XML, by hand: one root, every tag closed in order, attributes quoted, no bare < or & in text — what an SVG reader needs.
+  const wellFormed = (xml) => {
+    const stack = [];
+    let i = 0, roots = 0;
+    const re = /<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<\/([A-Za-z][\w:.-]*)\s*>|<([A-Za-z][\w:.-]*)((?:\s+[\w:.-]+\s*=\s*(?:"[^"<]*"|'[^'<]*'))*)\s*(\/?)>/g;
+    for (let m; (m = re.exec(xml)); ) {
+      const text = xml.slice(i, m.index);
+      if (/[<]|&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/.test(text)) return 'bad text before ' + m.index + ': ' + text.slice(0, 40);
+      if (stack.length === 0 && text.trim()) return 'text outside the root';
+      i = m.index + m[0].length;
+      if (m[1]) { if (stack.pop() !== m[1]) return 'a close tag that does not match: ' + m[1]; if (!stack.length) roots++; }
+      else if (m[2]) { if (!stack.length && roots) return 'a second root'; if (m[4]) { if (!stack.length) roots++; } else stack.push(m[2]); }
+    }
+    return stack.length === 0 && roots === 1 && !/<[A-Za-z/]/.test(xml.slice(i)) ? null : 'unclosed or stray markup near ' + i;
+  };
+
+  // …and a real parser's word where Python is here: an SVG that ElementTree reads (true), one it refuses (false), no Python (null — skipped).
+  const xmlOk = (xml) => { const r = spawnSync('python3', ['-I', '-c', 'import sys, xml.etree.ElementTree as E; E.fromstring(sys.stdin.buffer.read())'], { input: xml }); return r.error ? null : r.status === 0; };
+
+  // ---- The contracts as core builds them, asked a second way: an agent over a transport that only keeps what it was sent ----
+  const sent = {};
+  {
+    const s = MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG });
+    let current = '';
+    const agent = MM.createAgentParticipant(s, { kind: 'openai-compatible', baseUrl: 'http://127.0.0.1:1', model: 'keeper', label: 'keeper', vision: true }, 0,
+      { transport: (_cfg, messages) => { sent[current] = messages; return Promise.resolve({ ok: false, error: 'kept' }); } });
+    const t0 = Date.now();
+    const a = s.addStroke(MM.strokeFor({ shape: 'rectangle', x: 100, y: 100, w: 160, h: 100 }), t0, undefined, 1);
+    const b = s.addStroke(MM.strokeFor({ shape: 'rectangle', x: 320, y: 100, w: 160, h: 100 }), t0 + 1, undefined, 1);
+    const w = s.addStroke(Array.from({ length: 99 }, (_, i) => ({ x: 100 + i * 3, y: 400 - 20 * Math.abs(Math.sin(i / 4)) })), t0 + 2, undefined, 1);
+    const art = s.bless({ summonId: s.summonMarks([a, b], t0 + 3), name: 'cards', at: t0 + 4 });
+    current = 'what'; await agent.interpret([a, b], t0 + 5);
+    current = 'read'; await agent.read({ nodeId: w, image: 'data:image/png;base64,AA', at: t0 + 6 });
+    current = 'ask'; await agent.ask('why?', [a, b], t0 + 7);
+    current = 'build'; await agent.generate({ prompt: 'a page', artifactId: art, at: t0 + 8 });
+    s.attachCode({ participantId: MM.LOCAL_PARTICIPANT, nodeId: art, kind: 'html', code: '<div></div>', fill: { regions: { r1: { tag: 'div', html: 'x' } } }, at: t0 + 9 });
+    current = 'revise'; await agent.generate({ prompt: 'bigger title', artifactId: art, at: t0 + 10 });
+    current = 'program'; await agent.program({ prompt: 'a cube', artifactId: art, at: t0 + 11 });
+    current = 'draw'; await agent.draw({ prompt: 'a box under', nodeIds: [a], at: t0 + 12 });
+    current = 'behave'; await agent.behave({ nodeId: art, words: 'does a slow dance when the moon is out', at: t0 + 13 });
+  }
+  const systemOf = (k) => ((sent[k] || []).find((m) => m.role === 'system') || {}).content || '';
+
+  // ---- canvas_doors, on the hand in the rich room ----
+  const toolNames = ((await rpc('tools/list', {})).result.tools || []).map((t) => t.name);
+  const doorsRes = await call('canvas_doors', {});
+  const doors = textOf(doorsRes);
+  check('canvas_doors says where it reads from: the running code, never a copy in a document', /read from the running code/.test(doors) && /never from a copy/.test(doors), doors.slice(0, 400));
+  check('THE PEN: every shape canvas_draw takes is listed, probed just now and read back by the engine — and raw strokes, with the batch cap core says',
+    ['rectangle', 'circle', 'triangle', 'line', 'arrow'].every((s) => new RegExp('^  ' + s + '\\b[^\\n]*read as ' + s, 'm').test(doors)) && /raw strokes/.test(doors) && /gesture/.test(doors) && new RegExp('at most ' + MM.MAX_DRAWN + ' a batch').test(doors), doors.split('\n').filter((l) => /^  (rectangle|circle|triangle|line|arrow)/.test(l)));
+  const blocks = [...doors.matchAll(/^(seat [^\n]*)\n([\s\S]*?)(?=^seat |^== )/gm)].map((m) => ({ head: m[1].split(' — ')[0], text: m[2] }));
+  const kinds = ['seat what', 'seat read', 'seat read (lines)', 'seat ask', 'seat build', 'seat build (revise)', 'seat program', 'seat draw', 'seat behave'];
+  check('THE SEATS: every brief the seat answers today has its block — What is this?, Read the writing (one mark and a sheet of lines), ask:, build (make and revise), program, draw, behave', kinds.every((k) => blocks.some((b) => b.head === k)), blocks.map((b) => b.head));
+  const want = { 'seat what': 'what', 'seat read': 'read', 'seat ask': 'ask', 'seat build': 'build', 'seat build (revise)': 'revise', 'seat program': 'program', 'seat draw': 'draw', 'seat behave': 'behave' };
+  const missingLines = [];
+  for (const [head, key] of Object.entries(want)) {
+    const block = (blocks.find((b) => b.head === head) || {}).text || '';
+    for (const line of systemOf(key).split('\n')) if (line.trim() && !block.includes(line)) missingLines.push(head + ': ' + line.slice(0, 60));
+  }
+  const linesBlock = (blocks.find((b) => b.head === 'seat read (lines)') || {}).text || '';
+  for (const line of MM.READ_LINES_PROMPT.split('\n')) if (line.trim() && !linesBlock.includes(line)) missingLines.push('seat read (lines): ' + line.slice(0, 60));
+  check('…each with its contract VERBATIM: every line of the system message core\'s participants send, as an agent over a keeping transport was sent it', missingLines.length === 0 && Object.values(want).every((k) => systemOf(k).length > 100), missingLines.slice(0, 5));
+  const accepts = {
+    'seat what': (t) => MM.parseReadings(t).length > 0,
+    'seat read': (t) => MM.parseTranscripts(t).length > 0,
+    'seat read (lines)': (t) => MM.parseLineReadings(t, 1).some((l) => l.length > 0),
+    'seat ask': (t) => !!t.trim(),
+    'seat build': (t) => !!MM.parseFill(t),
+    'seat build (revise)': (t) => !!MM.parseFill(t),
+    'seat program': (t) => !!MM.parseProgram(t),
+    'seat draw': (t) => MM.parseShapes(t).length > 0,
+    'seat behave': (t) => MM.parseBehaviourReply(t).terms.length > 0,
+  };
+  const examples = {};
+  for (const b of blocks) { const m = /^  example reply: (.*)$/m.exec(b.text); if (m) examples[b.head] = m[1]; }
+  const refused = kinds.filter((k) => !examples[k] || !accepts[k](examples[k]));
+  check('…its reply\'s shape and an example reply each — and every example passes the parser the page reads a model\'s reply with', refused.length === 0 && kinds.every((k) => /^  reply: /m.test((blocks.find((b) => b.head === k) || {}).text || '')), { refused, examples });
+  check('…and says canvas_answer\'s own parser accepts each example (it checked them just now)', (doors.match(/canvas_answer's parser: accepts it/g) || []).length === kinds.length, (doors.match(/canvas_answer's parser: [^\n]*/g) || []));
+  check('…and how a session is woken for a brief — the silent watcher, Demos/seat-watch.mjs, with how it is run, read from its own header', /seat-watch\.mjs/.test(doors) && /Monitor/.test(doors) && /^    node Demos\/seat-watch\.mjs/m.test(doors), doors.split('\n').filter((l) => /seat-watch/.test(l)));
+  check('…who sits where, from the merged log: the engine at tier 0, Claude Code (MCP hand) a model at tier 2 on this machine, and who was heard in the room — the tab among them',
+    /\bengine\b[^\n]*tier 0/.test(doors) && /Claude Code \(MCP hand\)[^\n]*tier 2[^\n]*local/.test(doors) && /heard in the last minute: [^\n]*\btab\b/.test(doors), doors.split('\n').filter((l) => /tier \d|heard in the last/.test(l)));
+  check('…and the page\'s own seats — reader, writer, decider, semantic — read from 03-seats.js with what each is for, and which of them this hand cannot take yet (the decider, the semantic seat and the listener: CG7b)',
+    ['reader', 'writer', 'decider', 'semantic'].every((s) => new RegExp('^  ' + s + '\\b', 'm').test(doors)) && /CG7b/.test(doors) && /not built/i.test(doors), doors.split('\n').filter((l) => /CG7b|^  (reader|writer|decider|semantic)\b/.test(l)));
+  check('MCP BOTH WAYS: this hand\'s own tools, every one it has, from its own table — canvas_doors and canvas_export among them', toolNames.every((n) => new RegExp('^  ' + n + '\\b', 'm').test(doors)) && toolNames.length === 16, toolNames.filter((n) => !doors.includes(n)));
+  check('…the 3D hand\'s six, read from dynaink-3d/mcp.mjs, and the servers .mcp.json registers for a session',
+    ['space_look', 'space_draw', 'space_propose', 'space_say', 'space_pending', 'space_answer'].every((n) => new RegExp('^  ' + n + '\\b', 'm').test(doors)) && /\.mcp\.json/.test(doors) && /dynaink-3d/.test(doors), doors.split('\n').filter((l) => /space_|mcp\.json/.test(l)).slice(0, 8));
+  check('…and the canvas\'s client door, read from Demos/mcp-client.mjs and the page: its routes /tools and /call, its port and the roles the page maps (read, answer, draw)',
+    /GET \/tools/.test(doors) && /POST \/call/.test(doors) && /MM_DOOR_PORT/.test(doors) && /\bread:/.test(doors) && /\banswer:/.test(doors) && /\bdraw:/.test(doors), doors.split('\n').filter((l) => /\/tools|\/call|DOOR_PORT|read:|answer:|draw:/.test(l)));
+  check('THE ROOM: the relay, the room, whether a key is set (never the key), and the pictures it holds that the board names',
+    doors.includes(RELAY) && doors.includes(ROOM) && /key: (not set|set)/.test(doors) && /pictures/i.test(doors) && /the room holds \d+ of the \d+ pictures? this board names/.test(doors), doors.split('\n').filter((l) => /relay|room |key|pictures/.test(l)).slice(0, 8));
+  const formatsFound = ['log', 'bundle', 'svg', 'mermaid', 'truesize'].filter((f) => new RegExp('^  ' + f + '\\b', 'm').test(doors));
+  check('THE FORMATS: log, bundle, svg, mermaid and truesize, each with the function that writes it and the one that reads it — named from the code, checked to exist just now',
+    formatsFound.length === 5 && /encodeLog/.test(doors) && /decodeLog/.test(doors) && /bundleBuild/.test(doors) && /bundleRead/.test(doors) && /zipWrite/.test(doors) && /zipRead/.test(doors) && /boardSvg/.test(doors)
+      && /toMermaid/.test(doors) && /mermaidFor/.test(doors) && /readMermaid/.test(doors) && /trueSize/.test(doors) && !/missing in this build/.test(doors), { formatsFound });
+  check('…the version the log is written at, the Mermaid writers and readers core registers, and what the file is when it flows (a header line, then an event a line; a zip of board.jsonl and assets/<hash>.<ext>)',
+    new RegExp('version ' + MM.LOG_VERSION).test(doors) && MM.mermaidWriters().every((w) => doors.includes(w)) && MM.mermaidReaders().every((w) => doors.includes(w)) && /board\.jsonl/.test(doors) && /assets\/</.test(doors), { writers: MM.mermaidWriters(), readers: MM.mermaidReaders() });
+  check('WHAT NODE CANNOT MAKE: board.png and board.pdf are the page\'s (an offscreen canvas) — canvas_see\'s PNG is the ink alone — and what is not built yet is said as such: a lens (KN6) and a notebook directory (IN5)',
+    /board\.png/.test(doors) && /board\.pdf/.test(doors) && /offscreen canvas/.test(doors) && /lens[^\n]*KN6/.test(doors) && /notebook directory[^\n]*IN5/.test(doors) && /not built yet/.test(doors), doors.split('\n').filter((l) => /png|pdf|KN6|IN5/i.test(l)));
+  const onlyFormats = textOf(await call('canvas_doors', { door: 'formats' }));
+  check('canvas_doors { door } narrows it to one door — the formats alone are no seats and no tools', /^  bundle\b/m.test(onlyFormats) && !/^seat /m.test(onlyFormats) && !/canvas_look/.test(onlyFormats), onlyFormats.slice(0, 200));
+  const onlyDraw = textOf(await call('canvas_doors', { seat: 'draw' }));
+  check('canvas_doors { seat } narrows it to one brief kind — the draw seat\'s contract and nothing of the others\'', /^seat draw\b/m.test(onlyDraw) && !/^seat what\b/m.test(onlyDraw) && systemOf('draw').split('\n').filter((l) => l.trim()).every((l) => onlyDraw.includes(l)), onlyDraw.slice(0, 200));
+  const unknownDoor = textOf(await call('canvas_doors', { door: 'window' }));
+  check('an unknown door is said, with the doors there are', /no door called/.test(unknownDoor) && /pen/.test(unknownDoor) && /formats/.test(unknownDoor), unknownDoor);
+
+  // ---- a log too big to come back inline goes to a file, and says so; a bundle of a rich room says which pictures the room does not hold ----
+  // Twenty scribbles of four hundred points make the room's log certainly bigger than an answer carries.
+  await call('canvas_draw', { strokes: Array.from({ length: 20 }, (_, k) => Array.from({ length: 400 }, (_, i) => ({ x: 4000 + i * 2.5, y: 4000 + k * 30 + 12 * Math.sin(i / 7) }))) });
+  const bigLog = await call('canvas_export', { format: 'log' });
+  const bigHead = heads(bigLog).join('\n');
+  const bigPath = (/^path: (.+)$/m.exec(bigHead) || [])[1];
+  const bigText = bigPath && existsSync(bigPath) ? readFileSync(bigPath, 'utf8') : '';
+  const bigDecoded = bigText ? MM.decodeLog(bigText) : null;
+  check('a log past what an answer can carry inline is written to a file under the OS temp directory, the reply saying so, with its path and its events — which decode', !!bigPath && bigPath.startsWith(tmpdir()) && !!bigDecoded && bigDecoded.version === 1 && bigDecoded.skipped === 0 && new RegExp('\\b' + bigDecoded.events.length + ' events\\b').test(bigHead) && /too big to come back inline/.test(bigHead), { bigHead: bigHead.slice(0, 300), bigPath });
+  const bigBundle = await call('canvas_export', { format: 'bundle' });
+  const bbHead = heads(bigBundle).join('\n');
+  const bbPath = (/^path: (.+)$/m.exec(bbHead) || [])[1];
+  const bbBytes = bbPath && existsSync(bbPath) ? new Uint8Array(readFileSync(bbPath)) : null;
+  const bbRead = bbBytes ? await B.bundleRead(bbBytes, { inflate, digest: sha }) : null;
+  const named = bbRead && bbRead.ok ? [...A.assetsOfEvents(MM.decodeLog(bbRead.text).events)] : [];
+  check('the bundle of the rich room: the pictures the room holds are in it, hash for hash, and the two the tab named and nobody put in the room are said to be missing — never dropped in silence',
+    !!bbRead && bbRead.ok && bbRead.assets.length >= 4 && bbRead.assets.every((a) => named.includes(a.ref)) && named.length - bbRead.assets.length === 2 && /2 pictures? the room does not hold/.test(bbHead) && bbRead.damaged.length === 0, { bbHead: bbHead.slice(0, 500), assets: bbRead && bbRead.assets && bbRead.assets.length, named: named.length });
+  const bigImport = textOf(await call('canvas_import', { path: bbPath }));
+  const roomLook = textOf(await call('canvas_look', {}));
+  const markLines = (t) => t.split('\n').filter((l) => /^(stroke|artifact|region):/.test(l)).map((l) => l.replace(/ · its pixels [^·]*/g, '')).sort();
+  const sameLines = JSON.stringify(markLines(bigImport)) === JSON.stringify(markLines(roomLook));
+  check('the rich room\'s own bundle imported into a scratch session reads the same board, mark for mark — the picture notes aside, which say where the pixels are (the file, not the room)', sameLines && /compared with the board in the room: \d+ things? in both, all read the same/.test(bigImport), { only: markLines(roomLook).filter((l) => !markLines(bigImport).includes(l)).slice(0, 3), extra: markLines(bigImport).filter((l) => !markLines(roomLook).includes(l)).slice(0, 3) });
+
+  // ---- a hand of its own, in a room of its own ----
+  const dRoom = ROOM + '-doors';
+  const doorman = spawnHand({ MM_ROOM: dRoom, MM_RELAY: RELAY, MM_NAME: 'doorman' }, 'doors');
+  const obs = new MM.LiveStore(relayTransport(RELAY, dRoom), 'obs~1', dRoom);
+  obs.hello();
+  const dcall = doorman.call;
+  const idsIn = (t) => t.split('\n').map((l) => l.split(' ')[0]).filter((x) => /^stroke:/.test(x));
+  const cleanup = [];
+  try {
+    await doorman.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '0' } });
+    const flow = idsIn(textOf(await dcall('canvas_draw', { shapes: [
+      { shape: 'rectangle', x: 100, y: 100, w: 160, h: 80 }, { shape: 'rectangle', x: 400, y: 100, w: 160, h: 80 }, { shape: 'rectangle', x: 700, y: 100, w: 160, h: 80 },
+      { shape: 'arrow', from: { x: 260, y: 140 }, to: { x: 400, y: 140 } }, { shape: 'arrow', from: { x: 560, y: 140 }, to: { x: 700, y: 140 } }], why: 'three steps' })));
+    check('the doors hand drew a flow of three boxes and two arrows', flow.length === 5, flow);
+    await dcall('canvas_label', { id: flow[0], text: 'start' });
+    await dcall('canvas_region', { name: 'Flow', around: flow });
+    const swatch = new Uint8Array(encodePNG(16, 16, (() => { const px = new Uint8Array(16 * 16 * 4); for (let i = 0; i < 256; i++) px.set([200, 40, 40, 255], i * 4); return px; })()));
+    const swatchText = textOf(await dcall('canvas_import', { base64: Buffer.from(swatch).toString('base64'), name: 'swatch.png', at: { x: 900, y: 100, w: 80 } }));
+    // A right triangle ruled in three lines, a square in its corner, legs written 24″ and 8″: a figure at true size.
+    const tri = idsIn(textOf(await dcall('canvas_draw', { shapes: [
+      { shape: 'line', from: { x: 1000, y: 2160 }, to: { x: 1480, y: 2160 } }, { shape: 'line', from: { x: 1000, y: 2000 }, to: { x: 1000, y: 2160 } },
+      { shape: 'line', from: { x: 1480, y: 2160 }, to: { x: 1000, y: 2000 } }, { shape: 'rectangle', x: 1002, y: 2143, w: 15, h: 15 }] })));
+    await dcall('canvas_write', { kind: 'text', code: '24″', name: 'long-leg', bounds: { x: 1200, y: 2172, w: 60, h: 30 } });
+    await dcall('canvas_write', { kind: 'text', code: '8″', name: 'short-leg', bounds: { x: 946, y: 2070, w: 44, h: 30 } });
+    check('…with a picture, a label, a region and a labelled triangle on its board', /placed/.test(swatchText) && tri.length === 4, { swatchText, tri });
+    // The observer's copy of the hand's log once it has stopped growing: two reads, a moment apart, that agree.
+    const settle = async () => {
+      let logs = await obs.readLogs(), hand = Object.keys(logs).find((k) => /^doorman~/.test(k)), n = -1;
+      for (let i = 0; i < 40 && !(hand && logs[hand].length > 0 && logs[hand].length === n); i++) { n = hand ? logs[hand].length : -1; await wait(200); logs = await obs.readLogs(); hand = Object.keys(logs).find((k) => /^doorman~/.test(k)); }
+      return { logs, hand };
+    };
+    const body1 = (t) => t.split('\n').slice(1).join('\n');
+    const room0 = await settle();
+    const look0 = textOf(await dcall('canvas_look', {}));
+
+    // The log: version 1, a header, then one event a line — inline, in a block of its own beside the sentence that says what it is.
+    const exLog = await dcall('canvas_export', { format: 'log' });
+    const logParts = heads(exLog);
+    const logDec = MM.decodeLog(logParts[1] || '');
+    check('canvas_export log: a sentence (its events, its version) and then the file\'s exact text — a version 1 log that decodeLog reads, header and all, with nothing skipped',
+      logParts.length === 2 && logDec.version === 1 && logDec.skipped === 0 && logDec.events.length >= 12 && new RegExp('\\b' + logDec.events.length + ' events\\b').test(logParts[0]) && /version 1/.test(logParts[0])
+        && JSON.parse(logParts[1].split('\n')[0]).format === MM.LOG_FORMAT && logDec.app === version, { parts: logParts.map((p) => p.slice(0, 160)), version: logDec.version, skipped: logDec.skipped, app: logDec.app });
+    check('…and decodes to the same events the room holds of this hand — and writes back to the same bytes (encodeLog is decodeLog\'s inverse)',
+      !!room0.hand && JSON.stringify(logDec.events) === JSON.stringify(room0.logs[room0.hand]) && MM.encodeLog(logDec.events, { app: version }) === logParts[1], { hand: room0.hand, events: logDec.events.length, room: room0.hand && room0.logs[room0.hand].length });
+
+    // The bundle: a zip, always a file; its path, size and entries said.
+    const exBundle = await dcall('canvas_export', { format: 'bundle' });
+    const bHead = heads(exBundle).join('\n');
+    const bPath = (/^path: (.+)$/m.exec(bHead) || [])[1];
+    const bBytes = bPath && existsSync(bPath) ? new Uint8Array(readFileSync(bPath)) : null;
+    const bRead = bBytes ? await B.bundleRead(bBytes, { inflate, digest: sha }) : null;
+    const bDec = bRead && bRead.ok ? MM.decodeLog(bRead.text) : null;
+    cleanup.push(bPath && path.dirname(bPath));
+    check('canvas_export bundle: a .dyna.zip written under the OS temp directory, its path, size and entries said — never a byte inline, never a file in the repository',
+      !!bPath && bPath.startsWith(tmpdir()) && !path.resolve(bPath).startsWith(repoRoot + path.sep) && /\.dyna\.zip$/.test(bPath) && !!bBytes && new RegExp('size: ' + bBytes.length + ' bytes').test(bHead) && /entries: board\.jsonl/.test(bHead) && /assets\/[0-9a-f]{64}\.png/.test(bHead) && heads(exBundle).length === 1, { bHead: bHead.slice(0, 400), bPath });
+    check('…which bundleRead reads back whole: the same events as the log, the header saying one picture sits beside it, the picture\'s bytes the SHA-256 they are named for',
+      !!bDec && bDec.version === 1 && bDec.assets === 1 && JSON.stringify(bDec.events) === JSON.stringify(logDec.events) && bRead.assets.length === 1 && bRead.assets[0].ref === 'sha256:' + sha(swatch) && bRead.damaged.length === 0 && Buffer.compare(Buffer.from(bRead.assets[0].bytes), Buffer.from(swatch)) === 0, { bDec: bDec && { version: bDec.version, assets: bDec.assets, events: bDec.events.length }, assets: bRead && bRead.assets && bRead.assets.length });
+    const mine = path.join(mkdtempSync(path.join(tmpdir(), 'mm-export-out-')), 'mine.dyna.zip');
+    cleanup.push(path.dirname(mine));
+    const toOut = heads(await dcall('canvas_export', { format: 'bundle', out: mine })).join('\n');
+    check('out names where a bundle goes — a path outside the repository', existsSync(mine) && statSync(mine).size === bBytes.length && toOut.includes(mine), toOut.slice(0, 200));
+    const inRepo = path.join(repoRoot, 'must-not-exist.dyna.zip');
+    const refusedOut = heads(await dcall('canvas_export', { format: 'bundle', out: inRepo })).join('\n');
+    check('…and a path inside the repository is refused in words, with nothing written there', /inside the repository/.test(refusedOut) && !existsSync(inRepo), refusedOut.slice(0, 200));
+
+    // The SVG: the board in layers, pictures as data URLs, ink as paths named for the marks — well-formed, whole and narrowed.
+    const exSvg = heads(await dcall('canvas_export', { format: 'svg' }));
+    check('canvas_export svg: a sentence and the file — a well-formed SVG with the picture inside it as a data URL and every stroke a path named for its mark',
+      exSvg.length === 2 && wellFormed(exSvg[1]) === null && xmlOk(exSvg[1]) !== false && /^<svg\b/.test(exSvg[1]) && /<image\b[^>]*xlink:href="data:image\/png;base64,/.test(exSvg[1]) && flow.every((id) => exSvg[1].includes('data-node="' + id + '"')), { sentence: exSvg[0], wellFormed: wellFormed(exSvg[1] || ''), head: (exSvg[1] || '').slice(0, 200) });
+    const oneBox = heads(await dcall('canvas_export', { format: 'svg', ids: [flow[0]] }));
+    check('…ids narrow it to the marks named: one box, no arrows, no picture', oneBox.length === 2 && wellFormed(oneBox[1]) === null && (oneBox[1].match(/<path /g) || []).length === 1 && oneBox[1].includes('data-node="' + flow[0] + '"') && !/<image/.test(oneBox[1]), { paths: (oneBox[1] || '').match(/<path /g), sentence: oneBox[0] });
+    const svgOut = path.join(mkdtempSync(path.join(tmpdir(), 'mm-export-svg-')), 'board.svg');
+    cleanup.push(path.dirname(svgOut));
+    const svgOutRes = heads(await dcall('canvas_export', { format: 'svg', out: svgOut })).join('\n');
+    check('out writes a text format to a file instead of answering inline', existsSync(svgOut) && wellFormed(readFileSync(svgOut, 'utf8')) === null && xmlOk(readFileSync(svgOut, 'utf8')) !== false && svgOutRes.includes(svgOut), svgOutRes.slice(0, 200));
+
+    // Mermaid: the likeliest notation the marks read as — a drawn flowchart says as a flowchart.
+    const exMmd = heads(await dcall('canvas_export', { format: 'mermaid', ids: flow }));
+    check('canvas_export mermaid: a drawn flowchart is said as a flowchart — the reading in the sentence, the .mmd text alone in the block after it',
+      exMmd.length === 2 && /^flowchart (TD|LR)\n/.test(exMmd[1]) && (exMmd[1].match(/-->/g) || []).length === 2 && /start/.test(exMmd[1]) && /flowchart\.mmd/.test(exMmd[0]) && /a flowchart/.test(exMmd[0]), exMmd);
+    const notMmd = heads(await dcall('canvas_export', { format: 'mermaid', ids: [flow[0]] })).join('\n');
+    check('…and marks that read as no diagram are said so, not written as one', /nothing here reads as a diagram/.test(notMmd) && !/^flowchart/m.test(notMmd), notMmd);
+
+    // True size: the labelled triangle drawn from its numbers at its real size; a board with no numbers on the figure says what it needs.
+    const exTrue = heads(await dcall('canvas_export', { format: 'truesize' }));
+    check('canvas_export truesize: the triangle with 24″ and 8″ on its legs, drawn at real size from the numbers — an SVG whose root is paper, 24.8 inches wide',
+      exTrue.length === 2 && wellFormed(exTrue[1]) === null && xmlOk(exTrue[1]) !== false && /<svg [^>]*width="24\.8\d*in"/.test(exTrue[1]) && /true-size\.svg/.test(exTrue[0]) && /1 figure at real size/.test(exTrue[0]), { sentence: exTrue[0], head: (exTrue[1] || '').slice(0, 160) });
+    const noTrue = heads(await dcall('canvas_export', { format: 'truesize', ids: flow })).join('\n');
+    check('…and a flow with no numbers on it says what it would need, in the app\'s own words', /nothing to draw at true size/.test(noTrue) && /label a side/.test(noTrue), noTrue);
+    const noFormat = textOf(await dcall('canvas_export', { format: 'pdf' }));
+    check('a format Node cannot make is said, with the ones it can — and that the page makes board.png and board.pdf', /log/.test(noFormat) && /bundle/.test(noFormat) && /truesize/.test(noFormat) && /page/.test(noFormat) && /offscreen canvas/.test(noFormat), noFormat);
+
+    // Import: a log or a bundle read into a SCRATCH session — the board in words, the round trip in numbers, the room untouched.
+    const dir = mkdtempSync(path.join(tmpdir(), 'mm-import-board-'));
+    cleanup.push(dir);
+    const logFile = path.join(dir, 'doors.jsonl');
+    writeFileSync(logFile, logParts[1]);
+    const impLog = textOf(await dcall('canvas_import', { path: logFile }));
+    const roomAfter = await settle();
+    const look1 = textOf(await dcall('canvas_look', {}));
+    const afterOwn = roomAfter.logs[roomAfter.hand];
+    check('canvas_import of the exported log reads it into a scratch session and says so — nothing was written to the room: its log, its look and who is in it are as they were',
+      /scratch session/.test(impLog) && /nothing was written to the room/.test(impLog) && JSON.stringify(afterOwn) === JSON.stringify(room0.logs[room0.hand]) && body1(look1) === body1(look0) && Object.keys(roomAfter.logs).length === Object.keys(room0.logs).length, { head: impLog.slice(0, 300), before: room0.logs[room0.hand].length, after: afterOwn.length });
+    check('…the round-trip facts in numbers: the events, the marks, the artifacts, the region, the picture it names and does not carry (a log has none) — and the board in words, as canvas_look says it',
+      new RegExp('\\b' + logDec.events.length + ' events\\b').test(impLog) && /version 1/.test(impLog) && /1 region/.test(impLog) && /1 picture/.test(impLog) && /not in (it|a log)/.test(impLog) && /the board, as canvas_look says it/.test(impLog)
+        && flow.every((id) => impLog.includes(id)) && /labelled “start”/.test(impLog), impLog.slice(0, 700));
+    check('…and what reads differently: every mark compared with the same id on the room\'s board — all read the same, none only in the file, none only in the room',
+      /compared with the board in the room: \d+ things? in both, all read the same · 0 only in this file · 0 only in the room/.test(impLog), impLog.split('\n').filter((l) => /compared with/.test(l)));
+    const impBundle = textOf(await dcall('canvas_import', { path: bPath }));
+    check('canvas_import of the bundle: the picture is carried, its bytes checked against the hash it is named for, and the board\'s picture says its pixels are in the file',
+      /a bundle/.test(impBundle) && /1 picture/.test(impBundle) && /carried/.test(impBundle) && /its pixels are in the file/.test(impBundle) && /all read the same/.test(impBundle) && /nothing was written to the room/.test(impBundle), impBundle.split('\n').filter((l) => /picture|bundle|pixels/.test(l)));
+    // Version 0 is a log with no header: still read, and said to be version 0.
+    const v0File = path.join(dir, 'v0.jsonl');
+    writeFileSync(v0File, logParts[1].split('\n').slice(1).join('\n'));
+    const impV0 = textOf(await dcall('canvas_import', { path: v0File }));
+    check('a version 0 log — no header, every log kept before R2 — is read and said to be version 0', /version 0/.test(impV0) && new RegExp('\\b' + logDec.events.length + ' events\\b').test(impV0) && /all read the same/.test(impV0), impV0.slice(0, 300));
+    // …and a version 0 log whose first line is a stroke of a thousand points, far past the head of any file: still known for a log.
+    const longFirst = MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG });
+    longFirst.addStroke(Array.from({ length: 1000 }, (_, i) => ({ x: i, y: 50 + 30 * Math.sin(i / 9) })), Date.now(), undefined, 1);
+    const v0Long = path.join(dir, 'v0-long.jsonl');
+    writeFileSync(v0Long, MM.encodeLogTail(longFirst.getEvents()));
+    const impV0Long = textOf(await dcall('canvas_import', { path: v0Long }));
+    check('a version 0 log whose first line is one long stroke is read as a log all the same — a log is known by its first line, however long', statSync(v0Long).size > 20000 && /version 0/.test(impV0Long) && /\b1 event\b/.test(impV0Long) && /1 mark\b/.test(impV0Long), impV0Long.slice(0, 200));
+    // An example from the repository: a log the examples script wrote, never drawn.
+    const exampleFile = path.join(repoRoot, 'boards', 'examples', 'flowchart.jsonl');
+    const impExample = textOf(await dcall('canvas_import', { path: exampleFile }));
+    check('boards/examples/flowchart.jsonl — a log the engine made — reads in a scratch session as the flowchart it is, beside its Mermaid, none of it in the room',
+      /scratch session/.test(impExample) && /mermaid/i.test(impExample) && /rectangle|circle/.test(impExample) && /0 things? in both|none of its ids are on the room/.test(impExample), impExample.slice(0, 500));
+    // What cannot be read is a sentence, and nothing is opened.
+    const newer = path.join(dir, 'newer.jsonl');
+    writeFileSync(newer, JSON.stringify({ type: 'format', format: MM.LOG_FORMAT, version: 9, app: '9.9.9' }) + '\n' + JSON.stringify({ type: 'clean' }) + '\n');
+    const impNewer = textOf(await dcall('canvas_import', { path: newer }));
+    check('a log of a newer version is refused whole, in the engine\'s own sentence — nothing of it read', /version 9 log/.test(impNewer) && /nothing of it was read/.test(impNewer) && !/nothing was written to the room/.test(impNewer), impNewer);
+    const broken = path.join(dir, 'broken.jsonl');
+    writeFileSync(broken, JSON.stringify({ type: 'clean' }) + '\nthis line is not json\n');
+    const impBroken = textOf(await dcall('canvas_import', { path: broken }));
+    check('a log with a line that is not an event is not a board\'s log — said with the count, as the boards pane says it', /not a board/.test(impBroken) && /1 line/.test(impBroken), impBroken);
+    const noBoard = path.join(dir, 'not-a-bundle.zip');
+    writeFileSync(noBoard, Buffer.concat(B.zipWrite([{ name: 'notes.txt', data: new TextEncoder().encode('hello') }]).parts.map((p) => Buffer.from(p))));
+    const impNoBoard = textOf(await dcall('canvas_import', { path: noBoard }));
+    check('a zip with no board.jsonl is no bundle — said so, in the bundle reader\'s own words', /board\.jsonl/.test(impNoBoard) && /not a board bundle/.test(impNoBoard), impNoBoard);
+    const damagedBytes = new Uint8Array(bBytes);
+    const assetEntry = (await B.zipRead(bBytes, {})).entries.find((e) => /^assets\//.test(e.name));
+    damagedBytes[assetEntry.data.byteOffset - bBytes.byteOffset + 3] ^= 0xff;
+    const damagedFile = path.join(dir, 'damaged.dyna.zip');
+    writeFileSync(damagedFile, damagedBytes);
+    const impDamaged = textOf(await dcall('canvas_import', { path: damagedFile }));
+    check('a bundle with a damaged picture still opens the board and says which picture was left out and why', /damaged/.test(impDamaged) && /checksum/.test(impDamaged) && /1 picture/.test(impDamaged) && flow.every((id) => impDamaged.includes(id)), impDamaged.split('\n').filter((l) => /damaged|picture/.test(l)));
+    const impNothing = textOf(await dcall('canvas_import', { base64: Buffer.from('just words').toString('base64'), name: 'words.jsonl' }));
+    check('bytes that are no picture, no log and no bundle are refused naming all three', /not a picture/.test(impNothing) && /log/.test(impNothing) && /bundle/.test(impNothing) && !/nothing was written to the room/.test(impNothing), impNothing);
+    // The same file, read by ANOTHER hand in the room: the board reads the same, and who made each thing reads from the writer's side — a log is
+    // written from one hand's point of view, where its own marks are "me" and the others' are "by <name>".
+    const second = spawnHand({ MM_ROOM: dRoom, MM_RELAY: RELAY, MM_NAME: 'second' }, 'second');
+    try {
+      await second.rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'smoke', version: '0' } });
+      let seen = '';
+      for (let i = 0; i < 40 && !seen.includes(flow[0]); i++) { seen = textOf(await second.call('canvas_look', {})); if (!seen.includes(flow[0])) await wait(100); }
+      const impOther = textOf(await second.call('canvas_import', { path: bPath }));
+      check('the same bundle read by another hand in the room reads the same board, and says who made each thing reads from the writer\'s side — its own marks are "me" in the file and "by doorman" here',
+        /all read the same · 0 only in this file · 0 only in the room/.test(impOther) && /who made them reads from the writer's side: \d+ things?/.test(impOther) && /nothing was written to the room/.test(impOther), impOther.split('\n').filter((l) => /compared|writer/.test(l)));
+    } finally {
+      second.child.stdin.end();
+      await wait(100);
+      second.child.kill();
+    }
+    const roomEnd = await settle();
+    check('after every import and every export the room is as it was: this hand\'s log has not grown by one event', JSON.stringify(roomEnd.logs[roomEnd.hand]) === JSON.stringify(room0.logs[room0.hand]), { before: room0.logs[room0.hand].length, after: roomEnd.logs[roomEnd.hand].length });
+  } finally {
+    doorman.child.stdin.end();
+    await wait(100);
+    doorman.child.kill();
+    obs.close();
+    for (const d of cleanup) if (d) { try { rmSync(d, { recursive: true, force: true }); } catch { /* a temp directory */ } }
+    for (const p of [bigPath && path.dirname(bigPath), bbPath && path.dirname(bbPath)]) if (p) { try { rmSync(p, { recursive: true, force: true }); } catch { /* a temp directory */ } }
+  }
+
+  // ---- the walk is written down: a skill that names every door ----
+  const skillFile = path.join(repoRoot, 'skills', 'dynaink-doors', 'skill.md');
+  const skill = existsSync(skillFile) ? readFileSync(skillFile, 'utf8') : '';
+  check('skills/dynaink-doors/skill.md is the walk, in the skills\' own form, and names every tool this hand has and every format it writes',
+    /^<dynaink-doors>/.test(skill) && /<\/dynaink-doors>\s*$/.test(skill) && toolNames.every((n) => skill.includes(n)) && ['log', 'bundle', 'svg', 'mermaid', 'truesize'].every((f) => skill.includes(f)), { missing: toolNames.filter((n) => !skill.includes(n)) });
+  check('…and says never to take John\'s room or origin: a relay on a free port, a room of its own', /free port/.test(skill) && /never/i.test(skill) && /8020/.test(skill) && /scratch/i.test(skill), skill.slice(0, 200));
+} catch (err) {
+  check('the doors walk finished', false, err.stack || err.message);
 }
 
 child.stdin.end();

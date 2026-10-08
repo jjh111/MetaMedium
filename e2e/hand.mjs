@@ -57,6 +57,10 @@
 //          own Find on the same board finds the region; H1.28 (A2b, John's ruling of 2 Oct 2026): the hand moves
 //          his box, his word and the region that carries them, says whose it moved, the tab says it in the status line
 //          attributed, his undo does not reach the hand's move, and the hand moves them back
+//   H1.29  CG7a (V1-SPEC §3.13), the formats as they flow between the page and the hand: the page writes its board as a
+//          bundle with its own code and the hand reads it into a scratch session (the same events, the same board by readings;
+//          who made a thing read from the writer's side); the hand writes its bundle (canvas_export) and the page reads it with
+//          its own reader; the hand's SVG draws the page's own ink, path for path — and nothing was written to the room
 //   H1.S1-4 the rows only John's own hand can walk: skips, by name
 //   H1.Y   the invariant: Tier 1 before a model — the model was asked once, by H1.19, and no brief,
 //          no seat, no real model
@@ -71,6 +75,8 @@ import { startDevRelay } from '../cloudflare/relay/dev-server.mjs';
 import { keyForRoom } from '../cloudflare/relay/src/auth.mjs';
 import { encodePNG, decodePNG } from '../Demos/ink-png.mjs';
 import { createHash } from 'node:crypto';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { sleep } from './keep.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -861,6 +867,46 @@ export async function runHand(browser, servers, { freshContext, screenshot }) {
           && movesAfter - movesBefore === 3 && Math.abs(afterRegion[0].minX - (boxBefore.minX + 50)) < 1 && Math.abs(afterUndo.minX - (boxBefore.minX + 50)) < 1
           && /^moved/m.test(back1) && /^moved 2 marks — 2 of john’s/m.test(back2) && home && /^moved 1 mark\b/m.test(own) && !/ of john/.test(own.split('\n')[0]) && moved,
         { asBox, asWord, asRegion, status, own, afterRegion, afterUndo, boxBefore, back1, back2, movesBefore, movesAfter, boxMoved, told, home, moved });
+    });
+
+    // ---- CG7a. The formats as they flow between the page and the hand (V1-SPEC §3.13) ----
+    // The page writes its board as a bundle with its own code (18-out.js over 17-bundle.js) and the hand reads it into a scratch
+    // session; the hand writes its bundle and its SVG (canvas_export, with the page's own functions taken out of those fragments)
+    // and the page reads the bundle with its own reader. Reading never writes to the room: the hand's own log is the same after.
+    await record('H1.29', async () => {
+      const dir = mkdtempSync(join(tmpdir(), 'mm-hand-formats-'));
+      try {
+        await letGo(page);
+        const handLog = () => hand.call('canvas_look', {}).then((r) => textOf(r).split('\n').slice(1).join('\n'));
+        const lookBefore = await handLog();
+        const file = join(dir, 'page.dyna.zip');
+        let made = null, said = '';
+        const agreed = await until(async () => {
+          made = await page.evaluate(async () => { const r = await window.__mm.exportBundle(); return { events: r.events, assets: r.assets, missing: r.missing, bytes: Array.from(new Uint8Array(await r.blob.arrayBuffer())) }; });
+          writeFileSync(file, Buffer.from(made.bytes));
+          said = textOf(await hand.call('canvas_import', { path: file }));
+          return /all read the same · 0 only in this file · 0 only in the room/.test(said);
+        }, 12000);
+        const compared = (said.match(/^compared with the board in the room: (.+)$/m) || [])[1] || '';
+        const writer = (said.match(/who made them reads from the writer's side: (\d+) things?/) || [])[1];
+        // The hand's bundle, read by the page's own reader.
+        const out = textOf(await hand.call('canvas_export', { format: 'bundle' }));
+        const path = (out.match(/^path: (.+)$/m) || [])[1];
+        const handEvents = Number((out.match(/\b(\d+) events\b/) || [])[1]);
+        const probe = path ? await page.evaluate((b) => window.__mm.bundleProbe(new Uint8Array(b)), Array.from(readFileSync(path))) : null;
+        const format = await page.evaluate(() => window.__mm.MM.LOG_FORMAT);
+        // The hand's SVG, and the page's own, of the same board: the ink is the same paths, in the same order.
+        const handSvg = (await hand.call('canvas_export', { format: 'svg' })).content.filter((c) => c.type === 'text').pop().text;
+        const pageSvg = await page.evaluate(async () => (await window.__mm.exportSvg()).text);
+        const pathsOf = (svg) => (svg.match(/<path [^>]*>/g) || []);
+        const handPaths = pathsOf(handSvg), pagePaths = pathsOf(pageSvg);
+        const lookAfter = await handLog();
+        check(`H1.29. CG7a: the page's own bundle (${made && made.events} events, ${made && made.assets} pictures) imported by the hand into a scratch session says "${compared.slice(0, 90)}"${writer ? ' and that who made ' + writer + ' of them reads from the writer\'s side' : ''}; the hand's bundle (${handEvents} events) is read by the page's own reader (${probe && probe.ok ? probe.names.length + ' files, ' + probe.events + ' events, header ' + probe.header.format : 'NOT READ'}); the hand's SVG draws ${handPaths.length} paths and the page's ${pagePaths.length}, ${JSON.stringify(handPaths) === JSON.stringify(pagePaths) ? 'the same' : 'DIFFERENT'}; the room is as it was`,
+          agreed && !!made && made.events > 20 && /scratch session/.test(said) && /nothing was written to the room/.test(said) && new RegExp('\\b' + made.events + ' events\\b').test(said)
+            && !!probe && probe.ok && probe.header.format === format && probe.events === handEvents && probe.names.includes('board.jsonl') && probe.names.some((n) => /^assets\//.test(n))
+            && handPaths.length > 5 && JSON.stringify(handPaths) === JSON.stringify(pagePaths) && lookAfter === lookBefore,
+          { compared, said: said.slice(0, 900), out, probe: probe && { ok: probe.ok, names: probe.names, events: probe.events }, handPaths: handPaths.length, pagePaths: pagePaths.length, firstDifferent: handPaths.findIndex((p, i) => p !== pagePaths[i]) });
+      } finally { rmSync(dir, { recursive: true, force: true }); }
     });
 
     // ---- The rows of QA-v10 that only John's own hand can walk ----
