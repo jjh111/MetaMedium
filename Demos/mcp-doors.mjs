@@ -202,7 +202,9 @@ function clientDoorLines() {
     const block = commentBlock(src, /^\s*\/\/ Bidirectional: Demos\/mcp\.mjs/);
     const guess = [...src.matchAll(/^\s*(read|answer|draw): guessTool\(tools, \[([^\]]*)\]\)/gm)].map((m) => m[1] + ' ← a tool whose name has ' + m[2].replace(/'/g, '').replace(/,\s*/g, ', '));
     lines.push('  the page (Demos/surface/04-models.js, models pane ▸ MCP server) maps three roles from the server\'s tools — the person picks, the page guesses by name — each with a contract:');
-    for (const l of block.slice(Math.max(0, block.findIndex((x) => /^\s*read:/.test(x))))) lines.push('  ' + l);
+    const from = block.findIndex((x) => /^\s*read:/.test(x));
+    if (from < 0) lines.push('    (the comment that says so is not where it was — read mcpAgent in Demos/surface/04-models.js)');
+    else for (const l of block.slice(from)) lines.push('  ' + l);
     if (guess.length) lines.push('  guessed by name: ' + guess.join(' · '));
   } catch (err) { lines.push('  the page\'s mapping (Demos/surface/04-models.js): could not be read — ' + (err && err.message || err)); }
   return lines;
@@ -526,7 +528,7 @@ export function destination(out, name, format) {
   if (!real) return { error: '“' + dir + '” is not a folder that exists — make it first; this hand writes only into a place it is told, and makes no folder of its own choosing there' };
   const repo = realOf(REPO_ROOT) || REPO_ROOT;
   if (inside(real, repo)) return { error: 'refused: ' + target + ' is inside the repository (' + repo + ') — an export is never written there; name a place outside it, or leave out out to have it in the OS temp directory' };
-  if (!isDir && !target.toLowerCase().endsWith(EXT[format])) return { error: 'out names a file, and a ' + format + ' is written as ' + EXT[format] + ' — name a file that ends so, or a folder' };
+  if (!isDir && !target.toLowerCase().endsWith(EXT[format])) return { error: 'out names a file, and ' + format + ' is written as ' + EXT[format] + ' — name a file that ends so, or a folder' };
   return { file: isDir ? path.join(target, name) : target };
 }
 
@@ -663,7 +665,7 @@ export const IMPORT_LOOK_DEFAULT = 200;
 export function looksLikeBoard(bytes) {
   const B = bundleFragment();
   if (B.isZipBytes(bytes)) return true;
-  const head = Buffer.from(bytes.subarray(0, 4096)).toString('utf8').replace(/^﻿/, '').trimStart();
+  const head = Buffer.from(bytes.subarray(0, 4096)).toString('utf8').replace(/^\uFEFF/, '').trimStart();
   if (head.startsWith('[')) return true;
   const first = head.split('\n')[0];
   try { const v = JSON.parse(first); return !!v && typeof v === 'object' && typeof v.type === 'string'; } catch { return false; }
@@ -685,7 +687,7 @@ export async function importBoard(ctx, bytes, given, opts = {}) {
     if (!r.ok) return refuse('“' + name + '”: ' + r.words);
     text = r.text; kind = 'a bundle'; carried = r.assets; damaged = r.damaged; logSource = 'board.jsonl in “' + name + '”';
   } else {
-    text = Buffer.from(bytes).toString('utf8').replace(/^﻿/, '');
+    text = Buffer.from(bytes).toString('utf8').replace(/^\uFEFF/, '');
     kind = 'a log';
   }
   const read = readLog(MM, text, logSource);

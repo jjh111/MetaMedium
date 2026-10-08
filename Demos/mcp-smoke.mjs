@@ -7,7 +7,7 @@
 //
 // Every line it prints is a check; it exits 1 when one fails.
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startRelay } from './relay.mjs';
@@ -690,6 +690,23 @@ async function seatCases() {
 
     await wait(400);
     check('the watcher printed one line per brief parked — five — and nothing else', watchLines.length === 5 && watchLines.every((l) => /^brief \S+ · /.test(l)) && new Set(watchLines.map((l) => l.split(' ')[1])).size === 5, watchLines);
+
+    // ---- Read these: a sheet of numbered lines is a contract of its own, with a parser of its own (PLAN-IPAD-NOTES I8; CG7a) ----
+    // The reply is an object a line, numbered as the sheet is; canvas_pending says so, and canvas_answer checks it as the page reads it.
+    const line2 = session.addStroke(cursive.map((p) => ({ x: p.x, y: p.y + 100 })), Date.now(), undefined, 1);
+    const line3 = session.addStroke(cursive.map((p) => ({ x: p.x, y: p.y + 200 })), Date.now(), undefined, 1);
+    const sheet = seat.readLines({ lines: [{ nodeId: line2, ids: [line2] }, { nodeId: line3, ids: [line3] }], image, at: Date.now() });
+    const kSheet = seat.waiting()[0];
+    const pSheet = await pendingText((t) => kSheet && t.includes(kSheet.key));
+    check('Read these parks a sheet: canvas_pending prints the contract of a sheet and a reply shape that is an object a line — numbered, with how to say a line cannot be read',
+      !!kSheet && /sheet of numbered lines/.test(pSheet) && /an object a line, numbered as the sheet is/.test(pSheet) && /"line": 3, "text": ""/.test(pSheet), pSheet.slice(0, 600));
+    const offSheet = await call('canvas_answer', { key: kSheet ? kSheet.key : '', reply: [{ line: 5, text: 'x', confidence: 0.9 }] });
+    check('a reply that names a line the sheet does not have is not sent — the page would read nothing from it — and the brief still waits',
+      /would read nothing/.test(textOf(offSheet)) && /nothing was sent/.test(textOf(offSheet)) && keysIn(textOf(await call('canvas_pending', {}))).includes(kSheet.key), textOf(offSheet));
+    await call('canvas_answer', { key: kSheet ? kSheet.key : '', reply: [{ line: 1, text: 'first line', confidence: 0.9 }, { line: 2, text: 'second line', confidence: 0.8 }] });
+    const gotSheet = await settled(sheet);
+    check('a reply numbered as the sheet is lands a reading on each line, as the page reads it — attributed to the seat, never blessed',
+      gotSheet.ok && gotSheet.lines.length === 2 && gotSheet.lines.every((l) => l.ok) && MM.transcriptOf(session.getState().nodes.get(line2)) === 'first line' && MM.transcriptOf(session.getState().nodes.get(line3)) === 'second line', gotSheet);
   } finally {
     seat.leave();
     store.close();
@@ -835,6 +852,9 @@ try {
     }
     return stack.length === 0 && roots === 1 && !/<[A-Za-z/]/.test(xml.slice(i)) ? null : 'unclosed or stray markup near ' + i;
   };
+
+  // …and a real parser's word where Python is here: an SVG that ElementTree reads (true), one it refuses (false), no Python (null — skipped).
+  const xmlOk = (xml) => { const r = spawnSync('python3', ['-I', '-c', 'import sys, xml.etree.ElementTree as E; E.fromstring(sys.stdin.buffer.read())'], { input: xml }); return r.error ? null : r.status === 0; };
 
   // ---- The contracts as core builds them, asked a second way: an agent over a transport that only keeps what it was sent ----
   const sent = {};
@@ -1012,13 +1032,13 @@ try {
     // The SVG: the board in layers, pictures as data URLs, ink as paths named for the marks — well-formed, whole and narrowed.
     const exSvg = heads(await dcall('canvas_export', { format: 'svg' }));
     check('canvas_export svg: a sentence and the file — a well-formed SVG with the picture inside it as a data URL and every stroke a path named for its mark',
-      exSvg.length === 2 && wellFormed(exSvg[1]) === null && /^<svg\b/.test(exSvg[1]) && /<image\b[^>]*xlink:href="data:image\/png;base64,/.test(exSvg[1]) && flow.every((id) => exSvg[1].includes('data-node="' + id + '"')), { sentence: exSvg[0], wellFormed: wellFormed(exSvg[1] || ''), head: (exSvg[1] || '').slice(0, 200) });
+      exSvg.length === 2 && wellFormed(exSvg[1]) === null && xmlOk(exSvg[1]) !== false && /^<svg\b/.test(exSvg[1]) && /<image\b[^>]*xlink:href="data:image\/png;base64,/.test(exSvg[1]) && flow.every((id) => exSvg[1].includes('data-node="' + id + '"')), { sentence: exSvg[0], wellFormed: wellFormed(exSvg[1] || ''), head: (exSvg[1] || '').slice(0, 200) });
     const oneBox = heads(await dcall('canvas_export', { format: 'svg', ids: [flow[0]] }));
     check('…ids narrow it to the marks named: one box, no arrows, no picture', oneBox.length === 2 && wellFormed(oneBox[1]) === null && (oneBox[1].match(/<path /g) || []).length === 1 && oneBox[1].includes('data-node="' + flow[0] + '"') && !/<image/.test(oneBox[1]), { paths: (oneBox[1] || '').match(/<path /g), sentence: oneBox[0] });
     const svgOut = path.join(mkdtempSync(path.join(tmpdir(), 'mm-export-svg-')), 'board.svg');
     cleanup.push(path.dirname(svgOut));
     const svgOutRes = heads(await dcall('canvas_export', { format: 'svg', out: svgOut })).join('\n');
-    check('out writes a text format to a file instead of answering inline', existsSync(svgOut) && wellFormed(readFileSync(svgOut, 'utf8')) === null && svgOutRes.includes(svgOut), svgOutRes.slice(0, 200));
+    check('out writes a text format to a file instead of answering inline', existsSync(svgOut) && wellFormed(readFileSync(svgOut, 'utf8')) === null && xmlOk(readFileSync(svgOut, 'utf8')) !== false && svgOutRes.includes(svgOut), svgOutRes.slice(0, 200));
 
     // Mermaid: the likeliest notation the marks read as — a drawn flowchart says as a flowchart.
     const exMmd = heads(await dcall('canvas_export', { format: 'mermaid', ids: flow }));
@@ -1030,7 +1050,7 @@ try {
     // True size: the labelled triangle drawn from its numbers at its real size; a board with no numbers on the figure says what it needs.
     const exTrue = heads(await dcall('canvas_export', { format: 'truesize' }));
     check('canvas_export truesize: the triangle with 24″ and 8″ on its legs, drawn at real size from the numbers — an SVG whose root is paper, 24.8 inches wide',
-      exTrue.length === 2 && wellFormed(exTrue[1]) === null && /<svg [^>]*width="24\.8\d*in"/.test(exTrue[1]) && /true-size\.svg/.test(exTrue[0]) && /1 figure at real size/.test(exTrue[0]), { sentence: exTrue[0], head: (exTrue[1] || '').slice(0, 160) });
+      exTrue.length === 2 && wellFormed(exTrue[1]) === null && xmlOk(exTrue[1]) !== false && /<svg [^>]*width="24\.8\d*in"/.test(exTrue[1]) && /true-size\.svg/.test(exTrue[0]) && /1 figure at real size/.test(exTrue[0]), { sentence: exTrue[0], head: (exTrue[1] || '').slice(0, 160) });
     const noTrue = heads(await dcall('canvas_export', { format: 'truesize', ids: flow })).join('\n');
     check('…and a flow with no numbers on it says what it would need, in the app\'s own words', /nothing to draw at true size/.test(noTrue) && /label a side/.test(noTrue), noTrue);
     const noFormat = textOf(await dcall('canvas_export', { format: 'pdf' }));
