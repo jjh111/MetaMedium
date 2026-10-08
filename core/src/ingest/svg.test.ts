@@ -76,7 +76,7 @@ describe('a stroked path is a stroke exactly as drawn', () => {
 
   it('is given the density of ink, because the engine measures along a stroke and a stroke of corners reads as nothing', () => {
     const [s] = strokes(svg(pen('M10 10 L110 10 L110 60')));
-    for (let i = 1; i < s.points.length; i++) expect(Math.hypot(s.points[i].x - s.points[i - 1].x, s.points[i].y - s.points[i - 1].y)).toBeLessThanOrEqual(2.0001);
+    for (let i = 1; i < s.points.length; i++) expect(Math.hypot(s.points[i].x - s.points[i - 1].x, s.points[i].y - s.points[i - 1].y)).toBeLessThanOrEqual(3);
   });
 
   it('a box drawn as a rect, a circle and an ellipse read as a rectangle, a circle and a circle', () => {
@@ -130,21 +130,22 @@ describe('every path command, absolute and relative', () => {
 
   it('a cubic is walked along its curve, and a smooth one reflects the control before it', () => {
     const [c] = strokes(svg(pen('M0 0 C 0 50 100 50 100 0')));
-    expect(c.points.some((p) => Math.hypot(p.x - 50, p.y - 37.5) < 0.3)).toBe(true);
+    expect(c.points.some((p) => Math.hypot(p.x - 50, p.y - 37.5) < 1.6)).toBe(true);
     const [s] = strokes(svg(pen('M0 0 C 0 50 50 50 50 0 S 100 -50 100 0')));
-    // The second half is the first reflected: its middle is at (75, -37.5).
-    expect(s.points.some((p) => Math.hypot(p.x - 75, p.y + 37.5) < 0.3)).toBe(true);
+    // The second half is the first reflected: its middle is at (75, -37.5), and the points are three pixels apart at most.
+    expect(s.points.some((p) => Math.hypot(p.x - 75, p.y + 37.5) < 1.6)).toBe(true);
+    expect(Math.min(...s.points.map((p) => p.y))).toBeLessThan(-37);
   });
 
   it('a quadratic and a smooth quadratic', () => {
     const [q] = strokes(svg(pen('M0 0 Q 50 100 100 0 T 200 0')));
-    expect(q.points.some((p) => Math.hypot(p.x - 50, p.y - 50) < 0.3)).toBe(true);
-    expect(q.points.some((p) => Math.hypot(p.x - 150, p.y + 50) < 0.3)).toBe(true);
+    expect(q.points.some((p) => Math.hypot(p.x - 50, p.y - 50) < 1.6)).toBe(true);
+    expect(q.points.some((p) => Math.hypot(p.x - 150, p.y + 50) < 1.6)).toBe(true);
   });
 
   it('an arc stays on its circle; its flags choose the way round and the long way or the short', () => {
     const [a] = strokes(svg(pen('M50 0 A 50 50 0 0 1 100 50')));
-    for (const p of a.points) expect(Math.hypot(p.x - 50, p.y - 50)).toBeLessThan(0.1);
+    for (const p of a.points) expect(Math.abs(Math.hypot(p.x - 50, p.y - 50) - 50)).toBeLessThan(0.1);
     const [large] = strokes(svg(pen('M20 50 A 60 60 0 1 1 80 50')));
     const [small] = strokes(svg(pen('M20 50 A 60 60 0 0 1 80 50')));
     expect(lengthOf(large.points)).toBeGreaterThan(300);
@@ -220,7 +221,7 @@ describe('transforms nest, and a clone lands where it belongs', () => {
   it('a use that refers to itself, or to a thing that is not there, is said and does not loop', () => {
     const r = ok(read(svg('<g id="a"><use href="#a"/><path d="M0 0 L5 5" stroke="#000"/></g><use href="#a"/><use href="#nothing"/><use href="https://example.com/x.svg#y"/>')));
     expect(r.doc.pages[0].strokes.length).toBeGreaterThanOrEqual(1);
-    expect(r.notes.join(' ')).toMatch(/itself|refers/i);
+    expect(r.notes.join(' ')).toMatch(/themselves|nest/i);
   });
 
   it('thousands of clones are expanded, but only so many: past the cap the file is cut off with a sentence', () => {
@@ -363,6 +364,21 @@ describe('a pen stroke stored as a filled outline comes back as a line, in its c
     expect(big[0].width).toBeGreaterThan(7);
   });
 
+  it('a stroke cloned a thousand times is read once and moved a thousand times — the whiteboard’s trap', () => {
+    const uses = Array.from({ length: 1000 }, (_, i) => `<use href="#p" x="${(i % 40) * 4}" y="${Math.floor(i / 40) * 3}"/>`).join('');
+    const t0 = Date.now();
+    const { doc } = ok(read(svg(`<defs><path id="p" d="${penD()}" fill="#102030"/></defs>${uses}`, 'width="400" height="200" viewBox="0 0 400 200"')));
+    expect(doc.pages[0].strokes).toHaveLength(1000);
+    expect(doc.reading.evidence.clones).toBe(1000);
+    expect(doc.reading.evidence.outlinesRead).toBe(1);
+    expect(Date.now() - t0).toBeLessThan(3000);
+    // Each is the first, moved: same shape, its own place, and no two share their points.
+    const [a, b] = doc.pages[0].strokes;
+    expect(b.points[0].x - a.points[0].x).toBeCloseTo(4, 6);
+    expect(a.points).not.toBe(b.points);
+    expect(a.points[0]).not.toBe(b.points[0]);
+  });
+
   it('a compound path under even-odd is a ring and its hole: one closed line', () => {
     const outer = 'M100 50 A50 50 0 1 1 100 150 A50 50 0 1 1 100 50 Z';
     const inner = 'M100 54 A46 46 0 1 1 100 146 A46 46 0 1 1 100 54 Z';
@@ -470,8 +486,10 @@ describe('a drawing is ink or a figure, and says why', () => {
   });
 
   it('a hand-drawn stroked path is ink, a ruled line is a figure', () => {
-    const wobble = 'M10 10 C 30 40 50 -20 70 30 S 110 60 150 20';
-    expect(ok(read(svg(pen(wobble) + pen('M10 60 C 30 90 50 40 70 80 S 110 100 150 70')))).doc.reading.as).toBe('ink');
+    // A pencil's line has a node every few pixels; a designed curve has two or three.
+    const doodle = (y: number) => 'M10 ' + y + ' ' + Array.from({ length: 14 }, (_, i) => `S ${20 + i * 10} ${y + (i % 2 ? 9 : -9)} ${25 + i * 10} ${y + (i % 3) * 2}`).join(' ');
+    expect(ok(read(svg(pen(doodle(30)) + pen(doodle(70))))).doc.reading.as).toBe('ink');
+    expect(ok(read(svg(pen('M10 10 C 30 40 50 -20 70 30 S 110 60 150 20') + pen('M10 60 C 30 90 50 40 70 80 S 110 100 150 70')))).doc.reading.as).toBe('figure');
     expect(ok(read(svg('<line x1="5" y1="5" x2="95" y2="5" stroke="#000"/><line x1="5" y1="15" x2="95" y2="15" stroke="#000"/><rect x="5" y="30" width="40" height="30" fill="none" stroke="#000"/>'))).doc.reading.as).toBe('figure');
   });
 

@@ -95,6 +95,8 @@ export const MAX_CAP_CANDIDATES = 6;
 export const MAX_CAP_PAIRS = 8;
 /** The most points a ring is walked to. */
 const MAX_WALK = 8000;
+/** A raster bigger than this is thinned once: drawing it again at other offsets costs more than it is likely to find. */
+const RETRY_MAX_PX = 400_000;
 /** A thinned branch shorter than this many pen widths is junction debris, not a stroke. */
 const SCRAP_OF_WIDTH = 1.5;
 /** The scales, as multiples of the first, a fill is thinned at until a skeleton stands for it. */
@@ -187,7 +189,8 @@ function recoverUnit(u: Unit, rule: FillRule, opts: RecoverOptions): OutlineReco
   // on — so where the first drawing does not stand for the fill, it is drawn again at another scale.
   let skel: Candidate[] | null = null;
   let skelM: { recall: number; precision: number } | null = null;
-  for (const { mul, x, y } of SKELETON_SCALES) {
+  const tries = raster.width * raster.height > RETRY_MAX_PX ? SKELETON_SCALES.slice(0, 1) : SKELETON_SCALES;
+  for (const { mul, x, y } of tries) {
     let r = raster;
     if (mul !== 1 || x !== 0 || y !== 0) {
       if (!charge(raster.width * raster.height * mul * mul)) break;

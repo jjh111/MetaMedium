@@ -17,7 +17,7 @@ export const FAITHFUL_AT = 0.9;
 /** …and *near* when it does at least this: the bench reports both. */
 export const NEAR_AT = 0.8;
 /** The most pixels one raster may hold; past it the scale is reduced to fit. */
-export const MAX_RASTER_PX = 2_500_000;
+export const MAX_RASTER_PX = 1_500_000;
 
 export interface Raster {
   /** The page position of the raster's top left corner. */

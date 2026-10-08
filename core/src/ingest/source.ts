@@ -210,8 +210,8 @@ export const DEFAULT_LIMITS: IngestLimits = {
   outlines: 60_000,
   vertices: 30_000_000,
   points: 6_000_000,
-  rasterPx: 600_000_000,
-  ms: 90_000,
+  rasterPx: 400_000_000,
+  ms: 60_000,
 };
 
 export interface IngestOptions {
