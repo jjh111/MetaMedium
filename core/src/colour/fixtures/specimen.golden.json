@@ -1,0 +1,1353 @@
+{
+  "about": "The colour space's specimen (brand/colour-space.html at 4fa1bed, 2 October 2026) run in Node on the seed acts, the page's examples and seeded random boards, and what it said written down. Made by core/src/colour/test/make-golden.mjs. core/src/colour must say the same: hues to 1e-6, hexes equal. A scenario with an `overflow` is one where the specimen ran out of patterns and repeated the last; core says so instead, so only its colours are held to the golden there.",
+  "palette": {"grounds":{"paper":{"ground":"#f8f5ef","ink":"#0c1a24","L":[0.44,0.505,0.57],"C":0.15,"toward":1},"dark":{"ground":"#131315","ink":"#e3edf1","L":[0.8,0.735,0.67],"C":0.13,"toward":-1}},"signals":[{"name":"read","hex":"#1c5fb8","hue":257.4013696773599},{"name":"confident","hex":"#0b6f7d","hue":210.39085053248712},{"name":"unsure","hex":"#a3761c","hue":79.40191604061317},{"name":"broken","hex":"#a8493c","hue":29.873172138973473},{"name":"a model","hex":"#6b4fa8","hue":295.50225347673006}]},
+  "constants": {"OFFERED":0.38,"FLOOR":4.5,"APART":0.06,"DEPTHS":2,"CHANNELS":["solid","dashed","dotted","dash-dot","long"]},
+  "scenarios": [
+    {
+      "name": "seed",
+      "overflow": [],
+      "acts": [
+        {"text":"it's an idea · purple","act":{"act":"say","a":"idea","word":"purple"},"answer":"idea → 305°, your purple; it stands by the chrome's colour for a model (9° away) — on ink it means idea"},
+        {"text":"it's a task","act":{"act":"say","a":"task"},"answer":"task → 140°, the most distinct place left (165° from idea)"},
+        {"text":"it's a note","act":{"act":"say","a":"note"},"answer":"note → 51°, the most distinct place left (89° from task)"},
+        {"text":"insight is a kind of idea","act":{"act":"sub","a":"insight","b":"idea"},"answer":"insight is a kind of idea: idea's hue, a step toward the ground"},
+        {"text":"hunch is a kind of idea","act":{"act":"sub","a":"hunch","b":"idea"},"answer":"hunch is a kind of idea: idea's hue +28°, a step toward the ground"},
+        {"text":"question is kin to idea","act":{"act":"kin","a":"question","b":"idea"},"answer":"question is kin to idea: question 45° beside idea, on the side that stays most distinct"},
+        {"text":"assumption opposes evidence","act":{"act":"opposes","a":"assumption","b":"evidence"},"answer":"assumption opposes evidence: placed together across the wheel, 180° apart"}
+      ],
+      "kinds": [
+        {"name":"idea","hue":305,"depth":0,"source":"said","order":0,"parent":null,"anchor":null,"offset":0,"rel":null,"word":"purple","paper":{"said":{"hex":"#663693","contrast":7.688065525057642,"moved":0},"offered":{"hex":"#5a4a6c","contrast":7.304728138896393,"moved":0}},"dark":{"said":{"hex":"#d1a8ff","contrast":9.522886164076981,"moved":0},"offered":{"hex":"#c5b6d7","contrast":9.789130786083696,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"task","hue":140,"depth":0,"source":"placed","order":1,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#1a6400","contrast":6.753374960492275,"moved":0},"offered":{"hex":"#435a3d","contrast":6.975331187943172,"moved":0}},"dark":{"said":{"hex":"#90d281","contrast":10.37015454134611,"moved":0},"offered":{"hex":"#adc6a8","contrast":10.105165705080505,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"note","hue":51,"depth":0,"source":"placed","order":2,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#823b00","contrast":7.458490481831195,"moved":0},"offered":{"hex":"#664c3d","contrast":7.242396779836129,"moved":0}},"dark":{"said":{"hex":"#ffa56f","contrast":9.580638095037012,"moved":0},"offered":{"hex":"#d8b6a2","contrast":9.809546865715468,"moved":0}},"channel":{"channel":"dashed","alike":"task","who":["deuteranopes"]}},
+        {"name":"insight","hue":305,"depth":1,"source":"relative","order":3,"parent":"idea","anchor":"idea","offset":0,"rel":"sub","paper":{"said":{"hex":"#7949a8","contrast":5.795764143976542,"moved":0},"offered":{"hex":"#6c5d7f","contrast":5.520893691910922,"moved":0}},"dark":{"said":{"hex":"#bc93eb","contrast":7.53967476338074,"moved":0},"offered":{"hex":"#b0a2c3","contrast":7.775903153455702,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"hunch","hue":333,"depth":1,"source":"relative","order":4,"parent":"idea","anchor":"idea","offset":28,"rel":"sub","paper":{"said":{"hex":"#943d89","contrast":5.864963992494181,"moved":0},"offered":{"hex":"#795973","contrast":5.561237924908364,"moved":0}},"dark":{"said":{"hex":"#da89cc","contrast":7.446288033894885,"moved":0},"offered":{"hex":"#bd9eb7","contrast":7.730880234996653,"moved":0}},"channel":{"channel":"dotted","alike":"insight","who":["protanopes","deuteranopes"]}},
+        {"name":"question","hue":350,"depth":0,"source":"relative","order":5,"parent":null,"anchor":"idea","offset":45,"rel":"kin","paper":{"said":{"hex":"#8a235e","contrast":7.771429172778878,"moved":0},"offered":{"hex":"#6b4557","contrast":7.367176619823334,"moved":0}},"dark":{"said":{"hex":"#fc9ac9","contrast":9.372143742451016,"moved":0},"offered":{"hex":"#d8b1c2","contrast":9.718907596825009,"moved":0}},"channel":{"channel":"solid","alike":"note","who":["tritanopes"]}},
+        {"name":"assumption","hue":18,"depth":0,"source":"placed","order":6,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#932031","contrast":7.735631819908955,"moved":0},"offered":{"hex":"#6f4647","contrast":7.350560641702386,"moved":0}},"dark":{"said":{"hex":"#ff9fa2","contrast":9.471318184057619,"moved":0},"offered":{"hex":"#d9b3b3","contrast":9.758231904340839,"moved":0}},"channel":{"channel":"dash-dot","alike":"note","who":["deuteranopes","tritanopes"]}},
+        {"name":"evidence","hue":198,"depth":0,"source":"relative","order":7,"parent":null,"anchor":"assumption","offset":180,"rel":"opposes","paper":{"said":{"hex":"#005f61","contrast":6.882359464338029,"moved":0},"offered":{"hex":"#405858","contrast":7.037799161230578,"moved":0}},"dark":{"said":{"hex":"#28d7dc","contrast":10.441975462089466,"moved":0},"offered":{"hex":"#99c8c9","contrast":10.1274632116209,"moved":0}},"channel":{"channel":"dashed","alike":"question","who":["deuteranopes"]}}
+      ],
+      "pairs": [
+        {"a":"idea","b":"task","by":{"typical":0.25412513229066075,"protan":0.2066788578612375,"deutan":0.17684678465167455,"tritan":0.10193115004462082},"min":0.10193115004462082},
+        {"a":"idea","b":"note","by":{"typical":0.20301157143097415,"protan":0.20035983680341155,"deutan":0.20635426447228813,"tritan":0.11210686007100704},"min":0.11210686007100704},
+        {"a":"idea","b":"insight","by":{"typical":0.06499999957578782,"protan":0.06453385084950476,"deutan":0.06547940762724912,"tritan":0.06516935491195197},"min":0.06453385084950476},
+        {"a":"idea","b":"hunch","by":{"typical":0.08990472066201612,"protan":0.06041667827289951,"deutan":0.07672446659805565,"tritan":0.0996848396004551},"min":0.06041667827289951},
+        {"a":"idea","b":"question","by":{"typical":0.0981474410732783,"protan":0.0728448437949366,"deutan":0.08851288714003419,"tritan":0.10227386659009276},"min":0.0728448437949366},
+        {"a":"idea","b":"assumption","by":{"typical":0.14376276801283322,"protan":0.13084497442936646,"deutan":0.14532562103382832,"tritan":0.10840030815325381},"min":0.10840030815325381},
+        {"a":"idea","b":"evidence","by":{"typical":0.18618631922877418,"protan":0.1048754657469224,"deutan":0.05031590571033622,"tritan":0.11460513816999508},"min":0.05031590571033622},
+        {"a":"task","b":"note","by":{"typical":0.18069962080770569,"protan":0.07329022148257082,"deutan":0.011782830444021064,"tritan":0.19860594353085806},"min":0.011782830444021064},
+        {"a":"task","b":"insight","by":{"typical":0.26584449351848977,"protan":0.22966559106461318,"deutan":0.1947206979767963,"tritan":0.12365082040245241},"min":0.12365082040245241},
+        {"a":"task","b":"hunch","by":{"typical":0.26638075906619035,"protan":0.18593659313545624,"deutan":0.14457583286561188,"tritan":0.18566787320317735},"min":0.14457583286561188},
+        {"a":"task","b":"question","by":{"typical":0.2511407131907586,"protan":0.15677640334937257,"deutan":0.0893535184678567,"tritan":0.19610438148327183},"min":0.0893535184678567},
+        {"a":"task","b":"assumption","by":{"typical":0.21430022676805618,"protan":0.10735590671522226,"deutan":0.026945815210539778,"tritan":0.1987816785647725},"min":0.026945815210539778},
+        {"a":"task","b":"evidence","by":{"typical":0.12012393733173966,"protan":0.10946433029157904,"deutan":0.11287123659149369,"tritan":0.018411216577074573},"min":0.018411216577074573},
+        {"a":"note","b":"insight","by":{"typical":0.21596802246774177,"protan":0.20687536413878124,"deutan":0.2162583195038909,"tritan":0.11994147490927429},"min":0.11994147490927429},
+        {"a":"note","b":"hunch","by":{"typical":0.1748285950728778,"protan":0.17466189278559524,"deutan":0.16036436812934082,"tritan":0.05831164849001646},"min":0.05831164849001646},
+        {"a":"note","b":"question","by":{"typical":0.13089565587157537,"protan":0.13371850409628608,"deutan":0.10689965119372667,"tritan":0.024700514227871298},"min":0.024700514227871298},
+        {"a":"note","b":"assumption","by":{"typical":0.0700639721387937,"protan":0.06681395116658799,"deutan":0.034880986551021606,"tritan":0.011574594408014484},"min":0.011574594408014484},
+        {"a":"note","b":"evidence","by":{"typical":0.1820840767717022,"protan":0.12073048422108028,"deutan":0.12272374862112972,"tritan":0.21232082623077989},"min":0.12073048422108028},
+        {"a":"insight","b":"hunch","by":{"typical":0.06289969214264497,"protan":0.045484508572393896,"deutan":0.053358352467626095,"tritan":0.0777195608996632},"min":0.045484508572393896},
+        {"a":"insight","b":"question","by":{"typical":0.11884776393248465,"protan":0.07870982458628924,"deutan":0.11858233561676543,"tritan":0.11672906538072755},"min":0.07870982458628924},
+        {"a":"insight","b":"assumption","by":{"typical":0.15996641435463363,"protan":0.13661274267641446,"deutan":0.16793168397301442,"tritan":0.11813263695323978},"min":0.11813263695323978},
+        {"a":"insight","b":"evidence","by":{"typical":0.19720633605603055,"protan":0.12528361654749523,"deutan":0.08495270570515155,"tritan":0.12400975526728823},"min":0.08495270570515155},
+        {"a":"hunch","b":"question","by":{"typical":0.07551092220075095,"protan":0.06356900172217034,"deutan":0.07430407680716081,"tritan":0.059396778842453764},"min":0.059396778842453764},
+        {"a":"hunch","b":"assumption","by":{"typical":0.114899401116608,"protan":0.1081489523230696,"deutan":0.12003070837740125,"tritan":0.05640231561393318},"min":0.05640231561393318},
+        {"a":"hunch","b":"evidence","by":{"typical":0.2195494635862055,"protan":0.07898520298269153,"deutan":0.05903834960217941,"tritan":0.20370179832843058},"min":0.05903834960217941},
+        {"a":"question","b":"assumption","by":{"typical":0.06103137585701131,"protan":0.06164422116330536,"deutan":0.05721898930782907,"tritan":0.013634991948161736},"min":0.013634991948161736},
+        {"a":"question","b":"evidence","by":{"typical":0.21891767749387292,"protan":0.09705573155352516,"deutan":0.017785216318314433,"tritan":0.2324757063249258},"min":0.017785216318314433},
+        {"a":"assumption","b":"evidence","by":{"typical":0.2248399649789002,"protan":0.10556149254857121,"deutan":0.08873081345695764,"tritan":0.25770200036448204},"min":0.08873081345695764}
+      ],
+      "meaning": [
+        "idea, insight and hunch are one family: idea's hue, each kind below it a step toward the ground",
+        "question stands beside idea, 45° along the wheel: kin",
+        "assumption and evidence are drawn as opposites, 180° apart",
+        "task and note stand apart from the rest",
+        "idea's purple stands near the chrome's colour for a model: on the ink it means idea, and the chrome's colours never touch the ink",
+        "note is drawn dashed: beside task it looks alike to deuteranopes",
+        "hunch is drawn dotted: beside insight it looks alike to protanopes and deuteranopes",
+        "assumption is drawn dash-dot: beside note it looks alike to deuteranopes and tritanopes",
+        "evidence is drawn dashed: beside question it looks alike to deuteranopes"
+      ]
+    },
+    {
+      "name": "seed, then \"it's a quote · teal\"",
+      "overflow": [],
+      "acts": [
+        {"text":"it's an idea · purple","act":{"act":"say","a":"idea","word":"purple"},"answer":"idea → 305°, your purple; it stands by the chrome's colour for a model (9° away) — on ink it means idea"},
+        {"text":"it's a task","act":{"act":"say","a":"task"},"answer":"task → 140°, the most distinct place left (165° from idea)"},
+        {"text":"it's a note","act":{"act":"say","a":"note"},"answer":"note → 51°, the most distinct place left (89° from task)"},
+        {"text":"insight is a kind of idea","act":{"act":"sub","a":"insight","b":"idea"},"answer":"insight is a kind of idea: idea's hue, a step toward the ground"},
+        {"text":"hunch is a kind of idea","act":{"act":"sub","a":"hunch","b":"idea"},"answer":"hunch is a kind of idea: idea's hue +28°, a step toward the ground"},
+        {"text":"question is kin to idea","act":{"act":"kin","a":"question","b":"idea"},"answer":"question is kin to idea: question 45° beside idea, on the side that stays most distinct"},
+        {"text":"assumption opposes evidence","act":{"act":"opposes","a":"assumption","b":"evidence"},"answer":"assumption opposes evidence: placed together across the wheel, 180° apart"},
+        {"text":"it's a quote · teal","act":{"act":"say","a":"quote","word":"teal"},"answer":"quote → 195°, your teal"}
+      ],
+      "kinds": [
+        {"name":"idea","hue":305,"depth":0,"source":"said","order":0,"parent":null,"anchor":null,"offset":0,"rel":null,"word":"purple","paper":{"said":{"hex":"#663693","contrast":7.688065525057642,"moved":0},"offered":{"hex":"#5a4a6c","contrast":7.304728138896393,"moved":0}},"dark":{"said":{"hex":"#d1a8ff","contrast":9.522886164076981,"moved":0},"offered":{"hex":"#c5b6d7","contrast":9.789130786083696,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"task","hue":140,"depth":0,"source":"placed","order":1,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#1a6400","contrast":6.753374960492275,"moved":0},"offered":{"hex":"#435a3d","contrast":6.975331187943172,"moved":0}},"dark":{"said":{"hex":"#90d281","contrast":10.37015454134611,"moved":0},"offered":{"hex":"#adc6a8","contrast":10.105165705080505,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"note","hue":51,"depth":0,"source":"placed","order":2,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#823b00","contrast":7.458490481831195,"moved":0},"offered":{"hex":"#664c3d","contrast":7.242396779836129,"moved":0}},"dark":{"said":{"hex":"#ffa56f","contrast":9.580638095037012,"moved":0},"offered":{"hex":"#d8b6a2","contrast":9.809546865715468,"moved":0}},"channel":{"channel":"dashed","alike":"task","who":["deuteranopes"]}},
+        {"name":"insight","hue":305,"depth":1,"source":"relative","order":3,"parent":"idea","anchor":"idea","offset":0,"rel":"sub","paper":{"said":{"hex":"#7949a8","contrast":5.795764143976542,"moved":0},"offered":{"hex":"#6c5d7f","contrast":5.520893691910922,"moved":0}},"dark":{"said":{"hex":"#bc93eb","contrast":7.53967476338074,"moved":0},"offered":{"hex":"#b0a2c3","contrast":7.775903153455702,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"hunch","hue":333,"depth":1,"source":"relative","order":4,"parent":"idea","anchor":"idea","offset":28,"rel":"sub","paper":{"said":{"hex":"#943d89","contrast":5.864963992494181,"moved":0},"offered":{"hex":"#795973","contrast":5.561237924908364,"moved":0}},"dark":{"said":{"hex":"#da89cc","contrast":7.446288033894885,"moved":0},"offered":{"hex":"#bd9eb7","contrast":7.730880234996653,"moved":0}},"channel":{"channel":"dotted","alike":"insight","who":["protanopes","deuteranopes"]}},
+        {"name":"question","hue":350,"depth":0,"source":"relative","order":5,"parent":null,"anchor":"idea","offset":45,"rel":"kin","paper":{"said":{"hex":"#8a235e","contrast":7.771429172778878,"moved":0},"offered":{"hex":"#6b4557","contrast":7.367176619823334,"moved":0}},"dark":{"said":{"hex":"#fc9ac9","contrast":9.372143742451016,"moved":0},"offered":{"hex":"#d8b1c2","contrast":9.718907596825009,"moved":0}},"channel":{"channel":"solid","alike":"note","who":["tritanopes"]}},
+        {"name":"assumption","hue":18,"depth":0,"source":"placed","order":6,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#932031","contrast":7.735631819908955,"moved":0},"offered":{"hex":"#6f4647","contrast":7.350560641702386,"moved":0}},"dark":{"said":{"hex":"#ff9fa2","contrast":9.471318184057619,"moved":0},"offered":{"hex":"#d9b3b3","contrast":9.758231904340839,"moved":0}},"channel":{"channel":"dash-dot","alike":"note","who":["deuteranopes","tritanopes"]}},
+        {"name":"evidence","hue":198,"depth":0,"source":"relative","order":7,"parent":null,"anchor":"assumption","offset":180,"rel":"opposes","paper":{"said":{"hex":"#005f61","contrast":6.882359464338029,"moved":0},"offered":{"hex":"#405858","contrast":7.037799161230578,"moved":0}},"dark":{"said":{"hex":"#28d7dc","contrast":10.441975462089466,"moved":0},"offered":{"hex":"#99c8c9","contrast":10.1274632116209,"moved":0}},"channel":{"channel":"dashed","alike":"question","who":["deuteranopes"]}},
+        {"name":"quote","hue":195,"depth":0,"source":"said","order":8,"parent":null,"anchor":null,"offset":0,"rel":null,"word":"teal","paper":{"said":{"hex":"#005f5f","contrast":6.874702300663512,"moved":0},"offered":{"hex":"#405857","contrast":7.035115085061884,"moved":0}},"dark":{"said":{"hex":"#2ad7d7","contrast":10.456019742446147,"moved":0},"offered":{"hex":"#99c8c7","contrast":10.132114512876953,"moved":0}},"channel":{"channel":"dash-dot","alike":"evidence","who":["everyone","protanopes","deuteranopes","tritanopes"]}}
+      ],
+      "meaning": [
+        "idea, insight and hunch are one family: idea's hue, each kind below it a step toward the ground",
+        "question stands beside idea, 45° along the wheel: kin",
+        "assumption and evidence are drawn as opposites, 180° apart",
+        "task, note and quote stand apart from the rest",
+        "idea's purple stands near the chrome's colour for a model: on the ink it means idea, and the chrome's colours never touch the ink",
+        "note is drawn dashed: beside task it looks alike to deuteranopes",
+        "hunch is drawn dotted: beside insight it looks alike to protanopes and deuteranopes",
+        "assumption is drawn dash-dot: beside note it looks alike to deuteranopes and tritanopes",
+        "evidence is drawn dashed: beside question it looks alike to deuteranopes",
+        "quote is drawn dash-dot: beside evidence it looks alike to everyone, protanopes, deuteranopes and tritanopes"
+      ]
+    },
+    {
+      "name": "seed, then \"risk opposes opportunity\"",
+      "overflow": [],
+      "acts": [
+        {"text":"it's an idea · purple","act":{"act":"say","a":"idea","word":"purple"},"answer":"idea → 305°, your purple; it stands by the chrome's colour for a model (9° away) — on ink it means idea"},
+        {"text":"it's a task","act":{"act":"say","a":"task"},"answer":"task → 140°, the most distinct place left (165° from idea)"},
+        {"text":"it's a note","act":{"act":"say","a":"note"},"answer":"note → 51°, the most distinct place left (89° from task)"},
+        {"text":"insight is a kind of idea","act":{"act":"sub","a":"insight","b":"idea"},"answer":"insight is a kind of idea: idea's hue, a step toward the ground"},
+        {"text":"hunch is a kind of idea","act":{"act":"sub","a":"hunch","b":"idea"},"answer":"hunch is a kind of idea: idea's hue +28°, a step toward the ground"},
+        {"text":"question is kin to idea","act":{"act":"kin","a":"question","b":"idea"},"answer":"question is kin to idea: question 45° beside idea, on the side that stays most distinct"},
+        {"text":"assumption opposes evidence","act":{"act":"opposes","a":"assumption","b":"evidence"},"answer":"assumption opposes evidence: placed together across the wheel, 180° apart"},
+        {"text":"risk opposes opportunity","act":{"act":"opposes","a":"risk","b":"opportunity"},"answer":"risk opposes opportunity: placed together across the wheel, 180° apart"}
+      ],
+      "kinds": [
+        {"name":"idea","hue":305,"depth":0,"source":"said","order":0,"parent":null,"anchor":null,"offset":0,"rel":null,"word":"purple","paper":{"said":{"hex":"#663693","contrast":7.688065525057642,"moved":0},"offered":{"hex":"#5a4a6c","contrast":7.304728138896393,"moved":0}},"dark":{"said":{"hex":"#d1a8ff","contrast":9.522886164076981,"moved":0},"offered":{"hex":"#c5b6d7","contrast":9.789130786083696,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"task","hue":140,"depth":0,"source":"placed","order":1,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#1a6400","contrast":6.753374960492275,"moved":0},"offered":{"hex":"#435a3d","contrast":6.975331187943172,"moved":0}},"dark":{"said":{"hex":"#90d281","contrast":10.37015454134611,"moved":0},"offered":{"hex":"#adc6a8","contrast":10.105165705080505,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"note","hue":51,"depth":0,"source":"placed","order":2,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#823b00","contrast":7.458490481831195,"moved":0},"offered":{"hex":"#664c3d","contrast":7.242396779836129,"moved":0}},"dark":{"said":{"hex":"#ffa56f","contrast":9.580638095037012,"moved":0},"offered":{"hex":"#d8b6a2","contrast":9.809546865715468,"moved":0}},"channel":{"channel":"dashed","alike":"task","who":["deuteranopes"]}},
+        {"name":"insight","hue":305,"depth":1,"source":"relative","order":3,"parent":"idea","anchor":"idea","offset":0,"rel":"sub","paper":{"said":{"hex":"#7949a8","contrast":5.795764143976542,"moved":0},"offered":{"hex":"#6c5d7f","contrast":5.520893691910922,"moved":0}},"dark":{"said":{"hex":"#bc93eb","contrast":7.53967476338074,"moved":0},"offered":{"hex":"#b0a2c3","contrast":7.775903153455702,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"hunch","hue":333,"depth":1,"source":"relative","order":4,"parent":"idea","anchor":"idea","offset":28,"rel":"sub","paper":{"said":{"hex":"#943d89","contrast":5.864963992494181,"moved":0},"offered":{"hex":"#795973","contrast":5.561237924908364,"moved":0}},"dark":{"said":{"hex":"#da89cc","contrast":7.446288033894885,"moved":0},"offered":{"hex":"#bd9eb7","contrast":7.730880234996653,"moved":0}},"channel":{"channel":"dotted","alike":"insight","who":["protanopes","deuteranopes"]}},
+        {"name":"question","hue":350,"depth":0,"source":"relative","order":5,"parent":null,"anchor":"idea","offset":45,"rel":"kin","paper":{"said":{"hex":"#8a235e","contrast":7.771429172778878,"moved":0},"offered":{"hex":"#6b4557","contrast":7.367176619823334,"moved":0}},"dark":{"said":{"hex":"#fc9ac9","contrast":9.372143742451016,"moved":0},"offered":{"hex":"#d8b1c2","contrast":9.718907596825009,"moved":0}},"channel":{"channel":"solid","alike":"note","who":["tritanopes"]}},
+        {"name":"assumption","hue":18,"depth":0,"source":"placed","order":6,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#932031","contrast":7.735631819908955,"moved":0},"offered":{"hex":"#6f4647","contrast":7.350560641702386,"moved":0}},"dark":{"said":{"hex":"#ff9fa2","contrast":9.471318184057619,"moved":0},"offered":{"hex":"#d9b3b3","contrast":9.758231904340839,"moved":0}},"channel":{"channel":"dash-dot","alike":"note","who":["deuteranopes","tritanopes"]}},
+        {"name":"evidence","hue":198,"depth":0,"source":"relative","order":7,"parent":null,"anchor":"assumption","offset":180,"rel":"opposes","paper":{"said":{"hex":"#005f61","contrast":6.882359464338029,"moved":0},"offered":{"hex":"#405858","contrast":7.037799161230578,"moved":0}},"dark":{"said":{"hex":"#28d7dc","contrast":10.441975462089466,"moved":0},"offered":{"hex":"#99c8c9","contrast":10.1274632116209,"moved":0}},"channel":{"channel":"dashed","alike":"question","who":["deuteranopes"]}},
+        {"name":"risk","hue":90,"depth":0,"source":"placed","order":8,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#664f00","contrast":7.162768646241556,"moved":0},"offered":{"hex":"#5a523d","contrast":7.133720983804217,"moved":0}},"dark":{"said":{"hex":"#deba50","contrast":9.910766538238056,"moved":0},"offered":{"hex":"#cabd9a","contrast":9.941901749699227,"moved":0}},"channel":{"channel":"dotted","alike":"note","who":["protanopes","deuteranopes","tritanopes"]}},
+        {"name":"opportunity","hue":270,"depth":0,"source":"relative","order":9,"parent":null,"anchor":"risk","offset":180,"rel":"opposes","paper":{"said":{"hex":"#3448a4","contrast":7.418184279776955,"moved":0},"offered":{"hex":"#465172","contrast":7.188622790512684,"moved":0}},"dark":{"said":{"hex":"#a4bbff","contrast":9.836244882516434,"moved":0},"offered":{"hex":"#b4bdd7","contrast":9.908391501200855,"moved":0}},"channel":{"channel":"dash-dot","alike":"idea","who":["protanopes","deuteranopes"]}}
+      ],
+      "meaning": [
+        "idea, insight and hunch are one family: idea's hue, each kind below it a step toward the ground",
+        "question stands beside idea, 45° along the wheel: kin",
+        "assumption and evidence are drawn as opposites, 180° apart",
+        "risk and opportunity are drawn as opposites, 180° apart",
+        "task and note stand apart from the rest",
+        "idea's purple stands near the chrome's colour for a model: on the ink it means idea, and the chrome's colours never touch the ink",
+        "note is drawn dashed: beside task it looks alike to deuteranopes",
+        "hunch is drawn dotted: beside insight it looks alike to protanopes and deuteranopes",
+        "assumption is drawn dash-dot: beside note it looks alike to deuteranopes and tritanopes",
+        "evidence is drawn dashed: beside question it looks alike to deuteranopes",
+        "risk is drawn dotted: beside note it looks alike to protanopes, deuteranopes and tritanopes",
+        "opportunity is drawn dash-dot: beside idea it looks alike to protanopes and deuteranopes"
+      ]
+    },
+    {
+      "name": "seed, then \"todo is a kind of task\"",
+      "overflow": [],
+      "acts": [
+        {"text":"it's an idea · purple","act":{"act":"say","a":"idea","word":"purple"},"answer":"idea → 305°, your purple; it stands by the chrome's colour for a model (9° away) — on ink it means idea"},
+        {"text":"it's a task","act":{"act":"say","a":"task"},"answer":"task → 140°, the most distinct place left (165° from idea)"},
+        {"text":"it's a note","act":{"act":"say","a":"note"},"answer":"note → 51°, the most distinct place left (89° from task)"},
+        {"text":"insight is a kind of idea","act":{"act":"sub","a":"insight","b":"idea"},"answer":"insight is a kind of idea: idea's hue, a step toward the ground"},
+        {"text":"hunch is a kind of idea","act":{"act":"sub","a":"hunch","b":"idea"},"answer":"hunch is a kind of idea: idea's hue +28°, a step toward the ground"},
+        {"text":"question is kin to idea","act":{"act":"kin","a":"question","b":"idea"},"answer":"question is kin to idea: question 45° beside idea, on the side that stays most distinct"},
+        {"text":"assumption opposes evidence","act":{"act":"opposes","a":"assumption","b":"evidence"},"answer":"assumption opposes evidence: placed together across the wheel, 180° apart"},
+        {"text":"todo is a kind of task","act":{"act":"sub","a":"todo","b":"task"},"answer":"todo is a kind of task: task's hue, a step toward the ground"}
+      ],
+      "kinds": [
+        {"name":"idea","hue":305,"depth":0,"source":"said","order":0,"parent":null,"anchor":null,"offset":0,"rel":null,"word":"purple","paper":{"said":{"hex":"#663693","contrast":7.688065525057642,"moved":0},"offered":{"hex":"#5a4a6c","contrast":7.304728138896393,"moved":0}},"dark":{"said":{"hex":"#d1a8ff","contrast":9.522886164076981,"moved":0},"offered":{"hex":"#c5b6d7","contrast":9.789130786083696,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"task","hue":140,"depth":0,"source":"placed","order":1,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#1a6400","contrast":6.753374960492275,"moved":0},"offered":{"hex":"#435a3d","contrast":6.975331187943172,"moved":0}},"dark":{"said":{"hex":"#90d281","contrast":10.37015454134611,"moved":0},"offered":{"hex":"#adc6a8","contrast":10.105165705080505,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"note","hue":51,"depth":0,"source":"placed","order":2,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#823b00","contrast":7.458490481831195,"moved":0},"offered":{"hex":"#664c3d","contrast":7.242396779836129,"moved":0}},"dark":{"said":{"hex":"#ffa56f","contrast":9.580638095037012,"moved":0},"offered":{"hex":"#d8b6a2","contrast":9.809546865715468,"moved":0}},"channel":{"channel":"dashed","alike":"task","who":["deuteranopes"]}},
+        {"name":"insight","hue":305,"depth":1,"source":"relative","order":3,"parent":"idea","anchor":"idea","offset":0,"rel":"sub","paper":{"said":{"hex":"#7949a8","contrast":5.795764143976542,"moved":0},"offered":{"hex":"#6c5d7f","contrast":5.520893691910922,"moved":0}},"dark":{"said":{"hex":"#bc93eb","contrast":7.53967476338074,"moved":0},"offered":{"hex":"#b0a2c3","contrast":7.775903153455702,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"hunch","hue":333,"depth":1,"source":"relative","order":4,"parent":"idea","anchor":"idea","offset":28,"rel":"sub","paper":{"said":{"hex":"#943d89","contrast":5.864963992494181,"moved":0},"offered":{"hex":"#795973","contrast":5.561237924908364,"moved":0}},"dark":{"said":{"hex":"#da89cc","contrast":7.446288033894885,"moved":0},"offered":{"hex":"#bd9eb7","contrast":7.730880234996653,"moved":0}},"channel":{"channel":"dotted","alike":"insight","who":["protanopes","deuteranopes"]}},
+        {"name":"question","hue":350,"depth":0,"source":"relative","order":5,"parent":null,"anchor":"idea","offset":45,"rel":"kin","paper":{"said":{"hex":"#8a235e","contrast":7.771429172778878,"moved":0},"offered":{"hex":"#6b4557","contrast":7.367176619823334,"moved":0}},"dark":{"said":{"hex":"#fc9ac9","contrast":9.372143742451016,"moved":0},"offered":{"hex":"#d8b1c2","contrast":9.718907596825009,"moved":0}},"channel":{"channel":"solid","alike":"note","who":["tritanopes"]}},
+        {"name":"assumption","hue":18,"depth":0,"source":"placed","order":6,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#932031","contrast":7.735631819908955,"moved":0},"offered":{"hex":"#6f4647","contrast":7.350560641702386,"moved":0}},"dark":{"said":{"hex":"#ff9fa2","contrast":9.471318184057619,"moved":0},"offered":{"hex":"#d9b3b3","contrast":9.758231904340839,"moved":0}},"channel":{"channel":"dash-dot","alike":"note","who":["deuteranopes","tritanopes"]}},
+        {"name":"evidence","hue":198,"depth":0,"source":"relative","order":7,"parent":null,"anchor":"assumption","offset":180,"rel":"opposes","paper":{"said":{"hex":"#005f61","contrast":6.882359464338029,"moved":0},"offered":{"hex":"#405858","contrast":7.037799161230578,"moved":0}},"dark":{"said":{"hex":"#28d7dc","contrast":10.441975462089466,"moved":0},"offered":{"hex":"#99c8c9","contrast":10.1274632116209,"moved":0}},"channel":{"channel":"dashed","alike":"question","who":["deuteranopes"]}},
+        {"name":"todo","hue":140,"depth":1,"source":"relative","order":8,"parent":"task","anchor":"task","offset":0,"rel":"sub","paper":{"said":{"hex":"#2b7815","contrast":5.088676730689218,"moved":0},"offered":{"hex":"#536d4e","contrast":5.267127622588721,"moved":0}},"dark":{"said":{"hex":"#7bbd6d","contrast":8.268643774348622,"moved":0},"offered":{"hex":"#99b194","contrast":8.046658090377312,"moved":0}},"channel":{"channel":"solid","alike":"note","who":["protanopes","deuteranopes"]}}
+      ],
+      "meaning": [
+        "idea, insight and hunch are one family: idea's hue, each kind below it a step toward the ground",
+        "task and todo are one family: task's hue, each kind below it a step toward the ground",
+        "question stands beside idea, 45° along the wheel: kin",
+        "assumption and evidence are drawn as opposites, 180° apart",
+        "note stands apart from the rest",
+        "idea's purple stands near the chrome's colour for a model: on the ink it means idea, and the chrome's colours never touch the ink",
+        "note is drawn dashed: beside task it looks alike to deuteranopes",
+        "hunch is drawn dotted: beside insight it looks alike to protanopes and deuteranopes",
+        "assumption is drawn dash-dot: beside note it looks alike to deuteranopes and tritanopes",
+        "evidence is drawn dashed: beside question it looks alike to deuteranopes"
+      ]
+    },
+    {
+      "name": "seed, then \"method is kin to note\"",
+      "overflow": [],
+      "acts": [
+        {"text":"it's an idea · purple","act":{"act":"say","a":"idea","word":"purple"},"answer":"idea → 305°, your purple; it stands by the chrome's colour for a model (9° away) — on ink it means idea"},
+        {"text":"it's a task","act":{"act":"say","a":"task"},"answer":"task → 140°, the most distinct place left (165° from idea)"},
+        {"text":"it's a note","act":{"act":"say","a":"note"},"answer":"note → 51°, the most distinct place left (89° from task)"},
+        {"text":"insight is a kind of idea","act":{"act":"sub","a":"insight","b":"idea"},"answer":"insight is a kind of idea: idea's hue, a step toward the ground"},
+        {"text":"hunch is a kind of idea","act":{"act":"sub","a":"hunch","b":"idea"},"answer":"hunch is a kind of idea: idea's hue +28°, a step toward the ground"},
+        {"text":"question is kin to idea","act":{"act":"kin","a":"question","b":"idea"},"answer":"question is kin to idea: question 45° beside idea, on the side that stays most distinct"},
+        {"text":"assumption opposes evidence","act":{"act":"opposes","a":"assumption","b":"evidence"},"answer":"assumption opposes evidence: placed together across the wheel, 180° apart"},
+        {"text":"method is kin to note","act":{"act":"kin","a":"method","b":"note"},"answer":"method is kin to note: method 45° beside note, on the side that stays most distinct"}
+      ],
+      "kinds": [
+        {"name":"idea","hue":305,"depth":0,"source":"said","order":0,"parent":null,"anchor":null,"offset":0,"rel":null,"word":"purple","paper":{"said":{"hex":"#663693","contrast":7.688065525057642,"moved":0},"offered":{"hex":"#5a4a6c","contrast":7.304728138896393,"moved":0}},"dark":{"said":{"hex":"#d1a8ff","contrast":9.522886164076981,"moved":0},"offered":{"hex":"#c5b6d7","contrast":9.789130786083696,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"task","hue":140,"depth":0,"source":"placed","order":1,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#1a6400","contrast":6.753374960492275,"moved":0},"offered":{"hex":"#435a3d","contrast":6.975331187943172,"moved":0}},"dark":{"said":{"hex":"#90d281","contrast":10.37015454134611,"moved":0},"offered":{"hex":"#adc6a8","contrast":10.105165705080505,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"note","hue":51,"depth":0,"source":"placed","order":2,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#823b00","contrast":7.458490481831195,"moved":0},"offered":{"hex":"#664c3d","contrast":7.242396779836129,"moved":0}},"dark":{"said":{"hex":"#ffa56f","contrast":9.580638095037012,"moved":0},"offered":{"hex":"#d8b6a2","contrast":9.809546865715468,"moved":0}},"channel":{"channel":"dashed","alike":"task","who":["deuteranopes"]}},
+        {"name":"insight","hue":305,"depth":1,"source":"relative","order":3,"parent":"idea","anchor":"idea","offset":0,"rel":"sub","paper":{"said":{"hex":"#7949a8","contrast":5.795764143976542,"moved":0},"offered":{"hex":"#6c5d7f","contrast":5.520893691910922,"moved":0}},"dark":{"said":{"hex":"#bc93eb","contrast":7.53967476338074,"moved":0},"offered":{"hex":"#b0a2c3","contrast":7.775903153455702,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"hunch","hue":333,"depth":1,"source":"relative","order":4,"parent":"idea","anchor":"idea","offset":28,"rel":"sub","paper":{"said":{"hex":"#943d89","contrast":5.864963992494181,"moved":0},"offered":{"hex":"#795973","contrast":5.561237924908364,"moved":0}},"dark":{"said":{"hex":"#da89cc","contrast":7.446288033894885,"moved":0},"offered":{"hex":"#bd9eb7","contrast":7.730880234996653,"moved":0}},"channel":{"channel":"dotted","alike":"insight","who":["protanopes","deuteranopes"]}},
+        {"name":"question","hue":350,"depth":0,"source":"relative","order":5,"parent":null,"anchor":"idea","offset":45,"rel":"kin","paper":{"said":{"hex":"#8a235e","contrast":7.771429172778878,"moved":0},"offered":{"hex":"#6b4557","contrast":7.367176619823334,"moved":0}},"dark":{"said":{"hex":"#fc9ac9","contrast":9.372143742451016,"moved":0},"offered":{"hex":"#d8b1c2","contrast":9.718907596825009,"moved":0}},"channel":{"channel":"solid","alike":"note","who":["tritanopes"]}},
+        {"name":"assumption","hue":18,"depth":0,"source":"placed","order":6,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#932031","contrast":7.735631819908955,"moved":0},"offered":{"hex":"#6f4647","contrast":7.350560641702386,"moved":0}},"dark":{"said":{"hex":"#ff9fa2","contrast":9.471318184057619,"moved":0},"offered":{"hex":"#d9b3b3","contrast":9.758231904340839,"moved":0}},"channel":{"channel":"dash-dot","alike":"note","who":["deuteranopes","tritanopes"]}},
+        {"name":"evidence","hue":198,"depth":0,"source":"relative","order":7,"parent":null,"anchor":"assumption","offset":180,"rel":"opposes","paper":{"said":{"hex":"#005f61","contrast":6.882359464338029,"moved":0},"offered":{"hex":"#405858","contrast":7.037799161230578,"moved":0}},"dark":{"said":{"hex":"#28d7dc","contrast":10.441975462089466,"moved":0},"offered":{"hex":"#99c8c9","contrast":10.1274632116209,"moved":0}},"channel":{"channel":"dashed","alike":"question","who":["deuteranopes"]}},
+        {"name":"method","hue":96,"depth":0,"source":"relative","order":8,"parent":null,"anchor":"note","offset":45,"rel":"kin","paper":{"said":{"hex":"#625200","contrast":7.125466676544066,"moved":0},"offered":{"hex":"#58533d","contrast":7.119676323717231,"moved":0}},"dark":{"said":{"hex":"#d7bd51","contrast":9.970481966142808,"moved":0},"offered":{"hex":"#c7be9a","contrast":9.964286934511456,"moved":0}},"channel":{"channel":"dotted","alike":"note","who":["protanopes","deuteranopes"]}}
+      ],
+      "meaning": [
+        "idea, insight and hunch are one family: idea's hue, each kind below it a step toward the ground",
+        "question stands beside idea, 45° along the wheel: kin",
+        "assumption and evidence are drawn as opposites, 180° apart",
+        "method stands beside note, 45° along the wheel: kin",
+        "task stands apart from the rest",
+        "idea's purple stands near the chrome's colour for a model: on the ink it means idea, and the chrome's colours never touch the ink",
+        "note is drawn dashed: beside task it looks alike to deuteranopes",
+        "hunch is drawn dotted: beside insight it looks alike to protanopes and deuteranopes",
+        "assumption is drawn dash-dot: beside note it looks alike to deuteranopes and tritanopes",
+        "evidence is drawn dashed: beside question it looks alike to deuteranopes",
+        "method is drawn dotted: beside note it looks alike to protanopes and deuteranopes"
+      ]
+    },
+    {
+      "name": "seed, then \"make idea yellow\"",
+      "overflow": [],
+      "acts": [
+        {"text":"it's an idea · purple","act":{"act":"say","a":"idea","word":"purple"},"answer":"idea → 305°, your purple; it stands by the chrome's colour for a model (9° away) — on ink it means idea"},
+        {"text":"it's a task","act":{"act":"say","a":"task"},"answer":"task → 140°, the most distinct place left (165° from idea)"},
+        {"text":"it's a note","act":{"act":"say","a":"note"},"answer":"note → 51°, the most distinct place left (89° from task)"},
+        {"text":"insight is a kind of idea","act":{"act":"sub","a":"insight","b":"idea"},"answer":"insight is a kind of idea: idea's hue, a step toward the ground"},
+        {"text":"hunch is a kind of idea","act":{"act":"sub","a":"hunch","b":"idea"},"answer":"hunch is a kind of idea: idea's hue +28°, a step toward the ground"},
+        {"text":"question is kin to idea","act":{"act":"kin","a":"question","b":"idea"},"answer":"question is kin to idea: question 45° beside idea, on the side that stays most distinct"},
+        {"text":"assumption opposes evidence","act":{"act":"opposes","a":"assumption","b":"evidence"},"answer":"assumption opposes evidence: placed together across the wheel, 180° apart"},
+        {"text":"make idea yellow","act":{"act":"say","a":"idea","word":"yellow"},"answer":"idea → 105°, your yellow; on paper a yellow is drawn as dark as words need, ochre or olive, and on the dark ground it is yellow"}
+      ],
+      "kinds": [
+        {"name":"idea","hue":105,"depth":0,"source":"said","order":0,"parent":null,"anchor":null,"offset":0,"rel":null,"word":"yellow","paper":{"said":{"hex":"#5b5500","contrast":7.068144212376718,"moved":0},"offered":{"hex":"#55543d","contrast":7.097944362058325,"moved":0}},"dark":{"said":{"hex":"#cac256","contrast":10.060590917390547,"moved":0},"offered":{"hex":"#c2c09c","contrast":9.997370228665824,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"task","hue":140,"depth":0,"source":"placed","order":1,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#1a6400","contrast":6.753374960492275,"moved":0},"offered":{"hex":"#435a3d","contrast":6.975331187943172,"moved":0}},"dark":{"said":{"hex":"#90d281","contrast":10.37015454134611,"moved":0},"offered":{"hex":"#adc6a8","contrast":10.105165705080505,"moved":0}},"channel":{"channel":"dashed","alike":"idea","who":["protanopes","deuteranopes"]}},
+        {"name":"note","hue":51,"depth":0,"source":"placed","order":2,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#823b00","contrast":7.458490481831195,"moved":0},"offered":{"hex":"#664c3d","contrast":7.242396779836129,"moved":0}},"dark":{"said":{"hex":"#ffa56f","contrast":9.580638095037012,"moved":0},"offered":{"hex":"#d8b6a2","contrast":9.809546865715468,"moved":0}},"channel":{"channel":"dotted","alike":"idea","who":["protanopes","deuteranopes"]}},
+        {"name":"insight","hue":105,"depth":1,"source":"relative","order":3,"parent":"idea","anchor":"idea","offset":0,"rel":"sub","paper":{"said":{"hex":"#6e6700","contrast":5.336861481370892,"moved":0},"offered":{"hex":"#68664b","contrast":5.362562668055745,"moved":0}},"dark":{"said":{"hex":"#b6ad3f","contrast":8.00442779138207,"moved":0},"offered":{"hex":"#adab88","contrast":7.955193176036282,"moved":0}},"channel":{"channel":"solid","alike":"task","who":["protanopes"]}},
+        {"name":"hunch","hue":133,"depth":1,"source":"relative","order":4,"parent":"idea","anchor":"idea","offset":28,"rel":"sub","paper":{"said":{"hex":"#427500","contrast":5.141083128309956,"moved":0},"offered":{"hex":"#596c4b","contrast":5.2864778160461166,"moved":0}},"dark":{"said":{"hex":"#88bb62","contrast":8.223969003391707,"moved":0},"offered":{"hex":"#9db091","contrast":8.031762363095925,"moved":0}},"channel":{"channel":"dashed","alike":"insight","who":["protanopes","deuteranopes"]}},
+        {"name":"question","hue":150,"depth":0,"source":"relative","order":5,"parent":null,"anchor":"idea","offset":45,"rel":"kin","paper":{"said":{"hex":"#00642b","contrast":6.748068402765579,"moved":0},"offered":{"hex":"#405a45","contrast":6.980036480604007,"moved":0}},"dark":{"said":{"hex":"#7cd591","contrast":10.43144518878309,"moved":0},"offered":{"hex":"#a8c7ad","contrast":10.125396238554762,"moved":0}},"channel":{"channel":"dash-dot","alike":"task","who":["everyone","protanopes","deuteranopes","tritanopes"]}},
+        {"name":"assumption","hue":18,"depth":0,"source":"placed","order":6,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#932031","contrast":7.735631819908955,"moved":0},"offered":{"hex":"#6f4647","contrast":7.350560641702386,"moved":0}},"dark":{"said":{"hex":"#ff9fa2","contrast":9.471318184057619,"moved":0},"offered":{"hex":"#d9b3b3","contrast":9.758231904340839,"moved":0}},"channel":{"channel":"long","alike":"question","who":["deuteranopes"]}},
+        {"name":"evidence","hue":198,"depth":0,"source":"relative","order":7,"parent":null,"anchor":"assumption","offset":180,"rel":"opposes","paper":{"said":{"hex":"#005f61","contrast":6.882359464338029,"moved":0},"offered":{"hex":"#405858","contrast":7.037799161230578,"moved":0}},"dark":{"said":{"hex":"#28d7dc","contrast":10.441975462089466,"moved":0},"offered":{"hex":"#99c8c9","contrast":10.1274632116209,"moved":0}},"channel":{"channel":"solid","alike":"question","who":["tritanopes"]}}
+      ],
+      "meaning": [
+        "idea, insight and hunch are one family: idea's hue, each kind below it a step toward the ground",
+        "question stands beside idea, 45° along the wheel: kin",
+        "assumption and evidence are drawn as opposites, 180° apart",
+        "task and note stand apart from the rest",
+        "task is drawn dashed: beside idea it looks alike to protanopes and deuteranopes",
+        "note is drawn dotted: beside idea it looks alike to protanopes and deuteranopes",
+        "hunch is drawn dashed: beside insight it looks alike to protanopes and deuteranopes",
+        "question is drawn dash-dot: beside task it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "assumption is drawn long: beside question it looks alike to deuteranopes"
+      ]
+    },
+    {
+      "name": "seed, then \"it's a feeling\"",
+      "overflow": [],
+      "acts": [
+        {"text":"it's an idea · purple","act":{"act":"say","a":"idea","word":"purple"},"answer":"idea → 305°, your purple; it stands by the chrome's colour for a model (9° away) — on ink it means idea"},
+        {"text":"it's a task","act":{"act":"say","a":"task"},"answer":"task → 140°, the most distinct place left (165° from idea)"},
+        {"text":"it's a note","act":{"act":"say","a":"note"},"answer":"note → 51°, the most distinct place left (89° from task)"},
+        {"text":"insight is a kind of idea","act":{"act":"sub","a":"insight","b":"idea"},"answer":"insight is a kind of idea: idea's hue, a step toward the ground"},
+        {"text":"hunch is a kind of idea","act":{"act":"sub","a":"hunch","b":"idea"},"answer":"hunch is a kind of idea: idea's hue +28°, a step toward the ground"},
+        {"text":"question is kin to idea","act":{"act":"kin","a":"question","b":"idea"},"answer":"question is kin to idea: question 45° beside idea, on the side that stays most distinct"},
+        {"text":"assumption opposes evidence","act":{"act":"opposes","a":"assumption","b":"evidence"},"answer":"assumption opposes evidence: placed together across the wheel, 180° apart"},
+        {"text":"it's a feeling","act":{"act":"say","a":"feeling"},"answer":"feeling → 101°, the most distinct place left (39° from task)"}
+      ],
+      "kinds": [
+        {"name":"idea","hue":305,"depth":0,"source":"said","order":0,"parent":null,"anchor":null,"offset":0,"rel":null,"word":"purple","paper":{"said":{"hex":"#663693","contrast":7.688065525057642,"moved":0},"offered":{"hex":"#5a4a6c","contrast":7.304728138896393,"moved":0}},"dark":{"said":{"hex":"#d1a8ff","contrast":9.522886164076981,"moved":0},"offered":{"hex":"#c5b6d7","contrast":9.789130786083696,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"task","hue":140,"depth":0,"source":"placed","order":1,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#1a6400","contrast":6.753374960492275,"moved":0},"offered":{"hex":"#435a3d","contrast":6.975331187943172,"moved":0}},"dark":{"said":{"hex":"#90d281","contrast":10.37015454134611,"moved":0},"offered":{"hex":"#adc6a8","contrast":10.105165705080505,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"note","hue":51,"depth":0,"source":"placed","order":2,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#823b00","contrast":7.458490481831195,"moved":0},"offered":{"hex":"#664c3d","contrast":7.242396779836129,"moved":0}},"dark":{"said":{"hex":"#ffa56f","contrast":9.580638095037012,"moved":0},"offered":{"hex":"#d8b6a2","contrast":9.809546865715468,"moved":0}},"channel":{"channel":"dashed","alike":"task","who":["deuteranopes"]}},
+        {"name":"insight","hue":305,"depth":1,"source":"relative","order":3,"parent":"idea","anchor":"idea","offset":0,"rel":"sub","paper":{"said":{"hex":"#7949a8","contrast":5.795764143976542,"moved":0},"offered":{"hex":"#6c5d7f","contrast":5.520893691910922,"moved":0}},"dark":{"said":{"hex":"#bc93eb","contrast":7.53967476338074,"moved":0},"offered":{"hex":"#b0a2c3","contrast":7.775903153455702,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"hunch","hue":333,"depth":1,"source":"relative","order":4,"parent":"idea","anchor":"idea","offset":28,"rel":"sub","paper":{"said":{"hex":"#943d89","contrast":5.864963992494181,"moved":0},"offered":{"hex":"#795973","contrast":5.561237924908364,"moved":0}},"dark":{"said":{"hex":"#da89cc","contrast":7.446288033894885,"moved":0},"offered":{"hex":"#bd9eb7","contrast":7.730880234996653,"moved":0}},"channel":{"channel":"dotted","alike":"insight","who":["protanopes","deuteranopes"]}},
+        {"name":"question","hue":350,"depth":0,"source":"relative","order":5,"parent":null,"anchor":"idea","offset":45,"rel":"kin","paper":{"said":{"hex":"#8a235e","contrast":7.771429172778878,"moved":0},"offered":{"hex":"#6b4557","contrast":7.367176619823334,"moved":0}},"dark":{"said":{"hex":"#fc9ac9","contrast":9.372143742451016,"moved":0},"offered":{"hex":"#d8b1c2","contrast":9.718907596825009,"moved":0}},"channel":{"channel":"solid","alike":"note","who":["tritanopes"]}},
+        {"name":"assumption","hue":18,"depth":0,"source":"placed","order":6,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#932031","contrast":7.735631819908955,"moved":0},"offered":{"hex":"#6f4647","contrast":7.350560641702386,"moved":0}},"dark":{"said":{"hex":"#ff9fa2","contrast":9.471318184057619,"moved":0},"offered":{"hex":"#d9b3b3","contrast":9.758231904340839,"moved":0}},"channel":{"channel":"dash-dot","alike":"note","who":["deuteranopes","tritanopes"]}},
+        {"name":"evidence","hue":198,"depth":0,"source":"relative","order":7,"parent":null,"anchor":"assumption","offset":180,"rel":"opposes","paper":{"said":{"hex":"#005f61","contrast":6.882359464338029,"moved":0},"offered":{"hex":"#405858","contrast":7.037799161230578,"moved":0}},"dark":{"said":{"hex":"#28d7dc","contrast":10.441975462089466,"moved":0},"offered":{"hex":"#99c8c9","contrast":10.1274632116209,"moved":0}},"channel":{"channel":"dashed","alike":"question","who":["deuteranopes"]}},
+        {"name":"feeling","hue":101,"depth":0,"source":"placed","order":8,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#5e5300","contrast":7.093970374387914,"moved":0},"offered":{"hex":"#56533d","contrast":7.1077579763722865,"moved":0}},"dark":{"said":{"hex":"#d0c053","contrast":10.020588247835901,"moved":0},"offered":{"hex":"#c4bf9b","contrast":9.982783437729744,"moved":0}},"channel":{"channel":"dotted","alike":"task","who":["protanopes","deuteranopes"]}}
+      ],
+      "meaning": [
+        "idea, insight and hunch are one family: idea's hue, each kind below it a step toward the ground",
+        "question stands beside idea, 45° along the wheel: kin",
+        "assumption and evidence are drawn as opposites, 180° apart",
+        "task, note and feeling stand apart from the rest",
+        "idea's purple stands near the chrome's colour for a model: on the ink it means idea, and the chrome's colours never touch the ink",
+        "note is drawn dashed: beside task it looks alike to deuteranopes",
+        "hunch is drawn dotted: beside insight it looks alike to protanopes and deuteranopes",
+        "assumption is drawn dash-dot: beside note it looks alike to deuteranopes and tritanopes",
+        "evidence is drawn dashed: beside question it looks alike to deuteranopes",
+        "feeling is drawn dotted: beside task it looks alike to protanopes and deuteranopes"
+      ]
+    },
+    {
+      "name": "seed, then every example",
+      "overflow": ["risk","todo","method"],
+      "acts": [
+        {"text":"it's an idea · purple","act":{"act":"say","a":"idea","word":"purple"},"answer":"idea → 305°, your purple; it stands by the chrome's colour for a model (9° away) — on ink it means idea"},
+        {"text":"it's a task","act":{"act":"say","a":"task"},"answer":"task → 140°, the most distinct place left (165° from idea)"},
+        {"text":"it's a note","act":{"act":"say","a":"note"},"answer":"note → 51°, the most distinct place left (89° from task)"},
+        {"text":"insight is a kind of idea","act":{"act":"sub","a":"insight","b":"idea"},"answer":"insight is a kind of idea: idea's hue, a step toward the ground"},
+        {"text":"hunch is a kind of idea","act":{"act":"sub","a":"hunch","b":"idea"},"answer":"hunch is a kind of idea: idea's hue +28°, a step toward the ground"},
+        {"text":"question is kin to idea","act":{"act":"kin","a":"question","b":"idea"},"answer":"question is kin to idea: question 45° beside idea, on the side that stays most distinct"},
+        {"text":"assumption opposes evidence","act":{"act":"opposes","a":"assumption","b":"evidence"},"answer":"assumption opposes evidence: placed together across the wheel, 180° apart"},
+        {"text":"it's a quote · teal","act":{"act":"say","a":"quote","word":"teal"},"answer":"quote → 195°, your teal"},
+        {"text":"risk opposes opportunity","act":{"act":"opposes","a":"risk","b":"opportunity"},"answer":"risk opposes opportunity: placed together across the wheel, 180° apart"},
+        {"text":"todo is a kind of task","act":{"act":"sub","a":"todo","b":"task"},"answer":"todo is a kind of task: task's hue, a step toward the ground"},
+        {"text":"method is kin to note","act":{"act":"kin","a":"method","b":"note"},"answer":"method is kin to note: method 45° beside note, on the side that stays most distinct"},
+        {"text":"make idea yellow","act":{"act":"say","a":"idea","word":"yellow"},"answer":"idea → 105°, your yellow; on paper a yellow is drawn as dark as words need, ochre or olive, and on the dark ground it is yellow"},
+        {"text":"it's a feeling","act":{"act":"say","a":"feeling"},"answer":"feeling → 320°, the most distinct place left (46° from method)"}
+      ],
+      "kinds": [
+        {"name":"idea","hue":105,"depth":0,"source":"said","order":0,"parent":null,"anchor":null,"offset":0,"rel":null,"word":"yellow","paper":{"said":{"hex":"#5b5500","contrast":7.068144212376718,"moved":0},"offered":{"hex":"#55543d","contrast":7.097944362058325,"moved":0}},"dark":{"said":{"hex":"#cac256","contrast":10.060590917390547,"moved":0},"offered":{"hex":"#c2c09c","contrast":9.997370228665824,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"task","hue":140,"depth":0,"source":"placed","order":1,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#1a6400","contrast":6.753374960492275,"moved":0},"offered":{"hex":"#435a3d","contrast":6.975331187943172,"moved":0}},"dark":{"said":{"hex":"#90d281","contrast":10.37015454134611,"moved":0},"offered":{"hex":"#adc6a8","contrast":10.105165705080505,"moved":0}},"channel":{"channel":"dashed","alike":"idea","who":["protanopes","deuteranopes"]}},
+        {"name":"note","hue":51,"depth":0,"source":"placed","order":2,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#823b00","contrast":7.458490481831195,"moved":0},"offered":{"hex":"#664c3d","contrast":7.242396779836129,"moved":0}},"dark":{"said":{"hex":"#ffa56f","contrast":9.580638095037012,"moved":0},"offered":{"hex":"#d8b6a2","contrast":9.809546865715468,"moved":0}},"channel":{"channel":"dotted","alike":"idea","who":["protanopes","deuteranopes"]}},
+        {"name":"insight","hue":105,"depth":1,"source":"relative","order":3,"parent":"idea","anchor":"idea","offset":0,"rel":"sub","paper":{"said":{"hex":"#6e6700","contrast":5.336861481370892,"moved":0},"offered":{"hex":"#68664b","contrast":5.362562668055745,"moved":0}},"dark":{"said":{"hex":"#b6ad3f","contrast":8.00442779138207,"moved":0},"offered":{"hex":"#adab88","contrast":7.955193176036282,"moved":0}},"channel":{"channel":"solid","alike":"task","who":["protanopes"]}},
+        {"name":"hunch","hue":133,"depth":1,"source":"relative","order":4,"parent":"idea","anchor":"idea","offset":28,"rel":"sub","paper":{"said":{"hex":"#427500","contrast":5.141083128309956,"moved":0},"offered":{"hex":"#596c4b","contrast":5.2864778160461166,"moved":0}},"dark":{"said":{"hex":"#88bb62","contrast":8.223969003391707,"moved":0},"offered":{"hex":"#9db091","contrast":8.031762363095925,"moved":0}},"channel":{"channel":"dashed","alike":"insight","who":["protanopes","deuteranopes"]}},
+        {"name":"question","hue":150,"depth":0,"source":"relative","order":5,"parent":null,"anchor":"idea","offset":45,"rel":"kin","paper":{"said":{"hex":"#00642b","contrast":6.748068402765579,"moved":0},"offered":{"hex":"#405a45","contrast":6.980036480604007,"moved":0}},"dark":{"said":{"hex":"#7cd591","contrast":10.43144518878309,"moved":0},"offered":{"hex":"#a8c7ad","contrast":10.125396238554762,"moved":0}},"channel":{"channel":"dash-dot","alike":"task","who":["everyone","protanopes","deuteranopes","tritanopes"]}},
+        {"name":"assumption","hue":18,"depth":0,"source":"placed","order":6,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#932031","contrast":7.735631819908955,"moved":0},"offered":{"hex":"#6f4647","contrast":7.350560641702386,"moved":0}},"dark":{"said":{"hex":"#ff9fa2","contrast":9.471318184057619,"moved":0},"offered":{"hex":"#d9b3b3","contrast":9.758231904340839,"moved":0}},"channel":{"channel":"long","alike":"question","who":["deuteranopes"]}},
+        {"name":"evidence","hue":198,"depth":0,"source":"relative","order":7,"parent":null,"anchor":"assumption","offset":180,"rel":"opposes","paper":{"said":{"hex":"#005f61","contrast":6.882359464338029,"moved":0},"offered":{"hex":"#405858","contrast":7.037799161230578,"moved":0}},"dark":{"said":{"hex":"#28d7dc","contrast":10.441975462089466,"moved":0},"offered":{"hex":"#99c8c9","contrast":10.1274632116209,"moved":0}},"channel":{"channel":"solid","alike":"question","who":["tritanopes"]}},
+        {"name":"quote","hue":195,"depth":0,"source":"said","order":8,"parent":null,"anchor":null,"offset":0,"rel":null,"word":"teal","paper":{"said":{"hex":"#005f5f","contrast":6.874702300663512,"moved":0},"offered":{"hex":"#405857","contrast":7.035115085061884,"moved":0}},"dark":{"said":{"hex":"#2ad7d7","contrast":10.456019742446147,"moved":0},"offered":{"hex":"#99c8c7","contrast":10.132114512876953,"moved":0}},"channel":{"channel":"dotted","alike":"evidence","who":["everyone","protanopes","deuteranopes","tritanopes"]}},
+        {"name":"risk","hue":90,"depth":0,"source":"placed","order":9,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#664f00","contrast":7.162768646241556,"moved":0},"offered":{"hex":"#5a523d","contrast":7.133720983804217,"moved":0}},"dark":{"said":{"hex":"#deba50","contrast":9.910766538238056,"moved":0},"offered":{"hex":"#cabd9a","contrast":9.941901749699227,"moved":0}},"channel":{"channel":"long","alike":"idea","who":["everyone","protanopes","deuteranopes","tritanopes"]}},
+        {"name":"opportunity","hue":270,"depth":0,"source":"relative","order":10,"parent":null,"anchor":"risk","offset":180,"rel":"opposes","paper":{"said":{"hex":"#3448a4","contrast":7.418184279776955,"moved":0},"offered":{"hex":"#465172","contrast":7.188622790512684,"moved":0}},"dark":{"said":{"hex":"#a4bbff","contrast":9.836244882516434,"moved":0},"offered":{"hex":"#b4bdd7","contrast":9.908391501200855,"moved":0}},"channel":{"channel":"long","alike":"evidence","who":["deuteranopes","tritanopes"]}},
+        {"name":"todo","hue":140,"depth":1,"source":"relative","order":11,"parent":"task","anchor":"task","offset":0,"rel":"sub","paper":{"said":{"hex":"#2b7815","contrast":5.088676730689218,"moved":0},"offered":{"hex":"#536d4e","contrast":5.267127622588721,"moved":0}},"dark":{"said":{"hex":"#7bbd6d","contrast":8.268643774348622,"moved":0},"offered":{"hex":"#99b194","contrast":8.046658090377312,"moved":0}},"channel":{"channel":"long","alike":"hunch","who":["everyone","protanopes","deuteranopes","tritanopes"]}},
+        {"name":"method","hue":6,"depth":0,"source":"relative","order":12,"parent":null,"anchor":"note","offset":-45,"rel":"kin","paper":{"said":{"hex":"#911f46","contrast":7.758964484125897,"moved":0},"offered":{"hex":"#6e454e","contrast":7.362864999254466,"moved":0}},"dark":{"said":{"hex":"#ff9cb2","contrast":9.42505233352857,"moved":0},"offered":{"hex":"#d9b2b9","contrast":9.739093872418653,"moved":0}},"channel":{"channel":"long","alike":"assumption","who":["everyone","protanopes","deuteranopes","tritanopes"]}},
+        {"name":"feeling","hue":320,"depth":0,"source":"placed","order":13,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#752f85","contrast":7.740730144964856,"moved":0},"offered":{"hex":"#614866","contrast":7.337606288748445,"moved":0}},"dark":{"said":{"hex":"#e3a2f2","contrast":9.435648645776473,"moved":0},"offered":{"hex":"#ccb4d2","contrast":9.750859754828113,"moved":0}},"channel":{"channel":"dashed","alike":"opportunity","who":["protanopes","deuteranopes"]}}
+      ],
+      "meaning": [
+        "idea, insight and hunch are one family: idea's hue, each kind below it a step toward the ground",
+        "task and todo are one family: task's hue, each kind below it a step toward the ground",
+        "question stands beside idea, 45° along the wheel: kin",
+        "assumption and evidence are drawn as opposites, 180° apart",
+        "risk and opportunity are drawn as opposites, 180° apart",
+        "method stands beside note, 45° along the wheel: kin",
+        "quote and feeling stand apart from the rest",
+        "task is drawn dashed: beside idea it looks alike to protanopes and deuteranopes",
+        "note is drawn dotted: beside idea it looks alike to protanopes and deuteranopes",
+        "hunch is drawn dashed: beside insight it looks alike to protanopes and deuteranopes",
+        "question is drawn dash-dot: beside task it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "assumption is drawn long: beside question it looks alike to deuteranopes",
+        "quote is drawn dotted: beside evidence it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "risk is drawn long: beside idea it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "opportunity is drawn long: beside evidence it looks alike to deuteranopes and tritanopes",
+        "todo is drawn long: beside hunch it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "method is drawn long: beside assumption it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "feeling is drawn dashed: beside opportunity it looks alike to protanopes and deuteranopes"
+      ]
+    },
+    {
+      "name": "seed, then a chain three deep",
+      "overflow": [],
+      "acts": [
+        {"text":"it's an idea · purple","act":{"act":"say","a":"idea","word":"purple"},"answer":"idea → 305°, your purple; it stands by the chrome's colour for a model (9° away) — on ink it means idea"},
+        {"text":"it's a task","act":{"act":"say","a":"task"},"answer":"task → 140°, the most distinct place left (165° from idea)"},
+        {"text":"it's a note","act":{"act":"say","a":"note"},"answer":"note → 51°, the most distinct place left (89° from task)"},
+        {"text":"insight is a kind of idea","act":{"act":"sub","a":"insight","b":"idea"},"answer":"insight is a kind of idea: idea's hue, a step toward the ground"},
+        {"text":"hunch is a kind of idea","act":{"act":"sub","a":"hunch","b":"idea"},"answer":"hunch is a kind of idea: idea's hue +28°, a step toward the ground"},
+        {"text":"question is kin to idea","act":{"act":"kin","a":"question","b":"idea"},"answer":"question is kin to idea: question 45° beside idea, on the side that stays most distinct"},
+        {"text":"assumption opposes evidence","act":{"act":"opposes","a":"assumption","b":"evidence"},"answer":"assumption opposes evidence: placed together across the wheel, 180° apart"},
+        {"text":"detail is a kind of insight","act":{"act":"sub","a":"detail","b":"insight"},"answer":"detail is a kind of insight: insight's hue, a step toward the ground"},
+        {"text":"footnote is a kind of detail","act":{"act":"sub","a":"footnote","b":"detail"},"answer":"footnote is a kind of detail: detail's hue, a step toward the ground"},
+        {"text":"aside is a kind of hunch","act":{"act":"sub","a":"aside","b":"hunch"},"answer":"aside is a kind of hunch: hunch's hue, a step toward the ground"}
+      ],
+      "kinds": [
+        {"name":"idea","hue":305,"depth":0,"source":"said","order":0,"parent":null,"anchor":null,"offset":0,"rel":null,"word":"purple","paper":{"said":{"hex":"#663693","contrast":7.688065525057642,"moved":0},"offered":{"hex":"#5a4a6c","contrast":7.304728138896393,"moved":0}},"dark":{"said":{"hex":"#d1a8ff","contrast":9.522886164076981,"moved":0},"offered":{"hex":"#c5b6d7","contrast":9.789130786083696,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"task","hue":140,"depth":0,"source":"placed","order":1,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#1a6400","contrast":6.753374960492275,"moved":0},"offered":{"hex":"#435a3d","contrast":6.975331187943172,"moved":0}},"dark":{"said":{"hex":"#90d281","contrast":10.37015454134611,"moved":0},"offered":{"hex":"#adc6a8","contrast":10.105165705080505,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"note","hue":51,"depth":0,"source":"placed","order":2,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#823b00","contrast":7.458490481831195,"moved":0},"offered":{"hex":"#664c3d","contrast":7.242396779836129,"moved":0}},"dark":{"said":{"hex":"#ffa56f","contrast":9.580638095037012,"moved":0},"offered":{"hex":"#d8b6a2","contrast":9.809546865715468,"moved":0}},"channel":{"channel":"dashed","alike":"task","who":["deuteranopes"]}},
+        {"name":"insight","hue":305,"depth":1,"source":"relative","order":3,"parent":"idea","anchor":"idea","offset":0,"rel":"sub","paper":{"said":{"hex":"#7949a8","contrast":5.795764143976542,"moved":0},"offered":{"hex":"#6c5d7f","contrast":5.520893691910922,"moved":0}},"dark":{"said":{"hex":"#bc93eb","contrast":7.53967476338074,"moved":0},"offered":{"hex":"#b0a2c3","contrast":7.775903153455702,"moved":0}},"channel":{"channel":"solid","alike":null,"who":[]}},
+        {"name":"hunch","hue":333,"depth":1,"source":"relative","order":4,"parent":"idea","anchor":"idea","offset":28,"rel":"sub","paper":{"said":{"hex":"#943d89","contrast":5.864963992494181,"moved":0},"offered":{"hex":"#795973","contrast":5.561237924908364,"moved":0}},"dark":{"said":{"hex":"#da89cc","contrast":7.446288033894885,"moved":0},"offered":{"hex":"#bd9eb7","contrast":7.730880234996653,"moved":0}},"channel":{"channel":"dotted","alike":"insight","who":["protanopes","deuteranopes"]}},
+        {"name":"question","hue":350,"depth":0,"source":"relative","order":5,"parent":null,"anchor":"idea","offset":45,"rel":"kin","paper":{"said":{"hex":"#8a235e","contrast":7.771429172778878,"moved":0},"offered":{"hex":"#6b4557","contrast":7.367176619823334,"moved":0}},"dark":{"said":{"hex":"#fc9ac9","contrast":9.372143742451016,"moved":0},"offered":{"hex":"#d8b1c2","contrast":9.718907596825009,"moved":0}},"channel":{"channel":"solid","alike":"note","who":["tritanopes"]}},
+        {"name":"assumption","hue":18,"depth":0,"source":"placed","order":6,"parent":null,"anchor":null,"offset":0,"rel":null,"paper":{"said":{"hex":"#932031","contrast":7.735631819908955,"moved":0},"offered":{"hex":"#6f4647","contrast":7.350560641702386,"moved":0}},"dark":{"said":{"hex":"#ff9fa2","contrast":9.471318184057619,"moved":0},"offered":{"hex":"#d9b3b3","contrast":9.758231904340839,"moved":0}},"channel":{"channel":"dash-dot","alike":"note","who":["deuteranopes","tritanopes"]}},
+        {"name":"evidence","hue":198,"depth":0,"source":"relative","order":7,"parent":null,"anchor":"assumption","offset":180,"rel":"opposes","paper":{"said":{"hex":"#005f61","contrast":6.882359464338029,"moved":0},"offered":{"hex":"#405858","contrast":7.037799161230578,"moved":0}},"dark":{"said":{"hex":"#28d7dc","contrast":10.441975462089466,"moved":0},"offered":{"hex":"#99c8c9","contrast":10.1274632116209,"moved":0}},"channel":{"channel":"dashed","alike":"question","who":["deuteranopes"]}},
+        {"name":"detail","hue":305,"depth":2,"source":"relative","order":8,"parent":"insight","anchor":"insight","offset":0,"rel":"sub","paper":{"said":{"hex":"#8959ba","contrast":4.576417273094598,"moved":0.01},"offered":{"hex":"#79698d","contrast":4.558953633671736,"moved":0.02}},"dark":{"said":{"hex":"#a87fd5","contrast":5.894462044009181,"moved":0},"offered":{"hex":"#9c8eae","contrast":6.094512021248597,"moved":0}},"channel":{"channel":"dashed","alike":"insight","who":["everyone","protanopes","deuteranopes","tritanopes"]}},
+        {"name":"footnote","hue":305,"depth":3,"source":"relative","order":9,"parent":"detail","anchor":"detail","offset":0,"rel":"sub","paper":{"said":{"hex":"#8959ba","contrast":4.576417273094598,"moved":0.01},"offered":{"hex":"#79698d","contrast":4.558953633671736,"moved":0.02}},"dark":{"said":{"hex":"#a87fd5","contrast":5.894462044009181,"moved":0},"offered":{"hex":"#9c8eae","contrast":6.094512021248597,"moved":0}},"channel":{"channel":"dash-dot","alike":"detail","who":["everyone","protanopes","deuteranopes","tritanopes"]}},
+        {"name":"aside","hue":333,"depth":2,"source":"relative","order":10,"parent":"hunch","anchor":"hunch","offset":0,"rel":"sub","paper":{"said":{"hex":"#a84f9b","contrast":4.538899753041516,"moved":0.005},"offered":{"hex":"#866580","contrast":4.5922156517518005,"moved":0.02}},"dark":{"said":{"hex":"#c475b7","contrast":5.820266269241381,"moved":0},"offered":{"hex":"#a88aa2","contrast":6.057554821993582,"moved":0}},"channel":{"channel":"long","alike":"detail","who":["protanopes","deuteranopes"]}}
+      ],
+      "meaning": [
+        "idea, insight, hunch, detail, aside and footnote are one family: idea's hue, each kind below it a step toward the ground",
+        "question stands beside idea, 45° along the wheel: kin",
+        "assumption and evidence are drawn as opposites, 180° apart",
+        "task and note stand apart from the rest",
+        "idea's purple stands near the chrome's colour for a model: on the ink it means idea, and the chrome's colours never touch the ink",
+        "note is drawn dashed: beside task it looks alike to deuteranopes",
+        "hunch is drawn dotted: beside insight it looks alike to protanopes and deuteranopes",
+        "assumption is drawn dash-dot: beside note it looks alike to deuteranopes and tritanopes",
+        "evidence is drawn dashed: beside question it looks alike to deuteranopes",
+        "detail is drawn dashed: beside insight it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "footnote is drawn dash-dot: beside detail it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "aside is drawn long: beside detail it looks alike to protanopes and deuteranopes"
+      ]
+    },
+    {
+      "name": "random 004",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"say","a":"task"},"answer":"task → 140°, the first kind; its name leans it there"},
+        {"act":{"act":"say","a":"goal"},"answer":"goal → 307°, the most distinct place left (167° from task)"},
+        {"act":{"act":"say","a":"draft"},"answer":"draft → 51°, the most distinct place left (89° from task)"},
+        {"act":{"act":"say","a":"question"},"answer":"question → 226°, the most distinct place left (81° from goal)"},
+        {"act":{"act":"sub","a":"question","b":"event"},"answer":"question is a kind of event: event's hue, a step toward the ground"},
+        {"act":{"act":"say","a":"question","word":"orange"},"answer":"question → 62°, your orange"},
+        {"act":{"act":"opposes","a":"task","b":"place"},"answer":"task opposes place: place across the wheel from task, 167° apart"},
+        {"act":{"act":"say","a":"event","word":"rust"},"answer":"event → 40°, your rust; it stands by the chrome's colour for broken (10° away) — on ink it means event"}
+      ],
+      "kinds": [
+        ["task",140,0,"placed","#1a6400","#435a3d","#90d281","#adc6a8","solid"],
+        ["goal",307,0,"placed","#683591","#5b4a6b","#d4a7ff","#c6b6d7","solid"],
+        ["draft",51,0,"placed","#823b00","#664c3d","#ffa56f","#d8b6a2","dashed"],
+        ["question",62,1,"said","#935300","#775f4b","#e3954b","#c1a38a","dotted"],
+        ["event",40,0,"said","#8e2e00","#6c493c","#ffa383","#d8b5a8","dash-dot"],
+        ["place",333,0,"relative","#802975","#664760","#f09de2","#d2b2cc","dotted"]
+      ],
+      "meaning": [
+        "event and question are one family: event's hue, each kind below it a step toward the ground (question keeps your orange)",
+        "task and place are drawn as opposites, 167° apart",
+        "goal and draft stand apart from the rest",
+        "event's rust stands near the chrome's colour for broken: on the ink it means event, and the chrome's colours never touch the ink",
+        "draft is drawn dashed: beside task it looks alike to deuteranopes",
+        "question is drawn dotted: beside task it looks alike to protanopes",
+        "event is drawn dash-dot: beside draft it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "place is drawn dotted: beside goal it looks alike to everyone, protanopes and deuteranopes"
+      ]
+    },
+    {
+      "name": "random 009",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"say","a":"goal","word":"copper"},"answer":"goal → 48°, your copper"},
+        {"act":{"act":"sub","a":"place","b":"place"},"answer":"place cannot be related to itself"},
+        {"act":{"act":"sub","a":"theme","b":"plan"},"answer":"theme is a kind of plan: plan's hue, a step toward the ground"},
+        {"act":{"act":"say","a":"tool","word":"brown"},"answer":"tool → 55°, your brown"},
+        {"act":{"act":"kin","a":"goal","b":"link"},"answer":"goal is kin to link: link 39° beside goal, on the side that stays most distinct"},
+        {"act":{"act":"opposes","a":"event","b":"quote"},"answer":"event opposes quote: placed together across the wheel, 180° apart"}
+      ],
+      "kinds": [
+        ["goal",48,0,"said","#853900","#684b3d","#ffa475","#d8b5a4","solid"],
+        ["place",245,0,"placed","#00578b","#3f5569","#80c5ff","#a8c1d7","solid"],
+        ["theme",329,1,"relative","#913e8e","#775975","#d68ad1","#bb9fb9","dashed"],
+        ["plan",329,0,"placed","#7d2b7a","#644762","#ec9fe7","#d0b3ce","dashed"],
+        ["tool",55,0,"said","#7f3f00","#654d3d","#fea668","#d8b6a0","dotted"],
+        ["link",9,0,"relative","#921f41","#6e454c","#ff9dae","#d9b2b8","dash-dot"],
+        ["event",110,0,"placed","#565600","#53553d","#c3c55a","#bfc19d","dashed"],
+        ["quote",290,0,"relative","#543d9e","#524d70","#bcb2ff","#bdbad7","dotted"]
+      ],
+      "meaning": [
+        "plan and theme are one family: plan's hue, each kind below it a step toward the ground",
+        "goal stands beside link, 39° along the wheel: kin",
+        "event and quote are drawn as opposites, 180° apart",
+        "place and tool stand apart from the rest",
+        "theme is drawn dashed: beside place it looks alike to protanopes",
+        "plan is drawn dashed: beside place it looks alike to deuteranopes",
+        "tool is drawn dotted: beside goal it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "link is drawn dash-dot: beside goal it looks alike to deuteranopes and tritanopes",
+        "event is drawn dashed: beside tool it looks alike to protanopes and deuteranopes",
+        "quote is drawn dotted: beside place it looks alike to protanopes and deuteranopes"
+      ]
+    },
+    {
+      "name": "random 010",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"sub","a":"fact","b":"quote"},"answer":"fact is a kind of quote: quote's hue, a step toward the ground"},
+        {"act":{"act":"opposes","a":"theme","b":"risk"},"answer":"theme opposes risk: placed together across the wheel, 180° apart"},
+        {"act":{"act":"sub","a":"theme","b":"place"},"answer":"theme is a kind of place: place's hue, a step toward the ground"},
+        {"act":{"act":"say","a":"person","word":"turquoise"},"answer":"person → 185°, your turquoise"},
+        {"act":{"act":"say","a":"quote","word":"#4830e3"},"answer":"quote → 277°, your #4830e3"},
+        {"act":{"act":"kin","a":"tool","b":"tool"},"answer":"tool cannot be related to itself"},
+        {"act":{"act":"say","a":"fact"},"answer":"fact is already a kind"},
+        {"act":{"act":"say","a":"note"},"answer":"note → 359°, the most distinct place left (44° from tool)"},
+        {"act":{"act":"say","a":"task","word":"chartreuse"},"answer":"task → 125°, your chartreuse; on paper a yellow is drawn as dark as words need, ochre or olive, and on the dark ground it is yellow"},
+        {"act":{"act":"say","a":"goal"},"answer":"goal → 236°, the most distinct place left (41° from fact)"},
+        {"act":{"act":"say","a":"claim"},"answer":"claim → 334°, the most distinct place left (23° from theme)"},
+        {"act":{"act":"say","a":"place","word":"cyan"},"answer":"place → 215°, your cyan; it stands by the chrome's colour for confident (5° away) — on ink it means place"}
+      ],
+      "kinds": [
+        ["fact",277.1764568314834,1,"relative","#5257b8","#5c6285","#95a1fa","#a1a7c9","solid"],
+        ["quote",277.17645683148334,0,"said","#4144a3","#4a5072","#adb8ff","#b7bcd7","dashed"],
+        ["theme",215,1,"relative","#007184","#4f6a71","#00bddc","#86b2bd","dotted"],
+        ["risk",35,0,"relative","#932605","#6e473d","#ffa28a","#d8b4ab","solid"],
+        ["place",215,0,"said","#005d6d","#40575d","#37d2f2","#9ac6d2","dotted"],
+        ["person",185,0,"said","#006058","#405855","#37d8c9","#9bc9c2","solid"],
+        ["tool",43,0,"placed","#8a3300","#6a4a3c","#ffa37e","#d8b5a7","dashed"],
+        ["note",359,0,"placed","#8e2051","#6d4552","#ff9abc","#d9b2bd","dash-dot"],
+        ["task",125,0,"said","#455c00","#4d573d","#abcc6b","#b6c4a1","dotted"],
+        ["goal",236,0,"placed","#00597f","#3f5664","#6cc9ff","#a3c3d7","dash-dot"],
+        ["claim",334,0,"placed","#802974","#664760","#f09de0","#d2b2cb","long"]
+      ],
+      "meaning": [
+        "quote and fact are one family: quote's hue, each kind below it a step toward the ground",
+        "place and theme are one family: place's hue, each kind below it a step toward the ground",
+        "theme and risk are drawn as opposites, 180° apart",
+        "person, tool, note, task, goal and claim stand apart from the rest",
+        "place's cyan stands near the chrome's colour for confident: on the ink it means place, and the chrome's colours never touch the ink",
+        "quote is drawn dashed: beside fact it looks alike to deuteranopes",
+        "theme is drawn dotted: beside fact it looks alike to deuteranopes and tritanopes",
+        "place is drawn dotted: beside quote it looks alike to protanopes, deuteranopes and tritanopes",
+        "tool is drawn dashed: beside risk it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "note is drawn dash-dot: beside risk it looks alike to tritanopes",
+        "task is drawn dotted: beside tool it looks alike to deuteranopes",
+        "goal is drawn dash-dot: beside quote it looks alike to protanopes, deuteranopes and tritanopes",
+        "claim is drawn long: beside place it looks alike to deuteranopes"
+      ]
+    },
+    {
+      "name": "random 011",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"opposes","a":"method","b":"event"},"answer":"method opposes event: placed together across the wheel, 180° apart"},
+        {"act":{"act":"say","a":"plan"},"answer":"plan → 268°, the most distinct place left (88° from event)"},
+        {"act":{"act":"opposes","a":"method","b":"risk"},"answer":"method opposes risk: risk across the wheel from method, 160° apart"},
+        {"act":{"act":"say","a":"event"},"answer":"event is already a kind"},
+        {"act":{"act":"say","a":"theme","word":"aqua"},"answer":"theme → 190°, your aqua"},
+        {"act":{"act":"say","a":"event"},"answer":"event is already a kind"},
+        {"act":{"act":"say","a":"theme"},"answer":"theme is already a kind"},
+        {"act":{"act":"say","a":"fact"},"answer":"fact → 67°, the most distinct place left (67° from method)"},
+        {"act":{"act":"say","a":"claim","word":"banana"},"answer":"claim → 315°, the most distinct place left (45° from method); “banana” is no colour this space knows"},
+        {"act":{"act":"sub","a":"source","b":"quote"},"answer":"source is a kind of quote: quote's hue, a step toward the ground"},
+        {"act":{"act":"say","a":"event","word":"violet"},"answer":"event → 298°, your violet; it stands by the chrome's colour for a model (2° away) — on ink it means event"},
+        {"act":{"act":"kin","a":"goal","b":"risk"},"answer":"goal is kin to risk: goal 32° beside risk, on the side that stays most distinct"},
+        {"act":{"act":"kin","a":"risk","b":"fact"},"answer":"risk is kin to fact: fact 45° beside risk, on the side that stays most distinct"},
+        {"act":{"act":"sub","a":"plan","b":"place"},"answer":"plan is a kind of place: place's hue, a step toward the ground"}
+      ],
+      "kinds": [
+        ["method",0,0,"placed","#8f204f","#6d4551","#ff9bba","#d9b2bc","solid"],
+        ["event",298,0,"said","#5e3999","#564c6e","#c7adff","#c1b8d7","solid"],
+        ["plan",52,1,"relative","#9c4a00","#7c5d4b","#e99057","#c3a18d","dashed"],
+        ["risk",160,0,"relative","#00633f","#40594b","#68d7a1","#a3c8b3","dotted"],
+        ["theme",190,0,"said","#00605c","#405856","#2fd8d0","#9ac8c5","dashed"],
+        ["fact",115,0,"relative","#515800","#52553d","#bbc75f","#bcc29e","dash-dot"],
+        ["claim",315,0,"placed","#70318a","#5e4968","#dda4f7","#cab5d4","dotted"],
+        ["source",234,1,"relative","#006d97","#4e6978","#42b6ee","#8bafc4","dashed"],
+        ["quote",234,0,"placed","#005a7d","#3f5663","#66caff","#a2c3d7","dash-dot"],
+        ["goal",128,0,"relative","#405e00","#4b573d","#a5ce6f","#b4c4a3","long"],
+        ["place",52,0,"placed","#813c00","#664c3d","#ffa56d","#d8b6a1","dotted"]
+      ],
+      "meaning": [
+        "quote and source are one family: quote's hue, each kind below it a step toward the ground",
+        "place and plan are one family: place's hue, each kind below it a step toward the ground",
+        "method and event are said to oppose, but your colours stand 62° apart",
+        "method and risk are drawn as opposites, 160° apart",
+        "goal stands beside risk, 32° along the wheel: kin",
+        "risk stands beside fact, 45° along the wheel: kin",
+        "theme and claim stand apart from the rest",
+        "event's violet stands near the chrome's colour for a model: on the ink it means event, and the chrome's colours never touch the ink",
+        "plan is drawn dashed: beside method it looks alike to tritanopes",
+        "risk is drawn dotted: beside method it looks alike to deuteranopes",
+        "theme is drawn dashed: beside risk it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "fact is drawn dash-dot: beside plan it looks alike to protanopes",
+        "claim is drawn dotted: beside event it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "source is drawn dashed: beside claim it looks alike to protanopes",
+        "quote is drawn dash-dot: beside event it looks alike to protanopes and deuteranopes",
+        "goal is drawn long: beside plan it looks alike to protanopes and deuteranopes",
+        "place is drawn dotted: beside fact it looks alike to protanopes and deuteranopes"
+      ]
+    },
+    {
+      "name": "random 015",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"say","a":"source","word":"orange"},"answer":"source → 62°, your orange"},
+        {"act":{"act":"say","a":"source","word":"rose"},"answer":"source → 5°, your rose"},
+        {"act":{"act":"sub","a":"risk","b":"person"},"answer":"risk is a kind of person: person's hue, a step toward the ground"},
+        {"act":{"act":"sub","a":"task","b":"goal"},"answer":"task is a kind of goal: goal's hue, a step toward the ground"},
+        {"act":{"act":"kin","a":"draft","b":"note"},"answer":"draft is kin to note: placed together, 32° apart, where both stand most distinct"},
+        {"act":{"act":"opposes","a":"claim","b":"claim"},"answer":"claim cannot be related to itself"},
+        {"act":{"act":"say","a":"story","word":"rose"},"answer":"story → 5°, your rose"},
+        {"act":{"act":"say","a":"link","word":"salmon"},"answer":"link → 35°, your salmon; it stands by the chrome's colour for broken (5° away) — on ink it means link"},
+        {"act":{"act":"say","a":"risk","word":"#fc3afc"},"answer":"risk → 328°, your #fc3afc"}
+      ],
+      "kinds": [
+        ["source",5,0,"said","#902047","#6e454e","#ff9cb3","#d9b2ba","solid"],
+        ["risk",328.1291896493206,1,"said","#903f8f","#775975","#d58bd2","#bb9fb9","solid"],
+        ["person",128,0,"placed","#405e00","#4b573d","#a5ce6f","#b4c4a3","solid"],
+        ["task",307,1,"relative","#7b48a6","#6d5c7e","#bf92e9","#b1a2c2","dashed"],
+        ["goal",307,0,"placed","#683591","#5b4a6b","#d4a7ff","#c6b6d7","dashed"],
+        ["draft",198,0,"placed","#005f61","#405858","#28d7dc","#99c8c9","dotted"],
+        ["note",230,0,"relative","#005b79","#405662","#58ccff","#9fc4d7","dash-dot"],
+        ["claim",62,0,"placed","#794300","#624e3d","#f9aa60","#d6b79e","dashed"],
+        ["story",5,0,"said","#902047","#6e454e","#ff9cb3","#d9b2ba","dash-dot"],
+        ["link",35,0,"said","#932605","#6e473d","#ffa28a","#d8b4ab","dotted"]
+      ],
+      "meaning": [
+        "person and risk are one family: person's hue, each kind below it a step toward the ground (risk keeps your #fc3afc)",
+        "goal and task are one family: goal's hue, each kind below it a step toward the ground",
+        "draft stands beside note, 32° along the wheel: kin",
+        "source, claim, story and link stand apart from the rest",
+        "link's salmon stands near the chrome's colour for broken: on the ink it means link, and the chrome's colours never touch the ink",
+        "task is drawn dashed: beside risk it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "goal is drawn dashed: beside risk it looks alike to protanopes",
+        "draft is drawn dotted: beside goal it looks alike to deuteranopes",
+        "note is drawn dash-dot: beside goal it looks alike to deuteranopes",
+        "claim is drawn dashed: beside person it looks alike to protanopes and deuteranopes",
+        "story is drawn dash-dot: beside source it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "link is drawn dotted: beside claim it looks alike to everyone, protanopes, deuteranopes and tritanopes"
+      ]
+    },
+    {
+      "name": "random 016",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"say","a":"draft","word":"#a473f5"},"answer":"draft → 299°, your #a473f5; it stands by the chrome's colour for a model (3° away) — on ink it means draft"},
+        {"act":{"act":"opposes","a":"tool","b":"tool"},"answer":"tool cannot be related to itself"},
+        {"act":{"act":"sub","a":"theme","b":"event"},"answer":"theme is a kind of event: event's hue, a step toward the ground"},
+        {"act":{"act":"say","a":"quote","word":"rust"},"answer":"quote → 40°, your rust; it stands by the chrome's colour for broken (10° away) — on ink it means quote"},
+        {"act":{"act":"sub","a":"fact","b":"event"},"answer":"fact is a kind of event: event's hue +28°, a step toward the ground"},
+        {"act":{"act":"kin","a":"fact","b":"method"},"answer":"fact is kin to method: method 26° beside fact, on the side that stays most distinct"}
+      ],
+      "kinds": [
+        ["draft",298.53641198725575,0,"said","#5f3998","#564c6e","#c7adff","#c1b8d7","solid"],
+        ["tool",111,0,"placed","#555700","#53553d","#c1c55b","#bfc19d","dashed"],
+        ["theme",223,1,"relative","#00708c","#4e6a74","#25bae5","#88b1c0","dashed"],
+        ["event",223,0,"placed","#005c73","#40575f","#45cffa","#9cc5d5","dashed"],
+        ["quote",40,0,"said","#8e2e00","#6c493c","#ffa383","#d8b5a8","solid"],
+        ["fact",251,1,"relative","#0066b4","#4d6784","#67aef8","#93acc8","dotted"],
+        ["method",277,0,"relative","#4144a3","#4a5072","#adb8ff","#b7bcd7","dash-dot"]
+      ],
+      "meaning": [
+        "event, theme and fact are one family: event's hue, each kind below it a step toward the ground",
+        "fact stands beside method, 26° along the wheel: kin",
+        "draft, tool and quote stand apart from the rest",
+        "draft's #a473f5 stands near the chrome's colour for a model: on the ink it means draft, and the chrome's colours never touch the ink",
+        "quote's rust stands near the chrome's colour for broken: on the ink it means quote, and the chrome's colours never touch the ink",
+        "tool is drawn dashed: beside draft it looks alike to tritanopes",
+        "theme is drawn dashed: beside draft it looks alike to protanopes",
+        "event is drawn dashed: beside draft it looks alike to deuteranopes",
+        "fact is drawn dotted: beside theme it looks alike to protanopes, deuteranopes and tritanopes",
+        "method is drawn dash-dot: beside draft it looks alike to everyone, protanopes, deuteranopes and tritanopes"
+      ]
+    },
+    {
+      "name": "random 017",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"opposes","a":"risk","b":"risk"},"answer":"risk cannot be related to itself"},
+        {"act":{"act":"say","a":"source"},"answer":"source → 231°, the most distinct place left (139° from risk)"},
+        {"act":{"act":"say","a":"tool","word":"sky"},"answer":"tool → 240°, your sky"},
+        {"act":{"act":"say","a":"claim"},"answer":"claim → 142°, the most distinct place left (89° from source)"},
+        {"act":{"act":"sub","a":"person","b":"risk"},"answer":"person is a kind of risk: risk's hue, a step toward the ground"},
+        {"act":{"act":"sub","a":"goal","b":"goal"},"answer":"goal cannot be related to itself"}
+      ],
+      "kinds": [
+        ["risk",10,0,"placed","#921f3f","#6e454b","#ff9dac","#d9b2b7","solid"],
+        ["source",231,0,"placed","#005a7a","#405662","#5cccff","#a0c4d7","solid"],
+        ["tool",240,0,"said","#005884","#3f5666","#76c7ff","#a6c2d7","dashed"],
+        ["claim",142,0,"placed","#076500","#415b3d","#8cd384","#acc6a9","dotted"],
+        ["person",10,1,"relative","#a83551","#82575d","#ee8596","#c69da2","dashed"],
+        ["goal",306,0,"placed","#673592","#5a4a6c","#d2a8ff","#c5b6d7","dotted"]
+      ],
+      "meaning": [
+        "risk and person are one family: risk's hue, each kind below it a step toward the ground",
+        "source, tool, claim and goal stand apart from the rest",
+        "tool is drawn dashed: beside source it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "claim is drawn dotted: beside source it looks alike to tritanopes",
+        "person is drawn dashed: beside risk it looks alike to tritanopes",
+        "goal is drawn dotted: beside tool it looks alike to protanopes and deuteranopes"
+      ]
+    },
+    {
+      "name": "random 018",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"opposes","a":"question","b":"tool"},"answer":"question opposes tool: placed together across the wheel, 180° apart"},
+        {"act":{"act":"kin","a":"idea","b":"plan"},"answer":"idea is kin to plan: placed together, 32° apart, where both stand most distinct"},
+        {"act":{"act":"opposes","a":"risk","b":"story"},"answer":"risk opposes story: placed together across the wheel, 180° apart"},
+        {"act":{"act":"say","a":"source"},"answer":"source → 68°, the most distinct place left (68° from question)"},
+        {"act":{"act":"opposes","a":"link","b":"person"},"answer":"link opposes person: placed together across the wheel, 180° apart"},
+        {"act":{"act":"say","a":"quote","word":"grey"},"answer":"quote → 112°, the most distinct place left (32° from risk); “grey” is no colour this space knows — a kind takes a hue, and grey, black and white have none"}
+      ],
+      "kinds": [
+        ["question",0,0,"placed","#8f204f","#6d4551","#ff9bba","#d9b2bc","solid"],
+        ["tool",180,0,"relative","#006154","#405853","#40d9c1","#9cc9bf","dashed"],
+        ["idea",256,0,"placed","#0050a2","#3d5472","#92c1ff","#aebfd7","solid"],
+        ["plan",288,0,"relative","#523e9f","#514e70","#bab3ff","#bcbad7","dashed"],
+        ["risk",144,0,"placed","#006510","#405b3f","#88d487","#abc7aa","dotted"],
+        ["story",324,0,"relative","#792d80","#624864","#e7a0ed","#ceb3d0","dotted"],
+        ["source",68,0,"placed","#754600","#604f3d","#f5ad5a","#d4b89c","dashed"],
+        ["link",42,0,"placed","#8b3100","#6b493c","#ffa37f","#d8b5a7","dash-dot"],
+        ["person",222,0,"relative","#005c72","#40575f","#43d0f9","#9cc6d5","dash-dot"],
+        ["quote",112,0,"placed","#545700","#53553d","#c0c65c","#bec19d","solid"]
+      ],
+      "meaning": [
+        "question and tool are drawn as opposites, 180° apart",
+        "idea stands beside plan, 32° along the wheel: kin",
+        "risk and story are drawn as opposites, 180° apart",
+        "link and person are drawn as opposites, 180° apart",
+        "source and quote stand apart from the rest",
+        "tool is drawn dashed: beside question it looks alike to deuteranopes",
+        "plan is drawn dashed: beside idea it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "risk is drawn dotted: beside tool it looks alike to tritanopes",
+        "story is drawn dotted: beside plan it looks alike to protanopes and deuteranopes",
+        "source is drawn dashed: beside risk it looks alike to protanopes and deuteranopes",
+        "link is drawn dash-dot: beside source it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "person is drawn dash-dot: beside plan it looks alike to protanopes, deuteranopes and tritanopes"
+      ]
+    },
+    {
+      "name": "random 019",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"sub","a":"goal","b":"question"},"answer":"goal is a kind of question: question's hue, a step toward the ground"},
+        {"act":{"act":"opposes","a":"question","b":"person"},"answer":"question opposes person: person across the wheel from question, 166° apart"},
+        {"act":{"act":"kin","a":"place","b":"note"},"answer":"place is kin to note: placed together, 32° apart, where both stand most distinct"},
+        {"act":{"act":"opposes","a":"event","b":"idea"},"answer":"event opposes idea: placed together across the wheel, 180° apart"},
+        {"act":{"act":"opposes","a":"place","b":"method"},"answer":"place opposes method: method across the wheel from place, 180° apart"},
+        {"act":{"act":"say","a":"place"},"answer":"place is already a kind"},
+        {"act":{"act":"say","a":"note","word":"#332e81"},"answer":"note → 280°, your #332e81"},
+        {"act":{"act":"sub","a":"claim","b":"goal"},"answer":"claim is a kind of goal: goal's hue, a step toward the ground"},
+        {"act":{"act":"opposes","a":"claim","b":"link"},"answer":"claim opposes link: link across the wheel from claim, 178° apart"},
+        {"act":{"act":"say","a":"event","word":"banana"},"answer":"“banana” is no colour this space knows"},
+        {"act":{"act":"kin","a":"story","b":"story"},"answer":"story cannot be related to itself"}
+      ],
+      "kinds": [
+        ["goal",42,1,"relative","#a73e05","#815a4b","#ed8c65","#c5a091","solid"],
+        ["question",42,0,"placed","#8b3100","#6b493c","#ffa37f","#d8b5a7","dashed"],
+        ["person",236,0,"relative","#00597f","#3f5664","#6cc9ff","#a3c3d7","solid"],
+        ["place",308,0,"placed","#6a3491","#5b4a6b","#d5a6fe","#c6b6d7","dashed"],
+        ["note",279.8805362433247,0,"said","#4642a2","#4c4f72","#b0b7ff","#b8bcd7","dotted"],
+        ["event",8,0,"placed","#911f43","#6e454c","#ff9daf","#d9b2b8","dotted"],
+        ["idea",188,0,"relative","#00605a","#405855","#32d8cd","#9ac9c3","dashed"],
+        ["method",128,0,"relative","#405e00","#4b573d","#a5ce6f","#b4c4a3","dash-dot"],
+        ["claim",42,2,"relative","#ba4f1f","#8f6757","#d77852","#b08c7e","dashed"],
+        ["link",220,0,"relative","#005c71","#40575e","#40d1f7","#9bc6d4","long"],
+        ["story",338,0,"placed","#83276f","#67465e","#f49cdb","#d4b2c9","dash-dot"]
+      ],
+      "meaning": [
+        "question, goal and claim are one family: question's hue, each kind below it a step toward the ground",
+        "question and person are drawn as opposites, 166° apart",
+        "place stands beside note, 28° along the wheel: kin",
+        "event and idea are drawn as opposites, 180° apart",
+        "place and method are drawn as opposites, 180° apart",
+        "claim and link are drawn as opposites, 178° apart",
+        "story stands apart from the rest",
+        "question is drawn dashed: beside goal it looks alike to protanopes and tritanopes",
+        "place is drawn dashed: beside person it looks alike to protanopes and deuteranopes",
+        "note is drawn dotted: beside person it looks alike to protanopes, deuteranopes and tritanopes",
+        "event is drawn dotted: beside question it looks alike to tritanopes",
+        "idea is drawn dashed: beside person it looks alike to tritanopes",
+        "method is drawn dash-dot: beside question it looks alike to deuteranopes",
+        "claim is drawn dashed: beside method it looks alike to protanopes",
+        "link is drawn long: beside person it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "story is drawn dash-dot: beside idea it looks alike to deuteranopes"
+      ]
+    },
+    {
+      "name": "random 020",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"say","a":"place","word":"purple"},"answer":"place → 305°, your purple; it stands by the chrome's colour for a model (9° away) — on ink it means place"},
+        {"act":{"act":"kin","a":"risk","b":"link"},"answer":"risk is kin to link: placed together, 32° apart, where both stand most distinct"},
+        {"act":{"act":"say","a":"event"},"answer":"event → 28°, the most distinct place left (82° from risk)"},
+        {"act":{"act":"say","a":"tool"},"answer":"tool → 228°, the most distinct place left (77° from place)"},
+        {"act":{"act":"kin","a":"note","b":"theme"},"answer":"note is kin to theme: placed together, 32° apart, where both stand most distinct"},
+        {"act":{"act":"kin","a":"claim","b":"claim"},"answer":"claim cannot be related to itself"},
+        {"act":{"act":"sub","a":"event","b":"question"},"answer":"event is a kind of question: question's hue, a step toward the ground"},
+        {"act":{"act":"say","a":"person"},"answer":"person → 266°, the most distinct place left (38° from tool)"},
+        {"act":{"act":"sub","a":"tool","b":"place"},"answer":"tool is a kind of place: place's hue, a step toward the ground"}
+      ],
+      "kinds": [
+        ["place",305,0,"said","#663693","#5a4a6c","#d1a8ff","#c5b6d7","solid"],
+        ["risk",110,0,"placed","#565600","#53553d","#c3c55a","#bfc19d","dashed"],
+        ["link",142,0,"relative","#076500","#415b3d","#8cd384","#acc6a9","solid"],
+        ["event",66,1,"relative","#8f5500","#76604b","#e09746","#bfa489","dotted"],
+        ["tool",305,1,"relative","#7949a8","#6c5d7f","#bc93eb","#b0a2c3","solid"],
+        ["note",4,0,"placed","#902049","#6d454f","#ff9cb5","#d9b2ba","dashed"],
+        ["theme",332,0,"relative","#7f2976","#654761","#ef9ee3","#d2b3cc","dotted"],
+        ["claim",183,0,"placed","#006057","#405854","#3ad9c6","#9bc9c1","dash-dot"],
+        ["question",66,0,"placed","#764500","#614f3d","#f6ac5c","#d4b89d","dash-dot"],
+        ["person",266,0,"placed","#2b4aa4","#445272","#9fbdff","#b2bed7","dashed"]
+      ],
+      "meaning": [
+        "place and tool are one family: place's hue, each kind below it a step toward the ground",
+        "question and event are one family: question's hue, each kind below it a step toward the ground",
+        "risk stands beside link, 32° along the wheel: kin",
+        "note stands beside theme, 32° along the wheel: kin",
+        "claim and person stand apart from the rest",
+        "place's purple stands near the chrome's colour for a model: on the ink it means place, and the chrome's colours never touch the ink",
+        "risk is drawn dashed: beside place it looks alike to tritanopes",
+        "event is drawn dotted: beside link it looks alike to protanopes",
+        "note is drawn dashed: beside event it looks alike to tritanopes",
+        "theme is drawn dotted: beside note it looks alike to tritanopes",
+        "claim is drawn dash-dot: beside link it looks alike to tritanopes",
+        "question is drawn dash-dot: beside risk it looks alike to protanopes and deuteranopes",
+        "person is drawn dashed: beside place it looks alike to protanopes and deuteranopes"
+      ]
+    },
+    {
+      "name": "random 021",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"kin","a":"plan","b":"fact"},"answer":"plan is kin to fact: placed together, 32° apart, where both stand most distinct"},
+        {"act":{"act":"kin","a":"goal","b":"place"},"answer":"goal is kin to place: placed together, 32° apart, where both stand most distinct"},
+        {"act":{"act":"say","a":"event","word":"mint"},"answer":"event → 165°, your mint"},
+        {"act":{"act":"opposes","a":"tool","b":"person"},"answer":"tool opposes person: placed together across the wheel, 180° apart"},
+        {"act":{"act":"sub","a":"person","b":"question"},"answer":"person is a kind of question: question's hue, a step toward the ground"},
+        {"act":{"act":"say","a":"plan"},"answer":"plan is already a kind"},
+        {"act":{"act":"sub","a":"event","b":"quote"},"answer":"event keeps your mint; as a kind of quote it is drawn a step toward the ground"},
+        {"act":{"act":"kin","a":"plan","b":"plan"},"answer":"plan cannot be related to itself"},
+        {"act":{"act":"sub","a":"draft","b":"draft"},"answer":"draft cannot be related to itself"},
+        {"act":{"act":"kin","a":"risk","b":"fact"},"answer":"risk is kin to fact: risk 26° beside fact, on the side that stays most distinct"},
+        {"act":{"act":"say","a":"draft","word":"aqua"},"answer":"draft → 190°, your aqua"},
+        {"act":{"act":"say","a":"question"},"answer":"question is already a kind"},
+        {"act":{"act":"say","a":"goal","word":"ochre"},"answer":"goal → 75°, your ochre; it stands by the chrome's colour for unsure (4° away) — on ink it means goal"}
+      ],
+      "kinds": [
+        ["plan",0,0,"placed","#8f204f","#6d4551","#ff9bba","#d9b2bc","solid"],
+        ["fact",328,0,"relative","#7c2b7b","#644763","#eb9fe8","#d0b3ce","dashed"],
+        ["goal",75,0,"said","#704a00","#5e503d","#eeb154","#d1ba9b","dotted"],
+        ["place",107,0,"relative","#595500","#54543d","#c7c358","#c1c09c","solid"],
+        ["event",165,1,"said","#007755","#4f6c5f","#45c395","#8db4a2","dashed"],
+        ["tool",58,0,"placed","#7c4100","#644d3d","#fca864","#d7b79f","dash-dot"],
+        ["person",283,1,"relative","#5b54b6","#606185","#9e9ef8","#a4a6c8","solid"],
+        ["question",283,0,"placed","#4b41a1","#4e4e71","#b4b5ff","#babbd7","solid"],
+        ["quote",230,0,"placed","#005b79","#405662","#58ccff","#9fc4d7","dotted"],
+        ["draft",190,0,"said","#00605c","#405856","#2fd8d0","#9ac8c5","dash-dot"],
+        ["risk",302,0,"relative","#633796","#584b6d","#ccabff","#c3b7d7","dash-dot"]
+      ],
+      "meaning": [
+        "question and person are one family: question's hue, each kind below it a step toward the ground",
+        "quote and event are one family: quote's hue, each kind below it a step toward the ground (event keeps your mint)",
+        "plan stands beside fact, 32° along the wheel: kin",
+        "goal stands beside place, 32° along the wheel: kin",
+        "tool and person are said to oppose, but your colours stand 135° apart",
+        "risk stands beside fact, 26° along the wheel: kin",
+        "draft stands apart from the rest",
+        "goal's ochre stands near the chrome's colour for unsure: on the ink it means goal, and the chrome's colours never touch the ink",
+        "fact is drawn dashed: beside plan it looks alike to tritanopes",
+        "goal is drawn dotted: beside plan it looks alike to tritanopes",
+        "event is drawn dashed: beside plan it looks alike to deuteranopes",
+        "tool is drawn dash-dot: beside goal it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "quote is drawn dotted: beside question it looks alike to protanopes, deuteranopes and tritanopes",
+        "draft is drawn dash-dot: beside quote it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "risk is drawn dash-dot: beside question it looks alike to everyone, protanopes, deuteranopes and tritanopes"
+      ]
+    },
+    {
+      "name": "random 023",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"opposes","a":"quote","b":"question"},"answer":"quote opposes question: placed together across the wheel, 180° apart"},
+        {"act":{"act":"say","a":"question"},"answer":"question is already a kind"},
+        {"act":{"act":"opposes","a":"idea","b":"fact"},"answer":"idea opposes fact: placed together across the wheel, 180° apart"},
+        {"act":{"act":"say","a":"note"},"answer":"note → 330°, the most distinct place left (30° from quote)"},
+        {"act":{"act":"say","a":"source"},"answer":"source → 126°, the most distinct place left (52° from idea)"},
+        {"act":{"act":"say","a":"place"},"answer":"place → 42°, the most distinct place left (32° from idea)"},
+        {"act":{"act":"say","a":"claim"},"answer":"claim → 154°, the most distinct place left (26° from question)"}
+      ],
+      "kinds": [
+        ["quote",0,0,"placed","#8f204f","#6d4551","#ff9bba","#d9b2bc","solid"],
+        ["question",180,0,"relative","#006154","#405853","#40d9c1","#9cc9bf","dashed"],
+        ["idea",74,0,"placed","#714900","#5e503d","#efb055","#d1ba9b","dashed"],
+        ["fact",254,0,"relative","#00519d","#3e5470","#8fc1ff","#adc0d7","solid"],
+        ["note",330,0,"placed","#7d2a79","#654762","#ed9ee5","#d1b3cd","dotted"],
+        ["source",126,0,"placed","#435d00","#4d573d","#a9cd6d","#b6c4a2","solid"],
+        ["place",42,0,"placed","#8b3100","#6b493c","#ffa37f","#d8b5a7","dash-dot"],
+        ["claim",154,0,"placed","#006335","#405a48","#74d697","#a6c8af","dotted"]
+      ],
+      "meaning": [
+        "quote and question are drawn as opposites, 180° apart",
+        "idea and fact are drawn as opposites, 180° apart",
+        "note, source, place and claim stand apart from the rest",
+        "question is drawn dashed: beside quote it looks alike to deuteranopes",
+        "idea is drawn dashed: beside quote it looks alike to tritanopes",
+        "note is drawn dotted: beside quote it looks alike to tritanopes",
+        "place is drawn dash-dot: beside idea it looks alike to protanopes, deuteranopes and tritanopes",
+        "claim is drawn dotted: beside question it looks alike to everyone, protanopes, deuteranopes and tritanopes"
+      ]
+    },
+    {
+      "name": "random 026",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"kin","a":"draft","b":"method"},"answer":"draft is kin to method: placed together, 32° apart, where both stand most distinct"},
+        {"act":{"act":"say","a":"theme","word":"#4defd1"},"answer":"theme → 178°, your #4defd1"},
+        {"act":{"act":"kin","a":"question","b":"risk"},"answer":"question is kin to risk: placed together, 32° apart, where both stand most distinct"},
+        {"act":{"act":"say","a":"draft","word":"grey"},"answer":"“grey” is no colour this space knows — a kind takes a hue, and grey, black and white have none"},
+        {"act":{"act":"say","a":"place"},"answer":"place → 253°, the most distinct place left (75° from method)"},
+        {"act":{"act":"sub","a":"idea","b":"claim"},"answer":"idea is a kind of claim: claim's hue, a step toward the ground"}
+      ],
+      "kinds": [
+        ["draft",0,0,"placed","#8f204f","#6d4551","#ff9bba","#d9b2bc","solid"],
+        ["method",328,0,"relative","#7c2b7b","#644763","#eb9fe8","#d0b3ce","dashed"],
+        ["theme",177.75705850774852,0,"said","#006152","#405852","#44d9bd","#9cc9bd","dotted"],
+        ["question",60,0,"placed","#7b4200","#634e3d","#fba962","#d6b79e","dotted"],
+        ["risk",92,0,"relative","#645000","#59523d","#dcbb50","#c9bd9a","solid"],
+        ["place",253,0,"placed","#00529a","#3e546f","#8ec2ff","#acc0d7","solid"],
+        ["idea",292,1,"relative","#694fb2","#655f83","#ab99f4","#a9a4c6","dotted"],
+        ["claim",292,0,"placed","#573c9d","#534d70","#bfb1ff","#beb9d7","dotted"]
+      ],
+      "meaning": [
+        "claim and idea are one family: claim's hue, each kind below it a step toward the ground",
+        "draft stands beside method, 32° along the wheel: kin",
+        "question stands beside risk, 32° along the wheel: kin",
+        "theme and place stand apart from the rest",
+        "method is drawn dashed: beside draft it looks alike to tritanopes",
+        "theme is drawn dotted: beside draft it looks alike to deuteranopes",
+        "question is drawn dotted: beside draft it looks alike to tritanopes",
+        "idea is drawn dotted: beside place it looks alike to protanopes",
+        "claim is drawn dotted: beside place it looks alike to protanopes and deuteranopes"
+      ]
+    },
+    {
+      "name": "random 027",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"say","a":"fact"},"answer":"fact → 343°, the first kind; its name leans it there"},
+        {"act":{"act":"say","a":"tool"},"answer":"tool → 133°, the most distinct place left (150° from fact)"},
+        {"act":{"act":"opposes","a":"tool","b":"story"},"answer":"tool opposes story: story across the wheel from tool, 178° apart"},
+        {"act":{"act":"opposes","a":"place","b":"place"},"answer":"place cannot be related to itself"},
+        {"act":{"act":"kin","a":"task","b":"claim"},"answer":"task is kin to claim: placed together, 26° apart, where both stand most distinct"},
+        {"act":{"act":"say","a":"idea"},"answer":"idea → 173°, the most distinct place left (40° from tool)"},
+        {"act":{"act":"opposes","a":"question","b":"theme"},"answer":"question opposes theme: placed together across the wheel, 180° apart"},
+        {"act":{"act":"sub","a":"story","b":"goal"},"answer":"story is a kind of goal: goal's hue, a step toward the ground"}
+      ],
+      "kinds": [
+        ["fact",343,0,"placed","#862568","#69465b","#f89bd4","#d5b2c6","solid"],
+        ["tool",133,0,"placed","#356000","#48583d","#9cd076","#b2c5a5","solid"],
+        ["story",11,1,"relative","#a8354f","#82575d","#ef8595","#c69da1","solid"],
+        ["place",229,0,"placed","#005b78","#405661","#54cdff","#9ec4d7","dashed"],
+        ["task",40,0,"placed","#8e2e00","#6c493c","#ffa383","#d8b5a8","dashed"],
+        ["claim",66,0,"relative","#764500","#614f3d","#f6ac5c","#d4b89d","dotted"],
+        ["idea",173,0,"placed","#00614e","#405951","#4dd9b6","#9ec9bb","dotted"],
+        ["question",104,0,"placed","#5b5400","#56543d","#ccc255","#c3c09b","dash-dot"],
+        ["theme",284,0,"relative","#4c40a0","#4e4e71","#b5b5ff","#babbd7","dash-dot"],
+        ["goal",11,0,"placed","#921f3e","#6e454b","#ff9dab","#d9b3b7","long"]
+      ],
+      "meaning": [
+        "goal and story are one family: goal's hue, each kind below it a step toward the ground",
+        "tool and story are said to oppose, but your colours stand 122° apart",
+        "task stands beside claim, 26° along the wheel: kin",
+        "question and theme are drawn as opposites, 180° apart",
+        "fact, place and idea stand apart from the rest",
+        "place is drawn dashed: beside tool it looks alike to tritanopes",
+        "task is drawn dashed: beside tool it looks alike to deuteranopes",
+        "claim is drawn dotted: beside task it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "idea is drawn dotted: beside place it looks alike to tritanopes",
+        "question is drawn dash-dot: beside claim it looks alike to protanopes and deuteranopes",
+        "theme is drawn dash-dot: beside place it looks alike to protanopes, deuteranopes and tritanopes",
+        "goal is drawn long: beside task it looks alike to everyone, deuteranopes and tritanopes"
+      ]
+    },
+    {
+      "name": "random 029",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"sub","a":"note","b":"source"},"answer":"note is a kind of source: source's hue, a step toward the ground"},
+        {"act":{"act":"sub","a":"quote","b":"person"},"answer":"quote is a kind of person: person's hue, a step toward the ground"},
+        {"act":{"act":"sub","a":"fact","b":"source"},"answer":"fact is a kind of source: source's hue +28°, a step toward the ground"},
+        {"act":{"act":"opposes","a":"goal","b":"draft"},"answer":"goal opposes draft: placed together across the wheel, 180° apart"},
+        {"act":{"act":"kin","a":"place","b":"note"},"answer":"place is kin to note: place 38° beside note, on the side that stays most distinct"},
+        {"act":{"act":"say","a":"person","word":"tan"},"answer":"person → 70°, your tan; it stands by the chrome's colour for unsure (9° away) — on ink it means person"},
+        {"act":{"act":"say","a":"story"},"answer":"story → 219°, the most distinct place left (73° from draft)"},
+        {"act":{"act":"say","a":"claim","word":"#139059"},"answer":"claim → 157°, your #139059"},
+        {"act":{"act":"sub","a":"claim","b":"plan"},"answer":"claim keeps your #139059; as a kind of plan it is drawn a step toward the ground"}
+      ],
+      "kinds": [
+        ["note",340,1,"relative","#993b7f","#7b586f","#df87c3","#bf9eb3","solid"],
+        ["source",340,0,"placed","#84266c","#68465c","#f59cd8","#d4b2c8","solid"],
+        ["quote",70,1,"relative","#8c5700","#74614b","#dd9942","#bea488","dashed"],
+        ["person",70,0,"said","#734700","#604f3d","#f3ae58","#d3b99c","dotted"],
+        ["fact",8,1,"relative","#a73554","#81575e","#ee859a","#c69da3","dotted"],
+        ["goal",112,0,"placed","#545700","#53553d","#c0c65c","#bec19d","solid"],
+        ["draft",292,0,"relative","#573c9d","#534d70","#bfb1ff","#beb9d7","dashed"],
+        ["place",18,0,"relative","#932031","#6f4647","#ff9fa2","#d9b3b3","dash-dot"],
+        ["story",219,0,"placed","#005c70","#40575e","#3ed1f6","#9bc6d3","dash-dot"],
+        ["claim",157.16502115239223,1,"said","#007848","#4f6d5a","#58c288","#90b39d","solid"],
+        ["plan",253,0,"placed","#00529a","#3e546f","#8ec2ff","#acc0d7","dotted"]
+      ],
+      "meaning": [
+        "source, note and fact are one family: source's hue, each kind below it a step toward the ground",
+        "person and quote are one family: person's hue, each kind below it a step toward the ground",
+        "plan and claim are one family: plan's hue, each kind below it a step toward the ground (claim keeps your #139059)",
+        "goal and draft are drawn as opposites, 180° apart",
+        "place stands beside note, 38° along the wheel: kin",
+        "story stands apart from the rest",
+        "person's tan stands near the chrome's colour for unsure: on the ink it means person, and the chrome's colours never touch the ink",
+        "quote is drawn dashed: beside note it looks alike to tritanopes",
+        "person is drawn dotted: beside source it looks alike to tritanopes",
+        "fact is drawn dotted: beside quote it looks alike to tritanopes",
+        "draft is drawn dashed: beside goal it looks alike to tritanopes",
+        "place is drawn dash-dot: beside person it looks alike to deuteranopes and tritanopes",
+        "story is drawn dash-dot: beside draft it looks alike to protanopes and deuteranopes",
+        "plan is drawn dotted: beside draft it looks alike to protanopes and deuteranopes"
+      ]
+    },
+    {
+      "name": "random 030",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"kin","a":"goal","b":"fact"},"answer":"goal is kin to fact: placed together, 32° apart, where both stand most distinct"},
+        {"act":{"act":"say","a":"plan"},"answer":"plan → 157°, the most distinct place left (157° from goal)"},
+        {"act":{"act":"sub","a":"question","b":"fact"},"answer":"question is a kind of fact: fact's hue, a step toward the ground"},
+        {"act":{"act":"say","a":"theme"},"answer":"theme → 68°, the most distinct place left (68° from goal)"},
+        {"act":{"act":"say","a":"person"},"answer":"person → 246°, the most distinct place left (82° from fact)"},
+        {"act":{"act":"sub","a":"source","b":"risk"},"answer":"source is a kind of risk: risk's hue, a step toward the ground"},
+        {"act":{"act":"say","a":"claim","word":"#0592a2"},"answer":"claim → 208°, your #0592a2; it stands by the chrome's colour for confident (2° away) — on ink it means claim"},
+        {"act":{"act":"say","a":"claim"},"answer":"claim is already a kind"},
+        {"act":{"act":"say","a":"quote","word":"aqua"},"answer":"quote → 190°, your aqua"},
+        {"act":{"act":"say","a":"theme"},"answer":"theme is already a kind"},
+        {"act":{"act":"sub","a":"story","b":"note"},"answer":"story is a kind of note: note's hue, a step toward the ground"},
+        {"act":{"act":"sub","a":"event","b":"goal"},"answer":"event is a kind of goal: goal's hue, a step toward the ground"},
+        {"act":{"act":"sub","a":"idea","b":"note"},"answer":"idea is a kind of note: note's hue +28°, a step toward the ground"}
+      ],
+      "kinds": [
+        ["goal",0,0,"placed","#8f204f","#6d4551","#ff9bba","#d9b2bc","solid"],
+        ["fact",328,0,"relative","#7c2b7b","#644763","#eb9fe8","#d0b3ce","dashed"],
+        ["plan",157,0,"placed","#00633a","#40594a","#6ed79c","#a4c8b1","dashed"],
+        ["question",328,1,"relative","#903f8f","#775975","#d58bd3","#bb9fb9","solid"],
+        ["theme",68,0,"placed","#754600","#604f3d","#f5ad5a","#d4b89c","dotted"],
+        ["person",246,0,"placed","#00568c","#3f5569","#82c5ff","#a9c1d7","dotted"],
+        ["source",290,1,"relative","#6650b3","#645f83","#a89af5","#a8a5c7","dotted"],
+        ["risk",290,0,"placed","#543d9e","#524d70","#bcb2ff","#bdbad7","dash-dot"],
+        ["claim",208.47079993740633,0,"said","#005e69","#40575b","#2dd4ea","#99c7cf","long"],
+        ["quote",190,0,"said","#00605c","#405856","#2fd8d0","#9ac8c5","dash-dot"],
+        ["story",42,1,"relative","#a73e05","#815a4b","#ed8c65","#c5a091","solid"],
+        ["note",42,0,"placed","#8b3100","#6b493c","#ffa37f","#d8b5a7","dash-dot"],
+        ["event",0,1,"relative","#a43661","#805763","#eb85a6","#c59da8","dashed"],
+        ["idea",70,1,"relative","#8c5700","#74614b","#dd9942","#bea488","long"]
+      ],
+      "meaning": [
+        "goal and event are one family: goal's hue, each kind below it a step toward the ground",
+        "fact and question are one family: fact's hue, each kind below it a step toward the ground",
+        "risk and source are one family: risk's hue, each kind below it a step toward the ground",
+        "note, story and idea are one family: note's hue, each kind below it a step toward the ground",
+        "goal stands beside fact, 32° along the wheel: kin",
+        "plan, theme, person, claim and quote stand apart from the rest",
+        "claim's #0592a2 stands near the chrome's colour for confident: on the ink it means claim, and the chrome's colours never touch the ink",
+        "fact is drawn dashed: beside goal it looks alike to tritanopes",
+        "plan is drawn dashed: beside goal it looks alike to deuteranopes",
+        "theme is drawn dotted: beside goal it looks alike to tritanopes",
+        "person is drawn dotted: beside question it looks alike to protanopes",
+        "source is drawn dotted: beside question it looks alike to protanopes",
+        "risk is drawn dash-dot: beside person it looks alike to protanopes and deuteranopes",
+        "claim is drawn long: beside fact it looks alike to deuteranopes",
+        "quote is drawn dash-dot: beside claim it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "note is drawn dash-dot: beside theme it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "event is drawn dashed: beside story it looks alike to tritanopes",
+        "idea is drawn long: beside story it looks alike to protanopes, deuteranopes and tritanopes"
+      ]
+    },
+    {
+      "name": "random 031",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"kin","a":"source","b":"source"},"answer":"source cannot be related to itself"},
+        {"act":{"act":"say","a":"idea"},"answer":"idea → 250°, the most distinct place left (166° from source)"},
+        {"act":{"act":"say","a":"source"},"answer":"source is already a kind"},
+        {"act":{"act":"say","a":"method"},"answer":"method → 160°, the most distinct place left (90° from idea)"},
+        {"act":{"act":"sub","a":"draft","b":"method"},"answer":"draft is a kind of method: method's hue, a step toward the ground"},
+        {"act":{"act":"opposes","a":"idea","b":"source"},"answer":"idea opposes source: idea across the wheel from source, 165° apart"},
+        {"act":{"act":"kin","a":"plan","b":"person"},"answer":"plan is kin to person: placed together, 32° apart, where both stand most distinct"}
+      ],
+      "kinds": [
+        ["source",56,0,"placed","#7e3f00","#644d3d","#fda767","#d7b6a0","solid"],
+        ["idea",251,0,"relative","#005496","#3e556d","#8ac3ff","#abc0d7","solid"],
+        ["method",160,0,"placed","#00633f","#40594b","#68d7a1","#a3c8b3","dashed"],
+        ["draft",160,1,"relative","#00784d","#4f6d5c","#51c28d","#8fb39f","dashed"],
+        ["plan",322,0,"placed","#772e82","#614865","#e5a1ef","#cdb4d1","dashed"],
+        ["person",354,0,"relative","#8c2258","#6c4555","#ff99c3","#d9b1c0","dotted"]
+      ],
+      "meaning": [
+        "method and draft are one family: method's hue, each kind below it a step toward the ground",
+        "idea and source are drawn as opposites, 165° apart",
+        "plan stands beside person, 32° along the wheel: kin",
+        "method is drawn dashed: beside idea it looks alike to tritanopes",
+        "draft is drawn dashed: beside source it looks alike to protanopes",
+        "plan is drawn dashed: beside idea it looks alike to protanopes and deuteranopes",
+        "person is drawn dotted: beside source it looks alike to tritanopes"
+      ]
+    },
+    {
+      "name": "random 032",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"kin","a":"task","b":"story"},"answer":"task is kin to story: placed together, 32° apart, where both stand most distinct"},
+        {"act":{"act":"say","a":"link"},"answer":"link → 137°, the most distinct place left (137° from task)"},
+        {"act":{"act":"kin","a":"tool","b":"fact"},"answer":"tool is kin to fact: placed together, 26° apart, where both stand most distinct"},
+        {"act":{"act":"kin","a":"method","b":"task"},"answer":"method is kin to task: method 45° beside task, on the side that stays most distinct"},
+        {"act":{"act":"sub","a":"draft","b":"place"},"answer":"draft is a kind of place: place's hue, a step toward the ground"},
+        {"act":{"act":"say","a":"theme","word":"plum"},"answer":"theme → 320°, your plum"},
+        {"act":{"act":"kin","a":"plan","b":"note"},"answer":"plan is kin to note: placed together, 26° apart, where both stand most distinct"}
+      ],
+      "kinds": [
+        ["task",0,0,"placed","#8f204f","#6d4551","#ff9bba","#d9b2bc","solid"],
+        ["story",328,0,"relative","#7c2b7b","#644763","#eb9fe8","#d0b3ce","dashed"],
+        ["link",137,0,"placed","#296200","#45593d","#95d17c","#afc6a7","solid"],
+        ["tool",222,0,"placed","#005c72","#40575f","#43d0f9","#9cc6d5","dotted"],
+        ["fact",248,0,"relative","#005590","#3f556a","#85c4ff","#aac1d7","dash-dot"],
+        ["method",315,0,"relative","#70318a","#5e4968","#dda4f7","#cab5d4","solid"],
+        ["draft",170,1,"relative","#00775c","#4f6c61","#39c39d","#8bb4a4","dashed"],
+        ["place",170,0,"placed","#00624b","#405950","#54d8b1","#9fc9b9","dashed"],
+        ["theme",320,0,"said","#752f85","#614866","#e3a2f2","#ccb4d2","long"],
+        ["plan",50,0,"placed","#833b00","#674c3d","#ffa571","#d8b5a3","dotted"],
+        ["note",76,0,"relative","#6f4a00","#5e503d","#edb154","#d0ba9b","dash-dot"]
+      ],
+      "meaning": [
+        "place and draft are one family: place's hue, each kind below it a step toward the ground",
+        "task stands beside story, 32° along the wheel: kin",
+        "tool stands beside fact, 26° along the wheel: kin",
+        "method stands beside task, 45° along the wheel: kin",
+        "plan stands beside note, 26° along the wheel: kin",
+        "link and theme stand apart from the rest",
+        "story is drawn dashed: beside task it looks alike to tritanopes",
+        "tool is drawn dotted: beside story it looks alike to deuteranopes",
+        "fact is drawn dash-dot: beside tool it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "draft is drawn dashed: beside task it looks alike to deuteranopes",
+        "place is drawn dashed: beside task it looks alike to deuteranopes",
+        "theme is drawn long: beside method it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "plan is drawn dotted: beside link it looks alike to deuteranopes",
+        "note is drawn dash-dot: beside plan it looks alike to everyone, protanopes, deuteranopes and tritanopes"
+      ]
+    },
+    {
+      "name": "random 033",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"opposes","a":"note","b":"story"},"answer":"note opposes story: placed together across the wheel, 180° apart"},
+        {"act":{"act":"say","a":"task","word":"black"},"answer":"task → 268°, the most distinct place left (88° from story); “black” is no colour this space knows — a kind takes a hue, and grey, black and white have none"},
+        {"act":{"act":"opposes","a":"event","b":"question"},"answer":"event opposes question: placed together across the wheel, 180° apart"},
+        {"act":{"act":"say","a":"claim"},"answer":"claim → 65°, the most distinct place left (65° from note)"},
+        {"act":{"act":"say","a":"claim","word":"lime"},"answer":"claim → 130°, your lime; on paper a yellow is drawn as dark as words need, ochre or olive, and on the dark ground it is yellow"},
+        {"act":{"act":"say","a":"draft"},"answer":"draft → 60°, the most distinct place left (60° from note)"},
+        {"act":{"act":"say","a":"idea"},"answer":"idea → 231°, the most distinct place left (37° from task)"},
+        {"act":{"act":"opposes","a":"goal","b":"link"},"answer":"goal opposes link: placed together across the wheel, 180° apart"},
+        {"act":{"act":"say","a":"theme","word":"plum"},"answer":"theme → 320°, your plum"},
+        {"act":{"act":"sub","a":"event","b":"task"},"answer":"event is a kind of task: task's hue, a step toward the ground"},
+        {"act":{"act":"sub","a":"question","b":"theme"},"answer":"question is a kind of theme: theme's hue, a step toward the ground"},
+        {"act":{"act":"say","a":"fact","word":"olive"},"answer":"fact → 110°, your olive; on paper a yellow is drawn as dark as words need, ochre or olive, and on the dark ground it is yellow"}
+      ],
+      "kinds": [
+        ["note",0,0,"placed","#8f204f","#6d4551","#ff9bba","#d9b2bc","solid"],
+        ["story",180,0,"relative","#006154","#405853","#40d9c1","#9cc9bf","dashed"],
+        ["task",268,0,"placed","#3049a4","#455172","#a2bcff","#b3bdd7","solid"],
+        ["event",268,1,"relative","#405cb9","#576486","#86a5fb","#9ca9c9","dashed"],
+        ["question",320,1,"relative","#894299","#735a79","#cd8ddc","#b8a0bd","dotted"],
+        ["claim",130,0,"said","#3c5e00","#4a583d","#a2ce72","#b3c5a3","dotted"],
+        ["draft",60,0,"placed","#7b4200","#634e3d","#fba962","#d6b79e","dashed"],
+        ["idea",231,0,"placed","#005a7a","#405662","#5cccff","#a0c4d7","dash-dot"],
+        ["goal",156,0,"placed","#006338","#405949","#70d79a","#a5c8b1","long"],
+        ["link",336,0,"relative","#822871","#67465f","#f29dde","#d3b2ca","long"],
+        ["theme",320,0,"said","#752f85","#614866","#e3a2f2","#ccb4d2","dotted"],
+        ["fact",110,0,"said","#565600","#53553d","#c3c55a","#bfc19d","solid"]
+      ],
+      "meaning": [
+        "task and event are one family: task's hue, each kind below it a step toward the ground",
+        "theme and question are one family: theme's hue, each kind below it a step toward the ground",
+        "note and story are drawn as opposites, 180° apart",
+        "event and question are said to oppose, but your colours stand 52° apart",
+        "goal and link are drawn as opposites, 180° apart",
+        "claim, draft, idea and fact stand apart from the rest",
+        "story is drawn dashed: beside note it looks alike to deuteranopes",
+        "event is drawn dashed: beside task it looks alike to deuteranopes",
+        "question is drawn dotted: beside task it looks alike to protanopes",
+        "claim is drawn dotted: beside story it looks alike to tritanopes",
+        "draft is drawn dashed: beside claim it looks alike to protanopes and deuteranopes",
+        "idea is drawn dash-dot: beside task it looks alike to protanopes, deuteranopes and tritanopes",
+        "goal is drawn long: beside story it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "link is drawn long: beside idea it looks alike to deuteranopes",
+        "theme is drawn dotted: beside idea it looks alike to deuteranopes"
+      ]
+    },
+    {
+      "name": "random 034",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"sub","a":"fact","b":"tool"},"answer":"fact is a kind of tool: tool's hue, a step toward the ground"},
+        {"act":{"act":"kin","a":"place","b":"place"},"answer":"place cannot be related to itself"},
+        {"act":{"act":"say","a":"quote","word":"#af9c5c"},"answer":"quote → 93°, your #af9c5c; on paper a yellow is drawn as dark as words need, ochre or olive, and on the dark ground it is yellow; it stands by the chrome's colour for unsure (14° away) — on ink it means quote"},
+        {"act":{"act":"say","a":"event"},"answer":"event → 241°, the most distinct place left (100° from place)"},
+        {"act":{"act":"opposes","a":"method","b":"plan"},"answer":"method opposes plan: placed together across the wheel, 180° apart"},
+        {"act":{"act":"say","a":"idea"},"answer":"idea → 293°, the most distinct place left (48° from place)"}
+      ],
+      "kinds": [
+        ["fact",133,1,"relative","#427500","#596c4b","#88bb62","#9db091","solid"],
+        ["tool",133,0,"placed","#356000","#48583d","#9cd076","#b2c5a5","solid"],
+        ["place",341,0,"placed","#85266b","#68465c","#f69bd7","#d5b2c7","solid"],
+        ["quote",93.38001571029463,0,"said","#635100","#59523d","#dabc50","#c8be9a","dashed"],
+        ["event",241,0,"placed","#005885","#3f5666","#78c7ff","#a6c2d7","dashed"],
+        ["method",12,0,"placed","#921f3c","#6e454a","#ff9eaa","#d9b3b6","dotted"],
+        ["plan",192,0,"relative","#005f5d","#405857","#2dd8d3","#99c8c6","dotted"],
+        ["idea",293,0,"placed","#583b9c","#544d6f","#c0b0ff","#beb9d7","dotted"]
+      ],
+      "meaning": [
+        "tool and fact are one family: tool's hue, each kind below it a step toward the ground",
+        "method and plan are drawn as opposites, 180° apart",
+        "place, quote, event and idea stand apart from the rest",
+        "quote's #af9c5c stands near the chrome's colour for unsure: on the ink it means quote, and the chrome's colours never touch the ink",
+        "quote is drawn dashed: beside tool it looks alike to protanopes and deuteranopes",
+        "event is drawn dashed: beside tool it looks alike to tritanopes",
+        "method is drawn dotted: beside place it looks alike to tritanopes",
+        "plan is drawn dotted: beside place it looks alike to deuteranopes",
+        "idea is drawn dotted: beside event it looks alike to protanopes and deuteranopes"
+      ]
+    },
+    {
+      "name": "random 036",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"opposes","a":"place","b":"claim"},"answer":"place opposes claim: placed together across the wheel, 180° apart"},
+        {"act":{"act":"say","a":"note","word":"magenta"},"answer":"note → 330°, your magenta"},
+        {"act":{"act":"opposes","a":"draft","b":"plan"},"answer":"draft opposes plan: placed together across the wheel, 180° apart"},
+        {"act":{"act":"say","a":"event"},"answer":"event → 138°, the most distinct place left (42° from claim)"},
+        {"act":{"act":"kin","a":"story","b":"fact"},"answer":"story is kin to fact: placed together, 32° apart, where both stand most distinct"},
+        {"act":{"act":"kin","a":"risk","b":"theme"},"answer":"risk is kin to theme: placed together, 26° apart, where both stand most distinct"}
+      ],
+      "kinds": [
+        ["place",0,0,"placed","#8f204f","#6d4551","#ff9bba","#d9b2bc","solid"],
+        ["claim",180,0,"relative","#006154","#405853","#40d9c1","#9cc9bf","dashed"],
+        ["note",330,0,"said","#7d2a79","#654762","#ed9ee5","#d1b3cd","dotted"],
+        ["draft",74,0,"placed","#714900","#5e503d","#efb055","#d1ba9b","dashed"],
+        ["plan",254,0,"relative","#00519d","#3e5470","#8fc1ff","#adc0d7","solid"],
+        ["event",138,0,"placed","#256300","#44593d","#93d27e","#afc6a7","dotted"],
+        ["story",18,0,"placed","#932031","#6f4647","#ff9fa2","#d9b3b3","dash-dot"],
+        ["fact",50,0,"relative","#833b00","#674c3d","#ffa571","#d8b5a3","long"],
+        ["risk",284,0,"placed","#4c40a0","#4e4e71","#b5b5ff","#babbd7","dash-dot"],
+        ["theme",310,0,"relative","#6c338f","#5c4a6a","#d7a6fc","#c7b5d6","long"]
+      ],
+      "meaning": [
+        "place and claim are drawn as opposites, 180° apart",
+        "draft and plan are drawn as opposites, 180° apart",
+        "story stands beside fact, 32° along the wheel: kin",
+        "risk stands beside theme, 26° along the wheel: kin",
+        "note and event stand apart from the rest",
+        "claim is drawn dashed: beside place it looks alike to deuteranopes",
+        "note is drawn dotted: beside place it looks alike to tritanopes",
+        "draft is drawn dashed: beside place it looks alike to tritanopes",
+        "event is drawn dotted: beside draft it looks alike to protanopes and deuteranopes",
+        "story is drawn dash-dot: beside place it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "fact is drawn long: beside draft it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "risk is drawn dash-dot: beside plan it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "theme is drawn long: beside risk it looks alike to everyone, protanopes and deuteranopes"
+      ]
+    },
+    {
+      "name": "random 037",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"kin","a":"claim","b":"link"},"answer":"claim is kin to link: placed together, 32° apart, where both stand most distinct"},
+        {"act":{"act":"say","a":"event"},"answer":"event → 157°, the most distinct place left (157° from claim)"},
+        {"act":{"act":"say","a":"fact"},"answer":"fact → 247°, the most distinct place left (81° from link)"},
+        {"act":{"act":"say","a":"fact"},"answer":"fact is already a kind"},
+        {"act":{"act":"say","a":"note","word":"#5a6ac4"},"answer":"note → 273°, your #5a6ac4"},
+        {"act":{"act":"say","a":"note"},"answer":"note is already a kind"},
+        {"act":{"act":"kin","a":"source","b":"event"},"answer":"source is kin to event: source 45° beside event, on the side that stays most distinct"},
+        {"act":{"act":"opposes","a":"idea","b":"risk"},"answer":"idea opposes risk: placed together across the wheel, 172° apart"},
+        {"act":{"act":"sub","a":"tool","b":"theme"},"answer":"tool is a kind of theme: theme's hue, a step toward the ground"},
+        {"act":{"act":"say","a":"event"},"answer":"event is already a kind"},
+        {"act":{"act":"say","a":"question"},"answer":"question → 68°, the most distinct place left (34° from idea)"},
+        {"act":{"act":"say","a":"story"},"answer":"story → 134°, the most distinct place left (22° from source)"},
+        {"act":{"act":"sub","a":"person","b":"quote"},"answer":"person is a kind of quote: quote's hue, a step toward the ground"}
+      ],
+      "kinds": [
+        ["claim",0,0,"placed","#8f204f","#6d4551","#ff9bba","#d9b2bc","solid"],
+        ["link",328,0,"relative","#7c2b7b","#644763","#eb9fe8","#d0b3ce","dashed"],
+        ["event",157,0,"placed","#00633a","#40594a","#6ed79c","#a4c8b1","dashed"],
+        ["fact",247,0,"placed","#00568e","#3f556a","#84c4ff","#a9c1d7","solid"],
+        ["note",273.4218808589331,0,"said","#3b46a3","#485072","#a9b9ff","#b5bdd7","dotted"],
+        ["source",112,0,"relative","#545700","#53553d","#c0c65c","#bec19d","solid"],
+        ["idea",34,0,"placed","#93250a","#6e473d","#ffa28c","#d9b4ab","dotted"],
+        ["risk",206,0,"relative","#005e67","#40575a","#2bd5e7","#99c7cd","dash-dot"],
+        ["tool",302,1,"relative","#754aab","#6b5d80","#b995ed","#afa2c4","dash-dot"],
+        ["theme",302,0,"placed","#633796","#584b6d","#ccabff","#c3b7d7","long"],
+        ["question",68,0,"placed","#754600","#604f3d","#f5ad5a","#d4b89c","dash-dot"],
+        ["story",134,0,"placed","#326000","#48593d","#9bd078","#b1c5a5","long"],
+        ["person",345,1,"relative","#9d3978","#7d586c","#e386bc","#c19db0","dashed"],
+        ["quote",345,0,"placed","#872465","#69465a","#f99bd1","#d6b2c5","long"]
+      ],
+      "meaning": [
+        "theme and tool are one family: theme's hue, each kind below it a step toward the ground",
+        "quote and person are one family: quote's hue, each kind below it a step toward the ground",
+        "claim stands beside link, 32° along the wheel: kin",
+        "source stands beside event, 45° along the wheel: kin",
+        "idea and risk are drawn as opposites, 172° apart",
+        "fact, note, question and story stand apart from the rest",
+        "link is drawn dashed: beside claim it looks alike to tritanopes",
+        "event is drawn dashed: beside claim it looks alike to deuteranopes",
+        "note is drawn dotted: beside fact it looks alike to everyone, protanopes, deuteranopes and tritanopes",
+        "idea is drawn dotted: beside source it looks alike to deuteranopes",
+        "risk is drawn dash-dot: beside link it looks alike to deuteranopes",
+        "tool is drawn dash-dot: beside note it looks alike to protanopes",
+        "theme is drawn long: beside note it looks alike to everyone, protanopes and deuteranopes",
+        "question is drawn dash-dot: beside idea it looks alike to protanopes, deuteranopes and tritanopes",
+        "story is drawn long: beside source it looks alike to everyone, protanopes and deuteranopes",
+        "person is drawn dashed: beside fact it looks alike to protanopes",
+        "quote is drawn long: beside claim it looks alike to everyone, protanopes, deuteranopes and tritanopes"
+      ]
+    },
+    {
+      "name": "random 038",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"say","a":"draft"},"answer":"draft → 222°, the first kind; its name leans it there"},
+        {"act":{"act":"say","a":"quote","word":"grey"},"answer":"quote → 37°, the most distinct place left (175° from draft); “grey” is no colour this space knows — a kind takes a hue, and grey, black and white have none"},
+        {"act":{"act":"kin","a":"task","b":"question"},"answer":"task is kin to question: placed together, 32° apart, where both stand most distinct"},
+        {"act":{"act":"say","a":"person"},"answer":"person → 322°, the most distinct place left (75° from quote)"},
+        {"act":{"act":"opposes","a":"task","b":"method"},"answer":"task opposes method: method across the wheel from task, 162° apart"},
+        {"act":{"act":"opposes","a":"claim","b":"goal"},"answer":"claim opposes goal: placed together across the wheel, 180° apart"},
+        {"act":{"act":"say","a":"quote"},"answer":"quote is already a kind"}
+      ],
+      "kinds": [
+        ["draft",222,0,"placed","#005c72","#40575f","#43d0f9","#9cc6d5","solid"],
+        ["quote",37,0,"placed","#922800","#6e473c","#ffa287","#d8b4aa","solid"],
+        ["task",110,0,"placed","#565600","#53553d","#c3c55a","#bfc19d","dashed"],
+        ["question",142,0,"relative","#076500","#415b3d","#8cd384","#acc6a9","dotted"],
+        ["person",322,0,"placed","#772e82","#614865","#e5a1ef","#cdb4d1","dashed"],
+        ["method",272,0,"relative","#3847a4","#475172","#a7baff","#b5bdd7","dash-dot"],
+        ["claim",174,0,"placed","#00614f","#405851","#4bd9b7","#9ec9bb","dashed"],
+        ["goal",354,0,"relative","#8c2258","#6c4555","#ff99c3","#d9b1c0","dotted"]
+      ],
+      "meaning": [
+        "task stands beside question, 32° along the wheel: kin",
+        "task and method are drawn as opposites, 162° apart",
+        "claim and goal are drawn as opposites, 180° apart",
+        "draft, quote and person stand apart from the rest",
+        "task is drawn dashed: beside quote it looks alike to deuteranopes",
+        "question is drawn dotted: beside task it looks alike to protanopes and deuteranopes",
+        "person is drawn dashed: beside draft it looks alike to deuteranopes",
+        "method is drawn dash-dot: beside draft it looks alike to protanopes, deuteranopes and tritanopes",
+        "claim is drawn dashed: beside question it looks alike to tritanopes",
+        "goal is drawn dotted: beside claim it looks alike to deuteranopes"
+      ]
+    },
+    {
+      "name": "random 039",
+      "overflow": [],
+      "acts": [
+        {"act":{"act":"sub","a":"event","b":"event"},"answer":"event cannot be related to itself"},
+        {"act":{"act":"say","a":"theme"},"answer":"theme → 309°, the most distinct place left (150° from event)"},
+        {"act":{"act":"sub","a":"note","b":"plan"},"answer":"note is a kind of plan: plan's hue, a step toward the ground"},
+        {"act":{"act":"opposes","a":"event","b":"quote"},"answer":"event opposes quote: quote across the wheel from event, 160° apart"},
+        {"act":{"act":"say","a":"goal","word":"orange"},"answer":"goal → 62°, your orange"},
+        {"act":{"act":"say","a":"person"},"answer":"person → 198°, the most distinct place left (39° from event)"}
+      ],
+      "kinds": [
+        ["event",159,0,"placed","#00633d","#40594b","#6ad79f","#a4c8b2","solid"],
+        ["theme",309,0,"placed","#6b3490","#5c4a6b","#d6a6fd","#c7b6d6","solid"],
+        ["note",242,1,"relative","#006ba3","#4e687d","#55b2f4","#8faec6","dashed"],
+        ["plan",242,0,"placed","#005887","#3f5567","#7ac6ff","#a7c2d7","dotted"],
+        ["quote",359,0,"relative","#8e2051","#6d4552","#ff9abc","#d9b2bd","dashed"],
+        ["goal",62,0,"said","#794300","#624e3d","#f9aa60","#d6b79e","solid"],
+        ["person",198,0,"placed","#005f61","#405858","#28d7dc","#99c8c9","dash-dot"]
+      ],
+      "meaning": [
+        "plan and note are one family: plan's hue, each kind below it a step toward the ground",
+        "event and quote are drawn as opposites, 160° apart",
+        "theme, goal and person stand apart from the rest",
+        "note is drawn dashed: beside theme it looks alike to protanopes",
+        "plan is drawn dotted: beside theme it looks alike to protanopes and deuteranopes",
+        "quote is drawn dashed: beside event it looks alike to deuteranopes",
+        "person is drawn dash-dot: beside event it looks alike to deuteranopes and tritanopes"
+      ]
+    }
+  ]
+}
