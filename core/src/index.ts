@@ -1379,3 +1379,30 @@ export type { LimitResult, LimitStep, LimitSide, Approach, Approaches, ApproachP
 
 // How a text is read when it matters who is writing it (`typed`: a sum typed after `=`, where a keyboard hyphen between bare numbers is a minus).
 export type { ReadOptions } from './maths/expr';
+
+// The coordinate plane, plots and a curve read (MATHS-SPEC lane C, M19–M21): two axes crossing near the right angle
+// with their ticks, numbers and names read from ink — held under the floor when the crossing is all there is, since
+// not every cross is a pair of axes — and what is drawn on them: a function plotted in canvas units (`plotOn`: sampled
+// where it bends, split where it breaks, a hole a ring, an asymptote dashed, clipped to the axes) and a stroke read as
+// a function (`fitCurve`: a line, a parabola, a cubic, a sine, an exponential or 1/x, ranked by residual with a
+// penalty for complexity, the rounded form offered when within the drawing's precision). `PLANE_FILL` offers a
+// drawn curve's equation and clean curve, a written function's curve with its holes, and a point's coordinates.
+export {
+  PLANE,
+  PLANE_TABLE,
+  PLANE_OFFER_FLOOR,
+  PLANE_CLAIM_FLOOR,
+  EVIDENCE as PLANE_EVIDENCE,
+  DEFAULT_UNITS as PLANE_DEFAULT_UNITS,
+  planesIn,
+  planeWordIds,
+  readPlane,
+  tickValueOf,
+  axisNameOf,
+} from './notations/plane';
+export type { PlanePart, PlaneAxis, PlaneTick, PlaneNumber, PlaneCurve, PlanePoint, PlaneReading, PlaneOptions, PlaneSymbolName } from './notations/plane';
+export { plotOn, planeOf, planeToCanvas, canvasToPlane, planeExtent, HOLE_RING as PLOT_HOLE_RING } from './maths/plot';
+export type { PlaneGeometry, PlaneAxisScale, ScaleHow, PlotFn, PlotOptions, Plot, PlotPiece, PlotHole, PlotAsymptote } from './maths/plot';
+export { fitCurve, FIT_OFFER_FLOOR, KEEP_RMS as FIT_KEEP_RMS } from './maths/fit';
+export type { CurveFit, FitReading, FitForm, FitFamily } from './maths/fit';
+export { PLANE_FILL, PLANE_FILL_ID, PLANE_RANK, planeFillIns } from './maths/fill-plane';
