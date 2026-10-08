@@ -260,6 +260,23 @@ export type { MathsChip, MathsChipKind, MathsSaid, TypedMaths } from './maths/bo
 // What a pattern piece's marks come to in numbers, and what true size prints of them (M6).
 export { garmentMaths, garmentDecor, offsetPolygon, affineFit, applyAffine, INK_AGREES as GARMENT_INK_AGREES } from './maths/garment';
 export type { GarmentPieceMaths, GarmentSeam, GarmentFold, GarmentDims, GarmentNotchMaths, GarmentDartMaths, GarmentDrawn, GarmentDecor } from './maths/garment';
+// The fill-in (MATHS-SPEC §4, C0): what the maths implies, one record from every
+// source, drawn faint where it would be written and taken by a tap. Derived, never
+// logged; one registry, one per key, strongest first; `fillInsOfSession` keeps it
+// while the log stands. `fill-builtin.ts` registers the sources the canvas ships.
+export {
+  registerFillSource,
+  fillSources,
+  fillSourcesVersion,
+  fillInsOf,
+  fillInsReport,
+  fillInsOfSession,
+  fillInsReportOfSession,
+} from './maths/fill';
+export type { FillKind, FillTake, FillIn, FillContext, FillSource, FillRefusal, FillReport } from './maths/fill';
+export { BUILTIN_FILL_SOURCES } from './maths/fill-builtin';
+// `compileFunction`'s shape (C0): a text with a variable as a function of it, or a reason.
+export type { CompiledFunction, CompileFunction } from './maths/compile';
 
 // Magnets — the places a mark offers attachment, derived from its clean form.
 export { magnetSites, nearestMagnet, magnetsNear, magnetRadius, describeMagnet, siteOf, MAGNET_SCREEN_PX, MAGNET_SIZE_FRACTION } from './session/magnets';

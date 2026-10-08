@@ -35,6 +35,7 @@ var DynaInkCore = (() => {
     BOX_FLOOR: () => BOX_FLOOR,
     BUILTIN_COMMAND_MARK: () => BUILTIN_COMMAND_MARK,
     BUILTIN_CONCEPTS: () => BUILTIN_CONCEPTS,
+    BUILTIN_FILL_SOURCES: () => BUILTIN_FILL_SOURCES,
     BUILTIN_TOOLS: () => BUILTIN_TOOLS,
     BUILTIN_TYPES: () => BUILTIN_TYPES,
     CAP_TURN: () => CAP_TURN,
@@ -499,6 +500,12 @@ var DynaInkCore = (() => {
     figureOfMark: () => figureOfMark,
     figuresAmong: () => figuresAmong,
     figuresOf: () => figuresOf,
+    fillInsOf: () => fillInsOf,
+    fillInsOfSession: () => fillInsOfSession,
+    fillInsReport: () => fillInsReport,
+    fillInsReportOfSession: () => fillInsReportOfSession,
+    fillSources: () => fillSources,
+    fillSourcesVersion: () => fillSourcesVersion,
     findCorners: () => findCorners,
     findCornersWithSeparation: () => findCornersWithSeparation,
     fingerprintOf: () => fingerprintOf,
@@ -786,6 +793,7 @@ var DynaInkCore = (() => {
     regionsOf: () => regionsOf,
     regionsOfBoard: () => regionsOfBoard,
     regionsOverlapping: () => regionsOverlapping,
+    registerFillSource: () => registerFillSource,
     registerMermaidReader: () => registerMermaidReader,
     registerMermaidWriter: () => registerMermaidWriter,
     registerNotation: () => registerNotation,
@@ -4601,10 +4609,10 @@ var DynaInkCore = (() => {
     return out;
   }
   function readSheet(input, options = {}) {
-    const sources2 = input.map(
+    const sources3 = input.map(
       (x) => typeof x === "string" ? { text: x } : { text: x.text, ...x.at ? { at: x.at } : {}, ...x.bounds ? { bounds: x.bounds } : {}, ...x.ids ? { ids: [...x.ids] } : {}, ...x.maths ? { maths: true } : {} }
     );
-    const drafts = sources2.map((src, line) => classify(src, line));
+    const drafts = sources3.map((src, line) => classify(src, line));
     proseToNotes(drafts);
     const { unit: unit7, reason: unitReason } = options.unit !== void 0 ? { unit: options.unit, reason: options.unit ? `${UNIT_NAMES[options.unit]}, as given` : "no unit, as given" } : inferUnit(drafts.map((d) => d.parse));
     const withUnit = (q) => isBare(q) && unit7 ? { ...q, unit: unit7, dim: 1 } : q;
@@ -5058,20 +5066,20 @@ var DynaInkCore = (() => {
     return bestT;
   }
   function readingOf(provider, node, nodes) {
-    let read3;
+    let read4;
     try {
-      read3 = provider.portsOf(node, nodes);
+      read4 = provider.portsOf(node, nodes);
     } catch {
       return null;
     }
-    if (!read3 || !Array.isArray(read3.ports)) return null;
-    return { notation: provider.notation, symbol: typeof read3.symbol === "string" ? read3.symbol : provider.notation, ports: read3.ports };
+    if (!read4 || !Array.isArray(read4.ports)) return null;
+    return { notation: provider.notation, symbol: typeof read4.symbol === "string" ? read4.symbol : provider.notation, ports: read4.ports };
   }
   function readings(node, nodes) {
     const out = [];
     for (const provider of registry.values()) {
-      const read3 = readingOf(provider, node, nodes);
-      if (read3) out.push(read3);
+      const read4 = readingOf(provider, node, nodes);
+      if (read4) out.push(read4);
     }
     return out;
   }
@@ -5134,15 +5142,15 @@ var DynaInkCore = (() => {
   }
   function alongSiteOf(node, nodes, notation, index, provider = registry.get(notation)) {
     if (!provider || !Number.isInteger(index) || index < 0) return null;
-    const read3 = readingOf(provider, node, nodes);
-    if (!read3) return null;
+    const read4 = readingOf(provider, node, nodes);
+    if (!read4) return null;
     const { ordinal, t } = alongOf(index);
     let k = 0;
-    for (const port of read3.ports) {
+    for (const port of read4.ports) {
       if (!port || typeof port.name !== "string" || isPointPort(port)) continue;
       const span = continuousSpan(port);
       if (!span) continue;
-      if (k++ === ordinal) return alongSite(node.id, read3.symbol, notation, port, span, ordinal, t);
+      if (k++ === ordinal) return alongSite(node.id, read4.symbol, notation, port, span, ordinal, t);
     }
     return null;
   }
@@ -5153,13 +5161,13 @@ var DynaInkCore = (() => {
     const provider = known.get(notation) ?? registry.get(notation);
     if (!provider || !Number.isInteger(index) || index < 0) return null;
     if (along2) return alongSiteOf(node, nodes, notation, index, provider);
-    const read3 = readingOf(provider, node, nodes);
-    if (!read3) return null;
+    const read4 = readingOf(provider, node, nodes);
+    if (!read4) return null;
     let k = 0;
-    for (const port of read3.ports) {
+    for (const port of read4.ports) {
       if (!port || typeof port.name !== "string" || !isPointPort(port)) continue;
       if (k++ !== index) continue;
-      return { nodeId: node.id, shape: read3.symbol, kind: `port:${notation}`, index, point: { x: port.at.x, y: port.at.y }, reasoning: said(port, notation), notation, port: port.name };
+      return { nodeId: node.id, shape: read4.symbol, kind: `port:${notation}`, index, point: { x: port.at.x, y: port.at.y }, reasoning: said(port, notation), notation, port: port.name };
     }
     return null;
   }
@@ -11004,11 +11012,11 @@ var DynaInkCore = (() => {
       raw = wantRecord(value, "", "the pack");
       const id = wantText(raw.id, "id", "its id", 40);
       if (!PACK_ID.test(id)) bad("id", `\u201C${id}\u201D is not a pack's id \u2014 lower case, a letter first, then letters, digits and dashes`);
-      const version2 = raw.version;
-      if (typeof version2 !== "number" || !Number.isSafeInteger(version2) || version2 < 1 || version2 > PACK_LIMITS.version) {
-        bad("version", `the version is ${String(version2)} \u2014 a pack's version is a whole number from 1`);
+      const version3 = raw.version;
+      if (typeof version3 !== "number" || !Number.isSafeInteger(version3) || version3 < 1 || version3 > PACK_LIMITS.version) {
+        bad("version", `the version is ${String(version3)} \u2014 a pack's version is a whole number from 1`);
       }
-      head = { id, version: version2, name: wantText(raw.name, "name", "its name", PACK_LIMITS.nameChars), describes: wantText(raw.describes, "describes", "what it adds") };
+      head = { id, version: version3, name: wantText(raw.name, "name", "its name", PACK_LIMITS.nameChars), describes: wantText(raw.describes, "describes", "what it adds") };
       if (raw.notation !== void 0) {
         const n2 = wantText(raw.notation, "notation", "the notation it carries", 40);
         if (!PACK_ID.test(n2)) bad("notation", `\u201C${n2}\u201D is not a notation's id`);
@@ -11025,9 +11033,9 @@ var DynaInkCore = (() => {
       throw err;
     }
     const refused = [];
-    const entry = (read3) => {
+    const entry = (read4) => {
       try {
-        return read3();
+        return read4();
       } catch (err) {
         if (err instanceof Fault) {
           refused.push({ at: err.at, reason: err.reason });
@@ -17753,8 +17761,8 @@ var DynaInkCore = (() => {
     }
     const isMultiplicity = /* @__PURE__ */ new Set();
     for (const g of groups.values()) {
-      const read3 = g.ids.map((id) => labelById.get(id).text).filter((x) => x !== void 0);
-      if (read3.length && cardinalityOf(read3.join("")) === null) continue;
+      const read4 = g.ids.map((id) => labelById.get(id).text).filter((x) => x !== void 0);
+      if (read4.length && cardinalityOf(read4.join("")) === null) continue;
       g.ids.forEach((id) => isMultiplicity.add(id));
       (g.r.sides[g.at].multiplicity ??= { ids: [], unread: [] }).ids.push(...g.ids);
       for (const id of g.ids) labelById.get(id).reason += ` \u2014 near its end at ${g.r.sides[g.at].entity}: a multiplicity`;
@@ -18984,8 +18992,8 @@ var DynaInkCore = (() => {
     }
     return out;
   }
-  function garmentMaths(state, board2, read3 = garmentOf(state)) {
-    const reading7 = read3 && read3.confidence >= NOTATION_FLOOR ? read3 : null;
+  function garmentMaths(state, board2, read4 = garmentOf(state)) {
+    const reading7 = read4 && read4.confidence >= NOTATION_FLOOR ? read4 : null;
     if (!reading7) return [];
     const figureOf3 = (id) => board2.figures.find((f) => f.figure.ids.length === 1 && f.figure.ids[0] === id);
     const allowance = (() => {
@@ -20347,6 +20355,104 @@ ${p.svg}</section>`),
     };
   }
 
+  // src/maths/fill.ts
+  var sources = [];
+  var version = 0;
+  function registerFillSource(s) {
+    const at2 = sources.findIndex((x) => x.id === s.id);
+    if (at2 >= 0) sources[at2] = s;
+    else sources.push(s);
+    version++;
+    return () => {
+      const i = sources.indexOf(s);
+      if (i >= 0) {
+        sources.splice(i, 1);
+        version++;
+      }
+    };
+  }
+  function fillSources() {
+    return sources.slice();
+  }
+  function fillSourcesVersion() {
+    return version;
+  }
+  var finite3 = (n2) => typeof n2 === "number" && Number.isFinite(n2);
+  var aPoint = (p) => !!p && finite3(p.x) && finite3(p.y);
+  function unusable(f) {
+    if (!f || typeof f !== "object") return "is not a record";
+    if (typeof f.key !== "string" || !f.key) return "has no key";
+    if (!aPoint(f.at)) return `"${f.key}" has nowhere to stand`;
+    if (!finite3(f.rank)) return `"${f.key}" has no rank`;
+    if (!Array.isArray(f.about)) return `"${f.key}" names no marks`;
+    if (f.points && !f.points.every(aPoint)) return `"${f.key}" has a point that is no number`;
+    if (!f.take || typeof f.take !== "object") return `"${f.key}" says nothing a tap would write`;
+    return null;
+  }
+  var stronger = (a, b) => b.rank - a.rank || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+  function read2(state, ctx) {
+    const refused = [];
+    const kept2 = /* @__PURE__ */ new Map();
+    for (const s of sources) {
+      let got;
+      try {
+        got = s.fillIns(state, ctx);
+      } catch (e) {
+        refused.push({ source: s.id, reason: `threw: ${e instanceof Error ? e.message : String(e)}` });
+        continue;
+      }
+      if (!Array.isArray(got)) {
+        refused.push({ source: s.id, reason: "gave no list" });
+        continue;
+      }
+      for (const f of got) {
+        const why = unusable(f);
+        if (why) {
+          refused.push({ source: s.id, reason: `a fill-in ${why}` });
+          continue;
+        }
+        const rank2 = Math.min(1, Math.max(0, f.rank));
+        const one = rank2 === f.rank ? f : { ...f, rank: rank2 };
+        const had = kept2.get(one.key);
+        if (!had || one.rank > had.rank) kept2.set(one.key, one);
+      }
+    }
+    return { fillIns: [...kept2.values()].sort(stronger), refused };
+  }
+  function onceContext(readBoard) {
+    let held2 = null;
+    return {
+      board() {
+        if (!held2) held2 = { board: readBoard() };
+        return held2.board;
+      }
+    };
+  }
+  function fillInsReport(state) {
+    return read2(state, onceContext(() => boardMaths(state)));
+  }
+  function fillInsOf(state) {
+    return fillInsReport(state).fillIns;
+  }
+  var memo2 = null;
+  function fillInsReportOfSession(session) {
+    const events = session.getEvents();
+    const last = events.length ? events[events.length - 1] : void 0;
+    if (memo2 && memo2.events === events && memo2.length === events.length && memo2.last === last && memo2.version === version) {
+      return memo2.report;
+    }
+    const report = read2(session.getState(), onceContext(() => boardMathsOf(session)));
+    memo2 = { events, length: events.length, last, version, report };
+    return report;
+  }
+  function fillInsOfSession(session) {
+    return fillInsReportOfSession(session).fillIns;
+  }
+
+  // src/maths/fill-builtin.ts
+  var BUILTIN_FILL_SOURCES = [];
+  for (const s of BUILTIN_FILL_SOURCES) registerFillSource(s);
+
   // src/session/hand-moves.ts
   var live2 = (n2) => !!n2 && !getRep(n2, "erased");
   function movedThings(board2, ids) {
@@ -20499,7 +20605,7 @@ ${p.svg}</section>`),
   function decodeLog(text, opts = {}) {
     const events = [];
     let skipped = 0;
-    let version2 = 0;
+    let version3 = 0;
     let app;
     let assets;
     let seen2 = false;
@@ -20519,7 +20625,7 @@ ${p.svg}</section>`),
         if (typeof n2 !== "number" || !Number.isInteger(n2) || n2 < 1) throw new LogFormatError(null, n2, theirApp, opts.source);
         if (n2 > LOG_VERSION) throw new LogFormatError(n2, n2, theirApp, opts.source);
         if (!seen2) {
-          version2 = n2;
+          version3 = n2;
           app = theirApp;
           seen2 = true;
           if (typeof v.assets === "number" && Number.isInteger(v.assets) && v.assets > 0) assets = v.assets;
@@ -20528,7 +20634,7 @@ ${p.svg}</section>`),
       }
       events.push(v);
     }
-    const out = { events, skipped, version: version2 };
+    const out = { events, skipped, version: version3 };
     if (app !== void 0) out.app = app;
     if (assets !== void 0) out.assets = assets;
     return out;
@@ -25495,12 +25601,12 @@ ${lines.join("\n")}
   }
   function ingestSvg(bytes, name, hash, opts = {}) {
     try {
-      return read2(bytes, name, hash, opts);
+      return read3(bytes, name, hash, opts);
     } catch (err) {
       return refuse("this SVG could not be read: " + (err instanceof Error ? err.message : String(err)));
     }
   }
-  function read2(bytes, name, hash, opts) {
+  function read3(bytes, name, hash, opts) {
     const limits = { ...DEFAULT_LIMITS, ...opts.limits };
     if (bytes.length > limits.bytes) return refuse(`that file is ${fmtBytes(bytes.length)} \u2014 over the ${fmtBytes(limits.bytes)} limit on what is read`);
     const text = decodeText(bytes);
@@ -26078,9 +26184,9 @@ ${lines.join("\n")}
   function drawMermaid(session, text, opts) {
     const open = openText(text);
     const reader = readers.get(open.keyword) ?? readers.get(open.keyword.toLowerCase());
-    const read3 = reader ? reader.read(text) : readMermaid(text);
-    if (!reader) return { notation: null, ids: {}, links: [], notes: [], refused: read3.refused, bounds: null, lastAt: opts.at - 1 };
-    return reader.draw(session, read3, opts);
+    const read4 = reader ? reader.read(text) : readMermaid(text);
+    if (!reader) return { notation: null, ids: {}, links: [], notes: [], refused: read4.refused, bounds: null, lastAt: opts.at - 1 };
+    return reader.draw(session, read4, opts);
   }
   var COUNT3 = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
   var count6 = (n2) => COUNT3[n2] ?? String(n2);
@@ -26335,10 +26441,10 @@ ${lines.join("\n")}
           c.ws();
           if (c.take(";")) rest = c.s.slice(c.i);
           else if (!c.done) throw new Refuse(`\u201C${c.s.slice(c.i, c.i + 16)}\u201D follows the statement`);
-          const read3 = st.groups.map((g) => g.map((ref) => node(ref, line.n)));
+          const read4 = st.groups.map((g) => g.map((ref) => node(ref, line.n)));
           st.links.forEach((l, k) => {
-            for (const a of read3[k]) {
-              for (const b of read3[k + 1]) {
+            for (const a of read4[k]) {
+              for (const b of read4[k + 1]) {
                 const shownAs = `${a.id} ${l.written} ${b.id}`;
                 if (l.invisible) {
                   refused.push({ line: line.n, text: shownAs, reason: "an invisible link (~~~) only spaces mermaid.js\u2019s own layout \u2014 nothing is drawn for it" });
@@ -26692,12 +26798,12 @@ ${lines.join("\n")}
     }));
     const st = scratch.getState();
     return placed2.every(({ c, id, heads }) => {
-      const read3 = headsOf(st, id);
-      if (!read3) return false;
+      const read4 = headsOf(st, id);
+      if (!read4) return false;
       const want = endsOf4(c.route, c.drawn);
       return ["start", "end"].every((end) => {
         if (!c.at[end]) return true;
-        const top = read3[end].heads[0];
+        const top = read4[end].heads[0];
         const w2 = want[end];
         if (w2 === "none") return !top || top.ids.some((x) => symbolIds.has(x));
         if (!top || top.ids.some((x) => symbolIds.has(x))) return false;
@@ -26717,32 +26823,32 @@ ${lines.join("\n")}
     }
     return Number.isFinite(maxX) ? { x: maxX + margin, y: minY } : { x: 0, y: 0 };
   }
-  function drawFlowchartRead(session, read3, opts) {
+  function drawFlowchartRead(session, read4, opts) {
     const scale = opts.scale && opts.scale > 0 ? opts.scale : 1;
     const pid = opts.participantId;
     const U = MERMAID_TEXT_PX;
-    const notes = [...read3.notes];
-    const refused = [...read3.refused];
+    const notes = [...read4.notes];
+    const refused = [...read4.refused];
     let t = opts.at;
     const next = () => t++;
-    const nodes = read3.nodes.slice(0, MERMAID_MAX_NODES);
+    const nodes = read4.nodes.slice(0, MERMAID_MAX_NODES);
     const kept2 = new Set(nodes.map((n2) => n2.id));
-    if (read3.nodes.length > nodes.length) {
-      const cut = read3.links.filter((l) => !kept2.has(l.from) || !kept2.has(l.to)).length;
-      notes.push(`the text holds ${read3.nodes.length} nodes and the board draws ${MERMAID_MAX_NODES} at most: the first ${MERMAID_MAX_NODES} are drawn, and the ${read3.nodes.length - MERMAID_MAX_NODES} after them${cut ? ` and the ${cut} link${cut === 1 ? "" : "s"} that touch them are` : " are"} not`);
+    if (read4.nodes.length > nodes.length) {
+      const cut = read4.links.filter((l) => !kept2.has(l.from) || !kept2.has(l.to)).length;
+      notes.push(`the text holds ${read4.nodes.length} nodes and the board draws ${MERMAID_MAX_NODES} at most: the first ${MERMAID_MAX_NODES} are drawn, and the ${read4.nodes.length - MERMAID_MAX_NODES} after them${cut ? ` and the ${cut} link${cut === 1 ? "" : "s"} that touch them are` : " are"} not`);
     }
-    const among = read3.links.filter((l) => kept2.has(l.from) && kept2.has(l.to));
+    const among = read4.links.filter((l) => kept2.has(l.from) && kept2.has(l.to));
     const links = among.slice(0, MERMAID_MAX_LINKS);
     if (among.length > links.length) notes.push(`the text holds ${among.length} links among the nodes drawn and the board draws ${MERMAID_MAX_LINKS} at most: the ${among.length - MERMAID_MAX_LINKS} after the first ${MERMAID_MAX_LINKS} are not drawn`);
     if (!nodes.length) {
       notes.push("nothing to draw: the text names no node");
-      return { notation: read3.notation, direction: read3.direction, ids: {}, links: [], notes, refused, bounds: null, lastAt: t - 1 };
+      return { notation: read4.notation, direction: read4.direction, ids: {}, links: [], notes, refused, bounds: null, lastAt: t - 1 };
     }
     const figures = new Map(nodes.map((n2) => [n2.id, figureOf2(n2.symbol, n2.text)]));
     const layout = layoutLayered(
       nodes.map((n2) => ({ id: n2.id, w: figures.get(n2.id).w * scale, h: figures.get(n2.id).h * scale })),
       links.map((l) => ({ from: l.from, to: l.to })),
-      { direction: read3.direction, rankGap: RANK_GAP * U * scale, nodeGap: NODE_GAP * U * scale }
+      { direction: read4.direction, rankGap: RANK_GAP * U * scale, nodeGap: NODE_GAP * U * scale }
     );
     const origin = opts.origin ?? besideContent(session, CORE_MIN * U * scale);
     const centreOf10 = (id) => add4(origin, layout.at.get(id));
@@ -26774,8 +26880,8 @@ ${lines.join("\n")}
         if (!best || d < best.d) best = { d, site: { kind: s.kind, index: s.index }, point: { x: s.point.x, y: s.point.y } };
       }
       if (best && best.d <= tol) return { nodeId, site: best.site, of: "mark", port, point: best.point };
-      const read4 = flowchartPortsOf(node, st().nodes);
-      const points = (read4?.ports ?? []).filter((p) => p.at && !p.along);
+      const read5 = flowchartPortsOf(node, st().nodes);
+      const points = (read5?.ports ?? []).filter((p) => p.at && !p.along);
       const k = points.findIndex((p) => Math.hypot(p.at.x - want.x, p.at.y - want.y) <= tol);
       if (k >= 0) return { nodeId, site: { kind: `port:${FLOWCHART_TABLE.notation}`, index: k }, of: "notation", port, point: { ...points[k].at } };
       notes.push(`${id}\u2019s ${port} is on no site its mark offers: bound at the nearest (${best ? `${best.site.kind} ${best.site.index}` : "none"})`);
@@ -26850,7 +26956,7 @@ ${lines.join("\n")}
         const conns = [...involved, c].map((d) => ({ ink: d.ink, route: d.route, drawn: d.drawn, at: { start: true, end: true } }));
         return readsAsDrawn([...symbols.values()].map((o) => o.ink), conns, scale);
       };
-      const route2 = routeLink(a, b2, others, read3.direction, taken, 0.5 * U * scale, scale, reads2);
+      const route2 = routeLink(a, b2, others, read4.direction, taken, 0.5 * U * scale, scale, reads2);
       if (route2.misread) notes.push(`no way between ${l.from} and ${l.to} reads as drawn beside the links already there: read back, the link ${l.from} \u2192 ${l.to} or one beside it may say otherwise`);
       routes.set(l, route2);
       placed2.push(placedOf(l, route2));
@@ -26891,8 +26997,8 @@ ${lines.join("\n")}
       const l = links[b2.index];
       notes.push(`the flow ${l.from} \u2192 ${l.to} closes a cycle (${b2.cycle.join(" \u2192 ")}), and runs back against the direction: ${l.to} comes first in the text`);
     }
-    if (layout.stretch > 1) notes.push(`the ranks stand ${layout.stretch.toFixed(1)}\xD7 further apart than the text size asks, so the flows run more ${read3.direction === "LR" || read3.direction === "RL" ? "across" : "down"} than ${read3.direction === "LR" || read3.direction === "RL" ? "down" : "across"}, as the header says`);
-    if (!layout.kept) notes.push(`every flow runs within a rank, so read back the drawing will say ${read3.direction === "LR" || read3.direction === "RL" ? "TD" : "LR"}, not ${read3.direction}`);
+    if (layout.stretch > 1) notes.push(`the ranks stand ${layout.stretch.toFixed(1)}\xD7 further apart than the text size asks, so the flows run more ${read4.direction === "LR" || read4.direction === "RL" ? "across" : "down"} than ${read4.direction === "LR" || read4.direction === "RL" ? "down" : "across"}, as the header says`);
+    if (!layout.kept) notes.push(`every flow runs within a rank, so read back the drawing will say ${read4.direction === "LR" || read4.direction === "RL" ? "TD" : "LR"}, not ${read4.direction}`);
     for (const n2 of nodes) {
       if (n2.symbol !== "start" && n2.symbol !== "end") continue;
       const outs = links.filter((l) => l.from === n2.id && l.head !== "none" || l.to === n2.id && l.head === "both").length;
@@ -26907,8 +27013,8 @@ ${lines.join("\n")}
     if (placeholder.length) notes.push(`\u201C${UNREAD_WRITING}\u201D is what D2 writes for writing nobody has read: it is put on the ink as the words, since the words are not known \u2014 ${some(placeholder)}`);
     const b = layout.bounds;
     return {
-      notation: read3.notation,
-      direction: read3.direction,
+      notation: read4.notation,
+      direction: read4.direction,
       ids,
       links: drawnLinks,
       notes,
@@ -27442,8 +27548,8 @@ ${lines.join("\n")}
     }
     return Number.isFinite(maxX) ? { x: maxX + margin, y: minY } : { x: 0, y: 0 };
   }
-  function drawClassDiagramRead(session, read3, opts) {
-    const r = read3;
+  function drawClassDiagramRead(session, read4, opts) {
+    const r = read4;
     const scale = opts.scale && opts.scale > 0 ? opts.scale : 1;
     const pid = opts.participantId;
     const U = MERMAID_TEXT_PX;
@@ -28008,8 +28114,8 @@ ${lines.join("\n")}
     }
     return Number.isFinite(maxX) ? { x: maxX + margin, y: minY } : { x: 0, y: 0 };
   }
-  function drawSequenceRead(session, read3, opts) {
-    const r = read3;
+  function drawSequenceRead(session, read4, opts) {
+    const r = read4;
     const scale = opts.scale && opts.scale > 0 ? opts.scale : 1;
     const pid = opts.participantId;
     const U = MERMAID_TEXT_PX * scale;
@@ -28647,8 +28753,8 @@ ${words}`;
     const u = seg2 > 0 ? (target - span.cum[i - 1]) / seg2 : 0;
     return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u };
   }
-  function drawStateRead(session, read3, opts) {
-    const r = read3;
+  function drawStateRead(session, read4, opts) {
+    const r = read4;
     const scale = opts.scale && opts.scale > 0 ? opts.scale : 1;
     const pid = opts.participantId;
     const U = MERMAID_TEXT_PX * scale;
@@ -30122,9 +30228,9 @@ ${pad}</${tag2}>`;
       if (!questions.length) return { ok: true, answers: [], via: config.model };
       const res = await send(config, wire.build(questions), { signal });
       if (!res.ok) return { ok: false, error: res.error };
-      const read3 = wire.parse(res.text, questions);
-      if (!read3.ok) return { ok: false, error: read3.error };
-      return { ok: true, answers: read3.answers, via: config.model };
+      const read4 = wire.parse(res.text, questions);
+      if (!read4.ok) return { ok: false, error: read4.error };
+      return { ok: true, answers: read4.answers, via: config.model };
     };
   }
 
@@ -30303,9 +30409,9 @@ if (mm.THREE && mm.scene) {
   // src/tools/registry.ts
   var registry3 = /* @__PURE__ */ new Map();
   var listeners = /* @__PURE__ */ new Set();
-  var version = 0;
+  var version2 = 0;
   function changed() {
-    version++;
+    version2++;
     for (const listener of [...listeners]) listener();
   }
   function registerTool(tool) {
@@ -30331,7 +30437,7 @@ if (mm.THREE && mm.scene) {
     return [...registry3.values()];
   }
   function toolsVersion() {
-    return version;
+    return version2;
   }
   function onToolsChange(listener) {
     listeners.add(listener);
@@ -30516,13 +30622,13 @@ if (mm.THREE && mm.scene) {
       const n2 = scope.state.nodes.get(id);
       return n2 ? transcriptsOf(n2)[0] : void 0;
     });
-    const read3 = ids.length >= 2 && said3.every((t) => !!t && !!t.text);
+    const read4 = ids.length >= 2 && said3.every((t) => !!t && !!t.text);
     return {
       ids,
       said: said3,
-      read: read3,
-      text: read3 ? said3.map((t) => t.text).join(" ") : "",
-      confidence: read3 ? Math.min(...said3.map((t) => t.confidence)) : 0
+      read: read4,
+      text: read4 ? said3.map((t) => t.text).join(" ") : "",
+      confidence: read4 ? Math.min(...said3.map((t) => t.confidence)) : 0
     };
   }
   function unionOf(boxes) {
@@ -31717,10 +31823,10 @@ Reply with ONLY a JSON object, no prose, no code fences:
       const node = scope.state.nodes.get(id);
       const rep = node && codeRepOf(node);
       if (!rep || rep.data.kind !== "mermaid" || !rep.data.code) return [];
-      const read3 = readMermaid(rep.data.code);
-      if (!read3.notation) return [];
-      const name = notationById(read3.notation)?.name ?? read3.notation;
-      const what = `${counted(read3.nodes.length, THINGS[read3.notation] ?? ["node", "nodes"])} and ${counted(read3.links.length, LINKS[read3.notation] ?? ["link", "links"])} read as ${withArticle(name)}`;
+      const read4 = readMermaid(rep.data.code);
+      if (!read4.notation) return [];
+      const name = notationById(read4.notation)?.name ?? read4.notation;
+      const what = `${counted(read4.nodes.length, THINGS[read4.notation] ?? ["node", "nodes"])} and ${counted(read4.links.length, LINKS[read4.notation] ?? ["link", "links"])} read as ${withArticle(name)}`;
       return [{
         key: "mermaid-draw",
         label: "Draw it",
@@ -31728,7 +31834,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
         base: 0.95,
         tool: "mermaid-draw",
         verbs: ["draw it", "ink it"],
-        data: { artifact: id, notation: read3.notation }
+        data: { artifact: id, notation: read4.notation }
       }];
     },
     take(offer) {
@@ -31990,15 +32096,15 @@ Reply with ONLY a JSON object, no prose, no code fences:
   };
 
   // src/search/extract.ts
-  var sources = /* @__PURE__ */ new Map();
+  var sources2 = /* @__PURE__ */ new Map();
   function registerSearchSource(src) {
-    sources.set(src.id, src);
+    sources2.set(src.id, src);
   }
   function unregisterSearchSource(id) {
-    sources.delete(id);
+    sources2.delete(id);
   }
   function sourceIds() {
-    return [...sources.keys()].sort();
+    return [...sources2.keys()].sort();
   }
   var MAX_ENTRIES = 800;
   var CHUNK_CHARS = 600;
@@ -32118,7 +32224,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
       if (only && !only.has(r.id)) continue;
       out.push({ id: r.id, kind: "region", text: r.name, what: "a region", box: r.bounds });
     }
-    for (const src of only ? [] : sources.values()) {
+    for (const src of only ? [] : sources2.values()) {
       if (out.length >= MAX_ENTRIES) break;
       try {
         for (const e of src.entries(state) || []) {
@@ -32751,13 +32857,13 @@ Reply with ONLY a JSON object, no prose, no code fences:
     const notations = /* @__PURE__ */ new Map();
     const concepts = /* @__PURE__ */ new Map();
     for (const hood of hoods) {
-      let read3 = [];
+      let read4 = [];
       try {
-        read3 = notationsOf(state, hood.ids);
+        read4 = notationsOf(state, hood.ids);
       } catch {
-        read3 = [];
+        read4 = [];
       }
-      for (const r of read3) {
+      for (const r of read4) {
         if (!(r.confidence >= NOTATION_FLOOR)) continue;
         const weight = r.confidence * hood.nearness;
         const had = notations.get(r.notation);
@@ -33044,13 +33150,13 @@ Reply with ONLY a JSON object, no prose, no code fences:
       const s = boardUsing(pack);
       const laid = layOut(s, jobs.map((j) => j.strokes));
       const misses = [];
-      let read3 = 0;
+      let read4 = 0;
       laid.forEach((ids, i) => {
         const top = s.matchesOf(ids)[0];
-        if (top && top.artifactId === want) read3++;
+        if (top && top.artifactId === want) read4++;
         else misses.push({ drawing: jobs[i].label, top: top ? top.name : null, score: top ? top.score : 0 });
       });
-      own.push({ definition: def.name, drawn: jobs.length, read: read3, rate: jobs.length ? read3 / jobs.length : 1, misses });
+      own.push({ definition: def.name, drawn: jobs.length, read: read4, rate: jobs.length ? read4 / jobs.length : 1, misses });
     }
     const ownDrawn = own.reduce((a, o) => a + o.drawn, 0);
     const ownRead = own.reduce((a, o) => a + o.read, 0);
@@ -33773,7 +33879,7 @@ Question: ${q}` }
       if (!prompt2) return { ok: false, error: "no prompt" };
       const state = session.getState();
       const generation = state.generation;
-      const version2 = session.codeVersion(args.artifactId);
+      const version3 = session.codeVersion(args.artifactId);
       const artifact = state.nodes.get(args.artifactId);
       if (!artifact) return { ok: false, error: "no such artifact" };
       const frame = frameOf(artifact);
@@ -33867,7 +33973,7 @@ ${brief}`, ids: planned.ids, build: planned.build };
         // A build is not pinned to a version: several participants may each
         // offer code for the same artifact and every offer is held. Only a
         // revision, which was written from one particular version, is pinned.
-        expect: revising ? { generation, version: version2 } : { generation }
+        expect: revising ? { generation, version: version3 } : { generation }
       });
       if (!accepted) {
         return { ok: false, error: staleWhy("the canvas did not accept the code"), code, raw: result2.text };
@@ -33883,7 +33989,7 @@ ${brief}`, ids: planned.ids, build: planned.build };
         raw: result2.text
       };
     }
-    async function read3(args) {
+    async function read4(args) {
       seat(args.at);
       if (!config.vision) return { ok: false, transcripts: [], error: `${name} cannot see images` };
       const state = session.getState();
@@ -34092,7 +34198,7 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
     }
     return { get id() {
       return id;
-    }, seat, name, config, interpret, ask, generate, read: read3, readLines, readPicture, draw, behave, program };
+    }, seat, name, config, interpret, ask, generate, read: read4, readLines, readPicture, draw, behave, program };
   }
 
   // src/participants/bridge.ts
@@ -34239,13 +34345,13 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
       const text = String(data.text ?? "");
       const maker = makerOf(node, state.nodes);
       if (question === SEAT_QUESTION) {
-        const read3 = readBriefText(text);
+        const read4 = readBriefText(text);
         briefs.push({
           key: id,
-          asked: read3.asked,
-          ask: askOf(read3.asked),
-          contract: read3.contract,
-          brief: read3.brief,
+          asked: read4.asked,
+          ask: askOf(read4.asked),
+          contract: read4.contract,
+          brief: read4.brief,
           about: aboutIdsOf(node),
           from: maker.from,
           who: maker.who,
@@ -34779,8 +34885,8 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
   var DASH3 = 0.9;
   var DASH_OFF3 = 0.6;
   var add6 = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
-  function drawErRead(session, read3, opts) {
-    const r = read3;
+  function drawErRead(session, read4, opts) {
+    const r = read4;
     const scale = opts.scale && opts.scale > 0 ? opts.scale : 1;
     const pid = opts.participantId;
     const U = MERMAID_TEXT_PX * scale;
@@ -35182,8 +35288,8 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
     place2(root, 0, 2 * Math.PI);
     return angle;
   }
-  function drawMindMapRead(session, read3, opts) {
-    const r = read3;
+  function drawMindMapRead(session, read4, opts) {
+    const r = read4;
     const scale = opts.scale && opts.scale > 0 ? opts.scale : 1;
     const pid = opts.participantId;
     const U = MERMAID_TEXT_PX * scale;
