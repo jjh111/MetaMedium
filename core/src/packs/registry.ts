@@ -23,6 +23,7 @@ import { ER_PACK } from './shipped/er';
 import { MINDMAP_PACK } from './shipped/mindmap';
 import { GARMENT_PACK } from './shipped/garment';
 import { TEST_MOLECULE } from './shipped/test-molecule';
+import { FEYNMAN_PACK } from './shipped/feynman';
 
 /** Where a board's packs come from: a name to its content, or undefined for a name this build does not have. */
 export type PackSource = (ref: string) => Pack | undefined;
@@ -54,6 +55,7 @@ ship(ER_PACK);
 ship(MINDMAP_PACK);
 ship(GARMENT_PACK);
 ship(TEST_MOLECULE);
+ship(FEYNMAN_PACK);
 
 /** The content a pack's name stands for in this build, or undefined. */
 export const shippedPack: PackSource = (ref) => shipped.get(ref);

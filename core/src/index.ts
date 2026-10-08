@@ -1168,3 +1168,64 @@ export type {
   Candidate as HueCandidate,
   Placed as HuePlaced,
 } from './colour';
+
+// Feynman diagrams (MATHS-SPEC M27): a stroke that oscillates — wavy, a zigzag or a coil — read with its axis
+// (diagram/waves.ts); particles as lines meeting at vertices, read from ink: fermions solid with an arrow, photons,
+// W and Z wavy, gluons curly, the Higgs dashed; the process, the channel, the order, tree or loops, and charge,
+// lepton number by family and baryon number checked at each vertex once the lines are named. Its content is
+// FEYNMAN_TABLE, which the feynman@1 pack names; TikZ-Feynman out is feynman-tikz.ts; the names it offers for
+// unnamed lines are a fill source (maths/fill-feynman.ts). Derived; nothing in the log.
+export {
+  waveOf,
+  waveOfNode,
+  WAVE_MIN_HALF_PERIODS,
+  WAVE_LONG,
+  CURLY_LONG,
+  WAVE_IRREGULAR,
+  WAVE_SWING_DEG,
+  WAVE_MIN_PX,
+  WAVE_AMPLITUDE_PX,
+  WAVE_BEND_MAX,
+  ZIGZAG_SHARP,
+  ZIGZAG_WINDOW,
+  CURLY_MIN_LOOPS,
+  CURVE_NODES,
+} from './diagram/waves';
+export type { WaveKind, WaveReading } from './diagram/waves';
+export {
+  FEYNMAN,
+  FEYNMAN_TABLE,
+  readFeynman,
+  parseParticle,
+  intoVertex as feynmanIntoVertex,
+  feynmanParticle,
+  LINE_MIN_PX as FEYNMAN_LINE_MIN_PX,
+  LINE_SHARE as FEYNMAN_LINE_SHARE,
+  VERTEX_SHARE as FEYNMAN_VERTEX_SHARE,
+  CHEVRON_SHARE as FEYNMAN_CHEVRON_SHARE,
+  CHEVRON_MID as FEYNMAN_CHEVRON_MID,
+  CHEVRON_OPEN as FEYNMAN_CHEVRON_OPEN,
+  CHEVRON_ALONG as FEYNMAN_CHEVRON_ALONG,
+  LABEL_REACH as FEYNMAN_LABEL_REACH,
+  SAME_TIME as FEYNMAN_SAME_TIME,
+  SCALAR_REACH as FEYNMAN_SCALAR_REACH,
+} from './notations/feynman';
+export type {
+  FeynmanReading,
+  FeynmanDiagram,
+  FeynmanLine,
+  FeynmanVertex,
+  FeynmanExternal,
+  FeynmanCheck,
+  FeynmanEnd,
+  FeynmanEndName,
+  FeynmanParticle,
+  FeynmanLineKind,
+  FeynmanDrawn,
+  FeynmanCoupling,
+  LeptonFamily,
+  ParticleLabel,
+} from './notations/feynman';
+export { toTikz as feynmanTikz } from './notations/feynman-tikz';
+export type { FeynmanTikz } from './notations/feynman-tikz';
+export { FEYNMAN_FILL, feynmanFillIns, FEYNMAN_FILL_RANK, NAME_OFF as FEYNMAN_NAME_OFF, NAME_SIZE as FEYNMAN_NAME_SIZE } from './maths/fill-feynman';

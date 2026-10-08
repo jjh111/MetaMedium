@@ -5,8 +5,10 @@
 
 import { registerFillSource } from './fill';
 import type { FillSource } from './fill';
+import { FEYNMAN_FILL } from './fill-feynman';
 
 export const BUILTIN_FILL_SOURCES: readonly FillSource[] = [
+  FEYNMAN_FILL,
 ];
 
 for (const s of BUILTIN_FILL_SOURCES) registerFillSource(s);

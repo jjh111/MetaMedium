@@ -48,6 +48,7 @@ import { ER } from './er';
 import { MINDMAP } from './mindmap';
 import { GARMENT } from './garment';
 import { DIAGRAM } from './diagram';
+import { FEYNMAN } from './feynman';
 
 /** A symbol a notation knows, and which of the six roles it plays. */
 export interface NotationSymbolDef {
@@ -193,6 +194,8 @@ export interface Notation {
    * class a drawing falls into when nothing says more (*a diagram*, diagram.ts).
    */
   fallback?: boolean;
+  /** Its name opens with a proper noun, which keeps its capital when said: *a Feynman diagram*. */
+  proper?: boolean;
 }
 
 /** Below this a reading is held but not said as what the drawing IS: the surface says "reads as" only above it. */
@@ -322,9 +325,10 @@ export function sayable(readings: readonly NotationReading[]): NotationReading[]
  */
 export function describeNotation(r: NotationReading): string {
   const acronym = /^[A-Z]{2,}\b/.test(r.name);
-  const name = acronym ? r.name : r.name.toLowerCase();
+  const proper = !acronym && !!registry.get(r.notation)?.proper;
+  const name = acronym || proper ? r.name : r.name.toLowerCase();
   // An acronym takes the article of the way it is said: “an ER diagram”, “a UML class diagram”.
-  const vowel = acronym ? /^[AEFHILMNORSX]/.test(name) : /^[aeio]/.test(name);
+  const vowel = acronym ? /^[AEFHILMNORSX]/.test(name) : /^[aeio]/i.test(name);
   return `${vowel ? 'an' : 'a'} ${name} ${r.confidence.toFixed(2)} — ${r.summary}`;
 }
 
@@ -339,3 +343,5 @@ registerNotation(MINDMAP);
 registerNotation(GARMENT);
 // Last: the class a drawing falls into when nothing above says more (PLAN-FIELD-PAR FP2).
 registerNotation(DIAGRAM);
+// The Feynman diagram (MATHS-SPEC M27): particles as lines meeting at vertices.
+registerNotation(FEYNMAN);
