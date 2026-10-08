@@ -31,6 +31,7 @@ export {
   MOVE_MAX,
   makePalette,
   colourOf,
+  movedWords,
 } from './scale';
 export type { Ground, Certainty, GroundSpec, Signal, Palette, PaletteInput, Colour } from './scale';
 export { VISIONS, MACHADO, WHO, LOOK_ALIKE, CHANNELS, simulateVision, oklabDistance, distinctness, channels } from './access';

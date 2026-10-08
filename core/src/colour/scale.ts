@@ -173,3 +173,13 @@ export function colourOf(kind: { hue: number; depth: number }, ground: Ground, c
   const hex = linearToHex(c.rgb);
   return { ...c, hex, contrast: contrastRatio(relativeLuminance(hexToLinear(hex)), groundLight), moved: Math.round(moved * 1000) / 1000, depth };
 }
+
+/**
+ * The move, in words, for a ledger or a panel: nothing when the colour read where its band put it, else how far
+ * lightness went toward the ink to read — and, when even the cap was not enough, that it still does not.
+ */
+export function movedWords(c: Colour): string {
+  if (!c.moved) return '';
+  const said = `lightness moved ${c.moved} to read`;
+  return c.contrast >= WORDS_CONTRAST ? said : `${said}, and still reads only ${c.contrast.toFixed(1)}:1`;
+}

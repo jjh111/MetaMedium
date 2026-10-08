@@ -13,6 +13,7 @@ import {
   MOVE_MAX,
   makePalette,
   colourOf,
+  movedWords,
   type Ground,
 } from './scale';
 import { hexToLinear, linearToOklab, oklabToLch, relativeLuminance, contrastRatio, hueDistance, maxChroma } from './oklch';
@@ -206,6 +207,16 @@ describe('colour that reads', () => {
     const c = colourOf({ hue: 140, depth: 0 }, 'paper', 'said', faint);
     expect(c.moved).toBeCloseTo(MOVE_MAX, 9);
     expect(c.contrast).toBeLessThan(WORDS_CONTRAST);                     // the number tells the truth
+  });
+
+  it('says the move in words for a ledger or a panel, and says so when even the move was not enough', () => {
+    expect(movedWords(colourOf({ hue: 305, depth: 0 }, 'paper'))).toBe('');                    // it read where the band put it
+    const deep = colourOf({ hue: 305, depth: 2 }, 'paper');
+    expect(deep.moved).toBeGreaterThan(0);
+    expect(movedWords(deep)).toBe(`lightness moved ${deep.moved} to read`);
+    const faint = makePalette({ grounds: { paper: { L: [0.99, 0.99, 0.99] } } });
+    const never = colourOf({ hue: 140, depth: 0 }, 'paper', 'said', faint);
+    expect(movedWords(never)).toBe(`lightness moved ${never.moved} to read, and still reads only ${never.contrast.toFixed(1)}:1`);
   });
 
   it('keeps a person’s pale yellow: its hue, drawn as dark as paper needs', () => {

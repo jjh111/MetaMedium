@@ -1082,6 +1082,7 @@ export {
   MOVE_MAX,
   makePalette,
   colourOf,
+  movedWords,
   VISIONS,
   MACHADO,
   WHO as VISION_WHO,

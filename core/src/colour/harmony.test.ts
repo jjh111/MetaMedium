@@ -379,6 +379,19 @@ describe('colour that reads, on both grounds, for any number of kinds', () => {
     expect(used.size).toBeGreaterThan(1);
   });
 
+  it('holds twelve kinds in families, down to the third step, where lightness has to move on paper to read', () => {
+    const { lens } = play([
+      "it's an idea · purple", 'insight is a kind of idea', 'hunch is a kind of idea', 'detail is a kind of insight',
+      "it's a task", 'todo is a kind of task', 'chore is a kind of todo',
+      "it's a note", "it's a quote", "it's a risk", 'opportunity opposes risk', 'method is kin to note',
+    ]);
+    expect(kindsOf(lens)).toHaveLength(12);
+    expect(Math.max(...kindsOf(lens).map(k => k.depth))).toBe(2);
+    expect(colourOf(lens.kinds.get('detail')!, 'paper').moved).toBeGreaterThan(0);   // the deepest step needed the move …
+    expect(colourOf(lens.kinds.get('detail')!, 'paper').contrast).toBeGreaterThanOrEqual(WORDS_CONTRAST);   // … and now reads, as drawn
+    check(lens);
+  });
+
   it('holds the seed with every example, fourteen kinds, which the specimen’s five patterns could not', () => {
     const { lens } = play([...SEED, "it's a quote · teal", 'risk opposes opportunity', 'todo is a kind of task', 'method is kin to note', 'make idea yellow', "it's a feeling"]);
     expect(kindsOf(lens)).toHaveLength(14);

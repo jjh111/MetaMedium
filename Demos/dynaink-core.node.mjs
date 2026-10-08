@@ -32034,6 +32034,11 @@ function colourOf(kind, ground, certainty = "said", palette = DEFAULT_PALETTE) {
   const hex = linearToHex(c.rgb);
   return { ...c, hex, contrast: contrastRatio(relativeLuminance(hexToLinear(hex)), groundLight), moved: Math.round(moved2 * 1e3) / 1e3, depth: depth2 };
 }
+function movedWords(c) {
+  if (!c.moved) return "";
+  const said3 = `lightness moved ${c.moved} to read`;
+  return c.contrast >= WORDS_CONTRAST ? said3 : `${said3}, and still reads only ${c.contrast.toFixed(1)}:1`;
+}
 
 // src/colour/access.ts
 var VISIONS = ["typical", "protan", "deutan", "tritan"];
@@ -33068,6 +33073,7 @@ export {
   modelWords,
   movedSaid,
   movedThings,
+  movedWords,
   movesWhole,
   nameHue,
   nameMarks,
