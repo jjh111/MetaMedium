@@ -249,6 +249,14 @@
 
   // ----- Drawing -----
   /** A soft halo along what a quantity measures, in its colour: a side's line, an angle's wedge. Whole outlines are not haloed (they lie on every side). */
+  /** A quantity's second channel as a dash, in the hand's pixels: what tells two colours apart for an eye that cannot (KN3a's patterns). */
+  const FG_DASHES = { dashed: [10, 6], dotted: [1.5, 6], 'dash-dot': [10, 5, 1.5, 5], long: [20, 6], 'dash-dot-dot': [10, 5, 1.5, 5, 1.5, 5], short: [4, 5], sparse: [2, 13] };
+  function fgDash(rd, quantity) {
+    const h = rd.hues.get(quantity);
+    const d = h && FG_DASHES[h.channel];
+    return d ? d.map(wpx) : null;
+  }
+
   function fgHalo(rd, q, strong) {
     const pts = q.points;
     if (!pts || (pts.length !== 2 && pts.length !== 3) || q.closed) return false;
@@ -256,10 +264,12 @@
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    const dash = fgDash(rd, q.quantity);
     if (pts.length === 2) {
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
       ctx.lineTo(pts[1].x, pts[1].y);
+      if (dash) { ctx.setLineDash(dash); ctx.lineCap = 'butt'; }
       ctx.lineWidth = wpx(strong ? 9 : 7);
       ctx.strokeStyle = fgRgba(c.hex, strong ? 0.26 : 0.2);
       ctx.stroke();
@@ -277,6 +287,7 @@
       ctx.fill();
       ctx.lineWidth = wpx(1.5);
       ctx.strokeStyle = fgRgba(c.hex, 0.55);
+      if (dash) ctx.setLineDash(dash);
       ctx.stroke();
     }
     ctx.restore();

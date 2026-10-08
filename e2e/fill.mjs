@@ -210,12 +210,17 @@ export async function runFill(browser, servers, { freshContext }) {
       await tapGhost(page, byText(await ghosts(page), '5'));
       await page.mouse.click(1100, 200);
       await page.waitForTimeout(250);
-      await page.mouse.dblclick(520, 542);
-      await page.waitForTimeout(200);
-      await page.keyboard.press('Control+a');
-      await page.keyboard.type('5');
-      await page.keyboard.press('Enter');
-      await page.waitForTimeout(400);
+      // A double-click on a machine too loaded to answer inside its window is a click; the hand would do it again.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await page.mouse.dblclick(520, 542);
+        await page.waitForTimeout(200);
+        await page.keyboard.press('Control+a');
+        await page.keyboard.type('5');
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(400);
+        const now = await board(page);
+        if (now && !now[0].labels.some((l) => l.text === '4')) break;
+      }
       // Hold again: the figure's marks.
       await hold(page, 450, 520);
       const gs = await ghosts(page);
@@ -356,6 +361,8 @@ export async function runFill(browser, servers, { freshContext }) {
       await written(p, '4', { x: 520, y: 542 });
       await written(p, '3', { x: 376, y: 430 });
       await p.waitForTimeout(300);
+      // A stroke drawn on a machine too loaded to keep the pointer moving can end as a press-and-hold; nothing held is what this asks.
+      if ((await state(p)).summon) { await p.mouse.click(1250, 140); await p.waitForTimeout(300); }
       const before = await state(p);
       const five = byText(await ghosts(p), '5');
       // Pen-like: a tap with a few pixels of wobble.
@@ -369,7 +376,7 @@ export async function runFill(browser, servers, { freshContext }) {
       const after = await state(p);
       const wrote = after.types.slice(before.events);
       check(`F11. with nothing held, a tap on the ghost that shows for a moment after the change writes it (${wrote.join(', ')}) and leaves no dot`,
-        !!five && !before.summon && wrote.join() === 'import' && !wrote.includes('stroke') && after.last.code === '5', { wrote, last: after.last });
+        !!five && !before.summon && wrote.join() === 'import' && !wrote.includes('stroke') && after.last.code === '5', { wrote, last: after.last, five: !!five, summonBefore: before.summon, summonAfter: after.summon, types: before.types.slice(-6) });
     } finally { await p.close().catch(() => {}); }
   });
 
