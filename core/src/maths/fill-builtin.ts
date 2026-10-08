@@ -6,9 +6,11 @@
 import { registerFillSource } from './fill';
 import type { FillSource } from './fill';
 import { FIGURE_SOURCE } from './fill-figure';
+import { FEYNMAN_FILL } from './fill-feynman';
 
 export const BUILTIN_FILL_SOURCES: readonly FillSource[] = [
   FIGURE_SOURCE,
+  FEYNMAN_FILL,
 ];
 
 for (const s of BUILTIN_FILL_SOURCES) registerFillSource(s);
