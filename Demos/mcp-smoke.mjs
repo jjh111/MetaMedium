@@ -819,6 +819,7 @@ async function seatCases() {
   const lm = leaf && [...leaf.rgba.slice(((leaf.height >> 1) * leaf.width + (leaf.width >> 1)) * 4, ((leaf.height >> 1) * leaf.width + (leaf.width >> 1)) * 4 + 3)];
   check('a picture the tab put in the room by its hash is seen by the hand, drawn where it stands', put.status === 204 && !!lm && lm[1] > 140 && lm[0] < 60, { put: put.status, lm });
   web.close();
+  rmSync(dir, { recursive: true, force: true });   // the folder the picture files were made in, which every run used to leave behind
 }
 
 // ===== Every door, listed and walked (V1-SPEC CG7a) ===========================================================
