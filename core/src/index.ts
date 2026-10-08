@@ -1406,3 +1406,68 @@ export type { PlaneGeometry, PlaneAxisScale, ScaleHow, PlotFn, PlotOptions, Plot
 export { fitCurve, FIT_OFFER_FLOOR, KEEP_RMS as FIT_KEEP_RMS } from './maths/fit';
 export type { CurveFit, FitReading, FitForm, FitFamily } from './maths/fit';
 export { PLANE_FILL, PLANE_FILL_ID, PLANE_RANK, planeFillIns } from './maths/fill-plane';
+
+// Numerals read at tier 1 (MATHS-SPEC §8 Lane F, M8; MATHS-PLAN §5, the `read` seat): digits and the signs of
+// school arithmetic read from strokes with no model — strokes grouped into glyphs, each glyph's point cloud ($P with
+// $Q's early abandoning) matched against built-in samples drawn from parametric definitions with seeded tremor,
+// checked by its ink's features and where it stands on its line, ranked and plural, twins said as ties; glyphs on a
+// band are a run, digits on its baseline a number. A lone circle or line is a shape first. Derived, never logged.
+export { GLYPHS, GLYPH_TABLE, isDigit as isDigitGlyph } from './read/glyphs';
+export type { Glyph, GlyphKind, GlyphInfo } from './read/glyphs';
+export { CLOUD_POINTS, MIN_POINTS_PER_STROKE, DOT_OF_GLYPH, resampleStroke, shareOut, cloudOf, matchClouds } from './read/pointcloud';
+export type { Cloud as PointCloud } from './read/pointcloud';
+export {
+  GLYPH_STYLES,
+  stylesOf as glyphStylesOf,
+  penThrough as glyphPenThrough,
+  SAMPLE_SIZE as GLYPH_SAMPLE_SIZE,
+  SAMPLE_LEAN as GLYPH_SAMPLE_LEAN,
+  drawGlyph,
+  HAND_DEFAULTS as GLYPH_HAND_DEFAULTS,
+  handGlyph,
+  handLine as handNumerals,
+} from './read/samples';
+export type {
+  Control as GlyphControl,
+  Range as GlyphRange,
+  GlyphStyle,
+  DrawnGlyph,
+  DrawOptions as GlyphDrawOptions,
+  HandOptions as GlyphHandOptions,
+  HandLine as HandNumerals,
+} from './read/samples';
+export {
+  SAMPLES_PER_STYLE as NUMERAL_SAMPLES_PER_STYLE,
+  FIT_ZERO as NUMERAL_FIT_ZERO,
+  NUMERAL_FLOOR,
+  TIE_MARGIN as NUMERAL_TIE_MARGIN,
+  DOUBT_MARGIN as NUMERAL_DOUBT_MARGIN,
+  FRAME_WEIGHT as NUMERAL_FRAME_WEIGHT,
+  INK_NOISE_PX,
+  DOT_OF_LINE,
+  SHAPE_FIRST as NUMERAL_SHAPE_FIRST,
+  NEVER_GLYPH,
+  MAX_GLYPH_STROKES,
+  RUN_GAP as NUMERAL_RUN_GAP,
+  NUMBER_GAP,
+  BASELINE_TOLERANCE as NUMERAL_BASELINE_TOLERANCE,
+  smoothInk,
+  inkFeatures as glyphInkFeatures,
+  numeralModel,
+  readGlyph,
+  readNumerals,
+  runReadings,
+  consistentReading,
+} from './read/numerals';
+export type {
+  LineFrame,
+  GlyphCandidate,
+  GlyphRead,
+  NumberRead,
+  RunReading as NumeralRunReading,
+  RunRead,
+  NumeralReading,
+  ReadOptions as NumeralReadOptions,
+  InkFeatures as GlyphInkFeatures,
+  StyleModel as NumeralStyleModel,
+} from './read/numerals';
