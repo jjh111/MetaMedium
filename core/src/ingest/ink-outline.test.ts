@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { recoverFill, FAITHFUL_AT, type Fill, type OutlineRecovery } from './ink-outline';
 import { penOutline, restart, brushWidth, pressureWidth } from './fixtures/pen';
+import { unionRings } from './fixtures/union';
 import { analyzeStroke } from '../recognition';
 import { strokeFor } from '../session/synthesize';
 import { handLike } from '../packs/synthesize';
@@ -48,8 +49,9 @@ describe('a ribbon — one ring, two caps', () => {
     const s = r.strokes[0];
     expect(s.recovery).toBe('ribbon');
     expect(s.closed).toBe(false);
-    expect(maxOff(s.points, truth)).toBeLessThan(1);
-    // The line runs the length of the stroke, give or take the half pen a round cap adds at each end.
+    // On the line, but for the half pen a round cap's apex stands beyond the end of the line the pen followed.
+    expect(maxOff(s.points, truth)).toBeLessThan(cap.cap === 'round' ? 2.6 : 1);
+    // The line runs the length of the stroke, give or take that half pen at each end.
     expect(lengthOf(s.points)).toBeGreaterThan(195);
     expect(lengthOf(s.points)).toBeLessThan(206);
     expect(r.width).toBeGreaterThan(3.6);
@@ -66,7 +68,7 @@ describe('a ribbon — one ring, two caps', () => {
       const r = one(recoverFill(nonzero(restart(ring, start, reverse))));
       expect(r.method).toBe('ribbon');
       expect(r.fidelity?.faithful).toBe(true);
-      expect(maxOff(r.strokes[0].points, truth)).toBeLessThan(1);
+      expect(maxOff(r.strokes[0].points, truth)).toBeLessThan(2.6);
       expect(Math.abs(lengthOf(r.strokes[0].points) - lengthOf(want.strokes[0].points))).toBeLessThan(2);
     }
   });
@@ -76,7 +78,8 @@ describe('a ribbon — one ring, two caps', () => {
     for (const width of [brushWidth(7), pressureWidth(3, 5, 0.4)]) {
       const r = one(recoverFill(nonzero(penOutline(curve, { width, cap: 'round' }))));
       expect(r.fidelity?.faithful).toBe(true);
-      expect(maxOff(r.strokes[0].points, curve)).toBeLessThan(1.5);
+      // Within the widest the pen got, half of it, and a little.
+      expect(maxOff(r.strokes[0].points, curve)).toBeLessThan(2.6);
     }
     const brush = one(recoverFill(nonzero(penOutline(curve, { width: brushWidth(7), cap: 'round' }))));
     expect(brush.width).toBeGreaterThan(3.5);
@@ -188,10 +191,11 @@ describe('where the ring will not pair — the skeleton', () => {
     const all = r.strokes.flatMap((s) => s.points);
     const reach = (f: (p: Point) => number) => [Math.min(...all.map(f)), Math.max(...all.map(f))];
     const [x0, x1] = reach((p) => p.x), [y0, y1] = reach((p) => p.y);
-    expect(x0).toBeLessThan(145);
-    expect(x1).toBeGreaterThan(255);
-    expect(y0).toBeLessThan(145);
-    expect(y1).toBeGreaterThan(255);
+    // The bars run 140 to 260 and are 12 wide: a thinned flat end stands back about half a pen from the end.
+    expect(x0).toBeLessThan(150);
+    expect(x1).toBeGreaterThan(250);
+    expect(y0).toBeLessThan(150);
+    expect(y1).toBeGreaterThan(250);
   });
 
   it('says what each method came to, the ribbon first, whichever stood', () => {
@@ -217,6 +221,68 @@ describe('where the ring will not pair — the skeleton', () => {
     expect(r.kind).toBe('pen');
     expect(r.fidelity?.recall).toBeGreaterThanOrEqual(FAITHFUL_AT);
     expect(r.fidelity?.precision).toBeGreaterThanOrEqual(FAITHFUL_AT);
+  });
+});
+
+describe('strokes merged into one silhouette', () => {
+  const poly = (...pts: Point[]): Point[] => pts.slice(1).reduce<Point[]>((acc, p, i) => acc.concat(line(pts[i], p, 24).slice(i ? 1 : 0)), []);
+  const merged = (width: number, ...paths: Point[][]): Fill => ({ rings: unionRings(paths.map((p) => penOutline(p, { width, cap: 'round' }))), rule: 'nonzero' });
+
+  it('the fixture merges strokes into an outer ring and a ring for each hole they closed', () => {
+    const ring = (cx: number) => Array.from({ length: 60 }, (_, i) => ({ x: cx + 30 * Math.cos((i / 60) * 2 * Math.PI), y: 100 + 30 * Math.sin((i / 60) * 2 * Math.PI) }));
+    expect(unionRings([penOutline(ring(100), { width: 4, cap: 'round' })])).toHaveLength(2);
+    // Four strokes laid as a # close the one square between them, so there is a hole.
+    const hash = unionRings([penOutline(poly({ x: 50, y: 70 }, { x: 150, y: 70 }), { width: 4, cap: 'flat' }), penOutline(poly({ x: 50, y: 110 }, { x: 150, y: 110 }), { width: 4, cap: 'flat' }), penOutline(poly({ x: 80, y: 40 }, { x: 80, y: 140 }), { width: 4, cap: 'flat' }), penOutline(poly({ x: 120, y: 40 }, { x: 120, y: 140 }), { width: 4, cap: 'flat' })]);
+    expect(hash).toHaveLength(2);
+  });
+
+  it('an x is two lines that cross, not a heap of scraps where they meet', () => {
+    const r = one(recoverFill(merged(3, poly({ x: 60, y: 60 }, { x: 180, y: 190 }), poly({ x: 180, y: 60 }, { x: 60, y: 190 }))));
+    expect(r.method).toBe('skeleton');
+    expect(r.fidelity?.faithful).toBe(true);
+    expect(r.strokes.length).toBeLessThanOrEqual(3);
+    expect(Math.max(...r.strokes.map((s) => lengthOf(s.points)))).toBeGreaterThan(150);
+  });
+
+  it('a shaft and a head drawn apart, at the worst diagonal for thinning, lose neither wing', () => {
+    // Zhang–Suen thinning eats one of two 45° wings from its end at some pixel offsets; the skeleton is drawn
+    // again at others until it stands for the fill.
+    for (const width of [3, 6]) {
+      const r = one(recoverFill(merged(width, poly({ x: 40, y: 100 }, { x: 200, y: 100 }), poly({ x: 170, y: 70 }, { x: 200, y: 100 }, { x: 170, y: 130 }))));
+      expect(r.method).toBe('skeleton');
+      expect(r.fidelity?.faithful).toBe(true);
+      const reach = (f: (p: Point) => number) => [Math.min(...r.strokes.flatMap((s) => s.points.map(f))), Math.max(...r.strokes.flatMap((s) => s.points.map(f)))];
+      const [y0, y1] = reach((p) => p.y);
+      expect(y0).toBeLessThan(80);
+      expect(y1).toBeGreaterThan(120);
+    }
+  });
+
+  it('a letter with two holes in it, as a b is, has no two sides to pair: the skeleton reads it', () => {
+    const bowl = (cy: number) => Array.from({ length: 30 }, (_, i) => { const a = -Math.PI / 2 + (Math.PI * i) / 29; return { x: 80 + 35 * Math.cos(a), y: cy + 35 * Math.sin(a) }; });
+    const r = one(recoverFill(merged(4, poly({ x: 80, y: 60 }, { x: 80, y: 200 }), bowl(95), bowl(165))));
+    expect(r.method).toBe('skeleton');
+    expect(r.fidelity?.faithful).toBe(true);
+  });
+});
+
+describe('the work a file may cost', () => {
+  it('with no raster pixels left an outline keeps its ribbon, unmeasured, and says so', () => {
+    const ring = penOutline(line({ x: 10, y: 10 }, { x: 200, y: 10 }), { width: 4, cap: 'round' });
+    const work = { rasterPx: 10 };
+    const r = one(recoverFill(nonzero(ring), { work }));
+    expect(r.kind).toBe('pen');
+    expect(r.method).toBe('ribbon');
+    expect(r.fidelity).toBeUndefined();
+    expect(r.notes.join(' ')).toMatch(/ran out/);
+  });
+
+  it('spends what it uses: a measured outline takes its raster from the budget', () => {
+    const ring = penOutline(line({ x: 10, y: 10 }, { x: 200, y: 10 }), { width: 4, cap: 'round' });
+    const work = { rasterPx: 1_000_000 };
+    one(recoverFill(nonzero(ring), { work }));
+    expect(work.rasterPx).toBeLessThan(1_000_000);
+    expect(work.rasterPx).toBeGreaterThan(0);
   });
 });
 
