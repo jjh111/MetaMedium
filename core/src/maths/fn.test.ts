@@ -3,7 +3,9 @@
 
 import { describe, it, expect } from 'vitest';
 import { compileFunction, parseFn, formatFn, evalFn, freeVariables, FUNCTIONS } from './fn';
+import type { FnNode } from './fn';
 import type { CompileFunction } from './compile';
+import { evaluateExpr, parseExpression, scopeOf } from './expr';
 
 /** The contract's shape: C will call it with exactly this type. */
 const compile: CompileFunction = compileFunction;
@@ -256,5 +258,69 @@ describe('the tree printer says what it read', () => {
       const env = Object.fromEntries(vars.map((v, i) => [v, 1.3 + i * 0.7]));
       expect(evalFn(again.node, env), t).toBeCloseTo(evalFn(a.node, env) ?? NaN, 10);
     }
+  });
+});
+
+// Properties, on seeded random formulas (the same every run): what the printer prints reads back as the same function,
+// and the sheet's grammar (expr.ts) agrees with this one wherever neither refuses.
+describe('properties of the grammar', () => {
+  let seed = 777;
+  const rnd = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+  const pick = <T,>(xs: readonly T[]): T => xs[Math.floor(rnd() * xs.length)];
+  function gen(d: number): FnNode {
+    if (d <= 0 || rnd() < 0.2) {
+      const r = rnd();
+      if (r < 0.35) return { k: 'num', v: pick([0, 1, 2, 3, 0.5, 4, 10, 2.5]) };
+      if (r < 0.7) return { k: 'var', name: pick(['x', 'y', 'a', 'b', 'c']) };
+      return { k: 'const', name: pick(['π', 'e'] as const) };
+    }
+    const r = rnd();
+    if (r < 0.1) return { k: 'neg', a: gen(d - 1) };
+    if (r < 0.2) return { k: 'call', fn: pick(['sin', 'cos', 'sqrt', 'ln', 'abs', 'exp', 'atan'] as const), a: gen(d - 1) };
+    if (r < 0.25) return { k: 'deg', a: gen(d - 1) };
+    const op = pick(['+', '-', '*', '*', '/', '^'] as const);
+    if (op === '^') return { k: 'bin', op, a: gen(d - 1), b: rnd() < 0.6 ? { k: 'num', v: pick([2, 3, 0.5, 4]) } : gen(d - 1) };
+    return { k: 'bin', op, a: gen(d - 1), b: gen(d - 1) };
+  }
+  const env = { x: 1.3, y: 2.1, a: 0.7, b: 3.3, c: 1.9 };
+
+  it('3,000 random trees print, and what is printed reads back as the same function', () => {
+    let different = 0, refused = 0;
+    for (let i = 0; i < 3000; i++) {
+      const t = gen(1 + Math.floor(rnd() * 4));
+      const text = formatFn(t);
+      const p = parseFn(text);
+      if (!p.ok) {
+        refused++;
+        continue;
+      }
+      const u = evalFn(t, env), w = evalFn(p.node, env);
+      if ((u === null) !== (w === null) || (u !== null && w !== null && Math.abs(u - w) > 1e-9 * Math.max(1, Math.abs(u)))) different++;
+    }
+    expect(refused).toBe(0);
+    expect(different).toBe(0);
+  });
+
+  it('the sheet\'s grammar reads what this one prints, to the same value — or refuses it, saying why', () => {
+    const scope = scopeOf(Object.fromEntries(Object.entries(env).map(([k, v]) => [k, String(v)])));
+    let compared = 0, wrong = 0;
+    for (let i = 0; i < 2000; i++) {
+      const t = gen(1 + Math.floor(rnd() * 4));
+      const text = formatFn(t);
+      // the sheet reads a run of letters as a name (ab), where this grammar multiplies them; atan answers in degrees there, and a degree sign makes an angle
+      if (/[A-Za-z]{2,}/.test(text.replace(/sin|cos|sqrt|ln|abs|exp|atan/g, '')) || /atan|°/.test(text)) continue;
+      const want = evalFn(t, env);
+      const readings = parseExpression(text, { typed: true });
+      if (!readings.length) continue; // refused: an ambiguity, said (the sheet's tests hold the sentences)
+      compared++;
+      const got = readings.map((r) => evaluateExpr(r.expr, scope).value?.lo ?? null);
+      const some = got.some((g) => (g === null && want === null) || (g !== null && want !== null && Math.abs(g - want) <= 1e-9 * Math.max(1, Math.abs(want))));
+      if (!some) wrong++;
+    }
+    expect(compared).toBeGreaterThan(1000);
+    expect(wrong).toBe(0);
   });
 });

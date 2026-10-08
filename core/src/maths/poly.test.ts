@@ -3,7 +3,8 @@
 // function is cancelled — its holes and its poles.
 
 import { describe, it, expect } from 'vitest';
-import { factor, expand, analyseRational, polyFromNumbers, polyText, polyGcd, polyDivide, polyDegree, rat, ratText, parsePoly, realRoots } from './poly';
+import { factor, factorPoly, expand, analyseRational, polyFromNumbers, polyMul, polyPow, polyText, polyGcd, polyDivide, polyDegree, rat, ratText, parsePoly, realRoots } from './poly';
+import type { Poly } from './poly';
 
 const factored = (t: string) => {
   const r = factor(t);
@@ -238,5 +239,66 @@ describe('rational functions: cancelled, and what is left', () => {
     const a = analysed('(x^2-4)/(x-2)');
     for (const x of [-3, -0.5, 0, 1.5, 2.5, 7]) expect(a.reducedFn(x)).toBeCloseTo((x * x - 4) / (x - 2), 12);
     expect(a.reducedFn(2)).toBe(4); // the hole is filled in the reduced form; plot it as a ring
+  });
+});
+
+// Properties, on seeded random polynomials and ratios (the same every run).
+describe('properties of factoring and cancelling', () => {
+  let seed = 99;
+  const rnd = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+  const ri = (a: number, b: number) => a + Math.floor(rnd() * (b - a + 1));
+
+  it('the factors of 150 random products multiply back to them, and none that is returned splits again', () => {
+    let mismatched = 0, splits = 0;
+    for (let i = 0; i < 150; i++) {
+      let p: Poly = [rat(ri(1, 3))];
+      for (let j = ri(1, 3); j > 0; j--) {
+        const deg = ri(1, 2);
+        const cs = Array.from({ length: deg + 1 }, () => ri(-4, 4));
+        if (cs[deg] === 0) cs[deg] = 1;
+        p = polyMul(p, polyFromNumbers(cs));
+      }
+      const f = factorPoly(p);
+      let back: Poly = [f.constant];
+      for (const g of f.factors) back = polyMul(back, polyPow(g.poly, g.power));
+      if (back.length !== p.length || !back.every((c, k) => c.n === p[k].n && c.d === p[k].d)) mismatched++;
+      for (const g of f.factors) {
+        if (polyDegree(g.poly) < 2) continue;
+        const again = factorPoly(g.poly);
+        if (again.factors.length !== 1 || again.factors[0].power !== 1) splits++;
+      }
+    }
+    expect(mismatched).toBe(0);
+    expect(splits).toBe(0);
+  });
+
+  it('the holes, the poles and their orders of 400 random ratios are the roots they were built from', () => {
+    let wrong = 0;
+    for (let i = 0; i < 400; i++) {
+      const nr = Array.from({ length: ri(0, 3) }, () => ri(-3, 3));
+      const dr = Array.from({ length: ri(1, 3) }, () => ri(-3, 3));
+      const count = (xs: number[]) => {
+        const m = new Map<number, number>();
+        for (const x of xs) m.set(x, (m.get(x) ?? 0) + 1);
+        return m;
+      };
+      const N = count(nr), D = count(dr);
+      const text = (m: Map<number, number>, extra: string) =>
+        [...m].map(([r, k]) => `(x${r < 0 ? `+${-r}` : r > 0 ? `-${r}` : ''})${k > 1 ? `^${k}` : ''}`.replace('(x)', 'x')).concat(extra ? [extra] : []).join('*') || '1';
+      const a = analyseRational(`(${text(N, '2')})/(${text(D, '')})`);
+      if (!a.ok) {
+        wrong++;
+        continue;
+      }
+      const holes = [...D].filter(([r, kd]) => (N.get(r) ?? 0) >= kd).map(([r]) => r).sort((x, y) => x - y);
+      const poles = [...D].filter(([r, kd]) => (N.get(r) ?? 0) < kd).map(([r, kd]) => [r, kd - (N.get(r) ?? 0)]).sort((x, y) => x[0] - y[0]);
+      const sameHoles = JSON.stringify(a.holes.map((h) => Math.round(h.x))) === JSON.stringify(holes);
+      const samePoles = JSON.stringify(a.poles.map((p) => [Math.round(p.x), p.order])) === JSON.stringify(poles);
+      if (!sameHoles || !samePoles) wrong++;
+    }
+    expect(wrong).toBe(0);
   });
 });

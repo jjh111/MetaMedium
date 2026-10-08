@@ -243,3 +243,57 @@ describe('reading and refusing', () => {
     expect(limit('π x', 'x', 2)).toMatchObject({ ok: true, method: 'substitution' });
   });
 });
+
+// The exact methods against the numbers, on seeded random ratios of polynomials (the same every run).
+describe('properties of the limits', () => {
+  let seed = 21;
+  const rnd = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+  const ri = (a: number, b: number) => a + Math.floor(rnd() * (b - a + 1));
+  const lin = (r: number) => (r === 0 ? 'x' : r > 0 ? `(x-${r})` : `(x+${-r})`);
+  const ratioText = (extra: string) => {
+    const nr = Array.from({ length: ri(0, 3) }, () => ri(-3, 3));
+    const dr = Array.from({ length: ri(1, 3) }, () => ri(-3, 3));
+    return `(${nr.map(lin).concat([extra]).join('*')})/(${dr.map(lin).join('*')})`;
+  };
+
+  it('every exact limit at a place agrees with where the samples either side are heading (400 ratios, either side or both)', () => {
+    let disagree = 0;
+    for (let i = 0; i < 400; i++) {
+      const side = (['both', 'left', 'right'] as const)[ri(0, 2)];
+      const r = limit(ratioText('(x^2+1)'), 'x', ri(-3, 3), side);
+      if (!r.ok) {
+        disagree++;
+        continue;
+      }
+      const ap = r.approach!;
+      const used = side === 'both' ? [ap.left, ap.right] : side === 'left' ? [ap.left] : [ap.right];
+      const heads = used.map((s) => s.settles);
+      if (r.kind === 'finite') {
+        if (!heads.every((h) => h !== null && Math.abs(h - r.value!) <= 1e-3 * Math.max(1, Math.abs(r.value!)))) disagree++;
+      } else if (r.kind === 'infinite') {
+        if (!heads.every((h) => h === r.value)) disagree++;
+      } else if (side !== 'both' || (heads[0] === heads[1] && heads[0] !== null)) disagree++;
+    }
+    expect(disagree).toBe(0);
+  });
+
+  it('and out at infinity, either way (300 ratios)', () => {
+    let disagree = 0;
+    for (let i = 0; i < 300; i++) {
+      for (const a of [Infinity, -Infinity]) {
+        const r = limit(ratioText('(2x^2+1)'), 'x', a);
+        if (!r.ok) {
+          disagree++;
+          continue;
+        }
+        const heads = (a > 0 ? r.approach!.left : r.approach!.right).settles;
+        const ok = r.kind === 'finite' ? heads !== null && Math.abs(heads - r.value!) <= 2e-3 * Math.max(1, Math.abs(r.value!)) : r.kind === 'infinite' && heads === r.value;
+        if (!ok) disagree++;
+      }
+    }
+    expect(disagree).toBe(0);
+  });
+});

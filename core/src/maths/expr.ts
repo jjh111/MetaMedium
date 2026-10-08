@@ -333,7 +333,8 @@ function refine(toks: Tok[]): Tok[] {
     if (t.t !== 'word') return t;
     const prev = toks[k - 1], next = toks[k + 1];
     if ((t.w === 'x' || t.w === 'X') && operandEnd(prev) && !fns[k - 1] && operandStart(next)) {
-      const letter = t.space === 0 && (next?.t === 'lp' || next?.t === 'word' || next?.t === 'fn');
+      // glued to π (πxπ), or to a bracket, a word or a function after it (2x(x+1)): the letter, not a sign for times
+      const letter = t.space === 0 && (next?.t === 'lp' || next?.t === 'word' || next?.t === 'fn' || (prev?.t === 'num' && !!prev.sym) || (next?.t === 'num' && !!next.sym));
       if (!letter) return { t: 'op', op: '*', glyph: t.w, at: t.at, end: t.end, space: t.space };
     }
     if (t.w.toLowerCase() === 'to' && prev?.t === 'num' && next?.t === 'num') {
