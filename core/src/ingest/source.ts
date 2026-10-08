@@ -172,3 +172,51 @@ export const isHash = (s: unknown): s is string => typeof s === 'string' && /^[0
 const HEX = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
 /** `#rrggbb` from three channels, each clamped to 0–255. */
 export const hexColor = (r: number, g: number, b: number): string => '#' + HEX(r) + HEX(g) + HEX(b);
+
+/**
+ * What one file may cost. A whiteboard export carries thousands of clones and masks, and a hostile file can nest
+ * a thousand `<use>` in a thousand; none of them may take the process with them. Every cap counts work, not time,
+ * so the same file is cut at the same place on every machine — except `ms`, the last resort, which is the wall
+ * clock. A file that passes a cap is read as far as it was and says so (`InkDocument.truncated`, a note).
+ */
+export interface IngestLimits {
+  /** The size of the file. Past it nothing is read. */
+  bytes: number;
+  /** XML elements parsed, and how deep they nest. */
+  elements: number;
+  depth: number;
+  /** Elements walked, the copies a `<use>` makes included. */
+  visited: number;
+  /** `<use>` expansions. */
+  clones: number;
+  /** Outlines read back to lines. */
+  outlines: number;
+  /** Vertices a curve or a ring is walked to. */
+  vertices: number;
+  /** Points handed back across the whole document. */
+  points: number;
+  /** Raster pixels the thinning and the fidelity measure may spend. */
+  rasterPx: number;
+  /** Milliseconds of the wall clock. */
+  ms: number;
+}
+
+export const DEFAULT_LIMITS: IngestLimits = {
+  bytes: 128 * 1024 * 1024,
+  elements: 1_500_000,
+  depth: 256,
+  visited: 2_000_000,
+  clones: 200_000,
+  outlines: 60_000,
+  vertices: 30_000_000,
+  points: 6_000_000,
+  rasterPx: 600_000_000,
+  ms: 90_000,
+};
+
+export interface IngestOptions {
+  /** The file's SHA-256 if the caller already has it (the platform's digest is faster than plain code on a big file). */
+  hash?: string;
+  /** Lower any of the caps, for a test or a small device. */
+  limits?: Partial<IngestLimits>;
+}

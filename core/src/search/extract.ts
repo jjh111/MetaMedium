@@ -14,6 +14,7 @@ import type { SessionState } from '../session/session';
 import { type MMNode, boundsOf, getRep, labelOf, transcriptsOf, topInterpretation, isWord, wordOf } from '../session/nodes';
 import { pictureOf } from '../kinds/picture';
 import { regionsOfBoard } from '../session/board-regions';
+import { decodeEntities } from './entities';
 
 export type SearchKind = 'label' | 'name' | 'text' | 'transcript' | 'figure' | 'mermaid' | 'picture' | 'page' | 'region' | 'board';
 
@@ -60,17 +61,6 @@ function nounOf(node: MMNode): string {
   return NOUN[t] || 'a ' + t;
 }
 
-const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
-function decodeEntities(s: string): string {
-  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
-    if (e[0] === '#') {
-      const n = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-      return n > 0 && n < 0x110000 ? String.fromCodePoint(n) : m;
-    }
-    const r = ENTITIES[e.toLowerCase()];
-    return r === undefined ? m : r;
-  });
-}
 const squash = (s: string) => s.replace(/\s+/g, ' ').trim();
 
 /** The words of a page: no scripts, no styles, no comments, no tags; entities read. */
