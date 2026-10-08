@@ -59,7 +59,7 @@
 import type { Bounds, Point } from '../types';
 import { analyzeStroke, MAX_TIER0_CONFIDENCE, HAND_RESOLUTION_PX } from '../recognition';
 import { simplifyStroke } from '../geometry';
-import { LETTER_MAX_HEIGHT_PX, LETTER_MAX_WIDTH_PX } from '../session/words';
+import { LETTER_MAX_HEIGHT_PX, LETTER_MAX_WIDTH_PX, SHAPE_NOT_LETTER } from '../session/words';
 import { seedOf } from '../packs/synthesize';
 import { GLYPHS, GLYPH_TABLE, isDigit, type Glyph } from './glyphs';
 import { cloudOf, matchClouds, DOT_OF_GLYPH, type Cloud } from './pointcloud';
@@ -99,8 +99,8 @@ export const DOT_OF_LINE = 0.14;
 /** Candidates scored under this are not worth matching: nothing is kept below it. */
 const LOWEST = 0.1;
 
-/** A stroke the shape rung reads at least this sure of is a shape first: the words' measure (session.ts keeps a sure shape out of a word at the same). */
-export const SHAPE_FIRST = 0.72;
+/** A stroke the shape rung reads at least this sure of is a shape first: the words' own measure, held in one place. */
+export const SHAPE_FIRST = SHAPE_NOT_LETTER;
 /**
  * A box or a triangle the rung is this sure of is a drawing, never a glyph. Surer than a shape first: a small ring
  * a hand wobbles reads as a box 0.73 (the rings of a % sign did), and a shape first may still be read in a run.

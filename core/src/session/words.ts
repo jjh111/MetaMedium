@@ -26,6 +26,12 @@ export const LETTER_MAX_HEIGHT_PX = 150;
 /** …or wider than this: an underline, a rule, a box. */
 export const LETTER_MAX_WIDTH_PX = 150;
 /**
+ * A stroke the shape rung reads at least this sure of as a shape is a shape first, not a letter: it never
+ * starts a word, and a box or a triangle this sure never joins one (session.ts). The numerals' reader asks
+ * the same of a glyph (`read/numerals.ts`, `SHAPE_FIRST`).
+ */
+export const SHAPE_NOT_LETTER = 0.72;
+/**
  * A letter may be this many times shorter than the run it joins, at most: an
  * x-height o beside a run that already holds an ascender and a descender
  * (h, e, l, l — the run's box is ascender + x-height + descender, some

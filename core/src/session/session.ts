@@ -93,7 +93,7 @@ function manipulationOf(ev: Extract<SessionEvent, { type: 'move' | 'scale' | 'ro
   if (ev.type === 'scale') return { type: 'scale', about: ev.about, sx: ev.sx, sy: ev.sy };
   return { type: 'rotate', about: ev.about, radians: ev.radians };
 }
-import { FIGURE_MEET_SHARE, LETTER_TINY_PX, WORD_WINDOW_MS, endsPairUp, isLetterLike, joinsRun, longAgainst, wordConfidence, xHeightOf } from './words';
+import { FIGURE_MEET_SHARE, LETTER_TINY_PX, SHAPE_NOT_LETTER, WORD_WINDOW_MS, endsPairUp, isLetterLike, joinsRun, longAgainst, wordConfidence, xHeightOf } from './words';
 import { type StructuralSignature, type Examples, structuralSignature, matchDefinition, addExample, MATCH_FLOOR, mayMatchBySize, shapeCount } from './signature';
 import type { Kind } from '../kinds/kinds';
 import { isPictureKind, isAssetRef } from '../kinds/picture';
@@ -3243,7 +3243,6 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
    * A word starts, then, from a stroke the rung could NOT place — an N, an
    * A, a V — and gathers the letter-like strokes written just before it.
    */
-  const SHAPE_NOT_LETTER = 0.72;
   function topShape(n: MMNode): { type: string; weight: number } | null {
     const top = resemblances(n)[0];
     if (!top) return null;
