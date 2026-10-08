@@ -11,7 +11,7 @@
 //     side away from the bob), a *dot* on the rod's top end, or *the rod's top end
 //     alone*.
 //
-// **A pendulum hangs.** The bob is below its pivot, within `MAX_ANGLE_DEG` of
+// **A pendulum hangs.** The bob is below its pivot, within `HANG_DEG` of
 // plumb — a bob above its pivot is a tree, a lollipop, a stick figure's head, not
 // a pendulum, and a bob read from a rod that ends on another ring of its own
 // size is a bond between two circles, the molecule's. The pivot end is FREE: it

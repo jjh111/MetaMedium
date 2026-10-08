@@ -710,6 +710,84 @@ one act, one undo (`mathsWrite`). The export pane has a row of its own,
 *true-size.svg* and *print.html* (Letter, or A4 for a metric drawing), waiting
 with its reason until a figure has numbers and a unit.
 
+### Maths with a variable: functions, polynomials and limits (MATHS-SPEC M11–M13)
+
+> `core/src/maths/fn.ts` (`parseFn`, `formatFn`, `compileFunction`, the shape in `compile.ts`), `poly.ts`
+> (`factor`, `analyseRational`, exact over the rationals), `limit.ts` (`limit`, `readLimit`, `limitFromText`);
+> `expr.ts` and `quantity.ts` (an angle). The Jake engine: the whitepaper's student and `(x² − 4)/(x − 2)`.
+
+**A function as a person writes it** (`fn.ts`): a grammar written by hand, no `eval` and no `new Function` —
+numbers, Latin and Greek names, `^` and superscripts, `√`, π and e, the functions in `FUNCTIONS` (one table, which
+`expr.ts` shares, so `sin` means one thing on a sheet and in a plot), degrees (`sin 30°`), implicit products (`2x`,
+`x(x+1)`, `2π√(L/g)`), absolute-value bars and a left side (`y =`, `f(x) =`) that is dropped — printed back as it
+was read (`formatFn`) and compiled by **`compileFunction(text, variable?, given?)`** into a function of one
+variable or a reason (C0's shape). Three rules: **what is ambiguous is refused with both ways to write it** (`1/2x`,
+`√4x`, `x2`); **what is not a function is refused** (`foo(x)` is no product of letters); **undefined is null, never a
+number** — a hole, a pole, a root of a negative, 0⁰ — so a plot breaks its line.
+
+**Polynomials, exact** (`poly.ts`): coefficients are fractions of BigInts, never floats, so x³ − 1 factors as
+(x − 1)(x² + x + 1); `factor` takes out the power of x, finds every rational root, and splits what is left by
+Kronecker's method up to cubic factors — saying when the work was too large to be sure, never claiming it.
+`analyseRational` cancels a ratio and says what is left: its **holes** (a common factor's roots, with the value the
+curve would have), its **poles** (with the way the curve goes either side) and how it ends.
+
+**Limits** (`limit.ts`), four methods in order, each result saying which (rule 12): **substitution**; **factoring**
+for 0/0 in a ratio of polynomials, the common factor struck and the steps written out (Jake's limit is 4, *by
+factoring*); **the known limits** (sin x / x and its kin, scaled and shifted), claimed only when the numbers from both
+sides confirm them; else **numerically from both sides**, 0.1, 0.01, 0.001 away (1.9, 1.99, 1.999 → 3.9, 3.99,
+3.999), said as numbers, not a proof. The point itself is never evaluated, so a hole is never read as a value.
+
+**The grammar's silently wrong lines** (MATHS-SPEC §2's table) are each read right or refused now, in `expr.ts`: a
+slash fraction beside ÷ or ^ is refused rather than read one way, `x` glued to a bracket or a name is the letter, a
+written decimal keeps its places and nothing nonzero shows as 0, and **an angle is a quantity of its own** (`30°`,
+`1.2 rad` in `quantity.ts`: converted between degrees and radians, never a bare count). A sum typed after `=` that
+names something the page does not define is refused (`evaluateTyped`), where a written step carries its result
+forward. Tier 1: no model computes anything. Not yet: Greek names in the sheet's grammar (M10), TeX out.
+
+### Fill-ins: what the maths implies, standing where it would be written (MATHS-SPEC §4–§5, M16–M18)
+
+> `core/src/maths/fill.ts` (the contract, C0: the registry of sources, `fillInsOf`, `fillInsOfSession`),
+> `fill-builtin.ts` (the sources, registered in order), `fill-figure.ts` (the figure's source), `fill-feynman.ts`
+> (the Feynman diagram's, below), `hues.ts` (one quantity, one colour), `session/settings.ts` (the `setting` event),
+> `tools/fill.ts`; the surface's `Demos/surface/25-ghosts.js`; e2e `fill` (22 records).
+
+John's direction, 8 Oct 2026: *maths in reverse* — draw a shape or write a number, and what the maths implies
+stands on the page beside it. **A fill-in** is a value, a name or a mark the board implies and nobody wrote, drawn
+faint where it would be written. It is **derived, never logged**: a source (`FillSource { id, fillIns(state, ctx) }`)
+reads the board and returns records, every source handed the board's maths read once (`ctx.board()`); the registry
+keeps **one fill-in per key** (the stronger, a tie to the source registered first), ranks strongest first, and leaves
+out — and names — a source that throws or a record that cannot be drawn; a session's fill-ins are kept while its log
+and the sources stand. A new source is one file and one line in `fill-builtin.ts`, as a tool is.
+
+**The figure's source** (`fill-figure.ts`): every value a solved figure's top reading derives that is not written —
+a side, an angle, the area, the perimeter, a circle's or an arc's measures — and, weaker, what the ink gives *at the
+drawing's scale*. A side's stands where M5's chip stood, an angle's inside its corner on the bisector, the area at the
+centroid. A label that cannot hold has what the labels make it beside it, shown and never taken. **A tap writes it
+as text the maths checks** (John's decision): one line, named where a bare number would be misread (`area 6`,
+`r = 5`), one act and one undo (`writeFillIn`, `tools/fill.ts`) — and before it is offered it is read back the way the
+maths would read it (`fillLandsOnBoard`), so a number that would attach to the wrong side is moved nearer or declined.
+
+**One quantity, one colour** (`hues.ts`, over the colour space): a quantity's halo, ghost, chip and written number
+share a hue. **The roles of a right triangle are fixed on every board** (`ROLE_HUES`: opposite, adjacent, hypotenuse,
+the angle — chosen once to stand apart for every eye on both grounds, the table checked by its test) and **nudged
+only on a clash, the nudge said** in the fill-in's reason (John's decision); every other quantity is placed for the
+board, deterministically, typical sight first, with a dash pattern as a second channel where colour alone cannot tell
+two apart. Certainty is chroma: a ghost muted, a written value full. (Kinds on a board are KN1's, not built, so no
+role is nudged on a real board yet.)
+
+**The board's settings** (`session/settings.ts`): a `setting { key, value }` event, a fact about the board like `use` —
+every merged board has it, undone per hand, a key or value it does not know refused at the door and ignored on replay.
+Two keys: `answers` — `show`, or **`wait`**: the board is set to teach, each answer stands as a ? in its colour, the
+first tap shows it (the page's, never logged) and the second writes it — and `colour` — `pointed`, or `always`: the
+maths is coloured at rest. Reached by typed offers (`tools/fill.ts`, the twenty-seventh built-in: *Write 5*, *Write all
+N*, *The answer waits*, *Show the answers*, *Colour the maths* …, all `hidden`, so e2e 49's golden stands) and by the
+panel's board line when nothing is held.
+
+**On the surface** (`25-ghosts.js`): drawn **beneath the ink** — faint text in the quantity's hue at the hand's size,
+a mark dashed, a halo under the measured marks while they are held or pointed at — and taken by a tap (`07-input.js`
+asks `fgAt` where a press and a tap land, so a ghost inside the selection is the ghost's). Open: on a waiting board a conflict still shows the value the labels make (hiding
+it would hide the disagreement — John's to say).
+
 ### Clean forms: a confident reading, redrawn
 
 > `core/src/session/clean.ts` — `snapReading`, `idealize`,
@@ -989,7 +1067,7 @@ said after the reason, and what makes it specific to these marks),
 `verbs`, `hidden` (typed, never a slot), `lead` (stands with the readings:
 *Fold “…” into the text*), and `data` for its take. `offersFor(scope, ctx)`
 asks every tool in **registry order** — `builtin.ts` registers the
-twenty-five built-ins (the last four *Which is it?*, I7, *Trace into ink*, I1, *Make it a region*, I5, and *Notes like this*, I9 — typed, only with a semantic seat held)
+twenty-seven built-ins (the last six *Which is it?*, I7, *Trace into ink*, I1, *Make it a region*, I5, *Notes like this*, I9 — typed, only with a semantic seat held — *Play the pendulum*, M23, and the fill-ins' typed offers, M16–M18)
 in the order the field always built its pills (the maths
 tool, M5 — *Show the sizes*, *Check the steps*, *Print at true size*, host
 acts that write nothing — then *Mermaid*, *drawing from Mermaid*, *routing*
@@ -2302,6 +2380,74 @@ middle of that side the length of a part between two notches, and the side was f
 by nothing — found drawing the piece with the pointer for e2e 68. `garmentNotFigures`
 leaves a notch, a dart, a fold and a grain line's drawn-apart heads out of what the
 solver is handed.
+
+### The Feynman diagram (MATHS-SPEC M27)
+
+> `core/src/diagram/waves.ts` (a stroke that oscillates), `notations/feynman.ts` (the reading, `FEYNMAN_TABLE`),
+> `feynman-tikz.ts` (TikZ-Feynman out), `maths/fill-feynman.ts` (a name offered for a line), `packs/shipped/feynman.ts`
+> (`feynman@1`); `feynman.test.ts`, `feynman.bench.test.ts`, `waves.test.ts`, `feynman-tikz.test.ts`.
+
+**Waves** (`waves.ts`): the shape rung has no word for a wavy line (it turns many times, low and wide — writing, to
+it), so a stroke is read for whether it oscillates about an axis — **wavy** or **zigzag** (the heading swings side to
+side; a zigzag turns at its crests all at once) or **curly** (a coil of loops turning one way) — along a line or an
+arc, a photon in a loop being an arc (the trap: the axis is a smoothed curve, never only the chord). **What makes it a
+wave and not writing**: it is regular (crests alike, half-periods alike, nodes in a line, crests alternating) and long
+against its amplitude; writing is neither (the corpus's words, drawn lines of writing and printed letters read as none). A scribble as
+regular as a wave — under 3 in 100 of them — IS one by its ink; where it stands — a boson line meets a vertex — is the notation's to read.
+
+**The reading** (`feynman.ts`): a **fermion** is a solid line with an arrow — a chevron on its middle (a new read: a
+small V on the line, its arms back along it) or its own barb at an end — the arrow its flow; a **photon**, W or Z is
+wavy or a zigzag (a photon until a label says W or Z), a **gluon** curly, the **Higgs** dashed (`dashes.ts`). Where
+three or four ends meet is a **vertex** (a magnet's bind first, a dot drawn there its own mark); a line with a free end
+is a particle coming in or going out. **Time runs left to right** unless the free lines run up and down, then bottom to
+top, said. It says the process (*e⁻ e⁺ → μ⁻ μ⁺*), for two in and two out at tree level the channel (*s*, *t* or *u*),
+the order from the vertices' couplings (*α²*), and tree or how many loops. **Once particles are labelled**, charge,
+lepton number by family and baryon number are checked at each vertex and a break is said with its sum — a label rules
+the particle, the ink rules the topology (MATHS-PLAN rule 2). `FEYNMAN_TABLE` (18 particles) is named by the
+`feynman@1` pack, which restates none of it. A notation named for a person says so (`Notation.proper`), so it is *a
+Feynman diagram* in a sentence (`notationNameInSentence`). Bench: 432 of 432 boards (36 hands × 4 diagrams × 3 sizes)
+read first at 0.92; every other bench's boards read none above 0.00.
+
+**Out, and a name offered.** `feynman-tikz.ts` writes the `\feynmandiagram` a physicist puts in a paper — vertices in
+time, each fermion as a chain along its flow, only the table's TeX names (no text a hand wrote reaches TeX) —
+**unverified by a compiler**: the container had no LuaLaTeX. `fill-feynman.ts` is the second fill source: a line nobody
+named is offered a name from how it is drawn and what flows through its vertices (γ where its vertices balance
+without it, W± where they need its charge, g, H, a fermion carried through a neutral vertex), taken by a tap as a label
+the notation then reads. Not yet: a fermion loop as one circle, an arrow on a W line, a line in two pieces, Feynman in
+(M28).
+
+### Runs: the pendulum is alive (MATHS-SPEC M23; V1-SPEC RN4)
+
+> `core/src/run/runner.ts` (the contract, `registerRunner`, `runsIn`, `createStepper`), `run/builtin.ts`,
+> `physics/pendulum.ts`, `notations/pendulum.ts` (the reading and `PENDULUM_RUNNER`), `tools/run.ts`; the clock on a
+> mark in `session.ts` (`applyClock`); the surface's `Demos/surface/14-run.js`; e2e `alive` (19 records).
+
+Chalktalk's road: draw a pendulum and it swings. **The pendulum** is read from ink as a notation — a straight **rod**,
+a **bob** (a ring, or a spot scribbled solid) at one end, and what it hangs from at the other: a level **ceiling** with
+**hatching** above it, a **dot**, or the rod's free end alone. **A pendulum hangs**: the bob below its pivot (fully within
+70° of plumb, none past 100°, `HANG_DEG`; a bob above is a lollipop or a head), and a rod ending on another ring of its size is the
+molecule's bond. Its confidence is its evidence, as the garment piece's is: a rod and a ring alone are held under the
+floor (Play still offered, quietly); a ceiling, its hatching or a dot take it above. The six roles hold.
+
+**A runner** (`runner.ts`) reads marks as something that runs, takes its inputs from what is written and drawn beside
+them, and is stepped at a fixed small step. Four rules: **nothing runs unblessed** (a run is started by the hand's own
+`clock` play event, stopped by Esc; this file holds no timer); **time is derived, never logged** (a run is a pure
+function of its inputs and its step count; a stepper keeps keyframes every `RUN_KEYFRAME_EVERY` steps and the surface
+keeps one while the inputs are the same); **every run has a step budget and says when it stopped** (*stopped after …
+steps — … of its own time*); **its outputs are named quantities** (`run:<key>:θ`). A runner is registered once
+(`registerRunner`), and `Runner.holds` lets `applyClock` put a clock on the mark a runner reads — it took only an
+artifact's before.
+
+**The physics** (`physics/pendulum.ts`): θ″ = −(g/L) sin θ, **stepped by RK4** at `PENDULUM_DT` (1/480 s), so the same
+bits in one go or in pieces; **the period exact, by the arithmetic–geometric mean** (T = 2π√(L/g) / AGM(1, cos(θ₀/2)),
+no small-angle error), the textbook's 2π√(L/g) said beside it. **Its inputs**: L is a length written beside the rod
+(attached by the dimensions' own rule), else the drawing's scale, else 1 m **assumed and said**; θ₀ as drawn; g = 9.81.
+
+**The tool** (`tools/run.ts`, the twenty-sixth built-in): *Play the pendulum* / *Pause*, *Reset the pendulum*, and for a
+rod drawn plumb *Pull it aside* — one `rotate` of the rod and bob about the pivot, one act, one undo. On the surface
+(`14-run.js`) a run turns the rod and bob each frame (a placement, never the ink), T and the live θ stand as chips
+beside it, Esc stops every run, a reload leaves it paused. Not yet: T and θ as fill-ins and in written maths (M24),
+plots over time (M25), more bodies (M26), a play from another hand starting this tab from t = 0 (M29).
 
 ### Spatial Graph — retired
 
