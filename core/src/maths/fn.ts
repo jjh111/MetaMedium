@@ -643,8 +643,27 @@ function precOf(n: FnNode): number {
 }
 
 const isAtom = (n: FnNode) => n.k === 'num' || n.k === 'var' || n.k === 'const';
-const endsWithLetter = (s: string) => /[A-Za-zÀ-ɏͰ-Ͽ]$/.test(s);
 const startsWithDigit = (s: string) => /^[\d.]/.test(s);
+
+/** The letters (π apart) a text ends with, and begins with. */
+const LETTERS = 'A-Za-zÀ-ɏͰ-ορ-Ͽ';
+const tailLetters = (s: string) => new RegExp(`[${LETTERS}]+$`).exec(s)?.[0] ?? '';
+const headLetters = (s: string) => new RegExp(`^[${LETTERS}]+`).exec(s)?.[0] ?? '';
+const SPELLS_A_WORD = new RegExp(`ln|pi|${Object.keys(FUNCTIONS).join('|')}|arcsin|arccos|arctan`);
+
+/**
+ * Two factors side by side, so that they read back as two factors: a root with a bare
+ * argument takes its brackets (√(2)x, not √2x), and letters that would run together into a
+ * word the grammar reads otherwise — more than three, or spelling sin, ln, pi — or a word
+ * straight into a bracket, are kept apart by a space.
+ */
+function juxtapose(l: string, r: string): string {
+  const guarded = l.replace(new RegExp(`√([\\dA-Za-z.πe]+)$`), '√($1)');
+  const trail = tailLetters(guarded), head = headLetters(r);
+  const run = trail + head;
+  const apart = (trail && head && (run.length > MOST_LETTERS || SPELLS_A_WORD.test(run))) || (trail.length >= 2 && r.startsWith('('));
+  return apart ? `${guarded} ${r}` : `${guarded}${r}`;
+}
 
 /** The tree as it reads: brackets only where they mean something, `−` for minus, `x²` for a small power, `2x` for a product. */
 export function formatFn(node: FnNode): string {
@@ -680,11 +699,10 @@ export function formatFn(node: FnNode): string {
           // Juxtaposition when it reads back as the same product: not after a ratio, not before a number or a minus.
           const lDiv = node.a.k === 'bin' && node.a.op === '/';
           const rStart = !startsWithDigit(r) && !r.startsWith('−') && node.b.k !== 'num';
-          if (!lDiv && rStart) return node.b.k === 'call' && endsWithLetter(l) && /^[A-Za-z]/.test(r) ? `${l} ${r}` : `${l}${r}`;
-          return `${l} × ${r}`;
+          return !lDiv && rStart ? juxtapose(l, r) : `${l} × ${r}`;
         }
         case '^': {
-          const base = P(node.a, PREC.pow + 1);
+          const base = node.a.k === 'call' && node.a.fn === 'sqrt' ? `(${formatFn(node.a)})` : P(node.a, PREC.pow + 1);
           const e = node.b;
           if (e.k === 'num') {
             const sup = Number.isInteger(e.v) && e.v >= 2 ? toSuperscript(e.v) : null;

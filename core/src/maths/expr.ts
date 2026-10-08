@@ -80,7 +80,7 @@ const GLYPH: Record<ExprOp, string> = { '+': '+', '-': '−', '*': '×', '/': '�
 /** A parsed expression. `num` ids are source offsets, so a range can be bound to the value a worked line chose. */
 export type Expr =
   /** `sym` is a number written as a symbol (π): it prints as the symbol and is the number all the same. */
-  | { k: 'num'; q: Quantity; text: string; id: number; sym?: string }
+  | { k: 'num'; q: Quantity; text: string; id: number; sym?: string; bracketed?: boolean }
   | { k: 'name'; name: string }
   | { k: 'ref'; step: number; text: string; bare?: boolean }
   /** `implicit` is a product written by putting the factors side by side (`2x`). `^` is a power. */
@@ -435,6 +435,10 @@ type PTok =
   | { t: 'lp' }
   | { t: 'rp' };
 
+/** A number written as a fraction with a slash and nothing else: 3/4. */
+const SLASH_FRACTION = /^(\d+)\s*[/⁄]\s*(\d+)$/;
+const slashOf = (e: Expr): RegExpExecArray | null => (e.k === 'num' && !e.bracketed ? SLASH_FRACTION.exec(e.text) : null);
+
 /** What parsing found wrong that is not just "cannot read": an ambiguity, said with both ways to write it. */
 interface Issues {
   ambiguous?: string;
@@ -466,7 +470,8 @@ function parseTokens(toks: PTok[], leftToRight: boolean, issues: Issues): Expr |
         if (!e) return null;
         // A bracket the hand never closed closes at the end of the line.
         if (toks[p]?.t === 'rp') p++;
-        return e;
+        // (3/4) is one number by the hand's own brackets, whatever stands beside it.
+        return e.k === 'num' ? { ...e, bracketed: true } : e;
       }
       case 'fn':
         return call();
@@ -532,7 +537,18 @@ function parseTokens(toks: PTok[], leftToRight: boolean, issues: Issues): Expr |
     if (toks[p]?.t === 'pow') {
       p++;
       const exp = unary();
-      return exp ? { k: 'op', op: '^', a: base, b: exp } : null;
+      if (!exp) return null;
+      // 2^1/3 — the cube root of 2 to one reader, 2 over 3 to another. 3/4² — likewise. Said, and neither is read.
+      const eb = slashOf(exp), bb = slashOf(base);
+      if (eb) {
+        issues.ambiguous = `${formatExpr(base)}^${eb[0]} is ambiguous — write ${formatExpr(base)}^(${eb[0]}) or (${formatExpr(base)}^${eb[1]})/${eb[2]}`;
+        return null;
+      }
+      if (bb) {
+        issues.ambiguous = `${bb[0]}^${formatExpr(exp)} is ambiguous — write (${bb[0]})^${formatExpr(exp)} or ${bb[1]}/(${bb[2]}^${formatExpr(exp)})`;
+        return null;
+      }
+      return { k: 'op', op: '^', a: base, b: exp };
     }
     return base;
   };
@@ -575,6 +591,12 @@ function parseTokens(toks: PTok[], leftToRight: boolean, issues: Issues): Expr |
       // A division takes one factor; a factor stuck to it is a question, not an answer.
       const b = t.op === '/' ? unary() : operand();
       if (!b) return null;
+      // a ÷ 3/4 — a over three-quarters to one reader, (a ÷ 3) over 4 to another.
+      const fb = t.op === '/' ? slashOf(b) : null;
+      if (fb) {
+        issues.ambiguous = `${formatExpr(a)} ÷ ${fb[0]} is ambiguous — write ${formatExpr(a)} ÷ (${fb[0]}) or (${formatExpr(a)} ÷ ${fb[1]})/${fb[2]}`;
+        return null;
+      }
       // a ÷ b c — (a ÷ b)c to one reader, a ÷ (bc) to another. Said, and neither is read.
       if (t.op === '/' && implicitAt()) {
         let rest: Expr | null = null;

@@ -171,6 +171,24 @@ describe('the new grammar, read both ways or refused', () => {
     expect(valueOf('2x/3', scopeOf({ x: '6' }))).toBe('4');
   });
 
+  it('a fraction written with a slash beside a power or a division is a question, so it is not read', () => {
+    // 3/4 is one number alone — and the end of a division, or a base, beside ÷ and ^
+    expect(valueOf('3/4')).toBe('¾'); // a number written as a fraction stays one
+    expect(valueOf('(3/4)^2')).toBe('0.56');
+    expect(valueOf('2 ÷ (1/2)')).toBe('4');
+    const cases: [string, RegExp][] = [
+      ['2^1/3', /2\^1\/3 is ambiguous — write 2\^\(1\/3\) or \(2\^1\)\/3/],
+      ['3/4^2', /\(3\/4\)\^2 or 3\/\(4\^2\)/],
+      ['A ÷ 3/4', /A ÷ \(3\/4\) or \(A ÷ 3\)\/4/],
+      ['x/2/3', /x ÷ \(2\/3\) or \(x ÷ 2\)\/3/],
+    ];
+    for (const [t, why] of cases) {
+      const c = parseLine(t).chain.segments[0];
+      expect(c.readings, t).toEqual([]);
+      expect(c.error, t).toMatch(why);
+    }
+  });
+
   it('an angle is not a length, and not a bare number', () => {
     expect(valueOf('30° + 15°')).toBe('45°');
     expect(valueOf('2 × 30°')).toBe('60°');
