@@ -10,6 +10,8 @@ import { sha256Hex } from './sha256';
 import { analyzeStroke } from '../recognition';
 import type { InkDocument, InkStroke } from './source';
 import type { Point } from '../types';
+import { createSession } from '../session/session';
+import { topInterpretation } from '../session/nodes';
 
 const lengthOf = (pts: Point[]) => pts.reduce((s, p, i) => (i ? s + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) : 0), 0);
 function off(p: Point, path: Point[]): number {
@@ -192,6 +194,48 @@ describe('figures whose strokes cross or merge — the hard material', () => {
       const lines = r.doc.pages[0].strokes.map((st) => st.points);
       expect(lines.length).toBeGreaterThan(0);
       for (const p of m.strokes.flat()) expect(Math.min(...lines.map((l) => off(p, l)))).toBeLessThan(m.width * 1.5 + 2);
+    }
+  });
+});
+
+describe('once imported, a stroke is a stroke', () => {
+  it('the engine reads a recovered stroke exactly as it reads a hand’s: a session given its points reads what the shape rung says', () => {
+    for (const style of STYLES) {
+      // A board to each, since a stroke across earlier marks is a gesture to the session, as it should be.
+      const s = createSession();
+      let at = 1000;
+      const smp = sample(style, 2, 12);
+      for (const st of read(smp).pages[0].strokes) {
+        const id = s.addStroke(st.points, (at += 50));
+        const node = s.getState().nodes.get(id)!;
+        const rung = analyzeStroke(st.points).results[0]?.type;
+        expect(topInterpretation(node)).toBe(rung);
+      }
+    }
+  });
+
+  it('no reading depends on its colour: the same drawing in other colours is the same strokes, point for point', () => {
+    for (const style of STYLES) {
+      const a = sample(style, 3, 12);
+      const recolour = a.svg
+        .replace(/fill="#([0-9a-f]{6})"/g, (_, h: string) => `fill="#${h.split('').reverse().join('')}"`)
+        .replace(/stroke="#([0-9a-f]{6})"/g, (_, h: string) => `stroke="#${h.split('').reverse().join('')}"`)
+        .replace(/\.st(\d)\{fill:#([0-9a-f]{6});\}/g, (_, k: string, h: string) => `.st${k}{fill:#${h.split('').reverse().join('')};}`);
+      expect(recolour).not.toBe(a.svg);
+      const one = read(a).pages[0].strokes, two = read({ ...a, svg: recolour }).pages[0].strokes;
+      expect(two).toHaveLength(one.length);
+      one.forEach((st, i) => {
+        expect(two[i].points).toEqual(st.points);
+        expect(two[i].color).not.toBe(st.color);
+        expect({ ...two[i], color: '' }).toEqual({ ...st, color: '' });
+      });
+    }
+  });
+
+  it('a stroke carries no engine state: plain points, a colour, a width, an order and how it was got', () => {
+    for (const st of read(sample('onenote', 1, 6)).pages[0].strokes) {
+      expect(Object.keys(st).sort()).toEqual(['closed', 'color', 'fidelity', 'outline', 'order', 'points', 'recovery', 'width'].sort());
+      for (const p of st.points) expect(Object.keys(p).sort()).toEqual(['x', 'y']);
     }
   });
 });

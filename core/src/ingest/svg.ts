@@ -29,14 +29,14 @@ import { compose, translation, IDENTITY, type Affine } from '../session/affine';
 import { densify } from '../image/trace';
 import {
   type IngestResult, type IngestLimits, type IngestOptions, type InkDocument, type InkPage, type InkStroke, type Recovery, type Reading,
-  DEFAULT_LIMITS, accept, blankPage, refuse,
+  ADAPTER_VERSIONS, DEFAULT_LIMITS, accept, blankPage, refuse,
 } from './source';
 import { parseXml, textOf, type XNode } from './xml';
 import { parsePath, flatten, rectCmds, ellipseCmds, lineCmds, pointsCmds, type Cmd, type Poly } from './path';
 import {
-  type Paint, type Sheet, parseColor, parsePaint, parseLength, parseNumber, numberList, parseDeclarations, parseSheet, declarationsFor,
+  type Paint, type Sheet, parseColor, parsePaint, parseLength, parseNumber, numberList, parseDeclarations, parseSheet, declarationsFor, emptySheet, MAX_RULES,
 } from './svg-style';
-import { recoverFill, type OutlineRecovery, type FillRule } from './ink-outline';
+import { recoverFill, stepFor, type OutlineRecovery, type FillRule } from './ink-outline';
 import { sniffImage, shownSize } from './raster';
 
 // ---- the state of a reading ------------------------------------------------------------------------------
@@ -70,12 +70,12 @@ interface Counters {
   masked: number; clipped: number; gradients: number; patterns: number; dashed: number; markers: number; foreign: number; filters: number;
   rotatedText: number; externalPictures: number; badPictures: number; svgPictures: number; brokenPaths: number; firstPathError: string;
   badShapes: number; badTransforms: number; cycles: number; missingUses: number; externalUses: number; grounds: number; failed: number; unfaithful: number;
-  pathsStopped: number; unsupportedCss: number; zeroLength: number;
+  pathsStopped: number; unsupportedCss: number; droppedCss: number; zeroLength: number;
 }
 const newCounters = (): Counters => ({
   masked: 0, clipped: 0, gradients: 0, patterns: 0, dashed: 0, markers: 0, foreign: 0, filters: 0, rotatedText: 0, externalPictures: 0, badPictures: 0,
   svgPictures: 0, brokenPaths: 0, firstPathError: '', badShapes: 0, badTransforms: 0, cycles: 0, missingUses: 0, externalUses: 0, grounds: 0, failed: 0, unfaithful: 0,
-  pathsStopped: 0, unsupportedCss: 0, zeroLength: 0,
+  pathsStopped: 0, unsupportedCss: 0, droppedCss: 0, zeroLength: 0,
 });
 
 interface Evidence {
@@ -316,12 +316,16 @@ function pushStroke(w: Walk, s: Omit<InkStroke, 'order'>): boolean {
   return true;
 }
 
-/** The points of a line given the density of ink: a vertex stays where it is, and no gap is more than a couple of pixels. */
-function inkPoints(pts: Point[], closed: boolean): Point[] {
+/** Coordinates beyond this are not a drawing; a line through one is left out rather than walked. */
+const COORD_LIMIT = 1e7;
+
+/** The points of a line given the density of ink: a vertex stays where it is, and no gap is more than a couple of pixels (more only on a line too long for that to be a sensible number of points). */
+function inkPoints(pts: Point[], closed: boolean): Point[] | null {
   const line = closed && pts.length > 1 ? [...pts, pts[0]] : pts;
   let len = 0;
+  for (const p of line) if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || Math.abs(p.x) > COORD_LIMIT || Math.abs(p.y) > COORD_LIMIT) return null;
   for (let i = 1; i < line.length; i++) len += Math.hypot(line[i].x - line[i - 1].x, line[i].y - line[i - 1].y);
-  return densify(line, Math.max(0.5, Math.min(2, len / 24)));
+  return densify(line, stepFor(len, Math.max(0.5, Math.min(2, len / 24))));
 }
 
 function shifted(rec: OutlineRecovery, dx: number, dy: number): OutlineRecovery {
@@ -344,8 +348,9 @@ function geometryOf(node: XNode, w: Walk, fontPx: number): Geometry | null {
   switch (node.name) {
     case 'path': {
       const d = a.d ?? '';
-      const p = parsePath(d);
-      if (p.error) {
+      const p = parsePath(d, Math.max(1, w.vertices.left));
+      if (p.capped) stopWith(w, `stopped after ${plural(w.limits.vertices, 'point')} of outline — the drawing is more detailed than is read, and the rest is left`);
+      else if (p.error) {
         w.c.pathsStopped++;
         if (!w.c.firstPathError) w.c.firstPathError = p.error;
       }
@@ -407,7 +412,13 @@ function paintShape(node: XNode, st: Style, m: Affine, w: Walk): void {
   const cacheKey = w.cloning > 0 && doFill ? `${node.uid}|${st.fillRule}|${m.a.toFixed(5)}|${m.b.toFixed(5)}|${m.c.toFixed(5)}|${m.d.toFixed(5)}` : '';
   let recs: OutlineRecovery[] | null = null;
   let polys: Poly[] | null = null;
-  const flat = (): Poly[] => (polys ??= flatten(geo.cmds, m, FLATTEN_TOL, w.vertices));
+  const flat = (): Poly[] => {
+    if (!polys) {
+      polys = flatten(geo.cmds, m, FLATTEN_TOL, w.vertices);
+      if (w.vertices.left <= 0) stopWith(w, `stopped after ${plural(w.limits.vertices, 'point')} of outline — the drawing is more detailed than is read, and the rest is left`);
+    }
+    return polys;
+  };
 
   let penOutlines = 0, solids = 0;
   let penColor = '', penWidth = 0;
@@ -429,7 +440,6 @@ function paintShape(node: XNode, st: Style, m: Affine, w: Walk): void {
         if (cacheKey) w.cache.set(cacheKey, { results: recs, e: m.e, f: m.f });
       }
     }
-    if (w.vertices.left <= 0) stopWith(w, `stopped after ${plural(w.limits.vertices, 'point')} of outline — the drawing is more detailed than is read, and the rest is left`);
     for (const rec of recs ?? []) {
       if (rec.kind === 'failed') { w.c.failed++; continue; }
       const outline = w.outline++;
@@ -452,7 +462,9 @@ function paintShape(node: XNode, st: Style, m: Affine, w: Walk): void {
         const lines = flatten(orig.cmds, m, FLATTEN_TOL, w.vertices);
         if (lines.length) {
           for (const l of lines) {
-            if (!pushStroke(w, { points: inkPoints(l.pts, l.closed), color: fill!.hex, width: rec.width, recovery: 'stroke', closed: l.closed, outline, ...(fillAlpha < 1 ? { opacity: roundOpacity(fillAlpha) } : {}) })) return;
+            const pts = inkPoints(l.pts, l.closed);
+            if (!pts) { w.c.badShapes++; continue; }
+            if (!pushStroke(w, { points: pts, color: fill!.hex, width: rec.width, recovery: 'stroke', closed: l.closed, outline, ...(fillAlpha < 1 ? { opacity: roundOpacity(fillAlpha) } : {}) })) return;
           }
           continue;
         }
@@ -479,7 +491,9 @@ function paintShape(node: XNode, st: Style, m: Affine, w: Walk): void {
         let len = 0;
         for (let i = 1; i < l.pts.length; i++) len += Math.hypot(l.pts[i].x - l.pts[i - 1].x, l.pts[i].y - l.pts[i - 1].y);
         if (!(len > 1e-9)) { w.c.zeroLength++; continue; }
-        if (!pushStroke(w, { points: inkPoints(l.pts, l.closed), color: strokeP!.hex, width, recovery: 'stroke', closed: l.closed, outline, ...(strokeAlpha < 1 ? { opacity: roundOpacity(strokeAlpha) } : {}) })) return;
+        const pts = inkPoints(l.pts, l.closed);
+        if (!pts) { w.c.badShapes++; continue; }
+        if (!pushStroke(w, { points: pts, color: strokeP!.hex, width, recovery: 'stroke', closed: l.closed, outline, ...(strokeAlpha < 1 ? { opacity: roundOpacity(strokeAlpha) } : {}) })) return;
       }
       if (lines.length) {
         if (freeform) { w.ev.penStrokes += lines.length; counted = true; }
@@ -704,33 +718,34 @@ function findAll(node: XNode, name: string, out: XNode[] = []): XNode[] {
 }
 
 function sentencesOf(c: Counters): string[] {
-  const n: string[] = [];
-  const add = (count: number, s: string) => { if (count > 0) n.push(s); };
-  add(c.clipped, `${plural(c.clipped, 'element')} use a clip path, which was not applied — ink it hid may show`);
-  add(c.masked, `${plural(c.masked, 'element')} use a mask, which was not applied — ink it hid may show`);
-  add(c.gradients, `${plural(c.gradients, 'mark')} are painted with a gradient; its first colour was used`);
-  add(c.patterns, `${plural(c.patterns, 'mark')} are painted with a pattern, which is not read`);
-  add(c.dashed, `${plural(c.dashed, 'element')} are dashed; they are drawn solid`);
-  add(c.markers, `${plural(c.markers, 'element')} have markers (arrowheads, dots), which are not drawn`);
-  add(c.filters, `${plural(c.filters, 'element')} have filters (blurs, shadows), which are not applied`);
-  add(c.foreign, `${plural(c.foreign, 'embedded page')} (foreignObject) were left out`);
-  add(c.rotatedText, `${plural(c.rotatedText, 'piece')} of text are turned or skewed; their words are kept, upright`);
-  add(c.externalPictures, `${plural(c.externalPictures, 'picture')} live in other files, which are not part of this one; they are kept as references`);
-  add(c.svgPictures, `${plural(c.svgPictures, 'picture')} are SVGs inside this SVG, which are not read`);
-  add(c.badPictures, `${plural(c.badPictures, 'picture')} could not be read`);
-  add(c.pathsStopped, `${plural(c.pathsStopped, 'path')} stopped where their data stops making sense (the first: ${c.firstPathError}); what came before is kept`);
-  add(c.brokenPaths, `${plural(c.brokenPaths, 'path')} had nothing to draw`);
-  add(c.badShapes, `${plural(c.badShapes, 'shape')} had a size or a number that is not one, and were left out`);
-  add(c.badTransforms, `${plural(c.badTransforms, 'transform')} could not be read and were ignored`);
-  add(c.cycles, `${plural(c.cycles, '<use>')} refer to themselves or nest too deeply, and were not expanded`);
-  add(c.missingUses, `${plural(c.missingUses, '<use>')} refer to something that is not in the file`);
-  add(c.externalUses, `${plural(c.externalUses, '<use>')} refer to another file, which is not read`);
-  add(c.grounds, c.grounds === 1 ? 'a solid shape fills the page — a background, not a mark — and was left out' : `${c.grounds} solid shapes fill the page — backgrounds, not marks — and were left out`);
-  add(c.zeroLength, `${plural(c.zeroLength, 'stroked line')} have no length, and were left out`);
-  add(c.failed, `${plural(c.failed, 'outline')} could not be read back to a line`);
-  add(c.unfaithful, `${plural(c.unfaithful, 'outline')} come back only roughly as their pen strokes (covering or staying on under 90% of the outline)`);
-  add(c.unsupportedCss, `${plural(c.unsupportedCss, 'style rule')} need selectors that are not read (descendants, attributes, pseudo-classes)`);
-  return n;
+  const out: string[] = [];
+  const say = (n: number, one: string, many: string) => { if (n > 0) out.push((n === 1 ? one : many).replace('{n}', n.toLocaleString('en'))); };
+  say(c.clipped, 'one element uses a clip path, which was not applied — ink it hid may show', '{n} elements use clip paths, which were not applied — ink they hid may show');
+  say(c.masked, 'one element uses a mask, which was not applied — ink it hid may show', '{n} elements use masks, which were not applied — ink they hid may show');
+  say(c.gradients, 'one mark is painted with a gradient; its first colour was used', '{n} marks are painted with gradients; their first colours were used');
+  say(c.patterns, 'one mark is painted with a pattern, which is not read', '{n} marks are painted with patterns, which are not read');
+  say(c.dashed, 'one element is dashed; it is drawn solid', '{n} elements are dashed; they are drawn solid');
+  say(c.markers, 'one element has a marker (an arrowhead, a dot), which is not drawn', '{n} elements have markers (arrowheads, dots), which are not drawn');
+  say(c.filters, 'one element has a filter (a blur, a shadow), which is not applied', '{n} elements have filters (blurs, shadows), which are not applied');
+  say(c.foreign, 'one embedded page (foreignObject) was left out', '{n} embedded pages (foreignObject) were left out');
+  say(c.rotatedText, 'one piece of text is turned or skewed; its words are kept, upright', '{n} pieces of text are turned or skewed; their words are kept, upright');
+  say(c.externalPictures, 'one picture lives in another file, which is not part of this one; it is kept as a reference', '{n} pictures live in other files, which are not part of this one; they are kept as references');
+  say(c.svgPictures, 'one picture is an SVG inside this SVG, which is not read', '{n} pictures are SVGs inside this SVG, which are not read');
+  say(c.badPictures, 'one picture could not be read', '{n} pictures could not be read');
+  say(c.pathsStopped, `one path stopped where its data stops making sense (${c.firstPathError}); what came before is kept`, `{n} paths stopped where their data stops making sense (the first: ${c.firstPathError}); what came before is kept`);
+  say(c.brokenPaths, 'one path had nothing to draw', '{n} paths had nothing to draw');
+  say(c.badShapes, 'one shape had a size or a number that is not one, and was left out', '{n} shapes had a size or a number that is not one, and were left out');
+  say(c.badTransforms, 'one transform could not be read and was ignored', '{n} transforms could not be read and were ignored');
+  say(c.cycles, 'one <use> refers to itself or nests too deeply, and was not expanded', '{n} <use> elements refer to themselves or nest too deeply, and were not expanded');
+  say(c.missingUses, 'one <use> refers to something that is not in the file', '{n} <use> elements refer to something that is not in the file');
+  say(c.externalUses, 'one <use> refers to another file, which is not read', '{n} <use> elements refer to other files, which are not read');
+  say(c.grounds, 'a solid shape fills the page — a background, not a mark — and was left out', '{n} solid shapes fill the page — backgrounds, not marks — and were left out');
+  say(c.zeroLength, 'one stroked line has no length, and was left out', '{n} stroked lines have no length, and were left out');
+  say(c.failed, 'one outline could not be read back to a line', '{n} outlines could not be read back to lines');
+  say(c.unfaithful, 'one outline comes back only roughly as its pen stroke (the line covers or stays on under 90% of it)', '{n} outlines come back only roughly as their pen strokes (the lines cover or stay on under 90% of them)');
+  say(c.droppedCss, `one style rule past the first ${MAX_RULES.toLocaleString('en')} was not read`, `{n} style rules past the first ${MAX_RULES.toLocaleString('en')} were not read`);
+  say(c.unsupportedCss, 'one style rule needs a selector that is not read (a descendant, an attribute, a pseudo-class)', '{n} style rules need selectors that are not read (descendants, attributes, pseudo-classes)');
+  return out;
 }
 
 function readingOf(ev: Evidence, work: { clones: number; outlines: number }): Reading {
@@ -767,7 +782,7 @@ function read(bytes: Uint8Array, name: string, hash: string, opts: IngestOptions
   const frame = frameOf(root);
   if (typeof frame === 'string') return refuse(`this SVG cannot be placed: ${frame}`);
 
-  let sheet: Sheet = { rules: [], unsupported: 0 };
+  let sheet: Sheet = emptySheet();
   const css = findAll(root, 'style').map((s) => textOf(s)).join('\n');
   if (css.trim()) sheet = parseSheet(css);
 
@@ -778,6 +793,7 @@ function read(bytes: Uint8Array, name: string, hash: string, opts: IngestOptions
     cache: new Map(), cloning: 0,
   };
   w.c.unsupportedCss = sheet.unsupported;
+  w.c.droppedCss = sheet.dropped;
 
   // The root is walked as a group under the frame's map; its own style and transform apply to it.
   const rootStyle = styleOf(root, ROOT_STYLE, w);
@@ -810,6 +826,7 @@ function read(bytes: Uint8Array, name: string, hash: string, opts: IngestOptions
   const tool = toolOf(parsed.comments, root);
   const doc: InkDocument = {
     source: { hash, name, format: 'svg', ...(tool ? { tool } : {}), ...(created ? { created } : {}) },
+    adapter: `svg@${ADAPTER_VERSIONS.svg}`,
     pages: [page],
     reading: readingOf(w.ev, { clones: w.clones, outlines: w.outlines }),
     ...(title && textOf(title) ? { title: textOf(title) } : {}),

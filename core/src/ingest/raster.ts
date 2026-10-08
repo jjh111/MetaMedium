@@ -12,7 +12,7 @@
 // Read, not trusted (DATA-1): every read is bounds-checked, and bytes that are not a picture, or whose size
 // cannot be read, are a refusal with the reason.
 
-import { type IngestResult, type InkDocument, type SourceFormat, accept, blankPage, refuse } from './source';
+import { type IngestResult, type InkDocument, type SourceFormat, ADAPTER_VERSIONS, accept, blankPage, refuse } from './source';
 
 export interface ImageInfo {
   format: 'png' | 'jpeg' | 'webp' | 'gif';
@@ -121,6 +121,7 @@ export function ingestRaster(bytes: Uint8Array, name: string, hash: string): Ing
   if (info.orientation > 1) notes.push(`the picture is stored turned (EXIF orientation ${info.orientation}); its size is given as shown`);
   const doc: InkDocument = {
     source: { hash, name, format: info.format as SourceFormat },
+    adapter: `raster@${ADAPTER_VERSIONS.raster}`,
     pages: [page],
     reading: { as: 'picture', evidence: { width: w, height: h, bytes: bytes.length }, words: `a ${info.format.toUpperCase()} picture, ${w} × ${h} pixels` },
   };

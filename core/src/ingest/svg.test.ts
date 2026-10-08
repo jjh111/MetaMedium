@@ -583,6 +583,72 @@ describe('a file that is not what it says is refused with its reason, and never 
   });
 });
 
+describe('absurd numbers cost nothing', () => {
+  const timed = (text: string, limits?: Partial<IngestLimits>) => {
+    const t0 = Date.now();
+    const r = ok(read(text, limits));
+    expect(Date.now() - t0).toBeLessThan(4000);
+    return r;
+  };
+  const pointsOf = (r: { doc: InkDocument }) => r.doc.pages[0].strokes.reduce((n, s) => n + s.points.length, 0);
+
+  it('a line a quadrillion long is left out, not walked at two pixels a point', () => {
+    const r = timed(svg(pen('M0 0 L1e300 1e300') + pen('M0 0 L1e15 5') + pen('M5 5 L50 50')));
+    expect(r.doc.pages[0].strokes).toHaveLength(1);
+    expect(r.notes.join(' ')).toMatch(/shape|left out/i);
+  });
+
+  it('a stroke ten million pixels long is sampled coarsely, to at most twenty thousand points', () => {
+    const r = timed(svg(pen('M0 0 L9e6 0')));
+    expect(r.doc.pages[0].strokes).toHaveLength(1);
+    expect(pointsOf(r)).toBeLessThanOrEqual(20_001);
+    expect(r.doc.pages[0].strokes[0].points[r.doc.pages[0].strokes[0].points.length - 1].x).toBeCloseTo(9e6, -2);
+  });
+
+  it('a solid shape ten million pixels long gives its edge in a bounded number of points; so does a pen stroke of that length', () => {
+    const r = timed(svg('<rect x="0" y="0" width="1e7" height="50" fill="#333"/><rect x="0" y="60" width="9e6" height="3" fill="#333"/>'));
+    expect(r.doc.pages[0].strokes.length).toBeGreaterThanOrEqual(1);
+    for (const s of r.doc.pages[0].strokes) expect(s.points.length).toBeLessThanOrEqual(20_001);
+  });
+
+  it('a transform that throws everything out of the world takes it out and says so', () => {
+    const r = timed(svg(`<g transform="scale(1e200)">${pen('M0 0 L1 1')}</g>${pen('M0 0 L9 9')}`));
+    expect(r.doc.pages[0].strokes).toHaveLength(1);
+  });
+
+  it('a viewBox of 1e300 maps everything to nothing, and the file still reads', () => {
+    const r = timed(svg(pen('M0 0 L9 9'), 'width="200" height="100" viewBox="0 0 1e300 1e300"'));
+    for (const s of r.doc.pages[0].strokes) for (const p of s.points) expect(Number.isFinite(p.x) && Number.isFinite(p.y)).toBe(true);
+  });
+
+  it('a polyline of two hundred thousand points, and a path of as many commands, are read in a moment', () => {
+    const pts = Array.from({ length: 200_000 }, (_, i) => `${i % 1000},${Math.floor(i / 1000)}`).join(' ');
+    const d = 'M0 0 ' + Array.from({ length: 200_000 }, (_, i) => `L${i % 1000} ${Math.floor(i / 1000)}`).join(' ');
+    const r = timed(svg(`<polyline points="${pts}" fill="none" stroke="#000"/><path d="${d}" fill="none" stroke="#000"/>`));
+    expect(r.doc.pages[0].strokes).toHaveLength(2);
+    // The vertex budget is a cap too.
+    const small = timed(svg(`<path d="${d}" fill="none" stroke="#000"/>`), { vertices: 1000 });
+    expect(small.doc.truncated).toBeTruthy();
+  });
+
+  it('a stylesheet of ten thousand rules over twenty thousand elements is read in a moment', () => {
+    const rules = Array.from({ length: 10_000 }, (_, i) => `.c${i}{stroke:#${(i % 4096).toString(16).padStart(3, '0')};}`).join('');
+    const els = Array.from({ length: 20_000 }, (_, i) => `<path class="c${i % 10_000}" d="M${i % 190} ${i % 90} l1 1" fill="none"/>`).join('');
+    const r = timed(svg(`<style>${rules}</style>${els}`), {});
+    // Only the first five thousand rules are read, so the elements named by the rest are left unstyled — and, with no
+    // stroke, undrawn — and the file says so.
+    expect(r.doc.pages[0].strokes.length).toBe(10_000);
+    expect(r.doc.pages[0].strokes[3].color).toBe('#000033');
+    expect(r.notes.join(' ')).toMatch(/5,000/);
+  });
+
+  it('elements nested two hundred deep, the most that is read, are read; one more is refused', () => {
+    const deep = (n: number) => '<g>'.repeat(n) + pen('M0 0 L9 9') + '</g>'.repeat(n);
+    expect(ok(read(svg(deep(200)))).doc.pages[0].strokes).toHaveLength(1);
+    expect(read(svg(deep(400))).ok).toBe(false);
+  });
+});
+
 describe('the work a file may cost', () => {
   const ribbons = (n: number) => Array.from({ length: n }, (_, i) => `<path d="${(() => {
     const ring = penOutline(Array.from({ length: 12 }, (_, k) => ({ x: 10 + k * 6, y: 5 + i * 7 })), { width: 2, cap: 'round' });

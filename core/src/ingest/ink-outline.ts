@@ -113,6 +113,10 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 
 /** The spacing ink is given: a pixel or two, finer for a hairline pen. */
 export const inkStep = (width: number) => Math.min(DENSIFY_STEP_PX, Math.max(0.5, width));
+/** The most points one stroke is given: a line a hundred thousand pixels long is sampled more coarsely, not asked for a million points. */
+export const MAX_STROKE_POINTS = 20_000;
+/** The spacing for a line of `len` that keeps it to `MAX_STROKE_POINTS`. */
+export const stepFor = (len: number, step: number) => Math.max(step, len / MAX_STROKE_POINTS);
 
 export function recoverFill(fill: Fill, opts: RecoverOptions = {}): OutlineRecovery[] {
   try {
@@ -248,7 +252,7 @@ interface Candidate {
 /** A recovered line at ink spacing, closed when it ends where it began. */
 function strokeOf(points: Point[], closed: boolean, recovery: Recovery, w: number, step: number): RecoveredStroke {
   const len = pathLength(points) + (closed ? Math.hypot(points[0].x - points[points.length - 1].x, points[0].y - points[points.length - 1].y) : 0);
-  const n = Math.max(2, Math.round(len / step) + 1);
+  const n = Math.max(2, Math.round(len / stepFor(len, step)) + 1);
   let out: Point[];
   if (closed) {
     out = resampleClosed(points, Math.max(3, n - 1));
@@ -284,7 +288,7 @@ function edgesOf(rings: Point[][], step: number): RecoveredStroke[] {
   return rings.map((ring) => {
     const closedRing = [...ring, ring[0]];
     const simple = simplifyStroke(closedRing, 0.25);
-    const dense = densify(simple, Math.max(step, 1));
+    const dense = densify(simple, stepFor(perimeter(ring), Math.max(step, 1)));
     return { points: dense, closed: true, recovery: 'stroke' as Recovery };
   });
 }
@@ -485,7 +489,7 @@ function skeletonLines(raster: Raster, w: number, step: number): Candidate[] {
     const page = p.points.map((q) => fromRaster(raster, q.x, q.y));
     let pts = simplifyStroke(page, tol);
     if (p.closed) pts = pts.concat([{ x: pts[0].x, y: pts[0].y }]);
-    pts = densify(pts, step);
+    pts = densify(pts, stepFor(pathLength(pts), step));
     if (pts.length < 2) continue;
     out.push({ points: p.closed ? pts.slice(0, -1) : pts, closed: p.closed });
   }

@@ -148,11 +148,16 @@ export interface InkDocument {
   source: Source;
   pages: InkPage[];
   reading: Reading;
+  /** Which adapter, at which version, read the file (`svg@1`): a better one can read the source again and the two be compared (V1-SPEC IN1, IN4). */
+  adapter: string;
   /** What the document is called, when the file says (a note's first heading, a figure's title). */
   title?: string;
   /** Set to the sentence that says so when the work on the file was cut short. */
   truncated?: string;
 }
+
+/** The adapters' versions. A change that makes a file come in differently raises its number. */
+export const ADAPTER_VERSIONS = { svg: 1, markdown: 1, raster: 1 } as const;
 
 export type IngestResult =
   | { ok: true; doc: InkDocument; notes: string[] }

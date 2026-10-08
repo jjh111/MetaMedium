@@ -209,9 +209,22 @@ export interface Rule {
 
 export interface Sheet {
   rules: Rule[];
+  /** The rules by what they name, so an element is tested against the few that could apply, not all of them. */
+  byClass: Map<string, Rule[]>;
+  byId: Map<string, Rule[]>;
+  byTag: Map<string, Rule[]>;
+  /** Rules that name nothing (`*`). */
+  any: Rule[];
   /** How many selectors needed more than a type, class and id (a combinator, an attribute, a pseudo-class). */
   unsupported: number;
+  /** How many rules were past `MAX_RULES` and not kept. */
+  dropped: number;
 }
+
+/** More rules than this in a sheet are not read: a drawing has a handful, and each is tested against elements. */
+export const MAX_RULES = 5000;
+
+export const emptySheet = (): Sheet => ({ rules: [], byClass: new Map(), byId: new Map(), byTag: new Map(), any: [], unsupported: 0, dropped: 0 });
 
 function simpleSelector(sel: string): Omit<Rule, 'decls' | 'order'> | null {
   const s = sel.trim();
@@ -237,10 +250,10 @@ function simpleSelector(sel: string): Omit<Rule, 'decls' | 'order'> | null {
 /** A stylesheet's rules: comments out, at-rules skipped whole, each comma-separated selector a rule of its own. */
 export function parseSheet(css: string): Sheet {
   const text = css.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/@(?:import|charset|namespace)[^;{}]*;/gi, ' ');
-  const rules: Rule[] = [];
-  let unsupported = 0;
+  const sheet = emptySheet();
   let order = 0;
   let i = 0;
+  const add = (map: Map<string, Rule[]>, key: string, r: Rule) => { const l = map.get(key); if (l) l.push(r); else map.set(key, [r]); };
   while (i < text.length) {
     const open = text.indexOf('{', i);
     if (open === -1) break;
@@ -258,21 +271,35 @@ export function parseSheet(css: string): Sheet {
     const decls = parseDeclarations(body);
     for (const sel of head.split(',')) {
       const parsed = simpleSelector(sel);
-      if (parsed) rules.push({ ...parsed, order: order++, decls });
-      else if (sel.trim()) unsupported++;
+      if (!parsed) { if (sel.trim()) sheet.unsupported++; continue; }
+      if (sheet.rules.length >= MAX_RULES) { sheet.dropped++; continue; }
+      const rule: Rule = { ...parsed, order: order++, decls };
+      sheet.rules.push(rule);
+      // Filed under the most particular thing it names.
+      if (rule.id) add(sheet.byId, rule.id, rule);
+      else if (rule.classes.length) add(sheet.byClass, rule.classes[0], rule);
+      else if (rule.tag) add(sheet.byTag, rule.tag, rule);
+      else sheet.any.push(rule);
     }
   }
-  return { rules, unsupported };
+  return sheet;
 }
 
 /** The declarations the rules of `sheet` give an element, the heavier selector over the lighter and the later over the earlier. */
 export function declarationsFor(sheet: Sheet, tag: string, id: string | undefined, classAttr: string | undefined): Record<string, string> {
   if (sheet.rules.length === 0) return {};
   const classes = classAttr ? classAttr.split(/\s+/).filter(Boolean) : [];
-  const hits = sheet.rules.filter((r) => (r.tag === null || r.tag === tag) && (r.id === null || r.id === id) && r.classes.every((c) => classes.includes(c)));
+  const hits: Rule[] = [];
+  const test = (r: Rule) => { if ((r.tag === null || r.tag === tag) && (r.id === null || r.id === id) && r.classes.every((c) => classes.includes(c))) hits.push(r); };
+  if (id) for (const r of sheet.byId.get(id) ?? []) test(r);
+  for (const c of classes) for (const r of sheet.byClass.get(c) ?? []) test(r);
+  for (const r of sheet.byTag.get(tag) ?? []) test(r);
+  for (const r of sheet.any) test(r);
   if (hits.length === 0) return {};
-  hits.sort((a, b) => a.weight - b.weight || a.order - b.order);
+  // A rule filed under its first class is found once per class the element has in common; keep it once.
+  const unique = [...new Set(hits)];
+  unique.sort((a, b) => a.weight - b.weight || a.order - b.order);
   const out: Record<string, string> = {};
-  for (const h of hits) Object.assign(out, h.decls);
+  for (const h of unique) Object.assign(out, h.decls);
   return out;
 }

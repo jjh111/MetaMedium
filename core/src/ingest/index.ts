@@ -68,12 +68,22 @@ function isPdf(b: Uint8Array): boolean {
   return latin.decode(b.subarray(0, 1024)).includes('%PDF-') && latin.decode(b.subarray(Math.max(0, b.length - 2048))).includes('%%EOF');
 }
 
+/** Bytes from a Uint8Array, a buffer view or an ArrayBuffer — from this realm or another, since a worker's are not `instanceof` the page's. */
+function bytesOf(input: unknown): Uint8Array | null {
+  if (input instanceof Uint8Array) return input;
+  const tag = Object.prototype.toString.call(input);
+  if (tag === '[object Uint8Array]') return input as Uint8Array;
+  if (tag === '[object ArrayBuffer]' || tag === '[object SharedArrayBuffer]') return new Uint8Array(input as ArrayBuffer);
+  if (ArrayBuffer.isView(input)) return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+  return null;
+}
+
 const NOTE_NAMES = /\.(?:md|markdown|mdown|txt|text)$/i;
 
-export function ingest(input: Uint8Array | ArrayBuffer, name: string, opts: IngestOptions = {}): IngestResult {
+export function ingest(input: Uint8Array | ArrayBuffer | ArrayBufferView, name: string, opts: IngestOptions = {}): IngestResult {
   try {
-    const bytes = input instanceof ArrayBuffer ? new Uint8Array(input) : input;
-    if (!(bytes instanceof Uint8Array)) return refuse('ingest takes a file’s bytes, and was handed something else');
+    const bytes = bytesOf(input);
+    if (!bytes) return refuse('ingest takes a file’s bytes, and was handed something else');
     const label = typeof name === 'string' && name ? name : 'untitled';
     if (bytes.length === 0) return refuse('that file is empty');
     const limits: IngestLimits = { ...DEFAULT_LIMITS, ...opts.limits };

@@ -14,7 +14,7 @@
 // and bytes that are not text are refused.
 
 import {
-  type IngestResult, type IngestOptions, type InkDocument, type InkLink, type IngestLimits, DEFAULT_LIMITS, accept, blankPage, refuse,
+  type IngestResult, type IngestOptions, type InkDocument, type InkLink, type IngestLimits, ADAPTER_VERSIONS, DEFAULT_LIMITS, accept, blankPage, refuse,
 } from './source';
 
 const MAX_LINKS = 50_000;
@@ -152,6 +152,7 @@ export function ingestMarkdown(bytes: Uint8Array, name: string, hash: string, op
     const words = (body.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length;
     const doc: InkDocument = {
       source: { hash, name, format: 'markdown', ...(created ? { created } : {}) },
+      adapter: `markdown@${ADAPTER_VERSIONS.markdown}`,
       pages: [page],
       reading: {
         as: 'text',

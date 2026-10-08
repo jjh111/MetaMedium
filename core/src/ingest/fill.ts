@@ -141,7 +141,7 @@ export function measure(r: Raster, lines: readonly (readonly Point[])[], width: 
         samples++;
         const ix = Math.floor(cx), iy = Math.floor(cy);
         // Precision: the sample is on the fill when it, or a pixel beside it, is.
-        let hit = false;
+        let hit = ix >= 0 && iy >= 0 && ix < r.width && iy < r.height && r.data[iy * r.width + ix] === 1;
         for (let dy = -1; dy <= 1 && !hit; dy++) {
           const yy = iy + dy;
           if (yy < 0 || yy >= r.height) continue;
@@ -151,15 +151,16 @@ export function measure(r: Raster, lines: readonly (readonly Point[])[], width: 
           }
         }
         if (hit) onFill++;
-        // Recall: stamp the disc of reach round the sample. Samples a pixel apart, with a reach of at least a pixel, make a solid band.
+        // Recall: stamp the disc of reach round the sample, a row at a time. Samples a pixel apart, with a reach of
+        // at least a pixel, make a solid band.
         const y0 = Math.max(0, Math.floor(cy - R)), y1 = Math.min(r.height - 1, Math.ceil(cy + R));
-        const x0 = Math.max(0, Math.floor(cx - R)), x1 = Math.min(r.width - 1, Math.ceil(cx + R));
         for (let yy = y0; yy <= y1; yy++) {
           const ddy = yy + 0.5 - cy;
-          for (let xx = x0; xx <= x1; xx++) {
-            const ddx = xx + 0.5 - cx;
-            if (ddx * ddx + ddy * ddy <= reach2) covered[yy * r.width + xx] = 1;
-          }
+          const rest = reach2 - ddy * ddy;
+          if (rest < 0) continue;
+          const half = Math.sqrt(rest);
+          const a = Math.max(0, Math.ceil(cx - half - 0.5)), b = Math.min(r.width - 1, Math.floor(cx + half - 0.5));
+          for (let i = yy * r.width + a, end = yy * r.width + b; i <= end; i++) covered[i] = 1;
         }
       }
       prev = p;

@@ -96,6 +96,15 @@ describe('what is not read is refused with the reason', () => {
       expect(r.ok).toBe(false);
     }
   });
+  it('a view of a buffer is bytes, with its offset and length', () => {
+    const png = makePng(2, 2);
+    const padded = new Uint8Array(png.length + 20);
+    padded.set(png, 11);
+    const r = ingest(new DataView(padded.buffer, 11, png.length), 'x.png');
+    expect(r.ok).toBe(true);
+    const r2 = ingest(padded.subarray(11, 11 + png.length), 'x.png');
+    expect(r2.ok && r2.doc.source.hash).toBe(sha256Hex(png));
+  });
   it('an ArrayBuffer is bytes', () => {
     const png = makePng(2, 2);
     const r = ingest(png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength) as ArrayBuffer, 'x.png');
@@ -113,6 +122,13 @@ describe('where a document came from', () => {
     expect(asked.ok && asked.doc.source.hash).toBe(given);
     const bogus = ingest(bytes, 'a.svg', { hash: 'not a hash' });
     expect(bogus.ok && bogus.doc.source.hash).toBe(sha256Hex(bytes));
+  });
+
+  it('each adapter says which version of itself read the file, so a better one can read it again and the two be compared', () => {
+    const adapters = (name: string, bytes: Uint8Array) => { const r = ingest(bytes, name); return r.ok ? r.doc.adapter : 'refused'; };
+    expect(adapters('a.svg', enc(SVG))).toBe('svg@1');
+    expect(adapters('a.md', enc('# Hi'))).toBe('markdown@1');
+    expect(adapters('a.png', makePng(3, 3))).toBe('raster@1');
   });
 
   it('the name goes with it, as it arrived', () => {

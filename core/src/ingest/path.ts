@@ -25,6 +25,8 @@ export interface PathParse {
   error: string | null;
   /** Whether the path has any curve in it. */
   curved: boolean;
+  /** The data had more commands than were asked for, and was cut there. */
+  capped: boolean;
 }
 
 const ARGS: Record<string, number> = { M: 2, L: 2, H: 1, V: 1, C: 6, S: 4, Q: 4, T: 2, A: 7, Z: 0 };
@@ -90,6 +92,7 @@ export function parsePath(d: string, maxCmds = 2_000_000): PathParse {
   let last = '';
   let cmd = '';
   let error: string | null = null;
+  let capped = false;
 
   const skip = () => {
     while (i < n) {
@@ -116,7 +119,7 @@ export function parsePath(d: string, maxCmds = 2_000_000): PathParse {
   };
 
   skip();
-  if (i >= n) return { cmds, error: null, curved };
+  if (i >= n) return { cmds, error: null, curved, capped: false };
   while (i < n && !error) {
     skip();
     if (i >= n) break;
@@ -135,7 +138,7 @@ export function parsePath(d: string, maxCmds = 2_000_000): PathParse {
       break;
     } else if (cmd === 'M') cmd = 'L';
     else if (cmd === 'm') cmd = 'l';
-    if (cmds.length >= maxCmds) { error = 'path data is longer than is read'; break; }
+    if (cmds.length >= maxCmds) { error = 'path data is longer than is read'; capped = true; break; }
 
     const rel = cmd === cmd.toLowerCase();
     const U = cmd.toUpperCase();
@@ -211,7 +214,7 @@ export function parsePath(d: string, maxCmds = 2_000_000): PathParse {
     // The smooth-curve memory is only good for the command right after: a cubic's for S, a quadratic's for T.
     last = U === 'H' || U === 'V' ? 'L' : U === 'A' ? 'A' : U;
   }
-  return { cmds, error, curved };
+  return { cmds, error, curved, capped };
 }
 
 // ---- shapes as commands ---------------------------------------------------------------------------------
