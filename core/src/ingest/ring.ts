@@ -15,8 +15,8 @@ export type FillRule = 'nonzero' | 'evenodd';
 const COORD_LIMIT = 1e7;
 /** The least area, in square units, that a ring may enclose. */
 const MIN_AREA = 1e-9;
-/** More rings than this in one fill are each their own outline: nesting them would be quadratic. */
-export const MAX_NESTED_RINGS = 4000;
+/** More rings than this in one fill are each their own outline, with no nesting looked for. */
+export const MAX_NESTED_RINGS = 60_000;
 
 /** `raw` as a ring of finite points, consecutive repeats and a closing repeat taken out; null when it encloses nothing. */
 export function cleanRing(raw: unknown): Point[] | null {
@@ -132,9 +132,27 @@ export function unitsOf(rings: readonly unknown[], rule: FillRule): { units: Uni
   if (infos.length > MAX_NESTED_RINGS) {
     return { units: infos.map((i) => ({ outer: i.ring, holes: [] })), dropped, nested: false };
   }
+  // Which rings contain a ring's inside point: found through a grid over the rings' boxes, so a page of ten thousand
+  // rings is not ten thousand times ten thousand tests. A ring is filed in every cell its box covers, or in `big` when
+  // that is many (a ring round the page).
+  const sizes = infos.map((i) => Math.max(i.box.maxX - i.box.minX, i.box.maxY - i.box.minY)).sort((a, b) => a - b);
+  const cell = Math.max(1e-3, (sizes[Math.floor(sizes.length / 2)] || 1) * 2);
+  const grid = new Map<number, number[]>();
+  const big: number[] = [];
+  const key = (cx: number, cy: number) => cx * 1_000_003 + cy;
+  infos.forEach((info, j) => {
+    const x0 = Math.floor(info.box.minX / cell), x1 = Math.floor(info.box.maxX / cell), y0 = Math.floor(info.box.minY / cell), y1 = Math.floor(info.box.maxY / cell);
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 64) { big.push(j); return; }
+    for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) {
+      const k = key(cx, cy);
+      const l = grid.get(k);
+      if (l) l.push(j); else grid.set(k, [j]);
+    }
+  });
   for (let i = 0; i < infos.length; i++) {
     const p = infos[i].inside;
-    for (let j = 0; j < infos.length; j++) {
+    const near = grid.get(key(Math.floor(p.x / cell), Math.floor(p.y / cell))) ?? [];
+    for (const j of [...near, ...big]) {
       if (i === j) continue;
       const b = infos[j].box;
       if (p.x < b.minX || p.x > b.maxX || p.y < b.minY || p.y > b.maxY) continue;

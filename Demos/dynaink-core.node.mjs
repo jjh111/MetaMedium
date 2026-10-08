@@ -22008,6 +22008,7 @@ function trace(bitmap, opts = {}) {
 }
 
 // src/ingest/source.ts
+var ADAPTER_VERSIONS = { svg: 1, markdown: 1, raster: 1 };
 var refuse = (reason) => ({ ok: false, reason });
 var accept = (doc, notes) => ({ ok: true, doc, notes });
 function blankPage(index, width = 0, height = 0) {
@@ -22249,6 +22250,7 @@ function ingestRaster(bytes, name, hash) {
   if (info.orientation > 1) notes.push(`the picture is stored turned (EXIF orientation ${info.orientation}); its size is given as shown`);
   const doc = {
     source: { hash, name, format: info.format },
+    adapter: `raster@${ADAPTER_VERSIONS.raster}`,
     pages: [page],
     reading: { as: "picture", evidence: { width: w2, height: h2, bytes: bytes.length }, words: `a ${info.format.toUpperCase()} picture, ${w2} \xD7 ${h2} pixels` }
   };
@@ -22485,6 +22487,7 @@ function parsePath(d, maxCmds = 2e6) {
   let last = "";
   let cmd = "";
   let error = null;
+  let capped = false;
   const skip = () => {
     while (i < n2) {
       const c = d.charCodeAt(i);
@@ -22512,7 +22515,7 @@ function parsePath(d, maxCmds = 2e6) {
     return null;
   };
   skip();
-  if (i >= n2) return { cmds, error: null, curved };
+  if (i >= n2) return { cmds, error: null, curved, capped: false };
   while (i < n2 && !error) {
     skip();
     if (i >= n2) break;
@@ -22539,6 +22542,7 @@ function parsePath(d, maxCmds = 2e6) {
     else if (cmd === "m") cmd = "l";
     if (cmds.length >= maxCmds) {
       error = "path data is longer than is read";
+      capped = true;
       break;
     }
     const rel = cmd === cmd.toLowerCase();
@@ -22644,7 +22648,7 @@ function parsePath(d, maxCmds = 2e6) {
     }
     last = U === "H" || U === "V" ? "L" : U === "A" ? "A" : U;
   }
-  return { cmds, error, curved };
+  return { cmds, error, curved, capped };
 }
 var KAPPA = 0.5522847498307936;
 function ellipseCmds(cx2, cy2, rx, ry) {
@@ -23053,6 +23057,8 @@ function parseDeclarations(text) {
   take(text.length);
   return out;
 }
+var MAX_RULES = 5e3;
+var emptySheet = () => ({ rules: [], byClass: /* @__PURE__ */ new Map(), byId: /* @__PURE__ */ new Map(), byTag: /* @__PURE__ */ new Map(), any: [], unsupported: 0, dropped: 0 });
 function simpleSelector(sel) {
   const s = sel.trim();
   if (!s || /[\s>+~[\]:()]/.test(s)) return null;
@@ -23075,10 +23081,14 @@ function simpleSelector(sel) {
 }
 function parseSheet(css) {
   const text = css.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/@(?:import|charset|namespace)[^;{}]*;/gi, " ");
-  const rules = [];
-  let unsupported = 0;
+  const sheet = emptySheet();
   let order2 = 0;
   let i = 0;
+  const add7 = (map, key2, r) => {
+    const l = map.get(key2);
+    if (l) l.push(r);
+    else map.set(key2, [r]);
+  };
   while (i < text.length) {
     const open = text.indexOf("{", i);
     if (open === -1) break;
@@ -23095,27 +23105,47 @@ function parseSheet(css) {
     const decls = parseDeclarations(body);
     for (const sel of head.split(",")) {
       const parsed = simpleSelector(sel);
-      if (parsed) rules.push({ ...parsed, order: order2++, decls });
-      else if (sel.trim()) unsupported++;
+      if (!parsed) {
+        if (sel.trim()) sheet.unsupported++;
+        continue;
+      }
+      if (sheet.rules.length >= MAX_RULES) {
+        sheet.dropped++;
+        continue;
+      }
+      const rule = { ...parsed, order: order2++, decls };
+      sheet.rules.push(rule);
+      if (rule.id) add7(sheet.byId, rule.id, rule);
+      else if (rule.classes.length) add7(sheet.byClass, rule.classes[0], rule);
+      else if (rule.tag) add7(sheet.byTag, rule.tag, rule);
+      else sheet.any.push(rule);
     }
   }
-  return { rules, unsupported };
+  return sheet;
 }
 function declarationsFor(sheet, tag2, id, classAttr) {
   if (sheet.rules.length === 0) return {};
   const classes = classAttr ? classAttr.split(/\s+/).filter(Boolean) : [];
-  const hits = sheet.rules.filter((r) => (r.tag === null || r.tag === tag2) && (r.id === null || r.id === id) && r.classes.every((c) => classes.includes(c)));
+  const hits = [];
+  const test = (r) => {
+    if ((r.tag === null || r.tag === tag2) && (r.id === null || r.id === id) && r.classes.every((c) => classes.includes(c))) hits.push(r);
+  };
+  if (id) for (const r of sheet.byId.get(id) ?? []) test(r);
+  for (const c of classes) for (const r of sheet.byClass.get(c) ?? []) test(r);
+  for (const r of sheet.byTag.get(tag2) ?? []) test(r);
+  for (const r of sheet.any) test(r);
   if (hits.length === 0) return {};
-  hits.sort((a, b) => a.weight - b.weight || a.order - b.order);
+  const unique = [...new Set(hits)];
+  unique.sort((a, b) => a.weight - b.weight || a.order - b.order);
   const out = {};
-  for (const h2 of hits) Object.assign(out, h2.decls);
+  for (const h2 of unique) Object.assign(out, h2.decls);
   return out;
 }
 
 // src/ingest/ring.ts
 var COORD_LIMIT = 1e7;
 var MIN_AREA = 1e-9;
-var MAX_NESTED_RINGS = 4e3;
+var MAX_NESTED_RINGS = 6e4;
 function cleanRing(raw) {
   if (!Array.isArray(raw)) return null;
   const out = [];
@@ -23206,9 +23236,28 @@ function unitsOf(rings, rule) {
   if (infos.length > MAX_NESTED_RINGS) {
     return { units: infos.map((i) => ({ outer: i.ring, holes: [] })), dropped, nested: false };
   }
+  const sizes = infos.map((i) => Math.max(i.box.maxX - i.box.minX, i.box.maxY - i.box.minY)).sort((a, b) => a - b);
+  const cell = Math.max(1e-3, (sizes[Math.floor(sizes.length / 2)] || 1) * 2);
+  const grid = /* @__PURE__ */ new Map();
+  const big = [];
+  const key2 = (cx2, cy2) => cx2 * 1000003 + cy2;
+  infos.forEach((info, j) => {
+    const x0 = Math.floor(info.box.minX / cell), x1 = Math.floor(info.box.maxX / cell), y0 = Math.floor(info.box.minY / cell), y1 = Math.floor(info.box.maxY / cell);
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 64) {
+      big.push(j);
+      return;
+    }
+    for (let cx2 = x0; cx2 <= x1; cx2++) for (let cy2 = y0; cy2 <= y1; cy2++) {
+      const k = key2(cx2, cy2);
+      const l = grid.get(k);
+      if (l) l.push(j);
+      else grid.set(k, [j]);
+    }
+  });
   for (let i = 0; i < infos.length; i++) {
     const p = infos[i].inside;
-    for (let j = 0; j < infos.length; j++) {
+    const near = grid.get(key2(Math.floor(p.x / cell), Math.floor(p.y / cell))) ?? [];
+    for (const j of [...near, ...big]) {
       if (i === j) continue;
       const b = infos[j].box;
       if (p.x < b.minX || p.x > b.maxX || p.y < b.minY || p.y > b.maxY) continue;
@@ -23381,7 +23430,7 @@ function measure2(r, lines, width) {
         const cy2 = prev ? prev.y + (p.y - prev.y) * t : p.y;
         samples++;
         const ix = Math.floor(cx2), iy = Math.floor(cy2);
-        let hit = false;
+        let hit = ix >= 0 && iy >= 0 && ix < r.width && iy < r.height && r.data[iy * r.width + ix] === 1;
         for (let dy = -1; dy <= 1 && !hit; dy++) {
           const yy = iy + dy;
           if (yy < 0 || yy >= r.height) continue;
@@ -23395,13 +23444,13 @@ function measure2(r, lines, width) {
         }
         if (hit) onFill++;
         const y0 = Math.max(0, Math.floor(cy2 - R)), y1 = Math.min(r.height - 1, Math.ceil(cy2 + R));
-        const x0 = Math.max(0, Math.floor(cx2 - R)), x1 = Math.min(r.width - 1, Math.ceil(cx2 + R));
         for (let yy = y0; yy <= y1; yy++) {
           const ddy = yy + 0.5 - cy2;
-          for (let xx = x0; xx <= x1; xx++) {
-            const ddx = xx + 0.5 - cx2;
-            if (ddx * ddx + ddy * ddy <= reach2) covered[yy * r.width + xx] = 1;
-          }
+          const rest = reach2 - ddy * ddy;
+          if (rest < 0) continue;
+          const half2 = Math.sqrt(rest);
+          const a = Math.max(0, Math.ceil(cx2 - half2 - 0.5)), b = Math.min(r.width - 1, Math.floor(cx2 + half2 - 0.5));
+          for (let i = yy * r.width + a, end = yy * r.width + b; i <= end; i++) covered[i] = 1;
         }
       }
       prev = p;
@@ -23434,6 +23483,8 @@ var wrapPi = (a) => {
 };
 var clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 var inkStep = (width) => Math.min(DENSIFY_STEP_PX, Math.max(0.5, width));
+var MAX_STROKE_POINTS = 2e4;
+var stepFor = (len4, step2) => Math.max(step2, len4 / MAX_STROKE_POINTS);
 function recoverFill(fill, opts = {}) {
   try {
     if (!fill || typeof fill !== "object" || !Array.isArray(fill.rings)) return [];
@@ -23552,7 +23603,7 @@ function penResult(cand, method, m, w2, step2, tried, notes) {
 }
 function strokeOf(points, closed, recovery, w2, step2) {
   const len4 = pathLength4(points) + (closed ? Math.hypot(points[0].x - points[points.length - 1].x, points[0].y - points[points.length - 1].y) : 0);
-  const n2 = Math.max(2, Math.round(len4 / step2) + 1);
+  const n2 = Math.max(2, Math.round(len4 / stepFor(len4, step2)) + 1);
   let out;
   if (closed) {
     out = resampleClosed(points, Math.max(3, n2 - 1));
@@ -23585,7 +23636,7 @@ function edgesOf(rings, step2) {
   return rings.map((ring2) => {
     const closedRing = [...ring2, ring2[0]];
     const simple = simplifyStroke(closedRing, 0.25);
-    const dense = densify(simple, Math.max(step2, 1));
+    const dense = densify(simple, stepFor(perimeter2(ring2), Math.max(step2, 1)));
     return { points: dense, closed: true, recovery: "stroke" };
   });
 }
@@ -23775,7 +23826,7 @@ function skeletonLines(raster, w2, step2) {
     const page = p.points.map((q) => fromRaster(raster, q.x, q.y));
     let pts = simplifyStroke(page, tol);
     if (p.closed) pts = pts.concat([{ x: pts[0].x, y: pts[0].y }]);
-    pts = densify(pts, step2);
+    pts = densify(pts, stepFor(pathLength4(pts), step2));
     if (pts.length < 2) continue;
     out.push({ points: p.closed ? pts.slice(0, -1) : pts, closed: p.closed });
   }
@@ -23824,6 +23875,7 @@ var newCounters = () => ({
   unfaithful: 0,
   pathsStopped: 0,
   unsupportedCss: 0,
+  droppedCss: 0,
   zeroLength: 0
 });
 var plural = (n2, one, many = one + "s") => `${n2.toLocaleString("en")} ${n2 === 1 ? one : many}`;
@@ -24007,11 +24059,13 @@ function pushStroke(w2, s) {
   w2.page.strokes.push({ ...s, order: w2.order++ });
   return true;
 }
+var COORD_LIMIT2 = 1e7;
 function inkPoints(pts, closed) {
   const line = closed && pts.length > 1 ? [...pts, pts[0]] : pts;
   let len4 = 0;
+  for (const p of line) if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || Math.abs(p.x) > COORD_LIMIT2 || Math.abs(p.y) > COORD_LIMIT2) return null;
   for (let i = 1; i < line.length; i++) len4 += Math.hypot(line[i].x - line[i - 1].x, line[i].y - line[i - 1].y);
-  return densify(line, Math.max(0.5, Math.min(2, len4 / 24)));
+  return densify(line, stepFor(len4, Math.max(0.5, Math.min(2, len4 / 24))));
 }
 function shifted(rec, dx, dy) {
   return { ...rec, strokes: rec.strokes.map((s) => ({ ...s, points: s.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) })) };
@@ -24026,8 +24080,9 @@ function geometryOf(node, w2, fontPx) {
   switch (node.name) {
     case "path": {
       const d = a.d ?? "";
-      const p = parsePath(d);
-      if (p.error) {
+      const p = parsePath(d, Math.max(1, w2.vertices.left));
+      if (p.capped) stopWith(w2, `stopped after ${plural(w2.limits.vertices, "point")} of outline \u2014 the drawing is more detailed than is read, and the rest is left`);
+      else if (p.error) {
         w2.c.pathsStopped++;
         if (!w2.c.firstPathError) w2.c.firstPathError = p.error;
       }
@@ -24090,7 +24145,13 @@ function paintShape(node, st, m, w2) {
   const cacheKey = w2.cloning > 0 && doFill ? `${node.uid}|${st.fillRule}|${m.a.toFixed(5)}|${m.b.toFixed(5)}|${m.c.toFixed(5)}|${m.d.toFixed(5)}` : "";
   let recs = null;
   let polys = null;
-  const flat = () => polys ??= flatten(geo.cmds, m, FLATTEN_TOL, w2.vertices);
+  const flat = () => {
+    if (!polys) {
+      polys = flatten(geo.cmds, m, FLATTEN_TOL, w2.vertices);
+      if (w2.vertices.left <= 0) stopWith(w2, `stopped after ${plural(w2.limits.vertices, "point")} of outline \u2014 the drawing is more detailed than is read, and the rest is left`);
+    }
+    return polys;
+  };
   let penOutlines = 0, solids = 0;
   let penColor = "", penWidth = 0;
   if (doFill) {
@@ -24116,7 +24177,6 @@ function paintShape(node, st, m, w2) {
         if (cacheKey) w2.cache.set(cacheKey, { results: recs, e: m.e, f: m.f });
       }
     }
-    if (w2.vertices.left <= 0) stopWith(w2, `stopped after ${plural(w2.limits.vertices, "point")} of outline \u2014 the drawing is more detailed than is read, and the rest is left`);
     for (const rec of recs ?? []) {
       if (rec.kind === "failed") {
         w2.c.failed++;
@@ -24144,7 +24204,12 @@ function paintShape(node, st, m, w2) {
         const lines = flatten(orig.cmds, m, FLATTEN_TOL, w2.vertices);
         if (lines.length) {
           for (const l of lines) {
-            if (!pushStroke(w2, { points: inkPoints(l.pts, l.closed), color: fill.hex, width: rec.width, recovery: "stroke", closed: l.closed, outline, ...fillAlpha < 1 ? { opacity: roundOpacity(fillAlpha) } : {} })) return;
+            const pts = inkPoints(l.pts, l.closed);
+            if (!pts) {
+              w2.c.badShapes++;
+              continue;
+            }
+            if (!pushStroke(w2, { points: pts, color: fill.hex, width: rec.width, recovery: "stroke", closed: l.closed, outline, ...fillAlpha < 1 ? { opacity: roundOpacity(fillAlpha) } : {} })) return;
           }
           continue;
         }
@@ -24175,7 +24240,12 @@ function paintShape(node, st, m, w2) {
           w2.c.zeroLength++;
           continue;
         }
-        if (!pushStroke(w2, { points: inkPoints(l.pts, l.closed), color: strokeP.hex, width, recovery: "stroke", closed: l.closed, outline, ...strokeAlpha < 1 ? { opacity: roundOpacity(strokeAlpha) } : {} })) return;
+        const pts = inkPoints(l.pts, l.closed);
+        if (!pts) {
+          w2.c.badShapes++;
+          continue;
+        }
+        if (!pushStroke(w2, { points: pts, color: strokeP.hex, width, recovery: "stroke", closed: l.closed, outline, ...strokeAlpha < 1 ? { opacity: roundOpacity(strokeAlpha) } : {} })) return;
       }
       if (lines.length) {
         if (freeform) {
@@ -24438,35 +24508,36 @@ function findAll(node, name, out = []) {
   return out;
 }
 function sentencesOf(c) {
-  const n2 = [];
-  const add7 = (count9, s) => {
-    if (count9 > 0) n2.push(s);
+  const out = [];
+  const say = (n2, one, many) => {
+    if (n2 > 0) out.push((n2 === 1 ? one : many).replace("{n}", n2.toLocaleString("en")));
   };
-  add7(c.clipped, `${plural(c.clipped, "element")} use a clip path, which was not applied \u2014 ink it hid may show`);
-  add7(c.masked, `${plural(c.masked, "element")} use a mask, which was not applied \u2014 ink it hid may show`);
-  add7(c.gradients, `${plural(c.gradients, "mark")} are painted with a gradient; its first colour was used`);
-  add7(c.patterns, `${plural(c.patterns, "mark")} are painted with a pattern, which is not read`);
-  add7(c.dashed, `${plural(c.dashed, "element")} are dashed; they are drawn solid`);
-  add7(c.markers, `${plural(c.markers, "element")} have markers (arrowheads, dots), which are not drawn`);
-  add7(c.filters, `${plural(c.filters, "element")} have filters (blurs, shadows), which are not applied`);
-  add7(c.foreign, `${plural(c.foreign, "embedded page")} (foreignObject) were left out`);
-  add7(c.rotatedText, `${plural(c.rotatedText, "piece")} of text are turned or skewed; their words are kept, upright`);
-  add7(c.externalPictures, `${plural(c.externalPictures, "picture")} live in other files, which are not part of this one; they are kept as references`);
-  add7(c.svgPictures, `${plural(c.svgPictures, "picture")} are SVGs inside this SVG, which are not read`);
-  add7(c.badPictures, `${plural(c.badPictures, "picture")} could not be read`);
-  add7(c.pathsStopped, `${plural(c.pathsStopped, "path")} stopped where their data stops making sense (the first: ${c.firstPathError}); what came before is kept`);
-  add7(c.brokenPaths, `${plural(c.brokenPaths, "path")} had nothing to draw`);
-  add7(c.badShapes, `${plural(c.badShapes, "shape")} had a size or a number that is not one, and were left out`);
-  add7(c.badTransforms, `${plural(c.badTransforms, "transform")} could not be read and were ignored`);
-  add7(c.cycles, `${plural(c.cycles, "<use>")} refer to themselves or nest too deeply, and were not expanded`);
-  add7(c.missingUses, `${plural(c.missingUses, "<use>")} refer to something that is not in the file`);
-  add7(c.externalUses, `${plural(c.externalUses, "<use>")} refer to another file, which is not read`);
-  add7(c.grounds, c.grounds === 1 ? "a solid shape fills the page \u2014 a background, not a mark \u2014 and was left out" : `${c.grounds} solid shapes fill the page \u2014 backgrounds, not marks \u2014 and were left out`);
-  add7(c.zeroLength, `${plural(c.zeroLength, "stroked line")} have no length, and were left out`);
-  add7(c.failed, `${plural(c.failed, "outline")} could not be read back to a line`);
-  add7(c.unfaithful, `${plural(c.unfaithful, "outline")} come back only roughly as their pen strokes (covering or staying on under 90% of the outline)`);
-  add7(c.unsupportedCss, `${plural(c.unsupportedCss, "style rule")} need selectors that are not read (descendants, attributes, pseudo-classes)`);
-  return n2;
+  say(c.clipped, "one element uses a clip path, which was not applied \u2014 ink it hid may show", "{n} elements use clip paths, which were not applied \u2014 ink they hid may show");
+  say(c.masked, "one element uses a mask, which was not applied \u2014 ink it hid may show", "{n} elements use masks, which were not applied \u2014 ink they hid may show");
+  say(c.gradients, "one mark is painted with a gradient; its first colour was used", "{n} marks are painted with gradients; their first colours were used");
+  say(c.patterns, "one mark is painted with a pattern, which is not read", "{n} marks are painted with patterns, which are not read");
+  say(c.dashed, "one element is dashed; it is drawn solid", "{n} elements are dashed; they are drawn solid");
+  say(c.markers, "one element has a marker (an arrowhead, a dot), which is not drawn", "{n} elements have markers (arrowheads, dots), which are not drawn");
+  say(c.filters, "one element has a filter (a blur, a shadow), which is not applied", "{n} elements have filters (blurs, shadows), which are not applied");
+  say(c.foreign, "one embedded page (foreignObject) was left out", "{n} embedded pages (foreignObject) were left out");
+  say(c.rotatedText, "one piece of text is turned or skewed; its words are kept, upright", "{n} pieces of text are turned or skewed; their words are kept, upright");
+  say(c.externalPictures, "one picture lives in another file, which is not part of this one; it is kept as a reference", "{n} pictures live in other files, which are not part of this one; they are kept as references");
+  say(c.svgPictures, "one picture is an SVG inside this SVG, which is not read", "{n} pictures are SVGs inside this SVG, which are not read");
+  say(c.badPictures, "one picture could not be read", "{n} pictures could not be read");
+  say(c.pathsStopped, `one path stopped where its data stops making sense (${c.firstPathError}); what came before is kept`, `{n} paths stopped where their data stops making sense (the first: ${c.firstPathError}); what came before is kept`);
+  say(c.brokenPaths, "one path had nothing to draw", "{n} paths had nothing to draw");
+  say(c.badShapes, "one shape had a size or a number that is not one, and was left out", "{n} shapes had a size or a number that is not one, and were left out");
+  say(c.badTransforms, "one transform could not be read and was ignored", "{n} transforms could not be read and were ignored");
+  say(c.cycles, "one <use> refers to itself or nests too deeply, and was not expanded", "{n} <use> elements refer to themselves or nest too deeply, and were not expanded");
+  say(c.missingUses, "one <use> refers to something that is not in the file", "{n} <use> elements refer to something that is not in the file");
+  say(c.externalUses, "one <use> refers to another file, which is not read", "{n} <use> elements refer to other files, which are not read");
+  say(c.grounds, "a solid shape fills the page \u2014 a background, not a mark \u2014 and was left out", "{n} solid shapes fill the page \u2014 backgrounds, not marks \u2014 and were left out");
+  say(c.zeroLength, "one stroked line has no length, and was left out", "{n} stroked lines have no length, and were left out");
+  say(c.failed, "one outline could not be read back to a line", "{n} outlines could not be read back to lines");
+  say(c.unfaithful, "one outline comes back only roughly as its pen stroke (the line covers or stays on under 90% of it)", "{n} outlines come back only roughly as their pen strokes (the lines cover or stay on under 90% of them)");
+  say(c.droppedCss, `one style rule past the first ${MAX_RULES.toLocaleString("en")} was not read`, `{n} style rules past the first ${MAX_RULES.toLocaleString("en")} were not read`);
+  say(c.unsupportedCss, "one style rule needs a selector that is not read (a descendant, an attribute, a pseudo-class)", "{n} style rules need selectors that are not read (descendants, attributes, pseudo-classes)");
+  return out;
 }
 function readingOf2(ev, work) {
   const ink = ev.penFills + ev.penStrokes;
@@ -24495,7 +24566,7 @@ function read2(bytes, name, hash, opts) {
   if (root.name !== "svg") return refuse(`that is not an SVG \u2014 its first element is <${root.name}>`);
   const frame = frameOf3(root);
   if (typeof frame === "string") return refuse(`this SVG cannot be placed: ${frame}`);
-  let sheet = { rules: [], unsupported: 0 };
+  let sheet = emptySheet();
   const css = findAll(root, "style").map((s) => textOf3(s)).join("\n");
   if (css.trim()) sheet = parseSheet(css);
   const page = blankPage(0, frame.width, frame.height);
@@ -24521,6 +24592,7 @@ function read2(bytes, name, hash, opts) {
     cloning: 0
   };
   w2.c.unsupportedCss = sheet.unsupported;
+  w2.c.droppedCss = sheet.dropped;
   const rootStyle = styleOf2(root, ROOT_STYLE, w2);
   const rt = parseTransform(root.attrs.transform);
   const base = rt ? compose(frame.m, rt) : frame.m;
@@ -24557,6 +24629,7 @@ function read2(bytes, name, hash, opts) {
   const tool = toolOf(parsed.comments, root);
   const doc = {
     source: { hash, name, format: "svg", ...tool ? { tool } : {}, ...created ? { created } : {} },
+    adapter: `svg@${ADAPTER_VERSIONS.svg}`,
     pages: [page],
     reading: readingOf2(w2.ev, { clones: w2.clones, outlines: w2.outlines }),
     ...title && textOf3(title) ? { title: textOf3(title) } : {},
@@ -24705,6 +24778,7 @@ function ingestMarkdown(bytes, name, hash, opts = {}) {
     const words = (body.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) ?? []).length;
     const doc = {
       source: { hash, name, format: "markdown", ...created ? { created } : {} },
+      adapter: `markdown@${ADAPTER_VERSIONS.markdown}`,
       pages: [page],
       reading: {
         as: "text",
@@ -24769,11 +24843,19 @@ function isPdf(b) {
   const latin = new TextDecoder("latin1");
   return latin.decode(b.subarray(0, 1024)).includes("%PDF-") && latin.decode(b.subarray(Math.max(0, b.length - 2048))).includes("%%EOF");
 }
+function bytesOf(input) {
+  if (input instanceof Uint8Array) return input;
+  const tag2 = Object.prototype.toString.call(input);
+  if (tag2 === "[object Uint8Array]") return input;
+  if (tag2 === "[object ArrayBuffer]" || tag2 === "[object SharedArrayBuffer]") return new Uint8Array(input);
+  if (ArrayBuffer.isView(input)) return new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+  return null;
+}
 var NOTE_NAMES = /\.(?:md|markdown|mdown|txt|text)$/i;
 function ingest(input, name, opts = {}) {
   try {
-    const bytes = input instanceof ArrayBuffer ? new Uint8Array(input) : input;
-    if (!(bytes instanceof Uint8Array)) return refuse("ingest takes a file\u2019s bytes, and was handed something else");
+    const bytes = bytesOf(input);
+    if (!bytes) return refuse("ingest takes a file\u2019s bytes, and was handed something else");
     const label = typeof name === "string" && name ? name : "untitled";
     if (bytes.length === 0) return refuse("that file is empty");
     const limits = { ...DEFAULT_LIMITS, ...opts.limits };

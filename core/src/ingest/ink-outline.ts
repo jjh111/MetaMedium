@@ -5,10 +5,14 @@
 // whiteboard export, Illustrator's brushes — as a FILL in the stroke's colour, never a stroked line. One method
 // brings the strokes back from all of them, in two parts, and a number decides between them:
 //
-//   1. **Ribbon pairing, the fast path.** A pen leaves a ring with two ends. The ring is walked at equal steps; the
-//      two sharpest turns, a pen width and a bit across, are the ends' caps; the ring is cut there into its two
-//      sides, the sides are walked to one count of points, and the pairs are averaged. A ring and the hole inside it
-//      (a loop the pen closed) are paired with each other the same way.
+//   1. **Ribbon pairing, the fast path.** A pen leaves a ring with two ends. The ring is walked at equal steps and
+//      its turning is measured over a window of `CAP_WINDOW` pen widths: a cap turns by half a revolution inside
+//      it, a bend of the pen's own path by less. The two sharpest turns, at least a quarter of the ring apart, are
+//      the caps; the ring is cut there into its two sides, the sides are walked to one count of points, and the
+//      pairs are averaged. Where more than two places turn that sharply (a pen that doubled back, as an arrow's head
+//      does) each pairing is tried and fidelity chooses. A ring and the hole inside it (a loop the pen closed) are
+//      paired with each other the same way. A round cap's apex stands half a pen beyond the line the pen followed,
+//      so the line runs half a pen long at each such end.
 //   2. **The skeleton, where a ring will not pair.** A stroke that crosses itself, forks, or was merged with another
 //      has no two sides. The fill is drawn as pixels, thinned, and walked into lines by `image/trace.ts`'s own
 //      thinning and straightest-branch walk, then mapped back, simplified and given the density of ink.

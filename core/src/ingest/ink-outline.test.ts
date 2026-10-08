@@ -266,6 +266,22 @@ describe('strokes merged into one silhouette', () => {
   });
 });
 
+describe('a whole page written as one fill', () => {
+  it('thousands of rings in one fill nest as they should: each loop its outline and its hole, in a moment', () => {
+    const ring = (cx: number, cy: number, r: number, n = 40): Point[] => Array.from({ length: n }, (_, i) => ({ x: cx + r * Math.cos((i / n) * 2 * Math.PI), y: cy + r * Math.sin((i / n) * 2 * Math.PI) }));
+    const rings: Point[][] = [];
+    for (let i = 0; i < 2500; i++) {
+      const cx = 20 + (i % 50) * 30, cy = 20 + Math.floor(i / 50) * 30;
+      rings.push(ring(cx, cy, 9), ring(cx, cy, 6).reverse());
+    }
+    const t0 = Date.now();
+    const got = recoverFill({ rings, rule: 'nonzero' });
+    expect(Date.now() - t0).toBeLessThan(8000);
+    expect(got).toHaveLength(2500);
+    expect(got.every((r) => r.kind === 'pen' && r.strokes.length === 1 && r.strokes[0].closed)).toBe(true);
+  });
+});
+
 describe('the work a file may cost', () => {
   it('with no raster pixels left an outline keeps its ribbon, unmeasured, and says so', () => {
     const ring = penOutline(line({ x: 10, y: 10 }, { x: 200, y: 10 }), { width: 4, cap: 'round' });
