@@ -53,12 +53,17 @@ tiny helper beside them (not in the repository):
 import { appendFileSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 const dir = process.env.WALK, idf = dir + '/id';
 const id = (existsSync(idf) ? +readFileSync(idf, 'utf8') : 0) + 1; writeFileSync(idf, String(id));
-let [m, a, b] = process.argv.slice(2), params = a ? JSON.parse(a) : {};
-if (m === 'call') { params = { name: a, arguments: b ? JSON.parse(b) : {} }; m = 'tools/call'; }
+let [m, a, b] = process.argv.slice(2), params;
+if (m === 'call') { params = { name: a, arguments: b ? JSON.parse(b) : {} }; m = 'tools/call'; } else params = a ? JSON.parse(a) : {};
 appendFileSync(dir + '/cmd.jsonl', JSON.stringify({ jsonrpc: '2.0', id, method: m, params }) + '\n');
 for (let i = 0; i < 300; i++) {
-  const hit = readFileSync(dir + '/out.jsonl', 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).find((r) => r.id === id);
-  if (hit) { for (const c of (hit.result && hit.result.content) || []) console.log(c.type === 'text' ? c.text : '[' + c.type + ']'); if (!hit.result) console.log(JSON.stringify(hit.error)); process.exit(0); }
+  const hit = readFileSync(dir + '/out.jsonl', 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return {}; } }).find((r) => r.id === id);
+  if (hit) {
+    const blocks = hit.result && hit.result.content;
+    if (blocks) for (const c of blocks) console.log(c.type === 'text' ? c.text : '[' + c.type + ']');   // a tool's reply
+    else console.log(JSON.stringify(hit.result || hit.error));                                         // initialize, tools/list, an error
+    process.exit(0);
+  }
   await new Promise((r) => setTimeout(r, 100));
 }
 ```
