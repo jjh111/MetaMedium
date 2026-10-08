@@ -3770,7 +3770,7 @@ var DynaInkCore = (() => {
     };
     while (i < s.length) {
       const c = s[i];
-      if (c === " " || c === "\xA0" || c === "\u2009" || c === "\u202F" || c === "," || c === ";") {
+      if (c === " " || c === "," || c === ";") {
         space += 1;
         i++;
         continue;
@@ -4134,7 +4134,7 @@ var DynaInkCore = (() => {
         const a2 = this.tight(t);
         return first.ch === "-" ? { k: "neg", a: a2 } : a2;
       }
-      if (first.t !== "num" && first.t !== "var" && first.t !== "const" && first.t !== "lp" && first.t !== "bar") {
+      if (first.t !== "num" && first.t !== "var" && first.t !== "const" && first.t !== "lp" && first.t !== "bar" && first.t !== "fn") {
         return refuse(`${t.text} has nothing it can take after it`);
       }
       let a = this.power();
@@ -4522,7 +4522,7 @@ var DynaInkCore = (() => {
       if (t.t !== "word") return t;
       const prev = toks[k - 1], next = toks[k + 1];
       if ((t.w === "x" || t.w === "X") && operandEnd(prev) && !fns[k - 1] && operandStart(next)) {
-        const letter = t.space === 0 && (next?.t === "lp" || next?.t === "word" || next?.t === "fn");
+        const letter = t.space === 0 && (next?.t === "lp" || next?.t === "word" || next?.t === "fn" || prev?.t === "num" && !!prev.sym || next?.t === "num" && !!next.sym);
         if (!letter) return { t: "op", op: "*", glyph: t.w, at: t.at, end: t.end, space: t.space };
       }
       if (t.w.toLowerCase() === "to" && prev?.t === "num" && next?.t === "num") {
@@ -4922,19 +4922,21 @@ var DynaInkCore = (() => {
     return say2(e, true);
   }
   var MAX_CHOICES = 3;
-  function readSegment(toks, src) {
+  function readSegment(toks, src, typed = false) {
     const junk = toks.find((t) => t.t === "junk");
     if (junk && junk.t === "junk") return { readings: [], error: `cannot read \u201C${junk.text}\u201D` };
     if (toks.some((t) => t.t === "eq")) return { readings: [], error: "more than one expression" };
     const plans = [];
+    const arithmetic2 = typed && !toks.some((t) => t.t === "name" || t.t === "ref");
     toks.forEach((t, k) => {
       if (t.t !== "dash") return;
-      const prev = toks[k - 1], next = toks[k + 1];
+      const prev = toks[k - 1], next = toks[k + 1], after = toks[k + 2];
       if (!operandEnd(prev)) return plans.push({ index: k, mode: "unary" });
       if (t.glyph === "to") return plans.push({ index: k, mode: "range" });
-      if (prev.t === "num" && next?.t === "num" && !isRange(prev.q) && !isRange(next.q) && prev.q.lo < next.q.lo && !prev.q.angle && !next.q.angle && toks[k - 2]?.t !== "pow" && (prev.q.unit === null || next.q.unit === null || prev.q.unit === next.q.unit)) {
+      const tight = after?.t === "pow" || after?.t === "op" && after.implicit;
+      if (prev.t === "num" && next?.t === "num" && !isRange(prev.q) && !isRange(next.q) && prev.q.lo < next.q.lo && !prev.q.angle && !next.q.angle && toks[k - 2]?.t !== "pow" && !tight && (prev.q.unit === null || next.q.unit === null || prev.q.unit === next.q.unit)) {
         const bare = prev.q.unit === null && next.q.unit === null && prev.q.dim === 0 && next.q.dim === 0;
-        return plans.push({ index: k, mode: "choice", plain: t.glyph === "\u2212" || t.glyph === "-" && bare ? "minus" : "range", glyph: t.glyph });
+        return plans.push({ index: k, mode: "choice", plain: t.glyph === "\u2212" || t.glyph === "-" && bare && arithmetic2 ? "minus" : "range", glyph: t.glyph });
       }
       plans.push({ index: k, mode: "minus" });
     });
@@ -5070,7 +5072,8 @@ var DynaInkCore = (() => {
         push(byPrecedence ?? leftToRight, null, null);
       }
     }
-    if (!out.length) return { readings: [], error: ambiguous || `cannot read \u201C${src.slice(toks[0]?.at ?? 0, toks[toks.length - 1]?.end ?? 0)}\u201D as a formula` };
+    if (ambiguous) return { readings: [], error: ambiguous };
+    if (!out.length) return { readings: [], error: `cannot read \u201C${src.slice(toks[0]?.at ?? 0, toks[toks.length - 1]?.end ?? 0)}\u201D as a formula` };
     const ranked2 = out.map((r, i) => ({ r, i })).sort((x, y) => x.r.departures - y.r.departures || x.i - y.i).map((x) => x.r);
     return { readings: ranked2 };
   }
@@ -5131,13 +5134,13 @@ var DynaInkCore = (() => {
         return e;
     }
   }
-  function parseExpression(text) {
+  function parseExpression(text, options = {}) {
     const s = text.replace(SPACES, " ");
     const toks = refine(scan(s));
     if (!toks.length || toks.some((t) => t.t === "eq")) return [];
     const segs = splitSegments(toks);
     if (segs.length !== 1) return [];
-    return readSegment(segs[0].toks, s).readings;
+    return readSegment(segs[0].toks, s, !!options.typed).readings;
   }
   var GAP_SPACES = 3;
   function splitSegments(toks) {
@@ -5160,12 +5163,12 @@ var DynaInkCore = (() => {
     }
     return segs.filter((s) => s.toks.length > 0);
   }
-  function parseChain(text) {
+  function parseChain(text, options = {}) {
     const s = text.replace(SPACES, " ");
     const toks = refine(scan(s));
     const segments = splitSegments(toks).map((seg2) => {
       const first = seg2.toks[0], last = seg2.toks[seg2.toks.length - 1];
-      const { readings: readings2, error } = readSegment(seg2.toks, s);
+      const { readings: readings2, error } = readSegment(seg2.toks, s, !!options.typed);
       return {
         text: s.slice(first.at, last.end),
         ...seg2.join ? { join: seg2.join } : {},
@@ -5201,10 +5204,10 @@ var DynaInkCore = (() => {
     if (e.k === "neg" && e.a.k === "num") return plain(e.a) ? negateQuantity(e.a.q) : null;
     return null;
   }
-  function parseLine(text) {
+  function parseLine(text, options = {}) {
     const s = text.replace(SPACES, " ").trim();
     const { label, body } = splitLabel(s);
-    const chain = parseChain(body);
+    const chain = parseChain(body, options);
     const segs = chain.segments;
     const base = { text: s, ...label ? { label } : {}, body: body.trim(), chain };
     if (!segs.length) return { ...base, shape: "empty" };
@@ -5715,7 +5718,7 @@ var DynaInkCore = (() => {
     return (names.length ? names.join(" ") : p.body).replace(/^\s*(add|plus)\s*/i, "").trim();
   }
   function classify(src, line) {
-    const parse = parseLine(src.text);
+    const parse = parseLine(src.text, { typed: !!src.maths });
     const d = { line, src, parse, kind: "note" };
     const L = parse.label;
     const unreadable = () => parse.shape === "empty" ? `${L ? `${L.text} with nothing after it` : "an empty line"}` : `cannot read \u201C${parse.body}\u201D`;
@@ -38429,12 +38432,15 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
       const ft = ratio(factorsText(fn, v), factorsText(fd, v));
       steps2.push({ kind: "factor", text: ft, why: "factor the top and the bottom" });
       const y = ratDiv(Nr_a, Dr_a);
-      const struck = factorPoly(an3.common).factors.flatMap((f) => Array(f.power).fill(f.text));
+      const cf = factorPoly(an3.common).factors;
+      const struck = cf.flatMap((f) => Array(f.power).fill(f.text));
+      const places = [...new Set(cf.flatMap((f) => f.root ? [ratText(f.root)] : realRoots(f.poly).map(show)))];
       steps2.push({
         kind: "cancel",
         text: `${ft} = ${an3.reduced}`,
         why: `${[...new Set(struck)].join(" and ")} is on the top and the bottom, and ${v} is never ${show(a)} on the way in, so it cancels`,
-        struck
+        struck,
+        excludes: `${v} \u2260 ${places.join(", ")}`
       });
       steps2.push({ kind: "substitute", text: `${an3.reduced} at ${at2} is ${ratText(y)}`, why: "now put the number in" });
       return result2({
