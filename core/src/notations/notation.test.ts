@@ -14,7 +14,7 @@ import type { Session } from '../session/session';
 import { ROLES } from '../diagram/roles';
 import type { Role } from '../diagram/roles';
 import { registeredPorts, unregisterPorts } from '../session/ports';
-import { registerNotation, unregisterNotation, registeredNotations, notationById, notationsOf, offerPorts, describeNotation, NOTATION_FLOOR } from './notation';
+import { registerNotation, unregisterNotation, registeredNotations, notationById, notationsOf, offerPorts, describeNotation, notationNameInSentence, NOTATION_FLOOR } from './notation';
 import type { Notation, NotationReading } from './notation';
 import { FLOWCHART, FLOWCHART_TABLE } from './flowchart';
 import { handRect, handArrow, handText } from '../test/strokes';
@@ -171,5 +171,15 @@ describe('a reading is derived', () => {
     expect(describeNotation(flow)).toMatch(/^a flowchart \d\.\d\d — two processes, one flow/);
     expect(NOTATION_FLOOR).toBeGreaterThan(0);
     expect(NOTATION_FLOOR).toBeLessThan(1);
+  });
+});
+
+describe('a notation named inside a sentence', () => {
+  it('is lower case, unless it opens with an acronym or is named for a person', () => {
+    expect(notationNameInSentence('Flowchart', 'flowchart')).toBe('flowchart');
+    expect(notationNameInSentence('ER diagram', 'er')).toBe('ER diagram');
+    expect(notationNameInSentence('UML class diagram', 'uml-class')).toBe('UML class diagram');
+    expect(notationNameInSentence('Feynman diagram', 'feynman')).toBe('Feynman diagram');
+    expect(notationNameInSentence('Mind map')).toBe('mind map');
   });
 });

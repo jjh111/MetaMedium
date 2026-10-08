@@ -324,10 +324,20 @@ export function sayable(readings: readonly NotationReading[]): NotationReading[]
  * an acronym keeps it: "a UML class diagram 0.85 — two classes, one
  * inheritance".
  */
+/**
+ * A notation's name as it stands inside a sentence: lower case (*a flowchart*), unless it opens with an acronym
+ * (*an ER diagram*) or the notation is named for a person (`proper`: *a Feynman diagram*). The one home of the
+ * rule — `describeNotation` and every surface that names a notation in words read it here.
+ */
+export function notationNameInSentence(name: string, notation?: string): string {
+  const acronym = /^[A-Z]{2,}\b/.test(name);
+  const proper = !acronym && !!(notation && registry.get(notation)?.proper);
+  return acronym || proper ? name : name.toLowerCase();
+}
+
 export function describeNotation(r: NotationReading): string {
   const acronym = /^[A-Z]{2,}\b/.test(r.name);
-  const proper = !acronym && !!registry.get(r.notation)?.proper;
-  const name = acronym || proper ? r.name : r.name.toLowerCase();
+  const name = notationNameInSentence(r.name, r.notation);
   // An acronym takes the article of the way it is said: “an ER diagram”, “a UML class diagram”.
   const vowel = acronym ? /^[AEFHILMNORSX]/.test(name) : /^[aeio]/i.test(name);
   return `${vowel ? 'an' : 'a'} ${name} ${r.confidence.toFixed(2)} — ${r.summary}`;

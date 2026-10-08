@@ -567,6 +567,7 @@ export {
   notationsOf,
   offerPorts,
   describeNotation,
+  notationNameInSentence,
   NOTATION_FLOOR,
 } from './notations/notation';
 export type {

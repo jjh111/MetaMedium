@@ -782,6 +782,7 @@ var DynaInkCore = (() => {
     normName: () => normName,
     normalizeStroke: () => normalizeStroke,
     notationById: () => notationById,
+    notationNameInSentence: () => notationNameInSentence,
     notationsInUse: () => notationsInUse,
     notationsOf: () => notationsOf,
     notesLike: () => notesLike,
@@ -22431,10 +22432,14 @@ var DynaInkCore = (() => {
     const said3 = readings2.some((r) => !fallbacks.has(r.notation) && r.confidence >= NOTATION_FLOOR) ? readings2.filter((r) => !fallbacks.has(r.notation)) : readings2.slice();
     return said3.sort((a, b) => b.confidence - a.confidence);
   }
+  function notationNameInSentence(name, notation) {
+    const acronym = /^[A-Z]{2,}\b/.test(name);
+    const proper = !acronym && !!(notation && registry3.get(notation)?.proper);
+    return acronym || proper ? name : name.toLowerCase();
+  }
   function describeNotation(r) {
     const acronym = /^[A-Z]{2,}\b/.test(r.name);
-    const proper = !acronym && !!registry3.get(r.notation)?.proper;
-    const name = acronym || proper ? r.name : r.name.toLowerCase();
+    const name = notationNameInSentence(r.name, r.notation);
     const vowel = acronym ? /^[AEFHILMNORSX]/.test(name) : /^[aeio]/i.test(name);
     return `${vowel ? "an" : "a"} ${name} ${r.confidence.toFixed(2)} \u2014 ${r.summary}`;
   }

@@ -16693,7 +16693,7 @@
     if (p.definitions.length) parts.push(p.definitions.map((d) => d.name).join(', '));
     if (p.notation) {
       const n = MM.notationById(p.notation);
-      parts.push('the ' + (n ? n.name.toLowerCase() : p.notation) + ' notation' + (n ? ': ' + n.symbols.map((x) => x.name).concat(n.connectors.map((x) => x.name + 's')).join(', ') : ''));
+      parts.push('the ' + (n ? MM.notationNameInSentence(n.name, n.id) : p.notation) + ' notation' + (n ? ': ' + n.symbols.map((x) => x.name).concat(n.connectors.map((x) => x.name + 's')).join(', ') : ''));
     }
     if (p.connectors && p.connectors.length) parts.push(p.connectors.map((c) => c.name).join(', '));
     return parts.join(' · ');
