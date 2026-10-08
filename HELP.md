@@ -180,6 +180,13 @@ and have it read) and it is that side's length.
   it. **Show the answers** puts it back. **Colour the maths** keeps the colours
   on every figure, not only the one you point at. Both are the board's: they
   undo, and everyone in a live room sees them.
+- **Axes and a curve**: draw two axes crossing — arrowheads, ticks and numbers
+  at the ticks help it know them as axes — and a rough curve on them. Hold the
+  curve and its equation stands faint beside it (*y = x²*) with the clean curve
+  beneath your sketch; tap either to write it or draw it. With no numbers on the
+  axes it takes a scale and says so. Type a function near the axes (double-click
+  the ground to type, `y = (x² − 4)/(x − 2)`) and its curve stands on them, a
+  ring where it has a hole and a dashed line where it runs off.
 - **More of what you write is read**: powers, roots, π and degrees —
   `= 2(3+1)`, `= 2^10`, `= sin 30°`, `= 2π√(L/g)` with L and g on your page.
   Something that could be read two ways (`= 1 ÷ 2x`) is not guessed: the field

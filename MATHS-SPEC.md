@@ -555,7 +555,18 @@ or name is the letter. Left: TeX printing; Greek names in the sheet's grammar (M
   a garment piece must not read as a plane; bench it. Where the hand doubled
   back, a curve's samples are no function.
 
-*Status, 8 Oct 2026: under way (`unit/m19-plane`, from `ab823fd`, after B merged).*
+*Status, 8 Oct 2026: **built and merged** (`unit/m19-plane`, merged as `5003827`). `notations/plane.ts`: two axes
+crossing near the right angle read from ink with their ticks, numbers and names — a crossing alone held under the
+floor, arrowheads, ticks, numbers and names each adding evidence, an axis's ends free — the plane held as its origin and
+two unit vectors (a hand's axes lean), its scale from the numbers at its ticks, else assumed (5 units a side, equal
+units) and said; the plane's numbers are left out of the dimensions (`planeWordIds`, one hook in `dimension.ts`).
+`maths/plot.ts`: `plotOn` samples where the curve bends, breaks at a pole (dashed) and at a hole (a ring, never
+evaluated there), clipped to the axes. `maths/fit.ts`: a stroke read as a line, a parabola, a cubic, a sine, an
+exponential or k/x, ranked by residual in the hand's pixels with a penalty for complexity, the rounded form (`y = x²`)
+offered within the drawing's precision — the true family first in 252 of 252 strokes. `maths/fill-plane.ts`: a drawn
+curve's equation and clean curve, a written function's pieces, holes and asymptotes, a point's coordinates. Bench:
+144/144 of its own read first; every other bench under 0.13. Gate `fill` F13–F13c. Not run: a real hand's bowed axes;
+only the school families are named.*
 
 #### Lane D — M23: the pendulum is alive, Chalktalk's road (core and surface)
 
@@ -719,7 +730,16 @@ vertex). Left: a fermion loop drawn as one circle, an arrow on a W line, a line 
   the reader (MATHS-PLAN §5): *13 + 2 = 16* is a doubtful reading before it is a
   wrong sum.
 
-*Status, 8 Oct 2026: under way (`unit/m8-numerals`, from `09ba264`, after D merged).*
+*Status, 8 Oct 2026: **built and merged; not yet wired** (`unit/m8-numerals`, merged as `dc23282`). `core/src/read/`:
+28 glyphs, each with its twins and look-alikes said; strokes that cross or stack are one glyph and what is in doubt is
+cut left to right the way that reads best; each glyph a point cloud matched against 46 parametric styles drawn with
+seeded tremor, checked by its ink's features and its place on its line; runs and numbers with their units; a lone
+circle or line, a sure box and a word of letters are not numerals; `runReadings` and `consistentReading` are the
+arithmetic's hook. Bench, synthetic: per glyph 1053/1056 (99.7%), lines 105/114 whole (92.1%), no false digit on the
+corpus or 92 boards. **A style it was not taught is not read** (a plain 1, an open 4, a curly x: 0 of 24 held out) — so
+the teach pane (wave 2) and John's own digits, read in a later session, are the gate for shipping. Designed, not
+wired: a derived tier-1 `transcript` on a run's marks, read only near the maths, under a person's correction, and a
+failed check that a near reading would make hold said as *doubtful reading, or 15*.*
 
 ### Shared files, and who touches them
 
@@ -781,6 +801,12 @@ It is still not a computer algebra system.
   CG7a, KN3a and IN1a)? Not asked to now; this push builds on its colour space
   either way, and it waits on John's word.
 - Whether any of T1–T10 join v1's acceptance (§7).
+- **Land `maths/wave-1`** (A–F, built and merged there; each status line in §8) — and whether it goes to
+  `master` before or after V1-SPEC wave 1.
+- **On a board where the answer waits, a conflict still shows** what the labels make beside the label that cannot
+  hold (lane A): hiding it would hide the disagreement, which colour is for. Should it wait too?
+- **The numerals' reader is not wired** (lane F): its bench is the author's own synthetic styles, and a style it was
+  not taught reads 0 of 24. Wiring it waits on the teach pane (wave 2) and John's own digits, read in a later session.
 
 ---
 
