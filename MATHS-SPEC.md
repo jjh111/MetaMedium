@@ -823,6 +823,8 @@ the teach pane and one event; K last, because every offer at rest goes through i
   origin fitted as the curve `y = mx`; π is a number, never a name; a name is a label, and labels
   rule the thing (MATHS-PLAN rule 2) — an arc that marks the wrong corner is the arc's error.
 
+*Status, 15 Oct 2026: under way (`unit/m10-names`, from `ecb0893`).*
+
 #### Lane H — M15, M22: algebra shown, and Jake's approach (core and surface; Sonnet)
 
 - **Owns:**
@@ -865,6 +867,8 @@ the teach pane and one event; K last, because every offer at rest goes through i
   fill-in; a step written as text that the sheet then misreads as a failed check; a strike counted
   in UTF-16 units while the drawing measures glyphs (− and ² are one unit each, but be sure).
 
+*Status, 15 Oct 2026: under way (`unit/m15-shown`, from `ecb0893`).*
+
 #### Lane I — M24, M25: a run's outputs in written maths, and plots over time (core and surface; Sonnet)
 
 - **Owns:**
@@ -899,6 +903,8 @@ the teach pane and one event; K last, because every offer at rest goes through i
   curve or as one of the plane's own marks — read it, and do not edit `plane.ts` (G owns it): say
   what you find in the report; the sheet reading `x = L sin θ` as a check that fails (it is a note
   today, because L is not on the page — keep it so).
+
+*Status, 15 Oct 2026: under way (`unit/m24-live`, from `ecb0893`).*
 
 #### Lane J — M9, and M8's teach pane: maths in two dimensions, and your own numbers (core and surface; Opus)
 
@@ -940,6 +946,8 @@ the teach pane and one event; K last, because every offer at rest goes through i
   fraction's bar swallowed as `=` by `stacked()`; a stacked fraction split by band overlap in
   `runsOf`; a raised digit is a power only after a glyph it can raise.
 
+*Status, 15 Oct 2026: under way (`unit/m9-glyphs`, from `ecb0893`).*
+
 #### Lane K — CS1: offers at rest, through one door (core and surface; Opus)
 
 - **Owns:** V1-SPEC CS1's files, all of them: core `tools/at-rest.ts` (pure: given what just changed
@@ -974,6 +982,8 @@ the teach pane and one event; K last, because every offer at rest goes through i
   against the drawing corpus: one that shows on more than a few percent of ordinary drawings is too
   eager. Free is not weightless: an unasked call in front of the person's own ask on a
   one-at-a-time local server is the slowness the transport was fixed for — cancel it first.
+
+*Status, 15 Oct 2026: under way (`unit/cs1-rest`, from `ecb0893`).*
 
 ### Wave 2's shared files
 
