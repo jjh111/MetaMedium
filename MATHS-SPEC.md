@@ -755,13 +755,248 @@ failed check that a near reading would make hold said as *doubtful reading, or 1
   `applyClock`, in different functions; `08-render.js` → A's render call and D's
   placement hook, in different functions; `07-input.js` → A's tap branch.
 
+
+### C1 — the fill-in's two new fields (the integrator, one commit before wave 2)
+
+Two optional fields on `FillIn` (`core/src/maths/fill.ts`), read not trusted like the rest:
+`strike` — spans of `text` drawn struck through, as `[from, to)` character indices (the common
+factor a step cancels, M15) — and `approach`, a `FillApproach`: the variable, the point approached,
+the samples from each side with f(x) or null, what they come to, how it was found and the sentence
+that says it (M22). A tap on a fill-in with an approach plays it before anything is written; the
+play is the page's and never logged. A strike outside the words or an approach that is no number
+leaves the record out and says why (`fill.test.ts`).
+
+### Wave 2 — five lanes
+
+From three surveys of `maths/wave-1` at `655818f` (15 Oct 2026), each with file:line. Lanes run in
+parallel from that commit plus C1; the merge order is **J, G, H, I, K** — J touches only `read/`,
+the teach pane and one event; K last, because every offer at rest goes through its door.
+
+#### Lane G — M10, M14: names on figures, and trigonometry (core; Sonnet)
+
+- **Owns:**
+  - core: a new `maths/names.ts` — **one letter rule** (`NAME_LETTER`: Latin and Greek, π kept a
+    number) that `expr.ts` (`LETTER`, the hyphen-word rule, `isLetterName`), `fn.ts` (`LETTER`) and
+    `notations/plane.ts` (`NAME`) all import instead of their three copies — and a bare name
+    attached to a corner or a side;
+  - `dimension.ts` (a name, alone or as `θ = 30°`, attaches as `attachNumber` attaches a number,
+    and an arc drawn in a corner marks that corner's angle), `sheet.ts` (a `SheetOptions` hook:
+    the names a board binds enter `nameIndex`, `definedNames` and `scopeFor`), `expr.ts` (Greek
+    names are names), `board.ts` (the order: figures solved, then the sheet read again with their
+    names), `solve.ts` only where the order needs it;
+  - M14: a new `maths/trig.ts` (roles from a named angle — opposite, adjacent and hypotenuse
+    relative to the angle a name or an arc marks; the unit circle read: a circle centred at a
+    plane's origin and a radius from it at an angle give cos, sin and tan as segments), the roles
+    in `fill-figure.ts`'s `roleQuantities` (it gives only the hypotenuse today), and a new fill
+    source `maths/fill-trig.ts` with its one line in `fill-builtin.ts`;
+  - `notations/plane.ts`, only so a circle at the origin and a radius from it neither void the plane
+    (`tipFree`) nor read as a curve;
+  - a new gate scenario, `e2e/trig.mjs` (`trig`).
+- **What:**
+  - **A name is the quantity everywhere.** θ written in a corner names that angle; *a*, *b*, *c*
+    beside sides name them; `θ = 30°` is a label with a name. A named quantity enters the sheet's
+    scope, so `sin θ = a / c` and `a² + b² = c²` written on the page are checks against the figure,
+    and `= sin θ` in the field is a sum. A lone `c` beside a triangle's side is that side's name,
+    not a circumference (`MEASURE_WORDS` still rules `c = 31.4` beside a circle).
+  - **SOH CAH TOA in colour.** With an angle named or marked, its opposite, adjacent and
+    hypotenuse take `ROLE_HUES`' three hues and the angle its fourth (§5); the ratios stand as
+    fill-ins beside the angle (`sin θ = 3/5`), exact where the sides are, taken by a tap as text
+    the maths checks.
+  - **The unit circle** (scene T3). A circle at a plane's origin with a radius at an angle: cos θ
+    and sin θ stand as the segments they are, in their hues, with their values; the arc from the
+    axis is x; `sin x / x` written beside it is read against the figure.
+- **Red first:**
+  - **Core.** θ in a corner of a 3-4-5 right triangle attaches as that angle's name, and
+    `sin θ = 3/5` checks ✓ beside it; `a² + b² = c²` with a, b, c written by the sides checks ✓;
+    a 30° radius on a unit circle gives cos 0.866 and sin 0.5 as segments; Greek names read the
+    same in a sum, a function and an axis name. `typed.test.ts:235` pins `θ = 30°` as no number —
+    that changes **by design**: say so in the report.
+  - **Gate** (`e2e/trig.mjs`). A right triangle drawn with the pointer, 3 and 4 typed by its legs
+    and θ in a corner: the roles in their hues, `sin θ = 0.6` standing faint, a tap writes it and
+    one undo takes it back; the unit circle at 30°.
+- **Checks:** the engine suite, typecheck, both bundles, the surface build,
+  `node e2e/run.mjs trig fill canvas`.
+- **Invariant:** where no name is written, every attachment, solve, fill-in and e2e 49's golden is
+  as it was — every existing test passes untouched (but the one pinned by design above); tier 1.
+- **Trap:** the solver reads the sheet before it solves the figures (`solve.ts:1186`), so a name the
+  figure binds is not in scope yet; `c` is circumference to `MEASURE_WORDS`; a radius through the
+  origin fitted as the curve `y = mx`; π is a number, never a name; a name is a label, and labels
+  rule the thing (MATHS-PLAN rule 2) — an arc that marks the wrong corner is the arc's error.
+
+#### Lane H — M15, M22: algebra shown, and Jake's approach (core and surface; Sonnet)
+
+- **Owns:**
+  - core: a new `maths/fill-algebra.ts` (a written expression's factored, cancelled and expanded
+    forms as ghost steps, from `limit.ts`'s steps and `poly.ts`'s `factor` and `expand`) and its
+    one line in `fill-builtin.ts`; `poly.ts` and `limit.ts` (a factored numerator and denominator
+    made public — `factorsText` is private to `limit.ts` today — and each step's struck spans as
+    indices into its text); `fill-plane.ts`'s hole fill-in (it carries its `approach`, C1);
+  - the surface's `25-ghosts.js` — its drawing (a struck span, steps stacked under their line)
+    and its tap (`fgTake`: a hole plays its approach before anything is written) — but not
+    `fgRest`, which is K's; a new fragment `25-approach.js` for the animation (prefix `fa`, so the
+    closure's names stay one each);
+  - a new gate scenario, `e2e/algebra.mjs` (`algebra`).
+- **What:**
+  - **Algebra shown** (M15). Under a one-line expression (`(x² − 4)/(x − 2)`, `x³ − 1`,
+    `(x + 1)²`), faint, one fill-in a step: factored, the common factor struck, cancelled with
+    what it excludes (`x + 2, x ≠ 2`), and for a product, expanded. A tap writes that step as text
+    — written as a line the sheet reads back as what it says, never as a check that fails (`=`
+    is a running total on a page). Steps stand with the selection, as every fill-in does.
+  - **Jake's approach** (M22). A hole on a plotted function is a ring; a tap on it plays the
+    approach: points slide along the curve from both sides toward the ring, the values beside them
+    (x = 1.9, 1.99, 1.999 → 3.9, 3.99, 3.999), then the limit and its method said (*the limit is 4,
+    by factoring*). The play is runtime — a page's, like the reveal — never logged; Esc stops it.
+    A second tap writes `lim x→2 = 4` as text the maths checks (the ring no longer becomes ink).
+- **Red first:**
+  - **Core.** `(x² − 4)/(x − 2)` gives factored, cancelled and its exclusion as three ghost steps,
+    the common factor struck at the right indices; `x³ − 1` its factors; `(x + 1)²` expanded; the
+    hole of Jake's function carries an approach of 1.9 … 1.99999 and 2.1 … 2.00001 coming to 4, by
+    factoring — and `f` is never evaluated at 2.
+  - **Gate** (`e2e/algebra.mjs`). The expression typed: its steps faint under it, the struck factor
+    drawn struck; a tap writes a step and one undo takes it back; Jake's axes and function
+    (`fill.mjs` F13's scene): a tap on the hole plays (positions change frame to frame with no
+    event), the values and the sentence are said, nothing enters the log; a second tap writes the
+    limit.
+- **Checks:** the engine suite, typecheck, both bundles, the surface build,
+  `node e2e/run.mjs algebra fill canvas`.
+- **Invariant:** fill-ins are derived and the play is runtime — nothing logged but what a tap
+  writes; the hole is never evaluated at the hole; tier 1.
+- **Trap:** fill-ins are read again only when the log changes, so the animation cannot be a
+  fill-in; a step written as text that the sheet then misreads as a failed check; a strike counted
+  in UTF-16 units while the drawing measures glyphs (− and ² are one unit each, but be sure).
+
+#### Lane I — M24, M25: a run's outputs in written maths, and plots over time (core and surface; Sonnet)
+
+- **Owns:**
+  - core: a new `run/live.ts` (pure: the written lines near a run whose names are its inputs and
+    outputs — L, g, θ, ω, x, y, T — compiled once while the log stands by `compileFunction` with
+    `given` (fn.ts), and evaluated from a run's outputs each frame); a new `run/flow.ts` (pure: an
+    arrow from a run's marks to a coordinate plane — bound at both ends, or ending on them — is a
+    flow of the run's output over time, θ by default or the output the plane's y axis names); a
+    new fill source `maths/fill-run.ts` (T and θ₀ beside a pendulum, derivable from the log) and
+    its one line in `fill-builtin.ts`;
+  - the surface's `14-run.js`, wholly (the values drawn after their lines each frame, the plane's
+    trace), and the gate's `e2e/alive.mjs` (its new records).
+- **What:**
+  - **Live values** (M24). Beside a running pendulum, `x = L sin θ` written on the page shows its
+    value after it, updating each frame, in the quantity's hue (`= 0.17 m`); `T` and `θ₀` stand as
+    fill-ins (T exact by the AGM); a tap on T writes it as text. Nothing per frame is logged.
+  - **Plots over time** (M25). An arrow drawn from the pendulum to a coordinate plane: the plane
+    traces θ(t) as the run plays — t along x (the plane's own numbers, else seconds at its assumed
+    scale, said), θ along y — a line under the ink, growing, cleared on Reset, kept still on Pause.
+    The first dataflow (V1-SPEC RN8): the arrow is the wire.
+- **Red first:**
+  - **Core.** `x = L sin θ` beside a pendulum of 0.5 m compiles once and gives 0.5 sin θ for the
+    run's θ; T as a fill-in, 2.0099 s for 1 m at 10°; an arrow from the bob to a plane is a flow
+    of θ, and a line drawn between them that is not an arrow is none.
+  - **Gate** (`alive.mjs`). Play: the written line's value changes from frame to frame with no new
+    event; the plane's trace grows; Esc stops both; a reload leaves both still; nothing logged but
+    the play.
+- **Checks:** the engine suite, typecheck, both bundles, the surface build,
+  `node e2e/run.mjs alive fill canvas`.
+- **Invariant:** time is never logged; nothing runs unblessed; tier 1.
+- **Trap:** compiling the line every frame (compile once a log); the arrow read by `planesIn` as a
+  curve or as one of the plane's own marks — read it, and do not edit `plane.ts` (G owns it): say
+  what you find in the report; the sheet reading `x = L sin θ` as a check that fails (it is a note
+  today, because L is not on the page — keep it so).
+
+#### Lane J — M9, and M8's teach pane: maths in two dimensions, and your own numbers (core and surface; Opus)
+
+- **Owns:**
+  - core `read/`: a new `read/layout2d.ts` (powers, fractions, roots and subscripts from glyph
+    positions: a raised run after a glyph its power, a bar with runs above and below a fraction, √
+    over a run its radicand, a lowered small run a subscript — read into text `fn.ts` compiles,
+    plural and ranked with reasons); `read/numerals.ts` (the model handed in — `ReadOptions.model`,
+    built from the built-in styles plus a hand's taught samples and cached by their digest, where
+    `numeralModel()` is a singleton today; the overlap exemption for a fraction's bar and a power;
+    a stacked fraction never split into two runs);
+  - **the `glyph` event** — `{ glyph, strokes }`, a hand's samples IN the log, so replay reads
+    as it read and the reader learns the hand that taught it — its arm in `session.ts`, per hand
+    like `teach`, undone per hand;
+  - a new tool, `tools/read-maths.ts` (*Read as maths*, **hidden** — typed `read as maths`,
+    `numbers` — on held letter-sized ink: the readings offered to pick, the one picked written as
+    text beside the ink as the person's act) and its one line in `tools/builtin.ts`;
+  - the surface: *your numbers* in the mark pane (`03-teach.js`): a pad a glyph, five samples, read
+    back as drawn so a person sees what the reader makes of their hand; kept on the device
+    (`mm-glyphs`) and taught into each board at open, as the command mark is (`restoreMark`);
+  - a new gate scenario, `e2e/glyphs.mjs` (`glyphs`).
+- **What:** the reader reads maths laid out in two dimensions, and learns a person's own hand from
+  five samples a glyph. **Nothing reads numerals unasked**: the one way in is *Read as maths*,
+  typed, whose readings the person picks — wiring the reader into the maths at rest still waits on
+  John's own digits, read in a session other than the one they were taught in.
+- **Red first:**
+  - **Core.** On synthetic lines (`handLine` with raised, stacked and rooted positions): `x²`,
+    `(x² − 4)/(x − 2)`, `√9`, `a₁` read as written; an open 4 (a style the built-ins lack) reads 0
+    of 24 before teaching and at least 20 of 24 after five taught samples; a `glyph` event replays
+    to the same model; the built-in bench unchanged (99.7% a glyph, 92.1% a line, no false digit).
+  - **Gate** (`e2e/glyphs.mjs`). Five 4s taught on the pad and read back; `x²` written with the
+    pointer read as maths and written as text; a reload reads the same.
+- **Checks:** the engine suite (the numerals bench among it), typecheck, both bundles, the surface
+  build, `node e2e/run.mjs glyphs canvas`.
+- **Invariant:** no model; nothing reads numerals unasked; a person's samples are theirs (per
+  hand), on their device and in their board's log, sent nowhere; e2e 49's golden unchanged.
+- **Trap:** samples in the log grow it (five a glyph a hand at most, strokes thinned); the
+  singleton model read by `matchStyles`, `candidatesOf` and `lineFromReadings` directly; a
+  fraction's bar swallowed as `=` by `stacked()`; a stacked fraction split by band overlap in
+  `runsOf`; a raised digit is a power only after a glyph it can raise.
+
+#### Lane K — CS1: offers at rest, through one door (core and surface; Opus)
+
+- **Owns:** V1-SPEC CS1's files, all of them: core `tools/at-rest.ts` (pure: given what just changed
+  and what the hand is near, the one offer that has earned its place, or none — V1-SPEC §3.4's six
+  rules), `participants/eager.ts` (pure: each seat's cost, free or metered, and whether it may be
+  asked unasked now), **the `decline` event** (`{ ids, offer }`, attributed, undone per hand; its
+  arm in `session.ts`); the surface — a new fragment `27-rest.js` (the chip, its fade, *not this*)
+  with one hook in `08-render.js` and one in `07-input.js` (what counts as moving on; the chip's
+  tap), `04-models.js` (an unasked call cancelled the moment the person asks), `06-handwriting.js`
+  (*auto-read* at rest, through the door), `20-controls.js` (each kind of offer turned off; the
+  *auto-read* default), `24-seat.js` (Claude Code's seat paid or unpaid — paid by default,
+  V1-SPEC decision 21), and in `25-ghosts.js` only `fgRest` (the fill-in at rest goes through the
+  door); a new gate scenario, `e2e/rest.mjs` (`rest`).
+- **What:** V1-SPEC §3.4, built, with the offers that exist: the fill-in at rest (the strongest,
+  one), *Play the pendulum* beside a pendulum that reads above its floor, the clean form's ghost,
+  *auto-read* of a finished line by a free reader, and the step up (*ask Claude?*, with the dot)
+  where a free rung cannot settle it. Each later unit's offer goes through this door.
+- **Red first:** core — the door picks the strongest earned offer, refuses an unasked call to a
+  metered seat and offers the step up instead, and honours a decline after replay; the budget lets
+  a free seat's unasked call through at rest, holds it while the pen is down, and drops it when the
+  person asks. Gate (`e2e/rest.mjs`): a pendulum drawn: *Play the pendulum* stands beside it with no
+  gesture; a stroke elsewhere fades it; on another, *not this* declines it, and it never returns,
+  through a reload; a word being written shows no offer; with a stub local model joined, a finished
+  line is read at rest, a typed ask cancels the unasked call in flight, and a stub hosted model
+  beside it is never called unasked — the gate's guard counts calls by cost.
+- **Checks:** the engine suite; `node e2e/run.mjs rest canvas walk models seat fill alive`.
+- **Invariant:** a metered model is asked only by a deliberate act, a free one unasked only at rest
+  and within its budget (decision 8); nothing interrupts the pen. **Every existing gate record
+  passes unchanged**: an offer at rest is drawn on its own list (`mm.restOffers()`), never in
+  `chipHits`, which ten records count, and never in the field, whose offers e2e 49 pins.
+- **Trap:** the chip that rose on every loop was noise and was taken out — bench each offer's floor
+  against the drawing corpus: one that shows on more than a few percent of ordinary drawings is too
+  eager. Free is not weightless: an unasked call in front of the person's own ask on a
+  one-at-a-time local server is the slowness the transport was fixed for — cancel it first.
+
+### Wave 2's shared files
+
+- **Appended, every line kept at merge:** `core/src/index.ts` (each lane in its own family's
+  section, never at the tail — the numerals block is the tail, and J's), `maths/fill-builtin.ts`
+  (G, H, I, in that order), `tools/builtin.ts` (J), and the scenario lists in `e2e/run.mjs` (G, H,
+  J, K).
+- **Two lanes, different functions:** `session.ts` — J's `glyph` event, K's `decline`, each its own
+  arm, case, function and door; `25-ghosts.js` — H's drawing and `fgTake`, K's `fgRest`.
+- **One owner each:** `dimension.ts`, `sheet.ts`, `expr.ts`, `board.ts`, `solve.ts`,
+  `notations/plane.ts`, `fill-figure.ts`, `hues.ts` → G; `poly.ts`, `limit.ts`, `fill-plane.ts` →
+  H; `run/`, `14-run.js`, `e2e/alive.mjs` → I; `read/`, `03-teach.js` → J; `08-render.js`,
+  `07-input.js`, `04-models.js`, `06-handwriting.js`, `20-controls.js`, `24-seat.js` → K. `fn.ts`
+  → G for the letter rule alone; H and I call it.
+- **Generated files are rebuilt, never merged by hand:** both bundles and `Demos/session-engine.js`.
+
 ---
 
 ## 9. The ladder
 
 - **Wave 1:** M16–M18, M11–M13, M19–M21, M23, M27 and M8 (§8).
 - **Wave 2:** M10, M14, M15, M22, M24, M25, M9, M8's teach pane, and CS1 — offers
-  at rest in general, with the `decline` event.
+  at rest in general, with the `decline` event (§8, *Wave 2 — five lanes*: G, H, I, J, K).
 - **Wave 3:** M26, M28, M29, M30, M31, derivatives and integrals, number sense,
   forces.
 

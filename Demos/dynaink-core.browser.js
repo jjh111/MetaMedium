@@ -25581,6 +25581,17 @@ ${p3.svg}</section>`),
     if (!Array.isArray(f.about)) return `"${f.key}" names no marks`;
     if (f.points && !f.points.every(aPoint)) return `"${f.key}" has a point that is no number`;
     if (!f.take || typeof f.take !== "object") return `"${f.key}" says nothing a tap would write`;
+    if (f.strike !== void 0) {
+      const n2 = typeof f.text === "string" ? f.text.length : 0;
+      const span = (r) => Array.isArray(r) && r.length === 2 && Number.isInteger(r[0]) && Number.isInteger(r[1]) && 0 <= r[0] && r[0] < r[1] && r[1] <= n2;
+      if (!Array.isArray(f.strike) || !f.strike.every(span)) return `"${f.key}" strikes outside its words`;
+    }
+    if (f.approach !== void 0) {
+      const a = f.approach;
+      const sample2 = (p3) => !!p3 && finite5(p3.x) && (p3.y === null || finite5(p3.y));
+      if (!a || !finite5(a.to) || !Array.isArray(a.left) || !Array.isArray(a.right) || !a.left.every(sample2) || !a.right.every(sample2) || !(a.value === null || finite5(a.value)))
+        return `"${f.key}" has an approach that is no number`;
+    }
     return null;
   }
   var stronger = (a, b) => b.rank - a.rank || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);

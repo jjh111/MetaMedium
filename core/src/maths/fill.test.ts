@@ -103,6 +103,28 @@ describe('the fill-in registry', () => {
     ]);
   });
 
+  it('leaves out a strike outside its words and an approach that is no number, and keeps sound ones (C1)', () => {
+    const approach = { variable: 'x', to: 2, left: [{ x: 1.9, y: 3.9 }, { x: 1.99, y: 3.99 }], right: [{ x: 2.1, y: 4.1 }], value: 4, method: 'by factoring', said: 'the limit is 4, by factoring' };
+    register({
+      id: 'c1',
+      fillIns: () => [
+        fill('struck', 0.5, { text: '(x + 2)(x − 2)/(x − 2)', strike: [[7, 14], [15, 22]] }),
+        fill('overrun', 0.5, { text: 'x + 2', strike: [[2, 9]] }),
+        fill('backwards', 0.5, { text: 'x + 2', strike: [[3, 1]] }),
+        fill('hole', 0.5, { approach }),
+        fill('undefined-sample', 0.5, { approach: { ...approach, left: [{ x: 1.9, y: null }], value: null } }),
+        fill('nan', 0.5, { approach: { ...approach, to: NaN } }),
+      ],
+    });
+    const r = fillInsReport(board());
+    expect(r.fillIns.map((f) => f.key).sort()).toEqual(['hole', 'struck', 'undefined-sample']);
+    expect(r.refused.map((x) => x.reason)).toEqual([
+      'a fill-in "overrun" strikes outside its words',
+      'a fill-in "backwards" strikes outside its words',
+      'a fill-in "nan" has an approach that is no number',
+    ]);
+  });
+
   it("hands every source the board's maths, read once", () => {
     const seen: unknown[] = [];
     register({ id: 'one', fillIns: (_s, ctx) => (seen.push(ctx.board()), []) });

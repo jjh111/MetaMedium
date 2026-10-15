@@ -57,6 +57,25 @@ export interface FillIn {
   /** 0–1: how strong it is — the one quiet offer at rest is the highest. */
   rank: number;
   take: FillTake;
+  /** Spans of `text` drawn struck through, as [from, to) character indices: the common factor a step cancels (M15). */
+  strike?: Array<[number, number]>;
+  /** What a tap plays before anything is written: the approach to a hole, from both sides (M22). Never logged. */
+  approach?: FillApproach;
+}
+
+/** The approach to a point, as data a surface animates: the samples from each side, and what they come to. */
+export interface FillApproach {
+  /** The variable's name and the point approached: `x → 2`. */
+  variable: string;
+  to: number;
+  /** The samples from each side, nearest last: x = 1.9, 1.99, 1.999 … with f(x), or null where undefined. */
+  left: Array<{ x: number; y: number | null }>;
+  right: Array<{ x: number; y: number | null }>;
+  /** What they come to, or null when they do not settle; and how it was found (`by factoring`, `numerically from both sides`). */
+  value: number | null;
+  method: string;
+  /** In words, as the surface says it at the end: `the limit is 4, by factoring`. */
+  said: string;
 }
 
 /** What every source is handed beside the state: the board's maths, read once however many sources ask. */
@@ -127,6 +146,17 @@ function unusable(f: FillIn): string | null {
   if (!Array.isArray(f.about)) return `"${f.key}" names no marks`;
   if (f.points && !f.points.every(aPoint)) return `"${f.key}" has a point that is no number`;
   if (!f.take || typeof f.take !== 'object') return `"${f.key}" says nothing a tap would write`;
+  if (f.strike !== undefined) {
+    const n = typeof f.text === 'string' ? f.text.length : 0;
+    const span = (r: unknown) => Array.isArray(r) && r.length === 2 && Number.isInteger(r[0]) && Number.isInteger(r[1]) && 0 <= r[0] && r[0] < r[1] && r[1] <= n;
+    if (!Array.isArray(f.strike) || !f.strike.every(span)) return `"${f.key}" strikes outside its words`;
+  }
+  if (f.approach !== undefined) {
+    const a = f.approach;
+    const sample = (p: unknown) => !!p && finite((p as { x: number }).x) && ((p as { y: unknown }).y === null || finite((p as { y: unknown }).y));
+    if (!a || !finite(a.to) || !Array.isArray(a.left) || !Array.isArray(a.right) || !a.left.every(sample) || !a.right.every(sample) || !(a.value === null || finite(a.value)))
+      return `"${f.key}" has an approach that is no number`;
+  }
   return null;
 }
 

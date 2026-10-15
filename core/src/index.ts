@@ -273,7 +273,7 @@ export {
   fillInsOfSession,
   fillInsReportOfSession,
 } from './maths/fill';
-export type { FillKind, FillTake, FillIn, FillContext, FillSource, FillRefusal, FillReport } from './maths/fill';
+export type { FillKind, FillTake, FillIn, FillApproach, FillContext, FillSource, FillRefusal, FillReport } from './maths/fill';
 export { BUILTIN_FILL_SOURCES } from './maths/fill-builtin';
 // The figure source (M16): what a solved figure derives that nobody wrote, as fill-ins — where each stands, what a
 // tap writes (and whether it would land on the side it was offered for), the quantities a board speaks of and the
