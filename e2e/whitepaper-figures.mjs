@@ -99,11 +99,12 @@ try {
         await figure.scrollIntoViewIfNeeded();
         const initial=await figure.getAttribute('data-active');
         const keys=await figure.locator('[data-select]').evaluateAll(els=>els.map(el=>el.dataset.select));
-        for(const value of keys) {
-          const button=figure.locator(`[data-select="${value}"]`);
-          if(width<1100) await button.tap(); else await button.click();
-          assert.equal(await figure.getAttribute('data-active'),value);
-          assert.equal(await button.getAttribute('aria-pressed'),'true');
+        // A comparison plate offers its choices on the phone only: from 561px
+        // up every scene is already side by side, so choosing one could only
+        // decorate what is on screen (figures.css). Where nothing is offered,
+        // the resting state is what gets audited.
+        const offered=await figure.locator('[data-select]').first().isVisible();
+        const audit=async value => {
           const metrics=await inspect(page,key);
           assert.deepEqual(metrics.clip,[],`${label}/${key}/${value}: text outside figure`);
           assert.deepEqual(metrics.targets,[],`${label}/${key}: small target`);
@@ -117,12 +118,28 @@ try {
           assert.ok(metrics.hasTitle&&metrics.hasDesc);
           assert.ok(metrics.x>=-1&&metrics.x+metrics.width<=width+1,`${label}/${key}: horizontal overflow`);
           states.push({key,value,...metrics});
+        };
+        if(offered) {
+          for(const value of keys) {
+            const button=figure.locator(`[data-select="${value}"]`);
+            if(width<1100) await button.tap(); else await button.click();
+            assert.equal(await figure.getAttribute('data-active'),value);
+            assert.equal(await button.getAttribute('aria-pressed'),'true');
+            await audit(value);
+          }
+          // Keyboard activation has exactly the same effect and retains focus.
+          const reset=figure.locator(`[data-select="${initial}"]`);
+          await reset.focus(); await page.keyboard.press('Enter');
+          assert.equal(await figure.getAttribute('data-active'),initial);
+          await page.evaluate(()=>document.activeElement?.blur());
+        } else {
+          // Nothing offered means nothing left standing: no empty toolbar, and
+          // only a comparison plate may drop its controls at all.
+          assert.ok(await figure.evaluate(el=>el.classList.contains('fp-comparison')),`${label}/${key}: an overview plate must keep its controls`);
+          assert.equal(await figure.locator('.fp-toolbar').isVisible(),false,`${label}/${key}: a toolbar with nothing to offer`);
+          assert.ok(width>=561,`${label}/${key}: the phone must be offered its choices`);
+          await audit(initial);
         }
-        // Keyboard activation has exactly the same effect and retains focus.
-        const reset=figure.locator(`[data-select="${initial}"]`);
-        await reset.focus(); await page.keyboard.press('Enter');
-        assert.equal(await figure.getAttribute('data-active'),initial);
-        await page.evaluate(()=>document.activeElement?.blur());
         if(width===1440||width===390||width===768) {
           await figure.screenshot({path:`${out}/${label}-${key}.png`,animations:'disabled',style:'nav { visibility: hidden !important; }'});
         }
@@ -139,16 +156,23 @@ try {
       assert.equal(await page.locator('.fp-feedback').evaluate(el=>getComputedStyle(el).opacity),'0');
       await loop.check();
       assert.equal(await page.locator('.fp-feedback').evaluate(el=>getComputedStyle(el).opacity),'1');
-      // HTTP/Tailscale has no clipboard permission: the selected URL is the fallback.
-      await page.locator('[data-plate="lenses"] [data-select="combined"]').click();
-      await page.locator('[data-share]').click();
-      const shared=await page.locator('.fp-share-link').inputValue();
-      assert.equal(new URL(shared).searchParams.get('lens'),'combined');
-      assert.equal(new URL(shared).hash,'#figure-lenses');
-      assert.equal(new URL(shared).searchParams.get('theme'),theme);
-      await page.locator('[data-plate="lenses"] [data-select="physics"]').click();
-      assert.equal(await page.locator('.fp-share-link').isVisible(),false);
-      await page.goto(shared,{waitUntil:'domcontentloaded'});
+      // Sharing a lens view belongs to the phone, with the choices that make a
+      // lens the one in view; the link it writes is honoured at every width.
+      if(width<561) {
+        // HTTP/Tailscale has no clipboard permission: the selected URL is the fallback.
+        await page.locator('[data-plate="lenses"] [data-select="combined"]').tap();
+        await page.locator('[data-share]').tap();
+        const shared=await page.locator('.fp-share-link').inputValue();
+        assert.equal(new URL(shared).searchParams.get('lens'),'combined');
+        assert.equal(new URL(shared).hash,'#figure-lenses');
+        assert.equal(new URL(shared).searchParams.get('theme'),theme);
+        await page.locator('[data-plate="lenses"] [data-select="physics"]').tap();
+        assert.equal(await page.locator('.fp-share-link').isVisible(),false);
+        await page.goto(shared,{waitUntil:'domcontentloaded'});
+      } else {
+        assert.equal(await page.locator('[data-plate="lenses"] [data-share]').isVisible(),false,`${label}: sharing a lens nobody chose`);
+        await page.goto(`${server.origin}/?theme=${theme}&lens=combined#figure-lenses`,{waitUntil:'domcontentloaded'});
+      }
       await page.waitForFunction(()=>document.querySelector('[data-plate="lenses"]').dataset.active==='combined');
       // Genuine theme switch on an already-loaded page (same button as readers).
       const before=await page.locator('[data-plate="alignment"]').evaluate(el=>getComputedStyle(el).backgroundColor);

@@ -5,15 +5,33 @@ progressive enhancement. Archival screenshots and the conceptual-blending GIF
 are intentionally unchanged. The former `fig-digidraw.svg` remains in Assets as
 an original artwork, but its whitepaper position now uses the spectrum plate.
 
+## What each plate offers, and where
+
+Two kinds of plate, and one rule: **a control is offered only where it does
+something.** Nothing is ever dimmed or hidden to make a selection legible, and
+no plate carries divider rules — they group by space alone.
+
+**Overview plates** hold one shared map beside every reading. Selecting a
+reading traces its role in that map, at every width, and from 851px the map
+stays beside the readings while they scroll — which is what makes the tracing
+worth doing on a long plate.
+
 | Anchor | Reading interaction |
 | --- | --- |
-| `#figure-spectrum` | Emphasize preserved marks, structure or interpretation |
-| `#figure-capacity` | Compare sequence, prosody and spatial relations |
-| `#figure-triad` | Inspect Language / Computation / Meaning; expose return paths |
-| `#figure-negotiation` | Step from oval to dots to a contextual word |
-| `#figure-semiotic` | Compare an unframed sign, portrait context and orbital context |
-| `#figure-lenses` | Apply physics / chemistry, compose both, share a view link |
-| `#figure-alignment` | Reveal shared ground while keeping safeguards present |
+| `#figure-spectrum` | Trace preserved marks, structure or interpretation in the layered map |
+| `#figure-triad` | Trace Language / Computation / Meaning; switch shared meaning off to isolate a command path |
+
+**Comparison plates** put every scene side by side from 561px up, so there is
+nothing left to choose: the whole toolbar is the phone's, where it picks which
+scene is on screen. A lens link (`?lens=`) is still honoured at every width.
+
+| Anchor | Scenes compared |
+| --- | --- |
+| `#figure-capacity` | Sequence, prosody and spatial relations |
+| `#figure-negotiation` | An oval, dots, and a contextual word |
+| `#figure-semiotic` | An unframed sign, portrait context, orbital context |
+| `#figure-lenses` | Physics, chemistry, both composed — and sharing one of them (phone) |
+| `#figure-alignment` | Constraints alone, and constraints plus shared ground |
 
 ## Source and rendering
 
@@ -21,6 +39,8 @@ an original artwork, but its whitepaper position now uses the spectrum plate.
   generation, model output, numerical confidence claims or vendor benchmarks.
 - `figures.css`: layout and graphic roles, using the page's existing brand tokens.
   No independent palette and no new font. Dark mode is `:root[data-theme="dark"]`.
+  It also decides which controls are offered at which width, and holds the one
+  `overflow: clip` that lets an overview map stick inside a clipped `figure`.
 - `figures.js`: small, dependency-free enhancement; no API calls, continuous
   animation, external sharing service, model inference or document mutation
   beyond the selected illustration state.
@@ -46,7 +66,9 @@ recognition or calibrated measurements.
 
 Geometry stays on a 1000-unit SVG canvas. Text and controls use HTML at reading
 size rather than inheriting the SVG's scale. Below 850px the graphic and reading
-stack; below 560px the facts reflow into a single column. Buttons have at least
+stack (and the map stops sticking); below 561px the facts reflow into a single
+column, a comparison plate stacks its scenes and offers the choices that pick
+between them, and "Show all states" reveals every one. Buttons have at least
 44 CSS-pixel hit targets; native click/keyboard semantics preserve scrolling.
 The triad also provides direct node-label controls. All state changes have a
 polite announcement. No information requires hover, dragging, animation or colour
@@ -65,7 +87,9 @@ whitepaper**, including its theme toggle. It does not extract CSS or use a fake
 portrait tablet, standard phone, narrow phone and landscape phone widths, in both
 themes. These are browser-engine/device emulations, not a physical iPad test.
 
-Checks cover all 20 selectable readings, rendered text bounds, overlapping
+Checks cover every selectable reading where the controls are offered (20 on a
+phone) and the resting state where they are not (11 from 561px up, with the
+toolbar asserted gone rather than merely empty), rendered text bounds, overlapping
 labels, 44px targets, text contrast (4.5:1 minimum, with alpha-composited HTML
 backgrounds), SVG marker references, keyboard/touch activation, direct triad
 controls, loop toggling, share-link restoration, runtime errors, normal/reduced

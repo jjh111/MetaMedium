@@ -72,7 +72,9 @@ def plate(key,num,eyebrow,title,dek,art,labels,choices,panels,caption,legend,ext
         else:
             drawing = snapshot(art, key, k, f'{t} — {title}')
             readings += f'<article class="fp-scene" data-scene="{esc(k)}" data-state="{esc(k)}" aria-label="{esc(t)}">{header}<div class="fp-map">{drawing}{labels}</div><section class="fp-reading" data-reading="{esc(k)}" aria-label="{esc(t)}">{panels[i]}</section></article>'
-    instruction = 'All readings are visible. Select one to trace its role in the map.' if shared else 'Compare every view. Select one to highlight it without hiding the others.'
+    # The comparison instruction is the phone's: from 561px up every scene is
+    # already side by side and the choices are not offered (figures.css).
+    instruction = 'All readings are visible. Select one to trace its role in the map.' if shared else 'Pick a view, or show all states to compare them.'
     controls = f'<div class="fp-toolbar"><div class="fp-controls fp-choices" role="group" aria-label="Explore {esc(eyebrow.lower())}" hidden>{options}</div><button type="button" class="fp-overview-toggle" data-overview aria-pressed="false" hidden>Show all states</button>{extra}<p class="fp-instruction" hidden>{instruction}</p><span class="fp-sr" data-announcement role="status" aria-live="polite" aria-atomic="true"></span></div>'
     if shared:
         body = f'<div class="fp-body"><div class="fp-visual"><div class="fp-map">{art}{labels}</div><div class="fp-legend">{legend}</div></div><div class="fp-aside"><div id="fp-{key}-reading" class="fp-readings" role="group" aria-label="Readings of {esc(eyebrow.lower())}">{readings}</div></div></div>'

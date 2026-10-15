@@ -2,8 +2,12 @@
    Native click semantics give keyboard, pointer and touch the same action;
    unlike pointerdown/preventDefault, they do not steal a scrolling gesture.
    
-   Desktop/tablet: all states visible, selection highlights without hiding.
-   Phone: focus on one state; "Show all states" toggle reveals all. */
+   Every state is visible from 561px up, so a selection never hides anything:
+   on an overview plate it traces one reading in the shared map (which stays
+   beside the readings while they scroll), and a comparison plate offers no
+   choice at all up there — its scenes are already side by side. The phone is
+   where the choices do the work: one state in focus, "Show all states"
+   reveals them. figures.css decides which controls are offered where. */
 (() => {
   'use strict';
   function enhance(root = document) {
@@ -11,7 +15,6 @@
   for (const figure of figures) {
     if (figure.dataset.enhanced) continue;
     const isComparison = figure.classList.contains('fp-comparison');
-    const isOverview = figure.classList.contains('fp-overview');
     const buttons = [...figure.querySelectorAll('button[data-select]')];
     const readings = [...figure.querySelectorAll('[data-reading]')];
     const scenes = [...figure.querySelectorAll('.fp-scene')];
@@ -27,7 +30,7 @@
       const sharedField = figure.querySelector('.fp-share-link');
       if (sharedField) sharedField.hidden = true;
       buttons.forEach(button => button.setAttribute('aria-pressed', String(button === selected)));
-      // Highlight instead of hide: toggle is-current class
+      // Mark the current reading; never hide another one.
       readings.forEach(panel => {
         const isCurrent = panel.dataset.reading === value;
         panel.classList.toggle('is-current', isCurrent);
