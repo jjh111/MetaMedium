@@ -33,6 +33,37 @@ scene is on screen. A lens link (`?lens=`) is still honoured at every width.
 | `#figure-lenses` | Physics, chemistry, both composed — and sharing one of them (phone) |
 | `#figure-alignment` | Constraints alone, and constraints plus shared ground |
 
+## Ink rules
+
+Tufte's test, applied to these plates: a stroke has to carry meaning, and what
+differs between scenes has to be the loudest thing on the page.
+
+- **No furniture.** No graph paper, no registration marks, no hatching, no
+  edition tag. Nothing in any plate is measured against a grid, so there is no
+  grid to measure against.
+- **One outline per thing.** A plane, a triangle, a boundary or a node is drawn
+  once. The plates used to stack five, seven or thirteen offset copies of a
+  contour to make a texture, and that texture was louder than the data inside
+  it. Where an outline and a relation said the same thing twice — the triad's
+  backdrop triangle behind its own edges — the relation stays and the outline
+  goes.
+- **Weight says what differs.** The substrate every scene shares is a hairline
+  in ink-soft; the overlay that makes a scene itself is drawn heavier
+  (`.fp-snapshot-layer`) and in its own colour.
+- **Label where the thing is.** An overlay is named beside the overlay —
+  `labels` may be a dict keyed by scene, `{'all': …, '<state>': …}` — not in a
+  legend the eye has to carry back to the picture. A legend stays only where it
+  defines a colour language the drawing cannot say for itself; `legend=''`
+  emits no legend row.
+- **Number only what is ordered.** `ordered=True` numbers the scenes of a
+  spectrum, a sequence of turns, or a cumulative pair. Three media, three
+  contexts and two vocabularies have no order, so they carry no numbers.
+- **Fill the canvas.** `fit=(scale, cx, cy)` scales a plate's artwork about its
+  own content centre onto the same 1000-unit canvas, so taking furniture away
+  never leaves the subject small in the middle of its box. The canvas stays
+  1000 units wide — the audit asserts it — and strokes scale with the drawing
+  as a zoom would.
+
 ## Source and rendering
 
 - `build.py`: authored content and deterministic vector geometry. No runtime

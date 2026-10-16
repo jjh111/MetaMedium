@@ -50,8 +50,6 @@
 .fp-snapshot-layer { opacity: 1 !important; }
 
 /* ── SVG artwork tokens ── */
-.fp-grid { fill: none; stroke: var(--dia-grid); stroke-width: 1.2; }
-.fp-registration { fill: none; stroke: var(--dia-hold); stroke-width: 1.6; }
 .fp-line { fill: none; stroke: var(--fp-line); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .fp-hair { stroke-width: 1.6; }
 .fp-dash { stroke-dasharray: 9 10; }
@@ -63,10 +61,13 @@
 .fp-dot.fp-key { color: var(--dia-key); }
 .fp-dot.fp-model { color: var(--dia-model); }
 .fp-surface { fill: var(--fig-plate); stroke-width: 3; }
-.fp-source { color: var(--ink-soft); stroke: var(--ink-soft); stroke-width: 5; }
+.fp-source { color: var(--ink-soft); stroke: var(--ink-soft); stroke-width: 3.4; }
+/* In a comparison, the layer that differs carries more weight than the
+   substrate every scene shares. */
+.fp-snapshot-layer .fp-line { stroke-width: 3.8; }
+.fp-snapshot-layer .fp-hair { stroke-width: 2.2; }
 .fp-dot.fp-source { fill: var(--ink-soft); stroke: none; }
 .fp-opaque { fill: var(--ink); stroke: var(--ink); }
-.fp-hatch { stroke: var(--fig-plate); opacity: .3; stroke-width: 1.4; }
 .fp-arrowhead { fill: var(--dia-key); stroke: none; }
 .fp-model-arrow { fill: var(--dia-model); }
 .fp-line.fp-model { stroke-dasharray: 8 7; }
@@ -81,7 +82,7 @@
 [data-emphasis] > circle { transition: stroke-width 200ms ease; }
 .fp-layer { opacity: 0; transition: opacity 240ms ease; }
 .fp-layer.is-selected { opacity: 1; }
-[data-plate="spectrum"] .fp-layer { opacity: .42; }
+[data-plate="spectrum"] .fp-layer { opacity: .55; }
 [data-plate="spectrum"] .fp-layer.is-selected { opacity: 1; }
 .fp-feedback, .fp-shared-path { transition: opacity 240ms ease; }
 [data-loop-open="true"] .fp-feedback { opacity: 0; }
@@ -176,7 +177,6 @@
 /* ── Phone ── */
 @media (max-width: 560px) {
   .folio-plate { width: 100%; max-width: 100%; }
-  .fp-edition { display: none; }
   .folio-plate .fp-heading h3 { letter-spacing: -.045em; }
   .fp-map-label { font-size: 13px; padding: 2px 4px; }
   .fp-word { font-size: 17px; }
@@ -202,10 +202,9 @@
 /* ── High contrast ── */
 @media (forced-colors: active) {
   .folio-plate button[aria-pressed="true"] { border: 3px solid Highlight; }
-  .fp-line, .fp-surface, .fp-registration { stroke: CanvasText; }
+  .fp-line, .fp-surface { stroke: CanvasText; }
   .fp-dot, .fp-arrowhead, .fp-opaque { fill: CanvasText; }
   .fp-surface { fill: Canvas; }
-  .fp-line.fp-hatch { stroke: Canvas; opacity: 1; }
 }
 
 /* ── Print ── */
