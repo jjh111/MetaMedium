@@ -29,7 +29,7 @@
 /* ── Shared-map (overview) layout: spectrum, triad ── */
 .fp-body { display: grid; grid-template-columns: minmax(0, 1.48fr) minmax(0, 1fr); gap: clamp(22px, 3vw, 46px); padding: var(--fp-pad); }
 .fp-visual { min-width: 0; display: flex; flex-direction: column; }
-.fp-map { position: relative; width: 100%; aspect-ratio: 1000 / 920; flex: 0 0 auto; }
+.fp-map { position: relative; width: 100%; aspect-ratio: 1000 / 920; flex: 0 0 auto; container-type: inline-size; }
 .fp-art { display: block; width: 100%; height: auto; overflow: visible; pointer-events: none; }
 .fp-art * { pointer-events: none; }
 
@@ -88,7 +88,11 @@
 [data-loop-open="true"] .fp-feedback { opacity: 0; }
 
 /* ── Map labels ── */
-.fp-map-label { position: absolute; left: var(--x); top: var(--y); transform: translate(-50%, -50%); max-width: 86%; width: max-content; padding: 3px 6px; background: var(--fig-plate); color: var(--ink-soft); font-size: 14px; line-height: 1.35; text-align: center; pointer-events: none; }
+.fp-map-label { position: absolute; left: var(--x); top: var(--y); transform: translate(-50%, -50%); max-width: 86%; width: max-content; padding: 3px 6px; background: var(--fig-plate); color: var(--ink-soft); font-size: 14px;
+  /* A label belongs to its drawing, so it is sized against the drawing's
+     own width: three scenes side by side make each map half the width an
+     overview map has, and a 14px label there is twice the size. */
+  font-size: clamp(11px, 4.2cqw, 14px); line-height: 1.35; text-align: center; pointer-events: none; }
 .fp-word { display: none; color: var(--ink-soft); font-size: 20px; }
 /* Single-view word rule (kept for no-JS fallback) */
 [data-active="word"] .fp-word { display: block; }

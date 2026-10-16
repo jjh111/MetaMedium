@@ -128,6 +128,16 @@ motion, print and no-JS fallbacks. Chromium also exercises a touch scroll gestur
 External YouTube/analytics requests are excluded; this is not the engine demo's
 release gate. The normal-motion and no-JS checks load the real page too.
 
+`node e2e/whitepaper-figure-ink.mjs [width …]` is the companion diagnostic, run
+by hand after editing geometry or moving a label. The plate audit cannot see a
+label sitting on a drawing — a label carries the plate's own background, so it
+simply hides what it covers — and this samples every geometry element along its
+own outline to find exactly that, plus geometry drawn outside the canvas and
+labels pushed outside their drawing. Desktop and tablet widths are held to zero
+findings; phone widths are reported, not enforced, because a 1000-unit drawing
+in a ~300px box with readable labels is crowded by construction. A label may
+interrupt the line it *names* — the two that do are named in its `ALLOWED`.
+
 Evidence is written to `/tmp/metamedium-figure-audit` (override with `FP_RESULTS`).
 Screenshots hide only the sticky navigation so it does not obscure the cropped
 figure; they otherwise use the page's real styles and fonts. Every run saves a

@@ -120,8 +120,8 @@ for i, (key,y) in enumerate([('marks',680),('structure',475),('meaning',270)]):
         a+=arrow(f'M280 {y+5}C430 {y+110},630 {y+90},735 {y-2}','spectrum')
         a+=circle(475,y-10,62,'fp-line fp-model')
     body+=group(key,a,i==2)
-body = planes + path('M450 115V780M880 270V680M120 270V680','fp-line fp-dash fp-held') + body
-plate('spectrum',1,'Representation','From marks to meaning','A drawing can preserve appearance, expose structure, or become something both parties can question.',svg('spectrum','Three layers of a digital representation',body,'An exploded stack: raster marks below a connected geometry layer, below a revisable interpretation layer. Select a layer to inspect its role.'),label('Interpretation',78,21)+label('Structure',78,49)+label('Marks',65,88),[('marks','Preserve'),('structure','Structure'),('meaning','Interpret')],[
+body = planes + path('M450 115V780','fp-line fp-dash fp-held') + body
+plate('spectrum',1,'Representation','From marks to meaning','A drawing can preserve appearance, expose structure, or become something both parties can question.',svg('spectrum','Three layers of a digital representation',body,'An exploded stack: raster marks below a connected geometry layer, below a revisable interpretation layer. Select a layer to inspect its role.'),label('Interpretation',82,17)+label('Structure',82,42)+label('Marks',66,94),[('marks','Preserve'),('structure','Structure'),('meaning','Interpret')],[
  note('Preserve the mark','Pixels and captured ink remember what was drawn. They do not, by themselves, say what it means.',[('Representation','Samples, strokes, appearance'),('In the paper','Photoshop; OneNote ink capture'),('Trade-off','Fidelity without an explicit semantic model')]),
  note('Expose the structure','Vectors, components and executable sketches give the drawing addressable parts and relationships.',[('Representation','Geometry, instances, links, behavior'),('In the paper','Illustrator; Figma; Miro; Chalktalk'),('Trade-off','Structure still needs an interpretation')]),
  note('Make interpretation revisable','Model-assisted tools can propose what marks stand for. dyna.ink’s aim is to keep that proposal visible, negotiable and reusable.',[('Representation','Marks + relations + readings'),('In the paper','tldraw computer; dyna.ink’s proposal'),('Trade-off','Interpretations can be wrong; preserve the source')])],'<b>The digital representation spectrum</b>A conceptual map of representations, not a current feature audit or a ranking of products. A tool may work across several layers.',legend([('fp-held','preserved source'),('fp-key','addressable structure'),('fp-model','proposed interpretation')]),ordered=True,default=2)
@@ -151,7 +151,6 @@ for ia,ib in [(0,1),(0,3),(1,2),(1,5),(2,4),(3,5),(5,4),(2,5)]:
     x,y,r=nodes[ia]; xx,yy,rr=nodes[ib]; a+=path(f'M{x} {y}L{xx} {yy}','fp-line fp-key')
 for x,y,r in nodes:
     a+=circle(x,y,r,'fp-surface fp-key')+circle(x,y,7,'fp-dot fp-key')
-a+=path('M180 770H815M180 756V784M815 756V784','fp-line fp-held')
 body+=group('drawing',a,True)
 plate('capacity',2,'Communication','A wider channel for thought','Sequence, prosody and spatial relations carry different kinds of context. Explore what each medium makes directly available.',svg('capacity','Three ways to carry context',body,'Selectable layers depict a sequence of marks, a family of sound waves, and a spatial network. These are qualitative illustrations, not bandwidth measurements.'),label('Context carried by the medium',50,9)+label('Same intent · different expression',50,90),[('text','Text'),('voice','Voice'),('drawing','Drawing')],[
  note('A sequence to interpret','Words make precise, portable statements. Relationships must usually be named and ordered in the sequence.',[('Directly available','Symbols; order; explicit descriptions'),('Example','“Connect the circle to the square.”'),('Strength','Precise language and searchable records')]),
@@ -176,10 +175,12 @@ a+=circle(745,670,22,'fp-line fp-model')+circle(766,670,22,'fp-line fp-model')
 extra='<div class="fp-controls fp-check" hidden><label><input type="checkbox" data-loop checked> Include shared meaning</label></div>'
 triad_labels=''
 # A node's name sits clear of its circle, not across the edge of it.
-for name,x,y in [('Language',50,8),('Computation',24.5,90),('Meaning',75.5,90)]:
+for name,x,y in [('Language',50,7),('Computation',24.5,92),('Meaning',75.5,92)]:
     triad_labels+=label(name,x,y,'fp-node-name')
     triad_labels+=f'<button type="button" class="fp-map-action" style="--x:{x}%;--y:{y}%" data-inspect="{name.lower()}" aria-controls="fp-triad-reading-{name.lower()}" hidden>{name}</button>'
-triad_labels+=label('Interpret ↔ revise',50,49,'fp-feedback-label')
+# Sits in the gap between the solid edge above it and the dashed return
+# arc below, interrupting only the arc it names.
+triad_labels+=label('Interpret ↔ revise',50,78,'fp-feedback-label')
 plate('triad',3,'Triadic closure','Meaning inside the loop','Language expresses. Computation transforms. Meaning connects the result back to an intention.',svg('triad','Language, computation and meaning in a feedback loop',a,'A triangle connects language, computation and meaning. A checkbox removes or restores the return paths, exposing the difference between execution and negotiated interpretation.'),triad_labels,[('language','Language'),('computation','Computation'),('meaning','Meaning')],[
  note('A proposal, not just a command','A word, line or gesture can propose a reading. Its meaning depends on what surrounds it and on the shared vocabulary.',[('Contribution','Express an intention'),('Return path','A visible reading can change the next mark'),('On the surface','An annotation stays attached to its subject')]),
  note('A transformation you can inspect','The system maps marks and relationships to operations. Its response belongs beside the source, not behind an opaque command boundary.',[('Contribution','Calculate, connect, simulate'),('Return path','The outcome helps test the interpretation'),('On the surface','The operation and its effects remain inspectable')]),
@@ -192,7 +193,7 @@ for x,y in [(303,310),(414,624),(637,423),(600,260)]: a+=circle(x,y,7,'fp-dot fp
 a+=group('oval',path('M680 255H818M680 435H863M680 615H796','fp-line fp-model fp-dash'),True)
 a+=group('eyes',circle(384,396,13,'fp-dot fp-source')+circle(528,396,13,'fp-dot fp-source')+path('M360 376h44v40h-44ZM505 376h44v40h-44Z','fp-line fp-model'))
 a+=group('word',circle(384,396,13,'fp-dot fp-source')+circle(528,396,13,'fp-dot fp-source')+path('M365 500Q452 589 552 490','fp-line fp-model')+arrow('M758 569Q733 686 565 670','negotiation','fp-model'))
-labels=label('Persistent source',29,12)+label('Proposed reading',71,87)+ '<span class="fp-map-label fp-word" style="--x:78%;--y:57%">“happy”</span>'
+labels=label('Persistent source',25,6)+label('Proposed reading',71,90)+ '<span class="fp-map-label fp-word" style="--x:78%;--y:57%">“happy”</span>'
 plate('negotiation',4,'Negotiation','Understanding is a sequence','Add evidence to the same drawing. Watch the interpretation change without erasing the mark that started it.',svg('negotiation','An annotated specimen, refined through three exchanges',a,'The original imperfect oval persists across three turns: draw an oval, add eyes, then write happy. The final smile is a model proposal rather than a replacement for the original ink.',fit=(1.3,576,470)),labels,[('oval','Draw an oval'),('eyes','Add two dots'),('word','Write “happy”')],[
  note('01 / Keep the alternatives open','A closed contour is not yet a face. The system can offer “circle”, “face” or “egg” without committing the source to any of them.',[('Person','Draws an imperfect oval'),('System','Offers several possible readings'),('What changed','A mark exists; its referent is unsettled')]),
  note('02 / Add evidence, not a command','Two interior dots make a face-like interpretation more plausible. The added detail negotiates the reading in the drawing itself.',[('Person','Adds two dots inside the contour'),('System','Revises the leading reading to “face”'),('What changed','Internal features constrain the interpretation')]),
@@ -214,7 +215,7 @@ for key in ['unframed','portrait','orbital']:
         for angle in [-40,0,40]: b+=f'<ellipse cx="500" cy="475" rx="160" ry="62" transform="rotate({angle} 500 475)" class="fp-line fp-model"/>'
         b+=circle(500,475,22,'fp-dot fp-key')+circle(654,493,10,'fp-dot fp-model')
     a+=group(key,b,key=='unframed')
-plate('semiotic',5,'Semiotics','A mark is not its meaning','The same contour can invite different readings. Context changes the relation between sign, referent and interpretation.',svg('semiotic','The semiotic triangle under different contexts',a,'Sign, object and interpretant form a triangle around an ambiguous contour. Portrait and orbital contexts suggest different referents without changing the source sign.',fit=(1.25,497,455)),label('Object / referent',50,9)+label('Sign / form',21,85)+label('Interpretant',79,85),[('unframed','No context'),('portrait','Portrait'),('orbital','Orbital diagram')],[
+plate('semiotic',5,'Semiotics','A mark is not its meaning','The same contour can invite different readings. Context changes the relation between sign, referent and interpretation.',svg('semiotic','The semiotic triangle under different contexts',a,'Sign, object and interpretant form a triangle around an ambiguous contour. Portrait and orbital contexts suggest different referents without changing the source sign.',fit=(1.05,497,455)),label('Object / referent',50,6)+label('Sign / form',19,94)+label('Interpretant',81,94),[('unframed','No context'),('portrait','Portrait'),('orbital','Orbital diagram')],[
  note('Hold the reading open','An oval supplies a form, not a unique referent. Face, egg, zero or a drawn orbit remain possibilities until a context makes one useful.',[('Sign','The visible contour'),('Object','What it may refer to'),('Interpretant','The sense made of that relationship')]),
  note('Read it as a portrait','Within a portrait, the contour can stand for a head. Surrounding features support that reading; they do not make every oval a face.',[('Sign','The same contour'),('Object','A person’s head'),('Interpretant','“This contour depicts a face.”')]),
  note('Read it as an orbit','Near a central body and trajectory marks, an oval can stand for a path through space. Meaning comes from connections, not shape alone.',[('Sign','The same contour'),('Object','A possible orbital path'),('Interpretant','“This contour depicts a trajectory.”')])],'<b>The semiotic triad applied</b>The interpretant is the sense made of a sign’s relation to its object—not simply “the AI”. A model can participate in interpretation while its reading remains contestable.',legend([('fp-key','semiotic relation'),('fp-model','contextual reading')]),foot='Conceptual contexts · no probabilities or model outputs are implied')
@@ -232,9 +233,9 @@ chemistry+=path('M330 508L453 369M550 369L684 508M360 594H655','fp-line fp-model
 a+=group('physics',physics,True)+group('chemistry',chemistry)+group('combined',physics+chemistry)
 extra='<div class="fp-controls fp-secondary" hidden><button type="button" data-share>Share this lens view <span aria-hidden="true">↗</span></button><input class="fp-share-link" type="text" aria-label="Link to this lens view" readonly hidden></div>'
 plate('lenses',6,'Cognitive lenses','One drawing. Several readings.','A lens brings a vocabulary to the surface. Compose vocabularies without replacing the drawing underneath.',svg('lenses','A graph read through physics and chemistry lenses',a,'A persistent triangular graph receives a physics overlay of force arrows, a chemistry overlay of bonds and sites, or both overlays together.',fit=(1.3,501,466)),{'all':label('Persistent drawing',50,10),
-   'physics':label('force vectors read from the edges',50,93),
-   'chemistry':label('bond sites read from the nodes',50,93),
-   'combined':label('both overlays, kept apart',50,93)},[('physics','Physics'),('chemistry','Chemistry'),('combined','Compose both')],[
+   'physics':label('force vectors',50,91),
+   'chemistry':label('bond sites',50,91),
+   'combined':label('both, kept apart',50,91)},[('physics','Physics'),('chemistry','Chemistry'),('combined','Compose both')],[
  note('Read forces and constraints','A physics vocabulary treats nodes as bodies and edges as constraints. Directional annotations become candidate force vectors.',[('Apply','Read a new sketch with familiar notation'),('Share','Send this view to a collaborator'),('Compose','Keep this vocabulary alongside another')]),
  note('Read sites and bonds','A chemistry vocabulary treats nodes as sites and edges as possible bonds. This is a diagrammatic analogy, not a chemically valid molecule.',[('Apply','Bring a second vocabulary to the same marks'),('Share','Preserve the chosen context in a link'),('Compose','Compare with the physics reading')]),
  note('Keep both readings inspectable','Composition retains each vocabulary’s contribution. A shared graph can support several readings without pretending their assumptions are identical.',[('Apply','Inspect the force and bond overlays together'),('Share','The link restores this composed view'),('Compose','Preserve disagreements instead of hiding them')])],'<b>Portable interpretation frameworks</b>Apply, share and compose are the proposed lens operations. These overlays are illustrative; sharing here sends only a URL to this view, not a trained recognizer.','',extra=extra,foot='Illustrative lenses · sharing contains only a view selection')
@@ -243,7 +244,8 @@ plate('lenses',6,'Cognitive lenses','One drawing. Several readings.','A lens bri
 a=''
 a+=circle(500,445,278,'fp-line fp-held fp-hair')
 a+=rect(185,155,630,600,'fp-line fp-held', 'rx="24"')
-for y in [260,445,630]: a+=path(f'M172 {y}h26M802 {y}h26','fp-line fp-held')
+# One opening, where the two arrows actually cross the boundary.
+a+=path('M172 445h26M802 445h26','fp-line fp-held')
 nodes=[(340,360),(475,270),(658,363),(414,574),(658,574),(525,454)]
 network=''
 for i,j in [(0,1),(1,2),(0,3),(1,5),(5,4),(2,4),(3,4),(0,5),(2,5)]:
