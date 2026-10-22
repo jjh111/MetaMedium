@@ -6,7 +6,7 @@
 //   seatState (for tests), and the door moved under "advanced".
 // Uses: relay (24-relay.js: claudeRelayFor, ownRelay — which relay "with Claude" defaults to, A2), core (MM, prefs, esc), models (agents, join, leave, renderAgents, workControllers, addMcp,
 //   syncProviderFields, the pane's elements), input (say), folder (folder, openLive, saveNow),
-//   teach (closePanel), controls (livePanel, tiles, syncTiles).
+//   teach (closePanel), controls (livePanel, tiles, syncTiles), room (24-room.js: roomKeyFor — the key this page knows for the room).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -39,7 +39,7 @@
 
   const CLAUDE_ROOM = 'claude';
   // The relay "with Claude" defaults to: the one on this machine, and on the dyna.ink origin the hosted one (24-relay.js; A2).
-  // A relay typed in the Live pane wins. The room's key, for a hosted relay, is the page address's ?key= — never held here.
+  // A relay typed in the Live pane wins. The room's key, for a hosted relay, is the one this page was opened with (24-room.js, roomKeyFor) — never held here.
   const CLAUDE_RELAY = claudeRelayFor(location.hostname);
   /** How recently a hand must have been heard to be in the room — the status line's own minute. */
   const HEARD_MS = 60000;
@@ -55,7 +55,7 @@
   /** Why the seat cannot take a question on this page now, in one sentence — or null. */
   function whyNoSeat() {
     if (folder.how !== 'live' || !folder.store) {
-      return 'Claude answers here once this page is in its room — tap “with Claude” in the live tile, or open this page with ?live=' + CLAUDE_ROOM + '&relay=' + CLAUDE_RELAY + (ownRelay(CLAUDE_RELAY) ? '&key=… (the room’s key)' : '') + '.';
+      return 'Claude answers here once this page is in its room — tap “with Claude” in the live tile, or open this page with ?live=' + CLAUDE_ROOM + '&relay=' + CLAUDE_RELAY + (ownRelay(CLAUDE_RELAY) ? '#key=… (the room’s key)' : '') + '.';
     }
     if (!folder.relay) return 'This room is between tabs on this machine, and Claude’s hand reaches a room only through a relay — tap “with Claude” in the live tile.';
     if (MM.providerLocality({ baseUrl: folder.relay }) !== 'local' && !ownRelay(folder.relay)) return 'This room’s relay is on another machine, and the seat asks only through a relay on this one or the dyna.ink relay — tap “with Claude” in the live tile.';
@@ -127,7 +127,8 @@
     if (name) prefs.set('hand-name', name);
     seatWanted = true;
     try {
-      await openLive(CLAUDE_ROOM, { relay: relay });
+      // The board on screen goes with you — the seat is there to read it — and the room's key, where this page knows it.
+      await openLive(CLAUDE_ROOM, { relay: relay, key: roomKeyFor(CLAUDE_ROOM), carry: true });
     } catch (err) {
       seatWanted = false;
       if (statusEl) statusEl.textContent = 'could not join: ' + (err.message || err);

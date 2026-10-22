@@ -12239,7 +12239,10 @@
 // Provides: the folder as the canvas — openFolder/openStatic/openStore (discovery into artifacts,
 //   per-participant logs merged), autosave (to the folder), the live budget (liveSet), the grid and
 //   focus views (setViewMode, focusOn), imageUrlFor, folderStatus; a live room (openLive: logs
-//   arriving live over a BroadcastChannel or a relay, merged as they land, and — over a relay — the bytes of
+//   arriving live over a BroadcastChannel or a relay — read as a stream with fetch, the room's key in a header and
+//   never an address, every line POSTed with this page's hand secret, PAGE_HAND, and answered with what became of
+//   it; the board on screen carried in only when asked (`carry`); the page's address made the room's, roomAddress —
+//   merged as they land, and — over a relay — the bytes of
 //   the pictures they name: put on it before a line names them, fetched by hash when one is missing,
 //   roomAssetFetch; PLAN-IPAD-NOTES A1; and tellOtherMoves — another hand's move of marks of mine, said once in the status
 //   line and attributed, A2b); and the boards this
@@ -12260,7 +12263,8 @@
 //   (savedMark, restoreMark), artifacts, render, input (say, flash), images (downloadText), controls
 //   (syncTiles), the boards pane (renderBoardsPane, roomChanged), the seat (seatRoomOpened: who is heard in a room),
 //   carrying (17-carry.js's rules; 22-carry.js's carryTake; the bundle reader and inflateRaw, 17-bundle.js and 18-out.js;
-//   rememberMark, 03-teach.js).
+//   rememberMark, 03-teach.js); the relay's address rules (24-relay.js: roomSearch, roomHash, withoutKey, roomRelayFor);
+//   the room's presence in the bar (24-room.js: liveRoomOpened).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -12380,40 +12384,133 @@
   }
   /** How long a line waits for the pictures it names to reach the room — under core's own wait on a send. */
   const ROOM_ASSET_WAIT_MS = 8000;
+  /** How long a dropped stream waits before it is opened again, doubling from the first to the last. */
+  const STREAM_RETRY_FIRST_MS = 1000;
+  const STREAM_RETRY_MAX_MS = 30000;
+  /** A stream that has carried nothing — not even the relay's beat, every 25 s — for this long is taken as cut, and opened again. */
+  const STREAM_QUIET_MS = 60000;
+  /** The header a hand's secret goes in (Demos/relay-protocol.mjs, HAND_HEADER). */
+  const HAND_HEADER = 'x-dyna-hand';
+  // This page load's hand secret: 16 random bytes, minted once and kept nowhere a reload would find them — a
+  // sitting (L1), like PAGE_SUFFIX and PAGE_SITTING below. Every line this page posts carries it, and the room
+  // holds the name this page writes under for it alone (relay-protocol.mjs, `claimCheck`): nobody else can write a
+  // line in this hand's name, so nobody can replace its log. Never in a line, a log, an address or storage.
+  const PAGE_HAND = (() => {
+    try {
+      const b = new Uint8Array(16);
+      crypto.getRandomValues(b);
+      let bin = '';
+      for (const x of b) bin += String.fromCharCode(x);
+      return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    } catch (err) { return MM.sittingToken(22); }
+  })();
+  /** Whether this browser can read a stream with fetch — a header (the key), a last id — rather than an EventSource, which can send neither. */
+  const STREAMS_BY_FETCH = typeof fetch === 'function' && typeof ReadableStream === 'function' && typeof TextDecoder === 'function' && typeof Response !== 'undefined' && 'body' in Response.prototype;
   function relayTransport(url, room, key) {
-    // A relay that asks for a key (cloudflare/relay) takes it as `?key=`: an EventSource cannot set a
-    // header. The key is the page's own — from the address or a typed field — and goes nowhere but
-    // this address: never the log, the board, an export, or a cache (`sw.js` does not keep a request with one).
-    const base = url.replace(/\/+$/, '') + '/rooms/' + encodeURIComponent(room) + '/events' + (key ? '?key=' + encodeURIComponent(key) : '');
+    // The key goes in a header — `Authorization: Bearer` — on the stream and on every line, so no address the
+    // network sees carries it (MU-11): fetch reads the stream as Server-Sent Events, which an EventSource cannot do
+    // with a header. Only where fetch cannot stream is there an EventSource, with `?key=` in its address. The key is
+    // the page's own — from an invite's fragment, a typed field or a room just opened — and goes nowhere else: never
+    // the log, the board, an export, or a cache (`sw.js` keeps no request with an authorization header).
+    const base = url.replace(/\/+$/, '') + '/rooms/' + encodeURIComponent(room) + '/events';
+    const auth = key ? { authorization: 'Bearer ' + key } : {};
     const listeners = new Set();
-    let es = null;
     let closed = false;
     let retry = null;
+    let ctl = null;           // the open stream's abort
+    let es = null;            // the fallback's EventSource
+    let lastId = 0;           // the newest line heard, so a stream opened again is sent only what it missed (MU-12)
+    let wait = STREAM_RETRY_FIRST_MS;
+    let streaming = false;
+    let heardAt = 0;
     const deliver = (line) => { for (const cb of listeners) cb(line); };
-    // Every line goes to the store — the relay's own word that the room has outlived its buffer
-    // included: the store says it (`notices`), and so does every other hand's.
-    const onLine = (e) => {
+    // One block of the stream: its id moves Last-Event-ID; its data is a line, or the relay's own word (the room
+    // has outlived its buffer), which goes to the store like any line — the store says it (`notices`).
+    const block = (text) => {
+      let id = 0;
+      const data = [];
+      for (const raw of text.split('\n')) {
+        const l = raw.replace(/\r$/, '');
+        if (l.startsWith('id:')) id = Number(l.slice(3).trim()) || 0;
+        else if (l.startsWith('data:')) data.push(l.slice(5).replace(/^ /, ''));
+      }
+      if (id) lastId = id;
+      if (!data.length) return;
       let line;
-      try { line = JSON.parse(e.data); } catch (err) { return; /* not a line */ }
+      try { line = JSON.parse(data.join('\n')); } catch (err) { return; /* not a line */ }
       deliver(line);
     };
-    // An EventSource that is closed for good was refused, and cannot say by what: ask once with a plain
-    // request. A key the relay will not take is said to the store (`{ relay: 'refused' }`) and not asked
-    // again, as Node's transport does; anything else is a hiccup, and the stream is opened again.
-    const refusedOr = () => {
-      fetch(base, { headers: { accept: 'text/event-stream' }, cache: 'no-store' }).then((res) => {
-        const status = res.status;
-        if (res.body) res.body.cancel().catch(() => undefined);
-        if ([401, 403, 503].includes(status)) { closed = true; deliver({ relay: 'refused', room: room, status: status }); return; }
-        if (!closed) retry = setTimeout(open, 3000);
-      }, () => { if (!closed) retry = setTimeout(open, 3000); });
-    };
-    const open = () => {
+    const again = () => {
+      streaming = false;
       if (closed) return;
-      es = new EventSource(base);
-      es.addEventListener('message', onLine);
-      es.addEventListener('error', () => { if (es.readyState === 2 && !closed) refusedOr(); });
+      clearTimeout(retry);
+      retry = setTimeout(open, wait);
+      wait = Math.min(STREAM_RETRY_MAX_MS, wait * 2);
     };
+    // A refusal that will not mend itself — no key, a wrong one, an origin the relay does not serve, a relay with no
+    // keys — is said to the store once (`{ relay: 'refused' }`) and not asked again; anything else is a hiccup, and the
+    // stream is opened again from its last id, later each time.
+    const refused = (status, words) => {
+      closed = true;
+      deliver(Object.assign({ relay: 'refused', room: room, status: status }, status === 403 && /origin/i.test(words || '') ? { reason: 'origin' } : {}));
+    };
+    async function open() {
+      if (closed) return;
+      if (!STREAMS_BY_FETCH) { openEventSource(); return; }
+      const mine = new AbortController();
+      ctl = mine;
+      let res;
+      try {
+        res = await fetch(base, { headers: Object.assign({ accept: 'text/event-stream' }, auth, lastId ? { 'last-event-id': String(lastId) } : {}), cache: 'no-store', signal: mine.signal });
+      } catch (err) { if (ctl === mine) again(); return; }
+      if (res.status !== 200 || !res.body) {
+        const words = await res.text().catch(() => '');
+        if (res.status === 401 || res.status === 403 || res.status === 404 || (res.status === 503 && /no key configured/i.test(words))) refused(res.status, words);
+        else if (ctl === mine) again();
+        return;
+      }
+      streaming = true;
+      heardAt = Date.now();
+      wait = STREAM_RETRY_FIRST_MS;
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          heardAt = Date.now();
+          buf += dec.decode(value, { stream: true });
+          let i;
+          while ((i = buf.indexOf('\n\n')) >= 0) { block(buf.slice(0, i)); buf = buf.slice(i + 2); }
+        }
+      } catch (err) { /* the stream was cut, or let go of */ }
+      if (ctl === mine) again();
+    }
+    function openEventSource() {
+      // The fallback: an EventSource can send no header, so the key is in its address — on this browser only.
+      es = new EventSource(base + (key ? '?key=' + encodeURIComponent(key) : ''));
+      es.addEventListener('message', (e) => {
+        if (e.lastEventId) lastId = Number(e.lastEventId) || lastId;
+        let line;
+        try { line = JSON.parse(e.data); } catch (err) { return; }
+        deliver(line);
+      });
+      es.addEventListener('error', () => { if (es && es.readyState === 2 && !closed) { es = null; again(); } });
+    }
+    // A stream that carries nothing for a minute — a laptop that slept, a phone that changed networks — is opened again.
+    const quiet = setInterval(() => { if (streaming && Date.now() - heardAt > STREAM_QUIET_MS && ctl) ctl.abort(); }, STREAM_QUIET_MS / 4);
+    // Back online: the stream is opened again at once, from its last id (the store sends what it owes on its own).
+    const online = () => {
+      if (closed) return;
+      clearTimeout(retry);
+      wait = STREAM_RETRY_FIRST_MS;
+      if (es) { es.close(); es = null; }
+      if (ctl) ctl.abort();
+      ctl = null;
+      open();
+    };
+    addEventListener('online', online);
     // ----- pictures in the room (PLAN-IPAD-NOTES A1; the rules are 17-assets.js's) -----
     // A header, not `?key=`: a fetch can send one, and an address is kept by logs and caches.
     const assetAuth = key ? { authorization: 'Bearer ' + key } : {};
@@ -12464,9 +12561,9 @@
     }
     open();
     return {
-      // The POST's promise goes back to the store, which sends the next line
-      // only when this one has gone — two POSTs in flight can land the wrong
-      // way round.
+      // The POST's answer goes back to the store, which sends the next line only when this one has gone — two
+      // POSTs in flight can land the wrong way round — and sends again what the relay did not take: the store is
+      // told what became of each line ({ ok, status, retryAfter }), never left to guess.
       send: (line) => {
         // A picture's bytes go first (PLAN-IPAD-NOTES A1): a line that names a picture this tab kept goes only once the
         // room holds the bytes — or after ROOM_ASSET_WAIT_MS, so a slow link never wedges the room (a hand that
@@ -12476,10 +12573,23 @@
         for (const r of owed) if (refs.indexOf(r) < 0) refs.push(r);
         const todo = refs.filter((r) => !held.has(r));
         const ready = todo.length ? Promise.race([putAssets(todo), new Promise((ok) => setTimeout(ok, ROOM_ASSET_WAIT_MS))]) : Promise.resolve();
-        return ready.catch(() => undefined).then(() => fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(line) })).then(() => undefined, () => undefined);
+        return ready.catch(() => undefined).then(() => {
+          const body = JSON.stringify(line);
+          // A small line goes with keepalive, so one sent as the page goes — the goodbye, the last mark — outlives the page
+          // (on a reload the page is still "visible" at pagehide, so the moment cannot be told). The browser's limit is 64 KB.
+          const keepalive = body.length < 60000;
+          return fetch(base, { method: 'POST', headers: Object.assign({ 'content-type': 'application/json', [HAND_HEADER]: PAGE_HAND }, auth), body: body, keepalive: keepalive, cache: 'no-store' })
+            .then(async (res) => {
+              const retryAfter = Number(res.headers.get('retry-after')) || 0;
+              await res.text().catch(() => '');
+              return res.ok ? { ok: true, status: res.status } : Object.assign({ ok: false, status: res.status }, retryAfter > 0 ? { retryAfter: retryAfter } : {});
+            }, () => ({ ok: false, status: 0 }));
+        });
       },
       onMessage: (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
-      close: () => { closed = true; clearTimeout(retry); if (es) es.close(); },
+      close: () => { closed = true; clearTimeout(retry); clearInterval(quiet); removeEventListener('online', online); if (ctl) ctl.abort(); ctl = null; if (es) es.close(); },
+      // For tests: whether the stream is open now, and the newest line heard.
+      state: () => ({ streaming: streaming, lastId: lastId, byFetch: STREAMS_BY_FETCH }),
       // The room's pictures: `get` is what 18-images.js asks for a picture this browser holds no bytes for.
       assets: { get: getAsset },
     };
@@ -12497,10 +12607,22 @@
   // sitting, so the same name and the same sitting id.
   const PAGE_SUFFIX = MM.sittingToken();
   const PAGE_SITTING = MM.sittingToken(8);
+  /**
+   * Join a room, or open one: `opts` — `relay` (none: tabs on this machine, a BroadcastChannel), `key` (the room's,
+   * held in memory only), `carry` (the board on screen goes in as this hand's opening log: Share and *with Claude*
+   * carry it, and say so; joining someone's room by a link or a name never does — UX-05), `idleDays` (how long the
+   * relay keeps the room, as it said when it opened it). The page's address becomes the room's (`?live=`, the key in
+   * the fragment), so a reload rejoins.
+   */
   async function openLive(room, opts) {
     opts = opts || {};
     // The board on screen is left only once its store holds all of it (R1).
     if (onBoardHere()) { const v = await readyToLeave(); if (v && v.kind !== 'not-kept') throw new Error(v.words); }
+    // What goes in as this hand's opening log: the board on screen when it is carried, else nothing — except that a page
+    // joining again the room it is in, in the same sitting, sends its log there as it stands: that is the room's already,
+    // and an empty one would take this hand's marks off every board in it.
+    const again = folder.how === 'live' && folder.name === room && (opts.relay || '') === (folder.relay || '');
+    const carried = opts.carry || again ? session.getEvents().filter((e) => !e.by) : [];
     // From here this page's log is the room's: nothing drawn under the room's
     // name is written into the board this browser keeps (L1: a live tab keeps no local log).
     leaveBoard();
@@ -12522,16 +12644,22 @@
     // What is already drawn keeps the ids it was drawn with: the name applies
     // to what is written next, and the two forms cannot collide.
     session.setLogName(me);
-    const transport = opts.transport || (opts.relay ? relayTransport(opts.relay, room, opts.key || params.get('key') || '') : broadcastTransport(room));
+    const key = opts.key || '';
+    const transport = opts.transport || (opts.relay ? relayTransport(opts.relay, room, key) : broadcastTransport(room));
     const store = new MM.LiveStore(transport, me, room, { sitting: PAGE_SITTING });
     // Which relay carries the room: the seat parks its questions only through one on this machine (V1-PLAN J4).
     folder.relay = opts.relay || '';
+    // The room's key, in memory only — for the invite this page offers, and its own fragment (a reload rejoins).
+    folder.key = key;
+    folder.idleDays = opts.idleDays === undefined ? null : opts.idleDays;
+    folder.transport = transport;
+    roomAddress(room, folder.relay, key);
     // The room's pictures, when its relay keeps them (PLAN-IPAD-NOTES A1): between tabs on one machine the asset store is shared already.
     folder.roomAssets = (transport && transport.assets) || null;
-    // What this hand already drew is its opening log in the room — sent whole,
+    // What this hand carries in is its opening log in the room — sent whole,
     // as a store's first send always is, so joining the same room again in
     // this sitting replaces what the room holds of it instead of doubling it.
-    await store.publish(session.getEvents().filter((e) => !e.by));
+    await store.publish(carried);
     store.subscribe(() => { if (liveMergePending) return; liveMergePending = true; Promise.resolve().then(() => { liveMergePending = false; return mergeLive(); }); });
     // `openStore` counted what it loaded BEFORE the device re-taught its mark,
     // so that teach is this hand's and goes out with its log. Counted again
@@ -12545,8 +12673,18 @@
     await mergeLive();
     // Who is heard here, for the seat: Claude's hand, offered in the models pane (24-seat.js).
     seatRoomOpened(store);
+    // Who is here, in the bar (24-room.js), and this hand said to be here while the page is seen.
+    liveRoomOpened(store);
     store.hello();
     return folder;
+  }
+  /** The page's address, as the room's: `?live=` (and a relay that is not this page's own), and the key only in the fragment. */
+  function roomAddress(room, relay, key) {
+    if (EMBED) return;
+    // A room with no key keeps its relay in the query whatever it is, so a reload still finds it; one with a key keeps
+    // only the key in the fragment, and its relay only where it is not this page's own.
+    try { history.replaceState(history.state, '', location.pathname + roomSearch(location.search, room, relay, key ? roomRelayFor(location.hostname) : null) + roomHash(key)); }
+    catch (err) { /* an address this page may not change: the room still holds, and a reload goes back to the board */ }
   }
   /** A name for this hand in a room: the person's name (a preference), and this page load's suffix. */
   function handName() {
@@ -13472,7 +13610,7 @@
     const untouched = view.zoom === 1 && view.panX === 0 && view.panY === 0;
     if (board.mode !== 'fresh' && (!o.boot || untouched)) restoreBoardView(id);
     if (o.address && !EMBED) {
-      try { history.replaceState(history.state, '', location.pathname + boardSearch(location.search, id) + location.hash); } catch (err) { /* an address this page may not change */ }
+      try { history.replaceState(history.state, '', location.pathname + boardSearch(location.search, id) + withoutKey(location.hash)); } catch (err) { /* an address this page may not change */ }
     }
     if (!o.boot) markAfterOpen();
     syncBoardFaces();
@@ -13546,7 +13684,7 @@
         // A folder, a repository or a room is on screen: what it has not sent goes first, then the board opens in a page of its own.
         if (folder.store && folder.how !== 'static') await saveNow();
         if (folder.saveTrouble && !o.force) return refuse({ kind: 'unsaved', words: troubleWords(folder.saveTrouble).lead, ways: ['export', 'leave'] });
-        location.assign(location.pathname + boardSearch(location.search, id) + location.hash);
+        location.assign(location.pathname + boardSearch(location.search, id) + withoutKey(location.hash));
         return true;
       }
       const prep = await prepareBoard(id);
@@ -14012,7 +14150,7 @@
       // name — this tab's own included, which both hands that share it hear —
       // and a truncated history.
       const notes = folder.store.notices ? folder.store.notices() : [];
-      return 'live ' + folder.name + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') +
+      return 'live ' + roomShort(folder.name) + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') +
         (notes.length ? ' · ' + notes.join(' · ') : '') + (folder.error ? ' · ' + folder.error : '');
     }
     const n = folder.entries.length;
@@ -15397,7 +15535,8 @@
 //   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards, packs);
 //   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
 // Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
-//   boardOnScreenName, resetBoard), models (agents, deciderHost), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude); the page's
+//   boardOnScreenName, resetBoard), models (agents, deciderHost), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude),
+//   relay (roomShort), room (24-room.js: renderLivePane, joinTyped, syncRoomChip — the Live pane's first rows and the chip in the bar); the page's
 //   version (folder's pageVersion: its <meta name="dynaink-version">, V1-PLAN R7, or on a page an older worker kept the
 //   tag's old name, RENAME-PLAN N3b; boards' versionWords), said at the head of the help pane, and under it the
 //   source line (boards' sourceLine: "Source code · AGPL-3.0", linking SOURCE_URL and its LICENSE — AGPL-3.0 §13).
@@ -15459,11 +15598,13 @@
     ui.tile(tiles.teach, 'mark', s.commandMark ? s.commandMark.name : 'check ✓', { on: !!s.commandMark, why: 'the mark that turns a circled group into a selection; teach your own' });
     ui.tile(tiles.reset, 'reset', 'fresh board', { why: 'a fresh board under the same name — what this one holds goes to the trash, from which it comes back whole' });
     ui.tile(tiles.help, 'help', '?', { why: 'how to use the canvas, on one page: draw, hold, choose — and models, boards, rooms, your mark, the shortcuts' });
-    ui.tile(tiles.live, 'live', folder.how === 'live' ? folder.name : 'room…', { on: folder.how === 'live', why: 'a room other hands can join: between tabs on this machine, or across machines through a relay' });
+    ui.tile(tiles.live, 'live', folder.how === 'live' ? roomShort(folder.name) : 'share…', { on: folder.how === 'live', why: 'share this board: anyone you send the link to draws on it with you, live — or join a room' });
     // Its face is the name of what is on screen (V1-PLAN R1); the pane is 22-boards.js.
     ui.tile(tiles.boards, 'boards', boardOnScreenName() || '…', { why: 'the boards this browser keeps — new, open, rename, duplicate, delete, and the trash — and the folders, repositories and sites opened lately' });
     // The library packs this board uses (V1-PLAN §2.3, B3), last in the grid; the pane is 23-packs.js.
     ui.tile(tiles.packs, 'packs', packsFace(s), { on: s.packs.length > 0, why: 'the library packs this board uses — premade definitions and notations, matched as if you had taught them; using one is an event in the board’s log, and undo takes it back' });
+    // While in a room, the chip in the bar: the room and who is here (24-room.js).
+    syncRoomChip();
   }
 
   tiles.theme.onclick = () => setThemeMode(THEME_MODES[(THEME_MODES.indexOf(themeMode) + 1) % THEME_MODES.length]);
@@ -15473,21 +15614,27 @@
   // Until a pen is seen it flips the side, as it always did; after, one word of its face a tap (07-hand.js, nextHand).
   tiles.hand.onclick = () => { const n = nextHand(hand, draws); if (n.draws !== draws) setDraws(n.draws); setHand(n.side); };
   tiles.autoRead.onclick = () => setAutoRead(!autoRead);
-  // A live room: a name, and a relay when the other hand is on another machine.
+  // A live room: Share this board — or, in a room, who is here, the invite, a copy, Leave (24-room.js) — and under
+  // "more", a room by its name or an invite link pasted, and "with Claude".
   const livePanel = document.getElementById('livePanel');
-  ui.pane(livePanel, 'live', () => closePanel(livePanel, tiles.live));
-  tiles.live.onclick = () => { togglePanel(livePanel, tiles.live); if (!livePanel.hasAttribute('hidden')) { const r = document.getElementById('liveRoom'); if (!r.value) r.value = folder.how === 'live' ? folder.name : 'table'; document.getElementById('liveName').value = prefs.get('hand-name', '') || ''; } };
+  ui.pane(livePanel, 'live', () => { closePanel(livePanel, tiles.live); const l = document.getElementById('liveLink'); if (l) { l.hidden = true; l.value = ''; } });
+  tiles.live.onclick = () => {
+    togglePanel(livePanel, tiles.live);
+    if (livePanel.hasAttribute('hidden')) return;
+    renderLivePane();
+    const r = document.getElementById('liveRoom');
+    if (!r.value && folder.how === 'live') r.value = folder.name;
+    document.getElementById('liveName').value = prefs.get('hand-name', '') || '';
+  };
   // The room Claude Code joins (Demos/mcp.mjs, SURFACE-v10-PLAN D1) — room "claude" through the relay
   // on this machine, or the one typed — and the seat, in one act (V1-PLAN J4, 24-seat.js).
   document.getElementById('liveClaude').onclick = () => { withClaude(); };
+  // Join: a room's name, or an invite link pasted — joining brings nothing of the board on screen in (24-room.js, joinTyped).
   document.getElementById('liveJoin').onclick = () => {
     const room = document.getElementById('liveRoom').value.trim();
     const name = document.getElementById('liveName').value.trim();
     const relay = document.getElementById('liveRelay').value.trim();
-    if (!room) { document.getElementById('liveStatus').textContent = 'a room needs a name'; return; }
-    if (name) prefs.set('hand-name', name);
-    openLive(room, relay ? { relay } : {}).then(() => { closePanel(livePanel, tiles.live); say('in room ' + room + ' as ' + handLabel(folder.me) + (relay ? ' through ' + relay : ' — other tabs on this machine can join')); syncTiles(); })
-      .catch((err) => { document.getElementById('liveStatus').textContent = 'could not join: ' + (err.message || err); });
+    joinTyped(room, name, relay).then((ok) => { if (ok) closePanel(livePanel, tiles.live); });
   };
 
   // Help is HELP.md, one page for a person — draw, hold, choose — read into a pane (PLAN-USER-SURFACE U1g).
@@ -16506,35 +16653,164 @@
   }
 
 // ===== relay =====
-// Provides: where *with Claude* looks for the room's relay (PLAN-IPAD-NOTES A2) — the pure half: CLAUDE_RELAY_LOCAL
-//   and CLAUDE_RELAY_HOSTED (the two addresses), claudeRelayFor (which one a page defaults to, from the hostname it
-//   is served from) and ownRelay (whether an address is the product's own relay, the one hosted relay the seat
-//   accepts besides one on this machine).
+// Provides: where a room's relay is and what a room's address carries — the pure half: CLAUDE_RELAY_LOCAL and
+//   CLAUDE_RELAY_HOSTED (the two addresses), roomRelayFor (the relay a page shares a board through, from the
+//   hostname it is served from — the hosted one on dyna.ink, else the one on this machine), claudeRelayFor (the
+//   same, for *with Claude*; PLAN-IPAD-NOTES A2), ownRelay (whether an address is the product's own relay),
+//   onThisMachine, relayFromAddress (whether a page may take the relay its address names); and an invite
+//   (the rooms lane, MU-1/MU-2): inviteLink (the link a person sends), inviteOf (what a page's address says
+//   of a room — the room, the relay, the key from the fragment or an old link's query, whether it came by an
+//   invite), roomSearch / roomHash (the address a page in a room keeps, so a reload rejoins), withoutKey (a
+//   fragment with no key in it), leaveSearch (the address a page goes to when it leaves a room), roomShort (a
+//   room's name as a person reads it), CARRY_MAX_CHARS / carryVerdict (whether the board on screen
+//   can be carried into a room), idleWords (how long a room is kept, in words).
 // Uses: NOTHING. No closure variable, no DOM, no storage, no session — so it is tested on its own in Node:
 //   node --test Demos/surface/24-relay.test.mjs
-//   24-seat.js is the adapter (it reads `location.hostname` and puts the answer in the Live pane).
+//   24-seat.js and 24-room.js are its adapters (they read `location` and put the answers in the Live pane).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
 //
-// On the dyna.ink origin the Live pane's *with Claude* defaults to the hosted relay, https://relay.dyna.ink
-// (cloudflare/README.md): a person on an iPad has no relay on the device, and the one on the machine Claude Code
-// runs on is not reachable from there. Everywhere else — this machine, the GitHub Pages address, a file — it is the
-// relay on this machine, as it always was. A relay typed into the pane always wins over either.
+// On the dyna.ink origin a room's relay — the one *Share this board* opens a room on, and the one *with
+// Claude* looks for — is the hosted relay, https://relay.dyna.ink (cloudflare/README.md): a person on an iPad
+// has no relay on the device. Everywhere else — this machine, the GitHub Pages address, a file — it is the
+// relay on this machine, as it always was. A relay typed into the pane always wins; one named in a page's
+// address (`?relay=`) is taken only where it cannot send the page's ink somewhere unasked: the page is on this
+// machine, the relay is, or it is the product's own.
 //
-// THE KEY IS NOT HERE. A hosted room wants a key (a key per room, the HMAC of its name under a secret only the relay
-// holds); a tab takes it from the page address's `?key=` where the room is opened (17-folder.js, `openLive`), and a
-// key never enters the log, a board, an export, a cache or a sentence of the page's. This fragment says where the
-// relay is and never holds, reads or repeats a key — an address that carries one in it is not judged the relay's own.
-
+// THE KEY TRAVELS ONLY IN THE FRAGMENT. A room on a relay that keeps keys has one (the HMAC of its name under a
+// secret only the relay holds); an invite carries it after `#key=`, which no browser sends to any server and no
+// Referer carries. A page that opens one keeps it in memory and in its own fragment (so a reload rejoins), and
+// drops it from every other address it makes. An old link's `?key=` is read once and moved to the fragment.
+// Nothing here holds a key: it is handed in and handed back, never kept, and a key is never put in a sentence.
   const CLAUDE_RELAY_LOCAL = 'http://127.0.0.1:8020';
   const CLAUDE_RELAY_HOSTED = 'https://relay.dyna.ink';
 
-  /** The relay *with Claude* defaults to for a page served from `hostname`: the hosted one on dyna.ink and its subdomains, else the one on this machine. */
-  function claudeRelayFor(hostname) {
+  /** The relay a page served from `hostname` opens and joins rooms through: the hosted one on dyna.ink and its subdomains, else the one on this machine. */
+  function roomRelayFor(hostname) {
     if (typeof hostname !== 'string') return CLAUDE_RELAY_LOCAL;
     const host = hostname.trim().toLowerCase().replace(/\.$/, '');
     return host === 'dyna.ink' || host.endsWith('.dyna.ink') ? CLAUDE_RELAY_HOSTED : CLAUDE_RELAY_LOCAL;
+  }
+  /** The relay *with Claude* defaults to: the room's relay, by the same rule. */
+  function claudeRelayFor(hostname) { return roomRelayFor(hostname); }
+
+  /** Whether a hostname is this machine: localhost, 127.x.x.x, [::1]. */
+  function onThisMachine(hostname) {
+    if (typeof hostname !== 'string') return false;
+    const h = hostname.trim().toLowerCase().replace(/^\[|\]$/g, '');
+    return h === 'localhost' || h === '::1' || /^127(\.\d{1,3}){3}$/.test(h);
+  }
+
+  /**
+   * The relay a page's address names (`?relay=`), when the page may take it: the page is on this machine (a person
+   * developing, the gate), the relay is (a room on this machine, as `?live=claude&relay=http://127.0.0.1:8020`), or
+   * it is the product's own. Else null — an invite cannot send a page on dyna.ink to a relay of someone's choosing.
+   */
+  function relayFromAddress(pageHost, given) {
+    if (typeof given !== 'string' || !given.trim()) return null;
+    let u;
+    try { u = new URL(given.trim()); } catch (err) { return null; }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    if (u.username || u.password || u.search || u.hash) return null;
+    const relay = (u.protocol + '//' + u.host + u.pathname).replace(/\/+$/, '');
+    if (onThisMachine(pageHost) || onThisMachine(u.hostname) || ownRelay(relay)) return relay;
+    return null;
+  }
+
+  const addressEnc = (v) => encodeURIComponent(v);
+  /** The parts of a query or a fragment, as [name, raw part]; a part that will not decode keeps its raw name. */
+  function addressParts(text) {
+    return String(text || '').replace(/^[?#]/, '').split('&').filter(Boolean).map((p) => {
+      let k;
+      try { k = decodeURIComponent(p.split('=')[0]); } catch (err) { k = p.split('=')[0]; }
+      return [k, p];
+    });
+  }
+  function addressValue(part) {
+    const i = part.indexOf('=');
+    if (i < 0) return '';
+    try { return decodeURIComponent(part.slice(i + 1).replace(/\+/g, ' ')); } catch (err) { return ''; }
+  }
+
+  /**
+   * The link a person sends to bring someone into a room: this app's address, `?live=<room>`, `&relay=` only when the
+   * relay is not the one this address opens rooms through anyway, and the key after `#key=` — or `#join` for a room
+   * on a relay that keeps no keys, so the page it opens still knows it came by an invite.
+   */
+  function inviteLink(o) {
+    const at = String(o && o.page || '').replace(/[?#].*$/, '');
+    let q = '?live=' + addressEnc(o.room);
+    if (o.relay && o.relay !== o.defaultRelay) q += '&relay=' + addressEnc(o.relay);
+    return at + q + (o.key ? '#key=' + addressEnc(o.key) : '#join');
+  }
+
+  /**
+   * What a page's address says of a room: `{ room, relay, key, invited, keyInQuery }` — the room (`?live=`), the relay
+   * it names (`?relay=`, as given: relayFromAddress judges it), the key from the fragment's `key=` or, for an old
+   * link, the query's (`keyInQuery`: to be moved out of it), and whether it came by an invite (a key in the fragment,
+   * or `#join`). Null when the address names no room.
+   */
+  function inviteOf(search, hash) {
+    let room = '', relay = '', qkey = '', fkey = '', join = false;
+    for (const [k, p] of addressParts(search)) {
+      if (k === 'live') room = addressValue(p);
+      else if (k === 'relay') relay = addressValue(p);
+      else if (k === 'key') qkey = addressValue(p);
+    }
+    for (const [k, p] of addressParts(hash)) {
+      if (k === 'key') fkey = addressValue(p);
+      else if (k === 'join') join = true;
+    }
+    if (!room.trim()) return null;
+    return { room: room.trim(), relay, key: fkey || qkey, invited: !!fkey || join, keyInQuery: !!qkey };
+  }
+
+  /** The query a page in a room keeps: its own parts, the room's name, a relay that is not the default, and never a key. */
+  function roomSearch(search, room, relay, defaultRelay) {
+    const out = [];
+    for (const [k, p] of addressParts(search)) {
+      if (k === 'live' || k === 'relay' || k === 'key' || k === 'board' || k === 'fresh' || k === 'example') continue;
+      out.push(p);
+    }
+    out.unshift('live=' + addressEnc(room));
+    if (relay && relay !== defaultRelay) out.splice(1, 0, 'relay=' + addressEnc(relay));
+    return '?' + out.join('&');
+  }
+  /** The fragment a page in a room keeps, so a reload rejoins: the key, and nothing else of the room. */
+  function roomHash(key) { return key ? '#key=' + addressEnc(key) : ''; }
+  /** A fragment with the room's key (and an invite's mark) taken out — for every address a page makes that is not its room's. */
+  function withoutKey(hash) {
+    const rest = addressParts(hash).filter(([k]) => k !== 'key' && k !== 'join').map(([, p]) => p);
+    return rest.length ? '#' + rest.join('&') : '';
+  }
+  /** Where a page goes when it leaves a room: its own address with the room, the relay and any key let go of — the board opened last comes back. */
+  function leaveSearch(search) {
+    const out = addressParts(search).filter(([k]) => !['live', 'relay', 'key', 'fresh', 'board'].includes(k)).map(([, p]) => p);
+    return out.length ? '?' + out.join('&') : '';
+  }
+
+  /** A room's name as a person reads it: a room a relay opened (128 random bits) by four of its letters, any other as it was named. */
+  function roomShort(name) {
+    const n = String(name || '');
+    return /^r-[A-Za-z0-9_-]{22}$/.test(n) ? 'room ' + n.slice(2, 6) : n;
+  }
+
+  /** The most of a board, as text, that Share carries into a room: well under what a room keeps (32 MB), and four minutes of what one hand may send. */
+  const CARRY_MAX_CHARS = 12_000_000;
+  /** Whether a board of `chars` characters (its log as text) can be carried into a room: `{ ok, words }`. */
+  function carryVerdict(chars) {
+    const n = Number(chars) || 0;
+    if (n <= CARRY_MAX_CHARS) return { ok: true, words: '' };
+    return { ok: false, words: 'this board is ' + (n / 1e6).toFixed(1) + ' MB — a shared room carries boards up to ' + CARRY_MAX_CHARS / 1e6 + ' MB' };
+  }
+
+  /** How long a room is kept, in words, from what the relay said when it opened it — or '' when it said nothing (a relay on this machine keeps a room while it runs). */
+  function idleWords(idleDays) {
+    const d = Number(idleDays);
+    if (!(d > 0)) return '';
+    if (d >= 1) { const n = Math.round(d); return 'the room is kept ' + n + ' day' + (n === 1 ? '' : 's') + ' after it was last used, then forgotten'; }
+    return 'the room is kept a short while after it was last used, then forgotten';
   }
 
   /**
@@ -16550,6 +16826,372 @@
     return u.protocol + '//' + u.host === CLAUDE_RELAY_HOSTED && (u.pathname === '/' || u.pathname === '') && !u.search && !u.hash && !u.username && !u.password;
   }
 
+// ===== room =====
+// Provides: a room anyone opens and shares, on the surface (the rooms lane: MU-1 to MU-4, MU-9, UX-01, UX-05) —
+//   renderLivePane (the Live pane's first rows: "Share this board", or, in a room, who is here, "Copy invite link",
+//   "Save a copy to my boards" and "Leave"), shareBoard (a room opened on the relay, the board on screen carried in),
+//   copyInvite, leaveLiveRoom, saveRoomCopy, joinFromAddress (a page opened on a room's address: a guest who came by an
+//   invite with no name kept is asked one, then joins; an old link's ?key= is moved into the fragment as it joins),
+//   joinTyped (the pane's Join: a room's name, or an invite link pasted), syncRoomChip (the chip in the bar: the room
+//   and one dot per hand heard, in its colour), liveRoomOpened (who is here followed; this hand said to be here every
+//   ROOM_BEAT_MS while the page is seen, and a goodbye when it goes), BOOT_ROOM (what the page's address said of a
+//   room as it loaded), roomKeyFor (the key this page knows for a room), roomState (for tests).
+// Uses: relay (24-relay.js: roomRelayFor, relayFromAddress, inviteLink, inviteOf, leaveSearch, roomShort, carryVerdict,
+//   idleWords), core (MM, prefs, params, esc, session, EMBED, ui), folder (folder, openLive, saveNow, handLabel, boards,
+//   boardsListed, openBoardsList, writeNewBoard, mintBoardId; 17-boards.js: newBoardEntry), render (handColour),
+//   input (say, flash), teach (closePanel, togglePanel), controls (livePanel, tiles, syncTiles, openPane).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+//
+// Sharing is one tap: *Share this board* asks the relay to open a room (POST /rooms — an unguessable name and, on a
+// relay that keeps keys, that room's key), joins it carrying the board on screen in, and the page's address becomes
+// the room's. *Copy invite link* hands the link on — the share sheet on a touch screen, else the clipboard — with the
+// key after `#`, which no browser sends to a server. A guest who opens it is asked a name (so two guests are never the
+// same "hand"), joins, and sees the board; joining never carries the guest's own board in. The bar shows the room and
+// a dot per hand heard in the last minute; every hand says it is here every 20 s while its page is seen, and says
+// goodbye when the page goes. *Save a copy to my boards* keeps the room's board, as it stands, as a board of this
+// browser's own — a room is kept by the relay only while it is used (`idleWords`), never on a device by itself.
+
+  /** How often a hand in a room says it is here while its page is seen: well inside the minute presence is judged by. */
+  const ROOM_BEAT_MS = 20000;
+  /** How recently a hand must have been heard to be in the room — the status line's own minute. */
+  const ROOM_HEARD_MS = 60000;
+  /** What the page's address said of a room as it loaded — read before anything rewrites it. */
+  const BOOT_ROOM = inviteOf(location.search, location.hash);
+  let roomBeat = 0;
+  let roomLeftOnHide = false;
+  const liveEls = {
+    here: document.getElementById('liveHere'), away: document.getElementById('liveAway'), name: document.getElementById('liveRoomName'),
+    who: document.getElementById('liveWho'), kept: document.getElementById('liveKept'), invite: document.getElementById('liveInvite'),
+    save: document.getElementById('liveSaveCopy'), leave: document.getElementById('liveLeave'), link: document.getElementById('liveLink'),
+    share: document.getElementById('liveShare'), empty: document.getElementById('liveEmptyRow'), shareEmpty: document.getElementById('liveShareEmpty'),
+    more: document.getElementById('liveMore'), status: document.getElementById('liveStatus'), chip: document.getElementById('roomChip'),
+  };
+  /** A sentence in the Live pane, and — when it is a refusal or what just happened — in the status line too. */
+  function liveSay(words, alsoLine) {
+    if (liveEls.status) liveEls.status.textContent = words || '';
+    if (words && alsoLine) say(words);
+  }
+
+  /** The relay this page opens rooms through: one typed in the pane, else one its address names where it may (24-relay.js), else this address's own. */
+  function shareRelay() {
+    const typed = document.getElementById('liveRelay');
+    const t = typed && typed.value.trim();
+    if (t) return t.replace(/\/+$/, '');
+    return relayFromAddress(location.hostname, params.get('relay') || '') || roomRelayFor(location.hostname);
+  }
+  /** The key this page knows for a room: the one it is in, else the one its address came with. Held in memory, never said. */
+  function roomKeyFor(room) {
+    if (folder.how === 'live' && folder.name === room && folder.key) return folder.key;
+    return BOOT_ROOM && BOOT_ROOM.room === room ? BOOT_ROOM.key : '';
+  }
+
+  /**
+   * Who is in the room, as a person sees them: this hand first, then every person heard in the last minute, each in its
+   * colour — a person once however many sittings of theirs were heard (a tab reloaded is a new sitting, and the old one's
+   * goodbye may not have made it out of the page as it went).
+   */
+  function whoIsHere() {
+    const mine = handLabel(folder.me);
+    const out = [{ name: folder.me, label: mine, colour: handColour(mine), you: true, seat: false }];
+    if (!folder.store || !folder.store.presence) return out;
+    const now = Date.now();
+    const seen = new Set([mine]);
+    for (const p of folder.store.presence()) {
+      const label = handLabel(p.participant);
+      if (p.participant === folder.me || seen.has(label) || now - p.at >= ROOM_HEARD_MS) continue;
+      seen.add(label);
+      out.push({ name: p.participant, label, colour: handColour(label), you: false, seat: !!p.seat });
+    }
+    return out;
+  }
+  const inLiveRoom = () => folder.how === 'live' && !!folder.store;
+
+  /** The chip in the bar while in a room: its name, and one dot per hand heard, in its colour. */
+  function syncRoomChip() {
+    const chip = liveEls.chip;
+    if (!chip) return;
+    const on = inLiveRoom() && !EMBED;
+    chip.hidden = !on;
+    if (!on) return;
+    const hands = whoIsHere();
+    const shown = hands.slice(0, 6);
+    chip.innerHTML = '<span class="rcName">' + esc(roomShort(folder.name)) + '</span><span class="rcDots">' +
+      shown.map((h) => '<i class="hueDot" style="background:' + h.colour + '"></i>').join('') + '</span>' +
+      (hands.length > shown.length ? '<span class="rcMore">+' + (hands.length - shown.length) + '</span>' : '');
+    chip.title = (hands.length === 1 ? 'only you so far' : hands.map((h) => h.label + (h.you ? ' (you)' : '')).join(', ')) + ' — tap for the invite link, a copy of the board, or to leave';
+    chip.setAttribute('aria-label', 'room ' + roomShort(folder.name) + ': ' + hands.length + ' here');
+  }
+
+  /** The Live pane's first rows: out of a room, Share; in one, who is here, the invite, a copy, Leave. */
+  function renderLivePane() {
+    const inRoom = inLiveRoom();
+    if (liveEls.here) liveEls.here.hidden = !inRoom;
+    if (liveEls.away) liveEls.away.hidden = inRoom;
+    if (!inRoom) return;
+    liveEls.name.textContent = (folder.relay ? 'a shared board' : 'a board between tabs on this machine') + ' · ' + roomShort(folder.name);
+    liveEls.who.innerHTML = whoIsHere().map((h) => '<li><i class="hueDot" style="background:' + h.colour + '"></i>' + esc(h.label) +
+      (h.you ? ' <span class="lvYou">you</span>' : h.seat ? ' <span class="lvYou">answers what you ask</span>' : '') + '</li>').join('');
+    liveEls.kept.textContent = folder.relay ? idleWords(folder.idleDays) : 'other tabs in this browser can join it — share a board to send a link';
+    liveEls.invite.disabled = !folder.relay;
+  }
+
+  /** How long a room a relay opened is kept, asked of the relay by a hand that joined by a link (the opener was told as it opened it). */
+  function learnRoomKept() {
+    if (!folder.relay || folder.idleDays !== null || !/^r-[A-Za-z0-9_-]{22}$/.test(folder.name)) return;
+    const at = folder.name;
+    fetch(folder.relay.replace(/\/+$/, '') + '/rooms', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((j) => {
+      if (!j || folder.name !== at || folder.how !== 'live') return;
+      folder.idleDays = Number(j.idleDays) > 0 ? Number(j.idleDays) : null;
+      if (livePanel && !livePanel.hasAttribute('hidden')) renderLivePane();
+    }, () => { /* said nothing: the pane says nothing of how long */ });
+  }
+
+  /** Every room this page joins: who is here followed, in the bar and the pane, and this hand said to be here while it is seen. */
+  function liveRoomOpened(store) {
+    learnRoomKept();
+    store.subscribe(() => {
+      syncRoomChip();
+      if (livePanel && !livePanel.hasAttribute('hidden')) renderLivePane();
+    });
+    clearInterval(roomBeat);
+    roomBeat = setInterval(() => {
+      if (folder.store !== store) { clearInterval(roomBeat); return; }
+      if (document.visibilityState === 'visible') store.here();
+      syncRoomChip();
+    }, ROOM_BEAT_MS);
+    roomLeftOnHide = false;
+    syncRoomChip();
+    if (livePanel && !livePanel.hasAttribute('hidden')) renderLivePane();
+  }
+  // Back in view: said at once, so the others see this hand again without waiting for the beat.
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && inLiveRoom()) folder.store.here(); });
+  // The page going: a goodbye after what it has not sent (flushBoard runs first, on the same event), so the hands that
+  // hold this hand's log hand it on to the next newcomer at once. A page the browser kept and shows again joins again.
+  addEventListener('pagehide', () => { if (inLiveRoom()) { roomLeftOnHide = true; folder.store.close(); } });
+  addEventListener('pageshow', (e) => { if (e.persisted && roomLeftOnHide) location.reload(); });
+
+  /** The board on screen, as the text a room carries: how big it is. */
+  function boardCarryChars() {
+    try { return JSON.stringify(session.getEvents().filter((e) => !e.by)).length; } catch (err) { return Infinity; }
+  }
+  /** What a relay that would not open a room said, in words. */
+  function mintRefusal(status, words) {
+    const said = String(words || '').trim();
+    const plain = said && said.length < 200 && !/[<>]/.test(said) ? said : '';
+    if (status === 0) return 'the relay did not answer — check the connection, and try again';
+    if (status === 403 && /origin/i.test(said)) return 'this site may not use that relay to open a room';
+    if (status === 404 || status === 405 || status === 501) return 'that relay does not open rooms — it is older than this page';
+    if (status === 429 || status === 503) return plain || 'the relay is not opening rooms just now — try again in a while';
+    return 'the relay would not open a room (HTTP ' + status + ')' + (plain ? ' — ' + plain : '');
+  }
+
+  /**
+   * Share this board: a room opened on the relay, joined, the board on screen carried in. A board too big to carry is
+   * said first, with the way to share an empty board instead (`o.empty`). Resolves true once the page is in the room.
+   */
+  async function shareBoard(o) {
+    o = o || {};
+    if (liveEls.empty) liveEls.empty.hidden = true;
+    if (!o.empty) {
+      const v = carryVerdict(boardCarryChars());
+      if (!v.ok) {
+        liveSay(v.words + ' — share an empty board instead, or keep this one to yourself', true);
+        if (liveEls.empty) liveEls.empty.hidden = false;
+        return false;
+      }
+    }
+    // A person with no name kept is asked one first, as a guest is — or the others would see "hand".
+    if (!prefs.get('hand-name', '') && !o.named) return new Promise((done) => askRoomName(() => { shareBoard(Object.assign({}, o, { named: true })).then(done); }, 'share this board'));
+    const relay = shareRelay();
+    liveSay('opening a room…');
+    if (liveEls.share) liveEls.share.disabled = true;
+    try {
+      let res, words;
+      try {
+        res = await fetch(relay.replace(/\/+$/, '') + '/rooms', { method: 'POST', cache: 'no-store' });
+        words = await res.text();
+      } catch (err) { liveSay(mintRefusal(0, ''), true); return false; }
+      let made = null;
+      if (res.status === 201) { try { made = JSON.parse(words); } catch (err) { made = null; } }
+      if (!made || typeof made.room !== 'string' || !made.room) { liveSay(res.status === 201 ? 'the relay opened a room but did not say which' : mintRefusal(res.status, words), true); return false; }
+      const marks = o.empty ? 0 : session.getState().contentIds.length;
+      try {
+        await openLive(made.room, { relay, key: typeof made.key === 'string' ? made.key : '', carry: !o.empty, idleDays: made.idleDays });
+      } catch (err) { liveSay('could not open the room — ' + (err.message || err), true); return false; }
+      syncTiles();
+      renderLivePane();
+      liveSay('');
+      say((o.empty ? 'an empty board is shared' : marks ? 'this board is shared — ' + marks + ' mark' + (marks === 1 ? '' : 's') + ' went into the room with you' : 'this board is shared') + '; copy the invite link to bring someone in');
+      return true;
+    } finally {
+      if (liveEls.share) liveEls.share.disabled = false;
+    }
+  }
+
+  /** The link that brings someone into this room, or null where there is none to send (no room, or a room between tabs). */
+  function currentInvite() {
+    if (!inLiveRoom() || !folder.relay) return null;
+    return inviteLink({ page: location.origin + location.pathname, room: folder.name, key: folder.key || null, relay: folder.relay, defaultRelay: roomRelayFor(location.hostname) });
+  }
+  /** Copy invite link: the share sheet on a touch screen that has one, else the clipboard, else the link shown to copy by hand. */
+  async function copyInvite() {
+    const link = currentInvite();
+    if (!link) { liveSay('this room is between tabs on this machine — share the board to have a link to send', true); return false; }
+    const sent = 'the invite link is copied — send it to whoever you want drawing here; anyone who has it can join';
+    const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    if (touch && navigator.share) {
+      try { await navigator.share({ title: 'Draw with me on dyna.ink', url: link }); liveSay('the invite link is on its way'); return true; }
+      catch (err) { if (err && err.name === 'AbortError') return false; }
+    }
+    try {
+      await navigator.clipboard.writeText(link);
+      if (liveEls.link) { liveEls.link.hidden = true; liveEls.link.value = ''; }
+      liveSay(sent);
+      flash(sent);
+      return true;
+    } catch (err) {
+      if (navigator.share) { try { await navigator.share({ url: link }); return true; } catch (e) { if (e && e.name === 'AbortError') return false; } }
+      // Nothing could take it: the link stands in the pane, selected, to copy by hand — and goes when the pane closes.
+      if (liveEls.link) { liveEls.link.hidden = false; liveEls.link.value = link; liveEls.link.select(); }
+      liveSay('this browser would not copy the link — it is selected below: copy it from there');
+      return false;
+    }
+  }
+
+  /** Leave: what this hand has not sent goes, a goodbye, and the board opened last comes back. */
+  async function leaveLiveRoom() {
+    if (!inLiveRoom()) return;
+    try { await saveNow(); } catch (err) { /* said in the line already */ }
+    roomLeftOnHide = true;
+    folder.store.close();
+    location.assign(location.pathname + leaveSearch(location.search));
+  }
+
+  /** A room's board, as it stands, kept as a board of this browser's own — the others' marks still theirs. */
+  async function saveRoomCopy() {
+    if (!inLiveRoom()) return null;
+    if (!boards.ready) await (boardsListed || openBoardsList());
+    if (boards.how !== 'indexeddb') { liveSay('this browser keeps one board here — export the board instead', true); return null; }
+    const events = session.getEvents().map((ev) => Object.assign({}, ev));
+    const when = new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    const entry = newBoardEntry([...boards.entries.values()], mintBoardId(), Date.now(), 'Shared board ' + when);
+    try { await writeNewBoard(entry, events, null); }
+    catch (err) { liveSay('could not keep a copy — ' + ((err && err.message) || err), true); return null; }
+    const marks = session.getState().contentIds.length;
+    liveSay('kept as “' + entry.name + '” in your boards — ' + marks + ' mark' + (marks === 1 ? '' : 's') + '; the room goes on as it was', true);
+    return entry;
+  }
+
+  /**
+   * A guest who came by an invite and has no name kept here — or a person sharing a board, with none — is asked one: one
+   * field, Enter goes on, the colour the name will draw in beside it. `title` says what it is for: joining, or sharing.
+   */
+  function askRoomName(then, title) {
+    const el = document.getElementById('namePanel');
+    const input = document.getElementById('nameInput');
+    const swatch = document.getElementById('nameSwatch');
+    const status = document.getElementById('nameStatus');
+    if (!el || !input) { then(); return; }
+    const sharing = title === 'share this board';
+    ui.pane(el, 'your name', () => { closePanel(el); say(sharing ? 'not shared — the board is as it was' : 'not joined — open the link again to join'); });
+    const head = el.querySelector('.paneTitle');
+    if (head) head.textContent = sharing ? 'share this board' : 'join a shared board';
+    const lead = el.querySelector('.hint');
+    if (lead) lead.textContent = sharing ? 'The others see your marks under this name, in its colour.' : 'You were invited to draw on a shared board.';
+    document.getElementById('nameJoin').textContent = sharing ? 'Share' : 'Join';
+    const paint = () => { const v = input.value.trim(); swatch.style.background = v ? handColour(v) : ''; };
+    const join = () => {
+      const v = input.value.trim().replace(/~/g, '').slice(0, 40);
+      if (!v) { status.textContent = 'a name, so the others can tell your marks from theirs'; input.focus(); return; }
+      prefs.set('hand-name', v);
+      closePanel(el);
+      then();
+    };
+    input.oninput = paint;
+    input.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); join(); } };
+    document.getElementById('nameJoin').onclick = join;
+    openPane(el, null);
+    paint();
+    setTimeout(() => input.focus(), 0);
+  }
+
+  /** Join a room with what the page is told: say where, and that joining brought nothing in. */
+  function joinRoom(room, opts, how) {
+    return openLive(room, opts).then(() => {
+      syncTiles();
+      say('in the room as ' + handLabel(folder.me) + (opts.relay ? ' — what you draw is shared as you draw it' : ' — other tabs on this machine can join') + (how ? ' · ' + how : ''));
+      return true;
+    }, (err) => { say('could not join the room — ' + (err.message || err)); return false; });
+  }
+
+  /**
+   * A page opened on a room's address (`?live=`): its relay — the one the address names where this page may take it,
+   * else this address's own when the link came with a key or as an invite, else tabs on this machine — and its key.
+   * A guest who came by an invite and has no name kept is asked one first.
+   */
+  function joinFromAddress() {
+    const inv = BOOT_ROOM;
+    if (!inv) return;
+    let relay = '';
+    if (inv.relay) {
+      relay = relayFromAddress(location.hostname, inv.relay) || '';
+      if (!relay) { say('this link names a relay this page does not use, so the room was not joined — ask for a link made on this site'); return; }
+    } else if (inv.key || inv.invited) relay = roomRelayFor(location.hostname);
+    const go = () => joinRoom(inv.room, relay ? { relay, key: inv.key } : {});
+    if (inv.invited && !prefs.get('hand-name', '') && arrived()) askRoomName(go);
+    else go();
+  }
+  /** Whether this page was opened, rather than reloaded or come back to: a name is asked of a guest arriving, never of a page reloaded in its room. */
+  function arrived() {
+    try {
+      const nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+      return !nav || nav.type === 'navigate' || nav.type === 'prerender';
+    } catch (err) { return true; }
+  }
+
+  /** The pane's Join: a room's name typed — or an invite link pasted, which carries its room, its relay and its key. */
+  function joinTyped(text, name, typedRelay) {
+    const t = String(text || '').trim();
+    if (!t) { liveSay('a room needs a name — or paste an invite link'); return Promise.resolve(false); }
+    if (name) prefs.set('hand-name', name);
+    let inv = null;
+    if (/^https?:\/\//i.test(t)) { try { const u = new URL(t); inv = inviteOf(u.search, u.hash); } catch (err) { inv = null; } }
+    if (/^https?:\/\//i.test(t) && !inv) { liveSay('that link names no room'); return Promise.resolve(false); }
+    let relay = typedRelay || '';
+    let key = '';
+    let room = t;
+    if (inv) {
+      room = inv.room;
+      key = inv.key;
+      if (!relay) relay = inv.relay ? relayFromAddress(location.hostname, inv.relay) || '' : (inv.key || inv.invited) ? roomRelayFor(location.hostname) : '';
+      if (inv.relay && !relay) { liveSay('that link names a relay this page does not use'); return Promise.resolve(false); }
+    } else key = roomKeyFor(room);
+    return joinRoom(room, relay ? { relay, key } : {});
+  }
+
+  if (liveEls.share) liveEls.share.onclick = () => { shareBoard(); };
+  if (liveEls.shareEmpty) liveEls.shareEmpty.onclick = () => { shareBoard({ empty: true }); };
+  if (liveEls.invite) liveEls.invite.onclick = () => { copyInvite(); };
+  if (liveEls.save) liveEls.save.onclick = () => { saveRoomCopy(); };
+  if (liveEls.leave) liveEls.leave.onclick = () => { leaveLiveRoom(); };
+  if (liveEls.chip) liveEls.chip.onclick = () => {
+    if (livePanel.hasAttribute('hidden')) { openPane(livePanel, liveEls.chip); renderLivePane(); } else closePanel(livePanel, liveEls.chip);
+  };
+
+  /** For tests: the room as this page holds it — never its key, only whether it has one. */
+  function roomState() {
+    return {
+      inRoom: inLiveRoom(), room: folder.how === 'live' ? folder.name : null, relay: folder.relay || '', keyed: !!folder.key, idleDays: folder.idleDays,
+      me: folder.me, here: inLiveRoom() ? whoIsHere().map((h) => ({ label: h.label, you: h.you })) : [],
+      unsent: inLiveRoom() && folder.store.unsent ? folder.store.unsent() : 0,
+      notices: inLiveRoom() && folder.store.notices ? folder.store.notices() : [],
+      stream: inLiveRoom() && folder.store && folder.transport && folder.transport.state ? folder.transport.state() : null,
+      chip: liveEls.chip && !liveEls.chip.hidden ? liveEls.chip.textContent : null,
+    };
+  }
+
 // ===== seat =====
 // Provides: the seat — Claude Code, over MCP, as a model the field asks (V1-PLAN J4): the models
 //   pane's first section (seatSection: "Claude Code — in this room", one tap; or what to do, in a
@@ -16558,7 +17200,7 @@
 //   seatState (for tests), and the door moved under "advanced".
 // Uses: relay (24-relay.js: claudeRelayFor, ownRelay — which relay "with Claude" defaults to, A2), core (MM, prefs, esc), models (agents, join, leave, renderAgents, workControllers, addMcp,
 //   syncProviderFields, the pane's elements), input (say), folder (folder, openLive, saveNow),
-//   teach (closePanel), controls (livePanel, tiles, syncTiles).
+//   teach (closePanel), controls (livePanel, tiles, syncTiles), room (24-room.js: roomKeyFor — the key this page knows for the room).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -16591,7 +17233,7 @@
 
   const CLAUDE_ROOM = 'claude';
   // The relay "with Claude" defaults to: the one on this machine, and on the dyna.ink origin the hosted one (24-relay.js; A2).
-  // A relay typed in the Live pane wins. The room's key, for a hosted relay, is the page address's ?key= — never held here.
+  // A relay typed in the Live pane wins. The room's key, for a hosted relay, is the one this page was opened with (24-room.js, roomKeyFor) — never held here.
   const CLAUDE_RELAY = claudeRelayFor(location.hostname);
   /** How recently a hand must have been heard to be in the room — the status line's own minute. */
   const HEARD_MS = 60000;
@@ -16607,7 +17249,7 @@
   /** Why the seat cannot take a question on this page now, in one sentence — or null. */
   function whyNoSeat() {
     if (folder.how !== 'live' || !folder.store) {
-      return 'Claude answers here once this page is in its room — tap “with Claude” in the live tile, or open this page with ?live=' + CLAUDE_ROOM + '&relay=' + CLAUDE_RELAY + (ownRelay(CLAUDE_RELAY) ? '&key=… (the room’s key)' : '') + '.';
+      return 'Claude answers here once this page is in its room — tap “with Claude” in the live tile, or open this page with ?live=' + CLAUDE_ROOM + '&relay=' + CLAUDE_RELAY + (ownRelay(CLAUDE_RELAY) ? '#key=… (the room’s key)' : '') + '.';
     }
     if (!folder.relay) return 'This room is between tabs on this machine, and Claude’s hand reaches a room only through a relay — tap “with Claude” in the live tile.';
     if (MM.providerLocality({ baseUrl: folder.relay }) !== 'local' && !ownRelay(folder.relay)) return 'This room’s relay is on another machine, and the seat asks only through a relay on this one or the dyna.ink relay — tap “with Claude” in the live tile.';
@@ -16679,7 +17321,8 @@
     if (name) prefs.set('hand-name', name);
     seatWanted = true;
     try {
-      await openLive(CLAUDE_ROOM, { relay: relay });
+      // The board on screen goes with you — the seat is there to read it — and the room's key, where this page knows it.
+      await openLive(CLAUDE_ROOM, { relay: relay, key: roomKeyFor(CLAUDE_ROOM), carry: true });
     } catch (err) {
       seatWanted = false;
       if (statusEl) statusEl.textContent = 'could not join: ' + (err.message || err);
@@ -17702,6 +18345,8 @@
     openLive: (room, opts) => openLive(room, opts), mergeLive: mergeLive, handColour: handColour,
     // The seat (V1-PLAN J4), for tests: where it stands, and the acts.
     seat: seatState, joinSeat: joinSeat, leaveSeat: leaveSeat, withClaude: withClaude,
+    // A room anyone opens and shares (24-room.js), for tests: where it stands — never its key — and the acts.
+    room: roomState, shareBoard: shareBoard, copyInvite: copyInvite, saveRoomCopy: saveRoomCopy, leaveRoom: leaveLiveRoom, sendRoom: () => saveNow(),
     folder: () => folder,
     setParticipant: setParticipant,
     forgetLocalLog: forgetLocalLog,
@@ -17800,7 +18445,8 @@
     }
     if (params.get('folder')) openStatic(params.get('folder'));
     else if (params.get('git')) openGit(params.get('git'));
-    else if (params.get('live')) openLive(params.get('live'), params.get('relay') ? { relay: params.get('relay') } : {});
+    // A room's address: a guest who came by an invite is asked a name first, and the key is read from the fragment (24-room.js).
+    else if (params.get('live')) joinFromAddress();
     // Boards carried from the old address (RENAME-PLAN N1): a page opened to take them listens for them; the old
     // address says once that dyna.ink is the new home (off until N4).
     carryAtBoot();

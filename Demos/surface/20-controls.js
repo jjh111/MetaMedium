@@ -5,7 +5,8 @@
 //   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards, packs);
 //   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
 // Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
-//   boardOnScreenName, resetBoard), models (agents, deciderHost), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude); the page's
+//   boardOnScreenName, resetBoard), models (agents, deciderHost), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude),
+//   relay (roomShort), room (24-room.js: renderLivePane, joinTyped, syncRoomChip — the Live pane's first rows and the chip in the bar); the page's
 //   version (folder's pageVersion: its <meta name="dynaink-version">, V1-PLAN R7, or on a page an older worker kept the
 //   tag's old name, RENAME-PLAN N3b; boards' versionWords), said at the head of the help pane, and under it the
 //   source line (boards' sourceLine: "Source code · AGPL-3.0", linking SOURCE_URL and its LICENSE — AGPL-3.0 §13).
@@ -67,11 +68,13 @@
     ui.tile(tiles.teach, 'mark', s.commandMark ? s.commandMark.name : 'check ✓', { on: !!s.commandMark, why: 'the mark that turns a circled group into a selection; teach your own' });
     ui.tile(tiles.reset, 'reset', 'fresh board', { why: 'a fresh board under the same name — what this one holds goes to the trash, from which it comes back whole' });
     ui.tile(tiles.help, 'help', '?', { why: 'how to use the canvas, on one page: draw, hold, choose — and models, boards, rooms, your mark, the shortcuts' });
-    ui.tile(tiles.live, 'live', folder.how === 'live' ? folder.name : 'room…', { on: folder.how === 'live', why: 'a room other hands can join: between tabs on this machine, or across machines through a relay' });
+    ui.tile(tiles.live, 'live', folder.how === 'live' ? roomShort(folder.name) : 'share…', { on: folder.how === 'live', why: 'share this board: anyone you send the link to draws on it with you, live — or join a room' });
     // Its face is the name of what is on screen (V1-PLAN R1); the pane is 22-boards.js.
     ui.tile(tiles.boards, 'boards', boardOnScreenName() || '…', { why: 'the boards this browser keeps — new, open, rename, duplicate, delete, and the trash — and the folders, repositories and sites opened lately' });
     // The library packs this board uses (V1-PLAN §2.3, B3), last in the grid; the pane is 23-packs.js.
     ui.tile(tiles.packs, 'packs', packsFace(s), { on: s.packs.length > 0, why: 'the library packs this board uses — premade definitions and notations, matched as if you had taught them; using one is an event in the board’s log, and undo takes it back' });
+    // While in a room, the chip in the bar: the room and who is here (24-room.js).
+    syncRoomChip();
   }
 
   tiles.theme.onclick = () => setThemeMode(THEME_MODES[(THEME_MODES.indexOf(themeMode) + 1) % THEME_MODES.length]);
@@ -81,21 +84,27 @@
   // Until a pen is seen it flips the side, as it always did; after, one word of its face a tap (07-hand.js, nextHand).
   tiles.hand.onclick = () => { const n = nextHand(hand, draws); if (n.draws !== draws) setDraws(n.draws); setHand(n.side); };
   tiles.autoRead.onclick = () => setAutoRead(!autoRead);
-  // A live room: a name, and a relay when the other hand is on another machine.
+  // A live room: Share this board — or, in a room, who is here, the invite, a copy, Leave (24-room.js) — and under
+  // "more", a room by its name or an invite link pasted, and "with Claude".
   const livePanel = document.getElementById('livePanel');
-  ui.pane(livePanel, 'live', () => closePanel(livePanel, tiles.live));
-  tiles.live.onclick = () => { togglePanel(livePanel, tiles.live); if (!livePanel.hasAttribute('hidden')) { const r = document.getElementById('liveRoom'); if (!r.value) r.value = folder.how === 'live' ? folder.name : 'table'; document.getElementById('liveName').value = prefs.get('hand-name', '') || ''; } };
+  ui.pane(livePanel, 'live', () => { closePanel(livePanel, tiles.live); const l = document.getElementById('liveLink'); if (l) { l.hidden = true; l.value = ''; } });
+  tiles.live.onclick = () => {
+    togglePanel(livePanel, tiles.live);
+    if (livePanel.hasAttribute('hidden')) return;
+    renderLivePane();
+    const r = document.getElementById('liveRoom');
+    if (!r.value && folder.how === 'live') r.value = folder.name;
+    document.getElementById('liveName').value = prefs.get('hand-name', '') || '';
+  };
   // The room Claude Code joins (Demos/mcp.mjs, SURFACE-v10-PLAN D1) — room "claude" through the relay
   // on this machine, or the one typed — and the seat, in one act (V1-PLAN J4, 24-seat.js).
   document.getElementById('liveClaude').onclick = () => { withClaude(); };
+  // Join: a room's name, or an invite link pasted — joining brings nothing of the board on screen in (24-room.js, joinTyped).
   document.getElementById('liveJoin').onclick = () => {
     const room = document.getElementById('liveRoom').value.trim();
     const name = document.getElementById('liveName').value.trim();
     const relay = document.getElementById('liveRelay').value.trim();
-    if (!room) { document.getElementById('liveStatus').textContent = 'a room needs a name'; return; }
-    if (name) prefs.set('hand-name', name);
-    openLive(room, relay ? { relay } : {}).then(() => { closePanel(livePanel, tiles.live); say('in room ' + room + ' as ' + handLabel(folder.me) + (relay ? ' through ' + relay : ' — other tabs on this machine can join')); syncTiles(); })
-      .catch((err) => { document.getElementById('liveStatus').textContent = 'could not join: ' + (err.message || err); });
+    joinTyped(room, name, relay).then((ok) => { if (ok) closePanel(livePanel, tiles.live); });
   };
 
   // Help is HELP.md, one page for a person — draw, hold, choose — read into a pane (PLAN-USER-SURFACE U1g).

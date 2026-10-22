@@ -107,6 +107,8 @@
     openLive: (room, opts) => openLive(room, opts), mergeLive: mergeLive, handColour: handColour,
     // The seat (V1-PLAN J4), for tests: where it stands, and the acts.
     seat: seatState, joinSeat: joinSeat, leaveSeat: leaveSeat, withClaude: withClaude,
+    // A room anyone opens and shares (24-room.js), for tests: where it stands — never its key — and the acts.
+    room: roomState, shareBoard: shareBoard, copyInvite: copyInvite, saveRoomCopy: saveRoomCopy, leaveRoom: leaveLiveRoom, sendRoom: () => saveNow(),
     folder: () => folder,
     setParticipant: setParticipant,
     forgetLocalLog: forgetLocalLog,
@@ -205,7 +207,8 @@
     }
     if (params.get('folder')) openStatic(params.get('folder'));
     else if (params.get('git')) openGit(params.get('git'));
-    else if (params.get('live')) openLive(params.get('live'), params.get('relay') ? { relay: params.get('relay') } : {});
+    // A room's address: a guest who came by an invite is asked a name first, and the key is read from the fragment (24-room.js).
+    else if (params.get('live')) joinFromAddress();
     // Boards carried from the old address (RENAME-PLAN N1): a page opened to take them listens for them; the old
     // address says once that dyna.ink is the new home (off until N4).
     carryAtBoot();
