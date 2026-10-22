@@ -40,6 +40,14 @@ import {
   MAX_ASSET_BYTES, assetRoomBytesFrom, assetPathOf, assetCheck, assetFull, assetSizeVerdict, assetHeaders, sniffImage, ASSET_WORDS,
 } from '../../../Demos/relay-protocol.mjs';
 import { secretsOf, keyOpens } from './auth.mjs';
+import { originAllowed, corsHeaders, text, keyOf } from './http.mjs';
+import { mintRoute } from './mint.mjs';
+import { aiRoute, AI_PATH } from './ai.mjs';
+import { Limits } from './limits.mjs';
+
+// The Durable Object classes this Worker binds (wrangler.toml): a room, and the limits the
+// routes beside the rooms count against.
+export { Limits };
 
 /** The largest line a POST may carry, in characters (the Node relay's cap). */
 const MAX_LINE_CHARS = 4e6;
@@ -54,31 +62,13 @@ const BATCH = 128;
 const MAX_ROOM_NAME = 128;
 const BEAT_MS = 25000;
 
-/** Origins a browser may call from: the app, its old address, a page served from this machine. */
-const ORIGINS = ['https://dyna.ink', 'https://www.dyna.ink', 'https://app.dyna.ink', 'https://jjh111.github.io'];
-const LOCAL = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\]):\d+$/;
-function originAllowed(origin, env) {
-  if (ORIGINS.includes(origin) || LOCAL.test(origin)) return true;
-  return String(env.MM_RELAY_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean).includes(origin);
-}
-const corsHeaders = (origin) => ({
-  'access-control-allow-origin': origin,
-  'access-control-allow-headers': 'content-type, last-event-id, authorization',
-  'access-control-allow-methods': 'GET, HEAD, POST, PUT, OPTIONS',
-  'access-control-max-age': '86400',
-  vary: 'origin',
-});
-const text = (status, body, extra = {}) => new Response(body, { status, headers: { 'content-type': 'text/plain; charset=utf-8', ...extra } });
-
-function keyOf(request, url) {
-  const m = /^Bearer\s+(\S+)\s*$/i.exec(request.headers.get('authorization') || '');
-  return m ? m[1] : url.searchParams.get('key') || '';
-}
-
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/' && (request.method === 'GET' || request.method === 'HEAD')) return text(200, 'dyna.ink relay — rooms/<room>/events (GET is a stream, POST is a line), rooms/<room>/assets/<sha256> (a picture\'s bytes)\n');
+    // Beside the rooms, each in a module of its own: opening a room, and the models.
+    if (url.pathname === '/rooms') return mintRoute(request, env);
+    if (AI_PATH.test(url.pathname)) return aiRoute(request, env);
     const m = /^\/rooms\/([^/]+)\/events$/.exec(url.pathname);
     const asset = m ? null : assetPathOf(url.pathname);
     if (!m && !asset) return text(404, 'rooms/<room>/events, rooms/<room>/assets/<sha256>');

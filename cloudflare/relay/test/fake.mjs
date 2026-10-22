@@ -4,7 +4,7 @@
 // the Room while keeping its storage, as Cloudflare does when it evicts one —
 // and a stand-in for the Worker's environment. No workerd, no network.
 
-import { Room } from '../src/worker.mjs';
+import { Room, Limits } from '../src/worker.mjs';
 
 export function fakeStorage(map = new Map()) {
   const writes = { puts: 0, deletes: 0 };
@@ -31,6 +31,27 @@ export function fakeStorage(map = new Map()) {
     async list({ prefix = '' } = {}) {
       return new Map([...map.entries()].filter(([k]) => k.startsWith(prefix)).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([k, v]) => [k, structuredClone(v)]));
     },
+    async deleteAll() { writes.deletes++; map.clear(); },
+    // An alarm is held, never fired by itself: a test fires it by calling the object's alarm().
+    alarm: null,
+    async getAlarm() { return this.alarm; },
+    async setAlarm(at) { this.alarm = Number(at); },
+    async deleteAlarm() { this.alarm = null; },
+  };
+}
+
+/** A namespace of Durable Objects of one class over fake storage, one per name (a scope of LIMITS, say). */
+export function fakeObjects(Class, env) {
+  const storages = new Map();
+  const objects = new Map();
+  const storageOf = (name) => storages.get(name) || storages.set(name, fakeStorage()).get(name);
+  const objectOf = (name) => objects.get(name) || objects.set(name, new Class({ storage: storageOf(name), blockConcurrencyWhile: (f) => f() }, env)).get(name);
+  return {
+    storages,
+    objects,
+    objectOf,
+    idFromName: (name) => name,
+    get(id) { return { fetch: (req, init) => objectOf(id).fetch(req instanceof Request ? req : new Request(req, init)) }; },
   };
 }
 
@@ -56,10 +77,11 @@ export function fakeNamespace(env) {
   };
 }
 
-/** The Worker's environment: a namespace and whatever else a test sets. */
+/** The Worker's environment: the rooms, the limits, and whatever else a test sets (an `AI`, say). */
 export function fakeEnv(vars = {}) {
   const env = { ...vars };
   env.ROOMS = fakeNamespace(env);
+  env.LIMITS = fakeObjects(Limits, env);
   return env;
 }
 

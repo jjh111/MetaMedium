@@ -16,10 +16,25 @@ workers_dev = true
 name = "ROOMS"
 class_name = "Room"
 
+# Counts for the routes beside the rooms (opening a room, asking a model): one object per scope
+# (src/limits.mjs), so a limit is one count wherever a request lands.
+[[durable_objects.bindings]]
+name = "LIMITS"
+class_name = "Limits"
+
 # SQLite-backed, which the free plan requires, and what a room's lines are kept in.
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Limits"]
+
+# Workers AI, for the model routes (src/ai.mjs): the Worker asks the model, so no key is ever
+# in a browser. Billed to the account that deploys this Worker.
+[ai]
+binding = "AI"
 
 [vars]
 # More origins a browser may call from, comma-separated (dyna.ink, its www, the github.io
