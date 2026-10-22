@@ -52,14 +52,28 @@
   function clockRows(s, id) {
     const c = s.clocks[id];
     const err = runtimeBroken(id);
+    // A program runs in THIS tab only when this hand played it here (C1): a
+    // clock the log says is playing, but that another hand set, stands as its
+    // source and offers *Play it here* — one tap, this hand's own play.
+    const elsewhere = c && c.playing && isProgram(s, id) && !consentedHere(id);
+    const who = elsewhere ? session.clockAuthor(id) : null;
     const stateText = !c ? 'not played'
+      : elsewhere ? 'playing for ' + (who || 'another hand') + ' — not running here'
       : c.playing ? 'playing · t = ' + tankTime(id).toFixed(1) + 's' : 'paused' + (c.reason ? ' — ' + c.reason : '') + ' · t = ' + tankTime(id).toFixed(1) + 's';
     return '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>' +
       '<div class="acts">' +
-      (c && c.playing
+      (elsewhere
+        ? '<button class="mini" data-act="clock-play-here" data-id="' + esc(id) + '">play it here</button>'
+        : c && c.playing
         ? '<button class="mini" data-act="clock-pause" data-id="' + esc(id) + '">pause</button>'
         : '<button class="mini" data-act="clock-play" data-id="' + esc(id) + '">play</button>') +
       '<button class="mini" data-act="clock-reset" data-id="' + esc(id) + '">reset</button></div>';
+  }
+  /** Whether an artifact runs arbitrary code (a js behaviour or a run program) — the kinds the consent gate governs. */
+  function isProgram(s, id) {
+    const node = s.nodes.get(id);
+    const k = codeKindOf(node);
+    return k === 'js' || k === 'run';
   }
 
   /** The kind of an artifact's newest code rep, html by default. */

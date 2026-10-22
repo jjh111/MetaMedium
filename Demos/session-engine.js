@@ -555,7 +555,7 @@
 
 // ===== artifacts =====
 // Provides: the live plane: frames of iframes for artifacts with code, syncStage, regionsUnderInk, pointerFrameAt.
-// Uses: core, view.
+// Uses: core, view, kinds (documentForKind, syncRuntime, the consent gate consentedHere — a run frame plays only when this hand played it here).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -568,12 +568,22 @@
   // inside the shared transform. The ink canvas sits ON TOP of it, so the boxes
   // you drew stay visible as the outlines of what they produced (MVP.md §3.3).
   //
-  // SANDBOX POSTURE, deliberate (MVP.md risk #5): `allow-same-origin` WITHOUT
-  // `allow-scripts`. Same-origin is what lets ink hit-test into the artifact's
-  // own DOM, which is the novel capability here. Granting both together is the
-  // known sandbox escape, and running arbitrary generated JS is not needed to
-  // prove the loop — so scripts stay off, and this is a choice to revisit
-  // explicitly rather than a default that drifted.
+  // SANDBOX POSTURE, deliberate (MVP.md risk #5):
+  //  - html/svg/text/picture frames: `allow-same-origin` WITHOUT `allow-scripts`.
+  //    Same-origin is what lets ink hit-test into the artifact's own DOM, the
+  //    novel capability here; granting both is the known escape, so scripts stay
+  //    off. An injected `<img onerror>`, an svg `<script>`, a page's code or a
+  //    Mermaid label never runs (it is inert markup in a script-less frame).
+  //  - run/mermaid frames: `allow-scripts` WITHOUT `allow-same-origin`, so they
+  //    run script at an OPAQUE origin that cannot reach the page, its storage or
+  //    its keys — and, since C6, each srcdoc carries a CSP (`connect-src 'none'`,
+  //    13-kinds.js `frameCSP`) so a playing program cannot phone out.
+  //  - the `js` worker (13-kinds.js) is the ONE same-origin code path: a blob
+  //    Worker runs at the PAGE's origin. So it is defended twice: nothing runs
+  //    there until this hand played it HERE (the consent gate, C1), and before
+  //    any code loads the worker strips network, storage, channels and nested
+  //    workers (`WORKER_HARDEN`), keeping only Math/performance/Function/
+  //    postMessage — it cannot open the person's boards or beacon out.
   const frames = new Map(); // artifactId -> { wrap, iframe, codeAt }
   // Text made from writing is flipped over to show the ink it came from (v10 F8). Runtime only.
   const flipped = new Set();
@@ -668,14 +678,22 @@
       f.wrap.style.width = fr.w + 'px';
       f.wrap.style.height = fr.h + 'px';
       f.wrap.classList.toggle('broken', !!runtimeBroken(id));
-      f.wrap.classList.toggle('playing', !!(s.clocks[id] && s.clocks[id].playing));
+      // A program runs in THIS tab only when this hand played it HERE (C1): the
+      // log may say a clock is playing on every hand's board, but another
+      // hand's play does not start arbitrary code in your tab — it stands as
+      // its source and offers *Play it here*. `playingHere` is the executing
+      // state; `playing` is what the log says, for the badge that it is playing
+      // for someone else.
+      const inLog = !!(s.clocks[id] && s.clocks[id].playing);
+      const playing = inLog && (kind !== 'run' || consentedHere(id));
+      f.wrap.classList.toggle('playing', playing);
+      f.wrap.classList.toggle('playing-elsewhere', inLog && !playing && kind === 'run');
       f.wrap.classList.toggle('writing', isWritingArtifact(node));
       f.wrap.classList.toggle('flipped', flipped.has(id));
 
       // What renders is the WIRED code when a frame feeds this member.
       const wired = wiredCodeOf(s, id);
       const code = wired !== null ? wired : rep.data.code;
-      const playing = !!(s.clocks[id] && s.clocks[id].playing);
       // A figure's document carries the board's own ink colour, baked in when
       // it was written — an iframe cannot inherit a token from the page — so
       // the THEME is part of what the document is made of. Without it in the
@@ -718,7 +736,7 @@
     for (const [id, f] of frames) {
       if (f.parked || f.kind !== 'run' || !f.iframe) continue;
       const c = state.clocks[id];
-      if (!c || !c.playing) continue;
+      if (!c || !c.playing || !consentedHere(id)) continue;
       const node = state.nodes.get(id);
       const fr = node && MM.frameOf(node);
       if (!fr) continue;
@@ -4413,6 +4431,8 @@
     else if (act === 'read') { const n = state.nodes.get(id); if (n && !readers().length) keepRead({ line: [], single: [id] }); else if (n && !readOne(n, true)) say('nothing there to read'); }
     else if (act === 'split') session.splitWord(id, Date.now());
     else if (act === 'clock-play') session.clock({ nodeId: id, op: 'play', at: Date.now() });
+    // Play another hand's program HERE: this hand's own play, so the code runs in this tab only by the person's tap (C1).
+    else if (act === 'clock-play-here') playHere(id);
     else if (act === 'clock-pause') session.clock({ nodeId: id, op: 'pause', at: Date.now() });
     else if (act === 'clock-reset') session.clock({ nodeId: id, op: 'reset', at: Date.now() });
     else if (act === 'behave-use') {
@@ -7992,14 +8012,28 @@
   function clockRows(s, id) {
     const c = s.clocks[id];
     const err = runtimeBroken(id);
+    // A program runs in THIS tab only when this hand played it here (C1): a
+    // clock the log says is playing, but that another hand set, stands as its
+    // source and offers *Play it here* — one tap, this hand's own play.
+    const elsewhere = c && c.playing && isProgram(s, id) && !consentedHere(id);
+    const who = elsewhere ? session.clockAuthor(id) : null;
     const stateText = !c ? 'not played'
+      : elsewhere ? 'playing for ' + (who || 'another hand') + ' — not running here'
       : c.playing ? 'playing · t = ' + tankTime(id).toFixed(1) + 's' : 'paused' + (c.reason ? ' — ' + c.reason : '') + ' · t = ' + tankTime(id).toFixed(1) + 's';
     return '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>' +
       '<div class="acts">' +
-      (c && c.playing
+      (elsewhere
+        ? '<button class="mini" data-act="clock-play-here" data-id="' + esc(id) + '">play it here</button>'
+        : c && c.playing
         ? '<button class="mini" data-act="clock-pause" data-id="' + esc(id) + '">pause</button>'
         : '<button class="mini" data-act="clock-play" data-id="' + esc(id) + '">play</button>') +
       '<button class="mini" data-act="clock-reset" data-id="' + esc(id) + '">reset</button></div>';
+  }
+  /** Whether an artifact runs arbitrary code (a js behaviour or a run program) — the kinds the consent gate governs. */
+  function isProgram(s, id) {
+    const node = s.nodes.get(id);
+    const k = codeKindOf(node);
+    return k === 'js' || k === 'run';
   }
 
   /** The kind of an artifact's newest code rep, html by default. */
@@ -8835,8 +8869,10 @@
 // ===== kinds =====
 // Provides: documentForKind (the renderers: every kind as a document ink can address), the mermaid harness (mermaidFrom, mermaidStates), postPointer (a hand forwarded into a playing frame), the worker runtime
 //   (a blessed `js` artifact's code runs in a worker with a budget; a throw or a hang pauses its clock
-//   with the reason), runtimeOffset, runtimeBroken, syncRuntime.
-// Uses: core (session, esc), artifacts (frames, documentFor).
+//   with the reason), runtimeOffset, runtimeBroken, syncRuntime, the consent gate (trackConsent, consentedHere,
+//   grantPlayingPrograms — this tab runs a program only when this hand played it here, C1), frameCSP (a run or
+//   mermaid frame cannot phone out), WORKER_HARDEN (the js worker keeps only Math/performance/Function/postMessage).
+// Uses: core (session, esc), artifacts (frames, documentFor), render (render).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -8955,6 +8991,39 @@
   // the frame: the program reports its parts as named rectangles, and the
   // canvas reads them back through postMessage.
   const THREE_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+
+  // ===== A program's frame cannot phone out (C6) ===========================
+  // run and mermaid frames are opaque-origin sandboxes: they cannot reach the
+  // page, its storage or its keys. But they can still `fetch` — under the
+  // app's own CSP that reaches the allowlisted hosts — so a program drawn by
+  // someone else could beacon out. A CSP meta inside the srcdoc closes it:
+  // `connect-src 'none'` (no fetch, XHR, WebSocket, EventSource or beacon),
+  // and nothing loads but what the frame actually needs — the pinned library
+  // by <script>, the launch film's video and the frame's own data: assets.
+  // The library host is derived from the URLs the frame is given, so a test's
+  // stand-in library (served from the gate's own origin) still loads and the
+  // CDNs stay in one home. img/media are held to the page's own origin and
+  // data:/blob:, so no <img> or <video> GET can beacon to a stranger either.
+  function originOf(u) { try { return new URL(u, location.href).origin; } catch (e) { return null; } }
+  function frameCSP(scriptUrls) {
+    const self = location.origin && location.origin !== 'null' ? location.origin : '';
+    const hosts = {};
+    for (const u of scriptUrls || []) { const o = originOf(u); if (o && o !== 'null') hosts[o] = 1; }
+    if (self) hosts[self] = 1;
+    const script = Object.keys(hosts).join(' ');
+    const sameAssets = (self ? self + ' ' : '') + 'data: blob:';
+    const content =
+      "default-src 'none'; " +
+      'script-src ' + (script ? script + ' ' : '') + "'unsafe-inline' 'unsafe-eval' blob:; " +
+      "style-src 'unsafe-inline'; " +
+      'img-src ' + sameAssets + '; ' +
+      'media-src ' + sameAssets + '; ' +
+      'font-src ' + sameAssets + '; ' +
+      "connect-src 'none'; " +
+      'worker-src blob:; ' +
+      "base-uri 'none'; form-action 'none'";
+    return '<meta http-equiv="Content-Security-Policy" content="' + content.replace(/"/g, '&quot;') + '">';
+  }
   const reported = new Map(); // artifactId -> [{ id, x, y, w, h }] in frame pixels
   const RUN_HARNESS = [
     '// three.js is loaded beside this script, not before it: a program that draws in 2D',
@@ -9042,7 +9111,7 @@
   function runDocument(id, code, w, h) {
     const safe = (s) => JSON.stringify(String(s)).replace(/<\//g, '<\\/');
     const script = RUN_HARNESS.replace('__W__', Math.round(w)).replace('__H__', Math.round(h)).replace('__ID__', safe(id)).replace('__CODE__', safe(code)).replace('__THREE__', JSON.stringify(THREE_CDN));
-    return '<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent;overflow:hidden;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px}</style>' +
+    return '<!doctype html><html><head><meta charset="utf-8">' + frameCSP([THREE_CDN]) + '<style>html,body{margin:0;background:transparent;overflow:hidden;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px}</style>' +
       '</head><body><script>' + script + '<\/script></body></html>';
   }
 
@@ -9155,7 +9224,7 @@
       '#out .flowchart-link,#out .edgePath path,#out path.relation,#out .messageLine0,#out .messageLine1,#out .actor-line,#out .divider path{stroke:' + ink + ' !important;}' +
       '#out marker path,#out marker circle,#out .arrowMarkerPath,#out #arrowhead path{fill:' + ink + ' !important;stroke:' + ink + ' !important;}' +
       '#out .edgeLabel,#out .edgeLabel rect,#out .labelBkg,#out .cluster rect{fill:transparent !important;background:transparent !important;}';
-    return '<!doctype html><html><head><meta charset="utf-8"><style>' + css + '</style></head><body>' +
+    return '<!doctype html><html><head><meta charset="utf-8">' + frameCSP(mermaidSourcesNow()) + '<style>' + css + '</style></head><body>' +
       '<div id="mmroot"><pre id="src">' + esc(text) + '</pre><p id="note" hidden></p><div id="out" hidden></div></div>' +
       '<script>' + script + '<\/script></body></html>';
   }
@@ -9266,7 +9335,37 @@
   const RUN_DT = 1 / 60;
   const RUN_SPEED_CAP = 400; // world units per second, the cap `steer` uses
 
+  // Defence in depth (C1): the worker is a plain blob worker at the page's
+  // own origin, so a `js` behaviour could in principle open the person's
+  // IndexedDB boards or beacon out. A behaviour needs NONE of that — it
+  // returns a force from a world object — so before any code is loaded the
+  // worker takes away network, storage, channels and nested workers at every
+  // place each lives: the prototype chain of the global AND the global name,
+  // each overridden with a throwing getter so prototype-walking, the Function
+  // constructor and shadowing all hit the same wall. URL.createObjectURL goes
+  // too, so even if a Worker constructor were missed a blob-worker route is
+  // dead. The behaviour keeps only what it uses: Math, performance, Function,
+  // postMessage. This runs in the worker string, so it holds in every engine,
+  // not only where a sandbox attribute would.
+  const WORKER_HARDEN = [
+    '(function(){',
+    '  var G = self;',
+    '  var gone = ["fetch","XMLHttpRequest","WebSocket","EventSource","importScripts","Worker","SharedWorker","ServiceWorker","BroadcastChannel","MessageChannel","indexedDB","caches","navigator","openDatabase","WebTransport","RTCPeerConnection","Notification","PushManager"];',
+    '  function deny(name){ return function(){ throw new Error(name + " is not available to a behaviour"); }; }',
+    '  function seal(obj, name){ try { Object.defineProperty(obj, name, { configurable: false, enumerable: false, get: deny(name) }); return true; } catch (e) { try { delete obj[name]; return true; } catch (e2) { try { obj[name] = undefined; } catch (e3) {} return false; } } }',
+    '  for (var i = 0; i < gone.length; i++){',
+    '    var n = gone[i];',
+    '    var p = G;',
+    '    while (p){ if (Object.prototype.hasOwnProperty.call(p, n)) seal(p, n); p = Object.getPrototypeOf(p); }',
+    '    seal(G, n);',
+    '  }',
+    '  try { if (G.URL && G.URL.createObjectURL) G.URL.createObjectURL = deny("URL.createObjectURL"); } catch (e) {}',
+    '  try { if (G.URL && G.URL.revokeObjectURL) G.URL.revokeObjectURL = function(){}; } catch (e) {}',
+    '})();',
+  ].join('\n');
+
   const WORKER_SRC = [
+    WORKER_HARDEN,
     'const fns = new Map();',
     'function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}',
     'onmessage = (e) => {',
@@ -9397,12 +9496,82 @@
     };
   }
 
-  /** The playing `js` artifacts, each with code the worker holds. */
+  // ===== Consent: this tab runs only what this hand played here (C1) =======
+  // A `js` behaviour and a playing `run` program run arbitrary code. The log
+  // may say a clock is `playing` — a pure function of the log, true on every
+  // hand's board — but THIS tab executes a program only when this hand played
+  // it HERE: a `clock{op:'play'}` this hand wrote live in this session. A play
+  // that arrived inside a loaded log — a room line, `from a file…`, a folder,
+  // a carry, an embed — grants nothing, so another hand's program never starts
+  // by itself; the person taps *Play it here* (a play of their own) to run it.
+  // This is runtime only (like paint culling): it governs what this tab runs,
+  // never the session state, so undo per hand still stops it — undo drops this
+  // hand's play, the clock stops, the loop stops.
+  const grantedHere = new Set();
+  let consentArr = null, consentLen = 0;
+  function trackConsent(s) {
+    const evs = session.getEvents();
+    if (evs !== consentArr) {
+      // A NEW events array — a load, a reset, an undo, a room rebase that cut:
+      // consent does not survive it. What is still playing from the loaded log
+      // waits for *Play it here*. (A live append keeps the same array.)
+      consentArr = evs; consentLen = evs.length;
+      grantedHere.clear();
+    } else {
+      // Appended live: a `clock{op:'play'}` THIS hand wrote (no `by` — every
+      // other hand's line is stamped on arrival) grants its artifact. A room
+      // line that only appends keeps the same array, so a foreign play lands
+      // here too — and is refused, because it carries `by`.
+      for (let i = consentLen; i < evs.length; i++) {
+        const ev = evs[i];
+        if (ev && ev.type === 'clock' && ev.op === 'play' && !ev.by) grantedHere.add(ev.nodeId);
+      }
+      consentLen = evs.length;
+    }
+    for (const id of [...grantedHere]) if (!s.live.includes(id) && !s.clocks[id]) grantedHere.delete(id);
+  }
+  /** Whether this tab may run this artifact's code: this hand played it here. */
+  function consentedHere(id) { return grantedHere.has(id); }
+  /**
+   * Play a program HERE — the person's one tap when it is playing for another
+   * hand (C1). It writes this hand's OWN `clock{op:'play'}`, so the consent is
+   * the person's deliberate act, kept in the log as any play is: undo per hand
+   * takes it back, and every peer sees this hand played it too. The live append
+   * is what `trackConsent` grants on, so the program then runs here.
+   */
+  function playHere(id) {
+    const s = session.getState();
+    if (!s.live.includes(id)) return false;
+    session.clock({ nodeId: id, op: 'play', at: Date.now() });
+    const who = session.clockAuthor(id);
+    flash('playing it here' + (who ? ' — it was playing for ' + who : ''));
+    return true;
+  }
+  /**
+   * Trust the programs a shipped example or the whitepaper's embed opens with:
+   * their code is dyna.ink's own, loaded from the site's own origin, and the
+   * example IS the program shown (the launch film). A deliberate, narrow grant
+   * made only by the example-open path (22-boards.js), never by a load.
+   */
+  function grantPlayingPrograms() {
+    const s = session.getState();
+    let any = false;
+    for (const id of Object.keys(s.clocks)) {
+      if (!s.clocks[id].playing || grantedHere.has(id)) continue;
+      const node = s.nodes.get(id);
+      const rep = node && codeRepOf(node);
+      const kind = rep && (rep.data.kind || 'html');
+      if (kind === 'js' || kind === 'run') { grantedHere.add(id); any = true; }
+    }
+    if (any) render(session.getState());
+  }
+
+  /** The playing `js` artifacts THIS hand played here, each with code the worker holds. */
   function runnable(s) {
     const out = [];
     for (const id of s.live) {
       const c = s.clocks[id];
-      if (!c || !c.playing) continue;
+      if (!c || !c.playing || !consentedHere(id)) continue;
       const node = s.nodes.get(id);
       const rep = node && codeRepOf(node);
       if (!rep || (rep.data.kind || 'html') !== 'js') continue;
@@ -12242,7 +12411,8 @@
 //   arriving live over a BroadcastChannel or a relay, merged as they land, and — over a relay — the bytes of
 //   the pictures they name: put on it before a line names them, fetched by hash when one is missing,
 //   roomAssetFetch; PLAN-IPAD-NOTES A1; and tellOtherMoves — another hand's move of marks of mine, said once in the status
-//   line and attributed, A2b); and the boards this
+//   line and attributed, A2b; and tellPlayingPrograms — a program another hand set playing, said once: it does not run here
+//   until this hand plays it, C1, reading the consent gate consentedHere/isProgram from kinds/inspector); and the boards this
 //   browser keeps when there is no folder (V1-PLAN R3, R1) — the adapter over 17-board.js's journal
 //   and 17-boards.js's list: IndexedDB (openBoard, persistBoard, flushBoard, forgetLocalLog; the list:
 //   switchBoard, newBoard, renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash,
@@ -12291,6 +12461,8 @@
     // status line.
     noticed: new Set(),
     movesSaid: new Set(),
+    // Programs another hand set playing, said once each (C1): this tab does not run another hand's code by itself.
+    playsSaid: new Set(),
     // What the merge said about a folder's logs: a log name two DIFFERENT
     // events were both numbered under (L1b) — two writers under one name. A
     // live room says it through its store; a folder has only the merge.
@@ -12507,6 +12679,7 @@
     if (folder.store && folder.store.close) folder.store.close();
     folder.noticed = new Set();
     folder.movesSaid = new Set();
+    folder.playsSaid = new Set();
     // A hand in a room is one SITTING: a second tab of the same person is a
     // second log, or their lines would be taken for its own. The name is the
     // person's; the suffix is this page load's. Held in memory only: a
@@ -12591,6 +12764,28 @@
   }
 
   /**
+   * A program another hand set playing arrives in the room (C1): the log says
+   * it plays, but this tab does not start another hand's code — it stands as
+   * its source and waits for *Play it here*. Said once per program, in plain
+   * words; the panel offers the tap. Said only for a program a PERSON other
+   * than this one played (clockAuthor), never for your own, and never on a
+   * first sync that rebuilds the board (the room already held it).
+   */
+  function tellPlayingPrograms(report) {
+    if (report.rebuilt) { const s = session.getState(); for (const id of s.live) if (s.clocks[id] && s.clocks[id].playing && session.clockAuthor(id)) folder.playsSaid.add(id); return; }
+    const s = session.getState();
+    for (const id of s.live) {
+      const c = s.clocks[id];
+      if (!c || !c.playing || folder.playsSaid.has(id)) continue;
+      if (consentedHere(id) || !isProgram(s, id)) continue;
+      const who = session.clockAuthor(id);
+      if (!who) continue;
+      folder.playsSaid.add(id);
+      say(who + ' set “' + (MM.wordOf(s.nodes.get(id)) || 'a program') + '” playing — it does not run here until you play it; open it and tap “play it here”');
+    }
+  }
+
+  /**
    * A line landed: merge it — only when a log another hand wrote changed.
    * A hello, a goodbye, the relay's word, a whole log already held change no
    * log and do no work here; what the room says about itself is still said.
@@ -12607,7 +12802,7 @@
       folder.mergedRevision = rev;
       const report = folder.merge.sync(folder.store.heldLogs());
       changed = report.how !== 'none';
-      if (changed) tellOtherMoves(report);
+      if (changed) { tellOtherMoves(report); tellPlayingPrograms(report); }
     }
     // What the room says about itself is said here once, the moment it is
     // heard, and then stands in the status line (folderStatus).
@@ -15689,7 +15884,8 @@
 //   renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash, emptyTrash, boardFromFile,
 //   rereadBoards, boardEntryName, exportLogNow, readLogText), input (flash, say), the
 //   inspector's element (the panel's start), boards list (exampleUrl, exampleRows, exampleName, starterOf),
-//   core (params, EMBED, session), folder (boardMode), view (fitAll, fitTo), render (union, viewportWorld).
+//   core (params, EMBED, session), folder (boardMode), view (fitAll, fitTo), render (union, viewportWorld),
+//   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -15963,7 +16159,13 @@
       } catch (err) { report('could not read the “' + row.name + '” example (' + ((err && err.message) || err) + ') — it opens once this page has been online'); return false; }
       if (!read.events) { report(read.refused || 'the “' + row.name + '” example is not a board’s log'); return false; }
       const events = read.events;
-      return await newBoard({ name: exampleName([...boards.entries.values()], row), events: events, force: !!o.force, said: o.said || ((v) => say(v.words)) });
+      const made = await newBoard({ name: exampleName([...boards.entries.values()], row), events: events, force: !!o.force, said: o.said || ((v) => say(v.words)) });
+      // A shipped example IS the program shown — the launch film — and its code
+      // is dyna.ink's own, from the site's own origin, so this hand's board of
+      // its own may run it without a tap (the consent gate, C1). A deliberate,
+      // narrow grant, made only here; a loaded board of someone else's gets none.
+      if (made) grantPlayingPrograms();
+      return made;
     } finally { examples.opening = false; }
   }
   /**
@@ -15990,6 +16192,9 @@
       // Unless the reader has drawn on the figure before the log arrived: theirs stands.
       if (session.getEvents().length) return;
       session.load(read.events);
+      // The embed shows the example's own program (the whitepaper's film): its
+      // code is dyna.ink's, from the site's own origin, so it runs here (C1).
+      grantPlayingPrograms();
       fitAll();
       // A board too big for a narrow frame (a phone's) stops at the least zoom and is cut wherever the fit
       // lands; its first region, whole, reads better — on the storyboard, the film.
@@ -17689,6 +17894,8 @@
     usesHere: () => JSON.parse(JSON.stringify(usesHere)),
     // The worker runtime, for tests: what is loaded, where each body is, what broke.
     runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS, log: runtime.log, pending: runtime.pending, stepOnce: stepOnce }),
+    // Consent to run another hand's code (C1), for tests: whether this tab may run an artifact here, who last played it, and the trusted example grant.
+    playedHere: (id) => consentedHere(id), clockAuthor: (id) => session.clockAuthor(id), grantPlayingPrograms: grantPlayingPrograms, playHere: (id) => playHere(id),
     // Programs, for tests: what a running frame reported, and the library.
     reportedRegions: (id) => reportedRegions(id),
     libraryEntries: () => libraryEntries(session.getState()),
@@ -17769,6 +17976,12 @@
   // a release on a big board paints for seconds, and the record of the stroke
   // must be the browser's before then (V1-PLAN R3, the kill test).
   session.subscribe(persistBoard);
+  // Before the paint: a program runs in this tab only when this hand played it
+  // HERE (C1), and that consent is read from the live log as it grows — a play
+  // this hand wrote grants it, a play that arrived in a loaded log (a room
+  // line, a file, a folder, a carry, an embed) grants nothing. Tracked before
+  // render so the grant is in place when the paint decides whether to run.
+  session.subscribe(trackConsent);
   session.subscribe(render);
   // The library packs the board uses (V1-PLAN §2.3, B3): the pane and the tile follow its log, and so
   // does the pen — a pack naming a notation offers its ports while in use, and takes them back after.

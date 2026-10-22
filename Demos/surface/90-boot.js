@@ -94,6 +94,8 @@
     usesHere: () => JSON.parse(JSON.stringify(usesHere)),
     // The worker runtime, for tests: what is loaded, where each body is, what broke.
     runtime: () => ({ bodies: runtime.bodies, broken: runtime.broken, loaded: runtime.loaded, budgetMs: RUN_BUDGET_MS, log: runtime.log, pending: runtime.pending, stepOnce: stepOnce }),
+    // Consent to run another hand's code (C1), for tests: whether this tab may run an artifact here, who last played it, and the trusted example grant.
+    playedHere: (id) => consentedHere(id), clockAuthor: (id) => session.clockAuthor(id), grantPlayingPrograms: grantPlayingPrograms, playHere: (id) => playHere(id),
     // Programs, for tests: what a running frame reported, and the library.
     reportedRegions: (id) => reportedRegions(id),
     libraryEntries: () => libraryEntries(session.getState()),
@@ -174,6 +176,12 @@
   // a release on a big board paints for seconds, and the record of the stroke
   // must be the browser's before then (V1-PLAN R3, the kill test).
   session.subscribe(persistBoard);
+  // Before the paint: a program runs in this tab only when this hand played it
+  // HERE (C1), and that consent is read from the live log as it grows — a play
+  // this hand wrote grants it, a play that arrived in a loaded log (a room
+  // line, a file, a folder, a carry, an embed) grants nothing. Tracked before
+  // render so the grant is in place when the paint decides whether to run.
+  session.subscribe(trackConsent);
   session.subscribe(render);
   // The library packs the board uses (V1-PLAN §2.3, B3): the pane and the tile follow its log, and so
   // does the pen — a pack naming a notation offers its ports while in use, and takes them back after.
