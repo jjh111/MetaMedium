@@ -43,6 +43,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startStatic } from './servers.mjs';
 import { rng, sleep, cellBox, boxPath, sig, sameSig, drawPath, waitReady, strokesOnBoard } from './keep.mjs';
+import { publishedLinks } from './links.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -140,34 +141,8 @@ async function helpText(page) {
   return text;
 }
 
-/**
- * Every address into the site that the whitepaper, its 404 page and the README
- * give: each relative href and src, and each absolute address under the
- * published site wherever it stands (a link, a social card's image, the root)
- * — with a replay's recording beside the page that plays it.
- */
-function publishedLinks() {
-  const SITE_URL = 'https://jjh111.github.io/MetaMedium/';
-  const out = new Set();
-  const add = (path) => {
-    out.add(path);
-    const replay = /^Demos\/[^?]+\?(?:.*&)?replay=([^&]+)/.exec(path);
-    if (replay) out.add('Demos/' + decodeURIComponent(replay[1]));
-  };
-  for (const f of ['index.html', '404.html', 'README.md']) {
-    const text = readFileSync(join(root, f), 'utf8').replace(/&amp;/g, '&');
-    for (const m of text.matchAll(/https:\/\/jjh111\.github\.io\/MetaMedium\/[^"'\s)<>]*/g)) add(m[0].slice(SITE_URL.length).split('#')[0]);
-    for (const m of text.matchAll(/\s(?:href|src)="([^"]+)"/g)) {
-      const u = m[1];
-      if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|#|\/)/i.test(u)) continue;
-      const path = u.split('#')[0];
-      if (path) add(path);
-    }
-  }
-  // And the address the whitepaper had before v5, kept as a redirect stub (CLAUDE.md: keep it).
-  add('MetaMedium_Whitepaper_v4.html');
-  return [...out];
-}
+// Every address into the site that the whitepaper, its 404 page and the README give: links.mjs's
+// publishedLinks, which the prod scenario and the site test ask too.
 
 // ===== A. The app on the gate's own static server ===============================
 

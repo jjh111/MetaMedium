@@ -2,51 +2,61 @@
 //
 //   node --test cloudflare/site.test.mjs
 //
-// Pure Node: the file list (git's), the generated `_headers` and `_redirects`, and the app's
-// Content-Security-Policy held to what the app's source actually loads — a host the source
-// names and the policy lacks is an app that breaks on dyna.ink and not on localhost; a host the
-// policy names and nothing loads is a door left open. The proof that the policy lets the
-// app run (a program's `new Function`, the worker, the frames) is a browser's, and was done
-// with `wrangler pages dev` over this very build (cloudflare/README.md says how).
+// Pure Node: the file list (git's, less what the product's site never serves), the generated
+// `_headers` read as Pages applies it, `_redirects`, `robots.txt`, the deployed commit named in
+// the app's pages, and the app's Content-Security-Policy held to what the app's source actually
+// loads — a host the source names and the policy lacks is an app that breaks on dyna.ink and not
+// on localhost; a host the policy names and nothing loads is a door left open. The proof that the
+// policy lets the app run (a program's `new Function`, the worker, the frames, offline) is a
+// browser's: the gate's `prod` scenario serves this very build with these headers (e2e/prod.mjs).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { siteFiles, headersText, LEFT_OUT } from './build-site.mjs';
+import { siteFiles, headersText, LEFT_OUT, whyLeftOut, headerRules, headersFor, ruleMatches, stampCommit, STAMPED, buildSite } from './build-site.mjs';
+import { publishedLinks, fileCandidates } from '../e2e/links.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const read = (f) => readFileSync(path.join(root, f), 'utf8');
 const csp = read('cloudflare/pages/csp.txt').trim();
 
-/** The `_headers` file as rules: a path and its header lines. */
-function rulesOf(text) {
-  const rules = [];
-  for (const raw of text.split('\n')) {
-    if (!raw.trim() || raw.trim().startsWith('#')) continue;
-    if (/^\S/.test(raw)) rules.push({ path: raw.trim(), headers: {} });
-    else { const i = raw.indexOf(':'); rules[rules.length - 1].headers[raw.slice(0, i).trim().toLowerCase()] = raw.slice(i + 1).trim(); }
-  }
-  return rules;
-}
 const policy = (directive) => (csp.split(';').map((d) => d.trim()).find((d) => d.startsWith(directive + ' ')) || '').split(/\s+/).slice(1);
 
-test('the site is what GitHub Pages publishes, less what is not a page', () => {
+test('the site is the product\'s pages: the whitepaper, the app, its demos and boards — never the tests, the plans, the source or a page that cannot run', () => {
   const files = siteFiles(root);
   for (const f of ['index.html', '404.html', 'app/index.html', 'app/sw.js', 'app/manifest.webmanifest', 'Demos/session-engine.html', 'Demos/session-engine.js',
     'Demos/dynaink-core.browser.js', 'Demos/sw.js', 'Demos/surface/surface.css', 'boards/examples/index.json', 'HELP.md', 'VERSION', 'MetaMedium_Whitepaper_v4.html',
-    'archive/MetaMedium_Whitepaper_v4.html', 'doodle2-canvas.html', 'metadoodle1.html', 'Assets/thumb-metamedium-v5.png', 'Assets/thumb-dynaink.png']) {
+    'archive/MetaMedium_Whitepaper_v4.html', 'doodle2-canvas.html', 'metadoodle1.html', 'Assets/thumb-metamedium-v5.png', 'Assets/thumb-dynaink.png',
+    'LICENSE', 'NOTICE', 'stories/reader.js', 'v2-poc/index.html', 'launch-video/dynaink-soft-launch.mp4']) {
     assert.ok(files.includes(f), f + ' is not published');
   }
+  // What a browser on dyna.ink never asks for, each with its reason: a dead page (dynaink-3d loads ./src/main.ts
+  // through a dev server), a harness, a test, a plan, the engine's source, the repository's configuration.
+  for (const [f, why] of [['dynaink-3d/index.html', /dev server/], ['Web App Skeleton/index.html', /dev server/], ['lens-canvas/index.html', /dev server/],
+    ['test-vision.html', /harness/], ['test-llm.html', /harness/], ['CLAUDE.md', /plan/], ['RENAME-PLAN.md', /plan/], ['core/src/session/session.ts', /source/],
+    ['Demos/session-engine.e2e.js', /test/], ['Demos/surface/09-field.test.mjs', /test/], ['Demos/mcp-smoke.mjs', /test/], ['Demos/relay-assets.conformance.mjs', /test/],
+    ['.mcp.json', /configuration/], ['.nojekyll', /configuration/], ['skills/dynaink-code/.DS_Store', /configuration/], ['e2e/run.mjs', /gate/], ['.env.example', /key/]]) {
+    assert.match(whyLeftOut(f) || '', why, f + ' should be left out');
+    assert.ok(!files.includes(f), f + ' is published');
+  }
   for (const f of files) {
+    assert.equal(whyLeftOut(f), null, f);
     assert.ok(!LEFT_OUT.some((d) => f === d || f.startsWith(d + '/')), f + ' should be left out');
     assert.ok(!f.split('/').includes('node_modules'), f);
     assert.ok(!/^\.env(\.|$)/.test(path.basename(f)), f + ' looks like a key\'s file');
   }
+});
+
+test('every address the whitepaper, its 404 page and the README link into the site is a file the site publishes', () => {
+  const files = new Set(siteFiles(root));
+  const links = publishedLinks(root);
+  assert.ok(links.length > 20, 'the oracle found the links');
+  assert.deepEqual(links.filter((a) => !fileCandidates(a).some((f) => files.has(f))), [], 'a linked address the site would not answer');
 });
 
 test('every file the whitepaper loads by a relative address is published — its figures, the drawings it credits, its scripts', () => {
@@ -68,25 +78,54 @@ test('only what git tracks is published: an untracked key, a committed node_modu
     put('untracked-notes.md');
     execFileSync('git', ['init', '-q'], { cwd: repo });
     execFileSync('git', ['add', '-f', 'index.html', 'app', 'Web App Skeleton', 'node_modules', 'e2e', 'cloudflare', '.env.local'], { cwd: repo });
-    assert.deepEqual(siteFiles(repo), ['Web App Skeleton/a.ts', 'app/index.html', 'index.html']);
+    assert.deepEqual(siteFiles(repo), ['app/index.html', 'index.html']);
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
 
-test('the _headers file: the app\'s policy on every address the app has, nosniff on all, the worker never kept', () => {
+test('_headers is read as Pages reads it: every matching rule in order, a header set twice joined, "! Name" taking it away first', () => {
+  const rules = headerRules('/*\n  A: one\n  B: x\n/app/*\n  A: two\n  ! B\n  B: y\n/:dir/page\n  C: z\n/*\n  X: 1\n  X: 2\n');
+  assert.deepEqual(rules.map((r) => r.path), ['/*', '/app/*', '/:dir/page', '/*']);
+  assert.deepEqual(rules[1].unset, ['b']);
+  assert.equal(rules[3].set.x, '1, 2', 'the same name twice in a rule is joined');
+  const h = (p) => Object.fromEntries(headersFor(rules, p, { 'Content-Type': 'text/html' }));
+  assert.deepEqual(h('/index.html'), { 'content-type': 'text/html', a: 'one', b: 'x', x: '1, 2' });
+  assert.deepEqual(h('/app/'), { 'content-type': 'text/html', a: 'one, two', b: 'y', x: '1, 2' }, 'joined without "!", replaced with it');
+  assert.equal(h('/Demos/page').c, 'z', 'a placeholder is one segment');
+  assert.equal(h('/a/b/page').c, undefined);
+  assert.ok(ruleMatches('/app/*', '/app/') && ruleMatches('/app/*', '/app/sw.js') && !ruleMatches('/app/*', '/app') && ruleMatches('/app', '/app'));
+  assert.throws(() => headerRules('  A: before any path'), /before any path/);
+  assert.throws(() => headerRules('/*\n  !B'), /neither a header/, 'Pages takes "! Name" with its space');
+});
+
+test('the _headers file: the app\'s policy once on every address the app has, a floor on every other page, HSTS and nosniff on all, the worker never kept', () => {
   const text = headersText();
-  const rules = rulesOf(text);
+  const rules = headerRules(text);
   assert.ok(rules.length <= 100, 'Pages allows 100 rules');
+  assert.equal(new Set(rules.map((r) => r.path)).size, rules.length, 'a path is one rule (Pages keys them by path)');
   for (const line of text.split('\n')) assert.ok(line.length <= 2000, 'Pages allows 2,000 characters a line: ' + line.slice(0, 60));
-  const by = Object.fromEntries(rules.map((r) => [r.path, r.headers]));
-  assert.equal(by['/*']['x-content-type-options'], 'nosniff');
-  assert.match(by['/*']['referrer-policy'], /strict-origin/);
-  for (const p of ['/app', '/app/*', '/Demos/session-engine', '/Demos/session-engine.html']) {
-    assert.equal(by[p]['content-security-policy'], csp, p);
-    assert.equal(by[p]['referrer-policy'], 'no-referrer', p + ' — a room\'s key is in its address');
-  }
-  assert.equal(by['/app/sw.js']['cache-control'], 'no-cache');
-  assert.equal(by['/Demos/sw.js']['cache-control'], 'no-cache');
   assert.ok(!text.includes('{{'), 'an unfilled placeholder');
+  const at = (p) => headersFor(rules, p);
+  // Every page: nosniff, a referrer rule, six months of HTTPS for this host alone, no FLoC's retired word, and the floor.
+  const SITE_CSP = "object-src 'none'; base-uri 'self'; frame-ancestors 'self'";
+  for (const p of ['/', '/404', '/doodle2-canvas', '/stories/reader.js', '/app/', '/Demos/session-engine', '/robots.txt']) {
+    const h = at(p);
+    assert.equal(h.get('x-content-type-options'), 'nosniff', p);
+    assert.equal(h.get('strict-transport-security'), 'max-age=15552000', p + ' — six months, no includeSubDomains (the relay is a subdomain), no preload');
+    assert.ok(h.get('permissions-policy') && !/interest-cohort/.test(h.get('permissions-policy')), p + ' — interest-cohort is retired');
+  }
+  for (const p of ['/', '/404', '/doodle2-canvas', '/metadoodle1', '/launch-video/', '/Demos/sw.js']) {
+    assert.equal(at(p).get('content-security-policy'), SITE_CSP, p);
+    assert.match(at(p).get('referrer-policy'), /^strict-origin-when-cross-origin$/, p);
+  }
+  // The app: csp.txt alone — the floor taken away, not joined as a second policy — and no-referrer once.
+  for (const p of ['/app', '/app/', '/app/sw.js', '/Demos/session-engine', '/Demos/session-engine.html']) {
+    assert.equal(at(p).get('content-security-policy'), csp, p);
+    assert.equal(at(p).get('referrer-policy'), 'no-referrer', p + ' — a room\'s key is in its address; sent once');
+  }
+  // …which loses nothing the floor said: the app's policy says each of the floor's directives the same way.
+  for (const d of SITE_CSP.split(';').map((x) => x.trim())) assert.ok(csp.split(';').map((x) => x.trim()).includes(d), 'the app\'s policy lacks the floor\'s ' + d);
+  assert.equal(at('/app/sw.js').get('cache-control'), 'no-cache');
+  assert.equal(at('/Demos/sw.js').get('cache-control'), 'no-cache');
   // COOP and COEP are not sent, on purpose (the template says why): require-corp would refuse the CDN scripts.
   assert.ok(!/cross-origin-(opener|embedder)-policy/i.test(text.replace(/^#.*$/gm, '')), 'COOP/COEP in the headers themselves');
 });
@@ -128,6 +167,38 @@ test('the policy and the source agree on which hosts the app talks to', () => {
 test('/app keeps its query on the way to /app/ — what GitHub Pages did', () => {
   const lines = read('cloudflare/pages/_redirects').split('\n').filter((l) => l.trim() && !l.startsWith('#'));
   assert.deepEqual(lines, ['/app /app/ 301']);
+});
+
+test('robots.txt lets the pages be read and keeps every app address with a query — a board, a room and its key, a replay — out', () => {
+  const rows = read('cloudflare/pages/robots.txt').split('\n').filter((l) => l.trim() && !l.startsWith('#'));
+  assert.deepEqual(rows, ['User-agent: *', 'Allow: /', 'Disallow: /app/?', 'Disallow: /Demos/session-engine?', 'Disallow: /Demos/session-engine.html?']);
+});
+
+test('the deployed commit is named in the app\'s pages of the built site, and nowhere in the repository', () => {
+  const sha = 'a'.repeat(40);
+  for (const f of STAMPED) {
+    const page = read(f);
+    assert.ok(!/dynaink-commit/.test(page), f + ' names a commit in the repository');
+    const stamped = stampCommit(page, sha);
+    assert.equal((stamped.match(/<meta name="dynaink-commit" content="a{40}">/g) || []).length, 1, f);
+    assert.match(stamped, /<meta name="dynaink-version"[^>]*>\n\s*<meta name="dynaink-commit"/, f + ': beside the version');
+    assert.equal(stampCommit(stamped, 'b'.repeat(40)).match(/dynaink-commit/g).length, 1, 'stamped again, replaced');
+  }
+  for (const bad of ['', 'HEAD', 'abc', 'A'.repeat(40), '"><script>', 'a'.repeat(41)]) assert.throws(() => stampCommit(read(STAMPED[0]), bad), /not a commit/, JSON.stringify(bad));
+  assert.throws(() => stampCommit('<html></html>', sha), /dynaink-version/);
+  // A build: the two pages carry it, nothing else does, the repository is untouched, and the Pages files are there.
+  const out = mkdtempSync(path.join(tmpdir(), 'dyna-built-'));
+  try {
+    const before = STAMPED.map((f) => read(f));
+    assert.throws(() => buildSite({ out, commit: 'not-a-sha' }), /not a commit/);
+    const written = buildSite({ out, commit: sha });
+    for (const f of ['_headers', '_redirects', 'robots.txt']) assert.ok(written.includes(f) && readFileSync(path.join(out, f), 'utf8').length > 0, f);
+    assert.equal(readFileSync(path.join(out, '_headers'), 'utf8'), headersText());
+    for (const f of STAMPED) assert.match(readFileSync(path.join(out, f), 'utf8'), /<meta name="dynaink-commit" content="a{40}">/, f);
+    assert.ok(!/dynaink-commit/.test(readFileSync(path.join(out, 'index.html'), 'utf8')), 'the whitepaper names no commit');
+    assert.deepEqual(STAMPED.map((f) => read(f)), before, 'the build wrote into the repository');
+    assert.ok(!existsSync(path.join(out, 'dynaink-3d')) && !existsSync(path.join(out, 'CLAUDE.md')) && !existsSync(path.join(out, 'core')), 'what is left out is not in the build');
+  } finally { rmSync(out, { recursive: true, force: true }); }
 });
 
 test('the relay\'s config binds the class the Worker exports, SQLite-backed, and asks for no route that needs a zone it may not have', () => {
