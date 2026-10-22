@@ -8,7 +8,8 @@ on:
 jobs:
   core:
     name: core (@dynaink/core) — typecheck, test, build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: core
@@ -96,6 +97,14 @@ jobs:
       # hosted relay on dyna.ink, this machine's anywhere else.
       - name: The relay "with Claude" defaults to, on its own
         run: node --test ../Demos/surface/24-relay.test.mjs
+      # The seats' rules (PLAN-IPAD-NOTES I7): who reads, who writes, whose key is whose — and which
+      # provider keys stay on the device (keysToKeep) — pure, in Node.
+      - name: The seats' rules, on their own
+        run: node --test ../Demos/surface/03-seats.test.mjs
+      # The MCP door (Demos/mcp-client.mjs): a fake stdio server behind the bridge, its tools listed
+      # and called over HTTP as the canvas calls them, and an unknown tool an error, not a crash.
+      - name: The MCP door answers over HTTP
+        run: node ../Demos/mcp-client.smoke.mjs
       # The app at /app/ (V1-PLAN R7): its page, its worker and its manifest
       # are made from the old address's, and VERSION is stamped into the page
       # and into both workers' caches — what is committed must be that build.
@@ -135,7 +144,8 @@ jobs:
 
   shard:
     name: dynaink-3d (DynaInk3D) — typecheck, test, build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: dynaink-3d
@@ -161,7 +171,8 @@ jobs:
 
   browser:
     name: the browser gate — the canvas and shard scenarios
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -192,7 +203,8 @@ jobs:
 
   webkit:
     name: WebKit — the smoke, pencil and tablet, no lost work, and carrying the boards, on a second engine
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -228,7 +240,8 @@ jobs:
 
   web-app:
     name: Web App Skeleton — typecheck, lint, test, build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: Web App Skeleton

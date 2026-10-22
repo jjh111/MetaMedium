@@ -212,12 +212,34 @@ test('the relay\'s config binds the class the Worker exports, SQLite-backed, and
     'workerd refuses an entry module that exports anything but handlers and classes');
 });
 
-test('the deploy workflow skips cleanly without its secrets, and names no key', () => {
+test('the deploy workflow deploys only what CI passed on master, the commit CI ran, with the lockfile\'s wrangler — and skips cleanly without its secrets, naming no key', () => {
   const wf = read('.github/workflows/deploy-cloudflare.yml');
+  // After CI, never on a push alone: a change that breaks the gate is not deployed.
+  assert.match(wf, /^on:\n  workflow_run:\n    workflows: \[CI\]\n    types: \[completed\]\n    branches: \[master\]\n  workflow_dispatch:\n/m, 'triggered by CI\'s completion on master, or by hand');
+  assert.ok(!/^\s+push:/m.test(wf), 'a push alone deploys');
+  const name = /^name: (.+)$/m.exec(read('.github/workflows/ci.yml'));
+  assert.equal(name && name[1], 'CI', 'workflow_run names the CI workflow by its name');
+  const jobs = wf.split(/\n  (?=\w+:\n    name:)/).slice(1);
+  assert.equal(jobs.length, 2, 'the site and the relay');
+  for (const job of jobs) {
+    const guard = /\n    if: >-\n([\s\S]*?)\n    runs-on:/.exec(job);
+    assert.ok(guard, 'each job is guarded');
+    const g = guard[1].replace(/\s+/g, ' ');
+    assert.match(g, /github\.event\.workflow_run\.conclusion == 'success'/, 'only a CI that passed');
+    assert.match(g, /github\.event\.workflow_run\.event == 'push'/, 'never a CI run for a pull request');
+    assert.match(g, /github\.event\.workflow_run\.head_repository\.full_name == github\.repository/, 'never a fork\'s branch that happens to be called master');
+    assert.match(g, /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/master'/, 'by hand, from master only');
+    assert.match(job, /runs-on: ubuntu-24\.04\n    timeout-minutes: 15\n/, 'a pinned runner and a timeout');
+    assert.match(job, /DEPLOY_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \|\| github\.sha \}\}/, 'the commit CI ran');
+    assert.match(job, /- uses: actions\/checkout@v4\n {8}if: steps\.have\.outputs\.yes == 'true'\n {8}with:\n {10}ref: \$\{\{ env\.DEPLOY_SHA \}\}/, 'checked out at that commit');
+  }
+  assert.match(wf, /node cloudflare\/build-site\.mjs --commit "\$DEPLOY_SHA"/, 'the built app names the commit it was built from');
+  // One wrangler, the relay's lockfile's: no action that installs a version of its own.
+  assert.ok(!/wrangler-action/.test(wf), 'wrangler-action installs a wrangler of its own');
+  assert.match(wf, /"\$W" pages deploy cloudflare\/dist --project-name=dyna-ink --branch=master --commit-hash="\$DEPLOY_SHA" --commit-dirty=true/);
+  assert.match(wf, /working-directory: cloudflare\/relay\n {8}run: npx wrangler deploy\n/, 'the Worker is deployed by the lockfile\'s wrangler, from its folder');
   assert.match(wf, /CLOUDFLARE_API_TOKEN/);
   assert.match(wf, /CLOUDFLARE_ACCOUNT_ID/);
-  const deploys = wf.split('\n').filter((l) => /uses: cloudflare\/wrangler-action/.test(l)).length;
-  assert.equal(deploys, 2);
   // Set up from a browser alone (John, 2 Oct 2026: the token and the secrets, then a push): the Pages project
   // is made when the account has none of that name, and the relay's secret is put from a GitHub secret when one is set.
   assert.match(wf, /pages project list[\s\S]*grep -qw dyna-ink[\s\S]*pages project create dyna-ink --production-branch=master/, 'the site job makes its Pages project when it is missing');
@@ -228,5 +250,25 @@ test('the deploy workflow skips cleanly without its secrets, and names no key', 
   assert.equal(wf.split('\n').filter((l) => /^\s+if: steps\.have\.outputs\.yes == 'true'/.test(l)).length >= 8, true, 'every step after the check waits on it');
   // A secret is never read in an `if:` (GitHub cannot), only through the env of the job.
   assert.ok(!/if:.*secrets\./.test(wf));
-  assert.ok(!/[A-Za-z0-9_-]{40,}/.test(wf.replace(/https?:\/\/\S+/g, '').replace(/cloudflare\/wrangler-action/g, '')), 'something key-shaped in the workflow');
+  assert.ok(!/[A-Za-z0-9_-]{40,}/.test(wf.replace(/https?:\/\/\S+/g, '')), 'something key-shaped in the workflow');
+});
+
+test('CI pins its runner and bounds every job, and runs every Node test the surface and the MCP door have', () => {
+  const ci = read('.github/workflows/ci.yml');
+  const jobs = Object.fromEntries(ci.split(/\n  (?=[\w-]+:\n    name:)/).slice(1).map((j) => [j.split(':')[0], j]));
+  // The limits the jobs have now; a job added later is held to a pinned image and a limit of its own.
+  const LIMITS = { core: 20, shard: 20, browser: 45, webkit: 25, 'web-app': 20 };
+  for (const job of Object.keys(LIMITS)) assert.ok(jobs[job], 'CI has no job ' + job);
+  for (const [job, text] of Object.entries(jobs)) {
+    assert.match(text, /\n    runs-on: ubuntu-24\.04\n/, job + ' runs on a pinned image');
+    const limit = /\n    timeout-minutes: (\d+)\n/.exec(text);
+    assert.ok(limit, job + ' has no timeout: a run hung for six hours once (7 Oct 2026)');
+    if (LIMITS[job]) assert.equal(Number(limit[1]), LIMITS[job], job + ' is bounded at ' + LIMITS[job] + ' minutes');
+  }
+  assert.ok(!/ubuntu-latest/.test(ci), 'a runner that moves under the jobs');
+  // Every pure fragment's Node test, and the door's smoke, run in the core job.
+  for (const f of readdirSync(path.join(root, 'Demos/surface')).filter((x) => x.endsWith('.test.mjs'))) {
+    assert.ok(ci.includes(`../Demos/surface/${f}`), `Demos/surface/${f} is not run in CI`);
+  }
+  assert.ok(ci.includes('node ../Demos/mcp-client.smoke.mjs'), 'the MCP door\'s smoke is not run in CI');
 });
