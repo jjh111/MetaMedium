@@ -421,7 +421,9 @@ export async function runSeat(browser, servers, { freshContext, screenshot }) {
         await p2.click('#ccBtn');
         await p2.click('#liveBtn');
         await p2.waitForFunction(() => !document.getElementById('livePanel').hasAttribute('hidden'), null, { timeout: 5000 });
-        // The gate's own relay, never :8020 — "with Claude" keeps a relay that is typed.
+        // The gate's own relay, never :8020 — "with Claude" keeps a relay that is typed. It stands under "more ways in",
+        // below "Share this board" (the rooms lane).
+        await p2.evaluate(() => { const d = document.getElementById('liveMore'); if (d) d.open = true; });
         await p2.fill('#liveRelay', RELAY);
         await p2.click('#liveClaude');
         const both = await waitFor(p2, () => { const mm = window.__mm; const s = mm.seat && mm.seat(); return mm.folder().how === 'live' && !!(s && s.seated); }, null, 10000);
