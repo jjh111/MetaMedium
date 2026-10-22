@@ -9,9 +9,9 @@
 //   ROOM_BEAT_MS while the page is seen, and a goodbye when it goes), BOOT_ROOM (what the page's address said of a
 //   room as it loaded), roomKeyFor (the key this page knows for a room), roomState (for tests).
 // Uses: relay (24-relay.js: roomRelayFor, relayFromAddress, inviteLink, inviteOf, leaveSearch, roomShort, carryVerdict,
-//   idleWords), core (MM, prefs, params, esc, session, EMBED, ui), folder (folder, openLive, saveNow, handLabel, boards,
-//   boardsListed, openBoardsList, writeNewBoard, mintBoardId; 17-boards.js: newBoardEntry), render (handColour),
-//   input (say, flash), teach (closePanel, togglePanel), controls (livePanel, tiles, syncTiles, openPane).
+//   idleWords), core (prefs, params, esc, session, EMBED), ui (00-ui.js: ui.pane), folder (folder, openLive, roomAddress,
+//   saveNow, handLabel, boards, boardsListed, openBoardsList, writeNewBoard, mintBoardId; 17-boards.js: newBoardEntry),
+//   render (handColour), input (say, flash), teach (closePanel), controls (livePanel, syncTiles, openPane).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -311,6 +311,8 @@
       relay = relayFromAddress(location.hostname, inv.relay) || '';
       if (!relay) { say('this link names a relay this page does not use, so the room was not joined — ask for a link made on this site'); return; }
     } else if (inv.key || inv.invited) relay = roomRelayFor(location.hostname);
+    // An old link's ?key= leaves the address at once — before a name is asked — for the fragment.
+    if (inv.keyInQuery) roomAddress(inv.room, relay, inv.key);
     const go = () => joinRoom(inv.room, relay ? { relay, key: inv.key } : {});
     if (inv.invited && !prefs.get('hand-name', '') && arrived()) askRoomName(go);
     else go();

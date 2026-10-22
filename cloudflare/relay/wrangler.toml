@@ -43,3 +43,8 @@ binding = "AI"
 # MM_RELAY_MAX_LINES = "5000"
 # MM_RELAY_MAX_BYTES = "32000000"
 # MM_RELAY_ASSET_BYTES = "67108864"   # bytes of pictures a room keeps (A1); past it a put is refused
+# Rooms anyone opens from the app (POST /rooms, src/mint.mjs):
+# MM_RELAY_MINT = "0"                  # open no new rooms (503, in words)
+# MM_RELAY_MINT_PER_HOUR = "10"        # rooms one address may open an hour
+# MM_RELAY_MINT_PER_DAY = "500"        # rooms the relay opens a day, in all
+# MM_RELAY_ROOM_IDLE_DAYS = "30"       # a room it opened is forgotten this long after it was last used
