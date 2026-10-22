@@ -1,7 +1,7 @@
 // Two hands on one canvas: two logs arriving live, merged like a folder's.
 
 import { describe, it, expect, vi } from 'vitest';
-import { LiveStore, LocalHub, SEND_WAIT_MS } from './live';
+import { LiveStore, LocalHub, SEND_WAIT_MS, LINE_CHARS, RETRY_FIRST_MS } from './live';
 import { mergeLogs } from './merge';
 import { createSession, DEFAULT_SESSION_CONFIG, type SessionEvent } from '../session/session';
 import { rectStroke, circleStroke } from '../test/strokes';
@@ -429,6 +429,221 @@ describe('live logs', () => {
       expect(page.revision()).toBe(rev);
       expect((await page.readLogs())['claude~c1'].length).toBe(held);
       expect(page.presence().find((p) => p.participant === 'claude~c1')?.seat).toBe(true);
+    });
+  });
+
+  // ===== Nothing lost on the wire, and nobody's marks taken by a copy (MU-5, MU-7, MU-8) =====
+  describe('what the room did not take is sent again, and what it never can take is said', () => {
+    const named = (logName: string) => createSession({ ...DEFAULT_SESSION_CONFIG, logName });
+    const mine = (s: ReturnType<typeof createSession>) => s.getEvents().filter((e) => !e.by);
+
+    /**
+     * A relay a test can break: every line POSTed resolves to what `answer` says (a SendResult), and a line it
+     * takes reaches every other store on it, in order — as a relay echoes a line to everyone in the room.
+     */
+    function relay() {
+      const members: ((line: any) => void)[] = [];
+      const posted: any[] = [];
+      let answer: (line: any) => { ok: boolean; status?: number; retryAfter?: number } = () => ({ ok: true });
+      return {
+        posted,
+        set: (fn: typeof answer) => { answer = fn; },
+        transport() {
+          let mineCb: ((line: any) => void) | null = null;
+          return {
+            send: (line: any) => {
+              const r = answer(line);
+              posted.push({ line: JSON.parse(JSON.stringify(line)), ok: r.ok, status: r.status });
+              if (r.ok) { const copy = JSON.parse(JSON.stringify(line)); for (const m of members) if (m !== mineCb) queueMicrotask(() => m(copy)); }
+              return Promise.resolve(r);
+            },
+            onMessage: (cb: any) => { mineCb = cb; members.push(cb); return () => { mineCb = null; }; },
+          };
+        },
+      };
+    }
+    /** A clock a test turns: `later` runs what is due when `run` is called. */
+    function clock() {
+      const due: { fn: () => void; ms: number }[] = [];
+      return {
+        due,
+        later: (fn: () => void, ms: number) => { const job = { fn, ms }; due.push(job); return () => { const i = due.indexOf(job); if (i >= 0) due.splice(i, 1); }; },
+        // Microtasks only, so a test on fake timers can turn it too.
+        run: async () => { const jobs = due.splice(0); for (const j of jobs) j.fn(); for (let i = 0; i < 30; i++) await Promise.resolve(); },
+      };
+    }
+
+    it('a line the room did not take is sent again, from where the room\'s copy stops, and the peer holds every mark in order', async () => {
+      const r = relay();
+      const c = clock();
+      const ada = named('ada~1');
+      const a = new LiveStore(r.transport() as any, 'ada~1', 'r', { later: c.later });
+      const b = new LiveStore(r.transport() as any, 'bob~1', 'r');
+      for (const x of [100, 400, 700]) {
+        ada.addStroke(rectStroke(x, 100, 200, 120), 1000 + x);
+        // The second line never reaches the relay: a phone between networks.
+        r.set((line) => (line.events.length && line.events[0] === undefined ? { ok: true } : x === 400 ? { ok: false, status: 0 } : { ok: true }));
+        await a.publish(mine(ada));
+        await tick();
+      }
+      // The third was not sent past the hole: it waits for the second, and the room is told nothing out of order.
+      expect(a.unsent()).toBe(2);
+      expect(a.notices()).toEqual(['not reaching the room — what you draw is kept here and sent when it answers']);
+      expect(c.due.map((d) => d.ms)).toEqual([RETRY_FIRST_MS]);
+      r.set(() => ({ ok: true }));
+      await c.run();
+      expect(a.unsent()).toBe(0);
+      expect(a.notices()).toEqual([]);
+      expect((await b.readLogs())['ada~1']).toEqual(mine(ada));
+    });
+
+    it('it waits longer each time the room does not answer — 2 s, 4, 8, … — and at once when the window is back online', async () => {
+      const r = relay();
+      const c = clock();
+      const ada = named('ada~1');
+      const a = new LiveStore(r.transport() as any, 'ada~1', 'r', { later: c.later });
+      r.set(() => ({ ok: false, status: 503 }));
+      ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      await a.publish(mine(ada));
+      await tick();
+      const waits: number[] = [];
+      for (let i = 0; i < 6; i++) { waits.push(c.due[0].ms); await c.run(); }
+      expect(waits).toEqual([2000, 4000, 8000, 16000, 30000, 30000]);
+      // Drawing while it waits sends nothing before the wait is up.
+      const before = r.posted.length;
+      ada.addStroke(rectStroke(400, 100, 200, 120), 1100);
+      await a.publish(mine(ada));
+      expect(r.posted.length).toBe(before);
+      r.set(() => ({ ok: true }));
+      await a.resend();
+      await tick();
+      expect(a.unsent()).toBe(0);
+      expect(c.due).toHaveLength(0);
+    });
+
+    it('a relay that asks for a moment (429) is left alone for as long as it asked', async () => {
+      const r = relay();
+      const c = clock();
+      const a = new LiveStore(r.transport() as any, 'ada~1', 'r', { later: c.later });
+      r.set(() => ({ ok: false, status: 429, retryAfter: 7 }));
+      await a.appendLog('ada~1', eventsOf((s) => s.addStroke(rectStroke(100, 100, 200, 120), 1000)));
+      await tick();
+      expect(c.due.map((d) => d.ms)).toEqual([7000]);
+      expect(a.notices()).toEqual(['the room is taking this hand’s lines more slowly — the rest is sent in a moment']);
+    });
+
+    it('a name another hand holds (409) stops the hand sending, and is said; nothing is retried', async () => {
+      const r = relay();
+      const c = clock();
+      const a = new LiveStore(r.transport() as any, 'ada~1', 'r', { later: c.later });
+      r.set(() => ({ ok: false, status: 409 }));
+      await a.appendLog('ada~1', eventsOf((s) => s.addStroke(rectStroke(100, 100, 200, 120), 1000)));
+      await tick();
+      expect(c.due).toHaveLength(0);
+      expect(a.notices()).toEqual(['the room takes nothing more from this hand: its name there is another hand’s — reload the page to join again']);
+      const n = r.posted.length;
+      r.set(() => ({ ok: true }));
+      await a.appendLog('ada~1', eventsOf((s) => s.addStroke(rectStroke(400, 100, 200, 120), 1100)));
+      expect(r.posted.length).toBe(n);
+    });
+
+    it('a whole log longer than a line goes as a `full` and appends cut between events, and a peer holds all of it', async () => {
+      const r = relay();
+      const ada = named('ada~1');
+      const a = new LiveStore(r.transport() as any, 'ada~1', 'r');
+      const b = new LiveStore(r.transport() as any, 'bob~1', 'r');
+      const pad = 'x'.repeat(Math.ceil(LINE_CHARS / 3));
+      for (let i = 0; i < 8; i++) ada.label({ nodeId: ada.addStroke(rectStroke(100 + i * 300, 100, 200, 120), 1000 + i), text: pad + i, at: 2000 + i });
+      const log = mine(ada);
+      expect(JSON.stringify(log).length).toBeGreaterThan(2 * LINE_CHARS);
+      await a.publish(log);
+      await tick(); await tick();
+      const lines = r.posted.map((p) => p.line);
+      expect(lines.length).toBeGreaterThan(2);
+      expect(lines.every((l) => JSON.stringify(l).length < LINE_CHARS + 2000)).toBe(true);
+      expect(lines[0].full).toBe(true);
+      expect(lines.slice(1).every((l) => !l.full)).toBe(true);
+      expect((await b.readLogs())['ada~1']).toEqual(log);
+    });
+
+    it('one thing no line can carry (413) is let go of and said, and the rest of the log still goes', async () => {
+      const r = relay();
+      const ada = named('ada~1');
+      const a = new LiveStore(r.transport() as any, 'ada~1', 'r');
+      const b = new LiveStore(r.transport() as any, 'bob~1', 'r');
+      r.set((line) => (JSON.stringify(line).length > 400_000 ? { ok: false, status: 413 } : { ok: true }));
+      ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      const huge = ada.addStroke(rectStroke(400, 100, 200, 120), 1100);
+      expect(ada.label({ nodeId: huge, text: 'y'.repeat(500_000), at: 1200 })).not.toBe(null);
+      ada.addStroke(rectStroke(700, 100, 200, 120), 1300);
+      await a.publish(mine(ada));
+      await tick(); await tick();
+      const held = (await b.readLogs())['ada~1'];
+      expect(held).toEqual(mine(ada).filter((e) => e.type !== 'label'));
+      expect(a.notices()).toEqual(['something on this board is 0.5 MB — more than a room carries in one piece — and was not shared']);
+      expect(a.unsent()).toBe(0);
+    });
+
+    it('a send taken as gone after its wait that then fails is sent again whole — a hole is never left', async () => {
+      vi.useFakeTimers();
+      try {
+        let settle: ((v: any) => void) | null = null;
+        const posted: any[] = [];
+        const t = {
+          send: (line: any) => { posted.push(line.full ? 'full:' + line.events.length : 'append:' + line.events.length); return posted.length === 2 ? new Promise((ok) => { settle = ok; }) : Promise.resolve({ ok: true }); },
+          onMessage: () => () => {},
+        };
+        const c = clock();
+        const ada = named('ada~1');
+        const a = new LiveStore(t as any, 'ada~1', 'r', { later: c.later });
+        ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
+        await a.publish(mine(ada));
+        ada.addStroke(rectStroke(400, 100, 200, 120), 1100);
+        const slow = a.publish(mine(ada));
+        await vi.advanceTimersByTimeAsync(SEND_WAIT_MS);
+        await slow;
+        ada.addStroke(rectStroke(700, 100, 200, 120), 1200);
+        await a.publish(mine(ada));
+        expect(posted).toEqual(['full:1', 'append:1', 'append:1']);
+        settle!({ ok: false, status: 0 });
+        await vi.advanceTimersByTimeAsync(0);
+        await c.run();
+        expect(posted).toEqual(['full:1', 'append:1', 'append:1', 'full:3']);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('a copy handed on may only add: one that leaves out marks held here is refused and said — the writer\'s own whole log still replaces', async () => {
+      const w = wire();
+      const store = new LiveStore(w.transport as any, 'me~1');
+      const ada = named('ada~1');
+      ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      ada.addStroke(rectStroke(400, 100, 200, 120), 1100);
+      const log = mine(ada);
+      w.deliver({ participant: 'ada~1', events: log, at: 2000, full: true, sid: 's-ada' });
+      // Eve hands on "a copy" of Ada's log with nothing in it, stamped far in the future.
+      w.deliver({ participant: 'ada~1', events: [], at: 9e12, full: true, sid: 's-ada', via: 'eve~1' });
+      expect((await store.readLogs())['ada~1']).toEqual(log);
+      expect(store.notices()).toEqual(['a copy of ada’s marks that would have taken some away was refused — what is held here is kept']);
+      // A copy that only adds is taken, and its clock holds the writer back from nothing: her undo still lands.
+      const more = named('ada~1');
+      more.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      more.addStroke(rectStroke(400, 100, 200, 120), 1100);
+      more.addStroke(rectStroke(700, 100, 200, 120), 1200);
+      w.deliver({ participant: 'ada~1', events: mine(more), at: 9e12, full: true, sid: 's-ada', via: 'eve~1' });
+      expect((await store.readLogs())['ada~1']).toHaveLength(3);
+      w.deliver({ participant: 'ada~1', events: log.slice(0, 1), at: 3000, full: true, sid: 's-ada' });
+      expect((await store.readLogs())['ada~1']).toEqual(log.slice(0, 1));
+      // A copy that holds what is held as a suffix holds — the room's early lines gone — is taken in its place.
+      const fresh = new LiveStore(wire().transport as any, 'n~1');
+      const w2 = wire();
+      const late = new LiveStore(w2.transport as any, 'late~1');
+      w2.deliver({ participant: 'ada~1', events: mine(more).slice(2), at: 2500, sid: 's-ada' });
+      w2.deliver({ participant: 'ada~1', events: mine(more), at: 2500, full: true, sid: 's-ada', via: 'bob~1' });
+      expect((await late.readLogs())['ada~1']).toEqual(mine(more));
+      expect(late.notices()).toEqual([]);
+      fresh.close();
     });
   });
 });
