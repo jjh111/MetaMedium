@@ -81,5 +81,12 @@ self.addEventListener('fetch', (e) => {
     }
     return res;
     // Only this worker's own cache answers: the origin's others may hold another release's copy of the same file.
-  }).catch(() => caches.open(CACHE).then((c) => c.match(key, { ignoreSearch: true })).then((hit) => hit || Response.error())));
+  }).catch(() => caches.open(CACHE).then((c) => c.match(key, { ignoreSearch: true })).then((hit) => (hit ? asPage(hit, req) : Response.error()))));
 });
+
+// Cloudflare Pages sends session-engine.html on to session-engine with a 308, so the page kept on install was
+// fetched through a redirect — and a browser refuses a redirected response for a navigation, so with no network
+// the old address (and its manifest's start_url) would not open. Answered as the same page, its headers kept.
+function asPage(res, req) {
+  return res.redirected && req.mode === 'navigate' ? new Response(res.body, { status: res.status, statusText: res.statusText, headers: res.headers }) : res;
+}
