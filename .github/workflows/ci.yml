@@ -117,6 +117,10 @@ jobs:
       # Git runs there with a configuration of its own and a test identity.
       - name: The app's build and the release script, on their own
         run: node --test ../scripts/build-app.test.mjs ../scripts/release.test.mjs
+      # RENAME-PLAN N4's list of address changes (scripts/n4.mjs, run by hand once dyna.ink answers):
+      # every edit still finds what it expects, and applied to a copy it names dyna.ink and breaks no link.
+      - name: N4's address changes still apply
+        run: node --test ../scripts/n4.test.mjs
       # The name a person sees (RENAME-PLAN N3a): the whitepaper and its 404, the
       # app at both addresses and their manifests, the help, the 3D surface's page
       # and the surface's strings say dyna.ink — never MetaMedium, outside an
