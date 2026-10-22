@@ -28457,8 +28457,8 @@ var WHICH_NOTATION = {
     const top = readings2[0];
     if (!top || !(top.confidence > NOTATION_OFFER_FROM)) return [];
     const under = top.confidence < NOTATION_FLOOR;
-    const tie = readings2.length > 1 && top.confidence - readings2[1].confidence <= TIE_MARGIN;
-    if (!under && !tie) return [];
+    const tie = !under && readings2.length > 1 && top.confidence - readings2[1].confidence <= TIE_MARGIN;
+    if (!tie && !(under && readPlainDiagram(s, scope.marks))) return [];
     const candidates = notationCandidates(s, scope.marks);
     if (!candidates.length) return [];
     return [{

@@ -25,6 +25,10 @@ const MODEL_HOSTS = [
   'api.groq.com',
   // A semantic seat's model is a file on this host (PLAN-IPAD-NOTES I9); the gate never fetches the real one — it serves its own.
   'huggingface.co',
+  // dyna.ink's own decider (the relay's /decide, Cloudflare's Clef) and Workers AI's own API: the gate points the house
+  // decider at the stub (`?decide=`, honoured only on a page on this machine), so a run that reached either is a failure.
+  'relay.dyna.ink',
+  'api.cloudflare.com',
 ];
 
 /**

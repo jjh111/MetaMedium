@@ -16,7 +16,8 @@
 //     the marks as the notation decided — from among the readings the engine computed, never one it did not —
 //     so *Make it Mermaid* and (where the connectors are tied) *Tidy the diagram* are offered after it;
 //   * it is offered for two marks or more, none an artifact and matching no definition, when the likeliest notation is above
-//     `NOTATION_OFFER_FROM` and under `NOTATION_FLOOR`, or the top two are within `TIE_MARGIN` — and not again for
+//     `NOTATION_OFFER_FROM` and under `NOTATION_FLOOR` and the marks are a graph of nodes joined by lines (never the
+//     molecule's circles), or when the top two clear the floor within `TIE_MARGIN` of each other — and not again for
 //     marks a decision already holds for. Registered last (`builtin.ts`), so the field's order before it stands.
 //
 // Derived: what is decided is the log's (the decision rep), and an undo takes it back.
@@ -110,8 +111,10 @@ export const WHICH_NOTATION: Tool = {
     const top = readings[0];
     if (!top || !(top.confidence > NOTATION_OFFER_FROM)) return [];
     const under = top.confidence < NOTATION_FLOOR;
-    const tie = readings.length > 1 && top.confidence - readings[1].confidence <= TIE_MARGIN;
-    if (!under && !tie) return [];
+    const tie = !under && readings.length > 1 && top.confidence - readings[1].confidence <= TIE_MARGIN;
+    // Under the floor, only a graph of nodes joined by lines is worth the question — never the molecule's circles,
+    // which are their own thing (and with a decider seated by default, a question on every molecule is noise).
+    if (!tie && !(under && readPlainDiagram(s, scope.marks))) return [];
     const candidates = notationCandidates(s, scope.marks);
     if (!candidates.length) return [];
     return [{

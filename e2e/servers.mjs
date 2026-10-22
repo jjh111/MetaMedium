@@ -219,6 +219,29 @@ function decideReply(userContent, p) {
   return { content: JSON.stringify({ answers }), decided };
 }
 
+/**
+ * What the stub's System One decision model says (the house decider's: `POST /decide`, as dyna.ink's relay answers it,
+ * `{ ok, model, ms, answers }`): for each question, the LAST option that is not `none_of_these` leads at `p` and the
+ * rest share what is left — in spelling `A` (a choice's `choice`, `probabilities` by key and `confidence`; a score's
+ * `probabilities` by level; a noul's `value`) or `B` (a list of `{ option, p }`; a score's numbers in order; a noul as a
+ * bare number) — the spellings core's reader takes (`llm/fixtures/systemone-replies.json`, written by hand).
+ */
+function systemOneReply(body, p, spelling) {
+  const answers = {};
+  const decided = [];
+  for (const [name, q] of Object.entries((body && body.questions) || {})) {
+    if (q.type === 'noul') { answers[name] = spelling === 'B' ? p : { type: 'noul', value: p }; decided.push({ id: name, lead: 'yes', p }); continue; }
+    const keys = q.type === 'score' ? (q.criteria || []).slice() : Object.keys(q.criteria || {});
+    const named = keys.filter((k) => k !== 'none_of_these');
+    const lead = (named.length ? named : keys)[(named.length ? named : keys).length - 1];
+    const share = (k) => (k === lead ? p : (1 - p) / Math.max(1, keys.length - 1));
+    decided.push({ id: name, lead, p });
+    if (q.type === 'score') answers[name] = spelling === 'B' ? { probabilities: keys.map(share) } : { type: 'score', score: keys.indexOf(lead), probabilities: Object.fromEntries(keys.map((k) => [k, share(k)])), confidence: p };
+    else answers[name] = spelling === 'B' ? { distribution: keys.map((k) => ({ option: k, p: share(k) })) } : { type: 'choice', choice: lead, probabilities: Object.fromEntries(keys.map((k) => [k, share(k)])), confidence: p };
+  }
+  return { answers, decided };
+}
+
 function readBody(req) {
   return new Promise((ok, fail) => {
     const parts = [];
@@ -274,6 +297,10 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
   const calls = [];
   const decisions = [];
   let decideP = 0.995;
+  // The house decider's route (POST /decide): every request kept whole — its body, and the headers a key or a cookie would ride in.
+  const systemOne = [];
+  let systemOneSpelling = 'A';
+  let systemOneRefusal = null;   // { status, error }: what the next calls are refused with, as the relay says it
   // The reader of notes (I8): how long it takes to answer a sheet, and a line it leaves out of its reply (0: none).
   let readDelayMs = 0;
   let readSkipLine = 0;
@@ -289,6 +316,20 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
     const url = new URL(req.url, 'http://127.0.0.1');
     const auth = req.headers.authorization || '';
     const keyWas = auth === `Bearer ${key}` ? 'the stub\'s' : auth ? 'another' : 'none';
+    if (url.pathname === '/decide') {
+      if (req.method === 'GET') { send(200, { ok: true, route: 'decide', models: [{ model: 'clef-flash', name: 'Clef-flash', sees: false }] }); return; }
+      if (req.method !== 'POST') { send(405, { ok: false, error: 'POST a decision' }); return; }
+      const raw = await readBody(req);
+      let body = null;
+      try { body = JSON.parse(raw); } catch { /* kept as it came */ }
+      systemOne.push({ at: Date.now(), raw, body, origin: req.headers.origin || null, authorization: req.headers.authorization || null, cookie: req.headers.cookie || null, referer: req.headers.referer || null });
+      if (!body) { send(400, { ok: false, error: 'the body is not JSON' }); return; }
+      if (systemOneRefusal) { send(systemOneRefusal.status, { ok: false, error: systemOneRefusal.error }); return; }
+      const r = systemOneReply(body, decideP, systemOneSpelling);
+      decisions.push(...r.decided.map((d) => ({ ...d, via: 'systemone' })));
+      send(200, { ok: true, model: body.model, ms: 4, answers: r.answers });
+      return;
+    }
     if (req.method === 'GET' && url.pathname === '/v1/models') {
       calls.push({ at: Date.now(), path: url.pathname, key: keyWas });
       send(200, models);
@@ -369,6 +410,12 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
     decisions: () => decisions.map((d) => ({ ...d })),
     /** How surely the stub's decision model leads from now on: 0.995 (sure, the default) or 0.97 (under the floor). */
     decideAt: (p) => { decideP = p; },
+    /** Every request to the house decider's route (`POST /decide`), oldest first: the body as sent and parsed, and the headers a key or a cookie would ride in. */
+    systemOne: () => systemOne.map((c) => ({ ...c })),
+    /** How the stub's System One replies are spelled from now on: 'A' (the default) or 'B'. */
+    systemOneSpelling: (x) => { systemOneSpelling = x; },
+    /** Refuse the house decider's next calls as the relay would (`{ status, error }`), or null to answer again. */
+    systemOneRefuse: (r) => { systemOneRefusal = r || null; },
     /** How long the stub's reader takes to answer a sheet or a picture from now on, in ms (0: at once). */
     readDelay: (ms) => { readDelayMs = ms; },
     /** The line the stub's reader leaves out of its reply to a sheet from now on (1-based; 0: none). */

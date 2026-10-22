@@ -47,10 +47,11 @@ export interface ToolHost {
   /** The models joined here, by name; `sees` when one can read writing. */
   models: { name: string; sees: boolean }[];
   /**
-   * The decision model seated here, if one is (V1-PLAN I7): its name in words. Absent or null, nobody
-   * is in the decider seat and *Which is it?* is not offered.
+   * The decision model seated here, if one is (V1-PLAN I7): its name in words, and whether it sees (a job that would
+   * send it a picture is offered only to one that does). Absent or null, nobody is in the decider seat and neither
+   * *Which is it?* nor *Which diagram is this?* is offered.
    */
-  decider?: { name: string } | null;
+  decider?: { name: string; sees?: boolean } | null;
   /**
    * The semantic seat held here, if one is (PLAN-IPAD-NOTES I9): a small model that runs on this device, its name
    * in words. Absent or null, nobody is in the seat and *Notes like this* is not offered — which is why the

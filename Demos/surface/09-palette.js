@@ -13,7 +13,7 @@
 //   applyLibrary, targetOf); renderSummon/refreshPalette/paintField.
 // Uses: core (hand, lastPen), ui, field (readFieldCommand, verbFor, libraryMatch, typedWord — pure,
 //   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading,
-//   askModelsAbout, offerModel), seatpane (writers, readers, deciderHost, askDecider — who is asked, by seat), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
+//   askModelsAbout, offerModel), seatpane (writers, readers, deciderHost, askDecider, askDeciderNotation — who is asked, by seat), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
 //   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
 //   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
 //   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
@@ -56,7 +56,7 @@
   function toolHost() {
     return {
       snap: snapMode,
-      // `sees`: who READS, by seat (I7) — a model that sees but sits elsewhere does not answer a read; `decider`: the decision model seated, if one is (*Which is it?*).
+      // `sees`: who READS, by seat (I7) — a model that sees but sits elsewhere does not answer a read; `decider`: the decision model seated, if one is (*Which is it?*, *Which diagram is this?*), its name and whether it sees.
       models: agents.map((a) => ({ name: a.name, sees: readers().includes(a) })),
       decider: deciderHost(),
       // The semantic seat held here, if one is (I9; 03-semantic.js): with it *Notes like this* is typed on marks that have words; without, the field offers what it always did.
@@ -303,6 +303,8 @@
     what: (o) => askModelsAbout(o.data.ids.slice()),
     // *Which is it?* asks the decider — only by this tap (I7; 04-seatpane.js), never on a hold.
     which: (o) => askDecider(o.data),
+    // *Which diagram is this?* asks the decider which notation the marks are — only by this tap (the audit's D2; 04-seatpane.js).
+    'which-notation': (o) => askDeciderNotation(o.data),
     // *Notes like this* lists the notes nearest these marks' words across every board — in Find's pane, only by this tap (I9; 26-find.js).
     like: (o) => { likeNotes(o.data); },
     // The maths tool's acts (M5): the sizes said and left showing beside their figure, the drawing printed at its real size.

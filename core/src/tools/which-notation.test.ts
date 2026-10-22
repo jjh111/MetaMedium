@@ -69,6 +69,10 @@ describe('Which diagram is this?', () => {
     hold(t, again);
     expect(t.getState().summon!.suggestions.some((x) => x.kind === 'match')).toBe(true);
     expect(which(t)).toEqual([]);
+    // A molecule nobody named: its circles are its own thing, not a diagram to ask about.
+    const u = createSession();
+    hold(u, [draw(u, circle(300, 300, 40)), draw(u, circle(500, 300, 40)), draw(u, circle(400, 460, 40)), draw(u, line({ x: 340, y: 300 }, { x: 460, y: 300 }, 30)), draw(u, line({ x: 328, y: 328 }, { x: 372, y: 432 }, 30))]);
+    expect(which(u)).toEqual([]);
   });
 
   it('taking it names the host act and writes nothing itself', () => {

@@ -73,6 +73,17 @@
 //   M27  Esc in the middle of a batch stops the rest: the second call is never made, and nothing lands
 //   M28  Read the picture: the picture, downscaled, goes to the reader alone; its text lands as a text artifact BESIDE it,
 //        held as the reader's, named for its source, editable; the picture stays as it was
+//
+// dyna.ink's own decider (the audit's S1, S3, D2) — Clef-flash through dyna.ink's relay, no key — pointed at the stub's
+// System One route by `?decide=`, which only a page on this machine honours; a clean device of its own:
+//   M37  the decider row says "dyna.ink · Clef-flash — no key needed · used only when 99% sure"; nothing is asked at boot,
+//        on a hold or on a model's join, and nothing is written to the board for it
+//   M38  Which is it? asks it once: a System One body (q1, none_of_these last) whose state holds the group's words and no
+//        node id, with no authorization header and its credentials omitted; held at 0.995 as one more reading, attributed
+//   M39  an answer at 0.97 is said and holds nothing — the engine's ranking stands
+//   M40  a refusal from the relay (429, today's decisions spent) is said in the status line and kept in the seat's row
+//   M41  Which diagram is this? on two boxes and a line no notation reads surely: offered, asked once, held as a decision
+//        (no reading claimed) — and then Make it Mermaid is offered
 
 import { startModelStub, STUB_KEY, REASONING_ONLY, JEV } from './servers.mjs';
 import { isModelRequest } from './guards.mjs';
@@ -167,6 +178,20 @@ async function takeReadThese(page) {
 
 /** The first transcript a mark holds, or null. */
 const saidOn = (page, id) => page.evaluate((nid) => { const mm = window.__mm, n = mm.session.getState().nodes.get(nid); const t = n && mm.MM.transcriptsOf(n)[0]; return t ? t.text : null; }, id);
+
+/** Before the page's scripts: every request the page makes to a decider's `/decide` is noted with how it was made — its credentials and its headers' names. */
+function recordDecideFetches() {
+  const real = window.fetch.bind(window);
+  window.__decideFetches = [];
+  window.fetch = function (input, init) {
+    const u = typeof input === 'string' ? input : (input && input.url) || String(input);
+    if (/\/decide$/.test(u)) {
+      const h = (init && init.headers) || {};
+      window.__decideFetches.push({ url: u, method: (init && init.method) || 'GET', credentials: init && init.credentials, headers: Object.keys(h instanceof Headers ? Object.fromEntries(h) : h).map((k) => k.toLowerCase()) });
+    }
+    return real(input, init);
+  };
+}
 
 /** The page's hand, as the canvas harness has it: strokes dispatched at the canvas. */
 function installDraw() {
@@ -1183,6 +1208,177 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
           !!text && text.code === FIX.picture.join('\n') && text.box.minX >= pic.box.maxX && text.by === text.agent && text.codeBy === text.agent && /notes-page/.test(text.name) &&
           JSON.stringify(after) === JSON.stringify(pic.box),
         { took, got, text, stats, pic, after });
+    });
+
+    // =====================================================================================================
+    // dyna.ink's own decider (the audit's S1, S3, D2): Clef-flash through dyna.ink's relay with no key, here pointed at
+    // the stub's System One route by `?decide=` — honoured only on a page on this machine. A clean device of its own.
+    // =====================================================================================================
+    const guards7 = await freshContext(browser, { origins: [servers.staticOrigin, stub.origin], label: 'models-house' });
+    guardsAll.push(guards7);
+    await guards7.context.addInitScript(localStandIn);
+    await guards7.context.addInitScript(recordDecideFetches);
+    const p7 = await guards7.context.newPage();
+    const houseUrl = `${url}?decide=${encodeURIComponent(stub.origin)}`;
+    const house = (since = 0) => stub.systemOne().slice(since);
+    const HOUSE_WORDS = 'dyna.ink · Clef-flash — no key needed · used only when 99% sure';
+    /** Every node id the board holds — none may reach a decider. */
+    const nodeIds = (page) => page.evaluate(() => [...window.__mm.session.getState().nodes.keys()].filter((id) => /:/.test(id)));
+    const nameThrough7 = async (at, text) => {
+      if (!(await holdAt(p7, at.x, at.y))) return false;
+      await p7.fill('#summon input.filter', 'name: ' + text);
+      await p7.press('#summon input.filter', 'Enter');
+      await sleep(200);
+      await letGo(p7);
+      return true;
+    };
+    const tieBoard = async () => {
+      await p7.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
+      await sleep(150);
+      const A = { x: 420, y: 130 }, B = { x: 860, y: 130 }, C = { x: 420, y: 500 };
+      await p7.evaluate(drawMolecule, A); const nA = await nameThrough7(A, 'molecule');
+      await p7.evaluate(drawMolecule, B); const nB = await nameThrough7(B, 'compound');
+      const third = await p7.evaluate(drawMolecule, C);
+      // A word written on the group held: the decider is shown it (the state), and never the mark's id.
+      await p7.evaluate((id) => window.__mm.session.label({ nodeId: id, text: 'oxygen', at: Date.now() }), third[0]);
+      await sleep(200);
+      return { nA, nB, third, C };
+    };
+
+    await record('M37', async () => {
+      await p7.goto(houseUrl, { waitUntil: 'load', timeout: 60000 });
+      await waitReady(p7);
+      await p7.evaluate(installDraw);
+      await sleep(400);
+      const seats = await seatsOf(p7);
+      await openModels(p7);
+      const row = await seatRow(p7, 'decider');
+      await closeModels(p7);
+      const ids = await p7.evaluate(drawMolecule, MOLECULE_AT);
+      await sleep(200);
+      const held = await holdAt(p7, MOLECULE_AT.x, MOLECULE_AT.y);
+      const pills = held ? await p7.evaluate(() => [...document.querySelectorAll('#summon .pill.item')].map((x) => x.textContent.trim())) : [];
+      await letGo(p7);
+      const joined = await joinCustom(p7, stub.baseUrl, 'z-ai/glm-5.3-flash', STUB_KEY, false, 'writer');
+      await closeModels(p7);
+      await sleep(300);
+      const joins = await p7.evaluate(() => window.__mm.session.getEvents().filter((e) => e.type === 'join').map((e) => e.name || e.participantName || e.kind));
+      const fetched = await p7.evaluate(() => window.__decideFetches.length);
+      check(`M37. on a page that may use it, dyna.ink's own decider is seated with no key and no word said — its row: "${row && row.who}" — and nothing is asked at boot, on a hold (${pills.length} pills) or on a model's join ("${joined.slice(0, 40)}"); no join of it on the board`,
+        !!seats.decider && seats.decider.house === true && seats.decider.name === 'Clef-flash' && seats.decider.model === 'clef-flash' && !!row && row.who === HOUSE_WORDS && row.tryable &&
+          held && ids.length === 5 && /^GLM 5\.3 Flash joined/.test(joined) && house().length === 0 && fetched === 0 && !joins.some((j) => /Clef/.test(String(j))),
+        { seats: seats.decider, row, held, pills, joined, joins, bodies: house().length, fetched });
+      const kept = await p7.evaluate(() => JSON.parse(localStorage.getItem('mm-seats') || 'null'));
+      check('M37b. seated silently, it is not kept as a choice — a reload asks the page again — and no key is kept for it',
+        !(kept && kept.decider) && !(await p7.evaluate(() => localStorage.getItem('mm-model-keys'))), { kept });
+    });
+
+    await record('M38', async () => {
+      const before = house().length;
+      const t = await tieBoard();
+      const held = await holdAt(p7, t.C.x, t.C.y);
+      const offered = held ? await p7.evaluate(() => [...document.querySelectorAll('#summon .pill.item')].map((x) => x.textContent.trim())) : [];
+      const took = offered.some((x) => /Which is it\?/.test(x)) && await takePill(p7, 'Which is it?');
+      const landed = await until(p7, (ids) => { const mm = window.__mm, s = mm.session.getState(); return ids.some((id) => { const n = s.nodes.get(id); return n && mm.MM.interpretationsOf(n, s.nodes).some((r) => r.tier === 1.5); }) ? true : null; }, t.third, 8000);
+      await sleep(250);
+      const calls = house(before);
+      const body = calls[0] && calls[0].body;
+      const ids = await nodeIds(p7);
+      const raw = calls[0] ? calls[0].raw : '';
+      const leaked = ids.filter((id) => raw.includes(id));
+      const fetches = await p7.evaluate(() => window.__decideFetches.slice());
+      const rows = await p7.evaluate((list) => {
+        const mm = window.__mm, s = mm.session.getState();
+        return list.flatMap((id) => { const n = s.nodes.get(id); return n ? mm.MM.interpretationsOf(n, s.nodes).filter((r) => r.tier === 1.5).map((r) => ({ label: r.label, weight: +r.weight.toFixed(3), source: r.sourceName })) : []; });
+      }, t.third);
+      const pills = await p7.evaluate(() => [...document.querySelectorAll('#summon .pill.item')].map((x) => x.textContent.trim()));
+      const q1 = body && body.questions && body.questions.q1;
+      const lead = q1 ? Object.keys(q1.criteria).filter((k) => k !== 'none_of_these').pop() : null;
+      check(`M38. Which is it? asks dyna.ink's decider once — a System One body for clef-flash, q1 a choice of ${q1 ? Object.keys(q1.criteria).join(', ') : '?'} — its state holding the group's words ("${body ? String(body.state).slice(0, 90) : ''}…") and no node id`,
+        t.nA && t.nB && held && took && calls.length === 1 && !!body && body.model === 'clef-flash' && Object.keys(body.questions).join() === 'q1' && q1.type === 'choice' &&
+          Object.keys(q1.criteria).slice(-1)[0] === 'none_of_these' && /oxygen/.test(body.state) && /three circles, two lines/.test(body.state) && /first of two/.test(JSON.stringify(q1.criteria)) &&
+          leaked.length === 0 && !/stroke:|which:/.test(raw),
+        { took, calls: calls.length, body, leaked });
+      check(`M38b. sent with no key and no cookie: no authorization header (${calls[0] && calls[0].authorization}), credentials ${fetches[0] && fetches[0].credentials}, headers ${fetches[0] && fetches[0].headers.join(', ')}`,
+        calls.length === 1 && calls[0].authorization === null && calls[0].cookie === null && fetches.length === 1 && fetches[0].credentials === 'omit' && JSON.stringify(fetches[0].headers) === '["content-type"]',
+        { call: calls[0] && { authorization: calls[0].authorization, cookie: calls[0].cookie, origin: calls[0].origin }, fetches });
+      check(`M38c. held at 0.995 as one more reading beside the engine's, in the decider's name — ${JSON.stringify(rows)} — and the field says it: ${pills.filter((x) => /Clef-flash/.test(x)).join(' | ')}`,
+        !!landed && rows.length >= 1 && rows.every((r) => r.weight >= 0.99 && r.label === lead && r.source === 'Clef-flash') && pills.some((x) => new RegExp('^' + lead + ' 0\\.99\\d? · Clef-flash').test(x)),
+        { rows, pills, lead });
+      await letGo(p7);
+    });
+
+    await record('M39', async () => {
+      stub.decideAt(0.97);
+      try {
+        const t = await tieBoard();
+        const before = house().length;
+        const held = await holdAt(p7, t.C.x, t.C.y);
+        const took = held && await takePill(p7, 'Which is it?');
+        const end = Date.now() + 8000;
+        while (Date.now() < end && house(before).length < 1) await sleep(50);
+        await sleep(500);
+        const said = await statusLine(p7);
+        const rows = await p7.evaluate((list) => { const mm = window.__mm, s = mm.session.getState(); return list.flatMap((id) => { const n = s.nodes.get(id); return n ? mm.MM.interpretationsOf(n, s.nodes).filter((r) => r.tier === 1.5).map((r) => r.label) : []; }); }, t.third);
+        check(`M39. an answer at 0.97 is said — "${said.slice(0, 140)}" — and holds nothing: the engine's ranking stands`,
+          held && took && house(before).length === 1 && rows.length === 0 && /Clef-flash/.test(said) && /0\.97/.test(said) && /engine/.test(said), { said, rows });
+        await letGo(p7);
+      } finally { stub.decideAt(0.995); }
+    });
+
+    await record('M40', async () => {
+      stub.systemOneRefuse({ status: 429, error: 'today’s decisions on dyna.ink are spent — the engine’s ranking stands' });
+      try {
+        const t = await tieBoard();
+        const before = house().length;
+        const held = await holdAt(p7, t.C.x, t.C.y);
+        const took = held && await takePill(p7, 'Which is it?');
+        const end = Date.now() + 8000;
+        while (Date.now() < end && house(before).length < 1) await sleep(50);
+        await sleep(500);
+        const said = await statusLine(p7);
+        await letGo(p7);
+        await openModels(p7);
+        const row = await seatRow(p7, 'decider');
+        await closeModels(p7);
+        check(`M40. a refusal from the relay is said in words — "${said.slice(0, 150)}" — and kept in the seat's row: "${row && row.call.slice(0, 120)}"`,
+          held && took && house(before).length === 1 && /could not decide/.test(said) && /429/.test(said) && /spent/.test(said) && !!row && /^failed/.test(row.call) && /429/.test(row.call),
+          { said, row });
+      } finally { stub.systemOneRefuse(null); }
+    });
+
+    await record('M41', async () => {
+      await p7.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
+      await sleep(150);
+      // John's two boxes and a line between them, not tied to either (drawn straight into the log: no magnet on the pen).
+      const ids = await p7.evaluate(() => {
+        const s = window.__mm.session;
+        const line = (a, b, n = 40) => Array.from({ length: n }, (_, i) => ({ x: a.x + ((b.x - a.x) * i) / (n - 1), y: a.y + ((b.y - a.y) * i) / (n - 1) }));
+        const box = (x, y) => [...line({ x, y }, { x: x + 160, y }), ...line({ x: x + 160, y }, { x: x + 160, y: y + 100 }), ...line({ x: x + 160, y: y + 100 }, { x, y: y + 100 }), ...line({ x, y: y + 100 }, { x, y })];
+        let t = Date.now();
+        const add = (pts) => { s.addStroke(pts, (t += 40), undefined, 1); const st = s.getState(); return st.contentIds[st.contentIds.length - 1]; };
+        return [add(box(500, 200)), add(box(900, 200)), add(line({ x: 662, y: 250 }, { x: 898, y: 250 }))];
+      });
+      await sleep(200);
+      await holdIds(p7, ids);
+      const offered = await p7.evaluate(() => [...document.querySelectorAll('#summon .pill.item')].map((x) => x.textContent.trim()));
+      const before = house().length;
+      const took = offered.some((x) => /Which diagram is this\?/.test(x)) && await takePill(p7, 'Which diagram is this?');
+      const end = Date.now() + 8000;
+      while (Date.now() < end && house(before).length < 1) await sleep(50);
+      const decided = await until(p7, (list) => window.__mm.MM.decidedNotationOf(window.__mm.session.getState(), list), ids, 8000);
+      await sleep(300);
+      await letGo(p7);
+      await holdIds(p7, ids);
+      const after = await p7.evaluate(() => [...document.querySelectorAll('#summon .pill.item')].map((x) => x.textContent.trim()));
+      const body = house(before)[0] && house(before)[0].body;
+      const st = await p7.evaluate((list) => { const mm = window.__mm, s = mm.session.getState(); return list.flatMap((id) => { const n = s.nodes.get(id); return n ? mm.MM.interpretationsOf(n, s.nodes).filter((r) => r.tier === 1.5).map((r) => r.label) : []; }); }, ids);
+      const said = await statusLine(p7);
+      check(`M41. Which diagram is this? on two boxes and a line no notation reads surely: offered without Make it Mermaid (${offered.filter((x) => /Mermaid|diagram/.test(x)).join(' | ')}), asked once with ${body ? Object.keys(body.questions.q1.criteria).join(', ') : '?'}, held as a decision (${decided && decided.notation} ${decided && decided.lead}), no reading claimed — "${said.slice(0, 110)}" — and then Make it Mermaid is offered: ${after.filter((x) => /Mermaid/.test(x)).join(' | ')}`,
+        !offered.some((x) => /Make it Mermaid/.test(x)) && took && house(before).length === 1 && !!body && JSON.stringify(Object.keys(body.questions.q1.criteria)) === '["flowchart","er","diagram","none_of_these"]' &&
+          !!decided && decided.notation === 'diagram' && decided.lead >= 0.99 && st.length === 0 && after.some((x) => /Make it Mermaid/.test(x)) && !after.some((x) => /Which diagram is this\?/.test(x)),
+        { offered, after, decided, st, said, body: body && body.questions });
+      await letGo(p7);
     });
   } catch (err) {
     check(`the scenario threw: ${String(err && err.message ? err.message : err).split('\n')[0]}`, false, { stack: String(err && err.stack) });
