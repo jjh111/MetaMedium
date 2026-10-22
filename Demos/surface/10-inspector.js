@@ -58,7 +58,7 @@
     const elsewhere = c && c.playing && isProgram(s, id) && !consentedHere(id);
     const who = elsewhere ? session.clockAuthor(id) : null;
     const stateText = !c ? 'not played'
-      : elsewhere ? 'playing for ' + (who || 'another hand') + ' — not running here'
+      : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : 'played — not running in this tab yet')
       : c.playing ? 'playing · t = ' + tankTime(id).toFixed(1) + 's' : 'paused' + (c.reason ? ' — ' + c.reason : '') + ' · t = ' + tankTime(id).toFixed(1) + 's';
     return '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>' +
       '<div class="acts">' +

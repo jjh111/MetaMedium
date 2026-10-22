@@ -8018,7 +8018,7 @@
     const elsewhere = c && c.playing && isProgram(s, id) && !consentedHere(id);
     const who = elsewhere ? session.clockAuthor(id) : null;
     const stateText = !c ? 'not played'
-      : elsewhere ? 'playing for ' + (who || 'another hand') + ' — not running here'
+      : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : 'played — not running in this tab yet')
       : c.playing ? 'playing · t = ' + tankTime(id).toFixed(1) + 's' : 'paused' + (c.reason ? ' — ' + c.reason : '') + ' · t = ' + tankTime(id).toFixed(1) + 's';
     return '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>' +
       '<div class="acts">' +
@@ -9512,11 +9512,19 @@
   function trackConsent(s) {
     const evs = session.getEvents();
     if (evs !== consentArr) {
-      // A NEW events array — a load, a reset, an undo, a room rebase that cut:
-      // consent does not survive it. What is still playing from the loaded log
-      // waits for *Play it here*. (A live append keeps the same array.)
+      // A NEW events array — a load, an undo, a room rebase that cut, a reset.
+      // Nothing LOADED is granted (another hand's program, or your own from a
+      // file/reload, waits for *Play it here*), but a grant this hand already
+      // gave survives an unrelated change: it is kept only while the artifact
+      // is still live and playing AND the latest play is still this hand's
+      // own (`clockAuthor` null). So undoing an unrelated stroke leaves a
+      // running program running, while undoing this hand's OWN play drops the
+      // grant — the clock falls to whatever is left and it stops here.
       consentArr = evs; consentLen = evs.length;
-      grantedHere.clear();
+      for (const id of [...grantedHere]) {
+        const c = s.clocks[id];
+        if (!(s.live.includes(id) && c && c.playing && session.clockAuthor(id) === null)) grantedHere.delete(id);
+      }
     } else {
       // Appended live: a `clock{op:'play'}` THIS hand wrote (no `by` — every
       // other hand's line is stamped on arrival) grants its artifact. A room
@@ -9527,8 +9535,8 @@
         if (ev && ev.type === 'clock' && ev.op === 'play' && !ev.by) grantedHere.add(ev.nodeId);
       }
       consentLen = evs.length;
+      for (const id of [...grantedHere]) if (!s.live.includes(id) && !s.clocks[id]) grantedHere.delete(id);
     }
-    for (const id of [...grantedHere]) if (!s.live.includes(id) && !s.clocks[id]) grantedHere.delete(id);
   }
   /** Whether this tab may run this artifact's code: this hand played it here. */
   function consentedHere(id) { return grantedHere.has(id); }
