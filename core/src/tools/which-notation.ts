@@ -121,7 +121,7 @@ export const WHICH_NOTATION: Tool = {
       key: 'which-notation',
       label: 'Which diagram is this?',
       reason: (under ? `no notation reads it surely (${describeNotation(top)})` : `${candidates.slice(0, 2).map((c) => c.id).join(' and ')} read it about equally`) +
-        ` — asks ${decider.name} which kind of diagram it is; held only when it is sure, and then it has Mermaid`,
+        ` — asks ${decider.name} which kind of diagram it is, sending it the words of these marks; held only when it is sure, and then it has Mermaid`,
       base: 0.6,
       tool: 'which-notation',
       asks: 'model',

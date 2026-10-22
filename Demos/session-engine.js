@@ -6443,6 +6443,9 @@
    *           are not offered and what it is missing. Read by core's intent table; a thunk, asked
    *           only once the verbs, the library and the verb table have said nothing.
    *
+   * @property {string|null} [decider]  the decision model seated, by name, if one is: a brief's Enter asks it first what
+   *           the brief should make (the audit's D3), so the line says the drawing's guess may be overruled.
+   *
    * @property {function(string): ({key:string,score:number}|null)} [meaning]
    *           the act these marks are offered that typed words are nearest in MEANING, when a semantic
    *           seat is held and has read them (PLAN-FIELD-PAR D1): only what was already worked out off
@@ -6664,13 +6667,15 @@
     // The brief. Tier 1 builds the structure of a page or a diagram at once, with no
     // words; tier 2 — a model — writes the words, and a program.
     if (revising) return models.length ? { kind: 'brief', line: '↵ ' + who + ' changes what the loop covers', command: build(text, true) } : needsModel('changing a page');
+    // With a decider seated, Enter asks it first what the brief should make, and a sure answer overrules the drawing's guess (D3).
+    const unless = c.decider ? ' — unless ' + c.decider + ' is sure it should be something else' : '';
     if ((c.target ? c.target() : 'program') === 'page') {
       return models.length
-        ? { kind: 'brief', line: '↵ the page’s boxes at once, then ' + who + ' writes the words', command: build(text, false) }
-        : { kind: 'structure', line: '↵ the page’s boxes at once — a model writes the words when one joins', command: build(text, false) };
+        ? { kind: 'brief', line: '↵ the page’s boxes at once, then ' + who + ' writes the words' + unless, command: build(text, false) }
+        : { kind: 'structure', line: '↵ the page’s boxes at once — a model writes the words when one joins' + unless, command: build(text, false) };
     }
     if (!models.length) return needsModel('writing a program');
-    return { kind: 'brief', line: '↵ ' + who + ' writes a program', command: build(text, false) };
+    return { kind: 'brief', line: '↵ ' + who + ' writes a program' + unless, command: build(text, false) };
 
     function take(item) { return { do: 'take', key: item.key, index: items.indexOf(item) }; }
     function build(t, rev) { return { do: 'build', text: t, revising: !!rev }; }
@@ -7334,6 +7339,8 @@
       items: items,
       // The models as the board says them: what their provider calls them, never an `llm:` id (FP6).
       models: agents.map((a) => modelWords(a)),
+      // The decider seated, by name: a brief's Enter asks it first what the brief should make (D3), and the line says so.
+      decider: deciderHost() ? deciderHost().name : null,
       library: revising ? [] : libraryEntries(s),
       definition: defId ? { id: defId, name: MM.wordOf(s.nodes.get(defId)) || defId } : null,
       // Whose ink is held: a label goes on the person's own marks only (V1-PLAN L2e).
@@ -8060,6 +8067,14 @@
         if (!now.summon || now.summon.id !== sum.id) { releasePrompted(); say('the field that sent the brief has closed — nothing was made'); return; }
         if (kind === 'mermaid' && diagram) { mermaidFromBrief(); return; }
         if (kind === 'answer') { answerBrief(sum, prompt); return; }
+        // A program needs a writer: with none here, the brief is kept until one joins — never a loop blessed for nothing.
+        if (kind === 'program' && !writers().length) {
+          releasePrompted();
+          keepAsk({ what: 'A program', needs: 'model', need: 'needs a model', ids: sum.enclosedIds.slice(),
+            sentence: 'A program needs a model to write it — kept: it runs when one joins · choose one under models',
+            run: () => runPromptAs(sum, prompt, false, 'program') });
+          return;
+        }
         runPromptAs(sum, prompt, false, kind === 'page' || kind === 'program' ? kind : null);
       });
       return;

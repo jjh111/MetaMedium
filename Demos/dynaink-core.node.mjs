@@ -28389,7 +28389,7 @@ var WHICH = {
     return [{
       key: "which",
       label: "Which is it?",
-      reason: `${candidates.map((c) => c.id).join(" and ")} match about equally \u2014 asks ${decider.name} to choose; its answer joins the readings and the engine's ranking stands unless it is sure`,
+      reason: `${candidates.map((c) => c.id).join(" and ")} match about equally \u2014 asks ${decider.name} to choose, sending it the words of these marks and where each definition came from; its answer joins the readings and the engine's ranking stands unless it is sure`,
       base: 0.7,
       tool: "which",
       asks: "model",
@@ -28464,7 +28464,7 @@ var WHICH_NOTATION = {
     return [{
       key: "which-notation",
       label: "Which diagram is this?",
-      reason: (under ? `no notation reads it surely (${describeNotation(top)})` : `${candidates.slice(0, 2).map((c) => c.id).join(" and ")} read it about equally`) + ` \u2014 asks ${decider.name} which kind of diagram it is; held only when it is sure, and then it has Mermaid`,
+      reason: (under ? `no notation reads it surely (${describeNotation(top)})` : `${candidates.slice(0, 2).map((c) => c.id).join(" and ")} read it about equally`) + ` \u2014 asks ${decider.name} which kind of diagram it is, sending it the words of these marks; held only when it is sure, and then it has Mermaid`,
       base: 0.6,
       tool: "which-notation",
       asks: "model",

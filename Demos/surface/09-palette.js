@@ -562,6 +562,8 @@
       items: items,
       // The models as the board says them: what their provider calls them, never an `llm:` id (FP6).
       models: agents.map((a) => modelWords(a)),
+      // The decider seated, by name: a brief's Enter asks it first what the brief should make (D3), and the line says so.
+      decider: deciderHost() ? deciderHost().name : null,
       library: revising ? [] : libraryEntries(s),
       definition: defId ? { id: defId, name: MM.wordOf(s.nodes.get(defId)) || defId } : null,
       // Whose ink is held: a label goes on the person's own marks only (V1-PLAN L2e).
@@ -1288,6 +1290,14 @@
         if (!now.summon || now.summon.id !== sum.id) { releasePrompted(); say('the field that sent the brief has closed — nothing was made'); return; }
         if (kind === 'mermaid' && diagram) { mermaidFromBrief(); return; }
         if (kind === 'answer') { answerBrief(sum, prompt); return; }
+        // A program needs a writer: with none here, the brief is kept until one joins — never a loop blessed for nothing.
+        if (kind === 'program' && !writers().length) {
+          releasePrompted();
+          keepAsk({ what: 'A program', needs: 'model', need: 'needs a model', ids: sum.enclosedIds.slice(),
+            sentence: 'A program needs a model to write it — kept: it runs when one joins · choose one under models',
+            run: () => runPromptAs(sum, prompt, false, 'program') });
+          return;
+        }
         runPromptAs(sum, prompt, false, kind === 'page' || kind === 'program' ? kind : null);
       });
       return;

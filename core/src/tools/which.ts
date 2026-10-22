@@ -59,7 +59,7 @@ export const WHICH: Tool = {
     return [{
       key: 'which',
       label: 'Which is it?',
-      reason: `${candidates.map((c) => c.id).join(' and ')} match about equally — asks ${decider.name} to choose; its answer joins the readings and the engine's ranking stands unless it is sure`,
+      reason: `${candidates.map((c) => c.id).join(' and ')} match about equally — asks ${decider.name} to choose, sending it the words of these marks and where each definition came from; its answer joins the readings and the engine's ranking stands unless it is sure`,
       base: 0.7,
       tool: 'which',
       asks: 'model',
