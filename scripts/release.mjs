@@ -7,10 +7,14 @@
 // Run it in the repository to release, on the commit to release (V1-PLAN.md
 // §7 and §9 R7). In order, it:
 //
-//   1. refuses a tree that is not clean — untracked files included — and a
+//   1. refuses a tree that is not clean — untracked files included — a
 //      version that is not greater than the last: VERSION's, or any release
 //      tag's (`v` and a version: `v0.2.0`, `v1.0.0-rc.1` — the day-one tag
-//      `v1.0-day1` is not one);
+//      `v1.0-day1` is not one) — and a clone that cannot see the last release:
+//      VERSION above 0.0.0 and no tag v<VERSION> reachable from HEAD, which is
+//      a shallow clone, or one made without its tags (CI's checkout, a new
+//      repository pushed without them), where the changelog would start from
+//      the beginning and a later release's tag would go unseen;
 //   2. writes CHANGELOG.md a section from the subjects of the commits since
 //      the previous release tag (merges left out), grouped by the unit each
 //      names — `R7: …`, `R4d red: …`, `Docs for R4b: …`, `… (R4c)`;
@@ -209,6 +213,23 @@ export function releaseState(repo) {
   return { version, tags, last };
 }
 
+/**
+ * Whether this clone can see the release VERSION names: its tag, `v<VERSION>`, reachable from HEAD.
+ * Null when it can (or VERSION is 0.0.0, nothing released yet); otherwise the sentence that says why
+ * not and what to run — `git fetch --tags --unshallow` in a shallow clone, `git fetch --tags` in a
+ * whole one that lacks the tag.
+ */
+export function unseenRelease(repo, version) {
+  if (compareVersions(version, '0.0.0') <= 0) return null;
+  const tag = `v${version}`;
+  const has = git(repo, ['rev-parse', '--verify', '--quiet', `refs/tags/${tag}^{commit}`], { allowFail: true }).status === 0;
+  if (has && git(repo, ['merge-base', '--is-ancestor', tag, 'HEAD'], { allowFail: true }).status === 0) return null;
+  const shallow = git(repo, ['rev-parse', '--is-shallow-repository'], { allowFail: true }).stdout.trim() === 'true';
+  const why = has ? `the tag ${tag} is here but HEAD does not descend from it${shallow ? ' in this shallow clone' : ''}` : `this clone holds no tag ${tag}${shallow ? ' and is shallow' : ''}`;
+  return `VERSION says ${version} was released, but ${why} — the changelog would start from the wrong commit and a later release's tag would go unseen: ` +
+    `run ${shallow ? 'git fetch --tags --unshallow' : 'git fetch --tags'} and try again (a repository made without its tags: tag the commit ${version} was released at, git tag -a ${tag} <commit>)`;
+}
+
 /** The previous release: the greatest release tag HEAD descends from, or null. */
 function previousRelease(repo, tags) {
   let best = null;
@@ -276,6 +297,8 @@ function main(argv) {
   if (state && compareVersions(version, state.last.version) <= 0) {
     refusals.push(`${version} is not greater than the last release, ${state.last.version} (${state.last.from})`);
   }
+  const unseen = state ? unseenRelease(repo, state.version) : null;
+  if (unseen) refusals.push(unseen);
   let base = null;
   if (since) {
     const r = git(repo, ['rev-parse', '--verify', '--quiet', `${since}^{commit}`], { allowFail: true });
