@@ -4,6 +4,7 @@
 // back that room's key: the HMAC of the name under the relay's first secret (auth.mjs), which the relay
 // needs to keep nowhere. The answer is `201 { room, key, idleDays }`, never cached: a room the relay opened
 // is kept until nobody has used it for `idleDays` days (the Room's alarm, worker.mjs), and then forgotten.
+// `GET /rooms` says that much to anyone — `{ idleDays, opens }` — so a guest who joined by a link can say it too.
 //
 // Who may open one is counted, not checked: a browser must come from the app's origins (http.mjs), and
 // every caller is held to MM_RELAY_MINT_PER_HOUR rooms an hour by its address (default 10) and the relay to
@@ -34,6 +35,8 @@ export async function mintRoute(request, env) {
   if (origin && !originAllowed(origin, env)) return text(403, 'this origin may not use this relay', corsHeaders(origin));
   const cors = origin ? corsHeaders(origin) : {};
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  // What this relay does with the rooms it opens, for a hand that joined one by a link and was not there when it was opened.
+  if (request.method === 'GET') return json(200, { idleDays: roomIdleDaysFrom(undefined, env), opens: env.MM_RELAY_MINT !== '0' }, cors);
   if (request.method !== 'POST') return text(405, 'a room is opened with POST /rooms', cors);
   if (env.MM_RELAY_MINT === '0') return text(503, 'this relay is not opening new rooms just now — join a room you were given a link to', cors);
   const open = env.MM_RELAY_OPEN === '1';

@@ -365,7 +365,11 @@ test('POST /rooms opens a room: an unguessable `r-` name, its key, how long it i
   const pre = await mint(env, { method: 'OPTIONS' });
   assert.equal(pre.status, 204);
   assert.match(pre.headers.get('access-control-allow-methods'), /POST/);
-  assert.equal((await mint(env, { method: 'GET' })).status, 405);
+  // A GET says what the relay does with the rooms it opens — to anyone, for a guest who was not there when it opened.
+  const said = await mint(env, { method: 'GET' });
+  assert.equal(said.status, 200);
+  assert.deepEqual(await said.json(), { idleDays: 30, opens: true });
+  assert.equal((await mint(env, { method: 'PUT' })).status, 405);
 });
 
 test('opening rooms is counted: ten an hour from one address, then a 429 that says when, in words — another address may still', async () => {

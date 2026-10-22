@@ -149,6 +149,7 @@ export function startRelay(port = Number(process.env.PORT || 8020), opts = {}) {
     if (a) { asset(req, res, a); return; }
     // A room opened for whoever asks: this relay keeps no keys and forgets a room when it stops.
     if (url.pathname === '/rooms') {
+      if (req.method === 'GET') { res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify({ idleDays: null, opens: true })); return; }
       if (req.method !== 'POST') { plain(res, 405, 'a room is opened with POST /rooms'); return; }
       res.writeHead(201, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
       res.end(JSON.stringify({ room: mintRoomName(), key: null, idleDays: null }));
