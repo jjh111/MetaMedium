@@ -43,3 +43,8 @@ binding = "AI"
 # MM_RELAY_MAX_LINES = "5000"
 # MM_RELAY_MAX_BYTES = "32000000"
 # MM_RELAY_ASSET_BYTES = "67108864"   # bytes of pictures a room keeps (A1); past it a put is refused
+# The model routes (src/ai.mjs, Demos/decide-protocol.mjs): who may ask — off | keyed (a room's key only) |
+# limited (the app's own pages, per address, and keyed hands; the default) — and how many calls a day across
+# everyone, past which a decision is refused with 429 and the engine's ranking stands:
+# MM_DECIDE = "limited"
+# MM_AI_DAILY = "20000"

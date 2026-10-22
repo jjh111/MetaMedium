@@ -1,16 +1,146 @@
-// The model routes — `/decide` (a decision model), `/extract` (an extraction model) and `/ai/…` —
-// through the Worker's Workers AI binding, so no key reaches a browser. Not built yet: the route is
-// here so the Worker's routing is settled; its body is the models unit's.
+// The model routes — `/decide` (a decision model) and `/extract` (an extraction model) — through the Worker's Workers
+// AI binding, so no key reaches a browser and none is sent by one. What a request may be is
+// `Demos/decide-protocol.mjs` (the Node relay reads it too, and answers both with 501); what the page sends and how
+// it reads the answer is core's `llm/decide-systemone.ts`. This file is who may ask, how often, and the call.
+// (`/ai/…` is held for model routes to come: it answers 501, in words.)
+//
+// Who may ask (`MM_DECIDE`: off | keyed | limited, `limited` when unset):
+//   * a page of the app (an Origin `http.mjs` allows), limited per address — `DECIDE_PER_MINUTE.caller` a minute;
+//   * a hand with a room's key (`Authorization: Bearer` and `X-Dyna-Room`, checked as the rooms check one), limited
+//     per room — `DECIDE_PER_MINUTE.room` a minute; `keyed` admits only these;
+//   * nothing else: a request with no Origin and no key is refused, because an Origin is easy to leave out and a
+//     script anywhere would otherwise ask the account's Workers AI for free;
+//   * and every call, whoever asks, counts against one budget a day (`MM_AI_DAILY`, `DEFAULT_AI_DAILY`), past which
+//     the answer is 429 and the sentence says the engine's ranking stands.
+// The counts are `limits.mjs`'s (one count wherever a request lands; with no LIMITS binding the route fails closed).
+//
+// The call: `env.AI.run(<@cf id>, { state, questions | fields, images? })`, raced against `DECIDE_WAIT_MS` (504 in
+// words), a throw said with its first 160 characters (502), and on 200 `{ ok, model, ms, answers }` with the
+// model's answers untouched. Nothing is cached and AI Gateway is not used (its logs would keep a board's words).
+// What is logged is the route, the model, the status, the time and the size — never a state, a question or a
+// criterion.
 
-import { originAllowed, corsHeaders, text } from './http.mjs';
+import { originAllowed, corsHeaders, text, json, callerOf } from './http.mjs';
+import { secretsOf, keyOpens } from './auth.mjs';
+import { hit } from './limits.mjs';
+import {
+  DECIDE_MODELS, EXTRACT_MODELS, DECIDE_LIMITS, DECIDE_WAIT_MS, DECIDE_PER_MINUTE, DECIDE_WORDS,
+  decideCheck, extractCheck, decideCatalog, aiDailyFrom,
+} from '../../../Demos/decide-protocol.mjs';
 
 /** The paths this module answers. */
 export const AI_PATH = /^\/(decide|extract|ai(\/[a-z0-9/-]*)?)$/;
+
+const MINUTE = 60_000;
+const DAY = 86_400_000;
+
+const no = (status, error, headers = {}) => json(status, { ok: false, error }, headers);
+
+/** A request's body as text, read up to `cap` bytes: `{ text, size }`, or `{ over: true }` past it. */
+async function bodyText(request, cap) {
+  const declared = Number(request.headers.get('content-length') || 0);
+  if (declared > cap) return { over: true };
+  if (!request.body) return { text: '', size: 0 };
+  const reader = request.body.getReader();
+  const parts = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > cap) { await reader.cancel().catch(() => undefined); return { over: true }; }
+    parts.push(value);
+  }
+  const all = new Uint8Array(size);
+  let at = 0;
+  for (const p of parts) { all.set(p, at); at += p.byteLength; }
+  return { text: new TextDecoder().decode(all), size };
+}
+
+/** Who is asking: a room's key that opens its room (`{ keyed: true, room }`), nobody in particular, or a refusal. */
+async function askerOf(request, env) {
+  const m = /^Bearer\s+(\S+)\s*$/i.exec(request.headers.get('authorization') || '');
+  const room = request.headers.get('x-dyna-room') || '';
+  if (!m && !room) return { keyed: false };
+  if (!m || !room || room.length > 128) return { refuse: [401, DECIDE_WORDS.keyed] };
+  if (!(await keyOpens(secretsOf(env.MM_RELAY_SECRET), room, m[1]))) return { refuse: [403, DECIDE_WORDS.wrongKey(room)] };
+  return { keyed: true, room };
+}
+
+/** One line a call, never its words. */
+function logCall(route, model, status, ms, bytes) {
+  console.log(JSON.stringify({ route, model, status, ms, bytes }));
+}
+
+async function modelRoute(request, env, cors, route) {
+  const models = route === 'extract' ? EXTRACT_MODELS : DECIDE_MODELS;
+  if (request.method === 'GET' || request.method === 'HEAD') return json(200, decideCatalog(route), cors);
+  if (request.method !== 'POST') return no(405, DECIDE_WORDS.method, cors);
+  const mode = env.MM_DECIDE || 'limited';
+  if (mode === 'off') return no(503, DECIDE_WORDS.off, cors);
+  if (mode !== 'keyed' && mode !== 'limited') return no(503, DECIDE_WORDS.mode, cors);
+  if (!env.AI) return no(501, DECIDE_WORDS.noBinding, cors);
+
+  const asker = await askerOf(request, env);
+  if (asker.refuse) return no(asker.refuse[0], asker.refuse[1], cors);
+  if (!asker.keyed && !request.headers.get('origin')) return no(403, DECIDE_WORDS.noOrigin, cors);
+  if (mode === 'keyed' && !asker.keyed) return no(401, DECIDE_WORDS.keyed, cors);
+
+  // Counted before the body is read: a flood of anything is a flood.
+  let count;
+  try {
+    count = asker.keyed
+      ? await hit(env, 'ai', 'room:' + asker.room, { limit: DECIDE_PER_MINUTE.room, windowMs: MINUTE })
+      : await hit(env, 'ai', 'ip:' + callerOf(request), { limit: DECIDE_PER_MINUTE.caller, windowMs: MINUTE });
+  } catch { return no(503, DECIDE_WORDS.uncounted, cors); }
+  if (!count.ok) return no(429, DECIDE_WORDS.rate, { ...cors, 'retry-after': String(count.retryAfter || 60) });
+
+  const read = await bodyText(request, DECIDE_LIMITS.bodyWithImages);
+  if (read.over) return no(413, DECIDE_WORDS.tooBig(DECIDE_LIMITS.bodyWithImages / 1024), cors);
+  let body;
+  try { body = JSON.parse(read.text); } catch { return no(400, DECIDE_WORDS.notJson, cors); }
+  const pictures = !!body && Array.isArray(body.images) && body.images.length > 0;
+  if (read.size > DECIDE_LIMITS.body && !pictures) return no(413, DECIDE_WORDS.tooBig(DECIDE_LIMITS.body / 1024), cors);
+  const why = route === 'extract' ? extractCheck(body) : decideCheck(body);
+  if (why) return no(400, why, cors);
+
+  // Every call that will reach a model counts against the day's budget — one budget for both routes.
+  let budget;
+  try { budget = await hit(env, 'ai-budget', 'day', { limit: aiDailyFrom(env), windowMs: DAY }); } catch { return no(503, DECIDE_WORDS.uncounted, cors); }
+  if (!budget.ok) return no(429, DECIDE_WORDS.spent, { ...cors, 'retry-after': String(budget.retryAfter || 3600) });
+
+  const m = models[body.model];
+  const input = route === 'extract'
+    ? { state: body.state, fields: body.fields }
+    : { state: body.state ?? '', questions: body.questions, ...(pictures ? { images: body.images } : {}) };
+  const t0 = Date.now();
+  let timer;
+  let out;
+  try {
+    out = await Promise.race([
+      env.AI.run(m.id, input),
+      new Promise((_, fail) => { timer = setTimeout(() => fail(Object.assign(new Error('timeout'), { timeout: true })), DECIDE_WAIT_MS); }),
+    ]);
+  } catch (e) {
+    const ms = Date.now() - t0;
+    if (e && e.timeout) { logCall(route, body.model, 504, ms, read.size); return no(504, DECIDE_WORDS.timeout(body.model), cors); }
+    logCall(route, body.model, 502, ms, read.size);
+    return no(502, DECIDE_WORDS.failed(body.model, e && e.message ? e.message : String(e)), cors);
+  } finally { clearTimeout(timer); }
+  const ms = Date.now() - t0;
+  const answers = out && typeof out === 'object' ? out.answers : undefined;
+  if (!answers || typeof answers !== 'object') { logCall(route, body.model, 502, ms, read.size); return no(502, DECIDE_WORDS.empty(body.model), cors); }
+  logCall(route, body.model, 200, ms, read.size);
+  return json(200, { ok: true, model: body.model, ms, answers }, cors);
+}
 
 export async function aiRoute(request, env) {
   const origin = request.headers.get('origin');
   if (origin && !originAllowed(origin, env)) return text(403, 'this origin may not use this relay', corsHeaders(origin));
   const cors = origin ? corsHeaders(origin) : {};
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-  return text(501, 'this relay asks no model yet', cors);
+  const path = new URL(request.url).pathname;
+  if (path === '/decide') return modelRoute(request, env, cors, 'decide');
+  if (path === '/extract') return modelRoute(request, env, cors, 'extract');
+  return no(501, DECIDE_WORDS.elsewhere, cors);
 }

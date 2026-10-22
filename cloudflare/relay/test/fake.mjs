@@ -85,6 +85,48 @@ export function fakeEnv(vars = {}) {
   return env;
 }
 
+/**
+ * What a System One decision model answers, written as the fakes answer it (never a real model's reply — core's
+ * `llm/fixtures/systemone-replies.json` holds the spellings): for each choice, the last option that is not
+ * `none_of_these` leads at `p` and the rest share what is left; a score leads at its top level; a noul is `p` sure of
+ * yes; an extraction finds nothing (every field absent, `p_null` 1).
+ */
+export function systemOneAnswers(input, p = 0.995) {
+  const answers = {};
+  for (const [name, q] of Object.entries((input && input.questions) || {})) {
+    if (q.type === 'noul') { answers[name] = { type: 'noul', value: p }; continue; }
+    const keys = q.type === 'score' ? q.criteria.slice() : Object.keys(q.criteria || {});
+    const named = keys.filter((k) => k !== 'none_of_these');
+    const lead = (named.length ? named : keys)[(named.length ? named : keys).length - 1];
+    const probabilities = {};
+    for (const k of keys) probabilities[k] = k === lead ? p : (1 - p) / Math.max(1, keys.length - 1);
+    answers[name] = q.type === 'score'
+      ? { type: 'score', score: keys.indexOf(lead), probabilities, confidence: p }
+      : { type: 'choice', choice: lead, probabilities, confidence: p };
+  }
+  for (const [name, f] of Object.entries((input && input.fields) || {})) answers[name] = { type: f.type, value: null, p_null: 1, confidence: 1 };
+  return { answers };
+}
+
+/**
+ * A stand-in for the Workers AI binding: `run(model, input)` answers from `book` — a function `(model, input)` that
+ * returns (or resolves to) the reply and throws to fail, or a map of `@cf/…` id to reply — and keeps every call
+ * (`calls`: the model and the input as asked). With no book it answers as `systemOneAnswers` does. Nothing is
+ * reached: no network, no account.
+ */
+export function fakeAI(book = (model, input) => systemOneAnswers(input)) {
+  const calls = [];
+  return {
+    calls,
+    async run(model, input) {
+      calls.push({ model, input: structuredClone(input) });
+      const reply = typeof book === 'function' ? await book(model, input) : book[model];
+      if (reply === undefined) throw new Error(`AiError: no such model ${model}`);
+      return structuredClone(reply);
+    },
+  };
+}
+
 /** Read an SSE response until `done(text)`, then stop reading. */
 export async function readUntil(res, done, ms = 3000) {
   const reader = res.body.getReader();

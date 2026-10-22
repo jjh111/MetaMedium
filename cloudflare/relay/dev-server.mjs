@@ -4,6 +4,11 @@
 //
 //   MM_RELAY_SECRET=… node cloudflare/relay/dev-server.mjs            # :8787, keys on
 //   MM_RELAY_OPEN=1 PORT=9000 node cloudflare/relay/dev-server.mjs    # no key asked
+//   MM_DECIDE_FAKE=1 MM_RELAY_OPEN=1 node cloudflare/relay/dev-server.mjs  # /decide answered by a fake model
+//
+// `/decide` and `/extract` need a Workers AI binding, which only Cloudflare has: here they answer 501 in words,
+// unless MM_DECIDE_FAKE=1 puts a fake model in its place (`fakeAI`, test/fake.mjs: the last option leads at 0.995)
+// — for working on the page's decider on this machine, never a measure of any real model.
 //
 // It is not the deployment (`wrangler dev` runs workerd, and is the closer
 // check); it is the Worker's logic with nothing else in the way.
@@ -12,7 +17,7 @@ import { createServer } from 'node:http';
 import { Readable } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 import worker from './src/worker.mjs';
-import { fakeEnv } from './test/fake.mjs';
+import { fakeEnv, fakeAI } from './test/fake.mjs';
 
 /** Serve `worker.fetch` as a Node request listener. */
 export function listener(env) {
@@ -44,6 +49,7 @@ export function listener(env) {
 /** A relay on a free port (or `port`): { url, env, close }. `vars` are the Worker's variables and secrets. */
 export function startDevRelay(vars = {}, port = 0) {
   const env = fakeEnv(vars);
+  if (vars.MM_DECIDE_FAKE === '1' && !env.AI) env.AI = fakeAI();
   const server = createServer(listener(env));
   return new Promise((resolve, reject) => {
     server.once('error', reject);
@@ -57,8 +63,8 @@ export function startDevRelay(vars = {}, port = 0) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const port = Number(process.env.PORT || 8787);
-  const vars = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('MM_RELAY_')));
+  const vars = Object.fromEntries(Object.entries(process.env).filter(([k]) => /^MM_(RELAY|DECIDE|AI)_|^MM_DECIDE$/.test(k)));
   startDevRelay(vars, port)
-    .then(({ url }) => console.log(`dyna relay (Worker logic, in memory) on ${url} — ${vars.MM_RELAY_OPEN === '1' ? 'no key asked' : vars.MM_RELAY_SECRET ? 'keys on' : 'no secret set: every request is refused (503)'}`))
+    .then(({ url }) => console.log(`dyna relay (Worker logic, in memory) on ${url} — ${vars.MM_RELAY_OPEN === '1' ? 'no key asked' : vars.MM_RELAY_SECRET ? 'keys on' : 'no secret set: every request is refused (503)'}${vars.MM_DECIDE_FAKE === '1' ? ' · /decide answered by a fake model' : ''}`))
     .catch((err) => { console.error(`relay: could not listen on :${port} — ${err.message}`); process.exit(1); });
 }
