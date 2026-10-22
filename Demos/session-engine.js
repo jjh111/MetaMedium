@@ -2623,29 +2623,32 @@
    * (core's decisionStateOf); what is sent is the question, its options and that state, to the decider's address alone.
    */
   function runDecision(job) {
-    if (!decider) { say('no decider is seated — choose one under models'); return false; }
+    const done = (of, stopped) => { if (job.done) job.done(of, !!stopped); };
+    if (!decider) { say('no decider is seated — choose one under models'); done(null); return false; }
     const d = decider;
     const ids = job.ids;
-    const key = 'decide:' + agentKey(d.pseudo) + ':' + ids.join('+');
+    const key = 'decide:' + agentKey(d.pseudo) + ':' + (job.key || ids.join('+'));
     const ctl = new AbortController();
     workControllers.set(key, ctl);
     say(d.name + ' is ' + job.asking + '…');
-    withWork(key, ids, d.name + ' · choosing', d.seat.ask([job.question], Date.now(), ctl.signal, job.state)).then((run) => {
-      if (ctl.signal.aborted) return;
+    withWork(key, job.workOn || ids, d.name + ' · choosing', d.seat.ask([job.question], Date.now(), ctl.signal, job.state)).then((run) => {
+      if (ctl.signal.aborted) { done(null, true); return; }
       const t = (x) => Number(x).toFixed(2);
-      let ok = false, said;
+      let ok = false, said, chosen = null;
       if (!run.ok) said = d.name + ' could not decide — ' + run.error;
       else if (run.refused) said = d.name + ' answered, but ' + run.refused + ' — nothing was held';
-      else if (!run.rows.length) said = d.name + ' gave no answer that could be read' + (run.notes && run.notes.length ? ' (' + run.notes[0].replace(/^q\d+: /, '') + ')' : '') + ' — the engine’s ranking stands';
+      else if (!run.rows.length) said = d.name + ' gave no answer that could be read' + (run.notes && run.notes.length ? ' (' + run.notes[0].replace(/^q\d+: /, '') + ')' : '') + ' — ' + job.otherwise;
       else {
         const row = run.rows[0], a = row.answer;
         const lead = a.kind === 'choice' ? (a.distribution.slice().sort((x, y) => y.p - x.p)[0] || { of: '?', p: 0 }) : { of: '?', p: 0 };
         const word = lead.of === MM.NO_MATCH ? 'none of these' : job.word(lead.of);
+        // Sure: picked out, past the floor (DECIDER_TAKE_AT), and something other than none of these.
+        const sure = !row.flat && !row.below && !row.none;
         // A sure none of these holds no reading (the audit's S5): said as nothing held, before anything else.
-        if (row.none && !row.below) { ok = true; said = d.name + ' says none of these (' + t(lead.p) + ') — nothing held, the engine’s ranking stands'; }
-        else if (row.held) { ok = true; said = d.name + ' says ' + word + ' (' + t(lead.p) + ') — ' + job.held; }
-        else if (row.below) said = d.name + ' is only ' + t(lead.p) + ' sure of ' + word + ' — under ' + MM.DECIDER_TAKE_AT + ', so the engine’s ranking stands';
-        else if (row.flat) said = d.name + ' could not tell ' + job.about + ' apart — the engine’s ranking stands';
+        if (row.none && !row.below) { ok = true; said = d.name + ' says none of these (' + t(lead.p) + ') — nothing taken, ' + job.otherwise; }
+        else if (sure && (job.holds === false || row.held)) { ok = true; chosen = lead.of; said = d.name + ' says ' + word + ' (' + t(lead.p) + ') — ' + job.held; }
+        else if (row.below) said = d.name + ' is only ' + t(lead.p) + ' sure of ' + word + ' — under ' + MM.DECIDER_TAKE_AT + ', so ' + job.otherwise;
+        else if (row.flat) said = d.name + ' could not tell ' + job.about + ' apart — ' + job.otherwise;
         else said = d.name + ' says ' + word + ' (' + t(lead.p) + ')';
       }
       // The row keeps what the CALL came to — a seat that answered under the floor answered — and the status line says what that meant.
@@ -2654,6 +2657,7 @@
       render(session.getState());
       refreshPalette();
       renderSeats();
+      done(chosen);
     }).finally(() => workControllers.delete(key));
     return true;
   }
@@ -2675,6 +2679,7 @@
       asking: 'choosing between ' + data.candidates.map((c) => c.id).join(' and '),
       word: (of) => '“' + readingWords(of) + '”',
       held: 'held beside the engine’s readings, which stand',
+      otherwise: 'the engine’s ranking stands',
       about: data.candidates.map((c) => c.id).join(' and '),
     });
   }
@@ -2693,7 +2698,37 @@
       asking: 'deciding which kind of diagram this is',
       word: (of) => 'it is ' + named(of),
       held: 'held as its decision; the drawing can be made Mermaid now',
+      otherwise: 'the engine’s ranking stands',
       about: 'the kinds of diagram',
+    });
+  }
+
+  /**
+   * What should this brief make? (the audit's D3) — asked on the Enter that sends a brief, before any writer is asked,
+   * when a decider is seated and no prefix said it (`page:`, `run:` …): a page, a program, a Mermaid diagram (only when
+   * the marks read as one: `opts.diagram`, its words), a text answer, or none of these. Nothing is held on the board —
+   * the answer chooses what is made, and only when it is sure (DECIDER_TAKE_AT); else what the drawing says stands
+   * (`opts.otherwise`, its words). `done(kind | null, stopped)` always follows: the kind taken, or null.
+   */
+  function askDeciderBrief(sum, brief, opts, done) {
+    const s = session.getState();
+    const ids = sum.enclosedIds.filter((id) => s.contentIds.includes(id));
+    const question = MM.briefQuestion({ diagram: opts.diagram || null });
+    const words = {};
+    for (const c of question.candidates) words[c.id] = MM.BRIEF_KIND_WORDS[c.id] || c.id;
+    return runDecision({
+      ids: ids,
+      key: 'brief:' + sum.id,
+      workOn: sum.enclosedIds,
+      question: question,
+      state: MM.decisionStateOf(s, ids, { reading: ids.length ? session.read(ids) : undefined, lead: ['The brief typed: “' + brief.slice(0, 500) + '”'] }),
+      asking: 'deciding what the brief should make',
+      word: (of) => words[of] || of,
+      holds: false,
+      held: 'so it makes that',
+      otherwise: 'the drawing decides: ' + opts.otherwise,
+      about: 'what to make',
+      done: done,
     });
   }
 
@@ -6750,7 +6785,7 @@
 //   applyLibrary, targetOf); renderSummon/refreshPalette/paintField.
 // Uses: core (hand, lastPen), ui, field (readFieldCommand, verbFor, libraryMatch, typedWord — pure,
 //   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading,
-//   askModelsAbout, offerModel), seatpane (writers, readers, deciderHost, askDecider, askDeciderNotation — who is asked, by seat), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
+//   askModelsAbout, offerModel), seatpane (writers, readers, deciderHost, askDecider, askDeciderNotation, askDeciderBrief — who is asked, by seat), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
 //   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
 //   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
 //   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
@@ -7920,8 +7955,11 @@
   }
 
   /** What a brief asks for: a page (a layout of regions) or a program (anything else), unless it says. */
+  /** A prefix that says what a brief makes (`page:`, `run:`, `program:`, `new:`): targetOf reads it, and with one no decider is asked. */
+  const TARGET_PREFIX = /^(page|run|program|new)\s*:\s*/i;
+
   function targetOf(sum, prompt) {
-    const m = /^(page|run|program|new)\s*:\s*/i.exec(prompt);
+    const m = TARGET_PREFIX.exec(prompt);
     const brief = m ? prompt.slice(m[0].length).trim() : prompt;
     if (m) return { target: m[1].toLowerCase() === 'page' ? 'page' : 'program', brief: brief, fresh: m[1].toLowerCase() === 'new' };
     const s = session.getState();
@@ -8009,13 +8047,57 @@
 
   function runPrompt(sum, prompt, revising) {
     if (alreadyUnderWay(sum)) return;
+    // What the brief should make (the audit's D3): with a decider seated, it is asked on this Enter, before any writer —
+    // never on a revision, never when a prefix said it. Only a sure answer is taken; else the drawing decides, as before.
+    if (!revising && deciderHost() && !TARGET_PREFIX.test(prompt)) {
+      const s = session.getState();
+      const marks = sum.enclosedIds.filter((id) => s.contentIds.includes(id));
+      const diagram = marks.length >= 2 && !marks.some((id) => s.artifacts.includes(id)) ? MM.mermaidFor(s, marks, (id) => { const n = s.nodes.get(id); return !!n && isRead(n); }) : null;
+      const drawn = targetOf(sum, prompt);
+      askDeciderBrief(sum, prompt, { diagram: diagram ? MM.describeNotation(diagram.reading) : null, otherwise: drawn.target === 'page' ? 'a page' : 'a program' }, (kind, stopped) => {
+        if (stopped) { releasePrompted(); say('stopped — nothing was made'); return; }
+        const now = session.getState();
+        if (!now.summon || now.summon.id !== sum.id) { releasePrompted(); say('the field that sent the brief has closed — nothing was made'); return; }
+        if (kind === 'mermaid' && diagram) { mermaidFromBrief(); return; }
+        if (kind === 'answer') { answerBrief(sum, prompt); return; }
+        runPromptAs(sum, prompt, false, kind === 'page' || kind === 'program' ? kind : null);
+      });
+      return;
+    }
+    runPromptAs(sum, prompt, revising, null);
+  }
+
+  /** The decider said the brief is a Mermaid diagram: the Mermaid tool's own act on the marks held, as its pill takes it. */
+  function mermaidFromBrief() {
+    const scope = fieldScope(session.getState(), '', null);
+    const o = MM.offersFor(scope).find((x) => x.tool === 'mermaid');
+    if (!o) { releasePrompted(); say('the marks no longer read as a diagram — nothing was made'); return; }
+    paletteScope = scope;
+    takeOffer(o);
+    // The Mermaid stands beside the marks and the field stays on them, ready for the next act: the brief was one act, and is done.
+    releasePrompted();
+    const f = fieldInput();
+    if (f) { f.disabled = false; f.value = ''; }
+  }
+
+  /** The decider said the brief is a question: it is asked of the writers, its answer beside the marks — or kept for one. */
+  function answerBrief(sum, prompt) {
+    if (writers().length) { runAsk(sum, prompt); return; }
+    releasePrompted();
+    keepAsk({ what: 'An answer', needs: 'model', need: 'needs a model', ids: sum.enclosedIds.slice(),
+      sentence: 'An answer needs a model to write it — kept: it runs when one joins · choose one under models',
+      run: () => runAsk(sum, prompt) });
+  }
+
+  /** A brief, made as `decided` says (`page` | `program`) or, with nothing decided, as the drawing says (`targetOf`). */
+  function runPromptAs(sum, prompt, revising, decided) {
     const at = Date.now();
     let artifactId, addressed;
 
     // A brief the library already answers is not sent anywhere: the entry is
     // reused. The model is asked only for what nothing here does (the
     // conservation John asked for — the library grows, the bloat does not).
-    const want = revising ? null : targetOf(sum, prompt);
+    const want = revising ? null : decided ? { target: decided, brief: prompt, fresh: false } : targetOf(sum, prompt);
     if (want && want.target === 'program') {
       const entry = want.fresh ? null : libraryMatch(want.brief, libraryEntries(session.getState()));
       if (entry) { applyLibrary(sum, entry); return; }

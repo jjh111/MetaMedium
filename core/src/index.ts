@@ -900,6 +900,8 @@ export {
 } from './participants/decide';
 // What a decision seat is shown of the board: words, never ids (the audit's S1).
 export { decisionStateOf, definitionWords, shapesCounted, wordsBeside, DECIDE_STATE_MAX } from './participants/decide-state';
+// What should this brief make? (the audit's D3): the closed list a decider chooses from on a brief's Enter.
+export { briefQuestion, BRIEF_QUESTION, BRIEF_KIND_WORDS } from './participants/brief-kind';
 export type { StateCandidate, DecisionStateOptions } from './participants/decide-state';
 export type {
   DecideState,

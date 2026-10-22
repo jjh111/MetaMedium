@@ -84,6 +84,10 @@
 //   M40  a refusal from the relay (429, today's decisions spent) is said in the status line and kept in the seat's row
 //   M41  Which diagram is this? on two boxes and a line no notation reads surely: offered, asked once, held as a decision
 //        (no reading claimed) — and then Make it Mermaid is offered
+//   M42  a brief's Enter asks the decider what it should make before any writer is asked: page, program, a text answer and
+//        none of these (no Mermaid for marks that read as no diagram), the brief's words in the state; sure of a program,
+//        a program is written where the drawing alone would have made a page — and nothing is held on the board for it
+//   M43  under the floor the drawing decides, and the status line says so; a prefix (`run:`) asks no decider at all
 
 import { startModelStub, STUB_KEY, REASONING_ONLY, JEV } from './servers.mjs';
 import { isModelRequest } from './guards.mjs';
@@ -1378,6 +1382,94 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
         !offered.some((x) => /Make it Mermaid/.test(x)) && took && house(before).length === 1 && !!body && JSON.stringify(Object.keys(body.questions.q1.criteria)) === '["flowchart","er","diagram","none_of_these"]' &&
           !!decided && decided.notation === 'diagram' && decided.lead >= 0.99 && st.length === 0 && after.some((x) => /Make it Mermaid/.test(x)) && !after.some((x) => /Which diagram is this\?/.test(x)),
         { offered, after, decided, st, said, body: body && body.questions });
+      await letGo(p7);
+    });
+
+    /** The status line's sentences from now on, in order — a brief says several, and the last is not the only one worth reading. */
+    const watchStatus = (page) => page.evaluate(() => {
+      window.__statusSaid = [];
+      const el = document.getElementById('status');
+      if (window.__statusWatch) window.__statusWatch.disconnect();
+      window.__statusWatch = new MutationObserver(() => { const t = (el.textContent || '').trim(); if (t && window.__statusSaid[window.__statusSaid.length - 1] !== t) window.__statusSaid.push(t); });
+      window.__statusWatch.observe(el, { childList: true, characterData: true, subtree: true });
+    });
+    const statusSaid = (page) => page.evaluate(() => (window.__statusSaid || []).slice());
+    /** Two boxes side by side, straight into the log: a layout the drawing alone makes a page. */
+    const twoBoxes = (page) => page.evaluate(() => {
+      const s = window.__mm.session;
+      const line = (a, b, n = 40) => Array.from({ length: n }, (_, i) => ({ x: a.x + ((b.x - a.x) * i) / (n - 1), y: a.y + ((b.y - a.y) * i) / (n - 1) }));
+      const box = (x, y) => [...line({ x, y }, { x: x + 220, y }), ...line({ x: x + 220, y }, { x: x + 220, y: y + 140 }), ...line({ x: x + 220, y: y + 140 }, { x, y: y + 140 }), ...line({ x, y: y + 140 }, { x, y })];
+      let t = Date.now();
+      const add = (pts) => { s.addStroke(pts, (t += 40), undefined, 1); const st = s.getState(); return st.contentIds[st.contentIds.length - 1]; };
+      return [add(box(500, 200)), add(box(760, 200))];
+    });
+    const sendBrief = async (page, ids, text) => {
+      await holdIds(page, ids);
+      await page.fill('#summon input.filter', text);
+      await sleep(150);
+      await page.press('#summon input.filter', 'Enter');
+    };
+
+    await record('M42', async () => {
+      await p7.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
+      await sleep(150);
+      const ids = await twoBoxes(p7);
+      await sleep(150);
+      const drawn = await p7.evaluate((list) => window.__mm.session.read(list).genre.genre, ids);
+      await watchStatus(p7);
+      const before = house().length, chatsBefore = chats().length;
+      const eventsBefore = await p7.evaluate(() => window.__mm.session.getEvents().length);
+      stub.systemOneLead('program');
+      try {
+        await sendBrief(p7, ids, 'a timer that counts down from ten');
+        const end = Date.now() + 10000;
+        while (Date.now() < end && chats(chatsBefore).length < 1) await sleep(60);
+        await sleep(600);
+      } finally { stub.systemOneLead(null); }
+      const calls = house(before);
+      const body = calls[0] && calls[0].body;
+      const q1 = body && body.questions.q1;
+      const asked = chats(chatsBefore);
+      const said = await statusSaid(p7);
+      const firstWriterAt = asked[0] ? asked[0].at : Infinity;
+      const added = await p7.evaluate((n) => window.__mm.session.getEvents().slice(n).map((e) => e.type + (e.type === 'propose' ? ':' + (e.reps || []).map((r) => r.modality).join('+') : '')), eventsBefore);
+      check(`M42. a brief's Enter asks the decider first — one body, its options ${q1 ? Object.keys(q1.criteria).join(', ') : '?'}, the brief in its state — and, sure of a program, a program is written where the drawing (${drawn}) would have made a page: ${said.filter((x) => /Clef-flash|wr|build/.test(x)).slice(0, 4).join(' | ')}`,
+        drawn === 'layout' && calls.length === 1 && !!q1 && JSON.stringify(Object.keys(q1.criteria)) === '["page","program","answer","none_of_these"]' && /a timer that counts down from ten/.test(body.state) &&
+          calls[0].at <= firstWriterAt && asked.length >= 1 && said.some((x) => /^Clef-flash says a program \(0\.99\) — so it makes that/.test(x)) &&
+          said.some((x) => /could not write it|wrote /.test(x)) && !said.some((x) => /could not build|built /.test(x)) && !added.some((x) => /decision/.test(x)),
+        { calls: calls.length, criteria: q1 && Object.keys(q1.criteria), said, asked: asked.map((c) => c.job), added });
+      await letGo(p7);
+    });
+
+    await record('M43', async () => {
+      await p7.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
+      await sleep(150);
+      let ids = await twoBoxes(p7);
+      await sleep(150);
+      await watchStatus(p7);
+      stub.decideAt(0.97);
+      stub.systemOneLead('program');
+      const before = house().length, chatsBefore = chats().length;
+      try {
+        await sendBrief(p7, ids, 'an invoice for the corner shop');
+        const end = Date.now() + 10000;
+        while (Date.now() < end && chats(chatsBefore).length < 1) await sleep(60);
+        await sleep(600);
+      } finally { stub.decideAt(0.995); stub.systemOneLead(null); }
+      const said = await statusSaid(p7);
+      const arts = await p7.evaluate(() => window.__mm.session.getState().artifacts.length);
+      check(`M43. under the floor the drawing decides — ${said.filter((x) => /Clef-flash/.test(x)).join(' | ').slice(0, 160)} — and a page is built`,
+        house(before).length === 1 && said.some((x) => /^Clef-flash is only 0\.97 sure of a program — under 0\.99, so the drawing decides: a page/.test(x)) && arts >= 1 &&
+          !said.some((x) => /could not write it|wrote /.test(x)),
+        { said, arts });
+      await letGo(p7);
+      await p7.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
+      await sleep(150);
+      ids = await twoBoxes(p7);
+      const before2 = house().length;
+      await sendBrief(p7, ids, 'run: a spinner that turns');
+      await sleep(800);
+      check('M43b. a prefix says what a brief makes: `run:` asks no decider', house(before2).length === 0, { calls: house(before2).length });
       await letGo(p7);
     });
   } catch (err) {

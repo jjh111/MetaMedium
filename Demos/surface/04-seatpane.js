@@ -268,29 +268,32 @@
    * (core's decisionStateOf); what is sent is the question, its options and that state, to the decider's address alone.
    */
   function runDecision(job) {
-    if (!decider) { say('no decider is seated — choose one under models'); return false; }
+    const done = (of, stopped) => { if (job.done) job.done(of, !!stopped); };
+    if (!decider) { say('no decider is seated — choose one under models'); done(null); return false; }
     const d = decider;
     const ids = job.ids;
-    const key = 'decide:' + agentKey(d.pseudo) + ':' + ids.join('+');
+    const key = 'decide:' + agentKey(d.pseudo) + ':' + (job.key || ids.join('+'));
     const ctl = new AbortController();
     workControllers.set(key, ctl);
     say(d.name + ' is ' + job.asking + '…');
-    withWork(key, ids, d.name + ' · choosing', d.seat.ask([job.question], Date.now(), ctl.signal, job.state)).then((run) => {
-      if (ctl.signal.aborted) return;
+    withWork(key, job.workOn || ids, d.name + ' · choosing', d.seat.ask([job.question], Date.now(), ctl.signal, job.state)).then((run) => {
+      if (ctl.signal.aborted) { done(null, true); return; }
       const t = (x) => Number(x).toFixed(2);
-      let ok = false, said;
+      let ok = false, said, chosen = null;
       if (!run.ok) said = d.name + ' could not decide — ' + run.error;
       else if (run.refused) said = d.name + ' answered, but ' + run.refused + ' — nothing was held';
-      else if (!run.rows.length) said = d.name + ' gave no answer that could be read' + (run.notes && run.notes.length ? ' (' + run.notes[0].replace(/^q\d+: /, '') + ')' : '') + ' — the engine’s ranking stands';
+      else if (!run.rows.length) said = d.name + ' gave no answer that could be read' + (run.notes && run.notes.length ? ' (' + run.notes[0].replace(/^q\d+: /, '') + ')' : '') + ' — ' + job.otherwise;
       else {
         const row = run.rows[0], a = row.answer;
         const lead = a.kind === 'choice' ? (a.distribution.slice().sort((x, y) => y.p - x.p)[0] || { of: '?', p: 0 }) : { of: '?', p: 0 };
         const word = lead.of === MM.NO_MATCH ? 'none of these' : job.word(lead.of);
+        // Sure: picked out, past the floor (DECIDER_TAKE_AT), and something other than none of these.
+        const sure = !row.flat && !row.below && !row.none;
         // A sure none of these holds no reading (the audit's S5): said as nothing held, before anything else.
-        if (row.none && !row.below) { ok = true; said = d.name + ' says none of these (' + t(lead.p) + ') — nothing held, the engine’s ranking stands'; }
-        else if (row.held) { ok = true; said = d.name + ' says ' + word + ' (' + t(lead.p) + ') — ' + job.held; }
-        else if (row.below) said = d.name + ' is only ' + t(lead.p) + ' sure of ' + word + ' — under ' + MM.DECIDER_TAKE_AT + ', so the engine’s ranking stands';
-        else if (row.flat) said = d.name + ' could not tell ' + job.about + ' apart — the engine’s ranking stands';
+        if (row.none && !row.below) { ok = true; said = d.name + ' says none of these (' + t(lead.p) + ') — nothing taken, ' + job.otherwise; }
+        else if (sure && (job.holds === false || row.held)) { ok = true; chosen = lead.of; said = d.name + ' says ' + word + ' (' + t(lead.p) + ') — ' + job.held; }
+        else if (row.below) said = d.name + ' is only ' + t(lead.p) + ' sure of ' + word + ' — under ' + MM.DECIDER_TAKE_AT + ', so ' + job.otherwise;
+        else if (row.flat) said = d.name + ' could not tell ' + job.about + ' apart — ' + job.otherwise;
         else said = d.name + ' says ' + word + ' (' + t(lead.p) + ')';
       }
       // The row keeps what the CALL came to — a seat that answered under the floor answered — and the status line says what that meant.
@@ -299,6 +302,7 @@
       render(session.getState());
       refreshPalette();
       renderSeats();
+      done(chosen);
     }).finally(() => workControllers.delete(key));
     return true;
   }
@@ -320,6 +324,7 @@
       asking: 'choosing between ' + data.candidates.map((c) => c.id).join(' and '),
       word: (of) => '“' + readingWords(of) + '”',
       held: 'held beside the engine’s readings, which stand',
+      otherwise: 'the engine’s ranking stands',
       about: data.candidates.map((c) => c.id).join(' and '),
     });
   }
@@ -338,7 +343,37 @@
       asking: 'deciding which kind of diagram this is',
       word: (of) => 'it is ' + named(of),
       held: 'held as its decision; the drawing can be made Mermaid now',
+      otherwise: 'the engine’s ranking stands',
       about: 'the kinds of diagram',
+    });
+  }
+
+  /**
+   * What should this brief make? (the audit's D3) — asked on the Enter that sends a brief, before any writer is asked,
+   * when a decider is seated and no prefix said it (`page:`, `run:` …): a page, a program, a Mermaid diagram (only when
+   * the marks read as one: `opts.diagram`, its words), a text answer, or none of these. Nothing is held on the board —
+   * the answer chooses what is made, and only when it is sure (DECIDER_TAKE_AT); else what the drawing says stands
+   * (`opts.otherwise`, its words). `done(kind | null, stopped)` always follows: the kind taken, or null.
+   */
+  function askDeciderBrief(sum, brief, opts, done) {
+    const s = session.getState();
+    const ids = sum.enclosedIds.filter((id) => s.contentIds.includes(id));
+    const question = MM.briefQuestion({ diagram: opts.diagram || null });
+    const words = {};
+    for (const c of question.candidates) words[c.id] = MM.BRIEF_KIND_WORDS[c.id] || c.id;
+    return runDecision({
+      ids: ids,
+      key: 'brief:' + sum.id,
+      workOn: sum.enclosedIds,
+      question: question,
+      state: MM.decisionStateOf(s, ids, { reading: ids.length ? session.read(ids) : undefined, lead: ['The brief typed: “' + brief.slice(0, 500) + '”'] }),
+      asking: 'deciding what the brief should make',
+      word: (of) => words[of] || of,
+      holds: false,
+      held: 'so it makes that',
+      otherwise: 'the drawing decides: ' + opts.otherwise,
+      about: 'what to make',
+      done: done,
     });
   }
 

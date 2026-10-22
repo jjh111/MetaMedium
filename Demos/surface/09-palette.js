@@ -13,7 +13,7 @@
 //   applyLibrary, targetOf); renderSummon/refreshPalette/paintField.
 // Uses: core (hand, lastPen), ui, field (readFieldCommand, verbFor, libraryMatch, typedWord — pure,
 //   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading,
-//   askModelsAbout, offerModel), seatpane (writers, readers, deciderHost, askDecider, askDeciderNotation — who is asked, by seat), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
+//   askModelsAbout, offerModel), seatpane (writers, readers, deciderHost, askDecider, askDeciderNotation, askDeciderBrief — who is asked, by seat), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
 //   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
 //   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
 //   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
@@ -1183,8 +1183,11 @@
   }
 
   /** What a brief asks for: a page (a layout of regions) or a program (anything else), unless it says. */
+  /** A prefix that says what a brief makes (`page:`, `run:`, `program:`, `new:`): targetOf reads it, and with one no decider is asked. */
+  const TARGET_PREFIX = /^(page|run|program|new)\s*:\s*/i;
+
   function targetOf(sum, prompt) {
-    const m = /^(page|run|program|new)\s*:\s*/i.exec(prompt);
+    const m = TARGET_PREFIX.exec(prompt);
     const brief = m ? prompt.slice(m[0].length).trim() : prompt;
     if (m) return { target: m[1].toLowerCase() === 'page' ? 'page' : 'program', brief: brief, fresh: m[1].toLowerCase() === 'new' };
     const s = session.getState();
@@ -1272,13 +1275,57 @@
 
   function runPrompt(sum, prompt, revising) {
     if (alreadyUnderWay(sum)) return;
+    // What the brief should make (the audit's D3): with a decider seated, it is asked on this Enter, before any writer —
+    // never on a revision, never when a prefix said it. Only a sure answer is taken; else the drawing decides, as before.
+    if (!revising && deciderHost() && !TARGET_PREFIX.test(prompt)) {
+      const s = session.getState();
+      const marks = sum.enclosedIds.filter((id) => s.contentIds.includes(id));
+      const diagram = marks.length >= 2 && !marks.some((id) => s.artifacts.includes(id)) ? MM.mermaidFor(s, marks, (id) => { const n = s.nodes.get(id); return !!n && isRead(n); }) : null;
+      const drawn = targetOf(sum, prompt);
+      askDeciderBrief(sum, prompt, { diagram: diagram ? MM.describeNotation(diagram.reading) : null, otherwise: drawn.target === 'page' ? 'a page' : 'a program' }, (kind, stopped) => {
+        if (stopped) { releasePrompted(); say('stopped — nothing was made'); return; }
+        const now = session.getState();
+        if (!now.summon || now.summon.id !== sum.id) { releasePrompted(); say('the field that sent the brief has closed — nothing was made'); return; }
+        if (kind === 'mermaid' && diagram) { mermaidFromBrief(); return; }
+        if (kind === 'answer') { answerBrief(sum, prompt); return; }
+        runPromptAs(sum, prompt, false, kind === 'page' || kind === 'program' ? kind : null);
+      });
+      return;
+    }
+    runPromptAs(sum, prompt, revising, null);
+  }
+
+  /** The decider said the brief is a Mermaid diagram: the Mermaid tool's own act on the marks held, as its pill takes it. */
+  function mermaidFromBrief() {
+    const scope = fieldScope(session.getState(), '', null);
+    const o = MM.offersFor(scope).find((x) => x.tool === 'mermaid');
+    if (!o) { releasePrompted(); say('the marks no longer read as a diagram — nothing was made'); return; }
+    paletteScope = scope;
+    takeOffer(o);
+    // The Mermaid stands beside the marks and the field stays on them, ready for the next act: the brief was one act, and is done.
+    releasePrompted();
+    const f = fieldInput();
+    if (f) { f.disabled = false; f.value = ''; }
+  }
+
+  /** The decider said the brief is a question: it is asked of the writers, its answer beside the marks — or kept for one. */
+  function answerBrief(sum, prompt) {
+    if (writers().length) { runAsk(sum, prompt); return; }
+    releasePrompted();
+    keepAsk({ what: 'An answer', needs: 'model', need: 'needs a model', ids: sum.enclosedIds.slice(),
+      sentence: 'An answer needs a model to write it — kept: it runs when one joins · choose one under models',
+      run: () => runAsk(sum, prompt) });
+  }
+
+  /** A brief, made as `decided` says (`page` | `program`) or, with nothing decided, as the drawing says (`targetOf`). */
+  function runPromptAs(sum, prompt, revising, decided) {
     const at = Date.now();
     let artifactId, addressed;
 
     // A brief the library already answers is not sent anywhere: the entry is
     // reused. The model is asked only for what nothing here does (the
     // conservation John asked for — the library grows, the bloat does not).
-    const want = revising ? null : targetOf(sum, prompt);
+    const want = revising ? null : decided ? { target: decided, brief: prompt, fresh: false } : targetOf(sum, prompt);
     if (want && want.target === 'program') {
       const entry = want.fresh ? null : libraryMatch(want.brief, libraryEntries(session.getState()));
       if (entry) { applyLibrary(sum, entry); return; }

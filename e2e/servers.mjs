@@ -226,14 +226,14 @@ function decideReply(userContent, p) {
  * `probabilities` by level; a noul's `value`) or `B` (a list of `{ option, p }`; a score's numbers in order; a noul as a
  * bare number) — the spellings core's reader takes (`llm/fixtures/systemone-replies.json`, written by hand).
  */
-function systemOneReply(body, p, spelling) {
+function systemOneReply(body, p, spelling, forced) {
   const answers = {};
   const decided = [];
   for (const [name, q] of Object.entries((body && body.questions) || {})) {
     if (q.type === 'noul') { answers[name] = spelling === 'B' ? p : { type: 'noul', value: p }; decided.push({ id: name, lead: 'yes', p }); continue; }
     const keys = q.type === 'score' ? (q.criteria || []).slice() : Object.keys(q.criteria || {});
     const named = keys.filter((k) => k !== 'none_of_these');
-    const lead = (named.length ? named : keys)[(named.length ? named : keys).length - 1];
+    const lead = forced && keys.includes(forced) ? forced : (named.length ? named : keys)[(named.length ? named : keys).length - 1];
     const share = (k) => (k === lead ? p : (1 - p) / Math.max(1, keys.length - 1));
     decided.push({ id: name, lead, p });
     if (q.type === 'score') answers[name] = spelling === 'B' ? { probabilities: keys.map(share) } : { type: 'score', score: keys.indexOf(lead), probabilities: Object.fromEntries(keys.map((k) => [k, share(k)])), confidence: p };
@@ -301,6 +301,7 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
   const systemOne = [];
   let systemOneSpelling = 'A';
   let systemOneRefusal = null;   // { status, error }: what the next calls are refused with, as the relay says it
+  let systemOneForced = null;    // the option that leads from now on, where a question offers it
   // The reader of notes (I8): how long it takes to answer a sheet, and a line it leaves out of its reply (0: none).
   let readDelayMs = 0;
   let readSkipLine = 0;
@@ -325,7 +326,7 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
       systemOne.push({ at: Date.now(), raw, body, origin: req.headers.origin || null, authorization: req.headers.authorization || null, cookie: req.headers.cookie || null, referer: req.headers.referer || null });
       if (!body) { send(400, { ok: false, error: 'the body is not JSON' }); return; }
       if (systemOneRefusal) { send(systemOneRefusal.status, { ok: false, error: systemOneRefusal.error }); return; }
-      const r = systemOneReply(body, decideP, systemOneSpelling);
+      const r = systemOneReply(body, decideP, systemOneSpelling, systemOneForced);
       decisions.push(...r.decided.map((d) => ({ ...d, via: 'systemone' })));
       send(200, { ok: true, model: body.model, ms: 4, answers: r.answers });
       return;
@@ -414,6 +415,8 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
     systemOne: () => systemOne.map((c) => ({ ...c })),
     /** How the stub's System One replies are spelled from now on: 'A' (the default) or 'B'. */
     systemOneSpelling: (x) => { systemOneSpelling = x; },
+    /** The option that leads the house decider's answers from now on, where a question offers it (null: the last that is not none of these). */
+    systemOneLead: (key) => { systemOneForced = key || null; },
     /** Refuse the house decider's next calls as the relay would (`{ status, error }`), or null to answer again. */
     systemOneRefuse: (r) => { systemOneRefusal = r || null; },
     /** How long the stub's reader takes to answer a sheet or a picture from now on, in ms (0: at once). */

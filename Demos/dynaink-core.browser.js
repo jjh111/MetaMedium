@@ -33,6 +33,8 @@ var DynaInkCore = (() => {
     BLANK_WORDS: () => BLANK_WORDS,
     BLOB_ASPECT: () => BLOB_ASPECT,
     BOX_FLOOR: () => BOX_FLOOR,
+    BRIEF_KIND_WORDS: () => BRIEF_KIND_WORDS,
+    BRIEF_QUESTION: () => BRIEF_QUESTION,
     BUILTIN_COMMAND_MARK: () => BUILTIN_COMMAND_MARK,
     BUILTIN_CONCEPTS: () => BUILTIN_CONCEPTS,
     BUILTIN_TOOLS: () => BUILTIN_TOOLS,
@@ -358,6 +360,7 @@ var DynaInkCore = (() => {
     boundsContain: () => boundsContain,
     boundsOf: () => boundsOf,
     boundsOverlap: () => boundsOverlap,
+    briefQuestion: () => briefQuestion,
     briefText: () => briefText,
     buildGraph3D: () => buildGraph3D,
     buildGraphScaffold: () => buildGraphScaffold,
@@ -31994,6 +31997,24 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
         }
       }
     };
+  }
+
+  // src/participants/brief-kind.ts
+  var BRIEF_QUESTION = "brief-kind";
+  var BRIEF_KIND_WORDS = {
+    page: "a page",
+    program: "a program",
+    mermaid: "a Mermaid diagram",
+    answer: "a text answer"
+  };
+  function briefQuestion(options = {}) {
+    const candidates = [
+      { id: "page", text: "a page \u2014 the drawing\u2019s boxes as a web page, its words written into them" },
+      { id: "program", text: "a program \u2014 something that runs: it draws itself, moves, or answers the pointer" },
+      ...options.diagram ? [{ id: "mermaid", text: `a Mermaid diagram \u2014 the drawing said as diagram text; it reads as ${options.diagram}` }] : [],
+      { id: "answer", text: "a text answer \u2014 words that answer a question about the marks; nothing is made" }
+    ];
+    return choice(BRIEF_QUESTION, "what should this brief make from the marks held?", candidates, void 0, { reading: false });
   }
 
   // src/participants/router.ts
