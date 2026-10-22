@@ -2,9 +2,10 @@
 // carries why; the clock is log state, so it replays and undoes.
 
 import { describe, it, expect } from 'vitest';
-import { createSession } from './session';
+import { createSession, DEFAULT_SESSION_CONFIG } from './session';
 import { rectStroke, circleStroke, checkStroke } from '../test/strokes';
 import { LOCAL_PARTICIPANT } from './nodes';
+import { mergeLogs } from '../store/merge';
 
 function liveArtifact(s: ReturnType<typeof createSession>, kind: 'js' | 'html' = 'js') {
   s.addStroke(rectStroke(100, 100, 200, 120), 1000);
@@ -53,5 +54,31 @@ describe('clocks', () => {
     expect(copy.getState().clocks[id].playing).toBe(true);
     s.undo();
     expect(s.getState().clocks[id]).toBeUndefined();
+  });
+
+  it('clockAuthor names the PERSON who last set the clock, or null for this hand (C1)', () => {
+    // This hand plays its own program: nobody else, so null.
+    const mine = createSession();
+    const id = liveArtifact(mine);
+    expect(mine.clockAuthor(id)).toBeNull();
+    mine.clock({ nodeId: id, op: 'play', at: 6000 });
+    expect(mine.clockAuthor(id)).toBeNull();
+
+    // Another hand draws, blesses and plays a js in its own log; merged as a
+    // room merges, the reader reads the play as that person's — so a surface
+    // knows the program is playing for someone else before it runs it here.
+    const eve = createSession({ ...DEFAULT_SESSION_CONFIG, logName: 'eve~zz' });
+    const eid = liveArtifact(eve);
+    eve.clock({ nodeId: eid, op: 'play', at: 6000 });
+
+    const me = createSession({ ...DEFAULT_SESSION_CONFIG, logName: 'me~aa' });
+    me.load(mergeLogs({ 'me~aa': [], 'eve~zz': eve.getEvents() }, { me: 'me~aa' }));
+    const theId = Object.keys(me.getState().clocks)[0];
+    expect(me.getState().clocks[theId].playing).toBe(true);
+    expect(me.clockAuthor(theId)).toBe('eve');
+
+    // When this hand then plays it too, the last word is this hand's: null.
+    me.clock({ nodeId: theId, op: 'play', at: 7000 });
+    expect(me.clockAuthor(theId)).toBeNull();
   });
 });

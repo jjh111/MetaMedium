@@ -13748,6 +13748,17 @@ var DynaInkCore = (() => {
         const node = nodes.get(nodeId);
         return !!node && samePerson(authorOf(node), participantId ?? LOCAL_PARTICIPANT);
       },
+      clockAuthor: (nodeId) => {
+        for (let i = events.length - 1; i >= 0; i--) {
+          const ev = events[i];
+          if (ev.type === "clock" && ev.nodeId === nodeId) {
+            const pid = ev.participantId;
+            const hand = ev.by && (pid === void 0 || pid === LOCAL_PARTICIPANT) ? handId(ev.by) : pid ?? LOCAL_PARTICIPANT;
+            return hand === LOCAL_PARTICIPANT ? null : personOf(hand);
+          }
+        }
+        return null;
+      },
       teachCommandMark: (mark, at) => void dispatch({ type: "teach", mark, at }),
       use: (pack, at, participantId) => {
         const ref = typeof pack === "string" ? pack.trim() : String(pack);
