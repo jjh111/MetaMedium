@@ -26,6 +26,7 @@ import type { NotationReading } from '../notations/notation';
 import { routable, routeRepOf, tidyPlanOf } from '../diagram/route';
 import type { Session } from '../session/session';
 import type { Tool, ToolScope } from './tool';
+import { readingDecided } from './which-notation';
 
 /** A rank whose centres stand off one line by no more than this, in board units, is lined up already. */
 export const TIDY_TOLERANCE = 0.5;
@@ -33,10 +34,16 @@ export const TIDY_TOLERANCE = 0.5;
 /** Notations that are left as drawn: a sequence's messages run level between its lifelines. */
 const LEFT_AS_DRAWN = new Set(['sequence']);
 
-/** What a scope's marks are as a diagram with connectors to route: the reading, and what there is to do to it. */
+/**
+ * What a scope's marks are as a diagram with connectors to route: the reading, and what there is to do to it. A
+ * notation a decision seat is sure of for these marks (`which-notation.ts`) is read first, whatever its own
+ * confidence — the engine's reading in that notation; the connectors must still be tied to be routed.
+ */
 export function diagramOf(state: SessionState, ids: readonly string[]) {
-  for (const reading of notationsOf(state, ids)) {
-    if (reading.confidence < NOTATION_FLOOR || LEFT_AS_DRAWN.has(reading.notation)) continue;
+  const held = readingDecided(state, ids);
+  const readings = held ? [held.reading, ...notationsOf(state, ids).filter((r) => r.notation !== held.reading.notation)] : notationsOf(state, ids);
+  for (const reading of readings) {
+    if ((reading !== held?.reading && reading.confidence < NOTATION_FLOOR) || LEFT_AS_DRAWN.has(reading.notation)) continue;
     const tied = reading.connectors.map((c) => c.id).filter((id) => routable(state.nodes.get(id)!, state.nodes));
     if (!tied.length) continue;
     const toRoute = tied.filter((id) => !routeRepOf(state.nodes.get(id)!));

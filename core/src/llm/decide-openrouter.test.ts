@@ -61,10 +61,22 @@ describe('what is sent', () => {
     ]);
   });
 
-  it('is built by a wire the transport can swap — the native systemone shape is another wire, not another seat', () => {
+  it('is built by a chat wire the transport can swap — the native System One shape is another TRANSPORT (decide-systemone.ts), not a wire and not a seat', () => {
     expect(CHAT_DECIDE_WIRE.id).toBe('chat');
     expect(typeof CHAT_DECIDE_WIRE.build).toBe('function');
     expect(typeof CHAT_DECIDE_WIRE.parse).toBe('function');
+  });
+
+  it('carries the board’s state, in words, beside the questions when the seat is shown one — and none when it is not', async () => {
+    const { complete, sent } = says(R.sure.content);
+    const t = createChatDecideTransport(CONFIG, { complete });
+    await t([q1], { state: { text: 'five marks — three circles, two lines; “water” written beside them' } });
+    await t([q1], {});
+    const withState = JSON.parse(String(sent[0].messages[1].content));
+    expect(withState.state).toMatch(/water/);
+    expect(Object.keys(withState)).toEqual(['state', 'questions']);
+    expect(String(sent[0].messages[0].content)).toMatch(/"state"/);
+    expect(JSON.parse(String(sent[1].messages[1].content))).not.toHaveProperty('state');
   });
 });
 

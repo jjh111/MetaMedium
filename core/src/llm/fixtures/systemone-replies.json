@@ -1,0 +1,85 @@
+{
+  "_about": "The shapes a System One decision model's reply may take — Cloudflare's Clef, Clef-flash and Clef-omni on Workers AI, asked through dyna.ink's relay (POST /decide, which answers { ok, model, ms, answers }) — as the decision seat's System One transport reads them (llm/decide-systemone.ts). WRITTEN BY HAND, NOT RECORDED: no real reply has been seen where this was written (Cloudflare's pages, its API and the relay were all out of reach), so these are the spellings third-party write-ups describe — a choice's `choice`, `probabilities` and `confidence`; a score's `score`, `legend`, `probabilities` and `confidence`; a noul's probability of yes — and the spellings the reader must refuse. `scripts/record-systemone.mjs` records one real reply per question shape beside them; once it has run, the reader is narrowed to the real spelling. Every case answers the questions the test builds: q1 a choice between molecule and compound (none_of_these last), q2 a score over rough < neat < clean, q3 a noul. Read by the core tests and by the e2e stub (e2e/servers.mjs), never by the page.",
+  "spelling-a": {
+    "_note": "A map of probabilities by option key, the vendor's own pick and confidence; a score's legend place → level; a noul as an object with its value.",
+    "body": {
+      "ok": true, "model": "@cf/cloudflare/clef-flash", "ms": 41,
+      "answers": {
+        "q1": { "type": "choice", "choice": "molecule", "probabilities": { "molecule": 0.995, "compound": 0.004, "none_of_these": 0.001 }, "confidence": 0.97 },
+        "q2": { "type": "score", "score": 1.6, "legend": { "0": "rough", "1": "neat", "2": "clean" }, "probabilities": { "rough": 0.1, "neat": 0.2, "clean": 0.7 }, "confidence": 0.62 },
+        "q3": { "type": "noul", "value": 0.93 }
+      }
+    }
+  },
+  "spelling-b": {
+    "_note": "A list of { option, p }; a score's probabilities by place; a noul as a bare number.",
+    "body": {
+      "ok": true, "model": "@cf/cloudflare/clef-flash", "ms": 38,
+      "answers": {
+        "q1": { "distribution": [{ "option": "molecule", "p": 0.2 }, { "option": "none_of_these", "p": 0.8 }] },
+        "q2": { "probabilities": { "0": 0.6, "1": 0.3, "2": 0.1 } },
+        "q3": 0.4
+      }
+    }
+  },
+  "spelling-c": {
+    "_note": "A score's probabilities as a list of numbers in the levels' order; a noul's p_yes beside probabilities that agree.",
+    "body": {
+      "ok": true, "model": "@cf/cloudflare/clef", "ms": 77,
+      "answers": {
+        "q2": { "probabilities": [0.05, 0.15, 0.8], "legend": ["rough", "neat", "clean"] },
+        "q3": { "p_yes": 0.25, "probabilities": { "yes": 0.25, "no": 0.75 } }
+      }
+    }
+  },
+  "disagree": {
+    "_note": "Two spellings of one distribution that disagree, and two spellings of yes that disagree: both unanswered, never read one way.",
+    "body": {
+      "ok": true, "model": "@cf/cloudflare/clef-flash", "ms": 40,
+      "answers": {
+        "q1": { "probabilities": { "molecule": 0.9, "compound": 0.05, "none_of_these": 0.05 }, "distribution": [{ "option": "molecule", "p": 0.5 }, { "option": "none_of_these", "p": 0.5 }] },
+        "q3": { "p_yes": 0.9, "probabilities": { "yes": 0.2, "no": 0.8 } }
+      }
+    }
+  },
+  "vendor-none": {
+    "_note": "A choice that answers with an option nobody offered (the vendor's own none): unanswered.",
+    "body": { "ok": true, "model": "@cf/cloudflare/clef-flash", "ms": 39, "answers": { "q1": { "choice": "none", "probabilities": { "molecule": 0.4, "none": 0.6 }, "confidence": 0.6 } } }
+  },
+  "pick-only": {
+    "_note": "A pick and a confidence with no distribution, and a score as a number alone: unanswered — a distribution made out of a pick is a guess.",
+    "body": { "ok": true, "model": "@cf/cloudflare/clef-flash", "ms": 39, "answers": { "q1": { "choice": "molecule", "confidence": 0.9 }, "q2": { "score": 1.4, "confidence": 0.7 } } }
+  },
+  "pick-disagrees": {
+    "_note": "The vendor's own pick is not where its distribution leads: the distribution is read, and the disagreement said.",
+    "body": { "ok": true, "model": "@cf/cloudflare/clef-flash", "ms": 39, "answers": { "q1": { "choice": "compound", "probabilities": { "molecule": 0.7, "compound": 0.2, "none_of_these": 0.1 }, "confidence": 0.5 } } }
+  },
+  "off-sum": {
+    "_note": "A distribution that sums to 2: normalised, and said.",
+    "body": { "ok": true, "model": "@cf/cloudflare/clef-flash", "ms": 39, "answers": { "q1": { "probabilities": { "molecule": 1.0, "compound": 0.6, "none_of_these": 0.4 } } } }
+  },
+  "not-asked": {
+    "_note": "An answer to a question nobody asked, beside one that was: the stranger is left out and said.",
+    "body": { "ok": true, "model": "@cf/cloudflare/clef-flash", "ms": 39, "answers": { "q9": { "probabilities": { "a": 1 } }, "q3": { "value": 0.8 } } }
+  },
+  "no-answers": {
+    "_note": "A reply with no answers map at all.",
+    "body": { "ok": true, "model": "@cf/cloudflare/clef-flash", "ms": 39, "result": "molecule" }
+  },
+  "relay-429-limit": {
+    "status": 429,
+    "body": { "ok": false, "error": "too many decisions from here — try again in a minute; the engine’s ranking stands meanwhile" }
+  },
+  "relay-429-budget": {
+    "status": 429,
+    "body": { "ok": false, "error": "today’s decisions on dyna.ink are spent — the engine’s ranking stands" }
+  },
+  "relay-502": {
+    "status": 502,
+    "body": { "ok": false, "error": "clef-flash failed — InferenceUpstreamError: model is temporarily unavailable" }
+  },
+  "relay-504": {
+    "status": 504,
+    "body": { "ok": false, "error": "clef-flash did not answer in 10 s" }
+  }
+}

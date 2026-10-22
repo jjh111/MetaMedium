@@ -29,8 +29,9 @@ import { WHICH } from './which';
 import { TRACE } from './trace';
 import { REGION } from './region';
 import { LIKE } from './like';
+import { WHICH_NOTATION } from './which-notation';
 
-export const BUILTIN_TOOLS = [CORRECT, TEXT, NAME, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES, TEXT_EDIT, VERBS, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH, TRACE, REGION, LIKE] as const;
+export const BUILTIN_TOOLS = [CORRECT, TEXT, NAME, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES, TEXT_EDIT, VERBS, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH, TRACE, REGION, LIKE, WHICH_NOTATION] as const;
 
 registerTool(CORRECT);
 registerTool(TEXT);
@@ -57,3 +58,5 @@ registerTool(WHICH);
 registerTool(TRACE);
 registerTool(REGION);
 registerTool(LIKE);
+// Last, so the field's order before it stands (e2e 49's golden): offered only with a decider seated (the audit's D2).
+registerTool(WHICH_NOTATION);

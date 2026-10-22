@@ -49,8 +49,8 @@ function readsAsCircle(state: SessionState, ids: readonly string[]): boolean {
   return !!top && top.type === 'circle';
 }
 
-/** A diagram's reading of the scope, or null when it is no graph of tied nodes. */
-export function readDiagram(state: SessionState, scopeIds?: readonly string[]): NotationReading | null {
+/** The flowchart's reading of a scope that is nodes joined by connectors and no molecule, with what joins and what is tied; or null. */
+function graphOf(state: SessionState, scopeIds?: readonly string[]) {
   const r = readFlowchart(state, scopeIds);
   if (!r || r.symbols.length < 2 || !r.connectors.length) return null;
   const joined = r.connectors.filter((c) => c.from && c.to && c.from !== c.to);
@@ -58,18 +58,42 @@ export function readDiagram(state: SessionState, scopeIds?: readonly string[]): 
   // The molecule's: every node a circle.
   if (r.symbols.every((s) => readsAsCircle(state, s.ids))) return null;
   const tied = joined.filter((c) => c.ends.from.bound && c.ends.to.bound);
-  if (!tied.length) return null;
-  const share = tied.length / r.connectors.length;
-  const confidence = Math.min(MAX_TIER0_CONFIDENCE, NOTATION_FLOOR + TIED_LIFT * share);
   const nodes = r.symbols.length, links = r.connectors.length;
   const summary = `${countWord(nodes)} ${nodes === 1 ? 'node' : 'nodes'}, ${countWord(links)} ${links === 1 ? 'connector' : 'connectors'}`;
+  return { r, joined, tied, summary, links };
+}
+
+/** A diagram's reading of the scope, or null when it is no graph of tied nodes. */
+export function readDiagram(state: SessionState, scopeIds?: readonly string[]): NotationReading | null {
+  const g = graphOf(state, scopeIds);
+  if (!g || !g.tied.length) return null;
+  const share = g.tied.length / g.r.connectors.length;
+  const confidence = Math.min(MAX_TIER0_CONFIDENCE, NOTATION_FLOOR + TIED_LIFT * share);
   return {
-    ...r,
+    ...g.r,
     notation: DIAGRAM_NOTATION,
     name: 'Diagram',
     confidence,
-    summary,
-    reason: `${tied.length} of ${links} connectors tied at both ends to the nodes they join — no notation says more (as a flowchart: ${r.confidence.toFixed(2)})`,
+    summary: g.summary,
+    reason: `${g.tied.length} of ${g.links} connectors tied at both ends to the nodes they join — no notation says more (as a flowchart: ${g.r.confidence.toFixed(2)})`,
+  };
+}
+
+/**
+ * The same graph as a plain diagram whether or not its connectors are tied — what a decision seat may say a
+ * drawing is when no notation says it (*a plain diagram*, `tools/which-notation.ts`). Never read by the
+ * registry: its confidence is the flowchart's own, under the floor, and only a held decision makes it a
+ * reading anything acts on. Null for no graph of nodes, and for the molecule's.
+ */
+export function readPlainDiagram(state: SessionState, scopeIds?: readonly string[]): NotationReading | null {
+  const g = graphOf(state, scopeIds);
+  if (!g) return null;
+  return {
+    ...g.r,
+    notation: DIAGRAM_NOTATION,
+    name: 'Diagram',
+    summary: g.summary,
+    reason: `${g.joined.length} of ${g.links} connectors join two nodes, ${g.tied.length} tied at both ends — a plain diagram (as a flowchart: ${g.r.confidence.toFixed(2)})`,
   };
 }
 
