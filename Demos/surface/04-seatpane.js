@@ -263,9 +263,12 @@
   /**
    * Ask the seated decider ONE question over one snapshot — a deliberate tap, never on its own — and say what came of
    * it: held (sure, at DECIDER_TAKE_AT), under the floor (said, nothing taken), none of these (nothing held), flat, or a
-   * failure in full. `job`: { ids, question, state, asking (the line while it works), lead(word) → what to say of a
-   * held answer, about (what was chosen between, for the status line) }. The state is words, never ids
-   * (core's decisionStateOf); what is sent is the question, its options and that state, to the decider's address alone.
+   * failure in full. `job`: { ids, question, state, asking (what the status line says while it works), word(of) → the
+   * pick in words, held (what a sure answer comes to), otherwise (what stands when it is not sure), about (what was
+   * chosen between), holds (false: a sure answer is taken without being held on the board), done(of | null, stopped)
+   * (called once whatever came of it), key and workOn (the work's key and the marks its dot stands on) }. The state is
+   * words, never ids (core's decisionStateOf); what is sent is the question, its options and that state, to the
+   * decider's address alone.
    */
   function runDecision(job) {
     const done = (of, stopped) => { if (job.done) job.done(of, !!stopped); };
@@ -279,7 +282,7 @@
     withWork(key, job.workOn || ids, d.name + ' · choosing', d.seat.ask([job.question], Date.now(), ctl.signal, job.state)).then((run) => {
       if (ctl.signal.aborted) { done(null, true); return; }
       const t = (x) => Number(x).toFixed(2);
-      let ok = false, said, chosen = null;
+      let said, chosen = null;
       if (!run.ok) said = d.name + ' could not decide — ' + run.error;
       else if (run.refused) said = d.name + ' answered, but ' + run.refused + ' — nothing was held';
       else if (!run.rows.length) said = d.name + ' gave no answer that could be read' + (run.notes && run.notes.length ? ' (' + run.notes[0].replace(/^q\d+: /, '') + ')' : '') + ' — ' + job.otherwise;
@@ -290,8 +293,8 @@
         // Sure: picked out, past the floor (DECIDER_TAKE_AT), and something other than none of these.
         const sure = !row.flat && !row.below && !row.none;
         // A sure none of these holds no reading (the audit's S5): said as nothing held, before anything else.
-        if (row.none && !row.below) { ok = true; said = d.name + ' says none of these (' + t(lead.p) + ') — nothing taken, ' + job.otherwise; }
-        else if (sure && (job.holds === false || row.held)) { ok = true; chosen = lead.of; said = d.name + ' says ' + word + ' (' + t(lead.p) + ') — ' + job.held; }
+        if (row.none && !row.below) said = d.name + ' says none of these (' + t(lead.p) + ') — nothing taken, ' + job.otherwise;
+        else if (sure && (job.holds === false || row.held)) { chosen = lead.of; said = d.name + ' says ' + word + ' (' + t(lead.p) + ') — ' + job.held; }
         else if (row.below) said = d.name + ' is only ' + t(lead.p) + ' sure of ' + word + ' — under ' + MM.DECIDER_TAKE_AT + ', so ' + job.otherwise;
         else if (row.flat) said = d.name + ' could not tell ' + job.about + ' apart — ' + job.otherwise;
         else said = d.name + ' says ' + word + ' (' + t(lead.p) + ')';

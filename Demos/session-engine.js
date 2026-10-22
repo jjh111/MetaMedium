@@ -1540,10 +1540,10 @@
 //   an ask kept until a model that can answer it is here (keepAsk, keptFor, needFor), one local model suggested a job,
 //   and a model's name and a reading in words (modelWords, readingWords);
 //   (V1-PLAN I7) who is asked, by seat — writers() here, readers() in 06-handwriting.js, the rules in 03-seats.js, the pane,
-//   the keys and the decider in 04-seatpane.js.
+//   the keys and the decider in 04-seatpane.js; recordingTransport, a decision transport whose calls are kept for the
+//   decider's row (dyna.ink's own decider's).
 // Uses: core, ui, teach (togglePanel), render, palette (refreshPalette), input (say), seats (03-seats.js: the rules),
 //   seatpane (04-seatpane.js: assignSeat, joinDecider, keyFor, holdKey, commitKey, renderSeats, seatsOf).
-//   recordingTransport: a decision transport whose calls are kept for the decider's row (the house decider's).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -2618,9 +2618,12 @@
   /**
    * Ask the seated decider ONE question over one snapshot — a deliberate tap, never on its own — and say what came of
    * it: held (sure, at DECIDER_TAKE_AT), under the floor (said, nothing taken), none of these (nothing held), flat, or a
-   * failure in full. `job`: { ids, question, state, asking (the line while it works), lead(word) → what to say of a
-   * held answer, about (what was chosen between, for the status line) }. The state is words, never ids
-   * (core's decisionStateOf); what is sent is the question, its options and that state, to the decider's address alone.
+   * failure in full. `job`: { ids, question, state, asking (what the status line says while it works), word(of) → the
+   * pick in words, held (what a sure answer comes to), otherwise (what stands when it is not sure), about (what was
+   * chosen between), holds (false: a sure answer is taken without being held on the board), done(of | null, stopped)
+   * (called once whatever came of it), key and workOn (the work's key and the marks its dot stands on) }. The state is
+   * words, never ids (core's decisionStateOf); what is sent is the question, its options and that state, to the
+   * decider's address alone.
    */
   function runDecision(job) {
     const done = (of, stopped) => { if (job.done) job.done(of, !!stopped); };
@@ -2634,7 +2637,7 @@
     withWork(key, job.workOn || ids, d.name + ' · choosing', d.seat.ask([job.question], Date.now(), ctl.signal, job.state)).then((run) => {
       if (ctl.signal.aborted) { done(null, true); return; }
       const t = (x) => Number(x).toFixed(2);
-      let ok = false, said, chosen = null;
+      let said, chosen = null;
       if (!run.ok) said = d.name + ' could not decide — ' + run.error;
       else if (run.refused) said = d.name + ' answered, but ' + run.refused + ' — nothing was held';
       else if (!run.rows.length) said = d.name + ' gave no answer that could be read' + (run.notes && run.notes.length ? ' (' + run.notes[0].replace(/^q\d+: /, '') + ')' : '') + ' — ' + job.otherwise;
@@ -2645,8 +2648,8 @@
         // Sure: picked out, past the floor (DECIDER_TAKE_AT), and something other than none of these.
         const sure = !row.flat && !row.below && !row.none;
         // A sure none of these holds no reading (the audit's S5): said as nothing held, before anything else.
-        if (row.none && !row.below) { ok = true; said = d.name + ' says none of these (' + t(lead.p) + ') — nothing taken, ' + job.otherwise; }
-        else if (sure && (job.holds === false || row.held)) { ok = true; chosen = lead.of; said = d.name + ' says ' + word + ' (' + t(lead.p) + ') — ' + job.held; }
+        if (row.none && !row.below) said = d.name + ' says none of these (' + t(lead.p) + ') — nothing taken, ' + job.otherwise;
+        else if (sure && (job.holds === false || row.held)) { chosen = lead.of; said = d.name + ' says ' + word + ' (' + t(lead.p) + ') — ' + job.held; }
         else if (row.below) said = d.name + ' is only ' + t(lead.p) + ' sure of ' + word + ' — under ' + MM.DECIDER_TAKE_AT + ', so ' + job.otherwise;
         else if (row.flat) said = d.name + ' could not tell ' + job.about + ' apart — ' + job.otherwise;
         else said = d.name + ' says ' + word + ' (' + t(lead.p) + ')';
@@ -7961,10 +7964,10 @@
     return id;
   }
 
-  /** What a brief asks for: a page (a layout of regions) or a program (anything else), unless it says. */
   /** A prefix that says what a brief makes (`page:`, `run:`, `program:`, `new:`): targetOf reads it, and with one no decider is asked. */
   const TARGET_PREFIX = /^(page|run|program|new)\s*:\s*/i;
 
+  /** What a brief asks for: a page (a layout of regions) or a program (anything else), unless it says. */
   function targetOf(sum, prompt) {
     const m = TARGET_PREFIX.exec(prompt);
     const brief = m ? prompt.slice(m[0].length).trim() : prompt;

@@ -6,10 +6,10 @@
 //   an ask kept until a model that can answer it is here (keepAsk, keptFor, needFor), one local model suggested a job,
 //   and a model's name and a reading in words (modelWords, readingWords);
 //   (V1-PLAN I7) who is asked, by seat — writers() here, readers() in 06-handwriting.js, the rules in 03-seats.js, the pane,
-//   the keys and the decider in 04-seatpane.js.
+//   the keys and the decider in 04-seatpane.js; recordingTransport, a decision transport whose calls are kept for the
+//   decider's row (dyna.ink's own decider's).
 // Uses: core, ui, teach (togglePanel), render, palette (refreshPalette), input (say), seats (03-seats.js: the rules),
 //   seatpane (04-seatpane.js: assignSeat, joinDecider, keyFor, holdKey, commitKey, renderSeats, seatsOf).
-//   recordingTransport: a decision transport whose calls are kept for the decider's row (the house decider's).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.

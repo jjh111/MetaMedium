@@ -1184,10 +1184,10 @@
     return id;
   }
 
-  /** What a brief asks for: a page (a layout of regions) or a program (anything else), unless it says. */
   /** A prefix that says what a brief makes (`page:`, `run:`, `program:`, `new:`): targetOf reads it, and with one no decider is asked. */
   const TARGET_PREFIX = /^(page|run|program|new)\s*:\s*/i;
 
+  /** What a brief asks for: a page (a layout of regions) or a program (anything else), unless it says. */
   function targetOf(sum, prompt) {
     const m = TARGET_PREFIX.exec(prompt);
     const brief = m ? prompt.slice(m[0].length).trim() : prompt;
