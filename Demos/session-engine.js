@@ -681,9 +681,9 @@
       // A program runs in THIS tab only when this hand played it HERE (C1): the
       // log may say a clock is playing on every hand's board, but another
       // hand's play does not start arbitrary code in your tab — it stands as
-      // its source and offers *Play it here*. `playingHere` is the executing
-      // state; `playing` is what the log says, for the badge that it is playing
-      // for someone else.
+      // its source and offers *Play it here*. `playing` is the executing state
+      // (in the log AND consented here); `inLog` is what the log says, for the
+      // badge that it is playing for someone else.
       const inLog = !!(s.clocks[id] && s.clocks[id].playing);
       const playing = inLog && (kind !== 'run' || consentedHere(id));
       f.wrap.classList.toggle('playing', playing);
