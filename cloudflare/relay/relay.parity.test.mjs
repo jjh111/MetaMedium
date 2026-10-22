@@ -134,3 +134,85 @@ assetConformance(test, async (vars = {}) => {
   const { url, close } = await startDevRelay({ MM_RELAY_OPEN: '1', ...(vars.assetRoomBytes ? { MM_RELAY_ASSET_BYTES: String(vars.assetRoomBytes) } : {}) });
   return { url, close };
 });
+
+// ----- Rooms anyone opens, and names a hand claims: the Node relay and the Worker alike -----
+import { startRelay } from '../../Demos/relay.mjs';
+import { HAND_HEADER, CLAIM_WORDS } from '../../Demos/relay-protocol.mjs';
+
+/** Both relays, each on a free port, no keys asked: { name, url, close }. */
+const bothRelays = async () => {
+  const node = await startRelay(0, {});
+  const dev = await startDevRelay({ MM_RELAY_OPEN: '1' });
+  return [
+    { name: 'the Node relay', url: `http://127.0.0.1:${node.address().port}`, close: () => new Promise((r) => { node.closeAllConnections?.(); node.close(() => r()); }) },
+    { name: 'the Worker', url: dev.url, close: dev.close },
+  ];
+};
+
+test('both relays open a room for whoever asks — an `r-` name, no key where none is kept — and take a line under a claimed name only from its claimer', async () => {
+  for (const relay of await bothRelays()) {
+    try {
+      const res = await fetch(relay.url + '/rooms', { method: 'POST', headers: { origin: 'http://127.0.0.1:9' } });
+      assert.equal(res.status, 201, relay.name);
+      assert.equal(res.headers.get('cache-control'), 'no-store', relay.name);
+      const { room, key } = await res.json();
+      assert.match(room, /^r-[A-Za-z0-9_-]{22}$/, relay.name);
+      assert.equal(key, null, relay.name);
+      const line = (body, secret) => fetch(`${relay.url}/rooms/${room}/events`, { method: 'POST', headers: { 'content-type': 'application/json', ...(secret ? { [HAND_HEADER]: secret } : {}) }, body: JSON.stringify(body) });
+      assert.equal((await line({ participant: 'ada~1', events: [{ type: 'mine' }], at: 1 }, 'ada-secret-000000001')).status, 204, relay.name);
+      const forged = await line({ participant: 'ada~1', events: [], at: 9e12, full: true }, 'eve-secret-000000002');
+      assert.equal(forged.status, 409, relay.name);
+      assert.equal(await forged.text(), CLAIM_WORDS.taken, relay.name);
+      assert.equal((await line({ participant: 'ada~1', events: [], at: 9e12, full: true })).status, 409, relay.name + ': no secret');
+      assert.equal((await line({ participant: 'ada~1', events: [{ type: 'mine' }], at: 2, full: true, via: 'eve~1' }, 'eve-secret-000000002')).status, 204, relay.name + ': a copy handed on');
+      assert.equal((await line({ participant: 'old~1', events: [] })).status, 204, relay.name + ': a hand from before claims');
+      // A browser may send the secret: the preflight says so.
+      const pre = await fetch(`${relay.url}/rooms/${room}/events`, { method: 'OPTIONS', headers: { origin: 'http://127.0.0.1:9', 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type, ' + HAND_HEADER } });
+      assert.match(pre.headers.get('access-control-allow-headers') || '', new RegExp(HAND_HEADER), relay.name);
+    } finally { await relay.close(); }
+  }
+});
+
+test('over both relays, live-node\'s hands claim their names, a forged whole log in a hand\'s name is refused, and its marks stand on every board', async () => {
+  for (const relay of await bothRelays()) {
+    const stores = [];
+    try {
+      const { room } = await (await fetch(relay.url + '/rooms', { method: 'POST' })).json();
+      const ada = MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG, logName: 'ada~1' });
+      const a = new MM.LiveStore(relayTransport(relay.url, room), 'ada~1', room);
+      const b = new MM.LiveStore(relayTransport(relay.url, room, { hand: 'bob-secret-0000000001' }), 'bob~1', room);
+      stores.push(a, b);
+      await wait(100);
+      for (let i = 0; i < 3; i++) { ada.addStroke(boxAt(i * 80), 1000 + i, undefined, 1); await a.publish(ada.getEvents()); }
+      assert.ok(await until(async () => ((await b.readLogs())['ada~1'] || []).length === 3), relay.name + ': bob never held ada\'s three marks');
+      // Eve has the room's address (and every sitting id, which every line carries) and a hand of her own.
+      const eve = relayTransport(relay.url, room, { hand: 'eve-secret-0000000002' });
+      const forged = await eve.send({ participant: 'ada~1', events: [], at: 9e12, full: true, sid: a.sitting });
+      assert.deepEqual(forged, { ok: false, status: 409 }, relay.name);
+      const viaForged = await eve.send({ participant: 'ada~1', events: [], at: 9e12, full: true, sid: a.sitting, via: 'eve~1' });
+      assert.equal(viaForged.ok, true, relay.name + ': a copy under eve\'s own name goes through the relay…');
+      await wait(200);
+      assert.equal(((await b.readLogs())['ada~1'] || []).length, 3, relay.name + ': …and bob\'s board refused it: ada\'s marks stand');
+      assert.ok(b.notices().some((n) => /a copy of ada’s marks that would have taken some away was refused/.test(n)), JSON.stringify(b.notices()));
+      // A newcomer joining after holds all three too.
+      const c = new MM.LiveStore(relayTransport(relay.url, room), 'cleo~1', room);
+      stores.push(c);
+      c.hello();
+      assert.ok(await until(async () => ((await c.readLogs())['ada~1'] || []).length === 3), relay.name + ': the newcomer did not hold ada\'s marks');
+      eve.close();
+    } finally { for (const s of stores) s.close(); await relay.close(); }
+  }
+});
+
+test('the Worker with a secret: a room opened by POST /rooms is reached with the key it gave, and that key opens no other room', async () => {
+  const secret = 'parity-mint-secret';
+  const { url, close } = await startDevRelay({ MM_RELAY_SECRET: secret });
+  try {
+    const { room, key } = await (await fetch(url + '/rooms', { method: 'POST' })).json();
+    assert.equal(key, await keyForRoom(secret, room));
+    assert.equal((await checkRelay(url, room, { key })).ok, true);
+    assert.equal((await checkRelay(url, 'claude', { key })).status, 403);
+    const { room: other } = await (await fetch(url + '/rooms', { method: 'POST' })).json();
+    assert.equal((await checkRelay(url, other, { key })).status, 403);
+  } finally { await close(); }
+});

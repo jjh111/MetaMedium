@@ -458,19 +458,21 @@ try {
   }
   tab2.close();
 
-  // ===== Two hands under one name: BOTH are told (DIRECTOR-PLAN-W2 L1, D4) ====
-  // A second hand comes up under the MCP hand's own log name. The hand's
-  // store checks its own name before discarding any line, so the hand hears
-  // it, says so in every look, and answers the newcomer's hello — which is how
-  // the second hand hears it too.
+  // ===== Two hands under one name: the second is refused, and told (DIRECTOR-PLAN-W2 L1, D4; MU-5) ====
+  // A second hand comes up under the MCP hand's own log name. The relay keeps a
+  // name for the hand that claimed it first (its sitting's secret, x-dyna-hand —
+  // relay-protocol.mjs), so the second hand's lines are refused at the door and
+  // its store says why; the first hand never hears a line in its name, and its
+  // marks are as they were. (Two hands that send no secret — a hand from before
+  // claims, two tabs between which no relay stands — are still told of each other
+  // by the stores: core's live tests hold that.)
   const handLog = heard.filter(fromSmoke).map((h) => h.participant)[0];
   const twin = new MM.LiveStore(relayTransport(RELAY, ROOM), handLog, ROOM);
   twin.hello();
-  let t4 = '';
-  for (let i = 0; i < 30 && !/two hands are both called/.test(t4); i++) { t4 = textOf(await call('canvas_look', {})); if (!/two hands are both called/.test(t4)) await wait(100); }
-  check('a second hand under the hand\'s own name: canvas_look says so, before the marks', /\nroom says: two hands are both called "smoke~[^"]+" — this one/.test(t4), t4.split('\n').slice(0, 3));
-  await until(() => twin.collisions().length === 1, 3000);
-  check('and the second hand is told as well', twin.collisions().length === 1, twin.collisions());
+  await until(() => twin.notices().some((n) => /its name there is another hand’s/.test(n)), 3000);
+  check('a second hand under the hand\'s own name is refused by the relay, and told why', twin.notices().some((n) => /its name there is another hand’s/.test(n)), twin.notices());
+  const t4 = textOf(await call('canvas_look', {}));
+  check('and the hand itself hears no line in its name: its look says no two hands, its marks stand', !/two hands are both called/.test(t4) && /\d+ marks?/.test(t4), t4.split('\n').slice(0, 3));
   twin.close();
 
   // ===== A room older than the relay remembers (L1) ===========================

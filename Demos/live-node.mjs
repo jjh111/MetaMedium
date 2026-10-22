@@ -8,18 +8,45 @@
 // the address, which a log or a proxy may keep (a browser's EventSource cannot
 // set a header, so a tab sends `?key=`; the relay takes either). A relay that
 // refuses the key is said once, to the store, as `{ relay: 'refused', status }`
-// and not asked again: a wrong key does not mend itself.
+// and not asked again: a wrong key does not mend itself. A 503 is that only when
+// it is the relay's own word that it has no keys; any other 5xx is a hiccup, and
+// the stream is opened again from its last id.
+//
+// Every line this process posts carries its hand's secret (`x-dyna-hand`,
+// relay-protocol.mjs): minted once per process — one sitting — and sent nowhere
+// else, never in a line, a log or an address. The room keeps a hash of it against
+// the name the hand writes under, so no one else can write under that name. A
+// send answers `{ ok, status, retryAfter }`, so the store can send again what the
+// relay did not take (core's LiveStore).
 
 import http from 'node:http';
 import https from 'node:https';
 import { startRelay } from './relay.mjs';
+import { HAND_HEADER, mintHandSecret } from './relay-protocol.mjs';
 
 /** The Authorization header a key is sent as ({} for none). */
 export const keyHeaders = (key) => (key ? { authorization: 'Bearer ' + key } : {});
 
+/** This process's hand secret: one sitting, one secret, held in memory only. */
+const PROCESS_HAND = mintHandSecret();
+
+/** What a POST's answer says to the store: taken, or not and why — the body read and let go, so the socket is free. */
+async function sendResult(res) {
+  const retry = Number(res.headers.get('retry-after'));
+  await res.arrayBuffer().catch(() => undefined);
+  return res.ok ? { ok: true, status: res.status } : { ok: false, status: res.status, ...(retry > 0 ? { retryAfter: retry } : {}) };
+}
+
+/** Whether a 503 is the relay's own word that it keeps no keys (final), rather than a hiccup on the way. */
+export const relaySaysNoKeys = (body) => /no key configured/i.test(String(body || ''));
+
 export function relayTransport(url, room, opts = {}) {
   const base = url.replace(/\/+$/, '') + '/rooms/' + encodeURIComponent(room) + '/events';
   const auth = keyHeaders(opts.key);
+  // `hand: false` sends no secret, as a hand from before claims did; a test may pass one of its own.
+  const handSecret = opts.hand === false ? '' : (typeof opts.hand === 'string' && opts.hand) || PROCESS_HAND;
+  const posting = { 'content-type': 'application/json', ...auth, ...(handSecret ? { [HAND_HEADER]: handSecret } : {}) };
+  let wait = 1000;
   const mod = base.startsWith('https:') ? https : http;
   let cbs = [];
   let lastId = 0;
@@ -41,13 +68,21 @@ export function relayTransport(url, room, opts = {}) {
   const connect = () => {
     if (closed) return;
     req = mod.get(base, { headers: { ...auth, ...(lastId ? { 'last-event-id': String(lastId) } : {}) } }, (res) => {
-      // A refusal is final: said to the store, and the hand stops asking.
-      if ([401, 403, 503].includes(res.statusCode)) {
-        res.resume();
-        closed = true;
-        for (const cb of cbs) cb({ relay: 'refused', room, status: res.statusCode });
+      // A refusal is final: said to the store, and the hand stops asking. A 503 only when the relay says it has no keys.
+      if ([401, 403].includes(res.statusCode) || res.statusCode === 503) {
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', (c) => { if (body.length < 400) body += c; });
+        res.on('end', () => {
+          if (res.statusCode === 503 && !relaySaysNoKeys(body)) { if (!closed) retry = setTimeout(connect, (wait = Math.min(30000, wait * 2))); return; }
+          closed = true;
+          const reason = res.statusCode === 403 && /origin/i.test(body) ? { reason: 'origin' } : {};
+          for (const cb of cbs) cb({ relay: 'refused', room, status: res.statusCode, ...reason });
+        });
         return;
       }
+      if (res.statusCode >= 500) { res.resume(); if (!closed) retry = setTimeout(connect, (wait = Math.min(30000, wait * 2))); return; }
+      wait = 1000;
       let buf = '';
       res.setEncoding('utf8');
       res.on('data', (c) => {
@@ -62,7 +97,7 @@ export function relayTransport(url, room, opts = {}) {
   };
   connect();
   return {
-    send: (line) => fetch(base, { method: 'POST', headers: { 'content-type': 'application/json', ...auth }, body: JSON.stringify(line) }).then(() => undefined).catch(() => undefined),
+    send: (line) => fetch(base, { method: 'POST', headers: posting, body: JSON.stringify(line) }).then(sendResult, () => ({ ok: false, status: 0 })),
     onMessage: (cb) => { cbs.push(cb); return () => { cbs = cbs.filter((c) => c !== cb); }; },
     close: () => { closed = true; clearTimeout(retry); if (req) req.destroy(); },
   };

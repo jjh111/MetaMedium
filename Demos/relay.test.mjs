@@ -294,3 +294,148 @@ test('the protocol\'s asset address and verdicts: a hash is 64 lower-case hex di
   assert.equal((await assetCheck(Uint8Array.from([1, 2, 3]), sha(Uint8Array.from([1, 2, 3])), { held: 0, cap: 1e6 })).status, 415);
   assert.equal((await assetCheck(png, sha(png), { held: 1e6, cap: 1e6 })).status, 507);
 });
+
+// ----- What a room may let go of first, the rooms a relay opens, the names a hand claims, the floodgate -----
+import {
+  compact, isMintedRoom, mintRoomName, roomIdleDaysFrom, DEFAULT_ROOM_IDLE_DAYS, claimCheck, writerOf, handHashOf, mintHandSecret,
+  CLAIM_WORDS, MAX_HAND_NAME, spend, FLOOD,
+} from './relay-protocol.mjs';
+
+/** A seeded room of random lines: hands, fulls, appends, hellos and copies handed on, some ids already gone. */
+function randomRoom(seed, n = 40) {
+  let x = seed >>> 0;
+  const rand = () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 2 ** 32; };
+  const hands = ['ada', 'bob', 'cleo', 'dan'];
+  const lines = [];
+  for (let id = 1; id <= n; id++) {
+    const participant = hands[Math.floor(rand() * hands.length)];
+    const r = rand();
+    const line = r < 0.35 ? { participant, full: true } : r < 0.45 ? { participant, hello: true } : r < 0.55 ? { participant, full: true, via: hands[Math.floor(rand() * hands.length)] } : { participant };
+    lines.push({ id, data: JSON.stringify(line), participant, kind: kindOf(line) });
+  }
+  // Some of the oldest lines let go of by the cap, as a relay does.
+  const gone = Math.floor(rand() * 6);
+  return { name: 'r', clients: new Set(), lines: lines.slice(gone), dropped: gone, lost: gone };
+}
+
+test('compaction drops only what replay would never send: for every last-seen id, on two hundred random rooms, replay and its notice are unchanged', () => {
+  const ids = (ls) => ls.map((l) => l.id).join(',');
+  for (let seed = 1; seed <= 200; seed++) {
+    const r = randomRoom(seed);
+    const kept = { ...r, lines: compact(r.lines) };
+    assert.ok(kept.lines.length <= r.lines.length);
+    for (let after = 0; after <= 41; after++) {
+      assert.equal(ids(replay(kept, after)), ids(replay(r, after)), `seed ${seed}, after ${after}`);
+      assert.deepEqual(truncationNotice(kept, after) && { ...truncationNotice(kept, after), kept: 0 }, truncationNotice(r, after) && { ...truncationNotice(r, after), kept: 0 }, `seed ${seed}, after ${after}`);
+    }
+  }
+});
+
+test('compaction keeps each hand\'s newest own full, every append, hello and copy, in order', () => {
+  const r = room(
+    { participant: 'alice', full: true },               // 1 — superseded by 4
+    { participant: 'alice' },                           // 2
+    { participant: 'bob', full: true },                 // 3 — bob's newest
+    { participant: 'alice', full: true },               // 4 — alice's newest
+    { participant: 'alice', full: true, via: 'bob' },   // 5 — a copy: kept
+    { participant: 'carol', hello: true },              // 6
+  );
+  assert.deepEqual(compact(r.lines).map((l) => l.id), [2, 3, 4, 5, 6]);
+});
+
+test('a room\'s notice counts what was lost to its cap, never what was compacted away: a client past the last line lost is told nothing', () => {
+  const r = room({ participant: 'a', full: true }, { participant: 'a' }, { participant: 'a', full: true }, { participant: 'b' });
+  // Line 1 let go of by the cap (lost through 1), then line 3 superseded — none, here; compaction drops 1 if it were held.
+  const capped = { ...r, lines: r.lines.slice(1), dropped: 1, lost: 1 };
+  assert.equal(truncationNotice(capped, 1), null);
+  assert.ok(truncationNotice(capped, 0));
+  // With no `lost` said, the line before the first held stands for it, as it always did.
+  assert.equal(truncationNotice({ ...capped, lost: undefined }, 1), null);
+});
+
+test('a room a relay opens is named `r-` and 128 random bits, and only such a name ages out', () => {
+  const names = new Set();
+  for (let i = 0; i < 200; i++) names.add(mintRoomName());
+  assert.equal(names.size, 200);
+  for (const n of names) { assert.match(n, /^r-[A-Za-z0-9_-]{22}$/); assert.equal(isMintedRoom(n), true); }
+  for (const n of ['claude', 'table', '*', 'r-', 'r-short', 'r-' + 'a'.repeat(23), 'R-' + 'a'.repeat(22), 'r-' + 'a'.repeat(21) + '!', null, 42]) assert.equal(isMintedRoom(n), false, String(n));
+  assert.equal(roomIdleDaysFrom(undefined, {}), DEFAULT_ROOM_IDLE_DAYS);
+  assert.equal(roomIdleDaysFrom(undefined, { MM_RELAY_ROOM_IDLE_DAYS: '7' }), 7);
+  assert.equal(roomIdleDaysFrom(2, { MM_RELAY_ROOM_IDLE_DAYS: '7' }), 2);
+  assert.equal(roomIdleDaysFrom(undefined, { MM_RELAY_ROOM_IDLE_DAYS: 'soon' }), DEFAULT_ROOM_IDLE_DAYS);
+});
+
+test('a line\'s writer is the hand that sends it: a copy handed on is its sender\'s', () => {
+  assert.equal(writerOf({ participant: 'ada~1' }), 'ada~1');
+  assert.equal(writerOf({ participant: 'ada~1', full: true, via: 'bob~2' }), 'bob~2');
+  assert.equal(writerOf({ relay: 'truncated' }), '');
+  assert.equal(writerOf(null), '');
+});
+
+test('a hand\'s secret is kept as a hash, never as itself, and what is not one is said to be not one', async () => {
+  const s = mintHandSecret();
+  assert.match(s, /^[A-Za-z0-9_-]{22}$/);
+  assert.notEqual(mintHandSecret(), s);
+  const h = await handHashOf(s);
+  assert.match(h, /^[0-9a-f]{64}$/);
+  assert.ok(!h.includes(s));
+  assert.equal(await handHashOf(s), h);
+  assert.equal(await handHashOf(''), '');
+  assert.equal(await handHashOf(undefined), '');
+  assert.equal(await handHashOf('short'), null);
+  assert.equal(await handHashOf('has spaces in it, sixteen+'), null);
+});
+
+test('a name is claimed by the first hand that writes under it with a secret; another secret, or none, is refused under it', async () => {
+  const claims = new Map();
+  const ada = await handHashOf(mintHandSecret()), eve = await handHashOf(mintHandSecret());
+  // Ada's first line claims her name.
+  const first = claimCheck(claims, { participant: 'ada~1', events: [] }, ada);
+  assert.deepEqual(first, { ok: true, claim: 'ada~1' });
+  claims.set(first.claim, ada);
+  // Her next line, with the same secret, is taken and claims nothing more.
+  assert.deepEqual(claimCheck(claims, { participant: 'ada~1', events: [] }, ada), { ok: true });
+  // A whole log in her name from anyone else — with a secret of its own, or none — is refused, in words.
+  for (const hash of [eve, '']) {
+    const no = claimCheck(claims, { participant: 'ada~1', events: [], full: true }, hash);
+    assert.equal(no.ok, false);
+    assert.equal(no.status, 409);
+    assert.equal(no.words, CLAIM_WORDS.taken);
+  }
+  // Eve may hand on a copy of Ada's log under her own name (the store judges what a copy may change) — and her line claims Eve.
+  assert.deepEqual(claimCheck(claims, { participant: 'ada~1', events: [], full: true, via: 'eve~1' }, eve), { ok: true, claim: 'eve~1' });
+  claims.set('eve~1', eve);
+  // …but not as Ada handing it on, and not in Eve's name with Ada's secret.
+  assert.equal(claimCheck(claims, { participant: 'ada~1', events: [], full: true, via: 'eve~1' }, ada).status, 409);
+  // A hand from before claims, sending no secret, is taken under a name nobody holds, and claims nothing.
+  assert.deepEqual(claimCheck(claims, { participant: 'old-hand', events: [] }, ''), { ok: true });
+  // A bad secret, and a name too long to keep, are said; a line that names no writer (the relay's own word) is no one's.
+  assert.equal(claimCheck(claims, { participant: 'x' }, null).status, 400);
+  assert.equal(claimCheck(claims, { participant: 'x'.repeat(MAX_HAND_NAME + 1) }, ada).status, 400);
+  assert.deepEqual(claimCheck(claims, { relay: 'truncated' }, ada), { ok: true });
+  // An object of claims reads the same as a Map.
+  assert.equal(claimCheck({ 'ada~1': ada }, { participant: 'ada~1' }, eve).status, 409);
+});
+
+test('the floodgate: about thirty lines in ten seconds and eight million characters a minute, refilled as time passes, with when to ask again', () => {
+  let b;
+  let t = 1_000_000;
+  for (let i = 0; i < FLOOD.lines; i++) { const r = spend(b, t, 100); assert.equal(r.refused, null, 'line ' + i); b = r.bucket; }
+  const no = spend(b, t, 100);
+  assert.equal(no.refused.status, 429);
+  assert.ok(no.refused.retryAfter >= 1 && no.refused.retryAfter <= 1, 'one line comes back in a third of a second, said as 1 s: ' + no.refused.retryAfter);
+  assert.match(no.refused.words, /wait \d+ s/);
+  // A second later, three lines more.
+  t += 1000;
+  for (let i = 0; i < 3; i++) { const r = spend(b, t, 100); assert.equal(r.refused, null); b = r.bucket; }
+  assert.ok(spend(b, t, 100).refused);
+  // Characters: a 6.9M board carried in goes at once; another of the same in the same minute waits.
+  let c;
+  const big = spend(c, t, 6_900_000);
+  assert.equal(big.refused, null);
+  c = big.bucket;
+  const again = spend(c, t, 6_900_000);
+  assert.equal(again.refused.status, 429);
+  assert.ok(again.refused.retryAfter >= 40 && again.refused.retryAfter <= 60, String(again.refused.retryAfter));
+  assert.equal(spend(again.bucket, t + 60_000, 6_900_000).refused, null);
+});

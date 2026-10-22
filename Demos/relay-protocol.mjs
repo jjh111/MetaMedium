@@ -4,9 +4,18 @@
 // clock and no Node import — so the one definition is read by the Node relay
 // (Demos/relay.mjs) and by the Worker that carries the same protocol on
 // Cloudflare (cloudflare/relay/src/worker.mjs), and the two cannot drift.
+// Beside them: what a room may let go of first (`compact`), the rooms a relay
+// opens for anyone (`mintRoomName`, `isMintedRoom`), the names a hand claims
+// (`claimCheck`, `handHashOf`, `writerOf`) and a hand's floodgate (`spend`).
 
 /** How many lines a room keeps when nothing says otherwise. */
 export const DEFAULT_MAX_LINES = 5000;
+
+/**
+ * The largest line a POST may carry, in characters: past it a relay refuses the line whole (413). A hand's whole
+ * log longer than this goes as several lines (core's LiveStore cuts at LINE_CHARS, under it).
+ */
+export const MAX_LINE_CHARS = 4_000_000;
 
 /** The cap a relay runs with: the option, else MM_RELAY_MAX_LINES, else the default. */
 export function maxLinesFrom(option, env = {}) {
@@ -63,11 +72,159 @@ export function replay(room, after = 0) {
  * What a client is owed when the room has outlived its buffer: a line saying
  * so, rather than a beginning-less history handed over as complete. Null when
  * nothing was lost, or when everything this client missed is still held.
+ *
+ * `room.lost` is the id of the newest line the room let go of for good (its
+ * cap); with none, it is the line before the first one held, as it was before
+ * compaction. A line compacted away (`compact`) was never owed to anyone, so it
+ * does not count as lost.
  */
 export function truncationNotice(room, after = 0) {
   if (!room.dropped) return null;
-  if (after && room.lines.length && after >= room.lines[0].id - 1) return null;
+  const lost = Number.isFinite(room.lost) ? room.lost : room.lines.length ? room.lines[0].id - 1 : Infinity;
+  if (after && after >= lost) return null;
   return { relay: 'truncated', room: room.name, dropped: room.dropped, kept: room.lines.length };
+}
+
+/**
+ * The lines a room may let go of before it lets go of any history: the ones
+ * `replay` would never send to anyone. Those are a hand's own `full` lines
+ * that a newer own `full` of the same hand stands after — whoever connects,
+ * from whatever id, is sent the newer one and never the older (a client past
+ * the newer one is sent neither). Every newcomer's hello is answered by each
+ * hand with its whole log, so these are most of what a busy room holds.
+ * Pure: the lines kept, in order; replay of what is kept is replay of the
+ * lines, for every last-seen id (Demos/relay.test.mjs proves it on random rooms).
+ * A copy handed on (`relayed`) is never dropped here: replay sends every one.
+ */
+export function compact(lines) {
+  const newest = new Map();
+  for (const l of lines) if (l.kind === 'full') newest.set(l.participant, l.id);
+  return lines.filter((l) => l.kind !== 'full' || newest.get(l.participant) === l.id);
+}
+
+// ===== Rooms anyone may open, names a hand claims, and a room's floodgate ===============
+// A relay on the internet opens a room for anyone on the app's origins (`POST /rooms`): an unguessable
+// name and, where the relay keeps keys, that room's key. Such a room ages out once nobody has used it for
+// a while; a room named by hand (`claude`, a table) never does. In any room, a hand's name is claimed by
+// the hand that first writes under it, with a secret of its sitting (`x-dyna-hand`, never in a line, a
+// log or an address): a line under a name claimed by another secret is refused, so no one can write in
+// another's name — a whole log in another's name would replace theirs on every board. And a hand that
+// sends too much too fast is told to wait, rather than flushing the room's history out of its buffer.
+// Pure functions with no socket and no Node import, read by both servers.
+
+/** A room a relay opened (`POST /rooms`): `r-` and 22 base64url characters — 128 random bits. Only such a room ages out. */
+export const MINTED_ROOM = /^r-[A-Za-z0-9_-]{22}$/;
+export const isMintedRoom = (name) => typeof name === 'string' && MINTED_ROOM.test(name);
+
+const b64url = (bytes) => {
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+/** A new room's name: 16 random bytes, base64url, after `r-`. Never a name a person chose, never `*`. */
+export function mintRoomName(random = (n) => globalThis.crypto.getRandomValues(new Uint8Array(n))) {
+  return 'r-' + b64url(random(16));
+}
+
+/** How many days a room a relay opened is kept after it was last used, when nothing says otherwise. */
+export const DEFAULT_ROOM_IDLE_DAYS = 30;
+/** The idle days a relay runs with: the option, else MM_RELAY_ROOM_IDLE_DAYS, else the default. */
+export function roomIdleDaysFrom(option, env = {}) {
+  for (const v of [option, env.MM_RELAY_ROOM_IDLE_DAYS]) {
+    const n = Number(v);
+    if (v !== undefined && v !== '' && v !== null && Number.isFinite(n) && n > 0) return n;
+  }
+  return DEFAULT_ROOM_IDLE_DAYS;
+}
+
+/** The header a hand sends its sitting's secret in, with every line it posts. */
+export const HAND_HEADER = 'x-dyna-hand';
+/** A hand's secret: 16 to 128 base64url characters (a sitting mints 16 random bytes: 22). */
+const HAND_SECRET = /^[A-Za-z0-9_-]{16,128}$/;
+/** The longest name a hand writes under that a room keeps a claim for. */
+export const MAX_HAND_NAME = 200;
+
+/** A fresh secret for one sitting of a hand: 16 random bytes, base64url. Kept in memory only, by whoever mints it. */
+export function mintHandSecret(random = (n) => globalThis.crypto.getRandomValues(new Uint8Array(n))) {
+  return b64url(random(16));
+}
+
+/**
+ * What a room keeps of a hand's secret: its SHA-256, as 64 hex digits — '' when no secret was sent, null when what
+ * was sent is not one. The secret itself is never kept, and never said back.
+ */
+export async function handHashOf(value) {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value !== 'string' || !HAND_SECRET.test(value)) return null;
+  return sha256Of(new TextEncoder().encode('dyna-hand:' + value));
+}
+
+/** Who writes a line: the hand that posts it — a copy handed on is its sender's (`via`), anything else its participant's. */
+export function writerOf(line) {
+  if (!line || typeof line !== 'object') return '';
+  if (typeof line.via === 'string' && line.via) return line.via;
+  return typeof line.participant === 'string' ? line.participant : '';
+}
+
+/** The words for a line refused by a room's claims and its floodgate. */
+export const CLAIM_WORDS = {
+  taken: 'that name is another hand’s in this room — the line was not taken',
+  secret: 'what was sent as this hand’s secret is not one (16–128 letters, digits, - and _)',
+  long: 'a hand’s name in a room is at most ' + MAX_HAND_NAME + ' characters',
+};
+
+/**
+ * Whether a room takes a line from a hand, by the names its hands have claimed: `{ ok: true }`, `{ ok: true, claim }`
+ * when the line's writer is a name no one holds and the hand sent a secret (the room keeps `claim → hash` from now
+ * on — the first claim wins), or `{ ok: false, status, words }`.
+ *
+ *   claims  what the room holds: a Map (or an object) of name → the SHA-256 `handHashOf` made of its claimer's secret
+ *   line    the line, parsed
+ *   hash    `handHashOf(the x-dyna-hand header)`: '' when the line came with none, null when it came with a bad one
+ *
+ * The writer is `writerOf(line)`: a copy handed on (`via`) is judged as its SENDER's line, so a hand may hand on a
+ * departed hand's log; it may not write in that hand's own name (the store judges what a copy may change: it may
+ * only add to what is held). A line with no header is taken only under a name no one has claimed, so a hand from
+ * before claims still works in a room where nobody claims its name; it claims nothing.
+ */
+export function claimCheck(claims, line, hash) {
+  if (hash === null) return { ok: false, status: 400, words: CLAIM_WORDS.secret };
+  const writer = writerOf(line);
+  if (!writer) return { ok: true };
+  if (writer.length > MAX_HAND_NAME) return { ok: false, status: 400, words: CLAIM_WORDS.long };
+  const held = claims && (typeof claims.get === 'function' ? claims.get(writer) : Object.prototype.hasOwnProperty.call(claims, writer) ? claims[writer] : undefined);
+  if (held === undefined || held === null || held === '') return hash ? { ok: true, claim: writer } : { ok: true };
+  if (hash && hash === held) return { ok: true };
+  return { ok: false, status: 409, words: CLAIM_WORDS.taken };
+}
+
+/**
+ * How much a hand may send a room: a token bucket of lines and one of characters, each full to begin with and
+ * refilled at its rate — about 30 lines in 10 s and 8,000,000 characters a minute, with a burst of the same — so a
+ * hand drawing, or carrying a 2,000-mark board in, is never held back, and a hand flooding a room is.
+ */
+export const FLOOD = { lines: 30, linesMs: 10_000, chars: 8_000_000, charsMs: 60_000 };
+
+/**
+ * One line of `chars` characters from a hand whose bucket is `bucket` (undefined for a hand not heard before):
+ * `{ bucket, refused }` — the bucket as it stands after (or unspent, when refused), and null, or `{ status: 429,
+ * retryAfter, words }` with when to ask again, in seconds. Pure: the caller keeps the bucket.
+ */
+export function spend(bucket, now, chars, limits = FLOOD) {
+  const b = bucket
+    ? {
+      lines: Math.min(limits.lines, bucket.lines + ((now - bucket.at) * limits.lines) / limits.linesMs),
+      chars: Math.min(limits.chars, bucket.chars + ((now - bucket.at) * limits.chars) / limits.charsMs),
+      at: now,
+    }
+    : { lines: limits.lines, chars: limits.chars, at: now };
+  const need = Math.min(chars, limits.chars);
+  if (b.lines >= 1 && b.chars >= need) return { bucket: { lines: b.lines - 1, chars: b.chars - need, at: now }, refused: null };
+  const waitLines = b.lines >= 1 ? 0 : ((1 - b.lines) * limits.linesMs) / limits.lines;
+  const waitChars = b.chars >= need ? 0 : ((need - b.chars) * limits.charsMs) / limits.chars;
+  const retryAfter = Math.max(1, Math.ceil(Math.max(waitLines, waitChars) / 1000));
+  return { bucket: b, refused: { status: 429, retryAfter, words: 'this hand is sending more than a room takes at once — wait ' + retryAfter + ' s and send again' } };
 }
 
 // ===== Pictures in a room (PLAN-IPAD-NOTES A1) =========================================

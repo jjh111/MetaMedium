@@ -241,7 +241,9 @@ test('the app\'s origins are let in, and named, never a wildcard; another origin
   for (const origin of ['https://evil.example', 'https://dyna.ink.evil.example', 'http://localhost.evil.example', 'null']) {
     const res = await post(openEnv(), 'r', { participant: 'a' }, { headers: { origin } });
     assert.equal(res.status, 403, origin);
-    assert.equal(res.headers.get('access-control-allow-origin'), null);
+    // Refused with CORS headers of its own (RELAY-1), so that page can read why — and nothing else: no line was taken.
+    assert.equal(res.headers.get('access-control-allow-origin'), origin);
+    assert.match(await res.text(), /this origin may not use this relay/);
   }
 });
 
@@ -336,4 +338,199 @@ test('the Worker\'s own address for an asset is the room\'s, and a path that is 
   const env = openEnv();
   assert.equal((await worker.fetch(new Request(`${ORIGIN}/assets/${'ab'.repeat(32)}`), env)).status, 404);
   assert.equal((await worker.fetch(new Request(`${ORIGIN}/rooms/r/assets/${'ab'.repeat(32)}`, { method: 'DELETE' }), env)).status, 405);
+});
+
+// ----- Rooms anyone opens (POST /rooms), and how long they are kept -------------------
+
+const mint = (env, init = {}) => worker.fetch(new Request(`${ORIGIN}/rooms`, { method: init.method || 'POST', headers: { origin: 'https://dyna.ink', 'cf-connecting-ip': init.ip || '203.0.113.7', ...(init.headers || {}) } }), env);
+
+test('POST /rooms opens a room: an unguessable `r-` name, its key, how long it is kept — never cached, with CORS for the app', async () => {
+  const env = fakeEnv({ MM_RELAY_SECRET: SECRET });
+  const res = await mint(env);
+  assert.equal(res.status, 201);
+  assert.equal(res.headers.get('cache-control'), 'no-store');
+  assert.equal(res.headers.get('access-control-allow-origin'), 'https://dyna.ink');
+  const { room, key, idleDays } = await res.json();
+  assert.match(room, /^r-[A-Za-z0-9_-]{22}$/);
+  assert.equal(key, await keyForRoom(SECRET, room));
+  assert.equal(idleDays, 30);
+  const other = await (await mint(env)).json();
+  assert.notEqual(other.room, room);
+  // Its key opens it…
+  assert.equal((await post(env, room, { participant: 'a' }, { headers: { authorization: 'Bearer ' + key } })).status, 204);
+  // …and no other room: not another minted one, not a room named by hand.
+  assert.equal((await post(env, other.room, { participant: 'a' }, { headers: { authorization: 'Bearer ' + key } })).status, 403);
+  assert.equal((await post(env, 'claude', { participant: 'a' }, { headers: { authorization: 'Bearer ' + key } })).status, 403);
+  // A preflight is answered; a GET is not how a room is opened.
+  const pre = await mint(env, { method: 'OPTIONS' });
+  assert.equal(pre.status, 204);
+  assert.match(pre.headers.get('access-control-allow-methods'), /POST/);
+  assert.equal((await mint(env, { method: 'GET' })).status, 405);
+});
+
+test('opening rooms is counted: ten an hour from one address, then a 429 that says when, in words — another address may still', async () => {
+  const env = fakeEnv({ MM_RELAY_SECRET: SECRET });
+  for (let i = 0; i < 10; i++) assert.equal((await mint(env)).status, 201, 'room ' + (i + 1));
+  const no = await mint(env);
+  assert.equal(no.status, 429);
+  const retry = Number(no.headers.get('retry-after'));
+  assert.ok(retry >= 1 && retry <= 3600, String(retry));
+  assert.equal(no.headers.get('access-control-allow-origin'), 'https://dyna.ink');
+  assert.match(no.headers.get('access-control-expose-headers'), /retry-after/);
+  assert.match(await no.text(), /^this address has opened as many rooms as it may for now — try again in \d+ (seconds|minutes)$/);
+  assert.equal((await mint(env, { ip: '198.51.100.2' })).status, 201);
+});
+
+test('the relay\'s day is counted too: past MM_RELAY_MINT_PER_DAY in all, every address is told to wait', async () => {
+  const env = fakeEnv({ MM_RELAY_SECRET: SECRET, MM_RELAY_MINT_PER_DAY: '3' });
+  for (let i = 0; i < 3; i++) assert.equal((await mint(env, { ip: '192.0.2.' + i })).status, 201);
+  const no = await mint(env, { ip: '192.0.2.99' });
+  assert.equal(no.status, 429);
+  assert.match(await no.text(), /this relay has opened as many rooms as it may today/);
+  assert.ok(Number(no.headers.get('retry-after')) >= 1);
+});
+
+test('MM_RELAY_MINT=0 opens no rooms, a relay with no secret opens none, an open relay opens rooms with no key, and a foreign origin is refused with CORS', async () => {
+  const off = await mint(fakeEnv({ MM_RELAY_SECRET: SECRET, MM_RELAY_MINT: '0' }));
+  assert.equal(off.status, 503);
+  assert.match(await off.text(), /not opening new rooms/);
+  const none = await mint(fakeEnv());
+  assert.equal(none.status, 503);
+  assert.match(await none.text(), /MM_RELAY_SECRET/);
+  const open = await mint(fakeEnv({ MM_RELAY_OPEN: '1', MM_RELAY_ROOM_IDLE_DAYS: '7' }));
+  assert.equal(open.status, 201);
+  const body = await open.json();
+  assert.equal(body.key, null);
+  assert.equal(body.idleDays, 7);
+  const foreign = await worker.fetch(new Request(`${ORIGIN}/rooms`, { method: 'POST', headers: { origin: 'https://evil.example' } }), fakeEnv({ MM_RELAY_SECRET: SECRET }));
+  assert.equal(foreign.status, 403);
+  assert.equal(foreign.headers.get('access-control-allow-origin'), 'https://evil.example');
+  // With no Limits binding the route fails closed, and says so.
+  const env = fakeEnv({ MM_RELAY_SECRET: SECRET });
+  delete env.LIMITS;
+  const closed = await mint(env);
+  assert.equal(closed.status, 503);
+  assert.match(await closed.text(), /cannot count/);
+});
+
+test('a room the relay opened is forgotten once nobody has used it for its idle days: the alarm empties its storage, its memory and its streams', async () => {
+  const env = fakeEnv({ MM_RELAY_OPEN: '1' });
+  const { room } = await (await mint(env)).json();
+  const before = Date.now();
+  assert.equal((await post(env, room, { participant: 'ada~1', events: [{ type: 'mark' }] }, { headers: { 'x-dyna-hand': 'ada-secret-0123456789' } })).status, 204);
+  const png = pngOf(4);
+  assert.equal((await putAsset(env, room, png)).status, 204);
+  const storage = env.ROOMS.storages.get(room);
+  const day = 24 * 3600_000;
+  assert.ok(storage.alarm >= before + 30 * day - 3600_000 && storage.alarm <= Date.now() + 30 * day, 'the alarm is thirty days out: ' + (storage.alarm - before) / day);
+  assert.ok([...storage.map.keys()].some((k) => k.startsWith('h:')), 'the name was claimed');
+  // A stream open as the time comes is closed.
+  const ctl = new AbortController();
+  const res = await open(env, room, { signal: ctl.signal });
+  const reader = res.body.getReader();
+  await env.ROOMS.rooms.get(room).alarm();
+  assert.equal(storage.map.size, 0, 'storage holds ' + [...storage.map.keys()].join(' '));
+  let done = false;
+  for (let i = 0; i < 20 && !done; i++) { const r = await reader.read(); done = r.done; }
+  assert.equal(done, true, 'the stream was left open');
+  // What it held is gone from memory too: a newcomer hears nothing, the picture is not there, the name is anyone's.
+  const text = await readUntil(await open(env, room), (t) => t.includes(': hello'));
+  assert.ok(!text.includes('ada~1'), text);
+  assert.equal((await getAsset(env, room, sha(png))).status, 404);
+  assert.equal((await post(env, room, { participant: 'ada~1' }, { headers: { 'x-dyna-hand': 'another-secret-0123456' } })).status, 204);
+  ctl.abort();
+});
+
+test('a room named by hand is never forgotten: it sets no alarm, whatever it holds', async () => {
+  const env = openEnv();
+  await post(env, 'claude', { participant: 'a', events: [{ type: 'x' }] });
+  await post(env, 'r-not-a-minted-name', { participant: 'a', events: [{ type: 'x' }] });
+  assert.equal(env.ROOMS.storages.get('claude').alarm, null);
+  assert.equal(env.ROOMS.storages.get('r-not-a-minted-name').alarm, null);
+});
+
+test('each use moves a room\'s alarm out again, but no more than once an hour', async () => {
+  const env = openEnv();
+  const { room } = await (await mint(env)).json();
+  await post(env, room, { participant: 'a' });
+  const storage = env.ROOMS.storages.get(room);
+  const first = storage.alarm;
+  const puts = storage.writes.puts;
+  await post(env, room, { participant: 'a' });
+  assert.equal(storage.alarm, first, 'moved within the hour');
+  assert.equal(storage.writes.puts, puts + 1, 'one write for the line, none for the alarm');
+  env.ROOMS.rooms.get(room).alarmAt = first - 2 * 3600_000;   // as if the last use were two hours ago
+  await post(env, room, { participant: 'a' });
+  assert.ok(storage.alarm >= first, 'moved out again');
+});
+
+// ----- A hand's name is its own: claims, and the forged line --------------------------
+
+const hand = (secret) => ({ headers: { 'x-dyna-hand': secret } });
+const ADA = 'ada-sitting-secret-0001', EVE = 'eve-sitting-secret-0002';
+
+test('a name is claimed by the hand that writes under it first: its own lines are taken, a whole log in its name from anyone else is refused (409, in words)', async () => {
+  const env = openEnv();
+  assert.equal((await post(env, 'r', { participant: 'ada~1', events: [{ type: 'mine' }], at: 1, sid: 's-ada' }, hand(ADA))).status, 204);
+  assert.equal((await post(env, 'r', { participant: 'ada~1', events: [{ type: 'more' }], at: 2, sid: 's-ada' }, hand(ADA))).status, 204);
+  // Eve, with the room's key and Ada's sitting id (which every line carries), sends an empty whole log as Ada.
+  for (const init of [hand(EVE), {}]) {
+    const forged = await post(env, 'r', { participant: 'ada~1', events: [], at: 9e12, full: true, sid: 's-ada' }, init);
+    assert.equal(forged.status, 409);
+    assert.equal(await forged.text(), 'that name is another hand’s in this room — the line was not taken');
+  }
+  const text = await readUntil(await open(env, 'r'), (t) => t.includes('"more"'));
+  assert.ok(!text.includes('9000000000000'), 'the forged line was kept');
+  // Eve's own name is hers, and she may hand on a copy of Ada's log under it.
+  assert.equal((await post(env, 'r', { participant: 'eve~1', events: [], at: 3 }, hand(EVE))).status, 204);
+  assert.equal((await post(env, 'r', { participant: 'ada~1', events: [{ type: 'mine' }, { type: 'more' }], at: 2, full: true, via: 'eve~1' }, hand(EVE))).status, 204);
+  // A bad secret is said; the secret is never said back, nor kept.
+  const bad = await post(env, 'r', { participant: 'x~1' }, hand('no good'));
+  assert.equal(bad.status, 400);
+  const kept = JSON.stringify([...env.ROOMS.storages.get('r').map]);
+  assert.ok(!kept.includes(ADA) && !kept.includes(EVE), 'a secret was stored');
+});
+
+test('a hand from before claims — no secret — still writes under a name nobody holds, and the claims outlive the Durable Object', async () => {
+  const env = openEnv();
+  assert.equal((await post(env, 'r', { participant: 'old-mcp' })).status, 204);
+  assert.equal((await post(env, 'r', { participant: 'old-mcp' })).status, 204);
+  assert.equal((await post(env, 'r', { participant: 'ada~1' }, hand(ADA))).status, 204);
+  env.ROOMS.evict('r');
+  assert.equal((await post(env, 'r', { participant: 'ada~1' }, hand(EVE))).status, 409);
+  assert.equal((await post(env, 'r', { participant: 'ada~1' }, hand(ADA))).status, 204);
+});
+
+// ----- The floodgate, and what a room lets go of first ------------------------------------
+
+test('a hand that sends more than a room takes is told to wait (429, retry-after, words); another hand is not held back', async () => {
+  const env = openEnv();
+  let refused = null;
+  for (let i = 0; i < 40 && !refused; i++) {
+    const res = await post(env, 'r', { participant: 'eve~1', events: [{ type: 'spam' + i }] }, hand(EVE));
+    if (res.status === 429) refused = res;
+    else assert.equal(res.status, 204);
+  }
+  assert.ok(refused, 'forty lines at once were all taken');
+  assert.ok(Number(refused.headers.get('retry-after')) >= 1);
+  assert.match(await refused.text(), /wait \d+ s and send again/);
+  assert.equal((await post(env, 'r', { participant: 'ada~1', events: [{ type: 'fine' }] }, hand(ADA))).status, 204);
+});
+
+test('a room over its caps lets go first of what replay would never send — each hand\'s own whole logs a newer one stands after — and only then of history', async () => {
+  const env = openEnv({ MM_RELAY_MAX_BYTES: '200000' });
+  // Ada's twenty strokes, then every newcomer's hello answered with her whole log, again and again.
+  for (let i = 0; i < 20; i++) await post(env, 'r', { participant: 'ada~1', events: [{ type: 's' + i }], at: i + 1 }, hand(ADA));
+  for (let k = 0; k < 6; k++) await post(env, 'r', { participant: 'ada~1', events: [{ type: 'whole', pad: 'x'.repeat(40000), k }], at: 100 + k, full: true }, hand(ADA));
+  const text = await readUntil(await open(env, 'r'), (t) => t.includes('"k":5'));
+  assert.ok(!text.includes('truncated'), 'history was let go of while older whole logs stood: ' + text.slice(0, 300));
+  assert.ok(text.includes('"s0"') && text.includes('"s19"'));
+  const lines = [...env.ROOMS.storages.get('r').map.keys()].filter((k) => k.startsWith('m:'));
+  // Compaction runs only when the room is over a cap: the newest whole logs since the last time stay, the older ones went.
+  assert.ok(lines.length >= 21 && lines.length <= 22, 'twenty appends and the newest whole log or two: ' + lines.length);
+  assert.ok(!text.includes('"k":0') && !text.includes('"k":3'), 'a superseded whole log was replayed');
+  // Past what compaction can free, history goes as before, and the room says so.
+  for (let k = 0; k < 6; k++) await post(env, 'r', { participant: 'bob~' + k, events: [{ pad: 'y'.repeat(40000) }] }, hand('bob-secret-00000000' + k));
+  const later = await readUntil(await open(env, 'r'), (t) => t.includes('bob~5'));
+  assert.ok(later.includes('"relay":"truncated"'), later.slice(0, 200));
 });
