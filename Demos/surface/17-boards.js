@@ -303,8 +303,8 @@
     if (s.state === 'readonly' || (s.state === 'armed' && s.trouble)) {
       if (s.state === 'readonly' && !s.dirty) return null; // nothing drawn here, nothing to keep
       const tab = s.trouble && (s.trouble.kind === 'tab' || s.trouble.kind === 'elsewhere');
-      if (tab) return { kind: 'not-kept', words: name + ' is open in another tab, and what was drawn on it here was not kept — export the log to keep it, or leave it as that tab has it', ways };
-      return { kind: 'unsaved', words: name + ' is not saved' + (s.trouble && s.trouble.kind === 'full' ? ' (the browser\'s storage is full)' : '') + ' — export the log to keep it, or leave it and lose what was not saved', ways };
+      if (tab) return { kind: 'not-kept', words: name + ' is open in another tab, and what was drawn on it here was not kept — save it as a file to keep it, or leave it as that tab has it', ways };
+      return { kind: 'unsaved', words: name + ' is not saved' + (s.trouble && s.trouble.kind === 'full' ? ' (the browser\'s storage is full)' : '') + ' — save it as a file to keep it, or leave it and lose what was not saved', ways };
     }
     if (s.state === 'armed') return s.inFlight || s.dirty || s.needWhole ? { kind: 'busy' } : null;
     return { kind: 'busy' }; // 'waiting': the store is still being opened

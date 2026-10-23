@@ -252,7 +252,7 @@ export async function runSeat(browser, servers, { freshContext, screenshot }) {
         };
       });
       check(`J4.0. no room: the seat's entry leads the models pane and says how to reach Claude in one sentence — "${pane.text}" — with nothing to join; the key form no longer offers the door, which stands under "advanced", closed`,
-        pane.first === 'mpSeat' && /with Claude/.test(pane.text || '') && /\?live=claude/.test(pane.text || '') && !pane.join && pane.door === 0
+        pane.first === 'mpSeat' && /with Claude/.test(pane.text || '') && /\bshare\b/.test(pane.text || '') && !/\?live=/.test(pane.text || '') && !pane.join && pane.door === 0
           && !!pane.advanced && pane.advanced.tag === 'DETAILS' && !pane.advanced.open && /MCP server/.test(pane.advanced.text),
         pane);
     });

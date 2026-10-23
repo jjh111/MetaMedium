@@ -1,7 +1,7 @@
 // ===== input =====
 // Provides: pointer input (draw, pan, pinch) for the mouse, the pen and the finger — the palm ignored,
 //   the pen's pressure on every point it draws, its hover a hover (V1-PLAN R6) — keys (undo, copy,
-//   paste, erase, zoom), say()/flash() for the status line.
+//   paste, erase, zoom — Escape is the controls' one ladder, escapeStep), say()/flash() for the status line.
 // Uses: core (draws, setDraws), hand (the rules: fingerRole, palmNow, whenPenLands, releaseIs, PAN_SLOP_PX), view,
 //   snap (autoSweep, magnetQuery), render (drawLive), palette (copyMarks, pasteClip), handwriting
 //   (autoRead), artifacts (pointerFrameAt), kinds (postPointer).
@@ -357,7 +357,7 @@
     lastTap = null;
     session.summonMarks(group, Date.now());
     render(session.getState());
-    if (group.length > 1) flash('held with ' + (group.length - 1) + ' it hangs together with');
+    if (group.length > 1) flash('held, with the ' + (group.length - 1) + ' beside it that belong with it');
   }
 
   /** Is a world point inside the loop that waits to be taken up? */
@@ -474,7 +474,8 @@
       // …and a letter-sized stroke is writing, not a connector: an l beside a
       // box reads line 0.9, and pulling its foot onto the box's edge unwrites
       // the word (found by e2e 16 and 33).
-      const letterLike = MM.isLetterLike(MM.getBounds(points), 1 / view.zoom);
+      // A short arrow drawn from one closed mark into another is a connector whatever its size (UX-07).
+      const letterLike = MM.isLetterLike(MM.getBounds(points), 1 / view.zoom) && !arrowBetweenClosed(analysis, null);
       if (connector && !isMark && !letterLike) {
         // Only the place moves: a pen's pressure stays on the point it was pressed at.
         if (magnetStart) points[0] = Object.assign({}, points[0], { x: magnetStart.site.point.x, y: magnetStart.site.point.y });
@@ -557,12 +558,30 @@
 
   let lastTap = null; // the last tap on empty ground, for the double-tap
   const DOUBLE_TAP_MS = 400;
+  let loopTakenAt = 0; // when a double-tap inside a waiting loop took it up: the dblclick that follows is not 'type here'
 
+  // How sure the rung must be that a short stroke is an arrow before its size stops making it a letter (UX-07).
+  const ARROW_TIES_AT = 0.6;
   /**
-   * A tap: the dead state. A tap while something is dismissable is the dismissal, and never
-   * a dot — the pen's or the mouse's stroke too short to be one, or a finger's that never
-   * moved while the pen is what draws.
+   * A one-stroke arrow as short as a letter — up to about 150 px, its barb about as tall as an x-height — is
+   * still a connector when the rung reads it an arrow at ARROW_TIES_AT or more and its tail and tip each land
+   * on a closed mark, two different ones (UX-07): the letter rule vetoed it, so a small diagram's arrows never
+   * tied and Tidy and Route were never offered, while a line the same length between the same boxes tied. A
+   * letter beside a box lands on no second closed mark, so writing is still writing. `except` is the stroke's
+   * own id once it is on the board.
    */
+  function arrowBetweenClosed(analysis, except) {
+    const top = analysis && analysis.results && analysis.results[0];
+    if (!top || top.type !== 'arrow' || top.confidence < ARROW_TIES_AT || !top.meta || !top.meta.tip || !top.meta.tail) return false;
+    const closedAt = (p) => {
+      const hit = magnetQuery(p, except);
+      const n = hit && state.nodes.get(hit.site.nodeId);
+      return n && MM.standsClosed(n) ? hit.site.nodeId : null;
+    };
+    const a = closedAt(top.meta.tail), b = closedAt(top.meta.tip);
+    return !!a && !!b && a !== b;
+  }
+
   /**
    * The magnet at the end of a just-drawn ARROW its ink points with, or null:
    * `{ end, hit }`. Only an arrow (its tail read apart from its tip), never the
@@ -577,11 +596,16 @@
     if (!top || top.type !== 'arrow') return null;
     const activeMark = state.commandMark || MM.BUILTIN_COMMAND_MARK;
     if (activeMark && MM.matchesCommandMark(analysis.fingerprint, activeMark).match) return null;
-    if (MM.isLetterLike(MM.getBounds(pts), 1 / view.zoom)) return null;
+    if (MM.isLetterLike(MM.getBounds(pts), 1 / view.zoom) && !arrowBetweenClosed(analysis, id)) return null;
     const end = ends.tail === 'start' ? 'end' : 'start';
     const hit = magnetQuery(ends[end], id);
     return hit ? { end: end, hit: hit } : null;
   }
+  /**
+   * A tap: the dead state. A tap while something is dismissable is the dismissal, and never
+   * a dot — the pen's or the mouse's stroke too short to be one, or a finger's that never
+   * moved while the pen is what draws.
+   */
   function tapAt(e) {
     const s0 = session.getState();
     const now = Date.now();
@@ -601,7 +625,7 @@
       const inside = b && w.x >= b.minX && w.x <= b.maxX && w.y >= b.minY && w.y <= b.maxY;
       const again = lastTap && now - lastTap.t < DOUBLE_TAP_MS && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 24;
       lastTap = { x: e.clientX, y: e.clientY, t: now };
-      if (inside && again) { lastTap = null; session.summonHeld(now); render(session.getState()); return; }
+      if (inside && again) { lastTap = null; loopTakenAt = now; session.summonHeld(now); render(session.getState()); return; }
       if (inside) { render(session.getState()); return; }
     }
     lastTap = { x: e.clientX, y: e.clientY, t: now };
@@ -658,9 +682,7 @@
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); session.undo(); }
     // Copy holds the selection's ink (and puts it on the clipboard as SVG); paste is handled with files, in the images fragment.
     if ((e.ctrlKey || e.metaKey) && e.key === 'c' && e.target === document.body && state.selection.length) { e.preventDefault(); copyMarks(state.selection.slice()); }
-    if (e.target === document.body && e.key === 'Escape' && state.selection.length && !state.summon) session.deselect(Date.now());
-    // Esc with nothing held stops every model call in flight: a slow model is not a hang, and the hand can say enough.
-    else if (e.target === document.body && e.key === 'Escape' && !state.selection.length && !state.summon) cancelWork();
+    // Escape is one ladder, in the controls fragment (escapeStep): the field, a pane, the grid, the selection, then work in flight.
     if (e.target === document.body && (e.key === 'Backspace' || e.key === 'Delete') && state.selection.length) {
       e.preventDefault();
       eraseSelection();
@@ -696,7 +718,8 @@
     else if (act === 'split') session.splitWord(id, Date.now());
     else if (act === 'clock-play') session.clock({ nodeId: id, op: 'play', at: Date.now() });
     // Play another hand's program HERE: this hand's own play, so the code runs in this tab only by the person's tap (C1).
-    else if (act === 'clock-play-here') playHere(id);
+    // A program another hand set playing — or a tank held still under reduced motion (C4) — plays by this hand's own play.
+    else if (act === 'clock-play-here') playItHere(id);
     else if (act === 'clock-pause') session.clock({ nodeId: id, op: 'pause', at: Date.now() });
     else if (act === 'clock-reset') session.clock({ nodeId: id, op: 'reset', at: Date.now() });
     else if (act === 'behave-use') {

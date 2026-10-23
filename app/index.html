@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>dyna.ink — Ink Over Living Artifacts</title>
+<title>dyna.ink</title>
 <link rel="stylesheet" href="../Demos/surface/surface.css">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="dynaink-version" content="0.1.0">
@@ -125,18 +125,21 @@
     <button data-import="file" title="A page, a script, a text, Mermaid, JSON — a file of a kind the canvas knows becomes a thing on the board">other files</button>
   </div>
 </div>
+<!-- The export pane (the UX pass, UX-12): plain labels that fit the pane, two to a row, each file's name in its tooltip. -->
 <div id="exportPanel" hidden>
   <div class="exRow">
-    <button data-export="bundle" title="The whole board and its pictures in one .zip — boards ▸ from a file… opens it whole, pictures and all">board + pictures</button>
+    <button data-export="bundle" title="a .dyna.zip — the whole board and its pictures in one file; boards ▸ from a file… opens it whole, pictures and all">board + pictures</button>
   </div>
   <div class="exRow">
-    <button data-export="svg" title="The held marks, or the board: ink as paths, pictures, SVG figures and writing drawn in under it">board.svg</button>
-    <button data-export="png" title="The held marks, or the whole board, drawn as a picture with its pictures and figures — not the screen as it is">board.png</button>
-    <button data-export="pdf" title="The held marks, or the whole board, on one page of Letter or A4">board.pdf</button>
-    <button data-export="log" title="The whole board as a log: a header line, then one event per line — its pictures are not in it">canvas.jsonl</button>
+    <button data-export="svg" title="board.svg — the held marks, or the board, as a drawing: the ink, and the pictures, figures and writing under it">drawing · SVG</button>
+    <button data-export="png" title="board.png — the held marks, or the whole board, as a picture with its pictures and figures — not the screen as it is">picture · PNG</button>
+  </div>
+  <div class="exRow">
+    <button data-export="pdf" title="board.pdf — the held marks, or the whole board, on one page of Letter or A4">page · PDF</button>
+    <button data-export="log" title="canvas.jsonl — the whole board as a file of its own, to open again under boards ▸ from a file… — its pictures are not in it">board file</button>
   </div>
   <div class="exRow" id="exMermaid" hidden>
-    <button data-export="mermaid" title="The board as Mermaid text">flowchart.mmd</button>
+    <button data-export="mermaid" title="the board as Mermaid text">Mermaid text</button>
   </div>
 </div>
 <div id="helpPanel" hidden><p class="hint" id="helpVersion"></p><p class="hint" id="helpSource"></p><div class="helpBody"></div></div>
@@ -151,7 +154,7 @@
   <div class="fdList"></div>
 </div>
 <div id="packsPanel" hidden>
-  <p class="hint">A board says which packs it uses. Using one is an event in its log — undo takes it back — and what it ships is matched here as if you had taught it.</p>
+  <p class="hint">A pack is things already drawn and named for you. Once this board uses one — undo takes it back — what it holds is recognised here as if you had taught it.</p>
   <div class="pkList"></div>
   <div id="packsStatus" class="hint" aria-live="polite"></div>
 </div>
@@ -168,7 +171,7 @@
   </div>
   <!-- Not in a room: share the board on screen. -->
   <div id="liveAway">
-    <p class="hint">Anyone you send the link to draws on this board with you, live, from any browser.</p>
+    <p class="hint">Anyone you send the link to draws on this board with you, as you draw, from any browser.</p>
     <div class="mpRow"><button id="liveShare">Share this board</button></div>
     <div class="mpRow" id="liveEmptyRow" hidden><button id="liveShareEmpty">Share an empty board instead</button></div>
   </div>
@@ -176,8 +179,8 @@
     <summary>more ways in</summary>
     <input id="liveRoom" placeholder="a room’s name" autocomplete="off" spellcheck="false" />
     <input id="liveName" placeholder="your name in the room" autocomplete="off" spellcheck="false" />
-    <input id="liveRelay" placeholder="relay address — empty for other tabs on this machine" autocomplete="off" spellcheck="false" />
-    <div class="mpRow"><button id="liveJoin">Join</button><button id="liveClaude" title="the room Claude Code joins through node Demos/mcp.mjs: room “claude”, relay on this machine">with Claude</button></div>
+    <input id="liveRelay" placeholder="a relay’s address — or empty, for tabs on this computer" autocomplete="off" spellcheck="false" />
+    <div class="mpRow"><button id="liveJoin">Join</button><button id="liveClaude" title="the room Claude Code joins, “claude” — Claude reads, answers and draws here with you">with Claude</button></div>
   </details>
   <div id="liveStatus" class="hint" aria-live="polite"></div>
 </div>

@@ -55,10 +55,10 @@
   /** Why the seat cannot take a question on this page now, in one sentence — or null. */
   function whyNoSeat() {
     if (folder.how !== 'live' || !folder.store) {
-      return 'Claude answers here once this page is in its room — tap “with Claude” in the live tile, or open this page with ?live=' + CLAUDE_ROOM + '&relay=' + CLAUDE_RELAY + (ownRelay(CLAUDE_RELAY) ? '#key=… (the room’s key)' : '') + '.';
+      return 'Claude answers here once this page is in Claude’s room — tap share, then “with Claude” under more ways in.';
     }
-    if (!folder.relay) return 'This room is between tabs on this machine, and Claude’s hand reaches a room only through a relay — tap “with Claude” in the live tile.';
-    if (MM.providerLocality({ baseUrl: folder.relay }) !== 'local' && !ownRelay(folder.relay)) return 'This room’s relay is on another machine, and the seat asks only through a relay on this one or the dyna.ink relay — tap “with Claude” in the live tile.';
+    if (!folder.relay) return 'This room is between tabs on this machine, and Claude reaches a room only through a relay — tap share, then “with Claude” under more ways in.';
+    if (MM.providerLocality({ baseUrl: folder.relay }) !== 'local' && !ownRelay(folder.relay)) return 'This room’s relay is on another machine, and Claude is asked only through a relay on this one or dyna.ink’s own — tap share, then “with Claude” under more ways in.';
     return null;
   }
 
@@ -183,8 +183,8 @@
       html += '<div class="note">' + esc(here + ' is here, and sees: seated, What is this?, Read the writing and ask: go to it') + '</div>';
     } else {
       html += '<div class="note">' + esc(folder.name === CLAUDE_ROOM
-        ? 'Claude isn’t in this room yet — it joins whenever Claude Code is open in this project (its hand is node Demos/mcp.mjs), and is offered here the moment it is heard.'
-        : 'Claude isn’t in room “' + folder.name + '” — its hand joins room “' + CLAUDE_ROOM + '”: tap “with Claude” in the live tile.') + '</div>';
+        ? 'Claude isn’t in this room yet — it joins whenever Claude Code is open in this project, and is offered here the moment it is heard.'
+        : 'Claude isn’t in room “' + folder.name + '” — it joins room “' + CLAUDE_ROOM + '”: tap share, then “with Claude” under more ways in.') + '</div>';
     }
     seatSection.innerHTML = html;
     const join1 = seatSection.querySelector('#mpSeatJoin');

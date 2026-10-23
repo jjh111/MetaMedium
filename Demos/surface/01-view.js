@@ -95,9 +95,9 @@
       const eats = (vertical ? (side === 'left' ? p.right - v.left : v.right - p.left) / vw
         : (side === 'top' ? p.bottom - v.top : v.bottom - p.top) / vh);
       if (!hugs) { docks.push({ id: p.id, edge: 'none', why: 'floats, ' + Math.round(hug[side]) + 'px off the ' + side }); continue; }
-      if (cover < DOCK_COVER) { docks.push({ id: p.id, edge: 'none', why: 'covers ' + Math.round(cover * 100) + '% of the ' + side + ' edge' }); continue; }
+      if (cover < DOCK_COVER) { docks.push({ id: p.id, edge: 'none', why: 'covers ' + Math.round(cover * 100) + '% of the ' + side + ' side' }); continue; }
       if (eats > DOCK_MAX) { docks.push({ id: p.id, edge: 'none', why: 'would eat ' + Math.round(eats * 100) + '% of the canvas' }); continue; }
-      docks.push({ id: p.id, edge: side, why: 'covers ' + Math.round(cover * 100) + '% of the ' + side + ' edge' });
+      docks.push({ id: p.id, edge: side, why: 'covers ' + Math.round(cover * 100) + '% of the ' + side + ' side' });
       if (side === 'left') free.left = Math.max(free.left, p.right);
       else if (side === 'right') free.right = Math.min(free.right, p.left);
       else if (side === 'top') free.top = Math.max(free.top, p.bottom);

@@ -2,9 +2,11 @@
 // Provides: the panel: a mark, an artifact, a word, the selection — what it is and what it can become
 //   in plain words first, and the inspector (ids, tiers, relations, measures) behind details, closed by
 //   default and remembered on this device (PLAN-USER-SURFACE U1a: markSummary, inspectDetails).
+// Provides too: firstLoopHtml (the empty board's steps, also the first-run sheet's, 27-first.js).
 // Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models,
 //   palette (contextFor, paletteItems, afforded — what stands beside a selection, and what it put first),
-//   packs (packSaid — a definition from a library pack says its pack).
+//   packs (packSaid — a definition from a library pack says its pack), clocks (tankHeldStill — a tank held still under
+//   reduced motion offers *play it here*), first (tapWords — a board at rest says "point at one" only to a mouse).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -56,13 +58,18 @@
     // clock the log says is playing, but that another hand set, stands as its
     // source and offers *Play it here* — one tap, this hand's own play.
     const elsewhere = c && c.playing && isProgram(s, id) && !consentedHere(id);
+    // Under reduced motion a tank this hand did not start here holds still (C4, 14-clocks.js): its play is the person's.
+    const still = !elsewhere && c && c.playing && !isProgram(s, id) && tankHeldStill(s, id);
     const who = elsewhere ? session.clockAuthor(id) : null;
+    // A program's time is its own (a run program keeps none the tank could say); a tank's is said.
+    const t = isProgram(s, id) && codeKindOf(s.nodes.get(id)) === 'run' ? '' : ' · t = ' + tankTime(id).toFixed(1) + 's';
     const stateText = !c ? 'not played'
-      : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : 'played — not running in this tab yet')
-      : c.playing ? 'playing · t = ' + tankTime(id).toFixed(1) + 's' : 'paused' + (c.reason ? ' — ' + c.reason : '') + ' · t = ' + tankTime(id).toFixed(1) + 's';
+      : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : motionReduced() ? 'waiting for you to play it — this device asks for less motion' : 'played — not running in this tab yet')
+      : still ? 'playing — held still here, since this device asks for less motion'
+      : c.playing ? 'playing' + t : 'paused' + (c.reason ? ' — ' + c.reason : '') + t;
     return '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>' +
       '<div class="acts">' +
-      (elsewhere
+      (elsewhere || still
         ? '<button class="mini" data-act="clock-play-here" data-id="' + esc(id) + '">play it here</button>'
         : c && c.playing
         ? '<button class="mini" data-act="clock-pause" data-id="' + esc(id) + '">pause</button>'
@@ -74,6 +81,15 @@
     const node = s.nodes.get(id);
     const k = codeKindOf(node);
     return k === 'js' || k === 'run';
+  }
+
+  /**
+   * What a thing made is, said over the panel in the person's words (the UX pass, UX-08: "LIVING PAGE",
+   * "LIVING TEXT"): a page, a program, a text — never the engine's kind, and never "living".
+   */
+  function kindEyebrow(kind) {
+    const WORDS = { html: 'a page', run: 'a program', js: 'a behaviour', text: 'a text', svg: 'a figure', mermaid: 'a diagram in words', json: 'data', md: 'notes', control: 'a control' };
+    return WORDS[kind] || (MM.isPictureKind(kind) ? 'a picture' : 'a ' + kind + ' file');
   }
 
   /** The kind of an artifact's newest code rep, html by default. */
@@ -92,6 +108,23 @@
     inspectorEl.innerHTML = html;
   }
 
+  /**
+   * The empty board's three steps and its one tap, in the panel's plain voice — and, where the panel does not stand,
+   * in the first-run sheet at the foot of the screen (27-first.js; the UX pass, UX-03).
+   */
+  function firstLoopHtml() {
+    return '<div class="eyebrow">nothing drawn yet</div>' +
+      '<ol class="firstLoop">' +
+      '<li><b>draw a few marks</b> — a box, a circle, a line</li>' +
+      '<li><b>press and hold one</b> — it is held with what it sits with</li>' +
+      '<li><b>choose what it becomes</b> — tap a pill, or type in the field</li>' +
+      '</ol>' +
+      // R5: the first run's one tap — a board of your own made from the starter example (22-boards.js takes it).
+      '<div class="acts"><button class="mini" type="button" data-example-start title="a new board of your own with something already drawn — the starter example, yours to draw on">start from an example</button>' +
+      '<button class="mini" type="button" data-example-more title="a flowchart, a class diagram, a molecule and a pattern page — in the boards pane">more examples</button></div>' +
+      '<div class="why">the canvas reads every mark as you draw it; a model is asked only when you ask one</div>';
+  }
+
   function renderInspector(s, id) {
     if (s.summon) return renderSummonScope(s);
     // One region selected alone: what it is and holds, in words (I5; 12-regions.js).
@@ -107,20 +140,14 @@
       // It is not a tour and not a mode: it is the empty state of one row, and
       // the first mark drawn replaces it with that mark's reading.
       if (!s.contentIds.length && !s.artifacts.length) {
-        showPanel('<div class="eyebrow">nothing drawn yet</div>' +
-          '<ol class="firstLoop">' +
-          '<li><b>draw a few marks</b> — a box, a circle, a line</li>' +
-          '<li><b>press and hold one</b> — it is held with what it sits with</li>' +
-          '<li><b>choose what it becomes</b> — tap a pill, or type in the field</li>' +
-          '</ol>' +
-          // R5: the first run's one tap — a board of your own made from the starter example (22-boards.js takes it).
-          '<div class="acts"><button class="mini" type="button" data-example-start title="a new board of your own with something already drawn — the starter example, yours to draw on">start from an example</button>' +
-          '<button class="mini" type="button" data-example-more title="a flowchart, a class diagram, a molecule and a pattern page — in the boards pane">more examples</button></div>' +
-          '<div class="why">the canvas reads every mark as you draw it; a model is asked only when you ask one</div>');
+        showPanel(firstLoopHtml());
         return;
       }
-      showPanel('<div class="eyebrow">mark</div>' +
-        '<div class="empty">nothing here yet</div>');
+      // A board opened whole — an example — with nothing pointed at yet (UX-11): what it holds, and how to begin.
+      const marks = s.contentIds.length - s.artifacts.length, made = s.artifacts.length;
+      showPanel('<div class="eyebrow">this board</div>' +
+        '<div class="empty">' + esc([marks ? marks + ' mark' + (marks === 1 ? '' : 's') : '', made ? made + ' thing' + (made === 1 ? '' : 's') + ' made' : ''].filter(Boolean).join(' · ')) + '</div>' +
+        '<div class="why">press and hold a mark to see what it is and what it can become' + (tapWords() === 'double-click' ? ' — or point at one' : '') + '</div>');
       return;
     }
 
@@ -130,8 +157,8 @@
     // Who made it: a mark's drawer, an artifact's blesser — never who drew its marks (V1-PLAN L2f).
     const author = authorOf(node);
     const authorName = nameOfParticipant(author);
-    const eyebrow = '<div class="eyebrow">' +
-      (isLive ? (codeKindOf(node) === 'html' ? 'living page' : codeKindOf(node) === 'mermaid' ? 'a diagram in words' : 'living ' + codeKindOf(node)) : isArtifact ? 'artifact' : isWordNode ? 'word' : 'mark') + '</div>';
+    // Escaped: a kind is whatever the event said, and another hand's event may say anything.
+    const eyebrow = '<div class="eyebrow">' + esc(isLive ? kindEyebrow(codeKindOf(node)) : isArtifact ? 'a thing made' : isWordNode ? 'a word' : 'a mark') + '</div>';
     // What the person reads first (U1a): what it is and what it can become, in a few plain
     // lines. Everything the engine holds about it — ids, tiers, relations, measures — is
     // below, behind details.
@@ -199,7 +226,8 @@
           '<button class="mini" data-act="export-code" data-id="' + esc(id) + '">save as .' + esc(kind === 'text' ? 'txt' : kind) + '</button></div>';
       }
       // The clock: nothing runs until a hand plays it, and a stop says why. An act, so it stands above details.
-      if (kind === 'js') {
+      // A program too: one the log says plays but that does not run in this tab offers *play it here* (C1, C4).
+      if (kind === 'js' || kind === 'run') {
         top += clockRows(s, id);
       }
     }
@@ -283,7 +311,7 @@
         const m = mine && String(ownCode.data.code).match(new RegExp('<([a-z]+)[^>]*data-region="' + mine.id + '"'));
         rows.push(['code', isLive
           ? (codeKindOf(node) !== 'html' ? 'a running ' + codeKindOf(node) + (codeKindOf(node) === 'js' ? ' — code that runs when played' : '') : rung.genre && (rung.genre.genre === 'graph' || rung.genre.genre === 'mixed') ? 'a running diagram' : 'a running page')
-          : (m ? '<' + m[1] + ' data-region="' + mine.id + '">' : 'part of ' + (MM.wordOf(owner) || 'an artifact')),
+          : (m ? '<' + m[1] + ' data-region="' + mine.id + '">' : 'part of ' + (MM.wordOf(owner) || 'a thing made')),
           isLive && rung.genre ? rung.genre.reasoning : '']);
       }
       if (rows.length) {
@@ -318,7 +346,7 @@
         // A label is its maker's word and a name is a bless — neither is the shape rung, whatever tier the maker sits at.
         const basis = g.interpretations[0].basis;
         html += '<div class="srchead"><span class="by">' + esc(g.label) + '</span>' +
-          '<span class="tier">' + (basis === 'label' ? 'label · its maker' : basis === 'name' ? 'named' : tier === 0 ? 'tier 0 · shape' : tier === 2 ? 'tier 2 · model' : 'tier ' + tier) + '</span></div>';
+          '<span class="tier">' + (basis === 'label' ? 'label · its maker' : basis === 'name' ? 'named' : tier === 0 ? 'measured from the ink' : tier === 1 ? 'read by the canvas' : tier === 1.5 ? 'a decision model' : tier === 2 ? 'a model’s reading' : 'a reading') + '</span></div>';
         g.interpretations.forEach((r, i) => {
           html += '<div class="read' + (i === 0 ? ' top' : '') + (r.blessed ? ' blessed' : '') + '">' +
             '<span class="type">' + esc(r.label) + '</span>' +
@@ -470,12 +498,12 @@
       if (rep) {
         const kind = rep.data.kind || 'html';
         const what = kind === 'run' ? (rep.data.code && rep.data.code.startsWith(MM.GRAPH3D_MARK) ? 'a 3D thing' : 'a program') : kind === 'html' ? 'a page' : kind === 'text' ? 'text' : kind === 'mermaid' ? 'a diagram written in Mermaid' : MM.isPictureKind(kind) ? 'a picture' : 'a ' + kind + ' file';
-        return { here: 'an artifact, ' + what, next: kind === 'mermaid' ? (paletteItems.some((i) => i.key === 'mermaid-draw') ? 'Draw it puts it on the board as marks · ' : '') + 'edit the text for a new version · ink over a node addresses its marks' : 'ink over it addresses its parts · a brief is a new version · wire it in a frame' };
+        return { here: what + ', made', next: kind === 'mermaid' ? (paletteItems.some((i) => i.key === 'mermaid-draw') ? 'Draw it puts it on the board as marks · ' : '') + 'edit the words and it is drawn again · ink over a box in it reaches the marks it was written from' : 'ink over it reaches its parts · type a change and it is made again · wire it into a frame' };
       }
-      return { here: 'a definition' + (MM.wordOf(a) ? ' “' + MM.wordOf(a) + '”' : ''), next: 'another like it is matched · a brief builds on it · its tank plays' };
+      return { here: 'a definition' + (MM.wordOf(a) ? ' “' + MM.wordOf(a) + '”' : ''), next: 'another like it is recognised · type what to make from it · it can be played' };
     }
     const match = sum.suggestions.find((x) => x.kind === 'match');
-    if (match) return { here: 'a definition, ' + match.label + ' ' + (match.score || 1).toFixed(2) + (match.pack ? ', from ' + packSaid(match.pack) : ''), next: (libraryEntries(s).some((e) => e.id === match.artifactId) ? 'its program on this drawing' : 'take the name') + ' · a brief builds from it' };
+    if (match) return { here: 'a definition, ' + match.label + ' ' + (match.score || 1).toFixed(2) + (match.pack ? ', from ' + packSaid(match.pack) : ''), next: (libraryEntries(s).some((e) => e.id === match.artifactId) ? 'its program on this drawing' : 'take the name') + ' · type what to make from it' };
     const genre = reading.genre && reading.genre.genre;
     const concept = reading.concepts[0];
     // Writing becomes what Enter does with it: read, then text, a name or a label (W2, U2's walk).
@@ -501,7 +529,7 @@
     if (concept) return { here: 'a concept, ' + concept.concept + ' ' + concept.confidence.toFixed(2), next: concept.conversions.filter((c) => c.effect.kind !== 'name' && c.effect.kind !== 'prompt').map((c) => c.label).concat(['a name']).join(' · ') };
     const shapes = ids.map((id) => MM.topInterpretation(s.nodes.get(id))).filter(Boolean);
     if (shapes.length && shapes.every((x) => x === 'text')) return { here: 'writing', next: 'Read the writing · a name · text' };
-    return { here: 'shapes' + (shapes.length ? ', ' + [...new Set(shapes)].join(', ') : ''), next: 'draw them clean · a name · a brief is a program' };
+    return { here: 'shapes' + (shapes.length ? ', ' + [...new Set(shapes)].join(', ') : ''), next: 'draw them clean · a name · say what to make in a sentence' };
   }
 
   // What the selection reads as, kept while the log stands (R4c): a pan with

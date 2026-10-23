@@ -1,6 +1,6 @@
 // ===== packs (the pane) =====
 // Provides: the library packs pane under the bar (V1-PLAN §2.3, §9 B3) — every pack this build ships
-//   (never a test pack), each with what it adds, whether this board uses it, and *use* / *stop using*;
+//   (never a test pack), each with what it does in the person's words (packDoes) and what it adds, whether this board uses it, and *use* / *stop using*;
 //   the packs this board names that this build lacks, said, with *stop using*. packsFace (the tile's
 //   face), packShort and packSaid (how a match says its pack), renderPacksPane, packsHeard (the session's
 //   listener, subscribed by the boot, which also has the pen follow the board's packs — MM.followPacks).
@@ -19,10 +19,20 @@
 
   /** A pack as a match says it, short: `basics@1` → `basics`. */
   function packShort(ref) { return String(ref || '').split('@')[0]; }
-  /** A pack as a tooltip says it: `the Basics pack (basics@1)`. */
+  /** A pack as a tooltip says it: `the Basics pack` — its name, never its id (`basics@1`, the UX pass, UX-08). */
   function packSaid(ref) {
     const p = MM.shippedPack(ref);
-    return 'the ' + (p ? p.name : packShort(ref)) + ' pack (' + ref + ')';
+    return 'the ' + (p ? p.name : packShort(ref)) + ' pack';
+  }
+  /** A pack's name, as the pane and the status line say it. */
+  function packName(ref) { const p = MM.shippedPack(ref); return p ? p.name : packShort(ref); }
+  /** The plural of a symbol or a connector's name: branch → branches, self → self-calls (a word, never name + 's'). */
+  const PLURALS = { self: 'self-calls' };
+  function pluralWord(w) {
+    if (PLURALS[w]) return PLURALS[w];
+    if (/(?:s|x|z|ch|sh)$/.test(w)) return w + 'es';
+    if (/[^aeiou]y$/.test(w)) return w.slice(0, -1) + 'ies';
+    return w + 's';
   }
   /** The tile's face: the packs this board uses, short — or none; a name this build lacks shows as a question. */
   function packsFace(s) {
@@ -30,13 +40,33 @@
     return names.length ? names.join(', ') : 'none';
   }
 
+  /**
+   * What a pack does, in the person's words. A pack's own `describes` is core's and says it in the engine's
+   * ("the flowchart notation in use: its ports on the pen"); the pane says what the hand will notice instead.
+   * Keyed by the pack's id, which is never shown; a pack this table does not know says its own line.
+   */
+  const PACK_DOES = {
+    basics: 'a bubble, and a molecule of three bubbles joined by two bonds — already known, nothing to teach',
+    flowchart: 'lines snap to where a flowchart’s shapes join, and drawing clean and flows come first beside a flowchart',
+    'uml-class': 'lines snap to the sides of a class, and drawing clean and lining up come first beside a class diagram',
+    sequence: 'messages snap to the lifelines, and drawing clean and lining up come first beside a sequence diagram',
+    state: 'arrows snap to the border of each state and to the start dot, and drawing clean and lining up come first beside a state diagram',
+    er: 'lines snap to the border of each entity, and drawing clean and lining up come first beside an ER diagram',
+    mindmap: 'branches snap to the border of each idea, and drawing clean and lining up come first beside a mind map',
+    garment: 'drawing clean and the sizes — and printing the piece at its real size — come first beside a pattern piece',
+  };
+  function packDoes(p) { return PACK_DOES[p.id] || p.describes; }
+
   /** What a pack adds, in a line: its definitions by name, its notation's symbols, its connectors. */
   function packHolds(p) {
     const parts = [];
     if (p.definitions.length) parts.push(p.definitions.map((d) => d.name).join(', '));
     if (p.notation) {
       const n = MM.notationById(p.notation);
-      parts.push('the ' + (n ? n.name.toLowerCase() : p.notation) + ' notation' + (n ? ': ' + n.symbols.map((x) => x.name).concat(n.connectors.map((x) => x.name + 's')).join(', ') : ''));
+      // "Flowchart" → "a flowchart", "ER diagram" → "an ER diagram": a name in capitals keeps them.
+      const what = n ? (/^[A-Z]{2}/.test(n.name) ? n.name : n.name[0].toLowerCase() + n.name.slice(1)) : p.notation;
+      const joins = n && n.connectors.length ? ' — joined by ' + n.connectors.map((x) => pluralWord(x.name)).join(', ') : '';
+      parts.push('reads ' + (/^(?:[aeio]|ER\b)/i.test(what) ? 'an ' : 'a ') + what + (n ? ': ' + n.symbols.map((x) => x.name).join(', ') + joins : ''));
     }
     if (p.connectors && p.connectors.length) parts.push(p.connectors.map((c) => c.name).join(', '));
     return parts.join(' · ');
@@ -70,16 +100,16 @@
       const top = row.appendChild(pkEl('div', 'pkTop'));
       top.appendChild(pkEl('span', 'pkName', p.name));
       top.appendChild(document.createTextNode(' '));
-      top.appendChild(ui.chip(ref, { cls: 'pkRef', why: 'its name and version — content under one name never changes' }));
-      if (used) { top.appendChild(document.createTextNode(' ')); top.appendChild(ui.chip('in use', { cls: 'pkUsed', why: 'this board uses it: its log says so' })); }
-      row.appendChild(pkEl('div', 'pkWhat', p.describes));
+      top.appendChild(ui.chip('version ' + p.version, { cls: 'pkRef', why: 'what a pack holds under one version never changes' }));
+      if (used) { top.appendChild(document.createTextNode(' ')); top.appendChild(ui.chip('in use', { cls: 'pkUsed', why: 'this board uses it' })); }
+      row.appendChild(pkEl('div', 'pkWhat', packDoes(p)));
       const holds = packHolds(p);
       if (holds) row.appendChild(pkEl('div', 'pkHolds', holds));
       const b = row.appendChild(pkEl('button', '', used ? 'stop using' : 'use'));
       b.type = 'button';
       b.dataset[used ? 'unuse' : 'use'] = ref;
-      b.title = used ? 'its definitions leave this board’s matching — an event in its log; undo brings them back'
-        : 'this board uses it from now on — an event in its log: what it ships is matched here, attributed to it';
+      b.title = used ? 'what it holds is no longer recognised on this board — undo brings it back'
+        : 'this board uses it from now on: what it holds is recognised here, and says it came from the pack — undo takes it back';
     }
     // What this board names that this build does not ship: said, never hidden, and it can be let go.
     for (const n of s.packNotices || []) {
@@ -93,7 +123,7 @@
       const b = row.appendChild(pkEl('button', '', 'stop using'));
       b.type = 'button';
       b.dataset.unuse = n.pack;
-      b.title = 'the board stops naming it — an event in its log';
+      b.title = 'the board stops asking for it — undo brings it back';
     }
     pkList.replaceChildren(frag);
   }
@@ -110,13 +140,13 @@
         const refused = session.use(d.use, Date.now());
         if (refused) { pkSay(refused.detail); return; }
         const p = MM.shippedPack(d.use);
-        const what = p && p.definitions.length ? p.definitions.map((x) => x.name).join(', ') + ' matched here' : p && p.notation ? 'its notation’s ports on the pen' : 'in use';
-        pkSay('this board uses ' + d.use + ' — ' + what + '; undo takes it back');
+        const what = p && p.definitions.length ? p.definitions.map((x) => x.name).join(', ') + ' recognised here' : p && p.notation ? 'the pen ties lines to its symbols' : 'in use';
+        pkSay('this board uses ' + packSaid(d.use) + ' — ' + what + '; undo takes it back');
         say('using ' + packSaid(d.use) + ' — ' + what);
       } else if (d.unuse !== undefined) {
         session.unuse(d.unuse, Date.now());
-        pkSay('this board no longer uses ' + d.unuse + '; undo brings it back');
-        say('stopped using ' + d.unuse);
+        pkSay('this board no longer uses ' + packSaid(d.unuse) + '; undo brings it back');
+        say('stopped using ' + packSaid(d.unuse));
       }
       syncTiles();
       renderPacksPane();

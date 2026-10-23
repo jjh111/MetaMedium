@@ -15,9 +15,11 @@
 //   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading, keepFromHouse, settleKept — an ask dyna.ink's own could not answer is kept, and let go once answered, isHouse,
 //   askModelsAbout, offerModel), seatpane (writers, readers, deciderHost, briefDeciderHost, askDecider, askDeciderNotation, askDeciderBrief — who is asked, by seat), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
 //   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
-//   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
+//   clocks (definitionOf, tankHeldStill), kinds (consentedHere, playHere — a clock not moving here is offered
+//   *Play it here*, playHereInstead/playItHere, which 07-input.js's panel button takes too), inspector (isProgram), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
 //   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
-//   hand opened the field), hand (handOfPointer).
+//   hand opened the field), hand (handOfPointer), controls (escapeStep — the field's Escape is the ladder's),
+//   the first hour (27-first.js: bringIntoView — Make it Mermaid's card brought into view).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -78,6 +80,28 @@
   /** A reading, for the top row: what it stands on ranks it, exactly as it ranks an offer. */
   function readingItem(o) {
     return Object.assign({ certain: true, tier: 1, group: o.grounds.on, groupConf: o.grounds.confidence, groupWhy: o.grounds.why, base: MM.baseOn(o.grounds) }, o);
+  }
+
+  /**
+   * A clock the log says plays that does not move in this tab — another hand's program (the consent gate, C1), an
+   * example's film or a tank held still because this device asks for less motion (C4): *Pause* would pause what the
+   * person does not see moving, so the field offers *Play it here*, the person's own play, in its place.
+   */
+  function playHereInstead(it) {
+    const o = it.offer;
+    if (!o || o.tool !== 'clocks' || !o.data || o.data.op !== 'pause') return it;
+    const s = session.getState(), id = o.data.nodeId;
+    if (!(isProgram(s, id) ? !consentedHere(id) : tankHeldStill(s, id))) return it;
+    const name = o.label.replace(/^Pause /, '');
+    return Object.assign({}, it, {
+      key: 'clock-here:' + id, label: 'Play ' + name + ' here', verbs: ['play', 'run', 'start', 'go', 'play here'],
+      why: 'it is not moving here — ' + (isProgram(s, id) ? 'a program runs in this tab only when you play it' : 'this device asks for less motion') + '; this plays it, here',
+      run: () => session.withTool('clocks', () => playItHere(id), 'clock-here:' + id),
+    });
+  }
+  /** Play a clock here by this hand's own play: a program another hand set playing, or anything held still (C1, C4). */
+  function playItHere(id) {
+    if (!playHere(id)) { session.clock({ nodeId: id, op: 'play', at: Date.now() }); flash('playing it here'); }
   }
 
   /** An offer as a pill: its reason the tooltip, what it stands on after that, a dot when it asks a model. */
@@ -226,7 +250,7 @@
     });
 
     // --- What it AFFORDS: every tool's offer for this scope, in the registry's order. ---
-    const offers = MM.offersFor(scope).map(offerItem);
+    const offers = MM.offersFor(scope).map(offerItem).map(playHereInstead);
     // What the marks are as a diagram: each notation above the floor, ranked with the rest of the readings (N1).
     const notated = notationsHeld(marks).map((r) => notationItem(r, offers));
     // An act as particular to these marks as a reading (Fold “…” into the text)
@@ -330,7 +354,8 @@
     graph3d: { after: (o, scope, t) => say(!t.made ? 'could not hold that group' : t.detail.ok ? 'in 3D: ' + t.detail.reasoning : 'could not stand it in 3D: ' + t.detail.error) },
     frames: { after: (o, scope, t) => { if (o.data.act !== 'frame' || !t.made) return; const st = session.getState(); flash('framed ' + t.detail.members + ' — ' + MM.describeFrame(MM.frameOfNode(st.nodes.get(t.made)), st.nodes)); } },
     // The drawing said as Mermaid stands beside it: say so, remember which marks it was written from, and keep the field.
-    mermaid: { after: (o, scope, t) => { if (!t.made) { say(t.detail.error); return; } mermaidMadeFrom.set(t.made, scope.marks.slice()); flash('the drawing as Mermaid, beside it — ' + t.detail.reading + '; Draw it puts it back as marks'); refreshPalette(); } },
+    // The card stands beside the drawing — and is brought into view with it when it stood off screen (27-first.js; UX-13).
+    mermaid: { after: (o, scope, t) => { if (!t.made) { say(t.detail.error); return; } mermaidMadeFrom.set(t.made, scope.marks.slice()); bringIntoView(scope.marks.concat([t.made])); flash('the drawing as Mermaid, beside it — ' + t.detail.reading + '; Draw it puts it back as marks'); refreshPalette(); } },
     // A rectangle taken as a region: said, with what it holds (12-regions.js).
     region: { after: (o, scope, t) => { regionMadeSaid(t.detail); } },
     label: { after: (o, scope, t) => { const d = t.detail; if (d.done.length || d.saying.length || d.refused.length) say(labelSentence(String(o.data.word).trim(), d.done, d.saying, d.refused)); } },
@@ -437,7 +462,7 @@
         run: () => copyMarks(marks) },
       { key: 'paste', core: true, label: 'Paste', verbs: ['paste'], why: clip ? 'Paste — the copied ink, beside these' : 'Paste — nothing copied yet', disabled: !clip, tier: 1,
         run: () => { if (!clip) return; const b = selectionBounds(s) || (marks.length ? union(marks.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean)) : null); pasteClip(b ? { x: b.maxX + wpx(40), y: b.minY } : screenToWorld(innerWidth / 2, innerHeight / 2)); refreshPalette(); } },
-      { key: 'erase', core: true, label: 'Erase', verbs: ['erase', 'delete', 'del', 'remove', 'rm'], why: 'Erase — the ink stays in the log; undo brings it back', disabled: !marks.length, tier: 1,
+      { key: 'erase', core: true, label: 'Erase', verbs: ['erase', 'delete', 'del', 'remove', 'rm'], why: 'Erase — undo brings it back', disabled: !marks.length, tier: 1,
         run: () => { const at = Date.now(); if (sum) session.dismiss(sum.id, at); marks.forEach((id) => session.erase(id, at)); flash('erased ' + marks.length + ' mark' + (marks.length === 1 ? '' : 's')); } },
     ];
   }
@@ -737,6 +762,14 @@
   const FIELD_M = 8;         // the margin the field keeps off every edge
   const FIELD_TOP = 52;      // under the bar, when the usable rect cannot hold it
   let fieldAnchor = null;    // where the hand was when this field opened, on screen
+  // Where this field was put when it opened, kept while it is open (the UX pass, UX-06): placed again on every
+  // paint from its new height, it jumped 419 px between "make" and "make " as the pills changed under the hand.
+  // `edge` is the edge that stands still — its top when it opened below or beside the held marks, its bottom when
+  // it opened above them — so it grows away from what it holds. Let go when the field would leave the screen —
+  // grown past the room its standing edge leaves, a keyboard come up under it — or cover chrome (the panel, the
+  // minimap), and when the held marks move on screen (a pan, a zoom, a thing brought into view): the field is then
+  // placed again beside them, from where the hand was as the marks have carried it. Null while no field is open.
+  let fieldKept = null;      // { x, w, edge: 'top' | 'bottom', y, held }: y is the edge's place on screen, held the marks' box
 
   /** Pure: fit `size` at `want` inside `soft` if it fits there, inside `hard` otherwise. */
   function fitSpan(want, size, soft, hard) {
@@ -843,33 +876,95 @@
    * the list's own scroll height, so a list already scrolled keeps its place;
    * when the field fits, nothing is set and the stylesheet's rule stands.
    */
-  function fitFieldHeight(v, u) {
+  function fitFieldHeight(v, u, cap) {
     const list = summonEl.querySelector('.list');
     if (!list) return;
-    const room = Math.max(u.height - FIELD_M * 2, v.height - FIELD_TOP - FIELD_M);
+    // `cap`: the room a kept field has from its standing edge to the screen's (placeField).
+    const room = Math.min(Math.max(u.height - FIELD_M * 2, v.height - FIELD_TOP - FIELD_M), cap === undefined ? Infinity : cap);
     const natural = summonEl.offsetHeight - list.offsetHeight + list.scrollHeight;
     if (natural <= room) {
       if (list.classList.contains('held')) { list.classList.remove('held'); list.style.maxHeight = ''; }
       return;
     }
-    const cap = Math.max(FIELD_LIST_MIN, Math.floor(list.scrollHeight - (natural - room))) + 'px';
-    if (list.style.maxHeight !== cap) list.style.maxHeight = cap;
+    const px = Math.max(FIELD_LIST_MIN, Math.floor(list.scrollHeight - (natural - room))) + 'px';
+    if (list.style.maxHeight !== px) list.style.maxHeight = px;
     list.classList.add('held');
+  }
+
+  /**
+   * Pure: whether a field kept at `box` (`h` tall) still stands — whole on screen and off the chrome. The held
+   * marks are not chrome: a kept field grows away from them, and covering them is what moving it would do.
+   */
+  function keptFieldStands(box, h, v, chrome) {
+    const r = { left: box.x, top: box.y, right: box.x + box.w, bottom: box.y + h };
+    if (r.left < v.left + FIELD_M - 2 || r.right > v.right - FIELD_M + 2 || r.top < v.top + FIELD_M - 2 || r.bottom > v.bottom - FIELD_M + 2) return false;
+    return !chrome.some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top);
+  }
+
+  /** Pure: whether two boxes on screen stand in the same place, to within a pixel and a half. */
+  function sameScreenBox(a, b) {
+    if (!a || !b) return a === b;
+    return Math.abs(a.left - b.left) < 1.5 && Math.abs(a.top - b.top) < 1.5 && Math.abs(a.right - b.right) < 1.5 && Math.abs(a.bottom - b.bottom) < 1.5;
+  }
+  /** Pure: a point on screen carried as a box moved and scaled from `was` to `now` carries it (a pan, a zoom). */
+  function carriedBy(p, was, now) {
+    if (!p || !was || !now) return p;
+    const sx = was.right - was.left > 1 ? (now.right - now.left) / (was.right - was.left) : 1;
+    const sy = was.bottom - was.top > 1 ? (now.bottom - now.top) / (was.bottom - was.top) : 1;
+    return { x: now.left + (p.x - was.left) * sx, y: now.top + (p.y - was.top) * sy };
+  }
+  /** The field's height with its list unheld: what it would take to show every pill at its width now. */
+  function fieldNaturalHeight() {
+    const list = summonEl.querySelector('.list');
+    return list ? summonEl.offsetHeight - list.offsetHeight + list.scrollHeight : summonEl.offsetHeight;
   }
 
   /** Place the field where it stands now. Touches left/top/width, and the list's height when it must scroll — NOTHING else. */
   function placeField() {
     const v = viewportRect(), u = usableViewport();
+    // Kept where it opened while that still stands (UX-06): typing changes the pills, and the field stays. Placed
+    // again when the held marks moved on screen (from where the hand was, carried with them), when it would leave
+    // the screen — taller than the room its standing edge leaves, which a keyboard coming up takes away — and when
+    // it would cover the chrome.
+    if (fieldKept) {
+      const k = fieldKept;
+      const s = session.getState();
+      const held = s.summon ? heldBoxOf(s.summon) : null;
+      const cap = k.edge === 'top' ? v.bottom - FIELD_M - k.y : k.y - Math.max(v.top + FIELD_M, u.top + FIELD_M);
+      const still = sameScreenBox(k.held, held);
+      if (!still) fieldAnchor = carriedBy(fieldAnchor, k.held, held);
+      let fits = still && k.w <= v.width - FIELD_M * 2 && cap > FIELD_LIST_MIN;
+      if (fits) { summonEl.style.width = k.w + 'px'; fits = fieldNaturalHeight() <= cap; }
+      if (fits) {
+        fitFieldHeight(v, u, cap);
+        const h = summonEl.offsetHeight;
+        const box = { x: k.x, y: k.edge === 'top' ? k.y : k.y - h, w: k.w };
+        if (keptFieldStands(box, h, v, [panelRect(), minimapRect()].filter(Boolean))) {
+          summonEl.style.left = box.x + 'px';
+          summonEl.style.top = box.y + 'px';
+          return box;
+        }
+      }
+      fieldKept = null;
+    }
     // Width first: the height below is whatever the content comes to at that
     // width, measured rather than assumed.
     const avoid = fieldAvoids();
     const first = fieldBox(fieldAnchor, { viewport: v, usable: u, height: 0, hand: hand, avoid: avoid });
     summonEl.style.width = first.w + 'px';
     fitFieldHeight(v, u);
-    const box = fieldBox(fieldAnchor, { viewport: v, usable: u, height: summonEl.offsetHeight, hand: hand, avoid: avoid });
+    const h = summonEl.offsetHeight;
+    const box = fieldBox(fieldAnchor, { viewport: v, usable: u, height: h, hand: hand, avoid: avoid });
     summonEl.style.left = box.x + 'px';
     summonEl.style.top = box.y + 'px';
     summonEl.style.width = box.w + 'px';
+    // Kept from here on, once it has its pills (the first placing is of an empty field): above the held marks it
+    // grows up, away from them; anywhere else its top stands.
+    if (!summonEl.querySelector('.list')) return box;
+    const s = session.getState();
+    const held = s.summon ? heldBoxOf(s.summon) : null;
+    const above = !!held && box.y + h <= held.top + 1;
+    fieldKept = { x: box.x, w: box.w, edge: above ? 'bottom' : 'top', y: above ? box.y + h : box.y, held: held };
     return box;
   }
 
@@ -881,7 +976,7 @@
 
   function renderSummon(s) {
     document.body.classList.toggle('summoning', !!s.summon);
-    if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; fieldAnchor = null; return; }
+    if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; fieldAnchor = null; fieldKept = null; return; }
     const sum = s.summon;
     // The same field, rendered again: its content already stands and rebuilding
     // it would throw away the caret — but the space it stands in may have
@@ -889,6 +984,7 @@
     if (shownSummonId === sum.id) { placeField(); return; }
     shownSummonId = sum.id;
     fieldAnchor = fieldAnchorFor(sum);
+    fieldKept = null;
     paletteContext = contextFor(sum.enclosedIds);
     paletteItems = rankItems(conversionsFor(s), paletteContext);
     paletteIndex = -1;
@@ -904,8 +1000,8 @@
     filter.className = 'filter';
     filter.setAttribute('autocomplete', 'off');
     filter.setAttribute('spellcheck', 'false');
-    const onArt = sum.onArtifact ? (MM.wordOf(s.nodes.get(sum.onArtifact.artifactId)) || 'artifact') : null;
-    filter.placeholder = onArt ? 'on ' + onArt + ' — type what to change…' : sum.enclosedIds.length + ' mark' + (sum.enclosedIds.length === 1 ? '' : 's') + ' — a verb, a name, or what to make…';
+    const onArt = sum.onArtifact ? (MM.wordOf(s.nodes.get(sum.onArtifact.artifactId)) || null) : undefined;
+    filter.placeholder = onArt ? 'on ' + onArt + ' — type what to change…' : onArt === null ? 'on the thing made — type what to change…' : sum.enclosedIds.length + ' mark' + (sum.enclosedIds.length === 1 ? '' : 's') + ' — a verb, a name, or what to make…';
     filter.onkeydown = onPaletteKey;
     filter.oninput = () => { paletteNavigated = false; paletteIndex = -1; paintField(filter.value); meaningSoon(filter.value); };
     top.appendChild(filter);
@@ -1100,19 +1196,13 @@
   }
 
   /**
-   * The pills just rewrapped and the field grew: re-place it only if its foot
-   * has gone off the bottom. Re-placing on every keystroke would walk the
-   * field up the screen under the hand.
+   * The pills just rewrapped and the field grew: it stays where it opened, growing away from what it holds, its
+   * pills scrolling in the room a keyboard leaves (R6) — placed again only when it would leave the screen or
+   * cover the panel or the minimap (UX-06, placeField's kept place). Re-placing on every keystroke walked the
+   * field about under the hand.
    */
   function keepFieldOnScreen() {
     if (!summonEl.classList.contains('field')) return;
-    const v = viewportRect();
-    // The pills' list held to the room a keyboard leaves, or let go once they fit again (R6).
-    fitFieldHeight(v, usableViewport());
-    const r = summonEl.getBoundingClientRect();
-    // …or has grown over a card it keeps off — a model's readings landing make it taller (U1c).
-    const over = fieldAvoids().some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top);
-    if (!over && r.bottom <= v.bottom - 2 && r.right <= v.right - 2 && r.top >= v.top - 2 && r.left >= v.left - 2) return;
     placeField();
   }
 
@@ -1122,7 +1212,8 @@
     const shown = visibleItems(q);
     if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); paletteNavigated = true; paletteIndex = Math.min(shown.length - 1, paletteIndex + 1); paintField(q); return; }
     if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); paletteNavigated = true; paletteIndex = Math.max(0, paletteIndex - 1); paintField(q); return; }
-    if (e.key === 'Escape') { e.preventDefault(); session.dismiss(shownSummonId, Date.now()); return; }
+    // The field's own rung of the one Escape ladder (20-controls.js): it closes the field, or the controls standing over it.
+    if (e.key === 'Escape') { e.preventDefault(); escapeStep(e.target); return; }
     if (e.key !== 'Enter') return;
     e.preventDefault();
     // The arrows chose a pill: Enter takes it. Otherwise Enter does what the

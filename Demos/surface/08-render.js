@@ -6,7 +6,9 @@
 // Uses: core, view, artifacts, snap, models, seatpane (isHouse: dyna.ink's own are not named in the standing line), palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
 //   packs (packShort — a match chip says its pack; a pack this build lacks is said in the standing line),
 //   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet),
-//   selection (dragPreview, dragFollowers — what follows a drag is drawn where it will stand, V1-PLAN E2).
+//   selection (dragPreview, dragFollowers — what follows a drag is drawn where it will stand, V1-PLAN E2),
+//   the first hour (27-first.js: tapWords, resting, syncFirstRun, motionReduced — the standing line's word for the hand,
+//   an example opened with nothing inspected, the first-run sheet, a working dot that holds still).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -40,9 +42,10 @@
     if (s.summon) return 'type in the field, or tap a pill · a tap on the ground lets go';
     // One mark with its own points showing (E1): a ring reshapes its clean form.
     if (s.selection.length) return 'drag inside to move, a corner to scale, the knob to turn' + (markHandles(s).length ? ', a ring to reshape' : '') + ' · Esc lets go';
-    if (s.pendingLassoId) return 'or double-tap inside the loop';
-    if (!strokes && !s.artifacts.length) return 'draw anything · double-click empty ground to type';
-    return 'press and hold a mark to hold it · or circle marks and double-tap inside';
+    // The hand's own word (27-first.js, tapWords): a finger or a pen double-taps, a mouse double-clicks.
+    if (s.pendingLassoId) return 'or ' + tapWords() + ' inside the loop';
+    if (!strokes && !s.artifacts.length) return 'draw anything · ' + tapWords() + ' empty ground to type';
+    return 'press and hold a mark to hold it · or circle marks and ' + tapWords() + ' inside';
   }
 
   /** The last mark on the board whose box, with a little slack, holds the point — found among the few the paint's index says could. */
@@ -817,7 +820,7 @@
       const node = s.nodes.get(id), b0 = MM.boundsOf(node), pl = bodyPlacement(id);
       const b = pl ? { minX: b0.minX + pl.dx, maxX: b0.maxX + pl.dx, minY: b0.minY + pl.dy, maxY: b0.maxY + pl.dy } : b0;
       ctx.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
-      const w = ctx.measureText((MM.wordOf(node) || '') + '  ·  live').width;
+      const w = ctx.measureText(MM.wordOf(node) || '').width + wpx(40);
       const chrome = { minX: b.minX - wpx(24), minY: b.minY - wpx(40), maxX: Math.max(b.maxX, b.minX + w) + wpx(24), maxY: b.maxY + wpx(24) };
       if (boxMeets(chrome, vb)) out.add(id);
     }
@@ -918,7 +921,8 @@
       chipHits.push({ ids: group.length ? group : [id], x: at.x, y: at.y, w: at.w, h: at.h, text: rc.text });
     }
 
-    const inspectedId = hoverId || lastContentId(s);
+    // A board opened whole inspects nothing until the hand points or draws (27-first.js, resting; UX-11).
+    const inspectedId = hoverId || (resting() ? null : lastContentId(s));
     const pv = dragPreview();
     // The connectors bound to what a drag moves, each drawn as it will stand when the hand lets go (V1-PLAN E2).
     followShown = pv ? dragFollowers() : null;
@@ -997,22 +1001,25 @@
         // rule the reading under a mark already follows: shown for the one the
         // hand is on, not for every mark on the board.
         if (chromeShown(s, id, inspectedId)) {
-          const name = (MM.wordOf(node) || '') + (isLive ? '  ·  live' : '');
+          const name = MM.wordOf(node) || '';
           if (paintOps) recordOp({ kind: 'chrome', id: id, text: name, box: boxOfRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY), moved: !!pl });
           brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
           text(name, b.minX, b.minY - wpx(10), C.gold);
         }
       } else if (b && !pending && id === inspectedId && !s.selection.length) {
         // The reading of the mark the hand just made (or is over), and only
-        // that one: what it is, and what it plays. Under every mark it was a
-        // board of fragments; the panel has the rest.
+        // that one: what it is. Under every mark it was a board of fragments;
+        // the panel has the rest. What it plays — node, edge, annotation — is
+        // the engine's word, so it is said in the panel's details and kept for
+        // the tests (`role`), never drawn under the mark (the UX pass, UX-08:
+        // "text · annotation" under a squiggle).
         const top = readingUnder(s, node, id);
         const role = readRungs(s).roles.get(id);
-        const played = role && role.role !== 'unclassified' && role.role !== top ? ' · ' + role.role : '';
+        const played = role && role.role !== 'unclassified' && role.role !== top ? role.role : null;
         if (top) {
-          readingDrawn = { id: id, text: top + played };
-          if (paintOps) recordOp({ kind: 'reading', id: id, text: top + played, box: boxOfRect(b.minX, b.maxY, 0, wpx(15)), moved: !!pl });
-          text(top + played, b.minX, b.maxY + wpx(15), `rgba(${C.labelRGB},0.85)`);
+          readingDrawn = { id: id, text: top, role: played };
+          if (paintOps) recordOp({ kind: 'reading', id: id, text: top, role: played, box: boxOfRect(b.minX, b.maxY, 0, wpx(15)), moved: !!pl });
+          text(top, b.minX, b.maxY + wpx(15), `rgba(${C.labelRGB},0.85)`);
         }
       }
     }
@@ -1049,6 +1056,7 @@
     syncMarkChip(s);
     renderSummon(s);
     renderInspector(s, inspectedId);
+    syncFirstRun(s);
     renderMinimap(s);
 
     // The status line: what just happened, else the standing state, in a few
@@ -1061,7 +1069,7 @@
     const parts = strokes ? [strokes + ' mark' + (strokes === 1 ? '' : 's')] : []; // an empty board: the next move says it
     if (s.artifacts.length) {
       const running = liveSet(s).size;
-      parts.push(s.artifacts.length + ' thing' + (s.artifacts.length === 1 ? '' : 's') + ' made' + (s.live.length ? ' (' + (running < s.live.length ? running + ' of ' + s.live.length + ' live, the rest parked' : s.live.length + ' live') + ')' : ''));
+      parts.push(s.artifacts.length + ' thing' + (s.artifacts.length === 1 ? '' : 's') + ' made' + (running < s.live.length ? ' (' + running + ' of ' + s.live.length + ' shown — pan closer to the rest)' : ''));
     }
     if (s.regions.length) parts.push(s.regions.length + ' region' + (s.regions.length === 1 ? '' : 's'));
     const fs = folderStatus();
@@ -1105,7 +1113,7 @@
     if (key === statusSaid) return;
     statusSaid = key;
     if (!warn) { statusEl.textContent = text; return; }
-    const label = { export: 'export the log', folder: 'open a folder' };
+    const label = { export: 'save it as a file', folder: 'open a folder' };
     statusEl.innerHTML = '<span class="lead">' + esc(warn.lead) + '</span>' +
       (ways.length ? ': ' + ways.map((w) => '<button type="button" data-way="' + w + '">' + label[w] + '</button>').join(', or ') : '') +
       (text ? '<span class="rest">  ·  ' + esc(text) + '</span>' : '');
@@ -1121,7 +1129,8 @@
       let x, y;
       if (boxes.length) { const b = union(boxes); x = b.minX; y = b.minY - wpx(28); }
       else { const c = screenToWorld(innerWidth / 2, 70); x = c.x; y = c.y; }
-      const r = wpx(4 + 2 * Math.sin(t * 4));
+      // It breathes — unless the person asked for less motion (C4), when it holds still.
+      const r = wpx(motionReduced() ? 5 : 4 + 2 * Math.sin(t * 4));
       ctx.beginPath(); ctx.arc(x + wpx(5), y - wpx(4), r, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(${C.goldRGB},0.85)`; ctx.fill();
       text(w.label, x + wpx(16), y, C.gold);

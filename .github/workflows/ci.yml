@@ -129,6 +129,11 @@ jobs:
       # allowlist whose every entry says why and is still needed.
       - name: The name a person sees
         run: node --test ../scripts/name.test.mjs
+      # The words a person sees (the UX pass, UX-08): the surface's strings and the page say a mark, a thing made, a
+      # board — never artifact, live, log, session, event, tier, participant, notation, a pack's id, annotation,
+      # node or edge, a local port, 127.0.0.1 or ?live= — outside an allowlist whose every entry says why.
+      - name: The words a person sees
+        run: node --test ../scripts/words.test.mjs
       # The rights (RENAME-PLAN N2): LICENSE is the FSF's AGPL-3.0 text byte for
       # byte, every package says AGPL-3.0-only, NOTICE is the one home of who
       # holds the copyright and the whitepaper's footer and TRADEMARKS.md name the

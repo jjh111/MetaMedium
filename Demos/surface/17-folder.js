@@ -674,7 +674,7 @@
     try { logs = await store.readLogs(); }
     catch (err) {
       if (err && err.name === 'LogFormatError') { say(err.message); return null; }
-      readFailed = 'could not read the logs: ' + (err.message || err);
+      readFailed = 'could not read what the folder keeps of its boards: ' + (err.message || err);
     }
     // From here this page's log is the folder's or the room's: the board this
     // browser keeps stays as it was (where the hand left it too), and is not written again from this page.
@@ -728,7 +728,7 @@
     if (folder.how === 'folder' || folder.how === 'git' || folder.how === 'static') rememberPlace(folder.how, folder.name || folder.how, folder.name, opts.handle || null);
     syncBoardFaces();
     const misnumbered = [...folder.misnumbered.values()];
-    flash((carry ? 'the board is kept in ' + (folder.name || 'the folder') + ' now — ' + carry.length + ' event' + (carry.length === 1 ? '' : 's') + ' carried in, '
+    flash((carry ? 'the board is kept in ' + (folder.name || 'the folder') + ' now — ' + carry.length + ' change' + (carry.length === 1 ? '' : 's') + ' carried in, '
       : 'opened ' + (folder.name || 'a folder') + ': ') + entries.length + ' file' + (entries.length === 1 ? '' : 's') + (folder.truncated ? ' shown — the folder holds more' : '') +
       (misnumbered.length ? ' · ' + misnumbered.join(' · ') : ''));
     return folder;
@@ -1518,7 +1518,7 @@
   /** A big board: say so, and let the line paint before the replay holds the thread. */
   function boardOpening(n) {
     if (n < 400) return Promise.resolve();
-    say('opening the board kept in this browser — ' + n + ' events…', 600000);
+    say('opening the board kept in this browser — ' + n.toLocaleString('en') + ' changes to read…', 600000);
     return new Promise((resolve) => {
       let done = false;
       const go = () => { if (!done) { done = true; resolve(); } };
@@ -1715,7 +1715,7 @@
     return { events };
   }
   /** What a log written by this page says of itself in the status line: the version, and that an older app opens it. */
-  function logFileNote() { return ' · log version ' + MM.LOG_VERSION + ' — an older dyna.ink opens it too'; }
+  function logFileNote() { return ' · a board file, version ' + MM.LOG_VERSION + ' — an older dyna.ink opens it too'; }
   /**
    * The version this page is: its <meta name="dynaink-version">, or — on a page an older worker kept — the name that
    * tag had before (17-boards.js's pageVersionOf, RENAME-PLAN N3b). '' for none.
@@ -1760,13 +1760,13 @@
       else if (b.notCarried.length) notes.push(plural(b.notCarried.length, 'picture') + ' named in this board ' + (b.notCarried.length === 1 ? 'is' : 'are') + ' not in the file — ' + (b.notCarried.length === 1 ? 'it stands' : 'they stand') + ' as ' + (b.notCarried.length === 1 ? 'its name' : 'their names'));
     } else {
       const r = readLogText(await file.text(), file.name);
-      if (!r.events) return refuse(r.refused || '“' + file.name + '” is not a board’s log — one event per line, as export writes it');
+      if (!r.events) return refuse(r.refused || '“' + file.name + '” is not a board — a board file is what “export” writes, one change a line');
       events = r.events;
       // A bare log names pictures it does not carry: the ones this device holds draw, the rest stand as their names.
       const named = [...assetsOfEvents(events)];
       const lacking = [];
       for (const ref of named) if (!(await assetGet(ref))) lacking.push(ref);
-      if (lacking.length) { notes = [plural(lacking.length, 'picture') + (lacking.length === 1 ? ' is' : ' are') + ' named in this log but ' + (lacking.length === 1 ? 'is' : 'are') + ' not in it — ' + (lacking.length === 1 ? 'it stands' : 'they stand') + ' as ' + (lacking.length === 1 ? 'its name' : 'their names') + '; export “board + pictures”, a .zip, to carry them']; }
+      if (lacking.length) { notes = [plural(lacking.length, 'picture') + (lacking.length === 1 ? ' is' : ' are') + ' named on this board but ' + (lacking.length === 1 ? 'is' : 'are') + ' not in it — ' + (lacking.length === 1 ? 'it stands' : 'they stand') + ' as ' + (lacking.length === 1 ? 'its name' : 'their names') + '; export “board + pictures”, a .zip, to carry them']; }
     }
     try {
       const made = await newBoard(Object.assign({}, o, { name: name, events: events }));
@@ -1842,7 +1842,7 @@
       if (!br.ok) { failed.push({ name: b.name, why: br.words }); continue; }
       let read;
       try { read = readLogText(br.text, b.name); } catch (err) { read = { notLog: true }; }
-      if (!read.events) { failed.push({ name: b.name, why: read.refused || 'its board.jsonl is not a board’s log' }); continue; }
+      if (!read.events) { failed.push({ name: b.name, why: read.refused || 'the board in it cannot be read' }); continue; }
       incoming.push({ key: key, name: b.name, view: b.view, events: read.events, assets: br.assets, damaged: br.damaged.length, hash: await logHash(read.events) });
     }
     const held = await carryHeld();
@@ -1898,7 +1898,7 @@
    */
   async function resetBoard() {
     if (boards.how !== 'indexeddb') {
-      if (Date.now() - board.resetArmed > 5000) { board.resetArmed = Date.now(); say('this browser keeps one board here and has no trash — export the log to keep it; Reset again within 5 s empties it'); return false; }
+      if (Date.now() - board.resetArmed > 5000) { board.resetArmed = Date.now(); say('this browser keeps one board here and has no trash — save it as a file to keep it; Reset again within 5 s empties it'); return false; }
       board.resetArmed = 0;
       await forgetLocalLog();
       location.reload();
@@ -1989,7 +1989,7 @@
   function exportLogNow() {
     const evs = session.getEvents();
     downloadText('canvas.jsonl', MM.encodeLog(evs, logWrite()), 'application/json');
-    flash('canvas.jsonl — the whole board, ' + evs.length + ' events, to keep' + logFileNote());
+    flash('canvas.jsonl — the whole board as a file, ' + evs.length + ' change' + (evs.length === 1 ? '' : 's') + ', to keep' + logFileNote());
   }
   statusEl.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('button[data-way]');
@@ -2044,7 +2044,7 @@
       // name — this tab's own included, which both hands that share it hear —
       // and a truncated history.
       const notes = roomNotices();
-      return 'live ' + roomShort(folder.name) + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') +
+      return 'in room ' + roomShort(folder.name) + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') +
         (notes.length ? ' · ' + notes.join(' · ') : '') + (folder.error ? ' · ' + folder.error : '');
     }
     const n = folder.entries.length;
@@ -2098,6 +2098,9 @@
 
   function setViewMode(mode) {
     viewMode = mode;
+    // The panel speaks of the canvas's marks; over the grid it hid the first cards and its empty-board steps covered
+    // the grid's own words (the UX pass, UX-14). It stands aside while the grid shows.
+    document.body.classList.toggle('gridView', mode === 'grid');
     if (mode === 'grid') { renderGrid(session.getState()); gridEl.hidden = false; }
     else gridEl.hidden = true;
     document.getElementById('gridBtn').setAttribute('aria-pressed', String(mode === 'grid'));
@@ -2116,7 +2119,7 @@
     viewBarEl.hidden = false;
     const order = gridOrder(s);
     if (viewMode === 'grid') {
-      viewBarEl.innerHTML = '<b>' + order.length + '</b> artifact' + (order.length === 1 ? '' : 's') + ' · sort ' +
+      viewBarEl.innerHTML = '<b>' + order.length + '</b> thing' + (order.length === 1 ? '' : 's') + ' made · sort ' +
         ['name', 'kind', 'recency', 'folder'].map((k) => '<button data-sort="' + k + '"' + (gridSort === k ? ' class="on"' : '') + '>' + k + '</button>').join('') +
         '<button data-view="canvas" title="Esc">canvas</button>';
     } else {
@@ -2136,7 +2139,7 @@
 
   function renderGrid(s) {
     const order = gridOrder(s);
-    let html = order.length ? '<div class="cards">' : '<div class="empty">no artifacts yet — name something, or open a folder</div><div class="cards">';
+    let html = order.length ? '<div class="cards">' : '<div class="empty">nothing made yet — name something you drew, or open a folder</div><div class="cards">';
     for (const id of order) {
       const n = s.nodes.get(id);
       const r = codeRepOf(n);
@@ -2183,7 +2186,6 @@
   document.getElementById('folderBtn').onclick = () => { closeCC(); openFolder(); };
   addEventListener('keydown', (e) => {
     if (e.target !== document.body && e.target !== document && e.target !== window) return;
-    if (e.key === 'Escape' && viewMode !== 'canvas') { setViewMode('canvas'); e.preventDefault(); }
     if (viewMode === 'focus' && e.key === 'ArrowRight') { focusStep(1); e.preventDefault(); }
     if (viewMode === 'focus' && e.key === 'ArrowLeft') { focusStep(-1); e.preventDefault(); }
   });

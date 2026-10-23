@@ -12,7 +12,8 @@
 // printed, never a verdict. Run by the gate (`node e2e/run.mjs walk`, in the
 // default run — PLAN-FIELD-PAR FP9), `runWalk` holds the push's records W1–W8
 // against the same scenes, drawn the same way:
-//   W1   a one-stroke arrow drawn into a box is tied at its tip as well as its tail (FP3)
+//   W1   a one-stroke arrow drawn into a box is tied at its tip as well as its tail (FP3); one of 120 px
+//        between two small boxes too, and the field then offers Tidy the diagram (W1c, the UX pass, UX-07)
 //   W2   John's two boxes and a line, circled and checked, read as a diagram and are
 //        offered Make it Mermaid and Tidy the diagram (FP2); the arrow's the same (W2b);
 //        the molecule is its own thing — none of these (W2c)
@@ -23,10 +24,12 @@
 //   W4   a lone word that matches nothing waits for a pick: Enter writes nothing (FP4)
 //   W5   name and label: two pills only when they differ, each saying how; one when they
 //        would do the same
-//   W6   Read as writing is not offered on a head drawn apart (FP7)
+//   W6   Read as writing is not offered on a head drawn apart (FP7), nor on two boxes and a trembling arrow
+//        between them (W6b, UX-10)
 //   W7   no developer's words on the field's line or the panel (FP6)
 //   W8   with a semantic seat held, a word no table knows finds its act by meaning while
 //        typing, the seat asked once per rest (D1)
+//   W9   the field stays where it opened while ten words are typed into it, one key at a time (UX-06)
 
 import { chromium } from 'playwright';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -57,6 +60,8 @@ function arrow(a, b) {
   const w1 = { x: b.x - 22 * ux + 12 * uy, y: b.y - 22 * uy - 12 * ux }, w2 = { x: b.x - 22 * ux - 12 * uy, y: b.y - 22 * uy + 12 * ux };
   return join2(lerp(a, b, 40), lerp(b, w1, 8), lerp(w1, b, 8), lerp(b, w2, 8));
 }
+/** A hand that trembles a little: the same seeded noise on every run (the audit's walk, UX-10). */
+const jitter = (pts, j = 1.2, seed = 7) => { let s = seed; const r = () => ((s = (s * 16807) % 2147483647) / 2147483647 - 0.5) * 2 * j; return pts.map((p) => ({ x: p.x + r(), y: p.y + r() })); };
 const writing = (x, y, w, h, humps = 7) => Array.from({ length: humps * 14 + 1 }, (_, i) => { const t = i / (humps * 14), a = t * humps * Math.PI; return { x: x + w * t, y: y + h / 2 - (h / 2) * Math.abs(Math.sin(a)) * (0.7 + 0.3 * Math.cos(a * 0.37)) }; });
 
 async function draw(page, pts) {
@@ -114,6 +119,16 @@ const SCENES = {
     await draw(p, arrow({ x: 380, y: 282 }, { x: 380, y: 338 })); await draw(p, arrow({ x: 380, y: 462 }, { x: 380, y: 538 })); await draw(p, arrow({ x: 462, y: 400 }, { x: 598, y: 400 }));
     await hold(p, 300, 240);
   },
+  // The UX pass, UX-07: a small diagram — two boxes a hand draws on a phone, an arrow of 120 px between them, its barb
+  // as tall as an x-height. The letter rule took it for a letter and neither end tied.
+  'short-arrow-into-box': async (p) => { await draw(p, box(400, 400, 100, 70)); await draw(p, box(622, 400, 100, 70)); await draw(p, arrow({ x: 502, y: 435 }, { x: 620, y: 435 })); },
+  'short-arrow-hold': async (p) => { await draw(p, box(400, 400, 100, 70)); await draw(p, box(622, 400, 100, 70)); await draw(p, arrow({ x: 502, y: 435 }, { x: 620, y: 435 })); await hold(p, 400, 430); },
+  'arrow-hold': async (p) => { await draw(p, box(400, 380, 160, 110)); await draw(p, box(760, 380, 160, 110)); await draw(p, arrow({ x: 562, y: 435 }, { x: 758, y: 435 })); await hold(p, 400, 430); },
+  // The audit's own drawing (UX-10): two boxes and an arrow drawn with a little tremor, which the rung reads
+  // "probably an arrow" — unsure — and which was offered Read as writing.
+  'trembling-arrow-hold': async (p) => { await draw(p, jitter(box(260, 520, 160, 100))); await draw(p, jitter(box(620, 520, 160, 100))); await draw(p, jitter(arrow({ x: 422, y: 570 }, { x: 618, y: 570 }), 0.8)); await hold(p, 262, 570); },
+  // The audit's typing walk (UX-06): the same, with a line of writing across the board, held by the left box.
+  'typing-walk': async (p) => { await draw(p, jitter(box(260, 520, 160, 100))); await draw(p, jitter(box(620, 520, 160, 100))); await draw(p, jitter(arrow({ x: 422, y: 570 }, { x: 618, y: 570 }), 0.8)); await draw(p, writing(900, 300, 220, 40)); await p.waitForTimeout(300); await hold(p, 262, 570); },
   'arrow-into-box': async (p) => { await draw(p, box(400, 380, 160, 110)); await draw(p, box(760, 380, 160, 110)); await draw(p, arrow({ x: 562, y: 435 }, { x: 758, y: 435 })); },
   'named-thing-hold': async (p) => {
     await draw(p, box(400, 380, 160, 110)); await draw(p, box(760, 380, 160, 110)); await draw(p, lerp({ x: 562, y: 435 }, { x: 758, y: 435 }, 30));
@@ -161,6 +176,18 @@ export async function runWalk(browser, servers, { freshContext }) {
       const f = await facts(page);
       check(`W1. a one-stroke arrow drawn into a box is tied at its tail and at its tip, where its ink points (binds: ${f.binds.join(', ') || 'none'}; the pen lifted at a barb's wing)`,
         f.binds.includes('start') && f.binds.includes('end'), f);
+    });
+  });
+  await record('W1c', async () => {
+    await scene('short-arrow-into-box', async (page) => {
+      const f = await facts(page);
+      check(`W1c. a one-stroke arrow of 120 px between two small boxes — as short as a letter — is tied at both ends (binds: ${f.binds.join(', ') || 'none'})`,
+        f.binds.includes('start') && f.binds.includes('end'), f);
+    });
+    await scene('short-arrow-hold', async (page) => {
+      const f = await fieldNow(page);
+      check(`W1d. held, the small diagram is offered Tidy the diagram and Route the connectors, which ask for tied ends (affords: ${f && f.affords.join(' | ')})`,
+        f && f.affords.includes('Tidy the diagram') && f.affords.includes('Route the connectors'), f);
     });
   });
   await record('W2', async () => {
@@ -242,6 +269,12 @@ export async function runWalk(browser, servers, { freshContext }) {
       check(`W6. Read as writing is not offered on a head drawn apart (affords: ${f && f.affords.join(' | ')})`, f && !f.affords.includes('Read as writing'), f);
     });
   });
+  await record('W6b', async () => {
+    await scene('trembling-arrow-hold', async (page) => {
+      const f = await fieldNow(page);
+      check(`W6b. two boxes and a trembling arrow between them, held: Read as writing is not offered (affords: ${f && f.affords.join(' | ')})`, f && f.affords.length > 0 && !f.affords.includes('Read as writing'), f);
+    });
+  });
   await record('W7', async () => {
     const said = [];
     for (const name of ['john-line-lasso', 'one-box-hold', 'writing-hold']) {
@@ -274,6 +307,26 @@ export async function runWalk(browser, servers, { freshContext }) {
       const calls = await page.evaluate(() => window.__walkEmbedCalls() - window.__walkEmbedStart);
       check(`W8. with a semantic seat held, "schematic" — in no word table — finds Make it Mermaid by meaning while typing (${f && allPills(f).join(' | ')}; line ${f && f.line}), the seat asked ${calls} time(s) for nine keystrokes`,
         seated && f && allPills(f).includes('Make it Mermaid') && calls >= 1 && calls <= 2, { f, calls });
+    });
+  });
+  await record('W9', async () => {
+    await scene('typing-walk', async (page) => {
+      const input = page.locator('#summon input.filter');
+      await input.click();
+      const at = () => page.evaluate(() => { const r = document.querySelector('#summon').getBoundingClientRect(); return { x: Math.round(r.left), y: Math.round(r.top), b: Math.round(r.bottom) }; });
+      const start = await at();
+      const seen = [start];
+      for (const ch of 'make it a diagram and tidy the boxes then route them') {
+        await page.keyboard.type(ch, { delay: 10 });
+        await page.waitForTimeout(110);
+        seen.push(await at());
+      }
+      // Its top stands (or its bottom, when it opened above what it holds): the edge that does not move.
+      const tops = seen.map((p) => p.y), bottoms = seen.map((p) => p.b), xs = seen.map((p) => p.x);
+      const span = (a) => Math.max(...a) - Math.min(...a);
+      const moved = Math.min(span(tops), span(bottoms)), across = span(xs);
+      check(`W9. the field stays where it opened while ten words are typed one key at a time (its standing edge moved ${moved} px, across ${across} px; it opened at ${start.x},${start.y})`,
+        moved <= 3 && across <= 3, { seen });
     });
   });
   return { steps, guards: [guards] };

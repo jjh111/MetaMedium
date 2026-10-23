@@ -282,9 +282,9 @@
       const eats = (vertical ? (side === 'left' ? p.right - v.left : v.right - p.left) / vw
         : (side === 'top' ? p.bottom - v.top : v.bottom - p.top) / vh);
       if (!hugs) { docks.push({ id: p.id, edge: 'none', why: 'floats, ' + Math.round(hug[side]) + 'px off the ' + side }); continue; }
-      if (cover < DOCK_COVER) { docks.push({ id: p.id, edge: 'none', why: 'covers ' + Math.round(cover * 100) + '% of the ' + side + ' edge' }); continue; }
+      if (cover < DOCK_COVER) { docks.push({ id: p.id, edge: 'none', why: 'covers ' + Math.round(cover * 100) + '% of the ' + side + ' side' }); continue; }
       if (eats > DOCK_MAX) { docks.push({ id: p.id, edge: 'none', why: 'would eat ' + Math.round(eats * 100) + '% of the canvas' }); continue; }
-      docks.push({ id: p.id, edge: side, why: 'covers ' + Math.round(cover * 100) + '% of the ' + side + ' edge' });
+      docks.push({ id: p.id, edge: side, why: 'covers ' + Math.round(cover * 100) + '% of the ' + side + ' side' });
       if (side === 'left') free.left = Math.max(free.left, p.right);
       else if (side === 'right') free.right = Math.min(free.right, p.left);
       else if (side === 'top') free.top = Math.max(free.top, p.bottom);
@@ -646,7 +646,7 @@
         wrap.className = 'artifactFrame parked';
         const card = document.createElement('div');
         card.className = 'park';
-        card.innerHTML = '<b>' + esc(MM.wordOf(node) || id) + '</b>' + esc((rep.data.kind || 'html') + (rep.data.path ? ' · ' + rep.data.path : '')) + '<br>parked — past the live budget; pan closer to run it';
+        card.innerHTML = '<b>' + esc(MM.wordOf(node) || id) + '</b>' + esc((rep.data.kind || 'html') + (rep.data.path ? ' · ' + rep.data.path : '')) + '<br>waiting — only the nearest few run at once; pan closer to run it';
         wrap.appendChild(card);
         stage.appendChild(wrap);
         f = { wrap: wrap, iframe: null, codeAt: 'parked', parked: true };
@@ -4368,7 +4368,7 @@
 // ===== input =====
 // Provides: pointer input (draw, pan, pinch) for the mouse, the pen and the finger — the palm ignored,
 //   the pen's pressure on every point it draws, its hover a hover (V1-PLAN R6) — keys (undo, copy,
-//   paste, erase, zoom), say()/flash() for the status line.
+//   paste, erase, zoom — Escape is the controls' one ladder, escapeStep), say()/flash() for the status line.
 // Uses: core (draws, setDraws), hand (the rules: fingerRole, palmNow, whenPenLands, releaseIs, PAN_SLOP_PX), view,
 //   snap (autoSweep, magnetQuery), render (drawLive), palette (copyMarks, pasteClip), handwriting
 //   (autoRead), artifacts (pointerFrameAt), kinds (postPointer).
@@ -4724,7 +4724,7 @@
     lastTap = null;
     session.summonMarks(group, Date.now());
     render(session.getState());
-    if (group.length > 1) flash('held with ' + (group.length - 1) + ' it hangs together with');
+    if (group.length > 1) flash('held, with the ' + (group.length - 1) + ' beside it that belong with it');
   }
 
   /** Is a world point inside the loop that waits to be taken up? */
@@ -4841,7 +4841,8 @@
       // …and a letter-sized stroke is writing, not a connector: an l beside a
       // box reads line 0.9, and pulling its foot onto the box's edge unwrites
       // the word (found by e2e 16 and 33).
-      const letterLike = MM.isLetterLike(MM.getBounds(points), 1 / view.zoom);
+      // A short arrow drawn from one closed mark into another is a connector whatever its size (UX-07).
+      const letterLike = MM.isLetterLike(MM.getBounds(points), 1 / view.zoom) && !arrowBetweenClosed(analysis, null);
       if (connector && !isMark && !letterLike) {
         // Only the place moves: a pen's pressure stays on the point it was pressed at.
         if (magnetStart) points[0] = Object.assign({}, points[0], { x: magnetStart.site.point.x, y: magnetStart.site.point.y });
@@ -4924,12 +4925,30 @@
 
   let lastTap = null; // the last tap on empty ground, for the double-tap
   const DOUBLE_TAP_MS = 400;
+  let loopTakenAt = 0; // when a double-tap inside a waiting loop took it up: the dblclick that follows is not 'type here'
 
+  // How sure the rung must be that a short stroke is an arrow before its size stops making it a letter (UX-07).
+  const ARROW_TIES_AT = 0.6;
   /**
-   * A tap: the dead state. A tap while something is dismissable is the dismissal, and never
-   * a dot — the pen's or the mouse's stroke too short to be one, or a finger's that never
-   * moved while the pen is what draws.
+   * A one-stroke arrow as short as a letter — up to about 150 px, its barb about as tall as an x-height — is
+   * still a connector when the rung reads it an arrow at ARROW_TIES_AT or more and its tail and tip each land
+   * on a closed mark, two different ones (UX-07): the letter rule vetoed it, so a small diagram's arrows never
+   * tied and Tidy and Route were never offered, while a line the same length between the same boxes tied. A
+   * letter beside a box lands on no second closed mark, so writing is still writing. `except` is the stroke's
+   * own id once it is on the board.
    */
+  function arrowBetweenClosed(analysis, except) {
+    const top = analysis && analysis.results && analysis.results[0];
+    if (!top || top.type !== 'arrow' || top.confidence < ARROW_TIES_AT || !top.meta || !top.meta.tip || !top.meta.tail) return false;
+    const closedAt = (p) => {
+      const hit = magnetQuery(p, except);
+      const n = hit && state.nodes.get(hit.site.nodeId);
+      return n && MM.standsClosed(n) ? hit.site.nodeId : null;
+    };
+    const a = closedAt(top.meta.tail), b = closedAt(top.meta.tip);
+    return !!a && !!b && a !== b;
+  }
+
   /**
    * The magnet at the end of a just-drawn ARROW its ink points with, or null:
    * `{ end, hit }`. Only an arrow (its tail read apart from its tip), never the
@@ -4944,11 +4963,16 @@
     if (!top || top.type !== 'arrow') return null;
     const activeMark = state.commandMark || MM.BUILTIN_COMMAND_MARK;
     if (activeMark && MM.matchesCommandMark(analysis.fingerprint, activeMark).match) return null;
-    if (MM.isLetterLike(MM.getBounds(pts), 1 / view.zoom)) return null;
+    if (MM.isLetterLike(MM.getBounds(pts), 1 / view.zoom) && !arrowBetweenClosed(analysis, id)) return null;
     const end = ends.tail === 'start' ? 'end' : 'start';
     const hit = magnetQuery(ends[end], id);
     return hit ? { end: end, hit: hit } : null;
   }
+  /**
+   * A tap: the dead state. A tap while something is dismissable is the dismissal, and never
+   * a dot — the pen's or the mouse's stroke too short to be one, or a finger's that never
+   * moved while the pen is what draws.
+   */
   function tapAt(e) {
     const s0 = session.getState();
     const now = Date.now();
@@ -4968,7 +4992,7 @@
       const inside = b && w.x >= b.minX && w.x <= b.maxX && w.y >= b.minY && w.y <= b.maxY;
       const again = lastTap && now - lastTap.t < DOUBLE_TAP_MS && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 24;
       lastTap = { x: e.clientX, y: e.clientY, t: now };
-      if (inside && again) { lastTap = null; session.summonHeld(now); render(session.getState()); return; }
+      if (inside && again) { lastTap = null; loopTakenAt = now; session.summonHeld(now); render(session.getState()); return; }
       if (inside) { render(session.getState()); return; }
     }
     lastTap = { x: e.clientX, y: e.clientY, t: now };
@@ -5025,9 +5049,7 @@
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); session.undo(); }
     // Copy holds the selection's ink (and puts it on the clipboard as SVG); paste is handled with files, in the images fragment.
     if ((e.ctrlKey || e.metaKey) && e.key === 'c' && e.target === document.body && state.selection.length) { e.preventDefault(); copyMarks(state.selection.slice()); }
-    if (e.target === document.body && e.key === 'Escape' && state.selection.length && !state.summon) session.deselect(Date.now());
-    // Esc with nothing held stops every model call in flight: a slow model is not a hang, and the hand can say enough.
-    else if (e.target === document.body && e.key === 'Escape' && !state.selection.length && !state.summon) cancelWork();
+    // Escape is one ladder, in the controls fragment (escapeStep): the field, a pane, the grid, the selection, then work in flight.
     if (e.target === document.body && (e.key === 'Backspace' || e.key === 'Delete') && state.selection.length) {
       e.preventDefault();
       eraseSelection();
@@ -5063,7 +5085,8 @@
     else if (act === 'split') session.splitWord(id, Date.now());
     else if (act === 'clock-play') session.clock({ nodeId: id, op: 'play', at: Date.now() });
     // Play another hand's program HERE: this hand's own play, so the code runs in this tab only by the person's tap (C1).
-    else if (act === 'clock-play-here') playHere(id);
+    // A program another hand set playing — or a tank held still under reduced motion (C4) — plays by this hand's own play.
+    else if (act === 'clock-play-here') playItHere(id);
     else if (act === 'clock-pause') session.clock({ nodeId: id, op: 'pause', at: Date.now() });
     else if (act === 'clock-reset') session.clock({ nodeId: id, op: 'reset', at: Date.now() });
     else if (act === 'behave-use') {
@@ -5113,7 +5136,9 @@
 // Uses: core, view, artifacts, snap, models, seatpane (isHouse: dyna.ink's own are not named in the standing line), palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
 //   packs (packShort — a match chip says its pack; a pack this build lacks is said in the standing line),
 //   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet),
-//   selection (dragPreview, dragFollowers — what follows a drag is drawn where it will stand, V1-PLAN E2).
+//   selection (dragPreview, dragFollowers — what follows a drag is drawn where it will stand, V1-PLAN E2),
+//   the first hour (27-first.js: tapWords, resting, syncFirstRun, motionReduced — the standing line's word for the hand,
+//   an example opened with nothing inspected, the first-run sheet, a working dot that holds still).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -5147,9 +5172,10 @@
     if (s.summon) return 'type in the field, or tap a pill · a tap on the ground lets go';
     // One mark with its own points showing (E1): a ring reshapes its clean form.
     if (s.selection.length) return 'drag inside to move, a corner to scale, the knob to turn' + (markHandles(s).length ? ', a ring to reshape' : '') + ' · Esc lets go';
-    if (s.pendingLassoId) return 'or double-tap inside the loop';
-    if (!strokes && !s.artifacts.length) return 'draw anything · double-click empty ground to type';
-    return 'press and hold a mark to hold it · or circle marks and double-tap inside';
+    // The hand's own word (27-first.js, tapWords): a finger or a pen double-taps, a mouse double-clicks.
+    if (s.pendingLassoId) return 'or ' + tapWords() + ' inside the loop';
+    if (!strokes && !s.artifacts.length) return 'draw anything · ' + tapWords() + ' empty ground to type';
+    return 'press and hold a mark to hold it · or circle marks and ' + tapWords() + ' inside';
   }
 
   /** The last mark on the board whose box, with a little slack, holds the point — found among the few the paint's index says could. */
@@ -5924,7 +5950,7 @@
       const node = s.nodes.get(id), b0 = MM.boundsOf(node), pl = bodyPlacement(id);
       const b = pl ? { minX: b0.minX + pl.dx, maxX: b0.maxX + pl.dx, minY: b0.minY + pl.dy, maxY: b0.maxY + pl.dy } : b0;
       ctx.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
-      const w = ctx.measureText((MM.wordOf(node) || '') + '  ·  live').width;
+      const w = ctx.measureText(MM.wordOf(node) || '').width + wpx(40);
       const chrome = { minX: b.minX - wpx(24), minY: b.minY - wpx(40), maxX: Math.max(b.maxX, b.minX + w) + wpx(24), maxY: b.maxY + wpx(24) };
       if (boxMeets(chrome, vb)) out.add(id);
     }
@@ -6025,7 +6051,8 @@
       chipHits.push({ ids: group.length ? group : [id], x: at.x, y: at.y, w: at.w, h: at.h, text: rc.text });
     }
 
-    const inspectedId = hoverId || lastContentId(s);
+    // A board opened whole inspects nothing until the hand points or draws (27-first.js, resting; UX-11).
+    const inspectedId = hoverId || (resting() ? null : lastContentId(s));
     const pv = dragPreview();
     // The connectors bound to what a drag moves, each drawn as it will stand when the hand lets go (V1-PLAN E2).
     followShown = pv ? dragFollowers() : null;
@@ -6104,22 +6131,25 @@
         // rule the reading under a mark already follows: shown for the one the
         // hand is on, not for every mark on the board.
         if (chromeShown(s, id, inspectedId)) {
-          const name = (MM.wordOf(node) || '') + (isLive ? '  ·  live' : '');
+          const name = MM.wordOf(node) || '';
           if (paintOps) recordOp({ kind: 'chrome', id: id, text: name, box: boxOfRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY), moved: !!pl });
           brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
           text(name, b.minX, b.minY - wpx(10), C.gold);
         }
       } else if (b && !pending && id === inspectedId && !s.selection.length) {
         // The reading of the mark the hand just made (or is over), and only
-        // that one: what it is, and what it plays. Under every mark it was a
-        // board of fragments; the panel has the rest.
+        // that one: what it is. Under every mark it was a board of fragments;
+        // the panel has the rest. What it plays — node, edge, annotation — is
+        // the engine's word, so it is said in the panel's details and kept for
+        // the tests (`role`), never drawn under the mark (the UX pass, UX-08:
+        // "text · annotation" under a squiggle).
         const top = readingUnder(s, node, id);
         const role = readRungs(s).roles.get(id);
-        const played = role && role.role !== 'unclassified' && role.role !== top ? ' · ' + role.role : '';
+        const played = role && role.role !== 'unclassified' && role.role !== top ? role.role : null;
         if (top) {
-          readingDrawn = { id: id, text: top + played };
-          if (paintOps) recordOp({ kind: 'reading', id: id, text: top + played, box: boxOfRect(b.minX, b.maxY, 0, wpx(15)), moved: !!pl });
-          text(top + played, b.minX, b.maxY + wpx(15), `rgba(${C.labelRGB},0.85)`);
+          readingDrawn = { id: id, text: top, role: played };
+          if (paintOps) recordOp({ kind: 'reading', id: id, text: top, role: played, box: boxOfRect(b.minX, b.maxY, 0, wpx(15)), moved: !!pl });
+          text(top, b.minX, b.maxY + wpx(15), `rgba(${C.labelRGB},0.85)`);
         }
       }
     }
@@ -6156,6 +6186,7 @@
     syncMarkChip(s);
     renderSummon(s);
     renderInspector(s, inspectedId);
+    syncFirstRun(s);
     renderMinimap(s);
 
     // The status line: what just happened, else the standing state, in a few
@@ -6168,7 +6199,7 @@
     const parts = strokes ? [strokes + ' mark' + (strokes === 1 ? '' : 's')] : []; // an empty board: the next move says it
     if (s.artifacts.length) {
       const running = liveSet(s).size;
-      parts.push(s.artifacts.length + ' thing' + (s.artifacts.length === 1 ? '' : 's') + ' made' + (s.live.length ? ' (' + (running < s.live.length ? running + ' of ' + s.live.length + ' live, the rest parked' : s.live.length + ' live') + ')' : ''));
+      parts.push(s.artifacts.length + ' thing' + (s.artifacts.length === 1 ? '' : 's') + ' made' + (running < s.live.length ? ' (' + running + ' of ' + s.live.length + ' shown — pan closer to the rest)' : ''));
     }
     if (s.regions.length) parts.push(s.regions.length + ' region' + (s.regions.length === 1 ? '' : 's'));
     const fs = folderStatus();
@@ -6212,7 +6243,7 @@
     if (key === statusSaid) return;
     statusSaid = key;
     if (!warn) { statusEl.textContent = text; return; }
-    const label = { export: 'export the log', folder: 'open a folder' };
+    const label = { export: 'save it as a file', folder: 'open a folder' };
     statusEl.innerHTML = '<span class="lead">' + esc(warn.lead) + '</span>' +
       (ways.length ? ': ' + ways.map((w) => '<button type="button" data-way="' + w + '">' + label[w] + '</button>').join(', or ') : '') +
       (text ? '<span class="rest">  ·  ' + esc(text) + '</span>' : '');
@@ -6228,7 +6259,8 @@
       let x, y;
       if (boxes.length) { const b = union(boxes); x = b.minX; y = b.minY - wpx(28); }
       else { const c = screenToWorld(innerWidth / 2, 70); x = c.x; y = c.y; }
-      const r = wpx(4 + 2 * Math.sin(t * 4));
+      // It breathes — unless the person asked for less motion (C4), when it holds still.
+      const r = wpx(motionReduced() ? 5 : 4 + 2 * Math.sin(t * 4));
       ctx.beginPath(); ctx.arc(x + wpx(5), y - wpx(4), r, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(${C.goldRGB},0.85)`; ctx.fill();
       text(w.label, x + wpx(16), y, C.gold);
@@ -7221,9 +7253,11 @@
 //   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading, keepFromHouse, settleKept — an ask dyna.ink's own could not answer is kept, and let go once answered, isHouse,
 //   askModelsAbout, offerModel), seatpane (writers, readers, deciderHost, briefDeciderHost, askDecider, askDeciderNotation, askDeciderBrief — who is asked, by seat), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
 //   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
-//   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
+//   clocks (definitionOf, tankHeldStill), kinds (consentedHere, playHere — a clock not moving here is offered
+//   *Play it here*, playHereInstead/playItHere, which 07-input.js's panel button takes too), inspector (isProgram), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
 //   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
-//   hand opened the field), hand (handOfPointer).
+//   hand opened the field), hand (handOfPointer), controls (escapeStep — the field's Escape is the ladder's),
+//   the first hour (27-first.js: bringIntoView — Make it Mermaid's card brought into view).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -7284,6 +7318,28 @@
   /** A reading, for the top row: what it stands on ranks it, exactly as it ranks an offer. */
   function readingItem(o) {
     return Object.assign({ certain: true, tier: 1, group: o.grounds.on, groupConf: o.grounds.confidence, groupWhy: o.grounds.why, base: MM.baseOn(o.grounds) }, o);
+  }
+
+  /**
+   * A clock the log says plays that does not move in this tab — another hand's program (the consent gate, C1), an
+   * example's film or a tank held still because this device asks for less motion (C4): *Pause* would pause what the
+   * person does not see moving, so the field offers *Play it here*, the person's own play, in its place.
+   */
+  function playHereInstead(it) {
+    const o = it.offer;
+    if (!o || o.tool !== 'clocks' || !o.data || o.data.op !== 'pause') return it;
+    const s = session.getState(), id = o.data.nodeId;
+    if (!(isProgram(s, id) ? !consentedHere(id) : tankHeldStill(s, id))) return it;
+    const name = o.label.replace(/^Pause /, '');
+    return Object.assign({}, it, {
+      key: 'clock-here:' + id, label: 'Play ' + name + ' here', verbs: ['play', 'run', 'start', 'go', 'play here'],
+      why: 'it is not moving here — ' + (isProgram(s, id) ? 'a program runs in this tab only when you play it' : 'this device asks for less motion') + '; this plays it, here',
+      run: () => session.withTool('clocks', () => playItHere(id), 'clock-here:' + id),
+    });
+  }
+  /** Play a clock here by this hand's own play: a program another hand set playing, or anything held still (C1, C4). */
+  function playItHere(id) {
+    if (!playHere(id)) { session.clock({ nodeId: id, op: 'play', at: Date.now() }); flash('playing it here'); }
   }
 
   /** An offer as a pill: its reason the tooltip, what it stands on after that, a dot when it asks a model. */
@@ -7432,7 +7488,7 @@
     });
 
     // --- What it AFFORDS: every tool's offer for this scope, in the registry's order. ---
-    const offers = MM.offersFor(scope).map(offerItem);
+    const offers = MM.offersFor(scope).map(offerItem).map(playHereInstead);
     // What the marks are as a diagram: each notation above the floor, ranked with the rest of the readings (N1).
     const notated = notationsHeld(marks).map((r) => notationItem(r, offers));
     // An act as particular to these marks as a reading (Fold “…” into the text)
@@ -7536,7 +7592,8 @@
     graph3d: { after: (o, scope, t) => say(!t.made ? 'could not hold that group' : t.detail.ok ? 'in 3D: ' + t.detail.reasoning : 'could not stand it in 3D: ' + t.detail.error) },
     frames: { after: (o, scope, t) => { if (o.data.act !== 'frame' || !t.made) return; const st = session.getState(); flash('framed ' + t.detail.members + ' — ' + MM.describeFrame(MM.frameOfNode(st.nodes.get(t.made)), st.nodes)); } },
     // The drawing said as Mermaid stands beside it: say so, remember which marks it was written from, and keep the field.
-    mermaid: { after: (o, scope, t) => { if (!t.made) { say(t.detail.error); return; } mermaidMadeFrom.set(t.made, scope.marks.slice()); flash('the drawing as Mermaid, beside it — ' + t.detail.reading + '; Draw it puts it back as marks'); refreshPalette(); } },
+    // The card stands beside the drawing — and is brought into view with it when it stood off screen (27-first.js; UX-13).
+    mermaid: { after: (o, scope, t) => { if (!t.made) { say(t.detail.error); return; } mermaidMadeFrom.set(t.made, scope.marks.slice()); bringIntoView(scope.marks.concat([t.made])); flash('the drawing as Mermaid, beside it — ' + t.detail.reading + '; Draw it puts it back as marks'); refreshPalette(); } },
     // A rectangle taken as a region: said, with what it holds (12-regions.js).
     region: { after: (o, scope, t) => { regionMadeSaid(t.detail); } },
     label: { after: (o, scope, t) => { const d = t.detail; if (d.done.length || d.saying.length || d.refused.length) say(labelSentence(String(o.data.word).trim(), d.done, d.saying, d.refused)); } },
@@ -7643,7 +7700,7 @@
         run: () => copyMarks(marks) },
       { key: 'paste', core: true, label: 'Paste', verbs: ['paste'], why: clip ? 'Paste — the copied ink, beside these' : 'Paste — nothing copied yet', disabled: !clip, tier: 1,
         run: () => { if (!clip) return; const b = selectionBounds(s) || (marks.length ? union(marks.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean)) : null); pasteClip(b ? { x: b.maxX + wpx(40), y: b.minY } : screenToWorld(innerWidth / 2, innerHeight / 2)); refreshPalette(); } },
-      { key: 'erase', core: true, label: 'Erase', verbs: ['erase', 'delete', 'del', 'remove', 'rm'], why: 'Erase — the ink stays in the log; undo brings it back', disabled: !marks.length, tier: 1,
+      { key: 'erase', core: true, label: 'Erase', verbs: ['erase', 'delete', 'del', 'remove', 'rm'], why: 'Erase — undo brings it back', disabled: !marks.length, tier: 1,
         run: () => { const at = Date.now(); if (sum) session.dismiss(sum.id, at); marks.forEach((id) => session.erase(id, at)); flash('erased ' + marks.length + ' mark' + (marks.length === 1 ? '' : 's')); } },
     ];
   }
@@ -7943,6 +8000,14 @@
   const FIELD_M = 8;         // the margin the field keeps off every edge
   const FIELD_TOP = 52;      // under the bar, when the usable rect cannot hold it
   let fieldAnchor = null;    // where the hand was when this field opened, on screen
+  // Where this field was put when it opened, kept while it is open (the UX pass, UX-06): placed again on every
+  // paint from its new height, it jumped 419 px between "make" and "make " as the pills changed under the hand.
+  // `edge` is the edge that stands still — its top when it opened below or beside the held marks, its bottom when
+  // it opened above them — so it grows away from what it holds. Let go when the field would leave the screen —
+  // grown past the room its standing edge leaves, a keyboard come up under it — or cover chrome (the panel, the
+  // minimap), and when the held marks move on screen (a pan, a zoom, a thing brought into view): the field is then
+  // placed again beside them, from where the hand was as the marks have carried it. Null while no field is open.
+  let fieldKept = null;      // { x, w, edge: 'top' | 'bottom', y, held }: y is the edge's place on screen, held the marks' box
 
   /** Pure: fit `size` at `want` inside `soft` if it fits there, inside `hard` otherwise. */
   function fitSpan(want, size, soft, hard) {
@@ -8049,33 +8114,95 @@
    * the list's own scroll height, so a list already scrolled keeps its place;
    * when the field fits, nothing is set and the stylesheet's rule stands.
    */
-  function fitFieldHeight(v, u) {
+  function fitFieldHeight(v, u, cap) {
     const list = summonEl.querySelector('.list');
     if (!list) return;
-    const room = Math.max(u.height - FIELD_M * 2, v.height - FIELD_TOP - FIELD_M);
+    // `cap`: the room a kept field has from its standing edge to the screen's (placeField).
+    const room = Math.min(Math.max(u.height - FIELD_M * 2, v.height - FIELD_TOP - FIELD_M), cap === undefined ? Infinity : cap);
     const natural = summonEl.offsetHeight - list.offsetHeight + list.scrollHeight;
     if (natural <= room) {
       if (list.classList.contains('held')) { list.classList.remove('held'); list.style.maxHeight = ''; }
       return;
     }
-    const cap = Math.max(FIELD_LIST_MIN, Math.floor(list.scrollHeight - (natural - room))) + 'px';
-    if (list.style.maxHeight !== cap) list.style.maxHeight = cap;
+    const px = Math.max(FIELD_LIST_MIN, Math.floor(list.scrollHeight - (natural - room))) + 'px';
+    if (list.style.maxHeight !== px) list.style.maxHeight = px;
     list.classList.add('held');
+  }
+
+  /**
+   * Pure: whether a field kept at `box` (`h` tall) still stands — whole on screen and off the chrome. The held
+   * marks are not chrome: a kept field grows away from them, and covering them is what moving it would do.
+   */
+  function keptFieldStands(box, h, v, chrome) {
+    const r = { left: box.x, top: box.y, right: box.x + box.w, bottom: box.y + h };
+    if (r.left < v.left + FIELD_M - 2 || r.right > v.right - FIELD_M + 2 || r.top < v.top + FIELD_M - 2 || r.bottom > v.bottom - FIELD_M + 2) return false;
+    return !chrome.some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top);
+  }
+
+  /** Pure: whether two boxes on screen stand in the same place, to within a pixel and a half. */
+  function sameScreenBox(a, b) {
+    if (!a || !b) return a === b;
+    return Math.abs(a.left - b.left) < 1.5 && Math.abs(a.top - b.top) < 1.5 && Math.abs(a.right - b.right) < 1.5 && Math.abs(a.bottom - b.bottom) < 1.5;
+  }
+  /** Pure: a point on screen carried as a box moved and scaled from `was` to `now` carries it (a pan, a zoom). */
+  function carriedBy(p, was, now) {
+    if (!p || !was || !now) return p;
+    const sx = was.right - was.left > 1 ? (now.right - now.left) / (was.right - was.left) : 1;
+    const sy = was.bottom - was.top > 1 ? (now.bottom - now.top) / (was.bottom - was.top) : 1;
+    return { x: now.left + (p.x - was.left) * sx, y: now.top + (p.y - was.top) * sy };
+  }
+  /** The field's height with its list unheld: what it would take to show every pill at its width now. */
+  function fieldNaturalHeight() {
+    const list = summonEl.querySelector('.list');
+    return list ? summonEl.offsetHeight - list.offsetHeight + list.scrollHeight : summonEl.offsetHeight;
   }
 
   /** Place the field where it stands now. Touches left/top/width, and the list's height when it must scroll — NOTHING else. */
   function placeField() {
     const v = viewportRect(), u = usableViewport();
+    // Kept where it opened while that still stands (UX-06): typing changes the pills, and the field stays. Placed
+    // again when the held marks moved on screen (from where the hand was, carried with them), when it would leave
+    // the screen — taller than the room its standing edge leaves, which a keyboard coming up takes away — and when
+    // it would cover the chrome.
+    if (fieldKept) {
+      const k = fieldKept;
+      const s = session.getState();
+      const held = s.summon ? heldBoxOf(s.summon) : null;
+      const cap = k.edge === 'top' ? v.bottom - FIELD_M - k.y : k.y - Math.max(v.top + FIELD_M, u.top + FIELD_M);
+      const still = sameScreenBox(k.held, held);
+      if (!still) fieldAnchor = carriedBy(fieldAnchor, k.held, held);
+      let fits = still && k.w <= v.width - FIELD_M * 2 && cap > FIELD_LIST_MIN;
+      if (fits) { summonEl.style.width = k.w + 'px'; fits = fieldNaturalHeight() <= cap; }
+      if (fits) {
+        fitFieldHeight(v, u, cap);
+        const h = summonEl.offsetHeight;
+        const box = { x: k.x, y: k.edge === 'top' ? k.y : k.y - h, w: k.w };
+        if (keptFieldStands(box, h, v, [panelRect(), minimapRect()].filter(Boolean))) {
+          summonEl.style.left = box.x + 'px';
+          summonEl.style.top = box.y + 'px';
+          return box;
+        }
+      }
+      fieldKept = null;
+    }
     // Width first: the height below is whatever the content comes to at that
     // width, measured rather than assumed.
     const avoid = fieldAvoids();
     const first = fieldBox(fieldAnchor, { viewport: v, usable: u, height: 0, hand: hand, avoid: avoid });
     summonEl.style.width = first.w + 'px';
     fitFieldHeight(v, u);
-    const box = fieldBox(fieldAnchor, { viewport: v, usable: u, height: summonEl.offsetHeight, hand: hand, avoid: avoid });
+    const h = summonEl.offsetHeight;
+    const box = fieldBox(fieldAnchor, { viewport: v, usable: u, height: h, hand: hand, avoid: avoid });
     summonEl.style.left = box.x + 'px';
     summonEl.style.top = box.y + 'px';
     summonEl.style.width = box.w + 'px';
+    // Kept from here on, once it has its pills (the first placing is of an empty field): above the held marks it
+    // grows up, away from them; anywhere else its top stands.
+    if (!summonEl.querySelector('.list')) return box;
+    const s = session.getState();
+    const held = s.summon ? heldBoxOf(s.summon) : null;
+    const above = !!held && box.y + h <= held.top + 1;
+    fieldKept = { x: box.x, w: box.w, edge: above ? 'bottom' : 'top', y: above ? box.y + h : box.y, held: held };
     return box;
   }
 
@@ -8087,7 +8214,7 @@
 
   function renderSummon(s) {
     document.body.classList.toggle('summoning', !!s.summon);
-    if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; fieldAnchor = null; return; }
+    if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; fieldAnchor = null; fieldKept = null; return; }
     const sum = s.summon;
     // The same field, rendered again: its content already stands and rebuilding
     // it would throw away the caret — but the space it stands in may have
@@ -8095,6 +8222,7 @@
     if (shownSummonId === sum.id) { placeField(); return; }
     shownSummonId = sum.id;
     fieldAnchor = fieldAnchorFor(sum);
+    fieldKept = null;
     paletteContext = contextFor(sum.enclosedIds);
     paletteItems = rankItems(conversionsFor(s), paletteContext);
     paletteIndex = -1;
@@ -8110,8 +8238,8 @@
     filter.className = 'filter';
     filter.setAttribute('autocomplete', 'off');
     filter.setAttribute('spellcheck', 'false');
-    const onArt = sum.onArtifact ? (MM.wordOf(s.nodes.get(sum.onArtifact.artifactId)) || 'artifact') : null;
-    filter.placeholder = onArt ? 'on ' + onArt + ' — type what to change…' : sum.enclosedIds.length + ' mark' + (sum.enclosedIds.length === 1 ? '' : 's') + ' — a verb, a name, or what to make…';
+    const onArt = sum.onArtifact ? (MM.wordOf(s.nodes.get(sum.onArtifact.artifactId)) || null) : undefined;
+    filter.placeholder = onArt ? 'on ' + onArt + ' — type what to change…' : onArt === null ? 'on the thing made — type what to change…' : sum.enclosedIds.length + ' mark' + (sum.enclosedIds.length === 1 ? '' : 's') + ' — a verb, a name, or what to make…';
     filter.onkeydown = onPaletteKey;
     filter.oninput = () => { paletteNavigated = false; paletteIndex = -1; paintField(filter.value); meaningSoon(filter.value); };
     top.appendChild(filter);
@@ -8306,19 +8434,13 @@
   }
 
   /**
-   * The pills just rewrapped and the field grew: re-place it only if its foot
-   * has gone off the bottom. Re-placing on every keystroke would walk the
-   * field up the screen under the hand.
+   * The pills just rewrapped and the field grew: it stays where it opened, growing away from what it holds, its
+   * pills scrolling in the room a keyboard leaves (R6) — placed again only when it would leave the screen or
+   * cover the panel or the minimap (UX-06, placeField's kept place). Re-placing on every keystroke walked the
+   * field about under the hand.
    */
   function keepFieldOnScreen() {
     if (!summonEl.classList.contains('field')) return;
-    const v = viewportRect();
-    // The pills' list held to the room a keyboard leaves, or let go once they fit again (R6).
-    fitFieldHeight(v, usableViewport());
-    const r = summonEl.getBoundingClientRect();
-    // …or has grown over a card it keeps off — a model's readings landing make it taller (U1c).
-    const over = fieldAvoids().some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top);
-    if (!over && r.bottom <= v.bottom - 2 && r.right <= v.right - 2 && r.top >= v.top - 2 && r.left >= v.left - 2) return;
     placeField();
   }
 
@@ -8328,7 +8450,8 @@
     const shown = visibleItems(q);
     if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); paletteNavigated = true; paletteIndex = Math.min(shown.length - 1, paletteIndex + 1); paintField(q); return; }
     if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); paletteNavigated = true; paletteIndex = Math.max(0, paletteIndex - 1); paintField(q); return; }
-    if (e.key === 'Escape') { e.preventDefault(); session.dismiss(shownSummonId, Date.now()); return; }
+    // The field's own rung of the one Escape ladder (20-controls.js): it closes the field, or the controls standing over it.
+    if (e.key === 'Escape') { e.preventDefault(); escapeStep(e.target); return; }
     if (e.key !== 'Enter') return;
     e.preventDefault();
     // The arrows chose a pill: Enter takes it. Otherwise Enter does what the
@@ -8759,9 +8882,11 @@
 // Provides: the panel: a mark, an artifact, a word, the selection — what it is and what it can become
 //   in plain words first, and the inspector (ids, tiers, relations, measures) behind details, closed by
 //   default and remembered on this device (PLAN-USER-SURFACE U1a: markSummary, inspectDetails).
+// Provides too: firstLoopHtml (the empty board's steps, also the first-run sheet's, 27-first.js).
 // Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models,
 //   palette (contextFor, paletteItems, afforded — what stands beside a selection, and what it put first),
-//   packs (packSaid — a definition from a library pack says its pack).
+//   packs (packSaid — a definition from a library pack says its pack), clocks (tankHeldStill — a tank held still under
+//   reduced motion offers *play it here*), first (tapWords — a board at rest says "point at one" only to a mouse).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -8813,13 +8938,18 @@
     // clock the log says is playing, but that another hand set, stands as its
     // source and offers *Play it here* — one tap, this hand's own play.
     const elsewhere = c && c.playing && isProgram(s, id) && !consentedHere(id);
+    // Under reduced motion a tank this hand did not start here holds still (C4, 14-clocks.js): its play is the person's.
+    const still = !elsewhere && c && c.playing && !isProgram(s, id) && tankHeldStill(s, id);
     const who = elsewhere ? session.clockAuthor(id) : null;
+    // A program's time is its own (a run program keeps none the tank could say); a tank's is said.
+    const t = isProgram(s, id) && codeKindOf(s.nodes.get(id)) === 'run' ? '' : ' · t = ' + tankTime(id).toFixed(1) + 's';
     const stateText = !c ? 'not played'
-      : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : 'played — not running in this tab yet')
-      : c.playing ? 'playing · t = ' + tankTime(id).toFixed(1) + 's' : 'paused' + (c.reason ? ' — ' + c.reason : '') + ' · t = ' + tankTime(id).toFixed(1) + 's';
+      : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : motionReduced() ? 'waiting for you to play it — this device asks for less motion' : 'played — not running in this tab yet')
+      : still ? 'playing — held still here, since this device asks for less motion'
+      : c.playing ? 'playing' + t : 'paused' + (c.reason ? ' — ' + c.reason : '') + t;
     return '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>' +
       '<div class="acts">' +
-      (elsewhere
+      (elsewhere || still
         ? '<button class="mini" data-act="clock-play-here" data-id="' + esc(id) + '">play it here</button>'
         : c && c.playing
         ? '<button class="mini" data-act="clock-pause" data-id="' + esc(id) + '">pause</button>'
@@ -8831,6 +8961,15 @@
     const node = s.nodes.get(id);
     const k = codeKindOf(node);
     return k === 'js' || k === 'run';
+  }
+
+  /**
+   * What a thing made is, said over the panel in the person's words (the UX pass, UX-08: "LIVING PAGE",
+   * "LIVING TEXT"): a page, a program, a text — never the engine's kind, and never "living".
+   */
+  function kindEyebrow(kind) {
+    const WORDS = { html: 'a page', run: 'a program', js: 'a behaviour', text: 'a text', svg: 'a figure', mermaid: 'a diagram in words', json: 'data', md: 'notes', control: 'a control' };
+    return WORDS[kind] || (MM.isPictureKind(kind) ? 'a picture' : 'a ' + kind + ' file');
   }
 
   /** The kind of an artifact's newest code rep, html by default. */
@@ -8849,6 +8988,23 @@
     inspectorEl.innerHTML = html;
   }
 
+  /**
+   * The empty board's three steps and its one tap, in the panel's plain voice — and, where the panel does not stand,
+   * in the first-run sheet at the foot of the screen (27-first.js; the UX pass, UX-03).
+   */
+  function firstLoopHtml() {
+    return '<div class="eyebrow">nothing drawn yet</div>' +
+      '<ol class="firstLoop">' +
+      '<li><b>draw a few marks</b> — a box, a circle, a line</li>' +
+      '<li><b>press and hold one</b> — it is held with what it sits with</li>' +
+      '<li><b>choose what it becomes</b> — tap a pill, or type in the field</li>' +
+      '</ol>' +
+      // R5: the first run's one tap — a board of your own made from the starter example (22-boards.js takes it).
+      '<div class="acts"><button class="mini" type="button" data-example-start title="a new board of your own with something already drawn — the starter example, yours to draw on">start from an example</button>' +
+      '<button class="mini" type="button" data-example-more title="a flowchart, a class diagram, a molecule and a pattern page — in the boards pane">more examples</button></div>' +
+      '<div class="why">the canvas reads every mark as you draw it; a model is asked only when you ask one</div>';
+  }
+
   function renderInspector(s, id) {
     if (s.summon) return renderSummonScope(s);
     // One region selected alone: what it is and holds, in words (I5; 12-regions.js).
@@ -8864,20 +9020,14 @@
       // It is not a tour and not a mode: it is the empty state of one row, and
       // the first mark drawn replaces it with that mark's reading.
       if (!s.contentIds.length && !s.artifacts.length) {
-        showPanel('<div class="eyebrow">nothing drawn yet</div>' +
-          '<ol class="firstLoop">' +
-          '<li><b>draw a few marks</b> — a box, a circle, a line</li>' +
-          '<li><b>press and hold one</b> — it is held with what it sits with</li>' +
-          '<li><b>choose what it becomes</b> — tap a pill, or type in the field</li>' +
-          '</ol>' +
-          // R5: the first run's one tap — a board of your own made from the starter example (22-boards.js takes it).
-          '<div class="acts"><button class="mini" type="button" data-example-start title="a new board of your own with something already drawn — the starter example, yours to draw on">start from an example</button>' +
-          '<button class="mini" type="button" data-example-more title="a flowchart, a class diagram, a molecule and a pattern page — in the boards pane">more examples</button></div>' +
-          '<div class="why">the canvas reads every mark as you draw it; a model is asked only when you ask one</div>');
+        showPanel(firstLoopHtml());
         return;
       }
-      showPanel('<div class="eyebrow">mark</div>' +
-        '<div class="empty">nothing here yet</div>');
+      // A board opened whole — an example — with nothing pointed at yet (UX-11): what it holds, and how to begin.
+      const marks = s.contentIds.length - s.artifacts.length, made = s.artifacts.length;
+      showPanel('<div class="eyebrow">this board</div>' +
+        '<div class="empty">' + esc([marks ? marks + ' mark' + (marks === 1 ? '' : 's') : '', made ? made + ' thing' + (made === 1 ? '' : 's') + ' made' : ''].filter(Boolean).join(' · ')) + '</div>' +
+        '<div class="why">press and hold a mark to see what it is and what it can become' + (tapWords() === 'double-click' ? ' — or point at one' : '') + '</div>');
       return;
     }
 
@@ -8887,8 +9037,8 @@
     // Who made it: a mark's drawer, an artifact's blesser — never who drew its marks (V1-PLAN L2f).
     const author = authorOf(node);
     const authorName = nameOfParticipant(author);
-    const eyebrow = '<div class="eyebrow">' +
-      (isLive ? (codeKindOf(node) === 'html' ? 'living page' : codeKindOf(node) === 'mermaid' ? 'a diagram in words' : 'living ' + codeKindOf(node)) : isArtifact ? 'artifact' : isWordNode ? 'word' : 'mark') + '</div>';
+    // Escaped: a kind is whatever the event said, and another hand's event may say anything.
+    const eyebrow = '<div class="eyebrow">' + esc(isLive ? kindEyebrow(codeKindOf(node)) : isArtifact ? 'a thing made' : isWordNode ? 'a word' : 'a mark') + '</div>';
     // What the person reads first (U1a): what it is and what it can become, in a few plain
     // lines. Everything the engine holds about it — ids, tiers, relations, measures — is
     // below, behind details.
@@ -8956,7 +9106,8 @@
           '<button class="mini" data-act="export-code" data-id="' + esc(id) + '">save as .' + esc(kind === 'text' ? 'txt' : kind) + '</button></div>';
       }
       // The clock: nothing runs until a hand plays it, and a stop says why. An act, so it stands above details.
-      if (kind === 'js') {
+      // A program too: one the log says plays but that does not run in this tab offers *play it here* (C1, C4).
+      if (kind === 'js' || kind === 'run') {
         top += clockRows(s, id);
       }
     }
@@ -9040,7 +9191,7 @@
         const m = mine && String(ownCode.data.code).match(new RegExp('<([a-z]+)[^>]*data-region="' + mine.id + '"'));
         rows.push(['code', isLive
           ? (codeKindOf(node) !== 'html' ? 'a running ' + codeKindOf(node) + (codeKindOf(node) === 'js' ? ' — code that runs when played' : '') : rung.genre && (rung.genre.genre === 'graph' || rung.genre.genre === 'mixed') ? 'a running diagram' : 'a running page')
-          : (m ? '<' + m[1] + ' data-region="' + mine.id + '">' : 'part of ' + (MM.wordOf(owner) || 'an artifact')),
+          : (m ? '<' + m[1] + ' data-region="' + mine.id + '">' : 'part of ' + (MM.wordOf(owner) || 'a thing made')),
           isLive && rung.genre ? rung.genre.reasoning : '']);
       }
       if (rows.length) {
@@ -9075,7 +9226,7 @@
         // A label is its maker's word and a name is a bless — neither is the shape rung, whatever tier the maker sits at.
         const basis = g.interpretations[0].basis;
         html += '<div class="srchead"><span class="by">' + esc(g.label) + '</span>' +
-          '<span class="tier">' + (basis === 'label' ? 'label · its maker' : basis === 'name' ? 'named' : tier === 0 ? 'tier 0 · shape' : tier === 2 ? 'tier 2 · model' : 'tier ' + tier) + '</span></div>';
+          '<span class="tier">' + (basis === 'label' ? 'label · its maker' : basis === 'name' ? 'named' : tier === 0 ? 'measured from the ink' : tier === 1 ? 'read by the canvas' : tier === 1.5 ? 'a decision model' : tier === 2 ? 'a model’s reading' : 'a reading') + '</span></div>';
         g.interpretations.forEach((r, i) => {
           html += '<div class="read' + (i === 0 ? ' top' : '') + (r.blessed ? ' blessed' : '') + '">' +
             '<span class="type">' + esc(r.label) + '</span>' +
@@ -9227,12 +9378,12 @@
       if (rep) {
         const kind = rep.data.kind || 'html';
         const what = kind === 'run' ? (rep.data.code && rep.data.code.startsWith(MM.GRAPH3D_MARK) ? 'a 3D thing' : 'a program') : kind === 'html' ? 'a page' : kind === 'text' ? 'text' : kind === 'mermaid' ? 'a diagram written in Mermaid' : MM.isPictureKind(kind) ? 'a picture' : 'a ' + kind + ' file';
-        return { here: 'an artifact, ' + what, next: kind === 'mermaid' ? (paletteItems.some((i) => i.key === 'mermaid-draw') ? 'Draw it puts it on the board as marks · ' : '') + 'edit the text for a new version · ink over a node addresses its marks' : 'ink over it addresses its parts · a brief is a new version · wire it in a frame' };
+        return { here: what + ', made', next: kind === 'mermaid' ? (paletteItems.some((i) => i.key === 'mermaid-draw') ? 'Draw it puts it on the board as marks · ' : '') + 'edit the words and it is drawn again · ink over a box in it reaches the marks it was written from' : 'ink over it reaches its parts · type a change and it is made again · wire it into a frame' };
       }
-      return { here: 'a definition' + (MM.wordOf(a) ? ' “' + MM.wordOf(a) + '”' : ''), next: 'another like it is matched · a brief builds on it · its tank plays' };
+      return { here: 'a definition' + (MM.wordOf(a) ? ' “' + MM.wordOf(a) + '”' : ''), next: 'another like it is recognised · type what to make from it · it can be played' };
     }
     const match = sum.suggestions.find((x) => x.kind === 'match');
-    if (match) return { here: 'a definition, ' + match.label + ' ' + (match.score || 1).toFixed(2) + (match.pack ? ', from ' + packSaid(match.pack) : ''), next: (libraryEntries(s).some((e) => e.id === match.artifactId) ? 'its program on this drawing' : 'take the name') + ' · a brief builds from it' };
+    if (match) return { here: 'a definition, ' + match.label + ' ' + (match.score || 1).toFixed(2) + (match.pack ? ', from ' + packSaid(match.pack) : ''), next: (libraryEntries(s).some((e) => e.id === match.artifactId) ? 'its program on this drawing' : 'take the name') + ' · type what to make from it' };
     const genre = reading.genre && reading.genre.genre;
     const concept = reading.concepts[0];
     // Writing becomes what Enter does with it: read, then text, a name or a label (W2, U2's walk).
@@ -9258,7 +9409,7 @@
     if (concept) return { here: 'a concept, ' + concept.concept + ' ' + concept.confidence.toFixed(2), next: concept.conversions.filter((c) => c.effect.kind !== 'name' && c.effect.kind !== 'prompt').map((c) => c.label).concat(['a name']).join(' · ') };
     const shapes = ids.map((id) => MM.topInterpretation(s.nodes.get(id))).filter(Boolean);
     if (shapes.length && shapes.every((x) => x === 'text')) return { here: 'writing', next: 'Read the writing · a name · text' };
-    return { here: 'shapes' + (shapes.length ? ', ' + [...new Set(shapes)].join(', ') : ''), next: 'draw them clean · a name · a brief is a program' };
+    return { here: 'shapes' + (shapes.length ? ', ' + [...new Set(shapes)].join(', ') : ''), next: 'draw them clean · a name · say what to make in a sentence' };
   }
 
   // What the selection reads as, kept while the log stands (R4c): a pan with
@@ -9669,7 +9820,8 @@
 //   with the reason), runtimeOffset, runtimeBroken, syncRuntime, the consent gate (trackConsent, consentedHere,
 //   grantPlayingPrograms — this tab runs a program only when this hand played it here, C1), frameCSP (a run or
 //   mermaid frame cannot phone out), WORKER_HARDEN (the js worker keeps only Math/performance/Function/postMessage).
-// Uses: core (session, esc), artifacts (frames, documentFor), render (render).
+// Uses: core (session, esc), artifacts (frames, documentFor), render (render), the first hour (27-first.js: motionReduced —
+//   under reduced motion an example's program is not granted, and waits for the person's own play).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -10427,6 +10579,8 @@
    * made only by the example-open path (22-boards.js), never by a load.
    */
   function grantPlayingPrograms() {
+    // A person who asked for less motion starts it themselves (C4): the program waits for their own play.
+    if (motionReduced()) return false;
     const s = session.getState();
     let any = false;
     for (const id of Object.keys(s.clocks)) {
@@ -10557,7 +10711,8 @@
 // Provides: the tank — definitions and their instances as bodies, the fixed-step loop, determinism
 //   (positions are a function of the log and the clock's time), bodyPlacement(id) for render,
 //   tankTime/tankCount for the panel, stepTank for tests.
-// Uses: core (session, state, MM), render (render), kinds (runtimeBroken).
+// Provides too: tankHeldStill(s, id) — under reduced motion a tank this hand did not start here holds still (C4).
+// Uses: core (session, state, MM), render (render), kinds (runtimeBroken), the first hour (27-first.js: motionReduced).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -10810,8 +10965,31 @@
     return null;
   }
 
+  // ===== Less motion (the critic's C4) ======================================
+  // Under prefers-reduced-motion nothing moves that the person did not start: a tank plays here only when this
+  // hand played it live, in this sitting — a play this tab wrote (no `by`), appended as the person tapped it. A
+  // play that came in with a loaded board (a reload, a file, an example, a room's line) holds the tank still where
+  // it stands, and the panel offers *play it here*, the person's own play. Runtime only, like the consent gate
+  // (13-kinds.js): the log still says the clock plays, on every board. A new events array (a load, an undo) keeps
+  // a play this hand gave while the latest play is still its own.
+  const tankStartedHere = new Set();
+  let tankSeenArr = null, tankSeenLen = 0;
+  function trackTankPlays(s) {
+    const evs = session.getEvents();
+    if (evs !== tankSeenArr) {
+      tankSeenArr = evs; tankSeenLen = evs.length;
+      for (const id of [...tankStartedHere]) { const c = s.clocks[id]; if (!(c && c.playing && session.clockAuthor(id) === null)) tankStartedHere.delete(id); }
+      return;
+    }
+    for (let i = tankSeenLen; i < evs.length; i++) { const ev = evs[i]; if (ev && ev.type === 'clock' && ev.op === 'play' && !ev.by) tankStartedHere.add(ev.nodeId); }
+    tankSeenLen = evs.length;
+  }
+  /** Whether a playing tank holds still here: the person asked for less motion and did not start it in this tab. */
+  function tankHeldStill(s, id) { return motionReduced() && !tankStartedHere.has(id); }
+
   /** Called from every render: keep the tanks true to the log, and run the loop while anything plays. */
   function syncTank(s) {
+    trackTankPlays(s);
     const stamp = logStamp();
     const changed = stamp !== tank.logStamp;
     tank.logStamp = stamp;
@@ -10841,7 +11019,7 @@
     }
     for (const defId of tank.defs.keys()) if (!wanted.has(defId)) tank.defs.delete(defId);
     refreshPlacements();
-    const playing = [...wanted].some((id) => s.clocks[id].playing);
+    const playing = [...wanted].some((id) => s.clocks[id].playing && !tankHeldStill(s, id));
     if (playing && !tank.raf) { tank.last = performance.now(); tank.acc = 0; tank.raf = nextFrame(tankLoop); }
     if (!playing && tank.raf) { tank.raf.cancel(); tank.raf = 0; }
   }
@@ -10851,7 +11029,7 @@
     // syncTank, and a loop that looked stopped from there started a second
     // one and zeroed the accumulator — the tank ran at half speed.
     const s = session.getState();
-    const playing = Object.keys(s.clocks).filter((id) => s.clocks[id].playing && tank.defs.has(id));
+    const playing = Object.keys(s.clocks).filter((id) => s.clocks[id].playing && tank.defs.has(id) && !tankHeldStill(s, id));
     if (!playing.length) { tank.raf = 0; return; }
     tank.acc += Math.min(MAX_FRAME_MS, now - tank.last);
     tank.last = now;
@@ -11935,8 +12113,8 @@
     if (s.state === 'readonly' || (s.state === 'armed' && s.trouble)) {
       if (s.state === 'readonly' && !s.dirty) return null; // nothing drawn here, nothing to keep
       const tab = s.trouble && (s.trouble.kind === 'tab' || s.trouble.kind === 'elsewhere');
-      if (tab) return { kind: 'not-kept', words: name + ' is open in another tab, and what was drawn on it here was not kept — export the log to keep it, or leave it as that tab has it', ways };
-      return { kind: 'unsaved', words: name + ' is not saved' + (s.trouble && s.trouble.kind === 'full' ? ' (the browser\'s storage is full)' : '') + ' — export the log to keep it, or leave it and lose what was not saved', ways };
+      if (tab) return { kind: 'not-kept', words: name + ' is open in another tab, and what was drawn on it here was not kept — save it as a file to keep it, or leave it as that tab has it', ways };
+      return { kind: 'unsaved', words: name + ' is not saved' + (s.trouble && s.trouble.kind === 'full' ? ' (the browser\'s storage is full)' : '') + ' — save it as a file to keep it, or leave it and lose what was not saved', ways };
     }
     if (s.state === 'armed') return s.inFlight || s.dirty || s.needWhole ? { kind: 'busy' } : null;
     return { kind: 'busy' }; // 'waiting': the store is still being opened
@@ -13953,7 +14131,7 @@
     try { logs = await store.readLogs(); }
     catch (err) {
       if (err && err.name === 'LogFormatError') { say(err.message); return null; }
-      readFailed = 'could not read the logs: ' + (err.message || err);
+      readFailed = 'could not read what the folder keeps of its boards: ' + (err.message || err);
     }
     // From here this page's log is the folder's or the room's: the board this
     // browser keeps stays as it was (where the hand left it too), and is not written again from this page.
@@ -14007,7 +14185,7 @@
     if (folder.how === 'folder' || folder.how === 'git' || folder.how === 'static') rememberPlace(folder.how, folder.name || folder.how, folder.name, opts.handle || null);
     syncBoardFaces();
     const misnumbered = [...folder.misnumbered.values()];
-    flash((carry ? 'the board is kept in ' + (folder.name || 'the folder') + ' now — ' + carry.length + ' event' + (carry.length === 1 ? '' : 's') + ' carried in, '
+    flash((carry ? 'the board is kept in ' + (folder.name || 'the folder') + ' now — ' + carry.length + ' change' + (carry.length === 1 ? '' : 's') + ' carried in, '
       : 'opened ' + (folder.name || 'a folder') + ': ') + entries.length + ' file' + (entries.length === 1 ? '' : 's') + (folder.truncated ? ' shown — the folder holds more' : '') +
       (misnumbered.length ? ' · ' + misnumbered.join(' · ') : ''));
     return folder;
@@ -14797,7 +14975,7 @@
   /** A big board: say so, and let the line paint before the replay holds the thread. */
   function boardOpening(n) {
     if (n < 400) return Promise.resolve();
-    say('opening the board kept in this browser — ' + n + ' events…', 600000);
+    say('opening the board kept in this browser — ' + n.toLocaleString('en') + ' changes to read…', 600000);
     return new Promise((resolve) => {
       let done = false;
       const go = () => { if (!done) { done = true; resolve(); } };
@@ -14994,7 +15172,7 @@
     return { events };
   }
   /** What a log written by this page says of itself in the status line: the version, and that an older app opens it. */
-  function logFileNote() { return ' · log version ' + MM.LOG_VERSION + ' — an older dyna.ink opens it too'; }
+  function logFileNote() { return ' · a board file, version ' + MM.LOG_VERSION + ' — an older dyna.ink opens it too'; }
   /**
    * The version this page is: its <meta name="dynaink-version">, or — on a page an older worker kept — the name that
    * tag had before (17-boards.js's pageVersionOf, RENAME-PLAN N3b). '' for none.
@@ -15039,13 +15217,13 @@
       else if (b.notCarried.length) notes.push(plural(b.notCarried.length, 'picture') + ' named in this board ' + (b.notCarried.length === 1 ? 'is' : 'are') + ' not in the file — ' + (b.notCarried.length === 1 ? 'it stands' : 'they stand') + ' as ' + (b.notCarried.length === 1 ? 'its name' : 'their names'));
     } else {
       const r = readLogText(await file.text(), file.name);
-      if (!r.events) return refuse(r.refused || '“' + file.name + '” is not a board’s log — one event per line, as export writes it');
+      if (!r.events) return refuse(r.refused || '“' + file.name + '” is not a board — a board file is what “export” writes, one change a line');
       events = r.events;
       // A bare log names pictures it does not carry: the ones this device holds draw, the rest stand as their names.
       const named = [...assetsOfEvents(events)];
       const lacking = [];
       for (const ref of named) if (!(await assetGet(ref))) lacking.push(ref);
-      if (lacking.length) { notes = [plural(lacking.length, 'picture') + (lacking.length === 1 ? ' is' : ' are') + ' named in this log but ' + (lacking.length === 1 ? 'is' : 'are') + ' not in it — ' + (lacking.length === 1 ? 'it stands' : 'they stand') + ' as ' + (lacking.length === 1 ? 'its name' : 'their names') + '; export “board + pictures”, a .zip, to carry them']; }
+      if (lacking.length) { notes = [plural(lacking.length, 'picture') + (lacking.length === 1 ? ' is' : ' are') + ' named on this board but ' + (lacking.length === 1 ? 'is' : 'are') + ' not in it — ' + (lacking.length === 1 ? 'it stands' : 'they stand') + ' as ' + (lacking.length === 1 ? 'its name' : 'their names') + '; export “board + pictures”, a .zip, to carry them']; }
     }
     try {
       const made = await newBoard(Object.assign({}, o, { name: name, events: events }));
@@ -15121,7 +15299,7 @@
       if (!br.ok) { failed.push({ name: b.name, why: br.words }); continue; }
       let read;
       try { read = readLogText(br.text, b.name); } catch (err) { read = { notLog: true }; }
-      if (!read.events) { failed.push({ name: b.name, why: read.refused || 'its board.jsonl is not a board’s log' }); continue; }
+      if (!read.events) { failed.push({ name: b.name, why: read.refused || 'the board in it cannot be read' }); continue; }
       incoming.push({ key: key, name: b.name, view: b.view, events: read.events, assets: br.assets, damaged: br.damaged.length, hash: await logHash(read.events) });
     }
     const held = await carryHeld();
@@ -15177,7 +15355,7 @@
    */
   async function resetBoard() {
     if (boards.how !== 'indexeddb') {
-      if (Date.now() - board.resetArmed > 5000) { board.resetArmed = Date.now(); say('this browser keeps one board here and has no trash — export the log to keep it; Reset again within 5 s empties it'); return false; }
+      if (Date.now() - board.resetArmed > 5000) { board.resetArmed = Date.now(); say('this browser keeps one board here and has no trash — save it as a file to keep it; Reset again within 5 s empties it'); return false; }
       board.resetArmed = 0;
       await forgetLocalLog();
       location.reload();
@@ -15268,7 +15446,7 @@
   function exportLogNow() {
     const evs = session.getEvents();
     downloadText('canvas.jsonl', MM.encodeLog(evs, logWrite()), 'application/json');
-    flash('canvas.jsonl — the whole board, ' + evs.length + ' events, to keep' + logFileNote());
+    flash('canvas.jsonl — the whole board as a file, ' + evs.length + ' change' + (evs.length === 1 ? '' : 's') + ', to keep' + logFileNote());
   }
   statusEl.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('button[data-way]');
@@ -15323,7 +15501,7 @@
       // name — this tab's own included, which both hands that share it hear —
       // and a truncated history.
       const notes = roomNotices();
-      return 'live ' + roomShort(folder.name) + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') +
+      return 'in room ' + roomShort(folder.name) + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') +
         (notes.length ? ' · ' + notes.join(' · ') : '') + (folder.error ? ' · ' + folder.error : '');
     }
     const n = folder.entries.length;
@@ -15377,6 +15555,9 @@
 
   function setViewMode(mode) {
     viewMode = mode;
+    // The panel speaks of the canvas's marks; over the grid it hid the first cards and its empty-board steps covered
+    // the grid's own words (the UX pass, UX-14). It stands aside while the grid shows.
+    document.body.classList.toggle('gridView', mode === 'grid');
     if (mode === 'grid') { renderGrid(session.getState()); gridEl.hidden = false; }
     else gridEl.hidden = true;
     document.getElementById('gridBtn').setAttribute('aria-pressed', String(mode === 'grid'));
@@ -15395,7 +15576,7 @@
     viewBarEl.hidden = false;
     const order = gridOrder(s);
     if (viewMode === 'grid') {
-      viewBarEl.innerHTML = '<b>' + order.length + '</b> artifact' + (order.length === 1 ? '' : 's') + ' · sort ' +
+      viewBarEl.innerHTML = '<b>' + order.length + '</b> thing' + (order.length === 1 ? '' : 's') + ' made · sort ' +
         ['name', 'kind', 'recency', 'folder'].map((k) => '<button data-sort="' + k + '"' + (gridSort === k ? ' class="on"' : '') + '>' + k + '</button>').join('') +
         '<button data-view="canvas" title="Esc">canvas</button>';
     } else {
@@ -15415,7 +15596,7 @@
 
   function renderGrid(s) {
     const order = gridOrder(s);
-    let html = order.length ? '<div class="cards">' : '<div class="empty">no artifacts yet — name something, or open a folder</div><div class="cards">';
+    let html = order.length ? '<div class="cards">' : '<div class="empty">nothing made yet — name something you drew, or open a folder</div><div class="cards">';
     for (const id of order) {
       const n = s.nodes.get(id);
       const r = codeRepOf(n);
@@ -15462,7 +15643,6 @@
   document.getElementById('folderBtn').onclick = () => { closeCC(); openFolder(); };
   addEventListener('keydown', (e) => {
     if (e.target !== document.body && e.target !== document && e.target !== window) return;
-    if (e.key === 'Escape' && viewMode !== 'canvas') { setViewMode('canvas'); e.preventDefault(); }
     if (viewMode === 'focus' && e.key === 'ArrowRight') { focusStep(1); e.preventDefault(); }
     if (viewMode === 'focus' && e.key === 'ArrowLeft') { focusStep(-1); e.preventDefault(); }
   });
@@ -16209,7 +16389,7 @@
     if (t.figures) parts.push(plural(t.figures, 'figure'));
     if (t.writing) parts.push(t.writing === 1 ? 'writing' : t.writing + ' lines of writing');
     if (t.strokes) parts.push(plural(t.strokes, 'stroke'));
-    const left = t.left ? ' · ' + plural(t.left, 'page or program', 'pages and programs') + ' not drawn — only their text stands in the log' : '';
+    const left = t.left ? ' · ' + plural(t.left, 'page or program', 'pages and programs') + ' not drawn — the board file keeps them' : '';
     return name + ' — ' + of + (parts.length ? ': ' + parts.join(', ') : '') + (extra ? ' · ' + extra : '') + left;
   }
 
@@ -16360,7 +16540,7 @@
     const b = await boardBundleOf(evs);
     const name = bundleName(boardOnScreenName());
     const held = b.assets ? plural(b.assets, 'picture') : 'no pictures';
-    const said = name + ' — the whole board, its ' + plural(evs.length, 'event') + ' and ' + held + ' in one file; boards ▸ from a file… opens it whole' +
+    const said = name + ' — the whole board, its ' + plural(evs.length, 'change') + ' and ' + held + ' in one file; boards ▸ from a file… opens it whole' +
       (b.missing ? ' · ' + plural(b.missing, 'picture') + ' this device does not hold could not be put in it' : '');
     return { name: name, blob: new Blob(b.zip.parts, { type: 'application/zip' }), assets: b.assets, missing: b.missing, events: evs.length, said: said };
   }
@@ -16416,7 +16596,7 @@
     const r = await bundleRead(bytes, { inflate: inflateRaw, digest: digestHex });
     if (!r.ok) return r;
     const read = readLogText(r.text, file.name);
-    if (!read.events) return { ok: false, words: read.refused || 'the board.jsonl in this zip is not a board’s log — nothing was opened' };
+    if (!read.events) return { ok: false, words: read.refused || 'the board.jsonl in this zip cannot be read as a board — nothing was opened' };
     const info = new Map();
     for (const ev of read.events) if (ev && ev.type === 'import' && isAssetRef(ev.asset)) info.set(ev.asset, { mime: ev.mime, w: ev.w, h: ev.h });
     let stored = 0;
@@ -16436,7 +16616,7 @@
     const z = await zipRead(bytes, { inflate: inflateRaw });
     if (!z.ok) return { ok: false, words: z.words };
     const log = z.entries.find((e) => e.name === BUNDLE_LOG);
-    if (!log) return { ok: false, words: 'no log' };
+    if (!log) return { ok: false, words: 'no board in it' };
     const text = new TextDecoder().decode(log.data);
     return {
       ok: true, names: z.entries.map((e) => e.name), entries: z.entries.map((e) => ({ name: e.name, dataAt: e.data.byteOffset - bytes.byteOffset, bad: e.bad || null })),
@@ -16466,7 +16646,7 @@
     else if (which === 'log') {
       const evs = session.getEvents(), pics = assetsOfEvents(evs).size;
       downloadText('canvas.jsonl', MM.encodeLog(evs, logWrite()), 'application/json');
-      flash('canvas.jsonl — ' + evs.length + ' events' + logFileNote() + (pics ? ' · its ' + plural(pics, 'picture') + (pics === 1 ? ' is' : ' are') + ' not in it — export “board + pictures”, a .zip, to carry them' : ''));
+      flash('canvas.jsonl — the board as a file, ' + evs.length + ' change' + (evs.length === 1 ? '' : 's') + logFileNote() + (pics ? ' · its ' + plural(pics, 'picture') + (pics === 1 ? ' is' : ' are') + ' not in it — export “board + pictures”, a .zip, to carry them' : ''));
     }
     closePanel(exportPanel, exportBtn);
   });
@@ -16475,7 +16655,8 @@
 // Provides: text as an element — typeText (a text artifact at a point), editText (a new version of one),
 //   beginTextEdit/commitTextEdit (the editor on the canvas, opened by a double-click on empty ground or
 //   from the panel), wordToText (a written word becomes a text artifact, on request), strikeOnText/foldIntoText/textNear (text folds back from ink).
-// Uses: core, view, artifacts (frames), render.
+// Uses: core, view, artifacts (frames), render, palette (minimapRect, panelRect — a new text stands clear of them, UX-15),
+//   input (loopTakenAt, DOUBLE_TAP_MS — the double-click that took up a waiting loop does not also open the editor).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -16638,6 +16819,28 @@
     editorEl.style.fontSize = Math.max(11, 13 * view.zoom) + 'px';
   }
 
+  /**
+   * A new text's box, moved on screen so it stands clear of the minimap and the panel and inside the window (the UX
+   * pass, UX-15: a double-click at the lower right opened the editor over the minimap, and the text it kept ran under it
+   * and past the window's foot). It moves the least it can — left, or up — and keeps its size.
+   */
+  function clearOfChrome(b) {
+    const M = 8;
+    const a = worldToScreen(b.minX, b.minY), z = worldToScreen(b.maxX, b.maxY);
+    let x = a.x, y = a.y;
+    const w = z.x - a.x, h = z.y - a.y;
+    x = Math.min(x, innerWidth - M - w); y = Math.min(y, innerHeight - M - h);
+    for (const r of [minimapRect(), panelRect()].filter(Boolean)) {
+      if (!(x < r.right + M && x + w > r.left - M && y < r.bottom + M && y + h > r.top - M)) continue;
+      const left = r.left - M - w, up = r.top - M - h;
+      if (a.x - left <= a.y - up && left >= M) x = left; else y = Math.max(M, up);
+    }
+    x = Math.max(M, x); y = Math.max(M, y);
+    if (x === a.x && y === a.y) return b;
+    const p = screenToWorld(x, y);
+    return { minX: p.x, minY: p.y, maxX: p.x + (b.maxX - b.minX), maxY: p.y + (b.maxY - b.minY) };
+  }
+
   /** Open the editor on a text artifact, or on empty ground at a world point. */
   function beginTextEdit(id, at) {
     const s = session.getState();
@@ -16649,7 +16852,7 @@
       if (!rep || (rep.data.kind !== 'text' && rep.data.kind !== 'mermaid')) return false;
       bounds = MM.boundsOf(n); text = rep.data.code;
     } else {
-      bounds = { minX: at.x, minY: at.y, maxX: at.x + TEXT_W, maxY: at.y + TEXT_H };
+      bounds = clearOfChrome({ minX: at.x, minY: at.y, maxX: at.x + TEXT_W, maxY: at.y + TEXT_H });
     }
     editing = { id: id || null, bounds: bounds };
     editorEl.value = text;
@@ -16675,7 +16878,7 @@
     }
     if (!text.trim()) return null;
     const id = typeText({ x: e.bounds.minX, y: e.bounds.minY }, text);
-    flash('text: a file of words — circle it with a page to wire it into a slot');
+    flash('a text on the board — double-click it to change the words; undo takes it away');
     return id;
   }
   function cancelTextEdit() {
@@ -16694,6 +16897,9 @@
   // Double-click on empty ground: type here. A double-click on ink is nothing —
   // a dot is drawn, not tapped, and a tap is the dead state.
   canvas.addEventListener('dblclick', (e) => {
+    // The double-click that took up a waiting loop opened the field: it is not also "type here" (the standing line
+    // says "double-click inside the loop", and the editor used to open over the field and take the typing).
+    if (Date.now() - loopTakenAt < DOUBLE_TAP_MS + 200) return;
     const w = screenToWorld(e.clientX, e.clientY);
     const under = nodeAt(w.x, w.y);
     // A double-click on a text — typed, or writing taken as text — edits it in place.
@@ -16706,9 +16912,10 @@
 //   (PLAN-USER-SURFACE U1f: Board — boards, folder, import, export, reset; View — zoom, view, theme, hand,
 //   snap, snap now; Helpers — models, live, auto-read, packs, your mark, help; the markup is the page's) (zoom, snap,
 //   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards, packs);
-//   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
-// Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
-//   boardOnScreenName, resetBoard), models (agents, deciderHost; modelsFace, the tile's face — 04-seatpane.js), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude),
+//   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time;
+//   escapeStep, the one Escape ladder (controls, the field, a pane, the grid, the selection, work in flight).
+// Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, setViewMode, folder; the boards adapter:
+//   boardOnScreenName, resetBoard), models (agents, deciderHost, cancelWork; modelsFace, the tile's face — 04-seatpane.js), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude),
 //   relay (roomShort), room (24-room.js: renderLivePane, joinTyped, syncRoomChip — the Live pane's first rows and the chip in the bar); the page's
 //   version (folder's pageVersion: its <meta name="dynaink-version">, V1-PLAN R7, or on a page an older worker kept the
 //   tag's old name, RENAME-PLAN N3b; boards' versionWords), said at the head of the help pane, and under it the
@@ -16739,7 +16946,6 @@
   function openCC() { ccEl.removeAttribute('hidden'); ccBtn.setAttribute('aria-pressed', 'true'); syncTiles(); }
   function closeCC() { ccEl.setAttribute('hidden', ''); ccBtn.setAttribute('aria-pressed', 'false'); }
   ccBtn.onclick = () => { if (ccOpen()) closeCC(); else openCC(); };
-  addEventListener('keydown', (e) => { if (e.key === 'Escape' && ccOpen()) { closeCC(); e.preventDefault(); } });
   addEventListener('pointerdown', (e) => {
     if (!ccOpen()) return;
     if (ccEl.contains(e.target) || ccBtn.contains(e.target)) return;
@@ -16756,26 +16962,26 @@
     ui.tile(tiles.snap, 'snap', snapMode, { on: snapMode !== 'off', why: 'offer: a dashed ghost under a confident shape · auto: drawn clean as you draw · off' });
     const n = heldCandidates.length || snapOffers.size;
     if (tiles.snapNow) { tiles.snapNow.hidden = n === 0; ui.tile(tiles.snapNow, heldCandidates.length ? 'snap circled' : 'snap now', n ? String(n) : '', { why: 'redraw every confidently read shape clean; the ink stays underneath' }); }
-    ui.tile(tiles.view, 'view', viewMode === 'canvas' ? 'canvas' : viewMode, { on: viewMode !== 'canvas', why: 'canvas, or every artifact as a card' });
-    ui.tile(tiles.theme, 'theme', themeMode, { why: 'system follows the OS; light and dark are the same tokens inverted' });
+    ui.tile(tiles.view, 'layout', viewMode === 'grid' ? 'cards' : viewMode, { on: viewMode !== 'canvas', why: 'the board as one canvas, or every thing made on it as a card — Esc comes back' });
+    ui.tile(tiles.theme, 'theme', themeMode, { why: 'light, dark, or system — which follows your device' });
     // The hand: which side of the pen tip the field opens on — and, once a pen has been seen here, what draws (V1-PLAN R6).
     ui.tile(tiles.hand, 'hand', handFace(hand, draws), draws
       ? { on: draws === 'pen', why: 'which side of the pen tip the field opens on, and what draws: the pen — a finger pans and pinches, and a palm on the glass is ignored — or a finger too. A tap changes one word' }
       : { why: 'which side of the pen tip the field opens on' });
     ui.tile(tiles.autoRead, 'auto-read', autoRead ? 'on' : 'off', { on: autoRead, why: 'read handwriting with a model of yours as it is written — dyna.ink’s own reads only when you ask; off asks only when you say read' });
-    ui.tile(tiles.folder, folder.store ? (folder.how === 'git' ? 'repo' : folder.how === 'static' ? 'site' : 'folder') : 'folder', folder.store ? (folder.name || 'open') : 'open…', { on: !!folder.store, why: 'a folder is the canvas: its files are artifacts, your ink is saved beside them' });
+    ui.tile(tiles.folder, folder.store ? (folder.how === 'git' ? 'repo' : folder.how === 'static' ? 'site' : 'folder') : 'folder', folder.store ? (folder.name || 'open') : 'open…', { on: !!folder.store, why: 'a folder on this computer as the board: each file in it a thing on the board, your ink kept beside them' });
     ui.tile(tiles.imp, 'import', '…', { why: 'photos from your library, a picture from the camera, or a file of a known kind — pictures are kept with the board and drawn on it, under your ink. Drop or paste works too' });
-    ui.tile(tiles.exp, 'export', '…', { why: 'the board as SVG or PNG, or the session as its log' });
+    ui.tile(tiles.exp, 'export', '…', { why: 'the board as a file to keep or send: with its pictures, as a picture or a page, or as a board file to open again' });
     const seated = modelsFace(); // the hand's own models, dyna.ink's own once, a decider of theirs (04-seatpane.js)
-    ui.tile(tiles.models, 'models', seated.length ? seated.join(', ') : 'none', { on: seated.length > 0, why: 'a model joins as a participant, in a seat if you give it one; it is asked only when you ask' });
+    ui.tile(tiles.models, 'models', seated.length ? seated.join(', ') : 'none', { on: seated.length > 0, why: 'a model reads your writing and makes what you ask for — in a seat if you give it one; it is asked only when you ask' });
     ui.tile(tiles.teach, 'mark', s.commandMark ? s.commandMark.name : 'check ✓', { on: !!s.commandMark, why: 'the mark that turns a circled group into a selection; teach your own' });
     ui.tile(tiles.reset, 'reset', 'fresh board', { why: 'a fresh board under the same name — what this one holds goes to the trash, from which it comes back whole' });
     ui.tile(tiles.help, 'help', '?', { why: 'how to use the canvas, on one page: draw, hold, choose — and models, boards, rooms, your mark, the shortcuts' });
-    ui.tile(tiles.live, 'live', folder.how === 'live' ? roomShort(folder.name) : 'share…', { on: folder.how === 'live', why: 'share this board: anyone you send the link to draws on it with you, live — or join a room' });
+    ui.tile(tiles.live, 'share', folder.how === 'live' ? roomShort(folder.name) : '…', { on: folder.how === 'live', why: 'share this board: anyone you send the link to draws on it with you, as you draw — or join a room' });
     // Its face is the name of what is on screen (V1-PLAN R1); the pane is 22-boards.js.
     ui.tile(tiles.boards, 'boards', boardOnScreenName() || '…', { why: 'the boards this browser keeps — new, open, rename, duplicate, delete, and the trash — and the folders, repositories and sites opened lately' });
     // The library packs this board uses (V1-PLAN §2.3, B3), last in the grid; the pane is 23-packs.js.
-    ui.tile(tiles.packs, 'packs', packsFace(s), { on: s.packs.length > 0, why: 'the library packs this board uses — premade definitions and notations, matched as if you had taught them; using one is an event in the board’s log, and undo takes it back' });
+    ui.tile(tiles.packs, 'packs', packsFace(s), { on: s.packs.length > 0, why: 'the library packs this board uses — things already drawn and named for you, recognised as if you had taught them; undo takes a pack back' });
     // While in a room, the chip in the bar: the room and who is here (24-room.js).
     syncRoomChip();
   }
@@ -16790,7 +16996,7 @@
   // A live room: Share this board — or, in a room, who is here, the invite, a copy, Leave (24-room.js) — and under
   // "more", a room by its name or an invite link pasted, and "with Claude".
   const livePanel = document.getElementById('livePanel');
-  ui.pane(livePanel, 'live', () => { closePanel(livePanel, tiles.live); const l = document.getElementById('liveLink'); if (l) { l.hidden = true; l.value = ''; } });
+  ui.pane(livePanel, 'share', () => { closePanel(livePanel, tiles.live); const l = document.getElementById('liveLink'); if (l) { l.hidden = true; l.value = ''; } });
   tiles.live.onclick = () => {
     togglePanel(livePanel, tiles.live);
     if (livePanel.hasAttribute('hidden')) return;
@@ -16876,6 +17082,34 @@
     closeList(); closePara();
     return out.join('\n');
   }
+
+  // ===== One Escape (the UX pass, UX-09) =====================================
+  // Escape takes back the top thing standing, one thing a press: the control centre; the field, whatever has
+  // the focus inside it (a pill tapped holds the focus, and Escape used to stop there); the open pane — the one
+  // the focus is in first, else whichever stands; the grid; the selection; and with nothing standing, every
+  // model call in flight (cancelWork). It was four handlers in four fragments, and the panes and the grid had
+  // none. An input that owns its own Escape — the text editor, a board's name being changed, find's field —
+  // takes it first (stopPropagation or preventDefault), and the ladder lets it be. Returns what it took back.
+  function escapeStep(focus) {
+    if (ccOpen()) { closeCC(); return 'controls'; }
+    const s = session.getState();
+    if (s.summon) { session.dismiss(s.summon.id, Date.now()); return 'field'; }
+    const open = panes.filter((p) => !p.el.hasAttribute('hidden'));
+    const pane = open.find((p) => focus && p.el.contains(focus)) || open[open.length - 1];
+    if (pane) {
+      const x = pane.el.querySelector(':scope > .paneHead .paneClose');
+      if (x) x.click(); else closePanel(pane.el, pane.btn);
+      return 'pane';
+    }
+    if (viewMode !== 'canvas') { setViewMode('canvas'); return 'grid'; }
+    if (s.selection.length) { session.deselect(Date.now()); return 'selection'; }
+    // Esc with nothing held stops every model call in flight: a slow model is not a hang, and the hand can say enough.
+    return cancelWork() ? 'work' : null;
+  }
+  addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    if (escapeStep(document.activeElement)) e.preventDefault();
+  });
 
   // Panes open under the bar, one at a time.
   const panes = [];
@@ -17002,6 +17236,7 @@
 //   holds and has left and whether it may clear it (PLAN-IPAD-NOTES I3: loadRoom, roomChanged).
 //   And carrying (RENAME-PLAN N1): *Every board out* and, where this page can carry, *Carry my boards to dyna.ink*,
 //   at the pane's foot, and the old address's notice at its head once N4 turns it on (carryEl, homeNoticeEl).
+//   exampleButtonClick — the panel's start buttons, and the first-run sheet's (27-first.js).
 // Uses: the kept index and pictures (17-find.js: finder, findLoad, findThumbCurrent, findSyncSoon — a board's picture in its row),
 //   carrying (22-carry.js: carryHere, carryOut, everyOut; 17-carry.js: carryWhere),
 //   ui (pane, chip), controls (tiles.boards, togglePanel/closePanel), boards list (boardRows,
@@ -17010,7 +17245,9 @@
 //   rereadBoards, boardEntryName, exportLogNow, readLogText), input (flash, say), the
 //   inspector's element (the panel's start), boards list (exampleUrl, exampleRows, exampleName, starterOf),
 //   core (params, EMBED, session), folder (boardMode), view (fitAll, fitTo), render (union, viewportWorld),
-//   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1).
+//   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1; consentedHere),
+//   inspector (isProgram), the first hour (27-first.js: motionReduced — under reduced motion the film waits for a play;
+//   restAfterOpen, restWords — an example opens fitted, nothing inspected; one bigger than the screen on its program, said).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -17167,7 +17404,7 @@
     if (here.notice) frag.appendChild(homeNoticeEl(here));
     const head = bdJoin(bdEl('div', 'bdHead'), [
       bdButton('New board', 'bdNew', { boardNew: '' }, 'a new, empty board — the one on screen stays as it is'),
-      bdButton('from a file…', 'bdFrom', { boardFile: '' }, 'a board from a .zip made by export with its pictures, or from a log file — one event per line'),
+      bdButton('from a file…', 'bdFrom', { boardFile: '' }, 'a board from a file: a .zip that export made with its pictures, or a board file it made'),
     ]);
     if (!many) head.querySelectorAll('button').forEach((b) => { b.disabled = true; });
     frag.appendChild(head);
@@ -17234,7 +17471,7 @@
   // the service worker keeps for offline. Opening one reads its log and makes a board from its events
   // through the adapter's own door (newBoard) — a copy under an id of its own, named for the example, so
   // the example is never written and the hand draws on it at once.
-  const examples = { state: 'idle', index: null, rows: [], loading: null, opening: false };
+  const examples = { state: 'idle', index: null, rows: [], loading: null, opening: false, heldBack: '' };
   function loadExamples() {
     if (examples.loading) return examples.loading;
     if (examples.state === 'ready') return Promise.resolve();
@@ -17282,14 +17519,20 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         read = readLogText(await res.text(), row.name);
       } catch (err) { report('could not read the “' + row.name + '” example (' + ((err && err.message) || err) + ') — it opens once this page has been online'); return false; }
-      if (!read.events) { report(read.refused || 'the “' + row.name + '” example is not a board’s log'); return false; }
+      if (!read.events) { report(read.refused || 'the “' + row.name + '” example cannot be read as a board'); return false; }
       const events = read.events;
       const made = await newBoard({ name: exampleName([...boards.entries.values()], row), events: events, force: !!o.force, said: o.said || ((v) => say(v.words)) });
       // A shipped example IS the program shown — the launch film — and its code
       // is dyna.ink's own, from the site's own origin, so this hand's board of
       // its own may run it without a tap (the consent gate, C1). A deliberate,
       // narrow grant, made only here; a loaded board of someone else's gets none.
-      if (made) grantPlayingPrograms();
+      if (made) {
+        grantPlayingPrograms();
+        // Unless the person asked for less motion (C4): then it waits for their own play, and the opening's sentence says so.
+        examples.heldBack = motionReduced() && standingPrograms().length ? ' · the film waits for you — this device asks for less motion; press and hold it, then “Play … here”' : '';
+        // Opened fitted to the free ground, nothing inspected until the hand points or draws (27-first.js; UX-11).
+        restAfterOpen();
+      }
       return made;
     } finally { examples.opening = false; }
   }
@@ -17313,7 +17556,7 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         read = readLogText(await res.text(), row.name);
       } catch (err) { say('could not read the “' + row.name + '” example (' + ((err && err.message) || err) + ')'); return; }
-      if (!read.events) { say(read.refused || 'the “' + row.name + '” example is not a board’s log'); return; }
+      if (!read.events) { say(read.refused || 'the “' + row.name + '” example cannot be read as a board'); return; }
       // Unless the reader has drawn on the figure before the log arrived: theirs stands.
       if (session.getEvents().length) return;
       session.load(read.events);
@@ -17338,16 +17581,24 @@
       history.replaceState(history.state, '', url.pathname + url.search + url.hash);
     } catch (err) { /* an address that cannot be rewritten still opens the example once */ }
     const made = await openExample(id);
-    if (made) flash('“' + made.name + '” — a board of your own, made from the example; the example is as it was');
+    if (made) exampleOpened('“' + made.name + '” — a board of your own, made from the example; the example is as it was');
+  }
+  /** The sentence an opened example says: a flash — or, when its film waits for a play (C4), said for longer with that. */
+  function exampleOpened(words) {
+    const held = (examples.heldBack || '') + restWords();
+    examples.heldBack = '';
+    if (held) say(words + held); else flash(words);
   }
   async function exampleFromPane(id, force) {
     paneSay(null);
     const made = await openExample(id, { force: !!force, said: (v) => paneSay(v, () => exampleFromPane(id, true)) });
-    if (made) { closePanel(boardsPanel, tiles.boards); flash('“' + made.name + '” — a board of your own, made from the example; the example is as it was'); }
+    if (made) { closePanel(boardsPanel, tiles.boards); exampleOpened('“' + made.name + '” — a board of your own, made from the example; the example is as it was'); }
   }
   // The empty board's panel offers the starter in one tap, and more of them (10-inspector.js): its buttons carry no
   // data-act, so the panel's own handler never takes them for a mark's.
-  inspectorEl.addEventListener('click', async (e) => {
+  inspectorEl.addEventListener('click', (e) => exampleButtonClick(e));
+  /** The panel's start buttons, and the first-run sheet's (27-first.js): the same two acts. */
+  async function exampleButtonClick(e) {
     const b = e.target.closest && e.target.closest('button[data-example-start], button[data-example-more]');
     if (!b) return;
     if (b.hasAttribute('data-example-more')) { if (boardsPanel && boardsPanel.hasAttribute('hidden')) tiles.boards.onclick(); return; }
@@ -17355,8 +17606,13 @@
     const id = starterOf(examples.index);
     if (!id) { say('the examples could not be read — this page keeps them for offline once it has been online'); return; }
     const made = await openExample(id);
-    if (made) flash('“' + made.name + '” — a board of your own, made from the example; the board before stays in boards');
-  });
+    if (made) exampleOpened('“' + made.name + '” — a board of your own, made from the example; the board before stays in boards');
+  }
+  /** The programs the log says are playing that do not run here — what an example opened under reduced motion holds back. */
+  function standingPrograms() {
+    const s = session.getState();
+    return s.live.filter((id) => s.clocks[id] && s.clocks[id].playing && isProgram(s, id) && !consentedHere(id));
+  }
 
   /** The pane's own line: what just happened, or why not — with the ways out as buttons in it. */
   function paneSay(v, retry) {
@@ -17370,7 +17626,7 @@
     if (!bd.said) return;
     const parts = [document.createTextNode(bd.said.words)];
     for (const w of bd.said.ways) {
-      if (w === 'export') parts.push(bdButton('export the log', 'bdWay', { leaveWay: 'export' }, 'the whole board on screen, as a file to keep'));
+      if (w === 'export') parts.push(bdButton('save it as a file', 'bdWay', { leaveWay: 'export' }, 'the whole board on screen, as a file to keep'));
       else if (w === 'leave' && bd.said.retry) parts.push(bdButton('leave it anyway', 'bdWay', { leaveWay: 'leave' }, 'what was not saved is lost'));
     }
     bdJoin(bdStatus, parts);
@@ -17696,7 +17952,7 @@
 
 // ===== packs (the pane) =====
 // Provides: the library packs pane under the bar (V1-PLAN §2.3, §9 B3) — every pack this build ships
-//   (never a test pack), each with what it adds, whether this board uses it, and *use* / *stop using*;
+//   (never a test pack), each with what it does in the person's words (packDoes) and what it adds, whether this board uses it, and *use* / *stop using*;
 //   the packs this board names that this build lacks, said, with *stop using*. packsFace (the tile's
 //   face), packShort and packSaid (how a match says its pack), renderPacksPane, packsHeard (the session's
 //   listener, subscribed by the boot, which also has the pen follow the board's packs — MM.followPacks).
@@ -17715,10 +17971,20 @@
 
   /** A pack as a match says it, short: `basics@1` → `basics`. */
   function packShort(ref) { return String(ref || '').split('@')[0]; }
-  /** A pack as a tooltip says it: `the Basics pack (basics@1)`. */
+  /** A pack as a tooltip says it: `the Basics pack` — its name, never its id (`basics@1`, the UX pass, UX-08). */
   function packSaid(ref) {
     const p = MM.shippedPack(ref);
-    return 'the ' + (p ? p.name : packShort(ref)) + ' pack (' + ref + ')';
+    return 'the ' + (p ? p.name : packShort(ref)) + ' pack';
+  }
+  /** A pack's name, as the pane and the status line say it. */
+  function packName(ref) { const p = MM.shippedPack(ref); return p ? p.name : packShort(ref); }
+  /** The plural of a symbol or a connector's name: branch → branches, self → self-calls (a word, never name + 's'). */
+  const PLURALS = { self: 'self-calls' };
+  function pluralWord(w) {
+    if (PLURALS[w]) return PLURALS[w];
+    if (/(?:s|x|z|ch|sh)$/.test(w)) return w + 'es';
+    if (/[^aeiou]y$/.test(w)) return w.slice(0, -1) + 'ies';
+    return w + 's';
   }
   /** The tile's face: the packs this board uses, short — or none; a name this build lacks shows as a question. */
   function packsFace(s) {
@@ -17726,13 +17992,33 @@
     return names.length ? names.join(', ') : 'none';
   }
 
+  /**
+   * What a pack does, in the person's words. A pack's own `describes` is core's and says it in the engine's
+   * ("the flowchart notation in use: its ports on the pen"); the pane says what the hand will notice instead.
+   * Keyed by the pack's id, which is never shown; a pack this table does not know says its own line.
+   */
+  const PACK_DOES = {
+    basics: 'a bubble, and a molecule of three bubbles joined by two bonds — already known, nothing to teach',
+    flowchart: 'lines snap to where a flowchart’s shapes join, and drawing clean and flows come first beside a flowchart',
+    'uml-class': 'lines snap to the sides of a class, and drawing clean and lining up come first beside a class diagram',
+    sequence: 'messages snap to the lifelines, and drawing clean and lining up come first beside a sequence diagram',
+    state: 'arrows snap to the border of each state and to the start dot, and drawing clean and lining up come first beside a state diagram',
+    er: 'lines snap to the border of each entity, and drawing clean and lining up come first beside an ER diagram',
+    mindmap: 'branches snap to the border of each idea, and drawing clean and lining up come first beside a mind map',
+    garment: 'drawing clean and the sizes — and printing the piece at its real size — come first beside a pattern piece',
+  };
+  function packDoes(p) { return PACK_DOES[p.id] || p.describes; }
+
   /** What a pack adds, in a line: its definitions by name, its notation's symbols, its connectors. */
   function packHolds(p) {
     const parts = [];
     if (p.definitions.length) parts.push(p.definitions.map((d) => d.name).join(', '));
     if (p.notation) {
       const n = MM.notationById(p.notation);
-      parts.push('the ' + (n ? n.name.toLowerCase() : p.notation) + ' notation' + (n ? ': ' + n.symbols.map((x) => x.name).concat(n.connectors.map((x) => x.name + 's')).join(', ') : ''));
+      // "Flowchart" → "a flowchart", "ER diagram" → "an ER diagram": a name in capitals keeps them.
+      const what = n ? (/^[A-Z]{2}/.test(n.name) ? n.name : n.name[0].toLowerCase() + n.name.slice(1)) : p.notation;
+      const joins = n && n.connectors.length ? ' — joined by ' + n.connectors.map((x) => pluralWord(x.name)).join(', ') : '';
+      parts.push('reads ' + (/^(?:[aeio]|ER\b)/i.test(what) ? 'an ' : 'a ') + what + (n ? ': ' + n.symbols.map((x) => x.name).join(', ') + joins : ''));
     }
     if (p.connectors && p.connectors.length) parts.push(p.connectors.map((c) => c.name).join(', '));
     return parts.join(' · ');
@@ -17766,16 +18052,16 @@
       const top = row.appendChild(pkEl('div', 'pkTop'));
       top.appendChild(pkEl('span', 'pkName', p.name));
       top.appendChild(document.createTextNode(' '));
-      top.appendChild(ui.chip(ref, { cls: 'pkRef', why: 'its name and version — content under one name never changes' }));
-      if (used) { top.appendChild(document.createTextNode(' ')); top.appendChild(ui.chip('in use', { cls: 'pkUsed', why: 'this board uses it: its log says so' })); }
-      row.appendChild(pkEl('div', 'pkWhat', p.describes));
+      top.appendChild(ui.chip('version ' + p.version, { cls: 'pkRef', why: 'what a pack holds under one version never changes' }));
+      if (used) { top.appendChild(document.createTextNode(' ')); top.appendChild(ui.chip('in use', { cls: 'pkUsed', why: 'this board uses it' })); }
+      row.appendChild(pkEl('div', 'pkWhat', packDoes(p)));
       const holds = packHolds(p);
       if (holds) row.appendChild(pkEl('div', 'pkHolds', holds));
       const b = row.appendChild(pkEl('button', '', used ? 'stop using' : 'use'));
       b.type = 'button';
       b.dataset[used ? 'unuse' : 'use'] = ref;
-      b.title = used ? 'its definitions leave this board’s matching — an event in its log; undo brings them back'
-        : 'this board uses it from now on — an event in its log: what it ships is matched here, attributed to it';
+      b.title = used ? 'what it holds is no longer recognised on this board — undo brings it back'
+        : 'this board uses it from now on: what it holds is recognised here, and says it came from the pack — undo takes it back';
     }
     // What this board names that this build does not ship: said, never hidden, and it can be let go.
     for (const n of s.packNotices || []) {
@@ -17789,7 +18075,7 @@
       const b = row.appendChild(pkEl('button', '', 'stop using'));
       b.type = 'button';
       b.dataset.unuse = n.pack;
-      b.title = 'the board stops naming it — an event in its log';
+      b.title = 'the board stops asking for it — undo brings it back';
     }
     pkList.replaceChildren(frag);
   }
@@ -17806,13 +18092,13 @@
         const refused = session.use(d.use, Date.now());
         if (refused) { pkSay(refused.detail); return; }
         const p = MM.shippedPack(d.use);
-        const what = p && p.definitions.length ? p.definitions.map((x) => x.name).join(', ') + ' matched here' : p && p.notation ? 'its notation’s ports on the pen' : 'in use';
-        pkSay('this board uses ' + d.use + ' — ' + what + '; undo takes it back');
+        const what = p && p.definitions.length ? p.definitions.map((x) => x.name).join(', ') + ' recognised here' : p && p.notation ? 'the pen ties lines to its symbols' : 'in use';
+        pkSay('this board uses ' + packSaid(d.use) + ' — ' + what + '; undo takes it back');
         say('using ' + packSaid(d.use) + ' — ' + what);
       } else if (d.unuse !== undefined) {
         session.unuse(d.unuse, Date.now());
-        pkSay('this board no longer uses ' + d.unuse + '; undo brings it back');
-        say('stopped using ' + d.unuse);
+        pkSay('this board no longer uses ' + packSaid(d.unuse) + '; undo brings it back');
+        say('stopped using ' + packSaid(d.unuse));
       }
       syncTiles();
       renderPacksPane();
@@ -18511,10 +18797,10 @@
   /** Why the seat cannot take a question on this page now, in one sentence — or null. */
   function whyNoSeat() {
     if (folder.how !== 'live' || !folder.store) {
-      return 'Claude answers here once this page is in its room — tap “with Claude” in the live tile, or open this page with ?live=' + CLAUDE_ROOM + '&relay=' + CLAUDE_RELAY + (ownRelay(CLAUDE_RELAY) ? '#key=… (the room’s key)' : '') + '.';
+      return 'Claude answers here once this page is in Claude’s room — tap share, then “with Claude” under more ways in.';
     }
-    if (!folder.relay) return 'This room is between tabs on this machine, and Claude’s hand reaches a room only through a relay — tap “with Claude” in the live tile.';
-    if (MM.providerLocality({ baseUrl: folder.relay }) !== 'local' && !ownRelay(folder.relay)) return 'This room’s relay is on another machine, and the seat asks only through a relay on this one or the dyna.ink relay — tap “with Claude” in the live tile.';
+    if (!folder.relay) return 'This room is between tabs on this machine, and Claude reaches a room only through a relay — tap share, then “with Claude” under more ways in.';
+    if (MM.providerLocality({ baseUrl: folder.relay }) !== 'local' && !ownRelay(folder.relay)) return 'This room’s relay is on another machine, and Claude is asked only through a relay on this one or dyna.ink’s own — tap share, then “with Claude” under more ways in.';
     return null;
   }
 
@@ -18639,8 +18925,8 @@
       html += '<div class="note">' + esc(here + ' is here, and sees: seated, What is this?, Read the writing and ask: go to it') + '</div>';
     } else {
       html += '<div class="note">' + esc(folder.name === CLAUDE_ROOM
-        ? 'Claude isn’t in this room yet — it joins whenever Claude Code is open in this project (its hand is node Demos/mcp.mjs), and is offered here the moment it is heard.'
-        : 'Claude isn’t in room “' + folder.name + '” — its hand joins room “' + CLAUDE_ROOM + '”: tap “with Claude” in the live tile.') + '</div>';
+        ? 'Claude isn’t in this room yet — it joins whenever Claude Code is open in this project, and is offered here the moment it is heard.'
+        : 'Claude isn’t in room “' + folder.name + '” — it joins room “' + CLAUDE_ROOM + '”: tap share, then “with Claude” under more ways in.') + '</div>';
     }
     seatSection.innerHTML = html;
     const join1 = seatSection.querySelector('#mpSeatJoin');
@@ -18935,11 +19221,11 @@
   // ===== The export pane's row: the figure at its real size =================
   const mathsRow = document.createElement('div');
   mathsRow.className = 'exRow exMaths';
-  mathsRow.innerHTML = '<button data-mathsout="svg">true-size.svg</button><button data-mathsout="print">print.html</button>';
+  mathsRow.innerHTML = '<button data-mathsout="svg">true size · SVG</button><button data-mathsout="print">print at true size</button>';
   exportPanel.appendChild(mathsRow);
   const MATHS_WAITS = 'the figures at their real size — label a side, in inches or centimetres, and this draws it';
-  const MATHS_SVG_TITLE = 'Every labelled figure drawn from its numbers at its real size: the root in paper inches or centimetres';
-  const MATHS_PRINT_TITLE = 'The same tiled onto pages at 100%, a test square on each — a printer scales without saying so';
+  const MATHS_SVG_TITLE = 'true-size.svg — every labelled figure drawn from its numbers at its real size, in paper inches or centimetres';
+  const MATHS_PRINT_TITLE = 'print-true-size.html — the same tiled onto pages at 100%, a test square on each: a printer scales without saying so';
   let mathsRowState = null;
   /** The row is always there; it waits, and says why, until a figure has numbers and a unit. */
   function syncMathsRow(board) {
@@ -19029,6 +19315,8 @@
 
   // ===== Draw it: a text drawn as ink ========================================
   const MERMAID_THINGS = { sequence: ['participant', 'participants'], 'uml-class': ['class', 'classes'] };
+  // What Mermaid calls a node, in the person's word (the UX pass, UX-08).
+  const MERMAID_THING = ['shape', 'shapes'];
   const MERMAID_LINKS = { sequence: ['message', 'messages'] };
   const mermaidCount = (n, [one, many]) => n + ' ' + (n === 1 ? one : many);
   let mermaidDrawn = null;
@@ -19048,7 +19336,7 @@
     const article = /^[A-Z]{2,}\b/.test(called) ? 'a ' + called : (/^[aeio]/i.test(called) ? 'an ' : 'a ') + called.toLowerCase();
     const nodes = Object.keys(drawn.ids).length;
     let out = drawn.bounds
-      ? 'drew ' + article + ' from ' + name + ': ' + mermaidCount(nodes, MERMAID_THINGS[drawn.notation] || ['node', 'nodes']) + ' and ' + mermaidCount(drawn.links.length, MERMAID_LINKS[drawn.notation] || ['link', 'links'])
+      ? 'drew ' + article + ' from ' + name + ': ' + mermaidCount(nodes, MERMAID_THINGS[drawn.notation] || MERMAID_THING) + ' and ' + mermaidCount(drawn.links.length, MERMAID_LINKS[drawn.notation] || ['link', 'links'])
       : 'nothing was drawn from ' + name;
     const parts = [];
     if (drawn.refused.length) {
@@ -19101,7 +19389,7 @@
     const read = MM.readMermaid(rep.data.code);
     if (read.notation) {
       session.summonMarks([artifactId], Date.now());
-      say(name + ': ' + mermaidCount(read.nodes.length, MERMAID_THINGS[read.notation] || ['node', 'nodes']) + ' of Mermaid — Draw it puts it on the board as marks');
+      say(name + ': ' + mermaidCount(read.nodes.length, MERMAID_THINGS[read.notation] || MERMAID_THING) + ' of Mermaid — Draw it puts it on the board as marks');
     } else {
       const why = read.refused.length ? read.refused[0].reason : 'it is not a diagram the canvas reads';
       say(name + ' stands as text: the canvas cannot draw it yet — ' + why);
@@ -19134,8 +19422,8 @@
     exMermaid.hidden = !got;
     if (!got) return;
     const b = exMermaid.querySelector('button');
-    b.textContent = got.said.reading.notation + '.mmd';
-    b.title = (got.scope === 'held' ? 'The marks held' : 'The board') + ' as Mermaid text — ' + MM.describeNotation(got.said.reading);
+    b.textContent = 'Mermaid text';
+    b.title = got.said.reading.notation + '.mmd — ' + (got.scope === 'held' ? 'the marks held' : 'the board') + ' as Mermaid text: ' + MM.describeNotation(got.said.reading);
   }
   exportBtn.addEventListener('click', refreshMermaidRow);
   exportPanel.addEventListener('click', (e) => {
@@ -19159,7 +19447,7 @@
 //   matched is let in when the seat scores it near, each such hit said *by meaning 0.72* — and likeNotes (the field's
 //   *Notes like this*, a region's button) lists the notes nearest one thing's words across every board in this same
 //   list, each with its number and reason. With nobody in the seat none of that exists and Find is as it was.
-// Uses: ui (pane, esc), controls (openPane, closePanel, tiles), core (MM.searchBoards, describeHit, boundsOf,
+// Uses: the first hour (27-first.js: motionReduced — the ring holds still under reduced motion), ui (pane, esc), controls (openPane, closePanel, tiles), core (MM.searchBoards, describeHit, boundsOf,
 //   getRep), the session, view (fitTo, view, worldToScreen), the boards adapter (board, boards, onBoardHere,
 //   switchBoard), the kept index (finder, findBoards, findSync, findIdle, findIndexCurrent), the boards pane
 //   (rereadBoards), input (say, flash), the semantic seat (semanticHost, findSemantic, semanticNotesLike).
@@ -19485,8 +19773,9 @@
     g.clearRect(0, 0, innerWidth, innerHeight);
     if (t >= FIND_FLASH_MS) { ringStop(); return; }
     const a = worldToScreen(ring.box.minX, ring.box.minY), z = worldToScreen(ring.box.maxX, ring.box.maxY);
-    const pad = 10 + 4 * Math.sin(t / 160);
-    const alpha = Math.min(1, (FIND_FLASH_MS - t) / 700);
+    // It pulses and fades — unless the person asked for less motion (C4): then it stands still, and goes.
+    const pad = motionReduced() ? 10 : 10 + 4 * Math.sin(t / 160);
+    const alpha = motionReduced() ? 1 : Math.min(1, (FIND_FLASH_MS - t) / 700);
     g.lineWidth = 2.5;
     g.strokeStyle = 'rgba(' + (C ? C.goldRGB : '201,168,76') + ',' + (0.95 * alpha).toFixed(3) + ')';
     g.beginPath();
@@ -19497,6 +19786,160 @@
   addEventListener('pointerdown', (e) => { if (ring && ring.box && !(findPanel && findPanel.contains(e.target))) ringStop(); }, { capture: true, passive: true });
   /** For tests: whether the ring is up and the box it rings. */
   function findFlashState() { return { active: !!(ring && ring.box), box: ring && ring.box ? Object.assign({}, ring.box) : null }; }
+
+// ===== the first hour =====
+// Provides: what a first-time hand meets, on a desktop, a phone and an iPad (the UX pass):
+//   - the first run on every screen (UX-03): on an empty board the three steps and *start from an example* whatever
+//     the width — in the panel where it stands, else as a small sheet at the foot of the screen (#firstRun) that
+//     leaves on the first stroke (syncFirstRun, firstRunState);
+//   - the words for the hand in use (tapWords): a finger or a pen double-taps, a mouse double-clicks — read from the
+//     last pointer's own pointerType, else whether the screen's main pointer is coarse; never the user agent;
+//   - a board opened whole from an example inspects nothing until the hand points at a mark or draws (restAfterOpen,
+//     resting; UX-11) — one bigger than the screen opens on its program or its first part, and says so (restWords) —
+//     and a thing just made is brought into view (bringIntoView; UX-13);
+//   - a said sentence lets go when the hand draws again (UX-16);
+//   - reduced motion (motionReduced; the critic's C4): prefers-reduced-motion, read once and on change — the working
+//     dot and the find ring hold still, and an example's program waits for the person's own play.
+// Uses: core (canvas, session, state, panelOpen, panelToggle, EMBED, prefs), render (render), inspector (firstLoopHtml),
+//   folder (viewMode, boardMode), replay (rp), view (fitTo, usableViewport, worldToScreen, afterViewChange, union),
+//   input (flashText, flashAt, FLASH_MS — the status line's own), boards (exampleButtonClick — the sheet's buttons are
+//   the panel's, 22-boards.js).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== Reduced motion (C4) ===================================================
+  // The surface's motion is painted on the canvas, not in CSS, so the stylesheet's reduced-motion rule (no
+  // transitions) reached none of it. Read the person's preference once, and again when it changes; what moves by
+  // itself reads motionReduced(). A program the person plays still plays: that motion is theirs.
+  const reducedMotionQuery = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+  let reducedMotion = !!(reducedMotionQuery && reducedMotionQuery.matches);
+  if (reducedMotionQuery) {
+    const heard = (e) => { reducedMotion = !!e.matches; render(session.getState()); };
+    if (reducedMotionQuery.addEventListener) reducedMotionQuery.addEventListener('change', heard);
+    else if (reducedMotionQuery.addListener) reducedMotionQuery.addListener(heard);
+  }
+  /** Whether the person asked for less motion: what moves by itself holds still. */
+  function motionReduced() { return reducedMotion; }
+
+  // ===== The words for the hand in use =========================================
+  // "double-click" means nothing on a phone, and "double-tap" little with a mouse. The hand is told by the pointer it
+  // last used — its own pointerType — and before any, by whether the screen's main pointer is coarse (a finger).
+  let lastPointerType = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 'touch' : 'mouse';
+  addEventListener('pointerdown', (e) => { if (e.pointerType) lastPointerType = e.pointerType; }, { capture: true, passive: true });
+  /** "double-tap" for a finger or a pen, "double-click" for a mouse. */
+  function tapWords() { return lastPointerType === 'touch' || lastPointerType === 'pen' ? 'double-tap' : 'double-click'; }
+
+  // ===== The first run on every screen (UX-03) ==================================
+  // At 820 px and less the panel starts closed, and with it the three steps and *start from an example*: a first-time
+  // hand on a phone met an empty canvas and the word "double-click". Where the panel does not stand — closed, on any
+  // width — the same steps stand as a small sheet at the foot of the screen, until the first stroke. Not in an embed
+  // or a replay (a figure, not a board to start on), not in the grid, and never again once the hand has drawn here.
+  const firstRunEl = document.createElement('div');
+  firstRunEl.id = 'firstRun';
+  firstRunEl.hidden = true;
+  firstRunEl.setAttribute('role', 'region');
+  firstRunEl.setAttribute('aria-label', 'how to begin');
+  document.body.appendChild(firstRunEl);
+  let firstRunGone = false;
+  let firstRunSaid = null;
+  /** Whether the sheet stands now, and why not. */
+  function firstRunState(s) {
+    s = s || session.getState();
+    const empty = !s.contentIds.length && !s.artifacts.length;
+    const panelShows = !document.body.classList.contains('panelHidden');
+    const why = firstRunGone ? 'drawn' : !empty ? 'not empty' : EMBED ? 'embed' : (typeof rp !== 'undefined' && rp.rec) ? 'replay'
+      : viewMode !== 'canvas' ? 'grid' : panelShows ? 'the panel says it' : null;
+    return { shown: !why, why: why };
+  }
+  function syncFirstRun(s) {
+    const st = firstRunState(s);
+    if (st.shown && firstRunSaid === null) { firstRunSaid = firstLoopHtml(); firstRunEl.innerHTML = firstRunSaid; }
+    if (firstRunEl.hidden === st.shown) firstRunEl.hidden = !st.shown;
+  }
+  // The sheet's buttons are the panel's: a board of your own from the starter, or the boards pane's examples.
+  firstRunEl.addEventListener('click', (e) => exampleButtonClick(e));
+  // It leaves on the first stroke: a press on the canvas begins one.
+  canvas.addEventListener('pointerdown', () => { if (!firstRunGone) { firstRunGone = true; firstRunEl.hidden = true; } }, { capture: true, passive: true });
+  panelToggle.addEventListener('click', () => syncFirstRun(session.getState()));
+
+  // ===== A said sentence lets go (UX-16) ========================================
+  // A sentence said for a while (say, seven seconds) held the status line through the next acts — a kept ask stood
+  // beside the lasso's hint after the hand had moved on. Once it has been up for a flash's time, the hand drawing
+  // again is the hand having read it.
+  canvas.addEventListener('pointerdown', () => {
+    if (flashText && Date.now() - flashAt > FLASH_MS) { flashText = null; clearTimeout(flashTimer); }
+  }, { capture: true, passive: true });
+
+  // ===== A board opened whole inspects nothing (UX-11) ===========================
+  // An example opened with its last mark inspected — its note, a text, said as "a text" in the panel — and the panel
+  // over the drawing. Opened, it is fitted to the free ground and nothing is inspected until the hand points at a mark
+  // or the board changes; the panel says what the board holds and how to begin.
+  let restAt = null;
+  let restBigger = null; // what a board too big for the screen opened on: 'program' | 'part', else null
+  function restAfterOpen() {
+    const evs = session.getEvents();
+    restAt = { events: evs, len: evs.length };
+    hoverId = null;
+    fitAll();
+    // A board bigger than the screen even at the farthest zoom (the storyboard on a phone: 8% left half of it off the
+    // screen) opens on what it is for — its playing program, else its first region, else its first thing made — whole,
+    // and says the rest is there (restWords).
+    restBigger = null;
+    const s = session.getState();
+    const boxes = s.contentIds.map((id) => s.nodes.get(id) && MM.boundsOf(s.nodes.get(id))).filter(Boolean);
+    if (!boxes.length || shownWhole(union(boxes))) return;
+    const film = s.live.find((id) => s.clocks[id] && s.clocks[id].playing);
+    const first = film || (s.regions || [])[0] || s.artifacts[0];
+    const b = first && s.nodes.get(first) && MM.boundsOf(s.nodes.get(first));
+    if (!b) return;
+    fitTo(b);
+    restBigger = film ? 'program' : 'part';
+  }
+  /** What the opening sentence adds for a board bigger than the screen, in the words for the hand in use; else ''. */
+  function restWords() {
+    if (!restBigger) return '';
+    return ' · bigger than this screen — it opens on ' + (restBigger === 'program' ? 'its program' : 'its first part') + '; ' +
+      (tapWords() === 'double-tap' ? 'pinch' : 'zoom out') + ' or use the map in the corner to see the rest';
+  }
+  /** Whether a world box stands whole in the free ground, a margin inside its edges. */
+  function shownWhole(b) {
+    const free = usableViewport();
+    const a = worldToScreen(b.minX, b.minY), z = worldToScreen(b.maxX, b.maxY);
+    const M = 16;
+    return a.x >= free.left + M && a.y >= free.top + M && z.x <= free.right - M && z.y <= free.bottom - M;
+  }
+  /** Whether nothing is to be inspected: the board as it was opened, nothing pointed at. */
+  function resting() {
+    if (!restAt) return false;
+    const evs = session.getEvents();
+    if (evs !== restAt.events || evs.length !== restAt.len) { restAt = null; return false; }
+    return true;
+  }
+
+  // ===== A thing just made, in view (UX-13) ======================================
+  /**
+   * Bring marks into the free ground when any of them is outside it: panned, and zoomed out only as far as it takes —
+   * never zoomed in to show them. Make it Mermaid stood its card right of the drawing, cut off at the window's edge,
+   * and the view did not move. Returns whether the view moved.
+   */
+  function bringIntoView(ids) {
+    const s = session.getState();
+    const boxes = (ids || []).map((id) => s.nodes.get(id)).filter(Boolean).map((n) => MM.boundsOf(n)).filter(Boolean);
+    if (!boxes.length) return false;
+    const b = union(boxes);
+    const free = usableViewport();
+    if (shownWhole(b)) return false;
+    const zoom = view.zoom;
+    fitTo(b);
+    if (view.zoom > zoom) {
+      view.zoom = zoom;
+      view.panX = free.left + (free.width - (b.maxX - b.minX) * zoom) / 2 - b.minX * zoom;
+      view.panY = free.top + (free.height - (b.maxY - b.minY) * zoom) / 2 - b.minY * zoom;
+      afterViewChange();
+    }
+    return true;
+  }
 
 // ===== boot =====
 // Provides: the debug handle (window.__mm, what the e2e drives), subscription (the journal first, the paint,
@@ -19665,6 +20108,14 @@
     },
     carryPrefsAllowed: () => CARRY_PREFS.slice(),
     showHomeNotice: (on) => { carry.noticeForced = !!on; renderBoardsPane(); if (on) homeNoticeOnce(); },
+  });
+
+  // The first hour (the UX pass), for tests: the first-run sheet, the one Escape, the hand's word, reduced motion,
+  // whether nothing is inspected, a thing brought into view, where the open field stands, and a tank held still.
+  Object.assign(window.__mm, {
+    firstRun: () => firstRunState(), escapeStep: (focus) => escapeStep(focus || document.activeElement), tapWords: tapWords,
+    motionReduced: motionReduced, resting: resting, bringIntoView: bringIntoView,
+    tankHeldStill: (id) => tankHeldStill(session.getState(), id),
   });
 
   // Mermaid (V1-PLAN D2, D3), for tests: the library a frame loads (a stand-in, or the CDN's again), what a frame said of itself, what Draw it drew.

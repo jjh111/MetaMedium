@@ -11,6 +11,7 @@
 //   holds and has left and whether it may clear it (PLAN-IPAD-NOTES I3: loadRoom, roomChanged).
 //   And carrying (RENAME-PLAN N1): *Every board out* and, where this page can carry, *Carry my boards to dyna.ink*,
 //   at the pane's foot, and the old address's notice at its head once N4 turns it on (carryEl, homeNoticeEl).
+//   exampleButtonClick — the panel's start buttons, and the first-run sheet's (27-first.js).
 // Uses: the kept index and pictures (17-find.js: finder, findLoad, findThumbCurrent, findSyncSoon — a board's picture in its row),
 //   carrying (22-carry.js: carryHere, carryOut, everyOut; 17-carry.js: carryWhere),
 //   ui (pane, chip), controls (tiles.boards, togglePanel/closePanel), boards list (boardRows,
@@ -19,7 +20,9 @@
 //   rereadBoards, boardEntryName, exportLogNow, readLogText), input (flash, say), the
 //   inspector's element (the panel's start), boards list (exampleUrl, exampleRows, exampleName, starterOf),
 //   core (params, EMBED, session), folder (boardMode), view (fitAll, fitTo), render (union, viewportWorld),
-//   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1).
+//   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1; consentedHere),
+//   inspector (isProgram), the first hour (27-first.js: motionReduced — under reduced motion the film waits for a play;
+//   restAfterOpen, restWords — an example opens fitted, nothing inspected; one bigger than the screen on its program, said).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -176,7 +179,7 @@
     if (here.notice) frag.appendChild(homeNoticeEl(here));
     const head = bdJoin(bdEl('div', 'bdHead'), [
       bdButton('New board', 'bdNew', { boardNew: '' }, 'a new, empty board — the one on screen stays as it is'),
-      bdButton('from a file…', 'bdFrom', { boardFile: '' }, 'a board from a .zip made by export with its pictures, or from a log file — one event per line'),
+      bdButton('from a file…', 'bdFrom', { boardFile: '' }, 'a board from a file: a .zip that export made with its pictures, or a board file it made'),
     ]);
     if (!many) head.querySelectorAll('button').forEach((b) => { b.disabled = true; });
     frag.appendChild(head);
@@ -243,7 +246,7 @@
   // the service worker keeps for offline. Opening one reads its log and makes a board from its events
   // through the adapter's own door (newBoard) — a copy under an id of its own, named for the example, so
   // the example is never written and the hand draws on it at once.
-  const examples = { state: 'idle', index: null, rows: [], loading: null, opening: false };
+  const examples = { state: 'idle', index: null, rows: [], loading: null, opening: false, heldBack: '' };
   function loadExamples() {
     if (examples.loading) return examples.loading;
     if (examples.state === 'ready') return Promise.resolve();
@@ -291,14 +294,20 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         read = readLogText(await res.text(), row.name);
       } catch (err) { report('could not read the “' + row.name + '” example (' + ((err && err.message) || err) + ') — it opens once this page has been online'); return false; }
-      if (!read.events) { report(read.refused || 'the “' + row.name + '” example is not a board’s log'); return false; }
+      if (!read.events) { report(read.refused || 'the “' + row.name + '” example cannot be read as a board'); return false; }
       const events = read.events;
       const made = await newBoard({ name: exampleName([...boards.entries.values()], row), events: events, force: !!o.force, said: o.said || ((v) => say(v.words)) });
       // A shipped example IS the program shown — the launch film — and its code
       // is dyna.ink's own, from the site's own origin, so this hand's board of
       // its own may run it without a tap (the consent gate, C1). A deliberate,
       // narrow grant, made only here; a loaded board of someone else's gets none.
-      if (made) grantPlayingPrograms();
+      if (made) {
+        grantPlayingPrograms();
+        // Unless the person asked for less motion (C4): then it waits for their own play, and the opening's sentence says so.
+        examples.heldBack = motionReduced() && standingPrograms().length ? ' · the film waits for you — this device asks for less motion; press and hold it, then “Play … here”' : '';
+        // Opened fitted to the free ground, nothing inspected until the hand points or draws (27-first.js; UX-11).
+        restAfterOpen();
+      }
       return made;
     } finally { examples.opening = false; }
   }
@@ -322,7 +331,7 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         read = readLogText(await res.text(), row.name);
       } catch (err) { say('could not read the “' + row.name + '” example (' + ((err && err.message) || err) + ')'); return; }
-      if (!read.events) { say(read.refused || 'the “' + row.name + '” example is not a board’s log'); return; }
+      if (!read.events) { say(read.refused || 'the “' + row.name + '” example cannot be read as a board'); return; }
       // Unless the reader has drawn on the figure before the log arrived: theirs stands.
       if (session.getEvents().length) return;
       session.load(read.events);
@@ -347,16 +356,24 @@
       history.replaceState(history.state, '', url.pathname + url.search + url.hash);
     } catch (err) { /* an address that cannot be rewritten still opens the example once */ }
     const made = await openExample(id);
-    if (made) flash('“' + made.name + '” — a board of your own, made from the example; the example is as it was');
+    if (made) exampleOpened('“' + made.name + '” — a board of your own, made from the example; the example is as it was');
+  }
+  /** The sentence an opened example says: a flash — or, when its film waits for a play (C4), said for longer with that. */
+  function exampleOpened(words) {
+    const held = (examples.heldBack || '') + restWords();
+    examples.heldBack = '';
+    if (held) say(words + held); else flash(words);
   }
   async function exampleFromPane(id, force) {
     paneSay(null);
     const made = await openExample(id, { force: !!force, said: (v) => paneSay(v, () => exampleFromPane(id, true)) });
-    if (made) { closePanel(boardsPanel, tiles.boards); flash('“' + made.name + '” — a board of your own, made from the example; the example is as it was'); }
+    if (made) { closePanel(boardsPanel, tiles.boards); exampleOpened('“' + made.name + '” — a board of your own, made from the example; the example is as it was'); }
   }
   // The empty board's panel offers the starter in one tap, and more of them (10-inspector.js): its buttons carry no
   // data-act, so the panel's own handler never takes them for a mark's.
-  inspectorEl.addEventListener('click', async (e) => {
+  inspectorEl.addEventListener('click', (e) => exampleButtonClick(e));
+  /** The panel's start buttons, and the first-run sheet's (27-first.js): the same two acts. */
+  async function exampleButtonClick(e) {
     const b = e.target.closest && e.target.closest('button[data-example-start], button[data-example-more]');
     if (!b) return;
     if (b.hasAttribute('data-example-more')) { if (boardsPanel && boardsPanel.hasAttribute('hidden')) tiles.boards.onclick(); return; }
@@ -364,8 +381,13 @@
     const id = starterOf(examples.index);
     if (!id) { say('the examples could not be read — this page keeps them for offline once it has been online'); return; }
     const made = await openExample(id);
-    if (made) flash('“' + made.name + '” — a board of your own, made from the example; the board before stays in boards');
-  });
+    if (made) exampleOpened('“' + made.name + '” — a board of your own, made from the example; the board before stays in boards');
+  }
+  /** The programs the log says are playing that do not run here — what an example opened under reduced motion holds back. */
+  function standingPrograms() {
+    const s = session.getState();
+    return s.live.filter((id) => s.clocks[id] && s.clocks[id].playing && isProgram(s, id) && !consentedHere(id));
+  }
 
   /** The pane's own line: what just happened, or why not — with the ways out as buttons in it. */
   function paneSay(v, retry) {
@@ -379,7 +401,7 @@
     if (!bd.said) return;
     const parts = [document.createTextNode(bd.said.words)];
     for (const w of bd.said.ways) {
-      if (w === 'export') parts.push(bdButton('export the log', 'bdWay', { leaveWay: 'export' }, 'the whole board on screen, as a file to keep'));
+      if (w === 'export') parts.push(bdButton('save it as a file', 'bdWay', { leaveWay: 'export' }, 'the whole board on screen, as a file to keep'));
       else if (w === 'leave' && bd.said.retry) parts.push(bdButton('leave it anyway', 'bdWay', { leaveWay: 'leave' }, 'what was not saved is lost'));
     }
     bdJoin(bdStatus, parts);

@@ -15,6 +15,7 @@ import { offersFor, completionsFor, toolScope, takeOffer, describeTools, registe
 import { rankOffers } from './rank';
 import { BUILTIN_TOOLS } from './builtin';
 import { standStructure } from './structure';
+import { snapReading } from '../session/clean';
 
 // The harness's own strokes (Demos/session-engine.e2e.js, window.__helpers).
 const line = (a: Point, b: Point, n = 40): Point[] => Array.from({ length: n }, (_, i) => ({ x: a.x + ((b.x - a.x) * i) / (n - 1), y: a.y + ((b.y - a.y) * i) / (n - 1) }));
@@ -267,6 +268,23 @@ describe('offers relevant or absent', () => {
     const k = keys(ranked(s));
     expect(k).toContain('3d');
     expect(k).not.toContain('read-any');
+  });
+
+  // The UX pass, UX-10: the commonest diagram — two boxes and a hand-drawn arrow between them, its barb drawn back
+  // from the tip and the pen lifting at a wing — reads "probably an arrow", unsure, so it was offered Read as
+  // writing. A connector between two of the marks held is placed: its wires say what it joins.
+  it('two boxes and a hand-drawn arrow between them: nothing offers to read them as writing (UX-10)', () => {
+    const s = createSession();
+    const a = { x: 322, y: 240 }, b = { x: 478, y: 240 };
+    const w1 = { x: b.x - 22, y: b.y - 12 }, w2 = { x: b.x - 22, y: b.y + 12 };
+    const arrow = [...line(a, b, 40), ...line(b, w1, 8).slice(1), ...line(w1, b, 8).slice(1), ...line(b, w2, 8).slice(1)];
+    const box1 = draw(s, rect(200, 200, 120, 80)), box2 = draw(s, rect(480, 200, 120, 80)), shaft = draw(s, arrow);
+    hold(s, [box1, shaft, box2]);
+    const st = s.getState();
+    // The arrow is unsure — or this would test nothing — and it joins the two boxes.
+    expect(snapReading(st.nodes.get(shaft)!, st.nodes).ok).toBe(false);
+    expect(st.nodes.get(shaft)!.edges.filter((e) => e.rel === 'connects').map((e) => e.to).sort()).toEqual([box1, box2].sort());
+    expect(keys(ranked(s))).not.toContain('read-any');
   });
 
   it('ink the rung could not place for sure is still offered to read as writing (v10 F5)', () => {
