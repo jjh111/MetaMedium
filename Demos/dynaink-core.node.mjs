@@ -28410,9 +28410,19 @@ var READ = {
     });
     const held2 = scope.marks.map((id) => s.nodes.get(id)).filter((n2) => !!n2);
     const aHead = (n2) => held2.some((c) => c !== n2 && headApartAt(c, n2, s.nodes) !== null);
+    const heldSet = new Set(scope.marks);
+    const joinsHeld = (n2) => {
+      const ends = new Set(n2.edges.filter((e) => e.rel === "connects" && heldSet.has(e.to)).map((e) => e.to));
+      if (ends.size < 2) return false;
+      for (const id of ends) {
+        const m = s.nodes.get(id);
+        if (!m || isWritingMark(m, s.nodes)) return false;
+      }
+      return true;
+    };
     if (!ink.some((id) => {
       const n2 = s.nodes.get(id);
-      return isWord(n2) || !snapReading(n2, s.nodes).ok && !aHead(n2);
+      return isWord(n2) || !snapReading(n2, s.nodes).ok && !aHead(n2) && !joinsHeld(n2);
     })) return out;
     return [...out, {
       key: "read-any",

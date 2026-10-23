@@ -127,7 +127,17 @@ export const READ: Tool = {
     // were offered *Read as writing*).
     const held = scope.marks.map((id) => s.nodes.get(id)).filter((n): n is NonNullable<typeof n> => !!n);
     const aHead = (n: NonNullable<ReturnType<typeof s.nodes.get>>) => held.some((c) => c !== n && headApartAt(c, n, s.nodes) !== null);
-    if (!ink.some((id) => { const n = s.nodes.get(id)!; return isWord(n) || (!snapReading(n, s.nodes).ok && !aHead(n)); })) return out;
+    // A connector between two of the marks held is placed too: a hand-drawn arrow from one box to another reads
+    // "probably an arrow", unsure enough that the commonest diagram — two boxes and an arrow — was offered
+    // *Read as writing* (the UX pass, UX-10). Its wires say what it joins; writing joins nothing.
+    const heldSet = new Set(scope.marks);
+    const joinsHeld = (n: NonNullable<ReturnType<typeof s.nodes.get>>) => {
+      const ends = new Set(n.edges.filter((e) => e.rel === 'connects' && heldSet.has(e.to)).map((e) => e.to));
+      if (ends.size < 2) return false;
+      for (const id of ends) { const m = s.nodes.get(id); if (!m || isWritingMark(m, s.nodes)) return false; }
+      return true;
+    };
+    if (!ink.some((id) => { const n = s.nodes.get(id)!; return isWord(n) || (!snapReading(n, s.nodes).ok && !aHead(n) && !joinsHeld(n)); })) return out;
     return [...out, {
       key: 'read-any',
       label: 'Read as writing',
