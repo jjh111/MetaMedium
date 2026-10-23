@@ -17,7 +17,7 @@
 //   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
 //   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
 //   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
-//   hand opened the field), hand (handOfPointer).
+//   hand opened the field), hand (handOfPointer), controls (escapeStep — the field's Escape is the ladder's).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -1117,7 +1117,8 @@
     const shown = visibleItems(q);
     if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); paletteNavigated = true; paletteIndex = Math.min(shown.length - 1, paletteIndex + 1); paintField(q); return; }
     if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); paletteNavigated = true; paletteIndex = Math.max(0, paletteIndex - 1); paintField(q); return; }
-    if (e.key === 'Escape') { e.preventDefault(); session.dismiss(shownSummonId, Date.now()); return; }
+    // The field's own rung of the one Escape ladder (20-controls.js): it closes the field, or the controls standing over it.
+    if (e.key === 'Escape') { e.preventDefault(); escapeStep(e.target); return; }
     if (e.key !== 'Enter') return;
     e.preventDefault();
     // The arrows chose a pill: Enter takes it. Otherwise Enter does what the

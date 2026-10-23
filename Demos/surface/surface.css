@@ -135,7 +135,7 @@ input.fileIn { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacit
   display: flex; flex-direction: column; gap: 8px; padding: 8px;
   background: var(--panel); border: 1px solid var(--rule); border-radius: 10px;
   box-shadow: var(--shadow); backdrop-filter: blur(10px);
-  max-height: calc(100vh - 60px); overflow-y: auto; overscroll-behavior: contain;
+  max-height: calc(100vh - 60px); max-height: calc(100dvh - 60px); overflow-y: auto; overscroll-behavior: contain;
 }
 #cc[hidden] { display: none; }
 /* Three labelled groups (U1f): Board, View, Helpers — each its own grid of tiles in fixed slots. */
@@ -172,6 +172,12 @@ input.fileIn { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacit
   position: absolute; top: 52px; right: 12px; width: 300px; z-index: 21;
   background: var(--panel); border: 1px solid var(--rule); border-radius: 10px;
   padding: 10px 13px 12px; font-size: 11.5px; box-shadow: var(--shadow); backdrop-filter: blur(10px);
+  /* Every pane fits under the bar and scrolls inside itself (the UX pass, UX-02): the models pane ran to
+     1,200 px with its Join below the fold and nothing a wheel or a finger could scroll. The height is the
+     screen less the bar (52), a 12 px foot, and the pane's own padding and border (24) — the dynamic
+     viewport where the browser has one, so a phone's toolbar does not hide the foot. */
+  max-height: calc(100vh - 88px); max-height: calc(100dvh - 88px);
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
 }
 .pane[hidden] { display: none; }
 .paneHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
@@ -212,7 +218,7 @@ input.fileIn { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacit
 #exportPanel .exRow + .exRow { margin-top: 7px; }
 #exportPanel .exRow button:disabled { opacity: 0.45; cursor: default; }
 /* The live pane: share this board, or — in a room — who is here, the invite, a copy, leave; other ways in under "more". */
-#livePanel { width: min(320px, calc(100vw - 24px)); box-sizing: border-box; max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; }
+#livePanel { width: min(320px, calc(100vw - 24px)); box-sizing: border-box; }
 #livePanel .mpRow { display: flex; gap: 7px; margin-top: 11px; }
 #livePanel .mpRow[hidden], #livePanel [hidden] { display: none; }
 #livePanel .mpRow button { flex: 1; }
@@ -245,7 +251,7 @@ input.fileIn { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacit
 /* On a phone the bar has room for the dots only; the room's name is in the Live pane a tap away. */
 @media (max-width: 560px) { #roomChip .rcName { display: none; } #roomChip { padding: 5px 8px; } }
 /* The help pane: the QA plan, read into the page. */
-#helpPanel { width: min(420px, calc(100vw - 24px)); max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; font-size: 11.5px; line-height: 1.5; scrollbar-width: thin; }
+#helpPanel { width: min(420px, calc(100vw - 24px)); font-size: 11.5px; line-height: 1.5; scrollbar-width: thin; }
 #helpPanel .helpBody h2 { font-size: 13px; margin: 6px 0 4px; color: var(--gold); }
 #helpPanel .helpBody h3 { font-size: 11.5px; margin: 12px 0 4px; color: var(--ink); letter-spacing: 0.02em; }
 #helpPanel .helpBody h4 { font-size: 11px; margin: 10px 0 3px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.08em; }
@@ -261,7 +267,7 @@ input.fileIn { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacit
 #helpPanel #helpSource a:hover { color: var(--ink); }
 #helpPanel .helpBody hr { border: 0; border-top: 1px solid var(--rule); margin: 10px 0; }
 /* The boards pane (V1-PLAN R1): the boards this browser keeps, the places opened lately, the trash. */
-#boardsPanel { width: min(320px, calc(100vw - 24px)); box-sizing: border-box; max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+#boardsPanel { width: min(320px, calc(100vw - 24px)); box-sizing: border-box; }
 #boardsPanel .bdHead { display: flex; gap: 7px; margin-bottom: 8px; }
 #boardsPanel .bdHead button { flex: 1; }
 #boardsPanel .bdStorage { margin: 10px 0 0; padding-top: 8px; border-top: 1px solid var(--edge); }
@@ -298,7 +304,7 @@ input.fileIn { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacit
 
 /* Find: one field under the bar; the boards that say the word, each hit as the words in context. */
 #findBtn { min-width: 42px; }
-#findPanel { width: min(360px, calc(100vw - 24px)); box-sizing: border-box; max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+#findPanel { width: min(360px, calc(100vw - 24px)); box-sizing: border-box; }
 #findPanel #findInput { margin-top: 0; font-size: 13px; padding: 8px 9px; }
 #findPanel #findStatus { margin: 7px 0 0; }
 #findPanel .fdGroup { margin-top: 10px; border-top: 1px solid var(--edge); padding-top: 6px; }
@@ -317,7 +323,7 @@ input.fileIn { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacit
 #findRing[hidden] { display: none; }
 
 /* The library packs pane (V1-PLAN §2.3, B3): what this build ships, what the board uses, and use / stop using. */
-#packsPanel { width: min(320px, calc(100vw - 24px)); box-sizing: border-box; max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+#packsPanel { width: min(320px, calc(100vw - 24px)); box-sizing: border-box; }
 #packsPanel .pkItem { padding: 6px 7px; border: 1px solid transparent; border-radius: 6px; }
 #packsPanel .pkItem + .pkItem { margin-top: 2px; }
 #packsPanel .pkItem.used { border-color: var(--rule); background: rgba(var(--gold-rgb), 0.07); }

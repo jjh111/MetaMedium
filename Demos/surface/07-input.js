@@ -1,7 +1,7 @@
 // ===== input =====
 // Provides: pointer input (draw, pan, pinch) for the mouse, the pen and the finger — the palm ignored,
 //   the pen's pressure on every point it draws, its hover a hover (V1-PLAN R6) — keys (undo, copy,
-//   paste, erase, zoom), say()/flash() for the status line.
+//   paste, erase, zoom — Escape is the controls' one ladder, escapeStep), say()/flash() for the status line.
 // Uses: core (draws, setDraws), hand (the rules: fingerRole, palmNow, whenPenLands, releaseIs, PAN_SLOP_PX), view,
 //   snap (autoSweep, magnetQuery), render (drawLive), palette (copyMarks, pasteClip), handwriting
 //   (autoRead), artifacts (pointerFrameAt), kinds (postPointer).
@@ -658,9 +658,7 @@
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); session.undo(); }
     // Copy holds the selection's ink (and puts it on the clipboard as SVG); paste is handled with files, in the images fragment.
     if ((e.ctrlKey || e.metaKey) && e.key === 'c' && e.target === document.body && state.selection.length) { e.preventDefault(); copyMarks(state.selection.slice()); }
-    if (e.target === document.body && e.key === 'Escape' && state.selection.length && !state.summon) session.deselect(Date.now());
-    // Esc with nothing held stops every model call in flight: a slow model is not a hang, and the hand can say enough.
-    else if (e.target === document.body && e.key === 'Escape' && !state.selection.length && !state.summon) cancelWork();
+    // Escape is one ladder, in the controls fragment (escapeStep): the field, a pane, the grid, the selection, then work in flight.
     if (e.target === document.body && (e.key === 'Backspace' || e.key === 'Delete') && state.selection.length) {
       e.preventDefault();
       eraseSelection();

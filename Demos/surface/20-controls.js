@@ -3,9 +3,10 @@
 //   (PLAN-USER-SURFACE U1f: Board — boards, folder, import, export, reset; View — zoom, view, theme, hand,
 //   snap, snap now; Helpers — models, live, auto-read, packs, your mark, help; the markup is the page's) (zoom, snap,
 //   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards, packs);
-//   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
-// Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
-//   boardOnScreenName, resetBoard), models (agents, deciderHost), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude),
+//   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time;
+//   escapeStep, the one Escape ladder (controls, the field, a pane, the grid, the selection, work in flight).
+// Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, setViewMode, folder; the boards adapter:
+//   boardOnScreenName, resetBoard), models (agents, deciderHost, cancelWork), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude),
 //   relay (roomShort), room (24-room.js: renderLivePane, joinTyped, syncRoomChip — the Live pane's first rows and the chip in the bar); the page's
 //   version (folder's pageVersion: its <meta name="dynaink-version">, V1-PLAN R7, or on a page an older worker kept the
 //   tag's old name, RENAME-PLAN N3b; boards' versionWords), said at the head of the help pane, and under it the
@@ -36,7 +37,6 @@
   function openCC() { ccEl.removeAttribute('hidden'); ccBtn.setAttribute('aria-pressed', 'true'); syncTiles(); }
   function closeCC() { ccEl.setAttribute('hidden', ''); ccBtn.setAttribute('aria-pressed', 'false'); }
   ccBtn.onclick = () => { if (ccOpen()) closeCC(); else openCC(); };
-  addEventListener('keydown', (e) => { if (e.key === 'Escape' && ccOpen()) { closeCC(); e.preventDefault(); } });
   addEventListener('pointerdown', (e) => {
     if (!ccOpen()) return;
     if (ccEl.contains(e.target) || ccBtn.contains(e.target)) return;
@@ -173,6 +173,34 @@
     closeList(); closePara();
     return out.join('\n');
   }
+
+  // ===== One Escape (the UX pass, UX-09) =====================================
+  // Escape takes back the top thing standing, one thing a press: the control centre; the field, whatever has
+  // the focus inside it (a pill tapped holds the focus, and Escape used to stop there); the open pane — the one
+  // the focus is in first, else whichever stands; the grid; the selection; and with nothing standing, every
+  // model call in flight (cancelWork). It was four handlers in four fragments, and the panes and the grid had
+  // none. An input that owns its own Escape — the text editor, a board's name being changed, find's field —
+  // takes it first (stopPropagation or preventDefault), and the ladder lets it be. Returns what it took back.
+  function escapeStep(focus) {
+    if (ccOpen()) { closeCC(); return 'controls'; }
+    const s = session.getState();
+    if (s.summon) { session.dismiss(s.summon.id, Date.now()); return 'field'; }
+    const open = panes.filter((p) => !p.el.hasAttribute('hidden'));
+    const pane = open.find((p) => focus && p.el.contains(focus)) || open[open.length - 1];
+    if (pane) {
+      const x = pane.el.querySelector(':scope > .paneHead .paneClose');
+      if (x) x.click(); else closePanel(pane.el, pane.btn);
+      return 'pane';
+    }
+    if (viewMode !== 'canvas') { setViewMode('canvas'); return 'grid'; }
+    if (s.selection.length) { session.deselect(Date.now()); return 'selection'; }
+    // Esc with nothing held stops every model call in flight: a slow model is not a hang, and the hand can say enough.
+    return cancelWork() ? 'work' : null;
+  }
+  addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    if (escapeStep(document.activeElement)) e.preventDefault();
+  });
 
   // Panes open under the bar, one at a time.
   const panes = [];

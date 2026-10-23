@@ -2183,7 +2183,6 @@
   document.getElementById('folderBtn').onclick = () => { closeCC(); openFolder(); };
   addEventListener('keydown', (e) => {
     if (e.target !== document.body && e.target !== document && e.target !== window) return;
-    if (e.key === 'Escape' && viewMode !== 'canvas') { setViewMode('canvas'); e.preventDefault(); }
     if (viewMode === 'focus' && e.key === 'ArrowRight') { focusStep(1); e.preventDefault(); }
     if (viewMode === 'focus' && e.key === 'ArrowLeft') { focusStep(-1); e.preventDefault(); }
   });
