@@ -12,7 +12,7 @@
 //   prompts (runPrompt → a page or a program, runAsk, runDraw); the library (libraryEntries/reuseEntry/
 //   applyLibrary, targetOf); renderSummon/refreshPalette/paintField.
 // Uses: core (hand, lastPen), ui, field (readFieldCommand, verbFor, libraryMatch, typedWord — pure,
-//   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading, keepFromHouse,
+//   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading, keepFromHouse, isHouse,
 //   askModelsAbout, offerModel), seatpane (writers, readers, deciderHost, briefDeciderHost, askDecider, askDeciderNotation, askDeciderBrief — who is asked, by seat), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
 //   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
 //   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
@@ -560,8 +560,9 @@
       open: !!sum,
       revising: revising,
       items: items,
-      // The models as the board says them: what their provider calls them, never an `llm:` id (FP6).
-      models: agents.map((a) => modelWords(a)),
+      // The models as the board says them: what their provider calls them, never an `llm:` id (FP6) — dyna.ink's own only
+      // where it is the one that writes (its reader writes nothing, and the house is asked only when nothing else is).
+      models: agents.filter((a) => !isHouse(a) || writers().includes(a)).map((a) => modelWords(a)),
       // The decider a brief's Enter asks what it should make (D3) — one the hand chose, with a model here to write it — by name; the line says so.
       decider: briefDeciderHost() && writers().length ? briefDeciderHost().name : null,
       library: revising ? [] : libraryEntries(s),

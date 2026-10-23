@@ -1755,6 +1755,7 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       await holdIds(p8, ids);
       await p8.fill('#summon input.filter', 'page about dogs');
       await sleep(200);
+      const line = await fieldLine(p8);
       const t0 = await p8.evaluate(() => Date.now());
       await p8.press('#summon input.filter', 'Enter');
       const stood = await codeStoodAt(p8, arts);
@@ -1764,9 +1765,9 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       await sleep(200);
       const asked = houseChats(since);
       const said = await statusLine(p8);
-      check(`M49. a brief on Enter: the page's boxes stand at once (${stood ? stood - t0 : '?'} ms), and dyna.ink's own writer writes its words into them — asked ${asked.map((c) => c.job + ' of ' + c.model).join(', ')}; "${said.slice(0, 90)}"`,
-        !!stood && stood - t0 < 1500 && asked.length === 1 && asked[0].job === 'page' && asked[0].model === 'writer' && !asked[0].refused && !!filled && /dyna\.ink’s writer built/.test(said),
-        { stood: stood && stood - t0, asked: asked.map((c) => ({ job: c.job, model: c.model, refused: c.refused })), filled, said });
+      check(`M49. a brief on Enter — the line: "${line}" — the page's boxes stand at once (${stood ? stood - t0 : '?'} ms), and dyna.ink's own writer writes its words into them — asked ${asked.map((c) => c.job + ' of ' + c.model).join(', ')}; "${said.slice(0, 90)}"`,
+        line === '↵ the page’s boxes at once, then dyna.ink’s writer writes the words' && !!stood && stood - t0 < 1500 && asked.length === 1 && asked[0].job === 'page' && asked[0].model === 'writer' && !asked[0].refused && !!filled && /dyna\.ink’s writer built/.test(said),
+        { line, stood: stood && stood - t0, asked: asked.map((c) => ({ job: c.job, model: c.model, refused: c.refused })), filled, said });
       await letGo(p8);
     });
 
