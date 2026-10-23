@@ -282,7 +282,36 @@ function boardScope(state: SessionState): string[] {
  * throws, or names a role outside the six, is left out. Reads the session
  * and changes nothing in it.
  */
+/**
+ * What `notationsOf` read while one field is offered (`keepingNotations`): one board, read once a scope. Offering
+ * never writes, so the board cannot change under it, and the Mermaid, the routing and the *Which diagram is this?*
+ * tools — each reading the same held marks — share one read instead of three (every notation read over the marks is
+ * the costliest part of a field). Nothing is kept past the call that asked for it: a board that changes is read again.
+ */
+let kept: { state: SessionState; reads: Map<string, NotationReading[]> } | null = null;
+
+/** Read each scope's notations once for the length of `fn`, on this one board (nested calls share the outer one). */
+export function keepingNotations<T>(state: SessionState, fn: () => T): T {
+  if (kept) return fn();
+  kept = { state, reads: new Map() };
+  try {
+    return fn();
+  } finally {
+    kept = null;
+  }
+}
+
 export function notationsOf(state: SessionState, scopeIds?: readonly string[]): NotationReading[] {
+  const memo = kept && kept.state === state ? kept.reads : null;
+  const key = memo ? (scopeIds ? scopeIds.join('\u0000') : '\u0001board') : '';
+  const had = memo?.get(key);
+  if (had) return had.slice();
+  const read = readNotations(state, scopeIds);
+  memo?.set(key, read);
+  return read.slice();
+}
+
+function readNotations(state: SessionState, scopeIds?: readonly string[]): NotationReading[] {
   const scope = scopeIds ? [...new Set(scopeIds)].filter((id) => state.nodes.has(id)) : boardScope(state);
   if (!scope.length) return [];
   const out: NotationReading[] = [];

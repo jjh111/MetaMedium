@@ -11,7 +11,7 @@
 // matches are within `TIE_MARGIN`; the asking is the host's.
 
 import type { Tool } from './tool';
-import { definitionWords } from '../participants/decide-state';
+import { candidateWords } from '../participants/decide-state';
 import { choice, type ChoiceQuestion, type DecisionCandidate } from '../participants/decide';
 
 /** How close the second match's score must come to the first's for the two to be a tie worth asking about. */
@@ -48,13 +48,13 @@ export const WHICH: Tool = {
     // A name may stand for two definitions (this board's and a pack's); the seat is asked about names, so each is once.
     // Each candidate's words say where it came from (the audit's S1): two definitions named from one drawing match
     // with the same signature reasoning, word for word, so words made of it alone left the seat only the names.
+    // What stands beside a definition's drawing is never the group held nor the other's drawing (candidateWords), and
+    // each run of words is short: a candidate's words are an option, which the relay takes 1,000 characters of.
     const seen = new Set<string>();
     const kept = tied.filter((m) => !seen.has(m.name) && !!seen.add(m.name));
-    const candidates = kept.map((m) => ({
-      id: m.name,
-      text: `${m.name} — matches the group ${m.score.toFixed(2)}; ${definitionWords(scope.state, { name: m.name, artifactId: m.artifactId, ...(m.pack ? { pack: m.pack } : {}) })}`,
-    }));
     const definitions = kept.map((m) => ({ name: m.name, artifactId: m.artifactId, ...(m.pack ? { pack: m.pack } : {}) }));
+    const words = candidateWords(scope.state, definitions, scope.marks);
+    const candidates = kept.map((m, i) => ({ id: m.name, text: `${m.name} — matches the group ${m.score.toFixed(2)}; ${words[i]}` }));
     if (candidates.length < 2) return [];
     return [{
       key: 'which',

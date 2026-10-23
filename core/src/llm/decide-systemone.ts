@@ -22,7 +22,12 @@
 //     key, so nothing can reorder a scale;
 //   * a NOUL is its statement as the instructions, and no criteria;
 //   * the state is words (`DecideState.text`, `decide-state.ts`), never a node id; pictures, for a model that sees
-//     (Clef-omni), go in a top-level `images` list of data URLs, at most `SYSTEMONE_MAX_IMAGES`.
+//     (Clef-omni), go in a top-level `images` list of data URLs, at most `SYSTEMONE_MAX_IMAGES`;
+//   * nothing sent is longer than dyna.ink's relay takes (`Demos/decide-protocol.mjs`'s `DECIDE_LIMITS`, which
+//     `relay.decide.test.mjs` holds equal to these): a question's instructions and an option's words at most
+//     `SYSTEMONE_WORDS_MAX` characters, the state `SYSTEMONE_STATE_MAX` — cut at a space, the cut said with an
+//     ellipsis — so a long note beside a definition never makes the relay refuse the whole decision. (A score's
+//     levels are the engine's own few words, and its key back: sent as they are.)
 //
 // THE REPLY, read tolerantly and never guessed at: `{ answers: { q1: …, … } }` (the relay's own `{ ok, model, ms,
 // answers }` around it). A question is UNANSWERED — left out, its reason a note — whenever its answer is not what
@@ -68,6 +73,10 @@ export const SYSTEMONE_KEY = /^[a-z][a-z0-9_]{0,47}$/;
 export const SYSTEMONE_MAX_IMAGES = 4;
 /** How long the page waits for a decision: longer than the relay's own wait on the model, so the relay's sentence is the one heard. */
 export const SYSTEMONE_TIMEOUT_MS = 20_000;
+/** The most characters of a question's instructions, or of an option's words, that are sent. */
+export const SYSTEMONE_WORDS_MAX = 1000;
+/** The most characters of a state that are sent. */
+export const SYSTEMONE_STATE_MAX = 16000;
 /** How far a distribution's sum may stand off 1 before it is normalised and said. */
 export const SUM_SLACK = 0.02;
 /** How far two spellings of one number may differ and still be one number. */
@@ -99,6 +108,13 @@ export interface SystemOneRequest {
   names: Map<string, string>;
   /** Wire name → (criteria key → option id) for a choice; a score's levels in order; a noul's yes and no. */
   options: Map<string, Map<string, string>>;
+}
+
+/** Words cut to `max` characters at a space, the cut said with an ellipsis — what is sent is never longer than the relay takes. */
+function clip(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.lastIndexOf(' ', max - 1);
+  return text.slice(0, cut > max / 2 ? cut : max - 1).trimEnd() + '…';
 }
 
 /** A criteria key for an option: its id's words as lower snake case when they make one, else `option_<n>`; unique in its question. */
@@ -138,22 +154,22 @@ export function buildSystemOne(
         if (c.id === NO_MATCH) { if (c.text && c.text !== 'none of these') none = `${c.text} — choose this when no other option is right`; return; }
         const k = keyFor(c.id, n, taken);
         back.set(k, c.id);
-        criteria[k] = c.text || c.id;
+        criteria[k] = clip(c.text || c.id, SYSTEMONE_WORDS_MAX);
       });
       back.set(SYSTEMONE_NONE, NO_MATCH);
-      criteria[SYSTEMONE_NONE] = none;
-      qs[name] = { type: 'choice', instructions: q.ask, criteria };
+      criteria[SYSTEMONE_NONE] = clip(none, SYSTEMONE_WORDS_MAX);
+      qs[name] = { type: 'choice', instructions: clip(q.ask, SYSTEMONE_WORDS_MAX), criteria };
     } else if (q.kind === 'score') {
       q.levels.forEach((l) => back.set(l, l));
-      qs[name] = { type: 'score', instructions: q.ask, criteria: q.levels.slice() };
+      qs[name] = { type: 'score', instructions: clip(q.ask, SYSTEMONE_WORDS_MAX), criteria: q.levels.slice() };
     } else {
       back.set('yes', 'yes');
       back.set('no', 'no');
-      qs[name] = { type: 'noul', instructions: q.statement };
+      qs[name] = { type: 'noul', instructions: clip(q.statement, SYSTEMONE_WORDS_MAX) };
     }
     keys.set(name, back);
   });
-  const body: SystemOneBody = { ...(options.model ? { model: options.model } : {}), state: state?.text ?? '', questions: qs };
+  const body: SystemOneBody = { ...(options.model ? { model: options.model } : {}), state: clip(state?.text ?? '', SYSTEMONE_STATE_MAX), questions: qs };
   const images = options.sees && state?.images?.length ? state.images.slice(0, SYSTEMONE_MAX_IMAGES).map((im) => im.dataUrl) : [];
   if (images.length) body.images = images;
   return { body, names, options: keys };

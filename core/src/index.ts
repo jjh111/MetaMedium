@@ -722,7 +722,7 @@ export type { DecideWire, ChatDecideOptions, WireOption, WireQuestion } from './
 // The decision seat's System One transport (the audit's S2): Cloudflare's Clef, asked through dyna.ink's relay, no key.
 export {
   createSystemOneDecideTransport, buildSystemOne, readSystemOne,
-  SYSTEMONE_NONE, SYSTEMONE_KEY, SYSTEMONE_MAX_IMAGES, SYSTEMONE_TIMEOUT_MS,
+  SYSTEMONE_NONE, SYSTEMONE_KEY, SYSTEMONE_MAX_IMAGES, SYSTEMONE_TIMEOUT_MS, SYSTEMONE_WORDS_MAX, SYSTEMONE_STATE_MAX,
 } from './llm/decide-systemone';
 export type { SystemOneOptions, SystemOneRequest, SystemOneBody, SystemOneQuestion } from './llm/decide-systemone';
 
@@ -899,7 +899,7 @@ export {
   DECIDER_TAKE_AT,
 } from './participants/decide';
 // What a decision seat is shown of the board: words, never ids (the audit's S1).
-export { decisionStateOf, definitionWords, shapesCounted, wordsBeside, DECIDE_STATE_MAX } from './participants/decide-state';
+export { decisionStateOf, definitionWords, candidateWords, shapesCounted, wordsBeside, writtenOn, withoutIds, DECIDE_STATE_MAX, WORDS_SAID, CANDIDATE_WORDS_SAID, WRITTEN } from './participants/decide-state';
 // What should this brief make? (the audit's D3): the closed list a decider chooses from on a brief's Enter.
 export { briefQuestion, BRIEF_QUESTION, BRIEF_KIND_WORDS } from './participants/brief-kind';
 export type { StateCandidate, DecisionStateOptions } from './participants/decide-state';

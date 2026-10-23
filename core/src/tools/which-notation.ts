@@ -43,12 +43,19 @@ export function notationQuestion(ids: readonly string[], candidates: readonly De
   return choice(NOTATION_QUESTION + (ids[0] ?? ''), 'which kind of diagram is this drawing?', candidates.slice(), ids.slice(), { reading: false });
 }
 
-/** The notations a held decision may name for these marks, with their words: the readings over 0 and a plain diagram where it is one. */
-export function notationCandidates(state: SessionState, ids: readonly string[]): DecisionCandidate[] {
-  const out: DecisionCandidate[] = notationsOf(state, ids)
+/**
+ * The notations a held decision may name for these marks, with their words: the readings over 0 and a plain diagram
+ * where it is one. `known`: the readings and the plain diagram already read, so nothing is read twice.
+ */
+export function notationCandidates(
+  state: SessionState,
+  ids: readonly string[],
+  known?: { readings: readonly NotationReading[]; plain: NotationReading | null }
+): DecisionCandidate[] {
+  const out: DecisionCandidate[] = (known ? known.readings : notationsOf(state, ids))
     .filter((r) => r.notation !== DIAGRAM_NOTATION && r.confidence > 0)
     .map((r) => ({ id: r.notation, text: describeNotation(r) }));
-  if (readPlainDiagram(state, ids)) out.push({ id: DIAGRAM_NOTATION, text: PLAIN_WORDS });
+  if (known ? known.plain : readPlainDiagram(state, ids)) out.push({ id: DIAGRAM_NOTATION, text: PLAIN_WORDS });
   return out;
 }
 
@@ -107,15 +114,19 @@ export const WHICH_NOTATION: Tool = {
     // A group a definition matches is that thing (a molecule is its own thing): *Which is it?* is its question, not this.
     if (scope.summon.suggestions.some((x) => x.kind === 'match')) return [];
     if (decidedNotationOf(s, scope.marks)) return [];
+    // The costly part, read once: the field's other diagram tools read the same marks in the same offering
+    // (`keepingNotations`, so this is theirs), and the plain diagram only when nothing clears the floor.
     const readings = notationsOf(s, scope.marks);
     const top = readings[0];
     if (!top || !(top.confidence > NOTATION_OFFER_FROM)) return [];
     const under = top.confidence < NOTATION_FLOOR;
     const tie = !under && readings.length > 1 && top.confidence - readings[1].confidence <= TIE_MARGIN;
+    if (!under && !tie) return [];
     // Under the floor, only a graph of nodes joined by lines is worth the question — never the molecule's circles,
     // which are their own thing (and with a decider seated by default, a question on every molecule is noise).
-    if (!tie && !(under && readPlainDiagram(s, scope.marks))) return [];
-    const candidates = notationCandidates(s, scope.marks);
+    const plain = readPlainDiagram(s, scope.marks);
+    if (!tie && !plain) return [];
+    const candidates = notationCandidates(s, scope.marks, { readings, plain });
     if (!candidates.length) return [];
     return [{
       key: 'which-notation',
