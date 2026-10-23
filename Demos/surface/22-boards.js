@@ -246,7 +246,7 @@
   // the service worker keeps for offline. Opening one reads its log and makes a board from its events
   // through the adapter's own door (newBoard) — a copy under an id of its own, named for the example, so
   // the example is never written and the hand draws on it at once.
-  const examples = { state: 'idle', index: null, rows: [], loading: null, opening: false };
+  const examples = { state: 'idle', index: null, rows: [], loading: null, opening: false, heldBack: '' };
   function loadExamples() {
     if (examples.loading) return examples.loading;
     if (examples.state === 'ready') return Promise.resolve();
@@ -303,8 +303,8 @@
       // narrow grant, made only here; a loaded board of someone else's gets none.
       if (made) {
         grantPlayingPrograms();
-        // Unless the person asked for less motion (C4): then it waits for their own play, and the line says so.
-        if (motionReduced() && standingPrograms().length) say('the film waits for you — this device asks for less motion; open it and tap “play it here” to play it');
+        // Unless the person asked for less motion (C4): then it waits for their own play, and the opening's sentence says so.
+        examples.heldBack = motionReduced() && standingPrograms().length ? ' · the film waits for you — this device asks for less motion; open it and tap “play it here”' : '';
         // Opened fitted to the free ground, nothing inspected until the hand points or draws (27-first.js; UX-11).
         restAfterOpen();
       }
@@ -356,12 +356,18 @@
       history.replaceState(history.state, '', url.pathname + url.search + url.hash);
     } catch (err) { /* an address that cannot be rewritten still opens the example once */ }
     const made = await openExample(id);
-    if (made) flash('“' + made.name + '” — a board of your own, made from the example; the example is as it was');
+    if (made) exampleOpened('“' + made.name + '” — a board of your own, made from the example; the example is as it was');
+  }
+  /** The sentence an opened example says: a flash — or, when its film waits for a play (C4), said for longer with that. */
+  function exampleOpened(words) {
+    const held = examples.heldBack || '';
+    examples.heldBack = '';
+    if (held) say(words + held); else flash(words);
   }
   async function exampleFromPane(id, force) {
     paneSay(null);
     const made = await openExample(id, { force: !!force, said: (v) => paneSay(v, () => exampleFromPane(id, true)) });
-    if (made) { closePanel(boardsPanel, tiles.boards); flash('“' + made.name + '” — a board of your own, made from the example; the example is as it was'); }
+    if (made) { closePanel(boardsPanel, tiles.boards); exampleOpened('“' + made.name + '” — a board of your own, made from the example; the example is as it was'); }
   }
   // The empty board's panel offers the starter in one tap, and more of them (10-inspector.js): its buttons carry no
   // data-act, so the panel's own handler never takes them for a mark's.
@@ -375,7 +381,7 @@
     const id = starterOf(examples.index);
     if (!id) { say('the examples could not be read — this page keeps them for offline once it has been online'); return; }
     const made = await openExample(id);
-    if (made) flash('“' + made.name + '” — a board of your own, made from the example; the board before stays in boards');
+    if (made) exampleOpened('“' + made.name + '” — a board of your own, made from the example; the board before stays in boards');
   }
   /** The programs the log says are playing that do not run here — what an example opened under reduced motion holds back. */
   function standingPrograms() {
