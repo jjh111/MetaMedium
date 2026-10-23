@@ -100,7 +100,8 @@
 //   M46  once the relay's list answers (one GET, which calls no model), the writer and reader are seated silently: their
 //        rows say "dyna.ink’s writer — no key needed" and "dyna.ink’s reader — no key needed", the pane leads with
 //        "Using dyna.ink’s own models" and what is sent where, the rest under *more*, and the pane fits and scrolls to
-//        Join; nothing is called at boot, on a hold or on opening the field, and nothing is written to the board
+//        Join; nothing is called at boot, on a hold or on opening the field, and nothing is written to the board; try it
+//        on the writer’s row asks it one tiny prompt and keeps its reply in the row
 //   M47  What is this? asks the house writer once — no key, no cookie, the reply's budget the list's — and its readings
 //        land in its name; it joins the board at that first ask, once
 //   M48  Read the writing sends the house reader one picture of the ink, and the words land on the mark
@@ -1711,6 +1712,15 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
         held && pills.length > 0 && houseChats().length === 0 && houseLooks().length === 1 && fetches.length === 1 && fetches[0].method === 'GET' && /\/ai\/v1\/models$/.test(fetches[0].url) && joins.length === 0 &&
           houseLooks()[0].authorization === null && houseLooks()[0].cookie === null,
         { pills, fetches, joins, looks: houseLooks() });
+      // Try it: one tiny prompt to the house writer, a deliberate tap — its reply in the row, and nothing on the board.
+      const since = stub.house().length;
+      await openModels(p8);
+      if (!(await p8.evaluate(() => document.getElementById('modelPanel').classList.contains('moreOpen')))) await p8.click('#mpHouse .mpMore');
+      const tried = await trySeat(p8, 'writer');
+      await closeModels(p8);
+      check(`M46d. try it on the writer's row: one call to dyna.ink's own writer (${houseChats(since).map((c) => c.job + ' of ' + c.model).join(', ')}), its reply kept in the row — "${tried && tried.call}" — and nothing written to the board`,
+        houseChats(since).length === 1 && houseChats(since)[0].job === 'try' && houseChats(since)[0].model === 'writer' && !!tried && /^ok · \d+(\.\d)? s · replied “ok”/.test(tried.call) && (await joinsOn(p8)).length === 0,
+        { tried, calls: houseChats(since).map((c) => c.job) });
     });
 
     await record('M47', async () => {

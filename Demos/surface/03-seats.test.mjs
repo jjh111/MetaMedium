@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '03-seats.js'), 'utf8');
 const S = new Function(
-  src + '\n  return { SEATS, SEAT_WORDS, resolveReaders, resolveWriters, fallbackWords, keyId, keysToKeep, migrateStored, orderChoices, seatsOfPick, pickOf, SEMANTIC_SOURCE, SEMANTIC_MAX_BYTES, semanticSourceOf, semanticNameOf, semanticWords, semanticFailed, HOUSE_DECIDE, HOUSE_MODELS, HOUSE_DECIDER_MODEL, houseDeciderFor, deciderAtBoot, deciderWords, deciderAsks, HOUSE_AI, HOUSE_SEATS, HOUSE_WAIT_MS, HOUSE_PROBE_MS, houseAiFor, houseAtBoot, houseWords, houseSends, houseLead, probesOnOpen };'
+  src + '\n  return { SEATS, SEAT_WORDS, resolveReaders, resolveWriters, fallbackWords, keyId, keysToKeep, migrateStored, orderChoices, seatsOfPick, pickOf, SEMANTIC_SOURCE, SEMANTIC_MAX_BYTES, semanticSourceOf, semanticNameOf, semanticWords, semanticFailed, HOUSE_DECIDE, HOUSE_MODELS, HOUSE_DECIDER_MODEL, houseDeciderFor, deciderAtBoot, deciderWords, deciderAsks, HOUSE_AI, HOUSE_SEATS, HOUSE_WAIT_MS, HOUSE_PROBE_MS, houseAiFor, houseAtBoot, houseWords, houseSends, houseWaits, houseLead, probesOnOpen };'
 )();
 
 const m = (id, o = {}) => ({ id, vision: false, seats: [], size: Infinity, claude: false, local: false, ...o });
@@ -329,8 +329,10 @@ test('their rows and the pane’s lead say what they are and what is sent where,
   assert.match(S.fallbackWords('writer', { house: true }), /dyna\.ink’s own writer writes, with no key/);
   assert.match(S.fallbackWords('reader', { house: true }), /dyna\.ink’s own reader reads, with no key/);
   assert.doesNotMatch(S.fallbackWords('writer'), /dyna\.ink/);
+  assert.equal(S.houseWaits('writer'), 'dyna.ink’s writer stands by — asked only when nothing of yours would write');
+  assert.equal(S.houseWaits('reader'), 'dyna.ink’s reader stands by — asked only when nothing of yours would read');
   // None of the words a person meets here is a word of the code's.
-  for (const w of [S.houseWords('writer'), S.houseSends('writer'), S.houseSends('reader'), lead.head, lead.line, lead.more]) assert.doesNotMatch(w, /\b(seat|tier|session|participant|artifact|log|event)\b|@cf|127\.0\.0\.1|:\d{2,5}\b/i, w);
+  for (const w of [S.houseWords('writer'), S.houseSends('writer'), S.houseSends('reader'), S.houseWaits('reader'), lead.head, lead.line, lead.more]) assert.doesNotMatch(w, /\b(seat|tier|session|participant|artifact|log|event)\b|@cf|127\.0\.0\.1|:\d{2,5}\b/i, w);
   assert.equal(S.HOUSE_SEATS.writer.model, 'writer');
   assert.equal(S.HOUSE_SEATS.reader.model, 'reader');
   assert.ok(S.HOUSE_WAIT_MS > 60000, 'the page waits longer than the relay does, so the relay’s sentence is the one heard');

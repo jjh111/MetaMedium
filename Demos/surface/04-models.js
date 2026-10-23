@@ -826,6 +826,9 @@
   }
 
   function offerModel(why) {
+    // The hand asked to choose a model: what is under *more* is what it came for.
+    moreOpen = true;
+    renderHouseLead();
     if (panel.hasAttribute('hidden')) openPane(panel, modelBtn);
     if (PROBE_ON_OPEN) probeLocal();
     mpStatus.textContent = why || 'That needs a model.';

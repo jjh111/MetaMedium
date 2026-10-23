@@ -814,7 +814,7 @@
 //   deciderWords (what its row says), deciderAsks (when a decider is asked and what it is sent, in words); and dyna.ink's
 //   own writer and reader (the audit's UX-04): HOUSE_AI, HOUSE_SEATS and HOUSE_WAIT_MS (where they are asked and how long
 //   for), houseAiFor (whether a page may use them, and where), houseAtBoot (whether one is seated once the house answers),
-//   houseWords, houseSends and houseLead (what their rows and the pane's lead say, in words), and probesOnOpen (whether the
+//   houseWords, houseSends, houseWaits and houseLead (what their rows and the pane's lead say, in words), and probesOnOpen (whether the
 //   pane looks for models on this machine as it opens, or waits for the person to ask — UX-DEP-1).
 // Uses: NOTHING. Like 07-hand.js and 09-field.js, this fragment names no closure variable, touches no DOM and asks
 //   the session nothing; 04-models.js is the adapter that gathers the joined models, asks, and acts. So it loads on
@@ -1097,6 +1097,9 @@
     const what = seat === 'reader' ? 'a picture of the ink you ask it to read' : 'the brief you typed and the words of the marks you ask about';
     return 'asked only when you ask — it is sent ' + what + ', to dyna.ink’s relay, which asks Cloudflare’s models; dyna.ink keeps none of it';
   }
+
+  /** What a house seat's row says while a model of the person's is the one asked: it waits, and when it would be asked. */
+  function houseWaits(seat) { return (HOUSE_SEATS[seat] || HOUSE_SEATS.writer).name + ' stands by — asked only when nothing of yours would ' + (seat === 'reader' ? 'read' : 'write'); }
 
   /** The models pane's lead, when dyna.ink's own writer or reader is seated: what the person has, and what is sent where. */
   function houseLead() {
@@ -2502,6 +2505,9 @@
   }
 
   function offerModel(why) {
+    // The hand asked to choose a model: what is under *more* is what it came for.
+    moreOpen = true;
+    renderHouseLead();
     if (panel.hasAttribute('hidden')) openPane(panel, modelBtn);
     if (PROBE_ON_OPEN) probeLocal();
     mpStatus.textContent = why || 'That needs a model.';
@@ -3010,14 +3016,20 @@
     houseUp.asked = true;
     const looks = [];
     if (HOUSE) {
-      looks.push(fetch(HOUSE, { method: 'GET', credentials: 'omit', signal: AbortSignal.timeout(HOUSE_PROBE_MS) })
+      // Its own clock, not AbortSignal.timeout: Safari 15 has none, and a look that throws must never become a page error.
+      const ctl = new AbortController();
+      const clock = setTimeout(() => ctl.abort(), HOUSE_PROBE_MS);
+      looks.push(Promise.resolve()
+        .then(() => fetch(HOUSE, { method: 'GET', credentials: 'omit', signal: ctl.signal }))
         .then((r) => (r.ok ? r.json() : null))
         .then((j) => { if (j && j.ok) { houseUp.decide = true; seatHouseDecider(); } })
-        .catch(() => { /* not there: no house decider, nothing said */ }));
+        .catch(() => { /* not there: no house decider, nothing said */ })
+        .finally(() => clearTimeout(clock)));
     }
     if (HOUSE_CHAT) {
       looks.push(MM.readModels({ baseUrl: HOUSE_CHAT }, { timeoutMs: HOUSE_PROBE_MS })
-        .then((c) => { if (c.ok && c.models.length) { houseUp.ai = true; houseUp.catalog = c; seatHouse(); } }));
+        .then((c) => { if (c.ok && c.models.length) { houseUp.ai = true; houseUp.catalog = c; seatHouse(); } })
+        .catch(() => { /* never thrown by core; nothing said either way */ }));
     }
     await Promise.all(looks);
     renderSeats(); renderHouseLead(); syncTiles(); refreshPalette();
@@ -3233,7 +3245,8 @@
           (!house && houseUp.ai && seatPicks[seat] && seatPicks[seat].none ? '<button class="ghost" data-seat-house="' + seat + '" title="' + esc(houseWords(seat)) + '">dyna.ink’s own</button>' : '');
         if (held) { who = agentWords(held); call = callOf(agentKey(held)); }
         else if (houseAsked) { who = houseWords(seat); note = houseSends(seat); call = callOf(agentKey(house)); }
-        else { who = 'nothing chosen'; note = fallbackWords(seat, { house: !!house }) + (names(now) ? ' — now: ' + names(now) : ''); }
+        else if (house) { who = 'nothing chosen'; note = (names(now) ? 'now: ' + names(now) + ' — ' : '') + houseWaits(seat); }
+        else { who = 'nothing chosen'; note = fallbackWords(seat) + (names(now) ? ' — now: ' + names(now) : ''); }
       }
       html += '<div class="seatRow" data-seat="' + seat + '"><div class="seatHead"><b>' + seat + '</b><span class="seatJob">' + esc(w.job) + '</span></div>' +
         (body ? '<div class="seatBody">' + body + '</div>' : '') +

@@ -11,7 +11,7 @@
 //   deciderWords (what its row says), deciderAsks (when a decider is asked and what it is sent, in words); and dyna.ink's
 //   own writer and reader (the audit's UX-04): HOUSE_AI, HOUSE_SEATS and HOUSE_WAIT_MS (where they are asked and how long
 //   for), houseAiFor (whether a page may use them, and where), houseAtBoot (whether one is seated once the house answers),
-//   houseWords, houseSends and houseLead (what their rows and the pane's lead say, in words), and probesOnOpen (whether the
+//   houseWords, houseSends, houseWaits and houseLead (what their rows and the pane's lead say, in words), and probesOnOpen (whether the
 //   pane looks for models on this machine as it opens, or waits for the person to ask — UX-DEP-1).
 // Uses: NOTHING. Like 07-hand.js and 09-field.js, this fragment names no closure variable, touches no DOM and asks
 //   the session nothing; 04-models.js is the adapter that gathers the joined models, asks, and acts. So it loads on
@@ -294,6 +294,9 @@
     const what = seat === 'reader' ? 'a picture of the ink you ask it to read' : 'the brief you typed and the words of the marks you ask about';
     return 'asked only when you ask — it is sent ' + what + ', to dyna.ink’s relay, which asks Cloudflare’s models; dyna.ink keeps none of it';
   }
+
+  /** What a house seat's row says while a model of the person's is the one asked: it waits, and when it would be asked. */
+  function houseWaits(seat) { return (HOUSE_SEATS[seat] || HOUSE_SEATS.writer).name + ' stands by — asked only when nothing of yours would ' + (seat === 'reader' ? 'read' : 'write'); }
 
   /** The models pane's lead, when dyna.ink's own writer or reader is seated: what the person has, and what is sent where. */
   function houseLead() {

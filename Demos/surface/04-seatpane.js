@@ -450,14 +450,20 @@
     houseUp.asked = true;
     const looks = [];
     if (HOUSE) {
-      looks.push(fetch(HOUSE, { method: 'GET', credentials: 'omit', signal: AbortSignal.timeout(HOUSE_PROBE_MS) })
+      // Its own clock, not AbortSignal.timeout: Safari 15 has none, and a look that throws must never become a page error.
+      const ctl = new AbortController();
+      const clock = setTimeout(() => ctl.abort(), HOUSE_PROBE_MS);
+      looks.push(Promise.resolve()
+        .then(() => fetch(HOUSE, { method: 'GET', credentials: 'omit', signal: ctl.signal }))
         .then((r) => (r.ok ? r.json() : null))
         .then((j) => { if (j && j.ok) { houseUp.decide = true; seatHouseDecider(); } })
-        .catch(() => { /* not there: no house decider, nothing said */ }));
+        .catch(() => { /* not there: no house decider, nothing said */ })
+        .finally(() => clearTimeout(clock)));
     }
     if (HOUSE_CHAT) {
       looks.push(MM.readModels({ baseUrl: HOUSE_CHAT }, { timeoutMs: HOUSE_PROBE_MS })
-        .then((c) => { if (c.ok && c.models.length) { houseUp.ai = true; houseUp.catalog = c; seatHouse(); } }));
+        .then((c) => { if (c.ok && c.models.length) { houseUp.ai = true; houseUp.catalog = c; seatHouse(); } })
+        .catch(() => { /* never thrown by core; nothing said either way */ }));
     }
     await Promise.all(looks);
     renderSeats(); renderHouseLead(); syncTiles(); refreshPalette();
@@ -673,7 +679,8 @@
           (!house && houseUp.ai && seatPicks[seat] && seatPicks[seat].none ? '<button class="ghost" data-seat-house="' + seat + '" title="' + esc(houseWords(seat)) + '">dyna.ink’s own</button>' : '');
         if (held) { who = agentWords(held); call = callOf(agentKey(held)); }
         else if (houseAsked) { who = houseWords(seat); note = houseSends(seat); call = callOf(agentKey(house)); }
-        else { who = 'nothing chosen'; note = fallbackWords(seat, { house: !!house }) + (names(now) ? ' — now: ' + names(now) : ''); }
+        else if (house) { who = 'nothing chosen'; note = (names(now) ? 'now: ' + names(now) + ' — ' : '') + houseWaits(seat); }
+        else { who = 'nothing chosen'; note = fallbackWords(seat) + (names(now) ? ' — now: ' + names(now) : ''); }
       }
       html += '<div class="seatRow" data-seat="' + seat + '"><div class="seatHead"><b>' + seat + '</b><span class="seatJob">' + esc(w.job) + '</span></div>' +
         (body ? '<div class="seatBody">' + body + '</div>' : '') +
