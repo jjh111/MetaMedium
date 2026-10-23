@@ -4018,7 +4018,7 @@
 // ===== input =====
 // Provides: pointer input (draw, pan, pinch) for the mouse, the pen and the finger — the palm ignored,
 //   the pen's pressure on every point it draws, its hover a hover (V1-PLAN R6) — keys (undo, copy,
-//   paste, erase, zoom), say()/flash() for the status line.
+//   paste, erase, zoom — Escape is the controls' one ladder, escapeStep), say()/flash() for the status line.
 // Uses: core (draws, setDraws), hand (the rules: fingerRole, palmNow, whenPenLands, releaseIs, PAN_SLOP_PX), view,
 //   snap (autoSweep, magnetQuery), render (drawLive), palette (copyMarks, pasteClip), handwriting
 //   (autoRead), artifacts (pointerFrameAt), kinds (postPointer).
@@ -4491,7 +4491,8 @@
       // …and a letter-sized stroke is writing, not a connector: an l beside a
       // box reads line 0.9, and pulling its foot onto the box's edge unwrites
       // the word (found by e2e 16 and 33).
-      const letterLike = MM.isLetterLike(MM.getBounds(points), 1 / view.zoom);
+      // A short arrow drawn from one closed mark into another is a connector whatever its size (UX-07).
+      const letterLike = MM.isLetterLike(MM.getBounds(points), 1 / view.zoom) && !arrowBetweenClosed(analysis, null);
       if (connector && !isMark && !letterLike) {
         // Only the place moves: a pen's pressure stays on the point it was pressed at.
         if (magnetStart) points[0] = Object.assign({}, points[0], { x: magnetStart.site.point.x, y: magnetStart.site.point.y });
@@ -4575,11 +4576,28 @@
   let lastTap = null; // the last tap on empty ground, for the double-tap
   const DOUBLE_TAP_MS = 400;
 
+  // How sure the rung must be that a short stroke is an arrow before its size stops making it a letter (UX-07).
+  const ARROW_TIES_AT = 0.6;
   /**
-   * A tap: the dead state. A tap while something is dismissable is the dismissal, and never
-   * a dot — the pen's or the mouse's stroke too short to be one, or a finger's that never
-   * moved while the pen is what draws.
+   * A one-stroke arrow as short as a letter — up to about 150 px, its barb about as tall as an x-height — is
+   * still a connector when the rung reads it an arrow at ARROW_TIES_AT or more and its tail and tip each land
+   * on a closed mark, two different ones (UX-07): the letter rule vetoed it, so a small diagram's arrows never
+   * tied and Tidy and Route were never offered, while a line the same length between the same boxes tied. A
+   * letter beside a box lands on no second closed mark, so writing is still writing. `except` is the stroke's
+   * own id once it is on the board.
    */
+  function arrowBetweenClosed(analysis, except) {
+    const top = analysis && analysis.results && analysis.results[0];
+    if (!top || top.type !== 'arrow' || top.confidence < ARROW_TIES_AT || !top.meta || !top.meta.tip || !top.meta.tail) return false;
+    const closedAt = (p) => {
+      const hit = magnetQuery(p, except);
+      const n = hit && state.nodes.get(hit.site.nodeId);
+      return n && MM.standsClosed(n) ? hit.site.nodeId : null;
+    };
+    const a = closedAt(top.meta.tail), b = closedAt(top.meta.tip);
+    return !!a && !!b && a !== b;
+  }
+
   /**
    * The magnet at the end of a just-drawn ARROW its ink points with, or null:
    * `{ end, hit }`. Only an arrow (its tail read apart from its tip), never the
@@ -4594,11 +4612,16 @@
     if (!top || top.type !== 'arrow') return null;
     const activeMark = state.commandMark || MM.BUILTIN_COMMAND_MARK;
     if (activeMark && MM.matchesCommandMark(analysis.fingerprint, activeMark).match) return null;
-    if (MM.isLetterLike(MM.getBounds(pts), 1 / view.zoom)) return null;
+    if (MM.isLetterLike(MM.getBounds(pts), 1 / view.zoom) && !arrowBetweenClosed(analysis, id)) return null;
     const end = ends.tail === 'start' ? 'end' : 'start';
     const hit = magnetQuery(ends[end], id);
     return hit ? { end: end, hit: hit } : null;
   }
+  /**
+   * A tap: the dead state. A tap while something is dismissable is the dismissal, and never
+   * a dot — the pen's or the mouse's stroke too short to be one, or a finger's that never
+   * moved while the pen is what draws.
+   */
   function tapAt(e) {
     const s0 = session.getState();
     const now = Date.now();
@@ -4675,9 +4698,7 @@
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); session.undo(); }
     // Copy holds the selection's ink (and puts it on the clipboard as SVG); paste is handled with files, in the images fragment.
     if ((e.ctrlKey || e.metaKey) && e.key === 'c' && e.target === document.body && state.selection.length) { e.preventDefault(); copyMarks(state.selection.slice()); }
-    if (e.target === document.body && e.key === 'Escape' && state.selection.length && !state.summon) session.deselect(Date.now());
-    // Esc with nothing held stops every model call in flight: a slow model is not a hang, and the hand can say enough.
-    else if (e.target === document.body && e.key === 'Escape' && !state.selection.length && !state.summon) cancelWork();
+    // Escape is one ladder, in the controls fragment (escapeStep): the field, a pane, the grid, the selection, then work in flight.
     if (e.target === document.body && (e.key === 'Backspace' || e.key === 'Delete') && state.selection.length) {
       e.preventDefault();
       eraseSelection();
@@ -6871,7 +6892,7 @@
 //   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
 //   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
 //   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
-//   hand opened the field), hand (handOfPointer).
+//   hand opened the field), hand (handOfPointer), controls (escapeStep — the field's Escape is the ladder's).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -7590,6 +7611,12 @@
   const FIELD_M = 8;         // the margin the field keeps off every edge
   const FIELD_TOP = 52;      // under the bar, when the usable rect cannot hold it
   let fieldAnchor = null;    // where the hand was when this field opened, on screen
+  // Where this field was put when it opened, kept while it is open (the UX pass, UX-06): placed again on every
+  // paint from its new height, it jumped 419 px between "make" and "make " as the pills changed under the hand.
+  // `edge` is the edge that stands still — its top when it opened below or beside the held marks, its bottom when
+  // it opened above them — so it grows away from what it holds. Let go only when the field would leave the screen
+  // or cover chrome (the panel, the minimap); null while no field is open.
+  let fieldKept = null;      // { x, w, edge: 'top' | 'bottom', y }: y is the edge's place on screen
 
   /** Pure: fit `size` at `want` inside `soft` if it fits there, inside `hard` otherwise. */
   function fitSpan(want, size, soft, hard) {
@@ -7696,33 +7723,70 @@
    * the list's own scroll height, so a list already scrolled keeps its place;
    * when the field fits, nothing is set and the stylesheet's rule stands.
    */
-  function fitFieldHeight(v, u) {
+  function fitFieldHeight(v, u, cap) {
     const list = summonEl.querySelector('.list');
     if (!list) return;
-    const room = Math.max(u.height - FIELD_M * 2, v.height - FIELD_TOP - FIELD_M);
+    // `cap`: the room a kept field has from its standing edge to the screen's (placeField).
+    const room = Math.min(Math.max(u.height - FIELD_M * 2, v.height - FIELD_TOP - FIELD_M), cap === undefined ? Infinity : cap);
     const natural = summonEl.offsetHeight - list.offsetHeight + list.scrollHeight;
     if (natural <= room) {
       if (list.classList.contains('held')) { list.classList.remove('held'); list.style.maxHeight = ''; }
       return;
     }
-    const cap = Math.max(FIELD_LIST_MIN, Math.floor(list.scrollHeight - (natural - room))) + 'px';
-    if (list.style.maxHeight !== cap) list.style.maxHeight = cap;
+    const px = Math.max(FIELD_LIST_MIN, Math.floor(list.scrollHeight - (natural - room))) + 'px';
+    if (list.style.maxHeight !== px) list.style.maxHeight = px;
     list.classList.add('held');
+  }
+
+  /**
+   * Pure: whether a field kept at `box` (`h` tall) still stands — whole on screen and off the chrome. The held
+   * marks are not chrome: a kept field grows away from them, and covering them is what moving it would do.
+   */
+  function keptFieldStands(box, h, v, chrome) {
+    const r = { left: box.x, top: box.y, right: box.x + box.w, bottom: box.y + h };
+    if (r.left < v.left + FIELD_M - 2 || r.right > v.right - FIELD_M + 2 || r.top < v.top + FIELD_M - 2 || r.bottom > v.bottom - FIELD_M + 2) return false;
+    return !chrome.some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top);
   }
 
   /** Place the field where it stands now. Touches left/top/width, and the list's height when it must scroll — NOTHING else. */
   function placeField() {
     const v = viewportRect(), u = usableViewport();
+    // Kept where it opened while that still stands (UX-06): the list scrolls in the room its standing edge leaves
+    // rather than the field moving, and only a field that would leave the screen or cover the chrome is placed again.
+    if (fieldKept) {
+      const k = fieldKept;
+      const cap = k.edge === 'top' ? v.bottom - FIELD_M - k.y : k.y - Math.max(v.top + FIELD_M, u.top + FIELD_M);
+      if (k.w <= v.width - FIELD_M * 2 && cap > FIELD_LIST_MIN) {
+        summonEl.style.width = k.w + 'px';
+        fitFieldHeight(v, u, cap);
+        const h = summonEl.offsetHeight;
+        const box = { x: k.x, y: k.edge === 'top' ? k.y : k.y - h, w: k.w };
+        if (keptFieldStands(box, h, v, [panelRect(), minimapRect()].filter(Boolean))) {
+          summonEl.style.left = box.x + 'px';
+          summonEl.style.top = box.y + 'px';
+          return box;
+        }
+      }
+      fieldKept = null;
+    }
     // Width first: the height below is whatever the content comes to at that
     // width, measured rather than assumed.
     const avoid = fieldAvoids();
     const first = fieldBox(fieldAnchor, { viewport: v, usable: u, height: 0, hand: hand, avoid: avoid });
     summonEl.style.width = first.w + 'px';
     fitFieldHeight(v, u);
-    const box = fieldBox(fieldAnchor, { viewport: v, usable: u, height: summonEl.offsetHeight, hand: hand, avoid: avoid });
+    const h = summonEl.offsetHeight;
+    const box = fieldBox(fieldAnchor, { viewport: v, usable: u, height: h, hand: hand, avoid: avoid });
     summonEl.style.left = box.x + 'px';
     summonEl.style.top = box.y + 'px';
     summonEl.style.width = box.w + 'px';
+    // Kept from here on, once it has its pills (the first placing is of an empty field): above the held marks it
+    // grows up, away from them; anywhere else its top stands.
+    if (!summonEl.querySelector('.list')) return box;
+    const s = session.getState();
+    const held = s.summon ? heldBoxOf(s.summon) : null;
+    const above = !!held && box.y + h <= held.top + 1;
+    fieldKept = { x: box.x, w: box.w, edge: above ? 'bottom' : 'top', y: above ? box.y + h : box.y };
     return box;
   }
 
@@ -7734,7 +7798,7 @@
 
   function renderSummon(s) {
     document.body.classList.toggle('summoning', !!s.summon);
-    if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; fieldAnchor = null; return; }
+    if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; fieldAnchor = null; fieldKept = null; return; }
     const sum = s.summon;
     // The same field, rendered again: its content already stands and rebuilding
     // it would throw away the caret — but the space it stands in may have
@@ -7742,6 +7806,7 @@
     if (shownSummonId === sum.id) { placeField(); return; }
     shownSummonId = sum.id;
     fieldAnchor = fieldAnchorFor(sum);
+    fieldKept = null;
     paletteContext = contextFor(sum.enclosedIds);
     paletteItems = rankItems(conversionsFor(s), paletteContext);
     paletteIndex = -1;
@@ -7949,19 +8014,13 @@
   }
 
   /**
-   * The pills just rewrapped and the field grew: re-place it only if its foot
-   * has gone off the bottom. Re-placing on every keystroke would walk the
-   * field up the screen under the hand.
+   * The pills just rewrapped and the field grew: it stays where it opened, growing away from what it holds, its
+   * pills scrolling in the room a keyboard leaves (R6) — placed again only when it would leave the screen or
+   * cover the panel or the minimap (UX-06, placeField's kept place). Re-placing on every keystroke walked the
+   * field about under the hand.
    */
   function keepFieldOnScreen() {
     if (!summonEl.classList.contains('field')) return;
-    const v = viewportRect();
-    // The pills' list held to the room a keyboard leaves, or let go once they fit again (R6).
-    fitFieldHeight(v, usableViewport());
-    const r = summonEl.getBoundingClientRect();
-    // …or has grown over a card it keeps off — a model's readings landing make it taller (U1c).
-    const over = fieldAvoids().some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top);
-    if (!over && r.bottom <= v.bottom - 2 && r.right <= v.right - 2 && r.top >= v.top - 2 && r.left >= v.left - 2) return;
     placeField();
   }
 
@@ -7971,7 +8030,8 @@
     const shown = visibleItems(q);
     if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); paletteNavigated = true; paletteIndex = Math.min(shown.length - 1, paletteIndex + 1); paintField(q); return; }
     if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); paletteNavigated = true; paletteIndex = Math.max(0, paletteIndex - 1); paintField(q); return; }
-    if (e.key === 'Escape') { e.preventDefault(); session.dismiss(shownSummonId, Date.now()); return; }
+    // The field's own rung of the one Escape ladder (20-controls.js): it closes the field, or the controls standing over it.
+    if (e.key === 'Escape') { e.preventDefault(); escapeStep(e.target); return; }
     if (e.key !== 'Enter') return;
     e.preventDefault();
     // The arrows chose a pill: Enter takes it. Otherwise Enter does what the
@@ -15083,7 +15143,6 @@
   document.getElementById('folderBtn').onclick = () => { closeCC(); openFolder(); };
   addEventListener('keydown', (e) => {
     if (e.target !== document.body && e.target !== document && e.target !== window) return;
-    if (e.key === 'Escape' && viewMode !== 'canvas') { setViewMode('canvas'); e.preventDefault(); }
     if (viewMode === 'focus' && e.key === 'ArrowRight') { focusStep(1); e.preventDefault(); }
     if (viewMode === 'focus' && e.key === 'ArrowLeft') { focusStep(-1); e.preventDefault(); }
   });
@@ -16327,9 +16386,10 @@
 //   (PLAN-USER-SURFACE U1f: Board — boards, folder, import, export, reset; View — zoom, view, theme, hand,
 //   snap, snap now; Helpers — models, live, auto-read, packs, your mark, help; the markup is the page's) (zoom, snap,
 //   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards, packs);
-//   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
-// Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
-//   boardOnScreenName, resetBoard), models (agents, deciderHost), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude),
+//   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time;
+//   escapeStep, the one Escape ladder (controls, the field, a pane, the grid, the selection, work in flight).
+// Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, setViewMode, folder; the boards adapter:
+//   boardOnScreenName, resetBoard), models (agents, deciderHost, cancelWork), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude),
 //   relay (roomShort), room (24-room.js: renderLivePane, joinTyped, syncRoomChip — the Live pane's first rows and the chip in the bar); the page's
 //   version (folder's pageVersion: its <meta name="dynaink-version">, V1-PLAN R7, or on a page an older worker kept the
 //   tag's old name, RENAME-PLAN N3b; boards' versionWords), said at the head of the help pane, and under it the
@@ -16360,7 +16420,6 @@
   function openCC() { ccEl.removeAttribute('hidden'); ccBtn.setAttribute('aria-pressed', 'true'); syncTiles(); }
   function closeCC() { ccEl.setAttribute('hidden', ''); ccBtn.setAttribute('aria-pressed', 'false'); }
   ccBtn.onclick = () => { if (ccOpen()) closeCC(); else openCC(); };
-  addEventListener('keydown', (e) => { if (e.key === 'Escape' && ccOpen()) { closeCC(); e.preventDefault(); } });
   addEventListener('pointerdown', (e) => {
     if (!ccOpen()) return;
     if (ccEl.contains(e.target) || ccBtn.contains(e.target)) return;
@@ -16497,6 +16556,34 @@
     closeList(); closePara();
     return out.join('\n');
   }
+
+  // ===== One Escape (the UX pass, UX-09) =====================================
+  // Escape takes back the top thing standing, one thing a press: the control centre; the field, whatever has
+  // the focus inside it (a pill tapped holds the focus, and Escape used to stop there); the open pane — the one
+  // the focus is in first, else whichever stands; the grid; the selection; and with nothing standing, every
+  // model call in flight (cancelWork). It was four handlers in four fragments, and the panes and the grid had
+  // none. An input that owns its own Escape — the text editor, a board's name being changed, find's field —
+  // takes it first (stopPropagation or preventDefault), and the ladder lets it be. Returns what it took back.
+  function escapeStep(focus) {
+    if (ccOpen()) { closeCC(); return 'controls'; }
+    const s = session.getState();
+    if (s.summon) { session.dismiss(s.summon.id, Date.now()); return 'field'; }
+    const open = panes.filter((p) => !p.el.hasAttribute('hidden'));
+    const pane = open.find((p) => focus && p.el.contains(focus)) || open[open.length - 1];
+    if (pane) {
+      const x = pane.el.querySelector(':scope > .paneHead .paneClose');
+      if (x) x.click(); else closePanel(pane.el, pane.btn);
+      return 'pane';
+    }
+    if (viewMode !== 'canvas') { setViewMode('canvas'); return 'grid'; }
+    if (s.selection.length) { session.deselect(Date.now()); return 'selection'; }
+    // Esc with nothing held stops every model call in flight: a slow model is not a hang, and the hand can say enough.
+    return cancelWork() ? 'work' : null;
+  }
+  addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    if (escapeStep(document.activeElement)) e.preventDefault();
+  });
 
   // Panes open under the bar, one at a time.
   const panes = [];
