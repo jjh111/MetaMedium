@@ -193,7 +193,7 @@ test('in workerd: a picture is put by its hash under the room\'s key, comes back
 
 // ----- The model routes in workerd: the module loads and lists the models; a decision itself is not asked here -----
 
-test('in workerd: GET /decide lists the decision models and their limits, asking no model', { skip, timeout: 180000 }, async () => {
+test('in workerd: GET /decide and GET /ai/v1/models list the models and their limits, asking no model', { skip, timeout: 180000 }, async () => {
   const state = mkdtempSync(path.join(tmpdir(), 'dyna-relay-state-'));
   const server = await startWorkerd(state);
   try {
@@ -205,6 +205,14 @@ test('in workerd: GET /decide lists the decision models and their limits, asking
     // No Origin and no key: refused before any binding is touched.
     const bare = await fetch(`${server.url}/decide`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
     assert.equal(bare.status, 403);
+    // dyna.ink's own writer and reader: the list, as core's transport reads it, with no @cf id — and the same door.
+    const list = await fetch(`${server.url}/ai/v1/models`, { headers: { origin: 'https://dyna.ink' } });
+    assert.equal(list.status, 200);
+    const models = await list.json();
+    assert.deepEqual(models.data.map((m) => m.id), ['writer', 'reader']);
+    assert.equal(JSON.stringify(models).includes('@cf/'), false);
+    const noOrigin = await fetch(`${server.url}/ai/v1/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    assert.equal(noOrigin.status, 403);
   } finally {
     await server.stop();
     rmSync(state, { recursive: true, force: true });
@@ -254,3 +262,4 @@ test('in workerd: a room opened by POST /rooms is joined with the key it gave, a
 });
 
 test('in workerd: a decision asked of the real Workers AI', { skip: 'the AI binding is remote — it needs a Cloudflare account and bills it; /decide is held against a fake model in relay.decide.test.mjs, and scripts/record-systemone.mjs records a real reply' }, () => {});
+test('in workerd: a chat asked of the real Workers AI — what the binding takes for a picture, and whether it answers { response } or { choices }', { skip: 'the AI binding is remote — it needs a Cloudflare account and bills it; /ai/v1/chat/completions is held against a fake model in relay.chat.test.mjs, which reads both shapes' }, () => {});

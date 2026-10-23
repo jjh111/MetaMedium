@@ -2,7 +2,13 @@
 // AI binding, so no key reaches a browser and none is sent by one. What a request may be is
 // `Demos/decide-protocol.mjs` (the Node relay reads it too, and answers both with 501); what the page sends and how
 // it reads the answer is core's `llm/decide-systemone.ts`. This file is who may ask, how often, and the call.
-// (`/ai/…` is held for model routes to come: it answers 501, in words.)
+// And dyna.ink's own writer and reader (`/ai/v1/chat/completions`, `GET /ai/v1/models`): OpenAI's chat-completions
+// shape, so core's transport speaks to it unchanged; the page names a house model by its short name (`writer`,
+// `reader`) and the `@cf` id is the relay's own (`MM_AI_WRITER`, `MM_AI_READER`, `Demos/ai-protocol.mjs`). The same
+// doors as a decision's — an app origin, or a room's key — under a switch of its own (`MM_AI_CHAT`, which follows
+// `MM_DECIDE` when unset, so one word turns every model off), far fewer calls a minute, and a budget a day of its own
+// (`MM_AI_CHAT_DAILY`) with a share of it per address, because a chat call costs far more than a decision. Anything
+// else under `/ai/` answers 501, in words.
 //
 // Who may ask (`MM_DECIDE`: off | keyed | limited, `limited` when unset):
 //   * a page of the app (an Origin `http.mjs` allows), limited per address — `DECIDE_PER_MINUTE.caller` a minute and
@@ -29,6 +35,10 @@ import {
   DECIDE_MODELS, EXTRACT_MODELS, DECIDE_LIMITS, DECIDE_WAIT_MS, DECIDE_PER_MINUTE, DECIDE_PER_DAY, DECIDE_WORDS,
   decideCheck, extractCheck, decideCatalog, aiDailyFrom, decideTextBytes,
 } from '../../../Demos/decide-protocol.mjs';
+import {
+  AI_CHAT_LIMITS, AI_CHAT_WAIT_MS, AI_CHAT_PER_MINUTE, AI_CHAT_PER_DAY, AI_WORDS,
+  chatModeOf, aiChatDailyFrom, chatModelsFrom, chatCatalog, chatCheck, chatTextBytes, chatInput, chatReply, chatError,
+} from '../../../Demos/ai-protocol.mjs';
 
 /** The paths this module answers. */
 export const AI_PATH = /^\/(decide|extract|ai(\/[a-z0-9/-]*)?)$/;
@@ -95,14 +105,25 @@ function logCall(route, model, status, ms, bytes) {
   console.log(JSON.stringify({ route, model, status, ms, bytes }));
 }
 
+/**
+ * Whether a route could answer at all — its switch, the binding — as a refusal `[status, words]`, or null. A GET of the
+ * route's list answers it too, so a page that asks the list before it seats a house model (and calls no model doing
+ * so) seats none where every ask would be refused.
+ */
+function closedWhy(mode, env, words) {
+  if (mode === 'off') return [503, words.off];
+  if (mode !== 'keyed' && mode !== 'limited') return [503, words.mode];
+  if (!env.AI) return [501, words.noBinding];
+  return null;
+}
+
 async function modelRoute(request, env, cors, route) {
   const models = route === 'extract' ? EXTRACT_MODELS : DECIDE_MODELS;
-  if (request.method === 'GET' || request.method === 'HEAD') return json(200, decideCatalog(route), cors);
-  if (request.method !== 'POST') return no(405, DECIDE_WORDS.method, cors);
   const mode = env.MM_DECIDE || 'limited';
-  if (mode === 'off') return no(503, DECIDE_WORDS.off, cors);
-  if (mode !== 'keyed' && mode !== 'limited') return no(503, DECIDE_WORDS.mode, cors);
-  if (!env.AI) return no(501, DECIDE_WORDS.noBinding, cors);
+  const closed = closedWhy(mode, env, DECIDE_WORDS);
+  if (request.method === 'GET' || request.method === 'HEAD') return closed ? no(closed[0], closed[1], cors) : json(200, decideCatalog(route), cors);
+  if (request.method !== 'POST') return no(405, DECIDE_WORDS.method, cors);
+  if (closed) return no(closed[0], closed[1], cors);
 
   const asker = await askerOf(request, env);
   if (asker.refuse) return no(asker.refuse[0], asker.refuse[1], cors);
@@ -165,6 +186,85 @@ async function modelRoute(request, env, cors, route) {
   return json(200, { ok: true, model: body.model, ms, answers }, cors);
 }
 
+// ---- dyna.ink's own writer and reader: the chat route ----
+
+/** A refusal in OpenAI's error shape, which core's transport reads as the provider's own words. */
+const refuse = (status, message, headers = {}) => json(status, chatError(status, message), headers);
+
+/** `GET /ai/v1/models`: the house models and the limits — no model is called. Closed when every ask would be refused. */
+async function chatModelsRoute(request, env, cors) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') return refuse(405, AI_WORDS.method, cors);
+  const closed = closedWhy(chatModeOf(env), env, AI_WORDS);
+  if (closed) return refuse(closed[0], closed[1], cors);
+  return json(200, chatCatalog(env), cors);
+}
+
+/** `POST /ai/v1/chat/completions`: who may ask and how often, the shape, the call, and the reply as OpenAI's. */
+async function chatRoute(request, env, cors) {
+  if (request.method !== 'POST') return refuse(405, AI_WORDS.method, cors);
+  const mode = chatModeOf(env);
+  const closed = closedWhy(mode, env, AI_WORDS);
+  if (closed) return refuse(closed[0], closed[1], cors);
+
+  const asker = await askerOf(request, env);
+  if (asker.refuse) return refuse(asker.refuse[0], asker.refuse[0] === 401 ? AI_WORDS.keyed : asker.refuse[1], cors);
+  if (!asker.keyed && !request.headers.get('origin')) return refuse(403, AI_WORDS.noOrigin, cors);
+  if (mode === 'keyed' && !asker.keyed) return refuse(401, AI_WORDS.keyed, cors);
+  const who = asker.keyed ? 'room:' + asker.room : 'ip:' + callerKey(callerOf(request));
+
+  // Counted before the body is read: a flood of anything is a flood.
+  let count;
+  try {
+    count = await hit(env, 'ai-chat', who, { limit: asker.keyed ? AI_CHAT_PER_MINUTE.room : AI_CHAT_PER_MINUTE.caller, windowMs: MINUTE });
+  } catch { return refuse(503, AI_WORDS.uncounted, cors); }
+  if (!count.ok) return refuse(429, AI_WORDS.rate, { ...cors, 'retry-after': String(count.retryAfter || 60) });
+
+  const read = await bodyText(request, AI_CHAT_LIMITS.bodyWithImages);
+  if (read.over) return refuse(413, AI_WORDS.tooBig(AI_CHAT_LIMITS.bodyWithImages), cors);
+  let body;
+  try { body = JSON.parse(read.text); } catch { return refuse(400, AI_WORDS.notJson, cors); }
+  // The words are held to 64 KiB with or without a picture: the 6 MiB is the pictures' alone.
+  if (chatTextBytes(body, read.size) > AI_CHAT_LIMITS.text) return refuse(413, AI_WORDS.tooWordy(AI_CHAT_LIMITS.text), cors);
+  const models = chatModelsFrom(env);
+  const why = chatCheck(body, models);
+  if (why) return refuse(400, why, cors);
+  const m = models[body.model];
+  if (!m.id) return refuse(503, AI_WORDS.notSet(body.model), cors);
+
+  // Every call that will reach a model counts against the day's budget for chat, and a caller with no key against its
+  // own share of it first, so one machine cannot spend the day for everyone.
+  let budget;
+  try {
+    if (!asker.keyed) {
+      const share = await hit(env, 'ai-chat-share', who, { limit: AI_CHAT_PER_DAY.caller, windowMs: DAY });
+      if (!share.ok) return refuse(429, AI_WORDS.share, { ...cors, 'retry-after': String(share.retryAfter || 3600) });
+    }
+    budget = await hit(env, 'ai-chat-budget', 'day', { limit: aiChatDailyFrom(env), windowMs: DAY });
+  } catch { return refuse(503, AI_WORDS.uncounted, cors); }
+  if (!budget.ok) return refuse(429, AI_WORDS.spent, { ...cors, 'retry-after': String(budget.retryAfter || 3600) });
+
+  const input = chatInput(body, m);
+  const t0 = Date.now();
+  let timer;
+  let out;
+  try {
+    out = await Promise.race([
+      env.AI.run(m.id, input),
+      new Promise((_, fail) => { timer = setTimeout(() => fail(Object.assign(new Error('timeout'), { timeout: true })), AI_CHAT_WAIT_MS); }),
+    ]);
+  } catch (e) {
+    const ms = Date.now() - t0;
+    if (e && e.timeout) { logCall('chat', body.model, 504, ms, read.size); return refuse(504, AI_WORDS.timeout(body.model), cors); }
+    logCall('chat', body.model, 502, ms, read.size);
+    return refuse(502, AI_WORDS.failed(body.model, e && e.message ? e.message : String(e)), cors);
+  } finally { clearTimeout(timer); }
+  const ms = Date.now() - t0;
+  const reply = chatReply(out, body.model, input.max_tokens);
+  if (!reply.ok) { logCall('chat', body.model, 502, ms, read.size); return refuse(502, reply.words, cors); }
+  logCall('chat', body.model, 200, ms, read.size);
+  return json(200, reply.body, cors);
+}
+
 export async function aiRoute(request, env) {
   const origin = request.headers.get('origin');
   if (origin && !originAllowed(origin, env)) return text(403, 'this origin may not use this relay', corsHeaders(origin));
@@ -173,5 +273,7 @@ export async function aiRoute(request, env) {
   const path = new URL(request.url).pathname;
   if (path === '/decide') return modelRoute(request, env, cors, 'decide');
   if (path === '/extract') return modelRoute(request, env, cors, 'extract');
-  return no(501, DECIDE_WORDS.elsewhere, cors);
+  if (path === '/ai/v1/chat/completions') return chatRoute(request, env, cors);
+  if (path === '/ai/v1/models') return chatModelsRoute(request, env, cors);
+  return refuse(501, AI_WORDS.elsewhere, cors);
 }

@@ -15,6 +15,7 @@ import { keyForRoom } from './src/auth.mjs';
 import { fakeEnv, fakeAI, systemOneAnswers } from './test/fake.mjs';
 import { callerKey } from './src/ai.mjs';
 import { decideCheck, extractCheck, DECIDE_LIMITS, DECIDE_PER_MINUTE, DECIDE_PER_DAY, DECIDE_WORDS, DECIDE_MODELS } from '../../Demos/decide-protocol.mjs';
+import { AI_WORDS } from '../../Demos/ai-protocol.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const MM = await import(pathToFileURL(path.join(here, '../../Demos/dynaink-core.node.mjs')).href);
@@ -346,11 +347,12 @@ test('/extract: Clairic, text and list fields only, the same doors and limits', 
   assert.match(await said(asDecide), /no extraction model “clef-flash”/);
 });
 
-test('the rooms are where they were, and /ai/… answers 501 in words', async () => {
+test('the rooms are where they were, and what /ai/… does not hold answers 501 in words', async () => {
   const env = envWith();
   assert.equal((await worker.fetch(new Request('http://relay/'), env)).status, 200);
   assert.equal((await worker.fetch(new Request('http://relay/rooms/claude/events', { headers: { origin: APP } }), env)).status, 401);
+  // Under /ai/, what is not dyna.ink's own writer and reader (relay.chat.test.mjs) is not here, said in OpenAI's error shape.
   const ai = await worker.fetch(new Request('http://relay/ai/chat', { method: 'POST', headers: { origin: APP }, body: '{}' }), env);
   assert.equal(ai.status, 501);
-  assert.equal(await said(ai), DECIDE_WORDS.elsewhere);
+  assert.equal((await ai.json()).error.message, AI_WORDS.elsewhere);
 });
