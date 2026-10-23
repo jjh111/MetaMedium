@@ -641,3 +641,140 @@ test('a room at its most names lets go of the ones no line it holds was written 
   const stored = [...env.ROOMS.storages.get('r').map.keys()].filter((k) => k.startsWith('h:'));
   assert.equal(stored.length, room.claims.size);
 });
+
+// ----- One machine is one caller: an IPv6 address by its /64 ------------------------------
+
+test('a machine on IPv6 is one caller: rooms opened from one /64, a new interface id on every request, stop at ten an hour', async () => {
+  const env = fakeEnv({ MM_RELAY_SECRET: SECRET });
+  const statuses = [];
+  for (let i = 0; i < 14; i++) statuses.push((await mint(env, { ip: '2001:db8:aa:bb:' + (i + 1).toString(16) + '::7' })).status);
+  assert.deepEqual(statuses, [...Array(10).fill(201), ...Array(4).fill(429)]);
+  assert.equal((await mint(env, { ip: '2001:db8:aa:bc::1' })).status, 201, 'the next /64 is another caller');
+});
+
+test('a machine on IPv6 is one address in a room too: new names from one /64 stop at its share, and its lines share one bucket', async () => {
+  const env = openEnv();
+  const statuses = [];
+  for (let i = 0; i < 40; i++) {
+    const res = await post(env, 'r', { participant: 'v6~' + i, events: [{ type: 'x' }], at: 1 }, { headers: { 'x-dyna-hand': ('v6-secret-' + i).padEnd(22, 'q'), 'cf-connecting-ip': '2001:db8:cc:dd::' + (i + 1).toString(16) } });
+    statuses.push(res.status);
+  }
+  assert.equal(statuses.filter((s) => s === 204).length, 30, statuses.join(','));
+  assert.equal(env.ROOMS.rooms.get('r').addresses.size, 1, 'one /64, one address');
+});
+
+// ----- What a caller keeps is counted across rooms, and what opened rooms hold in all ---------
+
+test('what one address keeps is counted across every room it writes in — lines and pictures — and a beat costs nothing; another address keeps on', async () => {
+  const env = openEnv({ MM_RELAY_STORE_PER_DAY: String(3 * 1024 * 1024) });
+  const ip = '203.0.113.60';
+  const rooms = [];
+  for (let i = 0; i < 4; i++) rooms.push((await (await mint(env, { ip })).json()).room);
+  const pad = 'p'.repeat(600_000);
+  const statuses = [];
+  let said = null;
+  for (const room of rooms) {
+    const res = await post(env, room, { participant: 'a~' + room, events: [{ pad }], at: 1 }, { headers: { 'x-dyna-hand': ('store-' + room).slice(0, 22).padEnd(22, 'q'), 'cf-connecting-ip': ip } });
+    statuses.push(res.status);
+    if (res.status === 429 && !said) { said = await res.text(); assert.ok(Number(res.headers.get('retry-after')) >= 1); }
+  }
+  // Four fresh rooms are no fresh allowance: past three MiB a day in all, the next is refused.
+  assert.ok(statuses.filter((s) => s === 204).length <= 4 && statuses.filter((s) => s === 204).length >= 1, statuses.join(','));
+  const more = [];
+  for (let i = 0; i < 6; i++) more.push((await post(env, rooms[i % 4], { participant: 'a~' + rooms[i % 4], events: [{ pad }], at: 2 + i }, { headers: { 'x-dyna-hand': ('store-' + rooms[i % 4]).slice(0, 22).padEnd(22, 'q'), 'cf-connecting-ip': ip } })).status);
+  assert.ok(more.includes(429), 'one address filled room after room: ' + statuses.concat(more).join(','));
+  said = said || await (await post(env, rooms[0], { participant: 'a~' + rooms[0], events: [{ pad }], at: 99 }, { headers: { 'x-dyna-hand': ('store-' + rooms[0]).slice(0, 22).padEnd(22, 'q'), 'cf-connecting-ip': ip } })).text();
+  assert.match(said, /this address has kept as much on this relay as a day allows — nothing was added; try again in \d+ (seconds|minutes|hours)$/);
+  // A picture counts too (one bigger than what a room drew of the day and has not used: it draws a megabyte at a time).
+  const big = new Uint8Array(1_500_000);
+  big.set(pngOf(31));
+  const pic = await putAsset(env, rooms[1], big, { headers: { 'cf-connecting-ip': ip } });
+  assert.equal(pic.status, 429);
+  // A beat is kept nowhere and costs nothing.
+  assert.equal((await post(env, rooms[0], { participant: 'a~' + rooms[0], events: [], at: 500 }, { headers: { 'x-dyna-hand': ('store-' + rooms[0]).slice(0, 22).padEnd(22, 'q'), 'cf-connecting-ip': ip } })).status, 204);
+  // Another address keeps on, in the same rooms.
+  assert.equal((await post(env, rooms[0], { participant: 'b~1', events: [{ pad }], at: 3 }, { headers: { 'x-dyna-hand': 'other-address-secret-1', 'cf-connecting-ip': '198.51.100.61' } })).status, 204);
+  assert.equal((await putAsset(env, rooms[1], pngOf(32), { headers: { 'cf-connecting-ip': '198.51.100.61' } })).status, 204);
+});
+
+test('pictures go through a room\'s floodgate: a burst of big ones from one address is told to wait, in words', async () => {
+  const env = openEnv();
+  const big = (n) => { const b = pngOf(n); const out = new Uint8Array(6 * 1024 * 1024); out.set(b); return out; };
+  const statuses = [];
+  let said = null;
+  for (let i = 0; i < 8; i++) {
+    const res = await putAsset(env, 'r', big(40 + i), { headers: { 'cf-connecting-ip': '203.0.113.70' } });
+    statuses.push(res.status);
+    if (res.status === 429 && !said) { said = await res.text(); assert.ok(Number(res.headers.get('retry-after')) >= 1); }
+  }
+  assert.ok(statuses.includes(429) && statuses.filter((s) => s === 204).length <= 4, statuses.join(','));
+  assert.match(said, /this address is sending more than a room takes at once/);
+});
+
+test('what the rooms the relay opened hold at once is bounded: past it a room keeps nothing more, no room is opened, and a room forgotten gives its share back', async () => {
+  const env = openEnv({ MM_RELAY_MINTED_HELD: String(10 * 1024 * 1024) });
+  const a = (await (await mint(env, { ip: '192.0.2.10' })).json()).room;
+  const b = (await (await mint(env, { ip: '192.0.2.11' })).json()).room;
+  const pad = 'q'.repeat(3_000_000);
+  // Each room reserves its share as it fills: two rooms of a few MB each fill ten MB of reservations.
+  assert.equal((await post(env, a, { participant: 'a~1', events: [{ pad }], at: 1 }, { headers: { 'x-dyna-hand': 'gauge-secret-a-000001', 'cf-connecting-ip': '192.0.2.10' } })).status, 204);
+  assert.equal((await post(env, b, { participant: 'b~1', events: [{ pad }], at: 1 }, { headers: { 'x-dyna-hand': 'gauge-secret-b-000001', 'cf-connecting-ip': '192.0.2.11' } })).status, 204);
+  const statuses = [];
+  let full = null;
+  for (let i = 0; i < 4; i++) {
+    const res = await post(env, i % 2 ? b : a, { participant: (i % 2 ? 'b' : 'a') + '~1', events: [{ pad }], at: 2 + i }, { headers: { 'x-dyna-hand': 'gauge-secret-' + (i % 2 ? 'b' : 'a') + '-000001', 'cf-connecting-ip': '192.0.2.' + (10 + (i % 2)) } });
+    statuses.push(res.status);
+    if (res.status === 507 && !full) full = await res.text();
+  }
+  assert.ok(statuses.includes(507), statuses.join(','));
+  assert.equal(full, 'this relay holds as much as it may for the rooms people open — nothing was added, and what this room holds stays');
+  // No new room is opened to fill while they do; a room named by hand keeps on.
+  const no = await mint(env, { ip: '192.0.2.12' });
+  assert.equal(no.status, 503);
+  assert.match(await no.text(), /opens no new room until older ones are let go of/);
+  assert.equal((await post(env, 'claude', { participant: 'john~1', events: [{ pad }], at: 1 }, { headers: { 'x-dyna-hand': 'john-sitting-secret-01' } })).status, 204);
+  // A room forgotten gives back all it reserved, and rooms open again.
+  const held = env.ROOMS.rooms.get(a).reserved;
+  assert.ok(held > 0);
+  assert.equal(Number(env.ROOMS.storages.get(a).map.get('reserved')), held, 'what it reserved is written down, for the alarm after an eviction');
+  await env.ROOMS.rooms.get(a).alarm();
+  await env.ROOMS.rooms.get(b).alarm();
+  assert.equal(Number(env.LIMITS.storages.get('minted').map.get('held:rooms')), 0);
+  assert.equal((await mint(env, { ip: '192.0.2.12' })).status, 201);
+  // The gauge is never a window: the Limits alarm lets it be.
+  await post(env, (await (await mint(env, { ip: '192.0.2.13' })).json()).room, { participant: 'c~1', events: [{ pad }], at: 1 }, { headers: { 'x-dyna-hand': 'gauge-secret-c-000001', 'cf-connecting-ip': '192.0.2.13' } });
+  await env.LIMITS.objectOf('minted').alarm();
+  assert.ok(Number(env.LIMITS.storages.get('minted').map.get('held:rooms')) > 0);
+});
+
+// ----- A room forgotten, and a hand that read it before ----------------------------------
+
+test('a hand that reconnects to a room since forgotten is told so and sent the room as it is now — its old Last-Event-ID is past every id the room has', async () => {
+  const env = openEnv();
+  const { room } = await (await mint(env)).json();
+  for (let i = 1; i <= 5; i++) await post(env, room, { participant: 'ann~1', events: [{ type: 'old' + i }], at: i }, hand(ADA));
+  await env.ROOMS.rooms.get(room).alarm();
+  for (let i = 1; i <= 3; i++) await post(env, room, { participant: 'fern~1', events: [{ type: 'new' + i }], at: 10 + i }, hand(EVE));
+  const back = await readUntil(await open(env, room, { headers: { 'last-event-id': '5' } }), (t) => t.includes('{"relay":"live"}'));
+  assert.ok(back.includes('"relay":"forgotten"'), back.slice(0, 200));
+  assert.ok(back.includes('"new1"') && back.includes('"new3"'), 'the room as it is now was not sent');
+  assert.ok(back.indexOf('"relay":"forgotten"') < back.indexOf('{"relay":"replay"}'));
+  // A hand whose last id the room issued is told nothing of the kind.
+  const fine = await readUntil(await open(env, room, { headers: { 'last-event-id': '2' } }), (t) => t.includes('{"relay":"live"}'));
+  assert.ok(!fine.includes('forgotten') && fine.includes('"new3"') && !fine.includes('"new2"'));
+});
+
+// ----- A beat that lets names go deletes them as storage takes them ---------------------------
+
+test('a beat that claims a name in a full room lets go of more than a storage call takes, in as many calls as it needs', async () => {
+  const env = openEnv();
+  // A room holding a thousand names with no line left in it, as names claimed sitting after sitting leave one.
+  const storage = (await import('./test/fake.mjs')).fakeStorage();
+  for (let i = 0; i < 1000; i++) storage.map.set('h:gone~' + i, 'x'.repeat(64));
+  const fresh = new (await import('./src/worker.mjs')).Room({ storage, blockConcurrencyWhile: (f) => f() }, env);
+  const res = await fresh.fetch(new Request(`${ORIGIN}/rooms/beats/events`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-dyna-hand': 'beat-secret-000000001' }, body: JSON.stringify({ participant: 'new~1', events: [], at: 1 }) }));
+  assert.equal(res.status, 204);
+  const claims = [...storage.map.keys()].filter((k) => k.startsWith('h:'));
+  assert.deepEqual(claims, ['h:new~1']);
+  assert.equal(fresh.claims.size, 1);
+});

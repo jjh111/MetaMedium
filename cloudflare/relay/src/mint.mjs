@@ -10,12 +10,14 @@
 // every caller is held to MM_RELAY_MINT_PER_HOUR rooms an hour by its address (default 10) and the relay to
 // MM_RELAY_MINT_PER_DAY rooms a day in all (default 500), counted in the Limits object (limits.mjs) so the
 // count is one wherever a request lands. Past either it is a 429 with `retry-after` and a sentence.
+// And the relay opens none while the rooms it opened hold all they may at once (store.mjs, MM_RELAY_MINTED_HELD; 503).
 // MM_RELAY_MINT=0 opens no rooms (503, in words). With no secret the relay opens none either (503, as the
 // rooms answer); with MM_RELAY_OPEN=1 it opens rooms that need no key (`key: null`).
 
 import { originAllowed, corsHeaders, text, json, callerOf } from './http.mjs';
 import { secretsOf, keyForRoom } from './auth.mjs';
 import { hit } from './limits.mjs';
+import { mintedFull, STORE_WORDS } from './store.mjs';
 import { mintRoomName, roomIdleDaysFrom } from '../../../Demos/relay-protocol.mjs';
 
 const HOUR = 3600_000;
@@ -53,6 +55,10 @@ export async function mintRoute(request, env) {
   }
   if (!mine.ok) return text(429, 'this address has opened as many rooms as it may for now — try again in ' + later(mine.retryAfter), { ...cors, 'retry-after': String(mine.retryAfter) });
   if (!all.ok) return text(429, 'this relay has opened as many rooms as it may today — try again in ' + later(all.retryAfter), { ...cors, 'retry-after': String(all.retryAfter) });
+  // What every room the relay opened holds at once is bounded (store.mjs): past it, no new room is opened to fill.
+  let full;
+  try { full = await mintedFull(env); } catch { return text(503, STORE_WORDS.uncounted, cors); }
+  if (full) return text(503, STORE_WORDS.noRooms, cors);
 
   const room = mintRoomName();
   const key = open ? null : await keyForRoom(secrets[0], room);

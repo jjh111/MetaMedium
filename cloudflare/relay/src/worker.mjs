@@ -37,6 +37,8 @@
 //   MM_RELAY_MINT       "0": open no new rooms (POST /rooms answers 503); mint.mjs
 //   MM_RELAY_MINT_PER_HOUR, MM_RELAY_MINT_PER_DAY   rooms one address may open an hour (10), the relay a day (500)
 //   MM_RELAY_ROOM_IDLE_DAYS  how long a room the relay opened is kept after it was last used (default 30)
+//   MM_RELAY_STORE_PER_DAY  characters and bytes one address may keep a day across every room (default 256 MiB); store.mjs
+//   MM_RELAY_MINTED_HELD    bytes every room the relay opened may hold at once, in all (default 2 GiB); store.mjs
 //
 // Rooms anyone opens (mint.mjs, `POST /rooms`): their names are `r-` and 128 random bits, and such a room
 // ages out — an alarm at its last use and MM_RELAY_ROOM_IDLE_DAYS empties its storage (lines, pictures,
@@ -47,10 +49,13 @@
 // takes them; a room keeps at most MAX_CLAIMS names, letting go first of names no line it holds was written
 // under; before a room lets go of history to stay under its caps it lets go of the lines replay would never
 // send (`compact`); and a line that only says its hand is here is passed on to the open streams and kept
-// nowhere. The rules are relay-protocol.mjs's.
+// nowhere. The rules are relay-protocol.mjs's. What is kept is counted across rooms too (store.mjs): what one address
+// keeps a day in every room — lines and pictures, a picture through the room's floodgates as a line goes — and what
+// the rooms the relay opened hold at once, in all. A hand that reconnects past every id a room has (a room forgotten,
+// its ids begun again) is told so (`forgottenNotice`) and sent the room from its beginning.
 
 import {
-  kindOf, setOf, replay, truncationNotice, maxLinesFrom, MAX_LINE_CHARS, compact, isMintedRoom, roomIdleDaysFrom, HAND_HEADER, handHashOf, claimCheck, writerOf,
+  kindOf, setOf, replay, truncationNotice, forgottenNotice, maxLinesFrom, MAX_LINE_CHARS, compact, isMintedRoom, roomIdleDaysFrom, HAND_HEADER, handHashOf, claimCheck, writerOf,
   floodgate, FLOOD, FLOOD_ADDRESS, FLOOD_ROOM, NEW_HANDS, claimsToLetGo, CLAIMS_FULL, REPLAY_BEGINS, REPLAY_ENDS,
   MAX_ASSET_BYTES, assetRoomBytesFrom, assetPathOf, assetCheck, assetFull, assetSizeVerdict, assetHeaders, sniffImage, ASSET_WORDS,
 } from '../../../Demos/relay-protocol.mjs';
@@ -59,6 +64,7 @@ import { originAllowed, corsHeaders, text, keyOf, callerOf } from './http.mjs';
 import { mintRoute } from './mint.mjs';
 import { aiRoute, AI_PATH } from './ai.mjs';
 import { Limits } from './limits.mjs';
+import { chargeStore, reserveMinted, releaseMinted, LINE_COST } from './store.mjs';
 
 // The Durable Object classes this Worker binds (wrangler.toml): a room, and the limits the
 // routes beside the rooms count against.
@@ -179,6 +185,8 @@ export class Room {
     this.addresses = new Map(); // address -> its bucket of lines, and its bucket of new names (`floodgate`)
     this.roomFlood = null;      // the room's own bucket, across every hand
     this.alarmAt = 0;           // when this room is forgotten, if it is one the relay opened (0: never set)
+    this.grants = new Map();    // caller -> what this room drew of its day's allowance and has not used (store.mjs)
+    this.reserved = 0;          // what a room the relay opened reserved of what all such rooms may hold (store.mjs)
     this.ready = ctx.blockConcurrencyWhile ? ctx.blockConcurrencyWhile(() => this.load()) : this.load();
   }
 
@@ -188,6 +196,7 @@ export class Room {
     this.dropped = Number(meta.dropped) || 0;
     for (const [k, hash] of await this.ctx.storage.list({ prefix: 'h:' })) this.claims.set(k.slice(2), hash);
     if (this.ctx.storage.getAlarm) this.alarmAt = Number(await this.ctx.storage.getAlarm()) || 0;
+    this.reserved = Number(await this.ctx.storage.get('reserved')) || 0;
     const records = await this.ctx.storage.list({ prefix: 'm:' });
     const chunks = await this.ctx.storage.list({ prefix: 'c:' });
     for (const rec of records.values()) {
@@ -221,6 +230,9 @@ export class Room {
    */
   async alarm() {
     await this.ready;
+    // What it reserved of what every room the relay opened may hold goes back first: if that cannot be done, the
+    // alarm throws and is tried again, with the room as it was.
+    await releaseMinted(this.env, this.reserved);
     for (const c of [...this.clients]) this.drop(c);
     await this.ctx.storage.deleteAll();
     this.lines = [];
@@ -235,6 +247,8 @@ export class Room {
     this.addresses = new Map();
     this.roomFlood = null;
     this.alarmAt = 0;
+    this.grants = new Map();
+    this.reserved = 0;
   }
 
   async fetch(request) {
@@ -253,6 +267,32 @@ export class Room {
     return request.method === 'GET' ? this.stream(request) : this.post(request);
   }
 
+  /**
+   * A picture's bytes through the room's floodgates — its address's and the room's — then the counts of what is kept
+   * (`keep`): null when it may be kept, else the refusal as a response.
+   */
+  async admit(request, bytes, after) {
+    const caller = callerOf(request);
+    const now = Date.now();
+    const at = this.addresses.get(caller) || {};
+    const gate = floodgate([{ kind: 'address', bucket: at.lines, limits: FLOOD_ADDRESS }, { kind: 'room', bucket: this.roomFlood, limits: FLOOD_ROOM }], now, bytes);
+    if (gate.refused) return text(429, gate.refused.words, { 'retry-after': String(gate.refused.retryAfter) });
+    this.addresses.set(caller, { ...at, lines: gate.buckets[0] });
+    this.roomFlood = gate.buckets[1];
+    return this.keep(caller, bytes, after);
+  }
+
+  /**
+   * What is about to be kept, counted: `cost` against what `caller` may keep today in every room, and — in a room the
+   * relay opened — `after`, what the room will hold, against what all such rooms may hold (store.mjs). Null when it
+   * may be kept, else the refusal as a response.
+   */
+  async keep(caller, cost, after) {
+    const no = (await chargeStore(this.env, this.grants, caller, cost)) || (isMintedRoom(this.name) ? await reserveMinted(this.env, this, after) : null);
+    if (!no) return null;
+    return text(no.status, no.words, no.retryAfter ? { 'retry-after': String(no.retryAfter) } : {});
+  }
+
   /** A picture put: read up to the cap, judged by the protocol, kept in pieces — the record last, so a record always has its pieces. */
   async putAsset(request, hash) {
     const body = await bodyUpTo(request, MAX_ASSET_BYTES);
@@ -260,6 +300,12 @@ export class Room {
     const cap = assetRoomBytesFrom(undefined, this.env);
     const no = await assetCheck(body.bytes, hash, { held: this.assetBytes, cap, have: this.assets.has(hash) });
     if (no) return text(no.status, no.words);
+    if (this.assets.has(hash)) { await this.writing.get(hash); return new Response(null, { status: 204 }); }
+    // A picture goes through the room's floodgates as a line does — its address's and the room's, by its bytes — and
+    // counts against what its caller may keep a day in every room (store.mjs), and, in a room the relay opened, against
+    // what all such rooms may hold at once.
+    const refused = await this.admit(request, body.bytes.length, this.chars + this.assetBytes + body.bytes.length);
+    if (refused) return refused;
     if (this.assets.has(hash)) { await this.writing.get(hash); return new Response(null, { status: 204 }); }
     // Nothing awaited between this check and the claim: two puts at once cannot both fit.
     const full = assetFull(this.assetBytes, body.bytes.length, cap);
@@ -302,12 +348,17 @@ export class Room {
   }
 
   stream(request) {
-    const after = Number(request.headers.get('last-event-id') || 0);
+    const asked = Number(request.headers.get('last-event-id') || 0);
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
     const client = { writer };
     const say = (s) => writer.write(enc.encode(s)).catch(() => this.drop(client));
     say(': hello\n\n');
+    // A hand that read further than this room now goes read a room since forgotten (its idle days, `alarm`) whose ids
+    // began again at 1: it is told so and sent the room from its beginning, and its store sends its log again whole.
+    const forgotten = forgottenNotice({ name: this.name, last: this.last }, asked);
+    if (forgotten) say(`data: ${JSON.stringify(forgotten)}\n\n`);
+    const after = forgotten ? 0 : asked;
     // A room that has outlived its buffer says so — a line with no `participant`
     // and no `id:`, as the Node relay sends it, so it never moves Last-Event-ID.
     const notice = truncationNotice({ name: this.name, lines: this.lines, dropped: this.dropped, lost: this.lost }, after);
@@ -341,8 +392,9 @@ export class Room {
     // Whose name the line is written under, by the secret its hand sent (relay-protocol.mjs): a name claimed by
     // another hand is refused, so nobody can write in another's name — a whole log in it would replace theirs.
     const hash = await handHashOf(request.headers.get(HAND_HEADER) || '');
-    const verdict = claimCheck(this.claims, line, hash);
+    let verdict = claimCheck(this.claims, line, hash);
     if (!verdict.ok) return text(verdict.status, verdict.words);
+    const kind = kindOf(line);
     // A hand, an address or the room as a whole that sends more than a room takes is told to wait, rather than push
     // the room's history out — the hand's secret is its own to choose, so a hand that takes a new one on every line
     // is still its address, and still the room. A line that claims a new name counts against its address's names too.
@@ -358,6 +410,22 @@ export class Room {
     if (verdict.claim) gates.push({ kind: 'claim', bucket: at.claims, limits: NEW_HANDS });
     const gate = floodgate(gates, now, body.length);
     if (gate.refused) return text(429, gate.refused.words, { 'retry-after': String(gate.refused.retryAfter) });
+    this.floods.set(who, gate.buckets[0]);
+    this.addresses.set(caller, verdict.claim ? { lines: gate.buckets[1], claims: gate.buckets[3] } : { ...at, lines: gate.buckets[1] });
+    this.roomFlood = gate.buckets[2];
+    if (this.floods.size > FLOOD_HANDS) for (const [k, b] of this.floods) if (now - b.at > 60_000) this.floods.delete(k);
+    if (this.addresses.size > FLOOD_HANDS) for (const [k, b] of this.addresses) if (now - b.lines.at > 600_000) this.addresses.delete(k);
+    const maxLines = maxLinesFrom(undefined, this.env);
+    const maxChars = Number(this.env.MM_RELAY_MAX_BYTES) > 0 ? Number(this.env.MM_RELAY_MAX_BYTES) : DEFAULT_MAX_CHARS;
+    if (kind !== 'here') {
+      // A line that will be kept counts against what its caller may keep today in every room, and, in a room the relay
+      // opened, against what all such rooms hold (store.mjs) — a beat is kept nowhere and costs nothing.
+      const no = await this.keep(caller, body.length + LINE_COST, Math.min(this.chars + body.length, maxChars) + this.assetBytes);
+      if (no) return no;
+      // Another line may have claimed this name while the counts were asked: asked again, and nothing awaited from here to the claim.
+      verdict = claimCheck(this.claims, line, hash);
+      if (!verdict.ok) return text(verdict.status, verdict.words);
+    }
     // A room keeps so many names: past it, the names no line it holds was written under are let go of first.
     let letGo = [];
     if (verdict.claim) {
@@ -366,20 +434,14 @@ export class Room {
       letGo = cap.letGo;
       for (const name of letGo) this.claims.delete(name);
     }
-    this.floods.set(who, gate.buckets[0]);
-    this.addresses.set(caller, verdict.claim ? { lines: gate.buckets[1], claims: gate.buckets[3] } : { ...at, lines: gate.buckets[1] });
-    this.roomFlood = gate.buckets[2];
-    if (this.floods.size > FLOOD_HANDS) for (const [k, b] of this.floods) if (now - b.at > 60_000) this.floods.delete(k);
-    if (this.addresses.size > FLOOD_HANDS) for (const [k, b] of this.addresses) if (now - b.lines.at > 600_000) this.addresses.delete(k);
     // Nothing awaited between the check and the claim: two first lines at once cannot both claim a name.
     if (verdict.claim) this.claims.set(verdict.claim, hash);
-    const kind = kindOf(line);
     // A line that only says its hand is here is passed on to the streams open now and kept nowhere: a room's
     // history is its marks, not its beats, and beats kept would push the marks out of it.
     if (kind === 'here') {
       for (const c of this.clients) c.writer.write(enc.encode(`data: ${body}\n\n`)).catch(() => this.drop(c));
       if (verdict.claim) await this.ctx.storage.put(hKey(verdict.claim), hash);
-      if (letGo.length) await this.ctx.storage.delete(letGo.map(hKey));
+      await this.forget(letGo.map(hKey));
       return new Response(null, { status: 204 });
     }
     const id = ++this.last;
@@ -392,8 +454,6 @@ export class Room {
     this.chars += body.length;
     // Past the cap — in lines or in characters, the newest always kept — what replay would never send goes
     // first (`compact`: a hand's own whole logs that a newer one stands after), then the oldest.
-    const maxLines = maxLinesFrom(undefined, this.env);
-    const maxChars = Number(this.env.MM_RELAY_MAX_BYTES) > 0 ? Number(this.env.MM_RELAY_MAX_BYTES) : DEFAULT_MAX_CHARS;
     const gone = [];
     if (this.lines.length > maxLines || this.chars > maxChars) {
       const kept = compact(this.lines);
@@ -417,8 +477,12 @@ export class Room {
     for (let k = 0; k < n; k++) put[cKey(id, k)] = body.slice(k * CHUNK_CHARS, (k + 1) * CHUNK_CHARS);
     if (verdict.claim) put[hKey(verdict.claim)] = hash;
     await this.ctx.storage.put(put);
-    const keys = gone.flatMap((l) => [mKey(l.id), ...Array.from({ length: l.n }, (_, k) => cKey(l.id, k))]).concat(letGo.map(hKey));
-    for (let i = 0; i < keys.length; i += 128) await this.ctx.storage.delete(keys.slice(i, i + 128));
+    await this.forget(gone.flatMap((l) => [mKey(l.id), ...Array.from({ length: l.n }, (_, k) => cKey(l.id, k))]).concat(letGo.map(hKey)));
     return new Response(null, { status: 204 });
+  }
+
+  /** Delete keys from storage, as many calls as it takes: a storage call takes at most BATCH keys. */
+  async forget(keys) {
+    for (let i = 0; i < keys.length; i += BATCH) await this.ctx.storage.delete(keys.slice(i, i + BATCH));
   }
 }

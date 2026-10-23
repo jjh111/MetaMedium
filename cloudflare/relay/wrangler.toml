@@ -61,3 +61,6 @@ binding = "AI"
 # MM_RELAY_MINT_PER_HOUR = "10"        # rooms one address may open an hour
 # MM_RELAY_MINT_PER_DAY = "500"        # rooms the relay opens a day, in all
 # MM_RELAY_ROOM_IDLE_DAYS = "30"       # a room it opened is forgotten this long after it was last used
+# What the relay keeps, counted across rooms (src/store.mjs) — an operating ceiling under what the plan allows:
+# MM_RELAY_STORE_PER_DAY = "268435456" # characters and bytes one address may keep a day in every room (a line counts 4 KiB more, for its rows)
+# MM_RELAY_MINTED_HELD = "2147483648"  # bytes every room it opened may hold at once; past it they keep nothing more and none is opened

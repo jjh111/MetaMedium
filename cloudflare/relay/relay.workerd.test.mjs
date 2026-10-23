@@ -133,9 +133,9 @@ test('in workerd: keys, the stream, Last-Event-ID, the cap and the truncation wo
     const again = await readSse(`${server.url}/rooms/${room}/events?key=${key}`, {}, (t) => t.includes('"ada~1"'));
     assert.ok(again.text.includes('"ada~1"') && again.text.includes('"relay":"truncated"'), again.text.slice(0, 400));
     assert.equal((await fetch(`${server.url}/rooms/${room}/events?key=${key}`, { method: 'POST', body: JSON.stringify({ participant: 'hal', events: [] }) })).status, 204);
-    const ids = (await readSse(`${server.url}/rooms/${room}/events?key=${key}`, { headers: { 'last-event-id': '1000' } }, () => false, 500)).text;
-    // Past the end: nothing but the relay's two words around a replay of nothing.
-    assert.ok(!ids.includes('id:') && ids.split('\n').filter((l) => l.startsWith('data:')).every((l) => /^data: \{"relay":"(replay|live)"\}$/.test(l)), 'a client past the end was sent lines: ' + ids);
+    const ids = (await readSse(`${server.url}/rooms/${room}/events?key=${key}`, { headers: { 'last-event-id': '1000' } }, (t) => t.includes('{"relay":"live"}'))).text;
+    // Past every id the room has: a room since forgotten, whose ids began again — told so, and sent the room from its beginning.
+    assert.ok(ids.includes('"relay":"forgotten"') && ids.includes('"ada~1"'), 'a client past the end was not told the room was forgotten: ' + ids.slice(0, 400));
   } finally {
     await server.stop();
     rmSync(state, { recursive: true, force: true });
