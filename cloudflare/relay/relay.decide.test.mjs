@@ -13,7 +13,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import worker from './src/worker.mjs';
 import { keyForRoom } from './src/auth.mjs';
 import { fakeEnv, fakeAI, systemOneAnswers } from './test/fake.mjs';
-import { decideCheck, extractCheck, DECIDE_LIMITS, DECIDE_PER_MINUTE, DECIDE_WORDS, DECIDE_MODELS } from '../../Demos/decide-protocol.mjs';
+import { callerKey } from './src/ai.mjs';
+import { decideCheck, extractCheck, DECIDE_LIMITS, DECIDE_PER_MINUTE, DECIDE_PER_DAY, DECIDE_WORDS, DECIDE_MODELS } from '../../Demos/decide-protocol.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const MM = await import(pathToFileURL(path.join(here, '../../Demos/dynaink-core.node.mjs')).href);
@@ -43,6 +44,37 @@ test('the wire core builds is a body the relay takes — a choice, a score and a
   // No node id, no question id, no key reaches the relay.
   const sent = JSON.stringify(wire([which, finish, isBox]).body);
   assert.doesNotMatch(sent, /stroke:|which:|finish:|box:/);
+});
+
+test('what core sends is held to what the relay takes: one number for each limit, in both', () => {
+  assert.equal(MM.SYSTEMONE_WORDS_MAX, DECIDE_LIMITS.criterion);
+  assert.equal(MM.SYSTEMONE_WORDS_MAX, DECIDE_LIMITS.instructions);
+  assert.equal(MM.SYSTEMONE_STATE_MAX, DECIDE_LIMITS.state);
+  assert.equal(MM.SYSTEMONE_MAX_IMAGES, DECIDE_LIMITS.images);
+  assert.ok(MM.DECIDE_STATE_MAX <= DECIDE_LIMITS.state);
+});
+
+test('Which is it? on a board with a long typed note beside a definition: the page’s own offer builds a body the relay takes', async () => {
+  // The board as a hand leaves it: a molecule named, a paragraph of notes typed beside it, a second named, a third held.
+  const line = (a, b, n = 40) => Array.from({ length: n }, (_, i) => ({ x: a.x + ((b.x - a.x) * i) / (n - 1), y: a.y + ((b.y - a.y) * i) / (n - 1) }));
+  const circle = (cx, cy, r, n = 110) => Array.from({ length: n + 1 }, (_, i) => ({ x: cx + r * Math.cos((i / n) * Math.PI * 2), y: cy + r * Math.sin((i / n) * Math.PI * 2) }));
+  let clock = 1000;
+  const s = MM.createSession();
+  const draw = (pts) => s.addStroke(pts, (clock += 100), undefined, 1);
+  const molecule = (ox) => [...[[300, 300], [500, 300], [400, 460]].map(([x, y]) => draw(circle(ox + x, y, 40))), draw(line({ x: ox + 340, y: 300 }, { x: ox + 460, y: 300 }, 30)), draw(line({ x: ox + 328, y: 328 }, { x: ox + 372, y: 432 }, 30))];
+  const nameIt = (ids, name) => { s.summonMarks(ids, (clock += 100)); return s.bless({ summonId: s.getState().summon.id, name, at: (clock += 100) }); };
+  nameIt(molecule(0), 'molecule');
+  s.import({ kind: 'text', path: 'note.txt', name: 'note', bounds: { minX: 560, minY: 280, maxX: 900, maxY: 480 }, code: 'Water is two hydrogens bonded to one oxygen. '.repeat(40), at: (clock += 100) });
+  nameIt(molecule(1200), 'compound');
+  const held = molecule(2400);
+  s.summonMarks(held, (clock += 100));
+  const offer = MM.offersFor(MM.toolScope(s, { host: { decider: { name: 'Clef-flash' } } })).find((o) => o.tool === 'which');
+  assert.ok(offer, 'Which is it? is offered on the tie');
+  const req = MM.buildSystemOne([MM.whichQuestion(held, offer.data.candidates)], MM.decisionStateOf(s.getState(), held, { candidates: offer.data.definitions, reading: s.read(held) }), { model: 'clef-flash' });
+  assert.equal(decideCheck(req.body), null);
+  assert.match(JSON.stringify(req.body), /Water is two hydrogens/);
+  const res = await post(envWith(), req.body);
+  assert.equal(res.status, 200);
 });
 
 test('GET /decide lists the models and the limits, and asks no model', async () => {
@@ -122,14 +154,27 @@ test('a shape the relay does not ask with is refused in words, before any model 
   assert.equal(env.AI.calls.length, 0);
 });
 
-test('413: a body declared past 6 MiB, and one past 64 KiB with no pictures', async () => {
+test('413: a body declared past 6 MiB, and words past 64 KiB — with no picture, and with one tiny picture beside them', async () => {
   const env = envWith();
   const declared = await worker.fetch(new Request('http://relay/decide', { method: 'POST', headers: { origin: APP, 'content-length': String(7 * 1024 * 1024) }, body: '{}' }), env);
   assert.equal(declared.status, 413);
   const big = await post(env, { ...wire().body, state: 'x'.repeat(70 * 1024) });
   assert.equal(big.status, 413);
   assert.match(await said(big), /at most 64 KB/);
-  assert.equal(env.AI.calls.length, 0);
+  // Sixteen questions of sixty-four long options each, every field within its own cap: a megabyte of words. A picture
+  // of one pixel beside them does not let them through — the 6 MiB is the pictures' alone.
+  const criteria = Object.fromEntries(Array.from({ length: DECIDE_LIMITS.options }, (_, i) => ['o' + i, 'x'.repeat(DECIDE_LIMITS.criterion)]));
+  const questions = Object.fromEntries(Array.from({ length: DECIDE_LIMITS.questions }, (_, i) => ['q' + (i + 1), { type: 'choice', instructions: 'y'.repeat(DECIDE_LIMITS.instructions), criteria }]));
+  const wordy = { model: 'clef-omni', state: 'z'.repeat(DECIDE_LIMITS.state), questions };
+  assert.equal(decideCheck(wordy), null, 'each field is within its own cap');
+  const tiny = await post(env, { ...wordy, images: ['data:image/png;base64,iVBORw0KGgo='] }, { 'cf-connecting-ip': '203.0.113.30' });
+  assert.equal(tiny.status, 413);
+  assert.match(await said(tiny), /at most 64 KB/);
+  // Pictures up to 6 MiB still go, with words under 64 KiB.
+  const photo = 'data:image/jpeg;base64,' + 'A'.repeat(3 * 1024 * 1024);
+  const ok = await post(env, { ...wire([which], { text: 'a page' }, 'clef-omni', false).body, images: [photo] }, { 'cf-connecting-ip': '203.0.113.31' });
+  assert.equal(ok.status, 200);
+  assert.equal(env.AI.calls.length, 1);
 });
 
 test('who may ask: another origin no; no Origin and no key no; a room’s key yes, with or without an Origin', async () => {
@@ -179,6 +224,10 @@ test(`429: past ${DECIDE_PER_MINUTE.caller} a minute from one address, past ${DE
   assert.ok(Number(over.headers.get('retry-after')) >= 1);
   // Another address is counted apart.
   assert.equal((await post(env, wire().body, { 'cf-connecting-ip': '203.0.113.8' })).status, 200);
+  // An IPv6 address is counted by its /64: one machine holds a whole /64, and is one caller, not 2^64.
+  for (let i = 0; i < DECIDE_PER_MINUTE.caller; i++) assert.equal((await post(env, wire().body, { 'cf-connecting-ip': '2001:db8:1:2::' + (i + 1).toString(16) })).status, 200);
+  assert.equal((await post(env, wire().body, { 'cf-connecting-ip': '2001:db8:1:2:ffff::9' })).status, 429);
+  assert.equal((await post(env, wire().body, { 'cf-connecting-ip': '2001:db8:1:3::1' })).status, 200, 'the next /64 is another caller');
   // A room is counted per room, more generously.
   const key = await keyForRoom(SECRET, 'busy');
   for (let i = 0; i < DECIDE_PER_MINUTE.room; i++) assert.equal((await post(env, wire().body, { authorization: 'Bearer ' + key, 'x-dyna-room': 'busy' })).status, 200);
@@ -195,6 +244,36 @@ test(`429: past ${DECIDE_PER_MINUTE.caller} a minute from one address, past ${DE
   const r = await MM.createSystemOneDecideTransport({ endpoint: 'https://relay.dyna.ink/decide', model: 'clef-flash', fetch })([which], {});
   assert.equal(r.ok, false);
   assert.match(r.error, /^HTTP 429 — rate limited: “today’s decisions on dyna\.ink are spent — the engine’s ranking stands”/);
+});
+
+test('callerKey: an IPv4 address as it is, an IPv6 address by its /64, IPv4 written as IPv6 as IPv4', () => {
+  assert.equal(callerKey('203.0.113.7'), '203.0.113.7');
+  assert.equal(callerKey('2001:db8::1'), '2001:db8:0:0::/64');
+  assert.equal(callerKey('2001:0DB8:0000:0000:ffff:1:2:3'), '2001:db8:0:0::/64');
+  assert.equal(callerKey('2001:db8:1:2:3:4:5:6'), '2001:db8:1:2::/64');
+  assert.equal(callerKey('::ffff:203.0.113.9'), '203.0.113.9');
+  assert.equal(callerKey('fe80::1%eth0'), 'fe80:0:0:0::/64');
+  assert.equal(callerKey(undefined), 'local');
+  assert.equal(callerKey('2001:db8::1::2'), '2001:db8::1::2', 'what is not an address is counted as it came');
+});
+
+test(`a caller’s share of the day: past ${DECIDE_PER_DAY.caller} from one address the answer is 429 — and the budget stands for everyone else`, async () => {
+  const env = envWith({ MM_AI_DAILY: String(DECIDE_PER_DAY.caller * 3) });
+  let now = Date.UTC(2026, 9, 23, 0, 0, 30);
+  mock.method(Date, 'now', () => now);
+  mock.method(console, 'log', () => {}); // a line a call: a thousand of them say nothing here
+  try {
+    for (let i = 0; i < DECIDE_PER_DAY.caller; i++) {
+      if (i && i % DECIDE_PER_MINUTE.caller === 0) now += 61_000;
+      assert.equal((await post(env, wire().body, { 'cf-connecting-ip': '2001:db8:9::1' })).status, 200, `call ${i + 1}`);
+    }
+    now += 61_000;
+    const over = await post(env, wire().body, { 'cf-connecting-ip': '2001:db8:9::77' });
+    assert.equal(over.status, 429);
+    assert.equal(await said(over), DECIDE_WORDS.share);
+    assert.equal((await post(env, wire().body, { 'cf-connecting-ip': '198.51.100.9' })).status, 200, 'another caller is still answered');
+    assert.equal(env.AI.calls.length, DECIDE_PER_DAY.caller + 1);
+  } finally { mock.restoreAll(); }
 });
 
 test('with no LIMITS binding the route fails closed, and with no AI binding it says so — no model asked', async () => {

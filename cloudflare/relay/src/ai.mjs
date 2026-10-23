@@ -5,7 +5,9 @@
 // (`/ai/…` is held for model routes to come: it answers 501, in words.)
 //
 // Who may ask (`MM_DECIDE`: off | keyed | limited, `limited` when unset):
-//   * a page of the app (an Origin `http.mjs` allows), limited per address — `DECIDE_PER_MINUTE.caller` a minute;
+//   * a page of the app (an Origin `http.mjs` allows), limited per address — `DECIDE_PER_MINUTE.caller` a minute and
+//     `DECIDE_PER_DAY.caller` a day, its share of the budget — an IPv6 address by its /64 (`callerKey`), because one
+//     machine holds a whole /64 and would otherwise be 2^64 callers;
 //   * a hand with a room's key (`Authorization: Bearer` and `X-Dyna-Room`, checked as the rooms check one), limited
 //     per room — `DECIDE_PER_MINUTE.room` a minute; `keyed` admits only these;
 //   * nothing else: a request with no Origin and no key is refused, because an Origin is easy to leave out and a
@@ -24,8 +26,8 @@ import { originAllowed, corsHeaders, text, json, callerOf } from './http.mjs';
 import { secretsOf, keyOpens } from './auth.mjs';
 import { hit } from './limits.mjs';
 import {
-  DECIDE_MODELS, EXTRACT_MODELS, DECIDE_LIMITS, DECIDE_WAIT_MS, DECIDE_PER_MINUTE, DECIDE_WORDS,
-  decideCheck, extractCheck, decideCatalog, aiDailyFrom,
+  DECIDE_MODELS, EXTRACT_MODELS, DECIDE_LIMITS, DECIDE_WAIT_MS, DECIDE_PER_MINUTE, DECIDE_PER_DAY, DECIDE_WORDS,
+  decideCheck, extractCheck, decideCatalog, aiDailyFrom, decideTextBytes,
 } from '../../../Demos/decide-protocol.mjs';
 
 /** The paths this module answers. */
@@ -35,6 +37,27 @@ const MINUTE = 60_000;
 const DAY = 86_400_000;
 
 const no = (status, error, headers = {}) => json(status, { ok: false, error }, headers);
+
+/**
+ * Who a caller with no key is counted as: an IPv4 address as it is, an IPv6 address by its /64 — the network one
+ * machine is given, so it is one caller and not 2^64 — and an IPv4 address written as IPv6 (`::ffff:…`) as IPv4.
+ * Anything that does not read as an address is counted as it came.
+ */
+export function callerKey(ip) {
+  const a = String(ip || 'local').trim().toLowerCase().replace(/%.*$/, '');
+  if (!a.includes(':')) return a;
+  const mapped = /^(?:0{0,4}:){0,5}(?::|0{0,4}:)?ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(a);
+  if (mapped) return mapped[1];
+  const halves = a.split('::');
+  if (halves.length > 2) return a;
+  const head = halves[0] ? halves[0].split(':') : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  const fill = halves.length === 2 ? 8 - head.length - tail.length : 0;
+  if (fill < 0 || (halves.length === 1 && head.length !== 8)) return a;
+  const groups = [...head, ...Array(fill).fill('0'), ...tail];
+  if (groups.length !== 8 || groups.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return a;
+  return groups.slice(0, 4).map((g) => parseInt(g, 16).toString(16)).join(':') + '::/64';
+}
 
 /** A request's body as text, read up to `cap` bytes: `{ text, size }`, or `{ over: true }` past it. */
 async function bodyText(request, cap) {
@@ -91,7 +114,7 @@ async function modelRoute(request, env, cors, route) {
   try {
     count = asker.keyed
       ? await hit(env, 'ai', 'room:' + asker.room, { limit: DECIDE_PER_MINUTE.room, windowMs: MINUTE })
-      : await hit(env, 'ai', 'ip:' + callerOf(request), { limit: DECIDE_PER_MINUTE.caller, windowMs: MINUTE });
+      : await hit(env, 'ai', 'ip:' + callerKey(callerOf(request)), { limit: DECIDE_PER_MINUTE.caller, windowMs: MINUTE });
   } catch { return no(503, DECIDE_WORDS.uncounted, cors); }
   if (!count.ok) return no(429, DECIDE_WORDS.rate, { ...cors, 'retry-after': String(count.retryAfter || 60) });
 
@@ -100,13 +123,21 @@ async function modelRoute(request, env, cors, route) {
   let body;
   try { body = JSON.parse(read.text); } catch { return no(400, DECIDE_WORDS.notJson, cors); }
   const pictures = !!body && Array.isArray(body.images) && body.images.length > 0;
-  if (read.size > DECIDE_LIMITS.body && !pictures) return no(413, DECIDE_WORDS.tooBig(DECIDE_LIMITS.body / 1024), cors);
+  // The words are held to 64 KiB with or without a picture: the 6 MiB is the pictures' alone.
+  if (decideTextBytes(body, read.size) > DECIDE_LIMITS.body) return no(413, DECIDE_WORDS.tooBig(DECIDE_LIMITS.body / 1024), cors);
   const why = route === 'extract' ? extractCheck(body) : decideCheck(body);
   if (why) return no(400, why, cors);
 
-  // Every call that will reach a model counts against the day's budget — one budget for both routes.
+  // Every call that will reach a model counts against the day's budget — one budget for both routes — and a caller
+  // with no key against its own share of it first, so one machine cannot spend the day for everyone.
   let budget;
-  try { budget = await hit(env, 'ai-budget', 'day', { limit: aiDailyFrom(env), windowMs: DAY }); } catch { return no(503, DECIDE_WORDS.uncounted, cors); }
+  try {
+    if (!asker.keyed) {
+      const share = await hit(env, 'ai-share', 'ip:' + callerKey(callerOf(request)), { limit: DECIDE_PER_DAY.caller, windowMs: DAY });
+      if (!share.ok) return no(429, DECIDE_WORDS.share, { ...cors, 'retry-after': String(share.retryAfter || 3600) });
+    }
+    budget = await hit(env, 'ai-budget', 'day', { limit: aiDailyFrom(env), windowMs: DAY });
+  } catch { return no(503, DECIDE_WORDS.uncounted, cors); }
   if (!budget.ok) return no(429, DECIDE_WORDS.spent, { ...cors, 'retry-after': String(budget.retryAfter || 3600) });
 
   const m = models[body.model];

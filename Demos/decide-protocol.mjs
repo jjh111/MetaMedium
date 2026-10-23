@@ -46,8 +46,10 @@ export const DECIDE_NAME = /^[a-z][a-z0-9_]{0,47}$/;
 export const EXTRACT_FIELD_TYPES = ['text', 'list'];
 /** How long the relay waits for the model before it says so (the page waits longer, so this sentence is the one heard). */
 export const DECIDE_WAIT_MS = 10_000;
-/** The routes' limits, per minute: a page with no key, per address; a hand with a room's key, per room. */
+/** The routes' limits, per minute: a page with no key, per address (an IPv6 address by its /64); a hand with a room's key, per room. */
 export const DECIDE_PER_MINUTE = { caller: 20, room: 120 };
+/** A page with no key, per address, a day: its share of the day's budget, so one machine cannot spend everyone's. */
+export const DECIDE_PER_DAY = { caller: 1000 };
 /** Calls a day across every caller, when the relay's `MM_AI_DAILY` says nothing. */
 export const DEFAULT_AI_DAILY = 20000;
 
@@ -63,6 +65,7 @@ export const DECIDE_WORDS = {
   noOrigin: 'a decision is asked from the app’s own page, or with a room’s key — this request has neither',
   wrongKey: (room) => `that is not the key for room “${room}”`,
   rate: 'too many decisions from here — try again in a minute; the engine’s ranking stands meanwhile',
+  share: 'this address has asked its share of today’s decisions on dyna.ink — the engine’s ranking stands; try again tomorrow',
   spent: 'today’s decisions on dyna.ink are spent — the engine’s ranking stands',
   uncounted: 'this relay cannot count its decisions (it has no LIMITS binding), so it asks none',
   noModel: 'this relay has no decision model — dyna.ink’s relay runs Clef-flash; here, choose a decision model under models',
@@ -162,8 +165,19 @@ export function decideCatalog(route = 'decide') {
     ok: true,
     route,
     models: Object.entries(models).map(([model, m]) => ({ model, name: m.name, sees: m.sees })),
-    limits: { ...DECIDE_LIMITS, perMinute: DECIDE_PER_MINUTE },
+    limits: { ...DECIDE_LIMITS, perMinute: DECIDE_PER_MINUTE, perDay: DECIDE_PER_DAY },
   };
+}
+
+/**
+ * How big a body is without its pictures, in bytes: the text a model reads is held to `DECIDE_LIMITS.body` whether
+ * or not a picture comes with it — the larger allowance is the pictures' alone, or one tiny picture would let
+ * sixteen times the words through. `size` is the body's whole size; a picture is a data URL, so its bytes are its
+ * characters (and the quotes and comma round it).
+ */
+export function decideTextBytes(body, size) {
+  const images = isMap(body) && Array.isArray(body.images) ? body.images : [];
+  return size - images.reduce((n, im) => n + (typeof im === 'string' ? im.length + 3 : 0), 0);
 }
 
 /** How many calls a day the relay allows, from its environment: a positive whole number, else the default. */
