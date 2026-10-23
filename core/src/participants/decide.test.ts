@@ -46,6 +46,7 @@ describe('the seat joins as a participant, at tier 1.5', () => {
   it('is a participant like any other, and it is between the library and a model', () => {
     const { s, circle } = board();
     const seat = createDecideParticipant(s, createStubDecideTransport({}), 1200, { name: 'jury' });
+    seat.seat(1200);
     expect(s.getState().participants).toContain(seat.id);
     expect(seat.name).toBe('jury');
     expect(seat.tier).toBe(1.5);
@@ -176,6 +177,64 @@ describe('the reason is the question and the distribution, never a sentence writ
     expect(reasonOf(q, answer)).toBe(
       'asked “this mark is a label for the box beside it” — yes 0.82 · no 0.18'
     );
+  });
+});
+
+describe('lazily, and with what it is shown (the audit\'s S1, S4, S5)', () => {
+  it('a seat made and never asked writes nothing to the board — the first ask is what joins it, once', async () => {
+    const { s, circle } = board();
+    const before = s.getEvents().length;
+    const seat = createDecideParticipant(s, createStubDecideTransport({ q1: { pick: 'bubble', p: 0.8 } }), 1200, { name: 'jury' });
+    expect(s.getEvents().length).toBe(before);
+    expect(seat.id).toBe('');
+    await seat.ask([standsFor(circle)], 2000);
+    const joins = s.getEvents().filter((e) => e.type === 'join');
+    expect(joins).toHaveLength(1);
+    expect(s.getState().participants).toContain(seat.id);
+    await seat.ask([standsFor(circle, 'q2')], 3000);
+    expect(s.getEvents().filter((e) => e.type === 'join')).toHaveLength(1);
+  });
+
+  it('a seat made on a board that already holds its join is that participant, and writes no second', () => {
+    const { s } = board();
+    const first = createDecideParticipant(s, createStubDecideTransport({}), 1200, { name: 'jury' });
+    const id = first.seat(1200);
+    const second = createDecideParticipant(s, createStubDecideTransport({}), 1300, { name: 'jury' });
+    expect(second.id).toBe(id);
+    expect(s.getEvents().filter((e) => e.type === 'join')).toHaveLength(1);
+  });
+
+  it('the state the seat is shown reaches the transport as it is, and is never written to the log', async () => {
+    const { s, circle } = board();
+    let seen: unknown = null;
+    const t: DecideTransport = async (questions, opts) => { seen = opts.state; return createStubDecideTransport({ q1: { pick: 'bubble', p: 0.8 } })(questions, opts); };
+    const seat = createDecideParticipant(s, t, 1200, { name: 'jury' });
+    await seat.ask([standsFor(circle)], 2000, undefined, { text: 'one circle; “wheel” written beside it' });
+    expect(seen).toEqual({ text: 'one circle; “wheel” written beside it' });
+    expect(JSON.stringify(s.getEvents())).not.toMatch(/written beside it/);
+    // Asked with none, the transport is given none: a seat asked as it always was.
+    await seat.ask([standsFor(circle, 'q2')], 3000);
+    expect(seen).toBeUndefined();
+  });
+
+  it('a sure none of these is marked as such — kept as evidence, no reading claimed', async () => {
+    const { s, circle } = board();
+    const seat = createDecideParticipant(s, createStubDecideTransport({ q1: { pick: NO_MATCH, p: 0.995 } }), 1200, { name: 'jury', takeAt: 0.99 });
+    const run = await seat.ask([standsFor(circle)], 2000);
+    expect(run.rows[0].none).toBe(true);
+    const state = s.getState();
+    expect(interpretationsOf(state.nodes.get(circle)!, state.nodes).some((r) => r.sourceName === 'jury')).toBe(false);
+  });
+
+  it('a choice asked with reading: false holds its decision and claims no reading', async () => {
+    const { s, circle } = board();
+    const seat = createDecideParticipant(s, createStubDecideTransport({ q1: { pick: 'bubble', p: 0.995 } }), 1200, { name: 'jury', takeAt: 0.99 });
+    const q = choice('q1', 'which kind?', [{ id: 'bubble', text: 'b' }, { id: 'wheel', text: 'w' }], [circle], { reading: false });
+    const run = await seat.ask([q], 2000);
+    expect(run.rows[0].held).toBe(true);
+    const state = s.getState();
+    expect(state.nodes.get(circle)!.reps.some((r) => r.modality === 'decision')).toBe(true);
+    expect(interpretationsOf(state.nodes.get(circle)!, state.nodes).some((r) => r.sourceName === 'jury')).toBe(false);
   });
 });
 

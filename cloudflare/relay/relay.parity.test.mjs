@@ -134,3 +134,50 @@ assetConformance(test, async (vars = {}) => {
   const { url, close } = await startDevRelay({ MM_RELAY_OPEN: '1', ...(vars.assetRoomBytes ? { MM_RELAY_ASSET_BYTES: String(vars.assetRoomBytes) } : {}) });
   return { url, close };
 });
+
+// ----- The model routes: the Worker asks a decision model by binding; the Node relay has none, and says so -----
+import { startRelay } from '../../Demos/relay.mjs';
+import { createServer as netServer } from 'node:net';
+import { DECIDE_WORDS } from '../../Demos/decide-protocol.mjs';
+
+const freePort = () => new Promise((resolve) => { const s = netServer().listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => resolve(p)); }); });
+const decideBody = () => MM.buildSystemOne([MM.choice('w', 'which?', [{ id: 'molecule', text: 'm' }, { id: 'compound', text: 'c' }])], { text: 'three circles' }, { model: 'clef-flash' }).body;
+
+test('the Node relay answers /decide and /extract with 501, in words, with CORS — it asks no model', async () => {
+  const port = await freePort();
+  const server = await startRelay(port);
+  try {
+    for (const p of ['/decide', '/extract']) {
+      const res = await fetch(`http://127.0.0.1:${port}${p}`, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://127.0.0.1:9' }, body: JSON.stringify(decideBody()) });
+      assert.equal(res.status, 501, p);
+      assert.equal(res.headers.get('access-control-allow-origin'), '*');
+      assert.equal((await res.json()).error, DECIDE_WORDS.noModel);
+    }
+    // Core says it in its own sentence.
+    const r = await MM.createSystemOneDecideTransport({ endpoint: `http://127.0.0.1:${port}/decide`, model: 'clef-flash' })([MM.choice('w', 'which?', [{ id: 'a', text: 'a' }, { id: 'b', text: 'b' }])], {});
+    assert.equal(r.ok, false);
+    assert.match(r.error, /^HTTP 501 — .*“this relay has no decision model/);
+  } finally { await new Promise((r) => server.close(r)); }
+});
+
+test('the Worker run in Node: /decide says it has no binding — and, with MM_DECIDE_FAKE=1, a fake model answers over a socket and core reads it', async () => {
+  const bare = await startDevRelay({ MM_RELAY_OPEN: '1' });
+  try {
+    const res = await fetch(`${bare.url}/decide`, { method: 'POST', headers: { 'content-type': 'application/json', origin: 'http://127.0.0.1:9' }, body: JSON.stringify(decideBody()) });
+    assert.equal(res.status, 501);
+    assert.equal((await res.json()).error, DECIDE_WORDS.noBinding);
+  } finally { await bare.close(); }
+  const faked = await startDevRelay({ MM_RELAY_OPEN: '1', MM_DECIDE_FAKE: '1' });
+  try {
+    const seat = MM.createSystemOneDecideTransport({ endpoint: `${faked.url}/decide`, model: 'clef-flash', headers: {} });
+    // Node's fetch sends no Origin of its own: the relay refuses a request with neither an Origin nor a room's key.
+    const refused = await seat([MM.choice('w', 'which?', [{ id: 'molecule', text: 'm' }, { id: 'compound', text: 'c' }])], {});
+    assert.equal(refused.ok, false);
+    assert.match(refused.error, /^HTTP 403 — .*from the app’s own page, or with a room’s key/);
+    const asPage = MM.createSystemOneDecideTransport({ endpoint: `${faked.url}/decide`, model: 'clef-flash', headers: { origin: 'http://127.0.0.1:9' } });
+    const r = await asPage([MM.choice('w', 'which?', [{ id: 'molecule', text: 'm' }, { id: 'compound', text: 'c' }])], { state: { text: 'three circles' } });
+    assert.equal(r.ok, true);
+    assert.equal(r.answers[0].pick, 'compound');
+    assert.equal(faked.env.AI.calls.length, 1);
+  } finally { await faked.close(); }
+});

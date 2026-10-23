@@ -11,14 +11,19 @@
 // WHAT IS NOT KNOWN, AND WHERE THE SEAM IS. How the real model answers on OpenRouter is
 // unverified, and its own API (`/v1/systemone`) refuses browser origins (one test, 20 Sep,
 // unverified). So the request is the plainest honest one — *a chat completion that is asked to write
-// the typed JSON and nothing else* — and everything that depends on the shape of a vendor's request
-// or reply is a **wire** (`DecideWire`: build the messages, parse the text). The native
-// `/v1/systemone` shape, behind a proxy of our own, is a second transport made with the same
-// `DecideTransport` type and a different request (not a second seat): swap the factory, not the seat.
+// the typed JSON and nothing else* — and what depends on the shape of a CHAT vendor's messages or
+// reply text is a **wire** (`DecideWire`: build the messages, parse the text). A wire is a chat wire
+// and nothing else: it builds chat messages and reads reply text, and every call goes through
+// `complete`. The native System One shape — a typed request of questions and criteria, a typed
+// reply of answers, which Cloudflare's Clef speaks (dyna.ink's own relay asks it, `/decide`) — cannot
+// be said as a chat wire; it is a second TRANSPORT made with the same `DecideTransport` type
+// (`decide-systemone.ts`, `createSystemOneDecideTransport`), not a second seat and not a wire: swap
+// the factory, not the seat.
 //
 // WHAT THE SEAT IS HELD TO (decide.ts's rules, not this file's):
 //   * the options it is given always carry *none of these* — a seat forced to pick will pick;
-//   * it is shown option ids and words, never a node id it could get wrong;
+//   * it is shown option ids and words, never a node id it could get wrong — and, when the caller
+//     gives one, the board's STATE in words (`DecideState`, `decide-state.ts`), never an id;
 //   * its answer is read as a distribution over EXACTLY the options offered — an option nobody
 //     offered, a negative or non-finite probability, or nothing that sums to anything makes that
 //     question unanswered (never guessed), and the pick is read back off the distribution, never
@@ -35,6 +40,7 @@ import {
   type DecideTransport,
   type DecisionAnswer,
   type DecisionQuestion,
+  type DecideState,
   type Probability,
 } from '../participants/decide';
 
@@ -52,13 +58,14 @@ export interface WireOption { id: string; text: string }
 export interface WireQuestion { id: string; kind: DecisionQuestion['kind']; ask: string; options: WireOption[] }
 
 /**
- * Everything a vendor's request or reply shape decides, and nothing else: the messages that put the questions, and
- * how the text that comes back is read. A native systemone wire would replace `build` with a request body of its
- * own and `parse` with its reply — which is why the transport takes one.
+ * What a CHAT vendor's messages or reply text decide, and nothing else: the messages that put the questions (and
+ * the board's state, in words, when the caller gives one), and how the text that comes back is read. Another chat
+ * vendor's phrasing swaps in here. A typed, non-chat request — System One's — is not a wire: it is a transport of its
+ * own (`decide-systemone.ts`).
  */
 export interface DecideWire {
   id: string;
-  build(questions: readonly DecisionQuestion[]): ChatMessage[];
+  build(questions: readonly DecisionQuestion[], state?: DecideState): ChatMessage[];
   parse(text: string, questions: readonly DecisionQuestion[]): { ok: true; answers: DecisionAnswer[] } | { ok: false; error: string };
 }
 
@@ -77,6 +84,7 @@ const SYSTEM = [
   'You are a decision seat for a drawing canvas. You are not a writer: you write no prose, no code, no geometry and no names you were not offered.',
   'You are given questions. Each has options. For each question, say how likely each option is: a probability for EVERY option of that question, summing to 1.',
   'One option of a choice is always "no-match" — none of these. Choose it when none of the others is right; a seat that must pick will pick wrongly.',
+  'When a "state" is given, it is what the board shows, in words: read it to decide. It is not a question.',
   'Reply with JSON only, in exactly this shape, and nothing around it:',
   '{"answers":[{"id":"<the question id>","probabilities":{"<option id>":<0 to 1>, ...}}]}',
 ].join('\n');
@@ -84,10 +92,11 @@ const SYSTEM = [
 /** The chat wire: the questions as one JSON user message, the answer asked for as one JSON object. */
 export const CHAT_DECIDE_WIRE: DecideWire = {
   id: 'chat',
-  build(questions) {
+  build(questions, state) {
+    const said = state && state.text ? { state: state.text } : {};
     return [
       { role: 'system', content: SYSTEM },
-      { role: 'user', content: JSON.stringify({ questions: questions.map(wireQuestion) }) },
+      { role: 'user', content: JSON.stringify({ ...said, questions: questions.map(wireQuestion) }) },
     ];
   },
   parse(text, questions) {
@@ -183,9 +192,9 @@ export interface ChatDecideOptions {
 export function createChatDecideTransport(config: ProviderConfig, options: ChatDecideOptions = {}): DecideTransport {
   const send = options.complete ?? completeChat;
   const wire = options.wire ?? CHAT_DECIDE_WIRE;
-  return async (questions, { signal }): Promise<DecideResult> => {
+  return async (questions, { signal, state }): Promise<DecideResult> => {
     if (!questions.length) return { ok: true, answers: [], via: config.model };
-    const res = await send(config, wire.build(questions), { signal });
+    const res = await send(config, wire.build(questions, state), { signal });
     if (!res.ok) return { ok: false, error: res.error };
     const read = wire.parse(res.text, questions);
     if (!read.ok) return { ok: false, error: read.error };

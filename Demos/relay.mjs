@@ -38,6 +38,7 @@ import {
   DEFAULT_MAX_LINES, kindOf, replay, truncationNotice, maxLinesFrom as maxLinesOf,
   MAX_ASSET_BYTES, assetRoomBytesFrom, assetPathOf, assetCheck, assetSizeVerdict, assetHeaders, sniffImage, ASSET_WORDS,
 } from './relay-protocol.mjs';
+import { DECIDE_WORDS } from './decide-protocol.mjs';
 
 // The protocol — what a room keeps, what a client is sent, what it is owed — is
 // `relay-protocol.mjs`, shared with the Worker (cloudflare/relay).
@@ -138,6 +139,8 @@ export function startRelay(port = Number(process.env.PORT || 8020), opts = {}) {
     const url = new URL(req.url, 'http://x');
     const m = /^\/rooms\/([^/]+)\/events$/.exec(url.pathname);
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+    // The model routes are the Worker's (cloudflare/relay/src/ai.mjs, Workers AI by binding): this relay asks no model, and says so.
+    if (url.pathname === '/decide' || url.pathname === '/extract') { res.writeHead(501, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify({ ok: false, error: DECIDE_WORDS.noModel })); return; }
     const a = assetPathOf(url.pathname);
     if (a) { asset(req, res, a); return; }
     if (!m) { res.writeHead(404); res.end('rooms/<room>/events, rooms/<room>/assets/<sha256>'); return; }

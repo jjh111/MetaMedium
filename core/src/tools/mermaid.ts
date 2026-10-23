@@ -24,6 +24,7 @@ import '../notations/uml-class-mermaid';
 import '../notations/sequence-mermaid';
 import type { Tool, ToolScope } from './tool';
 import { codeRepOf, unionOf } from './board';
+import { readingDecided, decidedWords } from './which-notation';
 
 /** Roughly the drawing's own size, kept between a card and a wall, so the diagram is legible and never a poster. */
 const MIN_W = 320, MIN_H = 240, MAX_W = 900, MAX_H = 900;
@@ -36,9 +37,19 @@ const GAP_SHARE = 0.12, MIN_GAP = 48;
  * null. The export pane asks it of the whole board as the tool asks it of the
  * marks held — one home for what reads as a diagram worth saying. `isRead` is
  * the host's: writing read with its line says nothing of its own.
+ *
+ * A notation a decision seat was asked about and is sure of (*Which diagram is
+ * this?*, `which-notation.ts`; held only at `DECIDER_TAKE_AT`) comes first,
+ * whatever its own confidence: the engine's reading in that notation, never
+ * one it did not compute, with the decision beside it (`decided`).
  */
 export function mermaidFor(state: SessionState, ids: readonly string[], isRead: (id: string) => boolean = () => false) {
   const words = (id: string) => isRead(id) && !transcriptOf(state.nodes.get(id)!);
+  const held = readingDecided(state, ids);
+  if (held) {
+    const said = toMermaid(held.reading, { readWith: words });
+    if (said) return { reading: held.reading, said, decided: held.decided };
+  }
   for (const reading of notationsOf(state, ids)) {
     if (reading.confidence < NOTATION_FLOOR) continue;
     const said = toMermaid(reading, { readWith: words });
@@ -59,7 +70,8 @@ function standing(scope: ToolScope, text: string): boolean {
   });
 }
 
-const reasonOf = (reading: NotationReading) => `${describeNotation(reading)} — as Mermaid text beside it; the drawing stays`;
+const reasonOf = (reading: NotationReading, decided?: { lead: number; by: string }) =>
+  `${describeNotation(reading)}${decided ? ` — ${decidedWords(decided)}` : ''} — as Mermaid text beside it; the drawing stays`;
 
 export const MERMAID: Tool = {
   id: 'mermaid',
@@ -73,7 +85,7 @@ export const MERMAID: Tool = {
     return [{
       key: 'mermaid',
       label: 'Make it Mermaid',
-      reason: reasonOf(m.reading),
+      reason: reasonOf(m.reading, 'decided' in m ? m.decided : undefined),
       base: 0.35,
       tool: 'mermaid',
       verbs: ['mermaid', 'mmd', 'as mermaid'],

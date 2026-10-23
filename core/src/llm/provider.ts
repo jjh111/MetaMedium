@@ -107,7 +107,8 @@ export type FailureReason =
   | 'key' | 'credit' | 'model' | 'rate' | 'refused' | 'request' | 'server'
   | 'network' | 'timeout' | 'cancelled' | 'thinking' | 'length' | 'empty' | 'unreadable';
 
-type Failure = { ok: false; error: string; status?: number; reason?: FailureReason };
+/** A call that failed, said in full (`CompletionResult`'s failure). */
+export type Failure = { ok: false; error: string; status?: number; reason?: FailureReason };
 
 /**
  * Success or failure, never a throw — the caller is inside a drawing app.
@@ -432,14 +433,44 @@ async function post(
   external: AbortSignal | undefined,
   key: string | undefined
 ): Promise<{ ok: true; json: unknown } | Failure> {
+  return postJson(url, body, { headers, timeoutMs, signal: external, key });
+}
+
+/** How a JSON POST is made: its headers, how long it may take, who may cancel it, the key a sentence must never repeat. */
+export interface PostJsonOptions {
+  headers?: Record<string, string>;
+  /** Default `DEFAULT_TIMEOUT_MS`. */
+  timeoutMs?: number;
+  /** The caller's: a cancel is said `cancelled`, the one word callers test for. */
+  signal?: AbortSignal;
+  /** Never repeated in a sentence, even when the host echoes it back. */
+  key?: string;
+  /** The fetch to use — a test's, or a surface that keeps each call; the page's own by default. */
+  fetch?: typeof fetch;
+  /** Sent as the request's `credentials`: `omit` for a host that must never see a cookie (the house decider). */
+  credentials?: RequestCredentials;
+}
+
+/**
+ * POST a JSON body and read a JSON reply, never throwing: `{ ok: true, json }`, or a failure said in full —
+ * the HTTP status and what it means with the host's own words (`HTTP 429 — rate limited: “…”`), a timeout
+ * with the host and the wait, a network failure as one, `cancelled` when the caller gave up — the sentences
+ * every model call in this file says. Exported so a transport that is not a chat completion (the System One
+ * decider, `decide-systemone.ts`) fails in the same words.
+ */
+export async function postJson(url: string, body: unknown, options: PostJsonOptions = {}): Promise<{ ok: true; json: unknown } | Failure> {
   const where = hostOf(url);
-  const { signal, done } = withTimeout(timeoutMs, external);
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const key = options.key;
+  const { signal, done } = withTimeout(timeoutMs, options.signal);
+  const send = options.fetch ?? fetch;
   try {
-    const res = await fetch(url, {
+    const res = await send(url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', ...headers },
+      headers: { 'content-type': 'application/json', ...(options.headers ?? {}) },
       body: JSON.stringify(body),
       signal,
+      ...(options.credentials ? { credentials: options.credentials } : {}),
     });
     const text = await res.text();
     if (!res.ok) return httpFailure(res.status, text, key);
@@ -449,7 +480,7 @@ async function post(
       return { ok: false, error: redact(`${where} answered, but not with JSON: “${clip(text, 120)}”`, key), reason: 'unreadable' };
     }
   } catch (err) {
-    return thrownFailure(err, where, timeoutMs, external, signal);
+    return thrownFailure(err, where, timeoutMs, options.signal, signal);
   } finally {
     done();
   }

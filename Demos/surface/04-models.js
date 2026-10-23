@@ -6,7 +6,8 @@
 //   an ask kept until a model that can answer it is here (keepAsk, keptFor, needFor), one local model suggested a job,
 //   and a model's name and a reading in words (modelWords, readingWords);
 //   (V1-PLAN I7) who is asked, by seat — writers() here, readers() in 06-handwriting.js, the rules in 03-seats.js, the pane,
-//   the keys and the decider in 04-seatpane.js.
+//   the keys and the decider in 04-seatpane.js; recordingTransport, a decision transport whose calls are kept for the
+//   decider's row (dyna.ink's own decider's).
 // Uses: core, ui, teach (togglePanel), render, palette (refreshPalette), input (say), seats (03-seats.js: the rules),
 //   seatpane (04-seatpane.js: assignSeat, joinDecider, keyFor, holdKey, commitKey, renderSeats, seatsOf).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -149,6 +150,23 @@
       });
     };
   }
+  /**
+   * A decision transport whose every call is kept for its row, as `recording` keeps a completion's: the seat is
+   * marked asking while it runs, and the call's outcome — answered, or the failure in full — lands in its row.
+   * (A decider over a chat completion is recorded by `recording`; this is for one that is not — the System One
+   * decider, dyna.ink's own.)
+   */
+  function recordingTransport(holder, transport) {
+    return (questions, opts) => {
+      const t0 = performance.now();
+      if (holder.agent) { asking.set(agentKey(holder.agent), (asking.get(agentKey(holder.agent)) || 0) + 1); renderAgents(); }
+      return Promise.resolve(transport(questions, opts)).then((res) => {
+        const said = res.ok ? 'answered ' + res.answers.length + ' of ' + questions.length + (questions.length === 1 ? ' question' : ' questions') : '';
+        if (holder.agent) noteCall(holder.agent, res.ok ? { ok: true, text: said } : { ok: false, error: res.error }, performance.now() - t0);
+        return res;
+      });
+    };
+  }
   function sendFor(agent) {
     if (!sendOf.has(agentKey(agent))) sendOf.set(agentKey(agent), recording({ agent: agent }));
     return sendOf.get(agentKey(agent));
@@ -190,7 +208,7 @@
   let keptAsk = null; // { what, needs: 'model'|'sees', need, sentence, ids, summonId, generation, run(ids) }
   /** What a tool's ask needs that no joined model gives — "needs a model that can see" — or null. */
   function needFor(tool) {
-    if (tool === 'which') return null; // offered only with a decider seated: it is the one asked
+    if (tool === 'which' || tool === 'which-notation') return null; // offered only with a decider seated: it is the one asked
     if (tool === 'read') return readers().length ? null : 'needs a model that can see';
     return writers().length ? null : 'needs a model';
   }
@@ -231,12 +249,16 @@
     mpKey.hidden = p === 'mcp';
     mpEndpoint.placeholder = p === 'mcp' ? 'http://127.0.0.1:8030 — the door (Demos/mcp-client.mjs)' : 'http://host:port/v1';
     const forEl = document.getElementById('mpFor'), job = forEl ? forEl.value : 'any';
-    mpModel.placeholder = p === 'mcp' ? 'a name for it (optional)' : (defaultModelFor(p, job) || (job === 'reader' ? 'a model that can see' : 'model id'));
+    mpModel.placeholder = p === 'mcp' ? 'a name for it (optional)' : (defaultModelFor(p, job) || (job === 'reader' ? 'a model that can see' : job === 'decider' ? 'a decision model id' : 'model id'));
     mpKey.placeholder = p === 'custom' ? 'API key (if the endpoint needs one)' : 'API key';
   }
-  /** The model a seat asks for when none is typed: the writer's and the decider's are what John chose; the reader's is the hand's to name (a model that sees). */
+  /**
+   * The model a seat asks for when none is typed: the writer's and the decider's are what John chose; the reader's is
+   * the hand's to name (a model that sees). The decider's is named only where it is listed — OpenRouter (the audit's S6:
+   * it was offered for every provider, and exists on none of the others).
+   */
   function defaultModelFor(provider, seat) {
-    if (seat === 'decider') return MM.DEFAULT_DECIDER_MODEL;
+    if (seat === 'decider') return provider === 'openRouter' ? MM.DEFAULT_DECIDER_MODEL : '';
     if (seat === 'writer' && provider === 'openRouter') return 'z-ai/glm-5.3-flash';
     if (seat === 'reader') return provider === 'anthropic' ? DEFAULT_MODEL.anthropic : '';
     return DEFAULT_MODEL[provider] || '';

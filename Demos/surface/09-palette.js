@@ -13,7 +13,7 @@
 //   applyLibrary, targetOf); renderSummon/refreshPalette/paintField.
 // Uses: core (hand, lastPen), ui, field (readFieldCommand, verbFor, libraryMatch, typedWord — pure,
 //   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading,
-//   askModelsAbout, offerModel), seatpane (writers, readers, deciderHost, askDecider — who is asked, by seat), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
+//   askModelsAbout, offerModel), seatpane (writers, readers, deciderHost, briefDeciderHost, askDecider, askDeciderNotation, askDeciderBrief — who is asked, by seat), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
 //   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
 //   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
 //   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
@@ -56,7 +56,7 @@
   function toolHost() {
     return {
       snap: snapMode,
-      // `sees`: who READS, by seat (I7) — a model that sees but sits elsewhere does not answer a read; `decider`: the decision model seated, if one is (*Which is it?*).
+      // `sees`: who READS, by seat (I7) — a model that sees but sits elsewhere does not answer a read; `decider`: the decision model seated, if one is (*Which is it?*, *Which diagram is this?*), its name and whether it sees.
       models: agents.map((a) => ({ name: a.name, sees: readers().includes(a) })),
       decider: deciderHost(),
       // The semantic seat held here, if one is (I9; 03-semantic.js): with it *Notes like this* is typed on marks that have words; without, the field offers what it always did.
@@ -303,6 +303,8 @@
     what: (o) => askModelsAbout(o.data.ids.slice()),
     // *Which is it?* asks the decider — only by this tap (I7; 04-seatpane.js), never on a hold.
     which: (o) => askDecider(o.data),
+    // *Which diagram is this?* asks the decider which notation the marks are — only by this tap (the audit's D2; 04-seatpane.js).
+    'which-notation': (o) => askDeciderNotation(o.data),
     // *Notes like this* lists the notes nearest these marks' words across every board — in Find's pane, only by this tap (I9; 26-find.js).
     like: (o) => { likeNotes(o.data); },
     // The maths tool's acts (M5): the sizes said and left showing beside their figure, the drawing printed at its real size.
@@ -560,6 +562,8 @@
       items: items,
       // The models as the board says them: what their provider calls them, never an `llm:` id (FP6).
       models: agents.map((a) => modelWords(a)),
+      // The decider a brief's Enter asks what it should make (D3) — one the hand chose, with a model here to write it — by name; the line says so.
+      decider: briefDeciderHost() && writers().length ? briefDeciderHost().name : null,
       library: revising ? [] : libraryEntries(s),
       definition: defId ? { id: defId, name: MM.wordOf(s.nodes.get(defId)) || defId } : null,
       // Whose ink is held: a label goes on the person's own marks only (V1-PLAN L2e).
@@ -1180,9 +1184,12 @@
     return id;
   }
 
+  /** A prefix that says what a brief makes (`page:`, `run:`, `program:`, `new:`): targetOf reads it, and with one no decider is asked. */
+  const TARGET_PREFIX = /^(page|run|program|new)\s*:\s*/i;
+
   /** What a brief asks for: a page (a layout of regions) or a program (anything else), unless it says. */
   function targetOf(sum, prompt) {
-    const m = /^(page|run|program|new)\s*:\s*/i.exec(prompt);
+    const m = TARGET_PREFIX.exec(prompt);
     const brief = m ? prompt.slice(m[0].length).trim() : prompt;
     if (m) return { target: m[1].toLowerCase() === 'page' ? 'page' : 'program', brief: brief, fresh: m[1].toLowerCase() === 'new' };
     const s = session.getState();
@@ -1270,13 +1277,126 @@
 
   function runPrompt(sum, prompt, revising) {
     if (alreadyUnderWay(sum)) return;
+    // What the brief should make (the audit's D3) is asked of a decider the hand CHOSE — never dyna.ink's own seated
+    // silently at boot, so a brief's words go nowhere the hand did not send them — and only when a model is here to
+    // write what it decides, never on a revision or with a prefix, and never for a brief the library already answers
+    // (that is reused, and sent nowhere).
+    if (!revising && briefDeciderHost() && writers().length && !TARGET_PREFIX.test(prompt) && !libraryMatch(prompt, libraryEntries(session.getState()))) {
+      decideBrief(sum, prompt);
+      return;
+    }
+    runPromptAs(sum, prompt, revising, null);
+  }
+
+  /**
+   * What the brief should make, asked on its Enter (the audit's D3) — and nothing waits for it but the writer. What
+   * the drawing says (`targetOf`) is made at once: the loop held, a page's structure stood (`holdBrief`), so the page
+   * stands the moment Enter is pressed, the hand draws on while the decider answers, and its next stroke cannot
+   * dissolve the summon. Then: unsure (under DECIDER_TAKE_AT), failed, or sure of what the drawing said — the writer is
+   * asked for that. Sure of something else — a page for a program, a program for a page, a Mermaid diagram (only when
+   * the marks read as one), a text answer — what the drawing made is taken back while it is still this hand's last act
+   * (`takeBackBrief`, the dropFailedBless rule) and the decided thing is made instead; once the hand has done anything
+   * since, what the drawing made stands, and the status line says so. Esc stops it: no writer is asked.
+   */
+  function decideBrief(sum, prompt) {
+    const s = session.getState();
+    const marks = sum.enclosedIds.filter((id) => s.contentIds.includes(id));
+    const diagram = marks.length >= 2 && !marks.some((id) => s.artifacts.includes(id)) ? MM.mermaidFor(s, marks, (id) => { const n = s.nodes.get(id); return !!n && isRead(n); }) : null;
+    const drawn = targetOf(sum, prompt);
+    const who = briefDeciderHost();
+    let made = null;
+    // Asked first, so it is shown the marks as they stand (its state is read now); answered later, always after the hold below.
+    const asking = askDeciderBrief(sum, prompt, { diagram: diagram ? MM.describeNotation(diagram.reading) : null, otherwise: drawn.target === 'page' ? 'a page' : 'a program' }, (kind, stopped) => {
+      if (!made) return; // the loop could not be held, and that was said
+      if (stopped) {
+        if (drawn.target === 'program' && dropFailedBless(made.artifactId)) say('stopped — nothing was made; the drawing is as it was');
+        else { releasePrompted(); say(drawn.target === 'page' ? 'stopped — the page’s boxes stand; no model was asked to write the words' : 'stopped — no model was asked to write it'); }
+        return;
+      }
+      const other = !!kind && kind !== drawn.target && (kind === 'page' || kind === 'program' || kind === 'answer' || (kind === 'mermaid' && !!diagram));
+      if (!other) { writeBrief(made); return; }
+      if (!takeBackBrief(made)) {
+        say((who ? who.name : 'The decider') + ' is sure it should be ' + (MM.BRIEF_KIND_WORDS[kind] || kind) + ', but you have drawn since — the ' + drawn.target + ' the drawing made stands');
+        writeBrief(made);
+        return;
+      }
+      if (kind === 'mermaid') { mermaidFromBrief(); return; }
+      if (kind === 'answer') { answerBrief(sum, prompt); return; }
+      runPromptAs(sum, prompt, false, kind);
+    });
+    made = holdBrief(sum, drawn);
+    if (!made && asking && asking.abort) asking.abort();
+  }
+
+  /**
+   * What the drawing says a brief makes, made at once while a decider is asked: the loop blessed — the summon taken,
+   * so the hand's next stroke cannot dissolve it — and for a page its structure stood (tier 1, the engine's).
+   * `{ artifactId, target, brief, structure, sum }`, or null when the loop could not be held (said).
+   */
+  function holdBrief(sum, drawn) {
+    const at = Date.now();
+    const name = drawn.brief.length > 30 ? drawn.brief.slice(0, 30) + '…' : drawn.brief;
+    seatWriters(at);
+    const artifactId = session.bless({ summonId: sum.id, name: name, at: at });
+    if (!artifactId) { releasePrompted(); say('could not hold that group'); return null; }
+    const structure = drawn.target === 'page' ? MM.standStructure(session, artifactId, drawn.brief, at + 1) : null;
+    return { artifactId: artifactId, target: drawn.target, brief: drawn.brief, structure: !!(structure && structure.ok), sum: sum };
+  }
+
+  /** What `holdBrief` made, taken back while it is still this hand's last act — the structure's act, then the bless. False, nothing taken, once the hand has done anything since. */
+  function takeBackBrief(made) {
+    if (made.structure) {
+      const act = session.lastAct();
+      if (!(act.length && act.every((e) => e.type === 'code' && e.nodeId === made.artifactId))) return false;
+      session.undo();
+    }
+    return dropFailedBless(made.artifactId);
+  }
+
+  /** The writer asked for what `holdBrief` made: the page's words into its structure, or the program. */
+  function writeBrief(made) {
+    if (!writers().length) {
+      // The model that would write it left while the decider answered.
+      if (made.target === 'program') { const dropped = dropFailedBless(made.artifactId); say('no model is here to write the program' + (dropped ? ' — nothing was made' : '')); return; }
+      releasePrompted();
+      say(made.structure ? 'the page’s boxes stand — a model writes the words when one joins' : 'no model is here to write the page');
+      return;
+    }
+    if (made.target === 'program') { writeProgram(made.artifactId, made.brief); return; }
+    writePage(made.artifactId, made.brief, false, undefined, made.sum.enclosedIds);
+  }
+
+  /** The decider said the brief is a Mermaid diagram: the Mermaid tool's own act on the marks held, as its pill takes it. */
+  function mermaidFromBrief() {
+    const scope = fieldScope(session.getState(), '', null);
+    const o = MM.offersFor(scope).find((x) => x.tool === 'mermaid');
+    if (!o) { releasePrompted(); say('the marks no longer read as a diagram — nothing was made'); return; }
+    paletteScope = scope;
+    takeOffer(o);
+    // The Mermaid stands beside the marks and the field stays on them, ready for the next act: the brief was one act, and is done.
+    releasePrompted();
+    const f = fieldInput();
+    if (f) { f.disabled = false; f.value = ''; }
+  }
+
+  /** The decider said the brief is a question: it is asked of the writers, its answer beside the marks — or kept for one. */
+  function answerBrief(sum, prompt) {
+    if (writers().length) { runAsk(sum, prompt); return; }
+    releasePrompted();
+    keepAsk({ what: 'An answer', needs: 'model', need: 'needs a model', ids: sum.enclosedIds.slice(),
+      sentence: 'An answer needs a model to write it — kept: it runs when one joins · choose one under models',
+      run: () => runAsk(sum, prompt) });
+  }
+
+  /** A brief, made as `decided` says (`page` | `program`) or, with nothing decided, as the drawing says (`targetOf`). */
+  function runPromptAs(sum, prompt, revising, decided) {
     const at = Date.now();
     let artifactId, addressed;
 
     // A brief the library already answers is not sent anywhere: the entry is
     // reused. The model is asked only for what nothing here does (the
     // conservation John asked for — the library grows, the bloat does not).
-    const want = revising ? null : targetOf(sum, prompt);
+    const want = revising ? null : decided ? { target: decided, brief: prompt, fresh: false } : targetOf(sum, prompt);
     if (want && want.target === 'program') {
       const entry = want.fresh ? null : libraryMatch(want.brief, libraryEntries(session.getState()));
       if (entry) { applyLibrary(sum, entry); return; }
@@ -1308,9 +1428,14 @@
       } else if (!writers().length) { say('could not build the structure: ' + structure.error); return; }
     }
 
+    writePage(artifactId, brief, revising, addressed, sum.enclosedIds);
+  }
+
+  /** Every writer asked for a page's words — built into `artifactId`'s structure, or changed where `addressed` says. */
+  function writePage(artifactId, brief, revising, addressed, fallbackIds) {
     // What the human typed outranks a reading nobody asked for.
     cancelReading();
-    const aboutIds = session.getState().nodes.get(artifactId) ? [artifactId] : sum.enclosedIds;
+    const aboutIds = session.getState().nodes.get(artifactId) ? [artifactId] : fallbackIds;
     writers().forEach((agent) => {
       const key = 'build:' + agent.id + ':' + artifactId;
       withWork(key, aboutIds, modelWords(agent) + (revising ? ' · changing “' : ' · building “') + brief.slice(0, 32) + (brief.length > 32 ? '…' : '') + '”',
@@ -1337,6 +1462,11 @@
     seatWriters(at);
     const artifactId = session.bless({ summonId: sum.id, name: name, at: at });
     if (!artifactId) { releasePrompted(); say('could not hold that group'); return; }
+    writeProgram(artifactId, brief);
+  }
+
+  /** Every writer asked for a program into `artifactId`, with the library in its brief; what comes back runs. */
+  function writeProgram(artifactId, brief) {
     cancelReading();
     const library = libraryEntries(session.getState()).map((e) => ({ id: e.id, name: e.name }));
     writers().forEach((agent) => {

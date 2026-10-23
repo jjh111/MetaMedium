@@ -33,10 +33,13 @@ var DynaInkCore = (() => {
     BLANK_WORDS: () => BLANK_WORDS,
     BLOB_ASPECT: () => BLOB_ASPECT,
     BOX_FLOOR: () => BOX_FLOOR,
+    BRIEF_KIND_WORDS: () => BRIEF_KIND_WORDS,
+    BRIEF_QUESTION: () => BRIEF_QUESTION,
     BUILTIN_COMMAND_MARK: () => BUILTIN_COMMAND_MARK,
     BUILTIN_CONCEPTS: () => BUILTIN_CONCEPTS,
     BUILTIN_TOOLS: () => BUILTIN_TOOLS,
     BUILTIN_TYPES: () => BUILTIN_TYPES,
+    CANDIDATE_WORDS_SAID: () => CANDIDATE_WORDS_SAID,
     CHAT_DECIDE_WIRE: () => CHAT_DECIDE_WIRE,
     CHIP_OFFSET: () => CHIP_OFFSET,
     CLASSLIKE_PENALTY: () => CLASSLIKE_PENALTY,
@@ -70,6 +73,7 @@ var DynaInkCore = (() => {
     DASH_TOUCH: () => DASH_TOUCH,
     DASH_TOUCH_PX: () => DASH_TOUCH_PX,
     DECIDER_TAKE_AT: () => DECIDER_TAKE_AT,
+    DECIDE_STATE_MAX: () => DECIDE_STATE_MAX,
     DEFAULT_CORNER_OPTIONS: () => DEFAULT_CORNER_OPTIONS,
     DEFAULT_DECIDER_MODEL: () => DEFAULT_DECIDER_MODEL,
     DEFAULT_ERASE_CROSSINGS: () => DEFAULT_ERASE_CROSSINGS,
@@ -215,6 +219,8 @@ var DynaInkCore = (() => {
     NAMING_IS: () => NAMING_IS,
     NEIGHBOURHOOD_MAX: () => NEIGHBOURHOOD_MAX,
     NOTATION_FLOOR: () => NOTATION_FLOOR,
+    NOTATION_OFFER_FROM: () => NOTATION_OFFER_FROM,
+    NOTATION_QUESTION: () => NOTATION_QUESTION,
     NO_CONTEXT: () => NO_CONTEXT,
     NO_MATCH: () => NO_MATCH,
     ONE_BEND: () => ONE_BEND,
@@ -284,6 +290,12 @@ var DynaInkCore = (() => {
     STUB_PX: () => STUB_PX,
     STUB_SHARE: () => STUB_SHARE,
     SYMMETRIC_LINKS: () => SYMMETRIC_LINKS,
+    SYSTEMONE_KEY: () => SYSTEMONE_KEY,
+    SYSTEMONE_MAX_IMAGES: () => SYSTEMONE_MAX_IMAGES,
+    SYSTEMONE_NONE: () => SYSTEMONE_NONE,
+    SYSTEMONE_STATE_MAX: () => SYSTEMONE_STATE_MAX,
+    SYSTEMONE_TIMEOUT_MS: () => SYSTEMONE_TIMEOUT_MS,
+    SYSTEMONE_WORDS_MAX: () => SYSTEMONE_WORDS_MAX,
     StaticModelError: () => StaticModelError,
     StaticStore: () => StaticStore,
     TARGETED: () => TARGETED,
@@ -299,11 +311,14 @@ var DynaInkCore = (() => {
     USE_LIFT_MAX: () => USE_LIFT_MAX,
     USE_LIFT_RATE: () => USE_LIFT_RATE,
     VERBS: () => VERBS,
+    WHICH_NOTATION: () => WHICH_NOTATION,
     WINDOW_SHARE: () => WINDOW_SHARE,
+    WORDS_SAID: () => WORDS_SAID,
     WORD_GAP_RATIO: () => WORD_GAP_RATIO,
     WORD_WINDOW_MS: () => WORD_WINDOW_MS,
     WRITING_SPAN: () => WRITING_SPAN,
     WRITING_ZIGZAG: () => WRITING_ZIGZAG,
+    WRITTEN: () => WRITTEN,
     WRITTEN_PENALTY: () => WRITTEN_PENALTY,
     aboutIdsOf: () => aboutIdsOf,
     activeBindingsOf: () => activeBindingsOf,
@@ -350,17 +365,20 @@ var DynaInkCore = (() => {
     boundsContain: () => boundsContain,
     boundsOf: () => boundsOf,
     boundsOverlap: () => boundsOverlap,
+    briefQuestion: () => briefQuestion,
     briefText: () => briefText,
     buildGraph3D: () => buildGraph3D,
     buildGraphScaffold: () => buildGraphScaffold,
     buildScaffold: () => buildScaffold,
     buildStaticModel: () => buildStaticModel,
     buildStructure: () => buildStructure,
+    buildSystemOne: () => buildSystemOne,
     bySource: () => bySource,
     byTier: () => byTier,
     calculateDistance: () => calculateDistance,
     calculateStraightness: () => calculateStraightness,
     canLift: () => canLift,
+    candidateWords: () => candidateWords,
     canonicalCheckSamples: () => canonicalCheckSamples,
     cardinalityOf: () => cardinalityOf,
     cardinalityOfToken: () => cardinalityOfToken,
@@ -404,12 +422,16 @@ var DynaInkCore = (() => {
     createStaticTransport: () => createStaticTransport,
     createStubDecideTransport: () => createStubDecideTransport,
     createStubEmbedTransport: () => createStubEmbedTransport,
+    createSystemOneDecideTransport: () => createSystemOneDecideTransport,
     dashedHeads: () => dashedHeads,
     dashedLines: () => dashedLines,
+    decidedNotationOf: () => decidedNotationOf,
+    decisionStateOf: () => decisionStateOf,
     decodeLog: () => decodeLog,
     defaultHost: () => defaultHost,
     definitionId: () => definitionId,
     definitionOf: () => definitionOf,
+    definitionWords: () => definitionWords,
     definitionsIn: () => definitionsIn,
     denoise: () => denoise,
     dependentsOf: () => dependentsOf,
@@ -625,6 +647,8 @@ var DynaInkCore = (() => {
     normName: () => normName,
     normalizeStroke: () => normalizeStroke,
     notationById: () => notationById,
+    notationCandidates: () => notationCandidates,
+    notationQuestion: () => notationQuestion,
     notationsInUse: () => notationsInUse,
     notationsOf: () => notationsOf,
     notesLike: () => notesLike,
@@ -675,6 +699,7 @@ var DynaInkCore = (() => {
     planFor: () => planFor,
     pointNearnessOf: () => pointNearnessOf,
     polygonFigure: () => polygonFigure,
+    postJson: () => postJson,
     prepare: () => prepare,
     printTiled: () => printTiled,
     providerLabel: () => providerLabel,
@@ -700,12 +725,15 @@ var DynaInkCore = (() => {
     readMindMapText: () => readMindMapText,
     readModels: () => readModels,
     readNumber: () => readNumber,
+    readPlainDiagram: () => readPlainDiagram,
     readSequence: () => readSequence,
     readSequenceText: () => readSequenceText,
     readSheet: () => readSheet,
     readState: () => readState,
     readStateText: () => readStateText,
+    readSystemOne: () => readSystemOne,
     readUmlClass: () => readUmlClass,
+    readingDecided: () => readingDecided,
     readingsFor: () => readingsFor,
     readingsToEdges: () => readingsToEdges,
     reasonOf: () => reasonOf,
@@ -775,6 +803,7 @@ var DynaInkCore = (() => {
     sequenceText: () => sequenceText,
     shapeExtent: () => shapeExtent,
     shapeTokens: () => shapeTokens,
+    shapesCounted: () => shapesCounted,
     shapesSummary: () => shapesSummary,
     shareInside: () => shareInside,
     sheetEntry: () => sheetEntry,
@@ -849,15 +878,18 @@ var DynaInkCore = (() => {
     validateRegions: () => validateRegions,
     wallBoxes: () => wallBoxes,
     whereOf: () => whereOf,
+    whichQuestion: () => whichQuestion,
     whoseInk: () => whoseInk,
     whyNotResolved: () => whyNotResolved,
     wireQuestion: () => wireQuestion,
     withParams: () => withParams,
     withinReach: () => withinReach,
+    withoutIds: () => withoutIds,
     wordConfidence: () => wordConfidence,
     wordOf: () => wordOf,
     wordPieceOf: () => wordPieceOf,
     wordScore: () => wordScore,
+    wordsBeside: () => wordsBeside,
     wordsOfMarks: () => wordsOfMarks,
     worldOf: () => worldOf,
     writeEr: () => writeEr,
@@ -868,6 +900,7 @@ var DynaInkCore = (() => {
     writingLine: () => writingLine,
     writingLines: () => writingLines,
     writingLinesIn: () => writingLinesIn,
+    writtenOn: () => writtenOn,
     zigzagOf: () => zigzagOf
   });
 
@@ -1090,10 +1123,10 @@ var DynaInkCore = (() => {
     const total = cum[cum.length - 1];
     if (total === 0) return path.slice(0, n2);
     const out = [];
-    const count9 = closed ? n2 : n2 - 1;
+    const count10 = closed ? n2 : n2 - 1;
     let j = 0;
     for (let i = 0; i < (closed ? n2 : n2); i++) {
-      const target = i / count9 * total;
+      const target = i / count10 * total;
       while (j < cum.length - 2 && cum[j + 1] < target) j++;
       const span = cum[j + 1] - cum[j];
       const t = span > 0 ? (target - cum[j]) / span : 0;
@@ -4940,13 +4973,13 @@ var DynaInkCore = (() => {
     };
   }
   var ALONG_STEPS = 1e3;
-  function alongIndex(ordinal, t) {
+  function alongIndex(ordinal2, t) {
     const step2 = Math.round(Math.min(1, Math.max(0, t)) * ALONG_STEPS);
-    return ordinal * (ALONG_STEPS + 1) + step2;
+    return ordinal2 * (ALONG_STEPS + 1) + step2;
   }
   function alongOf(index) {
-    const ordinal = Math.floor(index / (ALONG_STEPS + 1));
-    return { ordinal, t: (index - ordinal * (ALONG_STEPS + 1)) / ALONG_STEPS };
+    const ordinal2 = Math.floor(index / (ALONG_STEPS + 1));
+    return { ordinal: ordinal2, t: (index - ordinal2 * (ALONG_STEPS + 1)) / ALONG_STEPS };
   }
   var quantised = (t) => Math.round(Math.min(1, Math.max(0, t)) * ALONG_STEPS) / ALONG_STEPS;
   var finite = (p) => !!p && typeof p.x === "number" && typeof p.y === "number" && Number.isFinite(p.x) && Number.isFinite(p.y);
@@ -5007,13 +5040,13 @@ var DynaInkCore = (() => {
   var said = (port, notation) => `${typeof port.reasoning === "string" ? port.reasoning : port.name} (${notation})`;
   var isPointPort = (p) => finite(p.at) && p.along === void 0;
   var continuousSpan = (p) => p.at === void 0 ? spanOf(p.along ?? [], !!p.closed) : null;
-  function alongSite(nodeId, symbol, notation, port, span, ordinal, t) {
+  function alongSite(nodeId, symbol, notation, port, span, ordinal2, t) {
     const tq = quantised(t);
     return {
       nodeId,
       shape: symbol,
       kind: `along:${notation}`,
-      index: alongIndex(ordinal, tq),
+      index: alongIndex(ordinal2, tq),
       point: pointAt(span, tq),
       reasoning: said(port, notation),
       notation,
@@ -5044,10 +5077,10 @@ var DynaInkCore = (() => {
         }
         const span = continuousSpan(port);
         if (!span) continue;
-        const ordinal = spans++;
+        const ordinal2 = spans++;
         const closedLoop = !!port.closed;
         const n2 = Math.max(1, Math.ceil(span.length / Math.max(1e-6, spacing)));
-        for (let i = 0; i <= (closedLoop ? n2 - 1 : n2); i++) out.push(alongSite(node.id, symbol, notation, port, span, ordinal, i / n2));
+        for (let i = 0; i <= (closedLoop ? n2 - 1 : n2); i++) out.push(alongSite(node.id, symbol, notation, port, span, ordinal2, i / n2));
       }
     }
     return out;
@@ -5058,20 +5091,20 @@ var DynaInkCore = (() => {
     if (!span) return { site, distance: Math.hypot(site.point.x - at.x, site.point.y - at.y) };
     const t = quantised(project(span, at));
     const point2 = pointAt(span, t);
-    const { ordinal } = alongOf(site.index);
-    return { site: { ...site, index: alongIndex(ordinal, t), point: point2, t }, distance: Math.hypot(point2.x - at.x, point2.y - at.y) };
+    const { ordinal: ordinal2 } = alongOf(site.index);
+    return { site: { ...site, index: alongIndex(ordinal2, t), point: point2, t }, distance: Math.hypot(point2.x - at.x, point2.y - at.y) };
   }
   function alongSiteOf(node, nodes, notation, index, provider = registry.get(notation)) {
     if (!provider || !Number.isInteger(index) || index < 0) return null;
     const read2 = readingOf(provider, node, nodes);
     if (!read2) return null;
-    const { ordinal, t } = alongOf(index);
+    const { ordinal: ordinal2, t } = alongOf(index);
     let k = 0;
     for (const port of read2.ports) {
       if (!port || typeof port.name !== "string" || isPointPort(port)) continue;
       const span = continuousSpan(port);
       if (!span) continue;
-      if (k++ === ordinal) return alongSite(node.id, read2.symbol, notation, port, span, ordinal, t);
+      if (k++ === ordinal2) return alongSite(node.id, read2.symbol, notation, port, span, ordinal2, t);
     }
     return null;
   }
@@ -6463,12 +6496,12 @@ var DynaInkCore = (() => {
         for (const f of members) if (raw.has(f.id)) labels.set(f.id, raw.get(f.id));
         continue;
       }
-      const count9 = /* @__PURE__ */ new Map();
-      for (const f of members) for (const l of raw.get(f.id) ?? []) if (!l.declared && l.value.unit && l.value.dim >= 1) count9.set(l.value.unit, (count9.get(l.value.unit) ?? 0) + 1);
+      const count10 = /* @__PURE__ */ new Map();
+      for (const f of members) for (const l of raw.get(f.id) ?? []) if (!l.declared && l.value.unit && l.value.dim >= 1) count10.set(l.value.unit, (count10.get(l.value.unit) ?? 0) + 1);
       let written2 = null;
-      for (const [u, n2] of count9) if (!written2 || n2 > count9.get(written2)) written2 = u;
+      for (const [u, n2] of count10) if (!written2 || n2 > count10.get(written2)) written2 = u;
       const unit7 = written2 ?? fallback;
-      const unitReason = written2 ? `${UNIT_NAMES2[written2]}, written on ${count9.get(written2)} of its labels` : unit7 ? `${UNIT_NAMES2[unit7]}, the unit the page speaks` : "no unit written, so its numbers stay bare";
+      const unitReason = written2 ? `${UNIT_NAMES2[written2]}, written on ${count10.get(written2)} of its labels` : unit7 ? `${UNIT_NAMES2[unit7]}, the unit the page speaks` : "no unit written, so its numbers stay bare";
       const given2 = [];
       for (const f of members) {
         const ls = (raw.get(f.id) ?? []).map((l) => {
@@ -6984,7 +7017,7 @@ var DynaInkCore = (() => {
   }
   var dimOf = (key2) => /^angle\d$/.test(key2) || key2 === "sweep" ? 0 : key2 === "area" ? 2 : 1;
   function check(model, facts, unit7) {
-    const kept2 = [...model.basis];
+    const kept3 = [...model.basis];
     const conflicts = [];
     const used = new Set(model.basis.map((x) => x.group));
     const groups = /* @__PURE__ */ new Map();
@@ -7003,13 +7036,13 @@ var DynaInkCore = (() => {
         }
         if (cmp.status === "off" && !miss) miss = { fact: x, derived: v.iv };
       }
-      if (hit) kept2.push(hit);
+      if (hit) kept3.push(hit);
       else if (miss) {
         conflicts.push(miss);
         share += Math.abs(miss.derived.lo - miss.fact.iv.lo) / Math.max(TOL, Math.abs(miss.fact.iv.lo));
       }
     }
-    return { model, kept: kept2, conflicts, share, ink: 0 };
+    return { model, kept: kept3, conflicts, share, ink: 0 };
   }
   function inkDistance(f, model) {
     const pairs = [];
@@ -7350,7 +7383,7 @@ var DynaInkCore = (() => {
     }
     const vals = /* @__PURE__ */ new Map();
     const basis = [];
-    const kept2 = [];
+    const kept3 = [];
     const conflicts = [];
     let share = 0;
     for (const rs of bySide.values()) {
@@ -7358,12 +7391,12 @@ var DynaInkCore = (() => {
       const best = rs[0];
       for (const [k, v] of best.model.vals) vals.set(k, v);
       basis.push(...best.model.basis);
-      kept2.push(...best.kept);
+      kept3.push(...best.kept);
       conflicts.push(...best.conflicts.map((c) => ({ ...c, against: best.model })));
       share += best.share;
     }
     const how = basis.map((x) => x.parts ? x.text : `${x.shown}`).join(", ");
-    return [{ model: { basis, vals, how, makes: [] }, kept: kept2, conflicts, share, ink: 0 }];
+    return [{ model: { basis, vals, how, makes: [] }, kept: kept3, conflicts, share, ink: 0 }];
   }
   function solveBoard(state, options = {}) {
     const pages = [];
@@ -7900,14 +7933,14 @@ var DynaInkCore = (() => {
       let ys = xs.get(cx2);
       if (!ys) xs.set(cx2, ys = /* @__PURE__ */ new Map());
       let here2 = ys.get(cy2);
-      const count9 = this.counts.get(level) ?? { marks: 0, cells: 0 };
+      const count10 = this.counts.get(level) ?? { marks: 0, cells: 0 };
       if (!here2) {
         ys.set(cy2, here2 = /* @__PURE__ */ new Set());
-        count9.cells++;
+        count10.cells++;
       }
       here2.add(id);
-      count9.marks++;
-      this.counts.set(level, count9);
+      count10.marks++;
+      this.counts.set(level, count10);
       this.filed.set(id, { level, cx: cx2, cy: cy2, bounds: { minX: bounds.minX, minY: bounds.minY, maxX: bounds.maxX, maxY: bounds.maxY } });
     }
     delete(id) {
@@ -7918,14 +7951,14 @@ var DynaInkCore = (() => {
       const ys = xs.get(f.cx);
       const here2 = ys.get(f.cy);
       here2.delete(id);
-      const count9 = this.counts.get(f.level);
-      count9.marks--;
+      const count10 = this.counts.get(f.level);
+      count10.marks--;
       if (here2.size === 0) {
         ys.delete(f.cy);
-        count9.cells--;
+        count10.cells--;
         if (ys.size === 0) xs.delete(f.cx);
       }
-      if (count9.marks === 0) {
+      if (count10.marks === 0) {
         this.counts.delete(f.level);
         this.levels.delete(f.level);
       }
@@ -7995,8 +8028,8 @@ var DynaInkCore = (() => {
         const x0 = Math.floor(box.minX / cell) - 1, x1 = Math.floor(box.maxX / cell);
         const y0 = Math.floor(box.minY / cell) - 1, y1 = Math.floor(box.maxY / cell);
         const span = (x1 - x0 + 1) * (y1 - y0 + 1);
-        const count9 = this.counts.get(level);
-        if (span > count9.cells) {
+        const count10 = this.counts.get(level);
+        if (span > count10.cells) {
           for (const [cx2, ys] of xs) {
             if (cx2 < x0 || cx2 > x1) continue;
             for (const [cy2, here2] of ys) {
@@ -11493,10 +11526,10 @@ var DynaInkCore = (() => {
       const length = events.length;
       if (length === 0 || checkpoints.some((c) => c.length === length)) return;
       keepCheckpoint({ length, snap: snapshot() });
-      let kept2 = 0;
+      let kept3 = 0;
       for (let i = checkpoints.length - 1; i >= 0; i--) {
         if (checkpoints[i].length % checkpointEvery === 0) continue;
-        if (++kept2 > END_CHECKPOINTS) checkpoints.splice(i, 1);
+        if (++kept3 > END_CHECKPOINTS) checkpoints.splice(i, 1);
       }
     }
     let order2 = /* @__PURE__ */ new Map();
@@ -13107,7 +13140,7 @@ var DynaInkCore = (() => {
       definitionsChanged = true;
       recomputeClusterCandidates();
       const summon = gestures.get(handOf(ev))?.summon;
-      if (summon && sameSet(summon.enclosedIds, ids)) {
+      if (summon && sameSet2(summon.enclosedIds, ids)) {
         summon.suggestions = summon.suggestions.filter((g) => g.kind !== "match");
         summon.suggestions.unshift(...makeSuggestions(ids).filter((g) => g.kind === "match"));
       }
@@ -13173,19 +13206,19 @@ var DynaInkCore = (() => {
       const picture = isPictureKind(ev.kind);
       if (ev.code === void 0 && !(picture && ev.asset !== void 0)) return null;
       const name = ev.name?.trim() || ev.path.split("/").pop() || ev.path;
-      const kept2 = {};
+      const kept3 = {};
       if (picture) {
-        if (isAssetRef(ev.asset)) kept2.asset = ev.asset;
-        if (typeof ev.mime === "string" && /^image\/[a-z0-9.+-]+$/i.test(ev.mime)) kept2.mime = ev.mime;
-        if (typeof ev.w === "number" && Number.isFinite(ev.w) && ev.w > 0) kept2.w = Math.round(ev.w);
-        if (typeof ev.h === "number" && Number.isFinite(ev.h) && ev.h > 0) kept2.h = Math.round(ev.h);
+        if (isAssetRef(ev.asset)) kept3.asset = ev.asset;
+        if (typeof ev.mime === "string" && /^image\/[a-z0-9.+-]+$/i.test(ev.mime)) kept3.mime = ev.mime;
+        if (typeof ev.w === "number" && Number.isFinite(ev.w) && ev.w > 0) kept3.w = Math.round(ev.w);
+        if (typeof ev.h === "number" && Number.isFinite(ev.h) && ev.h > 0) kept3.h = Math.round(ev.h);
       }
       const node = {
         id: nextId("artifact"),
         reps: [
           { modality: "word", data: name, source: pid },
           { modality: "bounds", data: { ...ev.bounds }, source: pid },
-          { modality: "code", data: { code: ev.code ?? "", language: ev.kind, kind: ev.kind, path: ev.path, regions: [], at: ev.at, ...kept2 }, source: pid },
+          { modality: "code", data: { code: ev.code ?? "", language: ev.kind, kind: ev.kind, path: ev.path, regions: [], at: ev.at, ...kept3 }, source: pid },
           { modality: "signature", data: { shapes: { [ev.kind]: 1 }, links: {}, size: 1 }, source: TIER0_PARTICIPANT }
         ],
         edges: [{ to: pid, rel: "made-by" }],
@@ -13220,7 +13253,7 @@ var DynaInkCore = (() => {
         source: pid
       });
     }
-    function sameSet(a, b) {
+    function sameSet2(a, b) {
       if (a.length !== b.length) return false;
       const set = new Set(a);
       return b.every((x) => set.has(x));
@@ -14663,8 +14696,8 @@ var DynaInkCore = (() => {
     const body = lines.join("<br>");
     return `"${body.length ? body : BLANK}"`;
   }
-  function unescapeMermaid(quoted2) {
-    const inner = quoted2.length >= 2 && quoted2.startsWith('"') && quoted2.endsWith('"') ? quoted2.slice(1, -1) : quoted2;
+  function unescapeMermaid(quoted3) {
+    const inner = quoted3.length >= 2 && quoted3.startsWith('"') && quoted3.endsWith('"') ? quoted3.slice(1, -1) : quoted3;
     return inner.split(/<br\s*\/?>/i).map(
       (part) => part.replace(/#(\w+);/g, (whole, name) => {
         if (/^\d+$/.test(name)) return String.fromCodePoint(Number(name));
@@ -15230,7 +15263,7 @@ var DynaInkCore = (() => {
         }
       }
     }
-    const kept2 = classes.filter((c) => !demoted.has(c));
+    const kept3 = classes.filter((c) => !demoted.has(c));
     if (demoted.size) for (const c of demoted) for (const id of c.box) classOfMark.delete(id);
     const headOf3 = /* @__PURE__ */ new Set();
     for (const [id, h2] of heads) for (const e of [h2.start, h2.end]) for (const x of e.heads[0]?.ids ?? []) if (x !== id && heads.has(x)) headOf3.add(x);
@@ -15276,7 +15309,7 @@ var DynaInkCore = (() => {
         return { class: c, headIds: [], quality: 1, said: { end: e.end, point: { ...e.point }, symbol: c.id, reason: `it ends on ${c.id}, which heads.ts reads as a head and this notation as a class` } };
       }
       let best;
-      for (const c of kept2) {
+      for (const c of kept3) {
         const reach = reachOf2(c);
         if (offBox2(point2, c.shape.bounds) > reach) continue;
         const d = outside(point2, c.shape.hull);
@@ -15344,14 +15377,14 @@ var DynaInkCore = (() => {
         ...said3 ? { text: said3 } : {}
       });
     }
-    const parent = new Map(kept2.map((c) => [c, c]));
+    const parent = new Map(kept3.map((c) => [c, c]));
     const find = (c) => parent.get(c) === c ? c : (parent.set(c, find(parent.get(c))), parent.get(c));
-    const byId = new Map(kept2.map((c) => [c.id, c]));
+    const byId = new Map(kept3.map((c) => [c.id, c]));
     for (const r of relations) parent.set(find(byId.get(r.from)), find(byId.get(r.to)));
     const says = /* @__PURE__ */ new Set();
-    for (const c of kept2) if (c.lines.length) says.add(find(c));
+    for (const c of kept3) if (c.lines.length) says.add(find(c));
     for (const r of relations) if (r.kind !== "association" && r.kind !== "link") says.add(find(byId.get(r.from)));
-    const inDiagram = kept2.filter((c) => says.has(find(c)));
+    const inDiagram = kept3.filter((c) => says.has(find(c)));
     if (!inDiagram.length) return null;
     const inSet = new Set(inDiagram);
     const joined = relations.filter((r) => inSet.has(byId.get(r.from)) && inSet.has(byId.get(r.to)));
@@ -17699,7 +17732,7 @@ var DynaInkCore = (() => {
       (g.r.sides[g.at].multiplicity ??= { ids: [], unread: [] }).ids.push(...g.ids);
       for (const id of g.ids) labelById.get(id).reason += ` \u2014 near its end at ${g.r.sides[g.at].entity}: a multiplicity`;
     }
-    const kept2 = [...labels];
+    const kept3 = [...labels];
     const inReading = (ids) => [...ids].sort((p, q) => {
       const a = labelById.get(p).bounds, b = labelById.get(q).bounds;
       const sameRow = !(a.maxY < b.minY || b.maxY < a.minY);
@@ -17722,13 +17755,13 @@ var DynaInkCore = (() => {
       const inside = labels.filter((l) => l.of === s.id && l.where === "inside").map((l) => l.id);
       s.name = writingWords(nodes, inside, " ", s.text);
     }
-    for (const l of kept2) if (isMultiplicity.has(l.id)) l.role = ER_TABLE.labels.multiplicity.role;
+    for (const l of kept3) if (isMultiplicity.has(l.id)) l.role = ER_TABLE.labels.multiplicity.role;
     const { roles, weight, unplaced: unplaced2 } = rolesOf2(
       scope,
       (put) => {
         for (const s of out) for (const id of [...s.ids, ...byId.get(s.id).marks]) put(id, s.role, 1);
         for (const k of relationships) for (const id of k.ids) put(id, k.role, 1);
-        for (const l of kept2) put(l.id, l.role, l.where === "alone" ? 0.5 : 1);
+        for (const l of kept3) put(l.id, l.role, l.where === "alone" ? 0.5 : 1);
         for (const id of pointers) put(id, "annotation", 0.5);
         for (const c of containers) for (const id of c.marks) put(id, "container", 0.5);
         for (const c of classLike) for (const id of c.marks) put(id, "container", 0.5);
@@ -17770,7 +17803,7 @@ var DynaInkCore = (() => {
     const order2 = new Map(scope.map((id, i) => [id, i]));
     const firstOf = (ids) => Math.min(...ids.map((id) => order2.get(id) ?? Infinity));
     out.sort((p, q) => firstOf([p.id, ...p.ids]) - firstOf([q.id, ...q.ids]));
-    kept2.sort((p, q) => (order2.get(p.id) ?? 0) - (order2.get(q.id) ?? 0));
+    kept3.sort((p, q) => (order2.get(p.id) ?? 0) - (order2.get(q.id) ?? 0));
     relationships.sort((p, q) => (order2.get(p.id) ?? 0) - (order2.get(q.id) ?? 0));
     return {
       notation: "er",
@@ -17780,7 +17813,7 @@ var DynaInkCore = (() => {
       reason: `${summary} \u2014 ${reason}`,
       symbols: out,
       connectors: relationships,
-      labels: kept2,
+      labels: kept3,
       roles,
       unplaced: unplaced2,
       counts,
@@ -18601,8 +18634,8 @@ var DynaInkCore = (() => {
       },
       /* @__PURE__ */ new Map()
     );
-    const count9 = (name) => out.filter((s) => s.symbol === name).length;
-    const grains = count9("grain"), foldsN = count9("fold"), notches = count9("notch"), darts = count9("dart"), seams = count9("seam");
+    const count10 = (name) => out.filter((s) => s.symbol === name).length;
+    const grains = count10("grain"), foldsN = count10("fold"), notches = count10("notch"), darts = count10("dart"), seams = count10("seam");
     const evi = evidence;
     if (grains) evi.push({ what: grains === 1 ? "a grain line" : `${countWord(grains)} grain lines`, weight: 1 - (1 - EVIDENCE4.grain) ** grains });
     if (foldsN) evi.push({ what: foldsN === 1 ? "a fold" : `${countWord(foldsN)} folds`, weight: 1 - (1 - EVIDENCE4.fold) ** foldsN });
@@ -18670,25 +18703,40 @@ var DynaInkCore = (() => {
     const top = analyzeStroke(pts, scaleOf2(node)).results[0];
     return !!top && top.type === "circle";
   }
-  function readDiagram(state, scopeIds) {
+  function graphOf(state, scopeIds) {
     const r = readFlowchart(state, scopeIds);
     if (!r || r.symbols.length < 2 || !r.connectors.length) return null;
     const joined = r.connectors.filter((c) => c.from && c.to && c.from !== c.to);
     if (!joined.length) return null;
     if (r.symbols.every((s) => readsAsCircle(state, s.ids))) return null;
     const tied = joined.filter((c) => c.ends.from.bound && c.ends.to.bound);
-    if (!tied.length) return null;
-    const share = tied.length / r.connectors.length;
-    const confidence = Math.min(MAX_TIER0_CONFIDENCE, NOTATION_FLOOR + TIED_LIFT * share);
     const nodes = r.symbols.length, links = r.connectors.length;
     const summary = `${countWord(nodes)} ${nodes === 1 ? "node" : "nodes"}, ${countWord(links)} ${links === 1 ? "connector" : "connectors"}`;
+    return { r, joined, tied, summary, links };
+  }
+  function readDiagram(state, scopeIds) {
+    const g = graphOf(state, scopeIds);
+    if (!g || !g.tied.length) return null;
+    const share = g.tied.length / g.r.connectors.length;
+    const confidence = Math.min(MAX_TIER0_CONFIDENCE, NOTATION_FLOOR + TIED_LIFT * share);
     return {
-      ...r,
+      ...g.r,
       notation: DIAGRAM_NOTATION,
       name: "Diagram",
       confidence,
-      summary,
-      reason: `${tied.length} of ${links} connectors tied at both ends to the nodes they join \u2014 no notation says more (as a flowchart: ${r.confidence.toFixed(2)})`
+      summary: g.summary,
+      reason: `${g.tied.length} of ${g.links} connectors tied at both ends to the nodes they join \u2014 no notation says more (as a flowchart: ${g.r.confidence.toFixed(2)})`
+    };
+  }
+  function readPlainDiagram(state, scopeIds) {
+    const g = graphOf(state, scopeIds);
+    if (!g) return null;
+    return {
+      ...g.r,
+      notation: DIAGRAM_NOTATION,
+      name: "Diagram",
+      summary: g.summary,
+      reason: `${g.joined.length} of ${g.links} connectors join two nodes, ${g.tied.length} tied at both ends \u2014 a plain diagram (as a flowchart: ${g.r.confidence.toFixed(2)})`
     };
   }
   var DIAGRAM = {
@@ -18755,7 +18803,26 @@ var DynaInkCore = (() => {
     const artifacts = new Set(state.artifacts);
     return state.contentIds.filter((id) => !artifacts.has(id));
   }
+  var kept2 = null;
+  function keepingNotations(state, fn) {
+    if (kept2) return fn();
+    kept2 = { state, reads: /* @__PURE__ */ new Map() };
+    try {
+      return fn();
+    } finally {
+      kept2 = null;
+    }
+  }
   function notationsOf(state, scopeIds) {
+    const memo2 = kept2 && kept2.state === state ? kept2.reads : null;
+    const key2 = memo2 ? scopeIds ? scopeIds.join("\0") : "board" : "";
+    const had = memo2?.get(key2);
+    if (had) return had.slice();
+    const read2 = readNotations(state, scopeIds);
+    memo2?.set(key2, read2);
+    return read2.slice();
+  }
+  function readNotations(state, scopeIds) {
     const scope = scopeIds ? [...new Set(scopeIds)].filter((id) => state.nodes.has(id)) : boardScope(state);
     if (!scope.length) return [];
     const out = [];
@@ -19529,15 +19596,15 @@ var DynaInkCore = (() => {
     const board2 = "dimensions" in solved ? solved : null;
     const owned = board2 ? garmentOwned(board2) : /* @__PURE__ */ new Set();
     const entries = entriesOf(solved).filter((e) => !(board2 && e.figure.ids.every((id) => owned.has(id)) && !pieceOfFigure(board2, e.figure.id))).map((e) => ({ e, b: inkBounds(e.figure) })).sort((p, q2) => p.b.minX - q2.b.minX || p.b.minY - q2.b.minY || (p.e.figure.id < q2.e.figure.id ? -1 : p.e.figure.id > q2.e.figure.id ? 1 : 0)).map((x2) => x2.e);
-    const count9 = /* @__PURE__ */ new Map();
-    for (const e of entries) count9.set(e.figure.kind, (count9.get(e.figure.kind) ?? 0) + 1);
+    const count10 = /* @__PURE__ */ new Map();
+    for (const e of entries) count10.set(e.figure.kind, (count10.get(e.figure.kind) ?? 0) + 1);
     const seen = /* @__PURE__ */ new Map();
     const nameOf4 = /* @__PURE__ */ new Map();
     for (const e of entries) {
       const k = e.figure.kind;
       const i = (seen.get(k) ?? 0) + 1;
       seen.set(k, i);
-      nameOf4.set(e.figure.id, options.names?.[e.figure.id] ?? ((count9.get(k) ?? 0) > 1 ? `${k} ${i}` : k));
+      nameOf4.set(e.figure.id, options.names?.[e.figure.id] ?? ((count10.get(k) ?? 0) > 1 ? `${k} ${i}` : k));
     }
     const drawable = [];
     const omitted = [];
@@ -19781,8 +19848,8 @@ ${barParts.join("\n")}
       const why = `the margins and a ${amount(od, U)} overlap leave no room on ${P.name} ${orientation}`;
       return empty(`nothing to print: ${why}`, why);
     }
-    const count9 = (len4, tile) => len4 <= tile + 1e-9 ? 1 : Math.ceil((len4 - od) / (tile - od) - 1e-9);
-    const cols = count9(rw, Wd), rows = count9(rh, Hd);
+    const count10 = (len4, tile) => len4 <= tile + 1e-9 ? 1 : Math.ceil((len4 - od) / (tile - od) - 1e-9);
+    const cols = count10(rw, Wd), rows = count10(rh, Hd);
     const n2 = rows * cols;
     const x0 = (c) => region.minX + c * (Wd - od);
     const y0 = (r) => region.minY + r * (Hd - od);
@@ -20352,9 +20419,9 @@ ${p.svg}</section>`),
       if (a.name !== b.name) return a.name < b.name ? -1 : 1;
       return a.i - b.i;
     });
-    const kept2 = foldAuthorship(tagged, opts);
+    const kept3 = foldAuthorship(tagged, opts);
     const stamp = opts.me !== void 0;
-    return kept2.map((t) => stamp && t.name !== opts.me ? { ...t.ev, by: t.name } : { ...t.ev });
+    return kept3.map((t) => stamp && t.name !== opts.me ? { ...t.ev, by: t.name } : { ...t.ev });
   }
   function describeAuthorshipCollision(c) {
     return `two different events are both "${c.origin}" number ${c.seq} \u2014 the one in ${c.kept}'s log is kept and the one in ${c.dropped}'s is left out; two hands have written under one name`;
@@ -21035,8 +21102,8 @@ ${p.svg}</section>`),
       for (const other of list5) {
         if (this.misnumbered.has(origin)) break;
         if (sameEvent(other.ev, ev)) continue;
-        const [kept2, dropped] = this.keeps(other, mine) ? [other, mine] : [mine, other];
-        this.misnumbered.set(origin, describeAuthorshipCollision({ origin, seq: ev.seq, kept: kept2.name, dropped: dropped.name }));
+        const [kept3, dropped] = this.keeps(other, mine) ? [other, mine] : [mine, other];
+        this.misnumbered.set(origin, describeAuthorshipCollision({ origin, seq: ev.seq, kept: kept3.name, dropped: dropped.name }));
       }
       list5.push(mine);
     }
@@ -23022,12 +23089,12 @@ ${lines.join("\n")}
     const keep = opts.keepDirection ?? KEEP_DIRECTION;
     const unstretched = fixed + opts.rankGap * spans;
     let stretch = 1;
-    let kept2 = !pairs.length || unstretched > sideways;
+    let kept3 = !pairs.length || unstretched > sideways;
     if (keep > 0 && pairs.length && unstretched < keep * sideways) {
       if (spans > 0 && opts.rankGap > 0) {
         stretch = (keep * sideways - fixed) / (opts.rankGap * spans);
-        kept2 = true;
-      } else kept2 = unstretched > sideways;
+        kept3 = true;
+      } else kept3 = unstretched > sideways;
     }
     const m = base.map((b, r) => b + opts.rankGap * stretch * r);
     const raw = list5.map((_, i) => {
@@ -23061,7 +23128,7 @@ ${lines.join("\n")}
       loops,
       unknown,
       stretch,
-      kept: kept2,
+      kept: kept3,
       bounds: { minX: 0, minY: 0, maxX: maxX - minX, maxY: maxY - minY }
     };
   }
@@ -23773,12 +23840,12 @@ ${lines.join("\n")}
     let t = opts.at;
     const next = () => t++;
     const nodes = read2.nodes.slice(0, MERMAID_MAX_NODES);
-    const kept2 = new Set(nodes.map((n2) => n2.id));
+    const kept3 = new Set(nodes.map((n2) => n2.id));
     if (read2.nodes.length > nodes.length) {
-      const cut = read2.links.filter((l) => !kept2.has(l.from) || !kept2.has(l.to)).length;
+      const cut = read2.links.filter((l) => !kept3.has(l.from) || !kept3.has(l.to)).length;
       notes.push(`the text holds ${read2.nodes.length} nodes and the board draws ${MERMAID_MAX_NODES} at most: the first ${MERMAID_MAX_NODES} are drawn, and the ${read2.nodes.length - MERMAID_MAX_NODES} after them${cut ? ` and the ${cut} link${cut === 1 ? "" : "s"} that touch them are` : " are"} not`);
     }
-    const among = read2.links.filter((l) => kept2.has(l.from) && kept2.has(l.to));
+    const among = read2.links.filter((l) => kept3.has(l.from) && kept3.has(l.to));
     const links = among.slice(0, MERMAID_MAX_LINKS);
     if (among.length > links.length) notes.push(`the text holds ${among.length} links among the nodes drawn and the board draws ${MERMAID_MAX_LINKS} at most: the ${among.length - MERMAID_MAX_LINKS} after the first ${MERMAID_MAX_LINKS} are not drawn`);
     if (!nodes.length) {
@@ -24333,7 +24400,7 @@ ${lines.join("\n")}
     const ws = () => {
       while (i < t.length && /\s/.test(t[i])) i++;
     };
-    const quoted2 = () => {
+    const quoted3 = () => {
       if (t[i] !== '"') return void 0;
       const end = t.indexOf('"', i + 1);
       if (end < 0) return void 0;
@@ -24342,7 +24409,7 @@ ${lines.join("\n")}
       return decoded(q);
     };
     ws();
-    const leftCard = quoted2();
+    const leftCard = quoted3();
     ws();
     RELATION.lastIndex = i;
     const r = RELATION.exec(t);
@@ -24352,7 +24419,7 @@ ${lines.join("\n")}
     if (rm === "o" && i < t.length && !/[\s"]/.test(t[i])) return null;
     if (lm === "()" || rm === "()") return { refuse: "a lollipop interface (()--) is not drawn yet" };
     ws();
-    const rightCard = quoted2();
+    const rightCard = quoted3();
     ws();
     CLASS_ID.lastIndex = i;
     const b = CLASS_ID.exec(t);
@@ -24499,9 +24566,9 @@ ${lines.join("\n")}
     let t = opts.at;
     const next = () => t++;
     const nodes = r.nodes.slice(0, MERMAID_MAX_NODES);
-    const kept2 = new Set(nodes.map((n2) => n2.id));
+    const kept3 = new Set(nodes.map((n2) => n2.id));
     if (r.nodes.length > nodes.length) notes.push(`the text holds ${r.nodes.length} classes and the board draws ${MERMAID_MAX_NODES} at most: the first ${MERMAID_MAX_NODES} are drawn`);
-    const among = r.links.filter((l) => kept2.has(l.left) && kept2.has(l.right));
+    const among = r.links.filter((l) => kept3.has(l.left) && kept3.has(l.right));
     const links = among.slice(0, MERMAID_MAX_LINKS);
     if (among.length > links.length) notes.push(`the text holds ${among.length} relations among the classes drawn and the board draws ${MERMAID_MAX_LINKS} at most`);
     if (!nodes.length) {
@@ -25067,9 +25134,9 @@ ${lines.join("\n")}
     const world = (p) => scaled2(p, scale);
     const hand = (p) => scaled2(p, 1 / scale);
     const nodes = r.nodes.slice(0, MERMAID_MAX_NODES);
-    const kept2 = new Set(nodes.map((x) => x.id));
+    const kept3 = new Set(nodes.map((x) => x.id));
     if (r.nodes.length > nodes.length) notes.push(`the text holds ${r.nodes.length} participants and the board draws ${MERMAID_MAX_NODES} at most: the first ${MERMAID_MAX_NODES} are drawn`);
-    const among = r.links.filter((l) => kept2.has(l.from) && kept2.has(l.to));
+    const among = r.links.filter((l) => kept3.has(l.from) && kept3.has(l.to));
     const links = among.slice(0, MERMAID_MAX_LINKS);
     if (among.length > links.length) notes.push(`the text holds ${among.length} messages among the participants drawn and the board draws ${MERMAID_MAX_LINKS} at most`);
     if (!nodes.length) {
@@ -25517,11 +25584,11 @@ ${lines.join("\n")}
           refused.push({ line: n2, text: t, reason: `a ${special[1].toLowerCase()} is not drawn as one \u2014 it is drawn as a state` });
           rest = rest.replace(special[0], "").trim();
         }
-        const quoted2 = /^"([^"]*)"\s+as\s+(\S+)$/.exec(rest) ?? /^(\S+)\s+as\s+"([^"]*)"$/.exec(rest);
+        const quoted3 = /^"([^"]*)"\s+as\s+(\S+)$/.exec(rest) ?? /^(\S+)\s+as\s+"([^"]*)"$/.exec(rest);
         let id, words;
-        if (quoted2) {
-          if (rest.startsWith('"')) [words, id] = [quoted2[1], quoted2[2]];
-          else [id, words] = [quoted2[1], quoted2[2]];
+        if (quoted3) {
+          if (rest.startsWith('"')) [words, id] = [quoted3[1], quoted3[2]];
+          else [id, words] = [quoted3[1], quoted3[2]];
         } else {
           id = rest;
           words = void 0;
@@ -25705,10 +25772,10 @@ ${words}`;
     const next = () => t++;
     const hand = (p) => scaled3(p, 1 / scale);
     const nodes = r.nodes.slice(0, MERMAID_MAX_NODES);
-    const kept2 = new Set(nodes.map((x) => x.id));
+    const kept3 = new Set(nodes.map((x) => x.id));
     if (r.nodes.length > nodes.length) notes.push(`the text holds ${r.nodes.length} states and the board draws ${MERMAID_MAX_NODES} at most: the first ${MERMAID_MAX_NODES} are drawn`);
     const symbolOf2 = new Map(nodes.map((x) => [x.id, x.symbol]));
-    let among = r.links.filter((l) => kept2.has(l.from) && kept2.has(l.to));
+    let among = r.links.filter((l) => kept3.has(l.from) && kept3.has(l.to));
     const loopsOnMarks = among.filter((l) => l.self && symbolOf2.get(l.from) !== "state");
     if (loopsOnMarks.length) notes.push(`a transition from the start or the end to itself is not drawn \u2014 ${someWords(loopsOnMarks.map((l) => l.from))}`);
     among = among.filter((l) => !(l.self && symbolOf2.get(l.from) !== "state"));
@@ -26500,14 +26567,21 @@ ${pad}</${tag}>`;
     };
   }
   async function post(url, headers, body, timeoutMs, external, key2) {
+    return postJson(url, body, { headers, timeoutMs, signal: external, key: key2 });
+  }
+  async function postJson(url, body, options = {}) {
     const where = hostOf(url);
-    const { signal, done } = withTimeout(timeoutMs, external);
+    const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const key2 = options.key;
+    const { signal, done } = withTimeout(timeoutMs, options.signal);
+    const send = options.fetch ?? fetch;
     try {
-      const res = await fetch(url, {
+      const res = await send(url, {
         method: "POST",
-        headers: { "content-type": "application/json", ...headers },
+        headers: { "content-type": "application/json", ...options.headers ?? {} },
         body: JSON.stringify(body),
-        signal
+        signal,
+        ...options.credentials ? { credentials: options.credentials } : {}
       });
       const text = await res.text();
       if (!res.ok) return httpFailure(res.status, text, key2);
@@ -26517,7 +26591,7 @@ ${pad}</${tag}>`;
         return { ok: false, error: redact(`${where} answered, but not with JSON: \u201C${clip(text, 120)}\u201D`, key2), reason: "unreadable" };
       }
     } catch (err) {
-      return thrownFailure(err, where, timeoutMs, external, signal);
+      return thrownFailure(err, where, timeoutMs, options.signal, signal);
     } finally {
       done();
     }
@@ -26853,14 +26927,15 @@ ${pad}</${tag}>`;
   var NO_MATCH = "no-match";
   var DECIDER_TAKE_AT = 0.99;
   var FLAT_MARGIN = 0.05;
-  function choice(id, ask, candidates, about) {
+  function choice(id, ask, candidates, about, options = {}) {
     const has2 = candidates.some((c) => c.id === NO_MATCH);
     return {
       kind: "choice",
       id,
       ask,
       about,
-      candidates: has2 ? candidates : [...candidates, { id: NO_MATCH, text: "none of these" }]
+      candidates: has2 ? candidates : [...candidates, { id: NO_MATCH, text: "none of these" }],
+      ...options.reading === false ? { reading: false } : {}
     };
   }
   function score(id, ask, levels, about) {
@@ -26919,15 +26994,15 @@ ${pad}</${tag}>`;
     const margin = options.flatMargin ?? FLAT_MARGIN;
     const takeAt = options.takeAt ?? 0;
     const seating = { kind: "agent", name, capability: tier, locality: options.locality ?? "local" };
-    let id = session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
-    const seat = (now = at) => id = seatOn(session, seating, id, now);
-    async function ask(questions, now, signal) {
+    let id = heldParticipant(session.getState(), seating) ?? "";
+    const seat = (now = at) => id = seatOn(session, seating, id || void 0, now);
+    async function ask(questions, now, signal, shown2) {
       seat(now);
       const snapshot = session.getState().generation;
       const started = Date.now();
       let result2;
       try {
-        result2 = await transport(questions, { signal });
+        result2 = await transport(questions, shown2 ? { signal, state: shown2 } : { signal });
       } catch (e) {
         return {
           ok: false,
@@ -26942,6 +27017,7 @@ ${pad}</${tag}>`;
       if (!result2.ok) {
         return { ok: false, error: result2.error, rows: [], unanswered: questions.map((q) => q.id), snapshot, ms };
       }
+      const notes = result2.notes && result2.notes.length ? { notes: result2.notes.slice() } : {};
       const byId = new Map(result2.answers.map((a) => [a.questionId, a]));
       const rows = [];
       const unanswered = [];
@@ -26957,7 +27033,8 @@ ${pad}</${tag}>`;
         }
         const { flat, why } = isFlat(answer, margin);
         const below = !flat && takeAt > 0 && leadOf(answer) < takeAt;
-        rows.push({ question: q, answer, flat, flatWhy: why, reason: reasonOf(q, answer), held: false, ...below ? { below: true } : {} });
+        const none2 = !flat && answer.kind === "choice" && answer.pick === NO_MATCH;
+        rows.push({ question: q, answer, flat, flatWhy: why, reason: reasonOf(q, answer), held: false, ...below ? { below: true } : {}, ...none2 ? { none: true } : {} });
       }
       const state = session.getState();
       if (state.generation !== snapshot) {
@@ -26968,6 +27045,7 @@ ${pad}</${tag}>`;
           snapshot,
           ms,
           via: result2.via,
+          ...notes,
           refused: `the board was replaced while the seat was answering (generation ${snapshot} \u2192 ${state.generation})`
         };
       }
@@ -26977,7 +27055,7 @@ ${pad}</${tag}>`;
         const targets = (row.question.about ?? []).filter((n2) => state.nodes.has(n2));
         if (!targets.length) continue;
         const edges = [];
-        if (row.answer.kind === "choice" && row.answer.pick && row.answer.pick !== NO_MATCH) {
+        if (row.answer.kind === "choice" && row.answer.pick && row.answer.pick !== NO_MATCH && row.question.reading !== false) {
           edges.push({
             to: `type:${row.answer.pick.toLowerCase().replace(/\s+/g, "-")}`,
             rel: "resembles",
@@ -27002,10 +27080,10 @@ ${pad}</${tag}>`;
         const stale = session.getState().staleResult;
         row.held = !stale;
         if (stale) {
-          return { ok: true, rows, unanswered, snapshot, ms, via: result2.via, refused: stale.detail };
+          return { ok: true, rows, unanswered, snapshot, ms, via: result2.via, ...notes, refused: stale.detail };
         }
       }
-      return { ok: true, rows, unanswered, snapshot, ms, via: result2.via };
+      return { ok: true, rows, unanswered, snapshot, ms, via: result2.via, ...notes };
     }
     return { get id() {
       return id;
@@ -27074,15 +27152,17 @@ ${pad}</${tag}>`;
     "You are a decision seat for a drawing canvas. You are not a writer: you write no prose, no code, no geometry and no names you were not offered.",
     "You are given questions. Each has options. For each question, say how likely each option is: a probability for EVERY option of that question, summing to 1.",
     'One option of a choice is always "no-match" \u2014 none of these. Choose it when none of the others is right; a seat that must pick will pick wrongly.',
+    'When a "state" is given, it is what the board shows, in words: read it to decide. It is not a question.',
     "Reply with JSON only, in exactly this shape, and nothing around it:",
     '{"answers":[{"id":"<the question id>","probabilities":{"<option id>":<0 to 1>, ...}}]}'
   ].join("\n");
   var CHAT_DECIDE_WIRE = {
     id: "chat",
-    build(questions) {
+    build(questions, state) {
+      const said3 = state && state.text ? { state: state.text } : {};
       return [
         { role: "system", content: SYSTEM },
-        { role: "user", content: JSON.stringify({ questions: questions.map(wireQuestion) }) }
+        { role: "user", content: JSON.stringify({ ...said3, questions: questions.map(wireQuestion) }) }
       ];
     },
     parse(text, questions) {
@@ -27165,13 +27245,254 @@ ${pad}</${tag}>`;
   function createChatDecideTransport(config, options = {}) {
     const send = options.complete ?? complete;
     const wire = options.wire ?? CHAT_DECIDE_WIRE;
-    return async (questions, { signal }) => {
+    return async (questions, { signal, state }) => {
       if (!questions.length) return { ok: true, answers: [], via: config.model };
-      const res = await send(config, wire.build(questions), { signal });
+      const res = await send(config, wire.build(questions, state), { signal });
       if (!res.ok) return { ok: false, error: res.error };
       const read2 = wire.parse(res.text, questions);
       if (!read2.ok) return { ok: false, error: read2.error };
       return { ok: true, answers: read2.answers, via: config.model };
+    };
+  }
+
+  // src/llm/decide-systemone.ts
+  var SYSTEMONE_NONE = "none_of_these";
+  var SYSTEMONE_KEY = /^[a-z][a-z0-9_]{0,47}$/;
+  var SYSTEMONE_MAX_IMAGES = 4;
+  var SYSTEMONE_TIMEOUT_MS = 2e4;
+  var SYSTEMONE_WORDS_MAX = 1e3;
+  var SYSTEMONE_STATE_MAX = 16e3;
+  var SUM_SLACK = 0.02;
+  var SAME2 = 1e-6;
+  var NONE_WORDS = "none of these \u2014 choose this when no other option is right";
+  function clip3(text, max) {
+    if (text.length <= max) return text;
+    const cut = text.lastIndexOf(" ", max - 1);
+    return text.slice(0, cut > max / 2 ? cut : max - 1).trimEnd() + "\u2026";
+  }
+  function keyFor(id, n2, taken) {
+    const slug = id.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
+    const base = SYSTEMONE_KEY.test(slug) && slug !== SYSTEMONE_NONE ? slug : `option_${n2 + 1}`;
+    let k = base;
+    for (let i = 2; taken.has(k); i++) k = `${base}_${i}`;
+    taken.add(k);
+    return k;
+  }
+  function buildSystemOne(questions, state, options = {}) {
+    const names = /* @__PURE__ */ new Map();
+    const keys = /* @__PURE__ */ new Map();
+    const qs = {};
+    questions.forEach((q, i) => {
+      const name = `q${i + 1}`;
+      names.set(name, q.id);
+      const back = /* @__PURE__ */ new Map();
+      if (q.kind === "choice") {
+        const criteria = {};
+        const taken = /* @__PURE__ */ new Set([SYSTEMONE_NONE]);
+        let none2 = NONE_WORDS;
+        q.candidates.forEach((c, n2) => {
+          if (c.id === NO_MATCH) {
+            if (c.text && c.text !== "none of these") none2 = `${c.text} \u2014 choose this when no other option is right`;
+            return;
+          }
+          const k = keyFor(c.id, n2, taken);
+          back.set(k, c.id);
+          criteria[k] = clip3(c.text || c.id, SYSTEMONE_WORDS_MAX);
+        });
+        back.set(SYSTEMONE_NONE, NO_MATCH);
+        criteria[SYSTEMONE_NONE] = clip3(none2, SYSTEMONE_WORDS_MAX);
+        qs[name] = { type: "choice", instructions: clip3(q.ask, SYSTEMONE_WORDS_MAX), criteria };
+      } else if (q.kind === "score") {
+        q.levels.forEach((l) => back.set(l, l));
+        qs[name] = { type: "score", instructions: clip3(q.ask, SYSTEMONE_WORDS_MAX), criteria: q.levels.slice() };
+      } else {
+        back.set("yes", "yes");
+        back.set("no", "no");
+        qs[name] = { type: "noul", instructions: clip3(q.statement, SYSTEMONE_WORDS_MAX) };
+      }
+      keys.set(name, back);
+    });
+    const body = { ...options.model ? { model: options.model } : {}, state: clip3(state?.text ?? "", SYSTEMONE_STATE_MAX), questions: qs };
+    const images = options.sees && state?.images?.length ? state.images.slice(0, SYSTEMONE_MAX_IMAGES).map((im) => im.dataUrl) : [];
+    if (images.length) body.images = images;
+    return { body, names, options: keys };
+  }
+  var DIST_FIELDS = ["probabilities", "probs", "distribution"];
+  var YES_FIELDS = ["p_yes", "yes", "p_true", "probability", "p", "value"];
+  var PICK_FIELDS = ["choice", "answer", "pick", "option"];
+  var isNumber = (x) => typeof x === "number";
+  var integerLike = (k) => /^(0|[1-9][0-9]*)$/.test(k);
+  function rawDist(raw, numbersOk) {
+    const pairs = [];
+    if (Array.isArray(raw)) {
+      if (numbersOk && raw.length && raw.every(isNumber)) return { ok: true, pairs: raw.map((p, i) => [String(i), p]) };
+      for (const e of raw) {
+        const o = e && typeof e === "object" ? e : {};
+        const k = [o.option, o.of, o.id, o.level, o.label].find((x) => typeof x === "string" || isNumber(x));
+        const p = [o.p, o.prob, o.probability].find(isNumber);
+        if (k === void 0 || p === void 0) return { ok: false, why: "an entry of its distribution names no option or no probability" };
+        pairs.push([String(k), p]);
+      }
+    } else if (raw && typeof raw === "object") {
+      for (const [k, p] of Object.entries(raw)) {
+        if (!isNumber(p)) return { ok: false, why: `\u201C${k}\u201D in its distribution is not a number` };
+        pairs.push([k, p]);
+      }
+    } else return { ok: false, why: "its distribution is neither a map nor a list" };
+    const seen = /* @__PURE__ */ new Set();
+    for (const [k] of pairs) {
+      if (seen.has(k)) return { ok: false, why: `\u201C${k}\u201D is given twice in its distribution` };
+      seen.add(k);
+    }
+    return { ok: true, pairs };
+  }
+  function distributionOf2(a, resolve, numbersOk) {
+    const present = DIST_FIELDS.filter((f) => f in a);
+    if (!present.length) return { ok: false, why: "no distribution came back" + (PICK_FIELDS.some((f) => f in a) || "score" in a ? " \u2014 only a pick, which is not a distribution" : "") };
+    let first = null;
+    for (const f of present) {
+      const r = rawDist(a[f], numbersOk);
+      if (!r.ok) return r;
+      const d = resolve(r.pairs);
+      if (!d.ok) return d;
+      if (!first) {
+        first = d.dist;
+        continue;
+      }
+      const keys = /* @__PURE__ */ new Set([...first.keys(), ...d.dist.keys()]);
+      if ([...keys].some((k) => Math.abs((first.get(k) ?? 0) - (d.dist.get(k) ?? 0)) > SAME2)) return { ok: false, why: `two spellings of its distribution disagree (${present.join(", ")})` };
+    }
+    return { ok: true, dist: first };
+  }
+  function overOffered(dist12, offered2, notes, name) {
+    if ([...dist12.values()].some((p) => !Number.isFinite(p) || p < 0)) return "a probability that is not one";
+    const sum = [...dist12.values()].reduce((n2, p) => n2 + p, 0);
+    if (!(sum > 0)) return "its probabilities sum to nothing";
+    if (Math.abs(sum - 1) > SUM_SLACK) notes.push(`${name}: its probabilities summed to ${sum.toFixed(3)} \u2014 normalised`);
+    return [...offered2].map(([k, id]) => ({ of: id, p: (dist12.get(k) ?? 0) / sum }));
+  }
+  function choiceKeys(offered2) {
+    return (pairs) => {
+      const foreign = pairs.map(([k]) => k).filter((k) => !offered2.has(k));
+      if (foreign.length) return { ok: false, why: `it names an option nobody offered (${foreign.join(", ")})` };
+      return { ok: true, dist: new Map(pairs) };
+    };
+  }
+  function scoreKeys(levels) {
+    return (pairs) => {
+      const words = new Set(levels);
+      const byWord = pairs.every(([k]) => words.has(k));
+      const byPlace = pairs.every(([k]) => integerLike(k) && Number(k) < levels.length);
+      if (byWord && byPlace) return { ok: false, why: "its keys could be levels or places in the list of levels (a level is itself a number) \u2014 not read either way" };
+      if (byWord) return { ok: true, dist: new Map(pairs) };
+      if (byPlace) return { ok: true, dist: new Map(pairs.map(([k, p]) => [levels[Number(k)], p])) };
+      const foreign = pairs.map(([k]) => k).filter((k) => !words.has(k) && !(integerLike(k) && Number(k) < levels.length));
+      return { ok: false, why: foreign.length ? `it names a level nobody offered (${foreign.join(", ")})` : "its keys mix levels and places in the list" };
+    };
+  }
+  function legendAgrees(legend, levels) {
+    if (legend === void 0) return true;
+    const said3 = Array.isArray(legend) ? legend.map((x, i) => [String(i), x]) : legend && typeof legend === "object" ? Object.entries(legend) : null;
+    if (!said3) return false;
+    return said3.every(([k, v]) => {
+      if (typeof v === "string" && integerLike(k)) return levels[Number(k)] === v;
+      if (isNumber(v)) return levels[v] === k;
+      return false;
+    });
+  }
+  function yesOf(raw) {
+    const found = [];
+    if (isNumber(raw)) found.push(raw);
+    else if (raw && typeof raw === "object") {
+      const a = raw;
+      for (const f of YES_FIELDS) if (isNumber(a[f])) found.push(a[f]);
+      for (const f of DIST_FIELDS) {
+        if (!(f in a)) continue;
+        const r = rawDist(a[f], false);
+        if (!r.ok) return r;
+        const y = r.pairs.find(([k]) => k === "yes" || k === "true");
+        if (y) found.push(y[1]);
+        else return { ok: false, why: "its distribution has no yes" };
+      }
+    }
+    if (!found.length) return { ok: false, why: "no probability of yes came back" };
+    if (found.some((y) => Math.abs(y - found[0]) > SAME2)) return { ok: false, why: "two spellings of its probability of yes disagree" };
+    if (!(found[0] >= 0 && found[0] <= 1)) return { ok: false, why: "its probability of yes is not between 0 and 1" };
+    return { ok: true, yes: found[0] };
+  }
+  function readSystemOne(json, req, questions) {
+    const root = json && typeof json === "object" ? json : {};
+    const answers = root.answers;
+    if (!answers || typeof answers !== "object" || Array.isArray(answers)) return { ok: false, error: "the decision model\u2019s reply has no answers to read" };
+    const byId = new Map(questions.map((q) => [q.id, q]));
+    const out = [];
+    const notes = [];
+    for (const [name, raw] of Object.entries(answers)) {
+      const id = req.names.get(name);
+      const q = id ? byId.get(id) : void 0;
+      const offered2 = req.options.get(name);
+      if (!q || !offered2) {
+        notes.push(`${name}: not a question that was asked \u2014 left out`);
+        continue;
+      }
+      const a = raw && typeof raw === "object" ? raw : {};
+      if (typeof a.type === "string" && a.type !== q.kind) {
+        notes.push(`${name}: answered as a ${a.type}, asked as a ${q.kind} \u2014 left out`);
+        continue;
+      }
+      if (q.kind === "noul") {
+        const y = yesOf(raw);
+        if (!y.ok) {
+          notes.push(`${name}: ${y.why}`);
+          continue;
+        }
+        out.push({ kind: "noul", questionId: q.id, yes: y.yes });
+        continue;
+      }
+      const d = q.kind === "choice" ? distributionOf2(a, choiceKeys(offered2), false) : distributionOf2(a, scoreKeys(q.levels), true);
+      if (!d.ok) {
+        notes.push(`${name}: ${d.why}`);
+        continue;
+      }
+      if (q.kind === "score" && !legendAgrees(a.legend, q.levels)) {
+        notes.push(`${name}: its legend says the levels otherwise than they were sent`);
+        continue;
+      }
+      const probs = overOffered(d.dist, offered2, notes, name);
+      if (typeof probs === "string") {
+        notes.push(`${name}: ${probs}`);
+        continue;
+      }
+      const order2 = [...probs].sort((x, y) => y.p - x.p);
+      const vendor = isNumber(a.confidence) && a.confidence >= 0 && a.confidence <= 1 ? a.confidence : void 0;
+      if (q.kind === "score") {
+        const expectation = probs.reduce((n2, p) => n2 + q.levels.indexOf(p.of) * p.p, 0);
+        if (isNumber(a.score) && Math.abs(a.score - expectation) > FLAT_MARGIN) notes.push(`${name}: said a score of ${a.score.toFixed(2)}, its distribution makes ${expectation.toFixed(2)} \u2014 the distribution is read`);
+        out.push({ kind: "score", questionId: q.id, levels: q.levels, distribution: probs, expectation, confidence: vendor ?? order2[0].p });
+        continue;
+      }
+      const pick3 = order2.length > 1 && order2[0].p - order2[1].p < FLAT_MARGIN ? null : order2[0]?.of ?? null;
+      const said3 = PICK_FIELDS.map((f) => a[f]).find((x) => typeof x === "string");
+      if (said3 !== void 0 && (offered2.get(said3) ?? said3) !== order2[0]?.of) notes.push(`${name}: said \u201C${said3}\u201D, its distribution leads with another \u2014 the distribution is read`);
+      out.push({ kind: "choice", questionId: q.id, pick: pick3, distribution: probs, confidence: vendor ?? order2[0].p });
+    }
+    return { ok: true, answers: out, notes };
+  }
+  function createSystemOneDecideTransport(o) {
+    return async (questions, { signal, state }) => {
+      if (!questions.length) return { ok: true, answers: [], via: o.model };
+      const req = buildSystemOne(questions, state, { model: o.model, sees: o.sees });
+      const res = await postJson(o.endpoint, req.body, {
+        headers: o.headers,
+        timeoutMs: o.timeoutMs ?? SYSTEMONE_TIMEOUT_MS,
+        signal,
+        fetch: o.fetch,
+        credentials: "omit"
+      });
+      if (!res.ok) return { ok: false, error: res.error };
+      const read2 = readSystemOne(res.json, req, questions);
+      if (!read2.ok) return { ok: false, error: read2.error };
+      return { ok: true, answers: read2.answers, via: o.model, ...read2.notes.length ? { notes: read2.notes } : {} };
     };
   }
 
@@ -27407,10 +27728,10 @@ if (mm.THREE && mm.scene) {
     return out;
   }
   function offersFor(scope, ctx = NO_CONTEXT) {
-    return gather2(registry3.values(), (tool) => tool.offers(scope, ctx));
+    return keepingNotations(scope.state, () => gather2(registry3.values(), (tool) => tool.offers(scope, ctx)));
   }
   function completionsFor(scope, ctx = NO_CONTEXT) {
-    return gather2(registry3.values(), (tool) => tool.completes ? tool.completes(scope, ctx) : []);
+    return keepingNotations(scope.state, () => gather2(registry3.values(), (tool) => tool.completes ? tool.completes(scope, ctx) : []));
   }
   function toolsFor(scope, ctx = NO_CONTEXT) {
     return registeredTools().filter((tool) => tool.offers(scope, ctx).length > 0);
@@ -28356,12 +28677,12 @@ Reply with ONLY a JSON object, no prose, no code fences:
     }
     return void 0;
   }
-  function parseLineReadings(text, count9) {
-    const out = Array.from({ length: Math.max(0, count9) }, () => []);
-    if (!text || count9 < 1) return out;
+  function parseLineReadings(text, count10) {
+    const out = Array.from({ length: Math.max(0, count10) }, () => []);
+    if (!text || count10 < 1) return out;
     const clean = unfence(text);
     const put = (line, t, confidence) => {
-      if (!Number.isInteger(line) || line < 1 || line > count9) return;
+      if (!Number.isInteger(line) || line < 1 || line > count10) return;
       const said3 = typeof t === "string" ? t.trim() : "";
       if (said3) out[line - 1].push({ text: said3, confidence: clamp01(confidence) });
     };
@@ -28390,7 +28711,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
           any = true;
         }
       }
-      if (!any && count9 === 1) {
+      if (!any && count10 === 1) {
         const bare = clean.replace(/^["'\s]+|["'\s]+$/g, "");
         if (bare && bare.length <= 200 && !/\n/.test(bare) && !/^the image|^i (can|cannot|can't)/i.test(bare)) put(1, bare, 0.5);
       }
@@ -28685,357 +29006,6 @@ Reply with ONLY a JSON object, no prose, no code fences:
     }
   };
 
-  // src/tools/mermaid.ts
-  var MIN_W = 320;
-  var MIN_H = 240;
-  var MAX_W = 900;
-  var MAX_H = 900;
-  var GAP_SHARE = 0.12;
-  var MIN_GAP = 48;
-  function mermaidFor(state, ids, isRead2 = () => false) {
-    const words = (id) => isRead2(id) && !transcriptOf(state.nodes.get(id));
-    for (const reading7 of notationsOf(state, ids)) {
-      if (reading7.confidence < NOTATION_FLOOR) continue;
-      const said3 = toMermaid(reading7, { readWith: words });
-      if (said3) return { reading: reading7, said: said3 };
-    }
-    return null;
-  }
-  var mermaidOf = (scope) => mermaidFor(scope.state, scope.marks, scope.host.isRead);
-  function standing(scope, text) {
-    const s = scope.state;
-    return s.artifacts.some((id) => {
-      const n2 = s.nodes.get(id);
-      const rep = n2 && codeRepOf(n2);
-      return !!rep && rep.data.kind === "mermaid" && rep.data.code === text;
-    });
-  }
-  var reasonOf2 = (reading7) => `${describeNotation(reading7)} \u2014 as Mermaid text beside it; the drawing stays`;
-  var MERMAID = {
-    id: "mermaid",
-    name: "Mermaid",
-    describe: () => "a drawing that reads as a flowchart, a class diagram or a sequence diagram said as Mermaid text, an artifact beside it that draws the diagram; the drawing stays",
-    offers(scope) {
-      if (scope.marks.length < 2) return [];
-      if (scope.marks.some((id) => scope.state.artifacts.includes(id))) return [];
-      const m = mermaidOf(scope);
-      if (!m || standing(scope, m.said.text)) return [];
-      return [{
-        key: "mermaid",
-        label: "Make it Mermaid",
-        reason: reasonOf2(m.reading),
-        base: 0.35,
-        tool: "mermaid",
-        verbs: ["mermaid", "mmd", "as mermaid"],
-        data: { notation: m.reading.notation }
-      }];
-    },
-    take(_offer, scope, session, at) {
-      const m = mermaidOf(scope);
-      if (!m) return { made: null, detail: { ok: false, error: "the marks held no longer read as a diagram" } };
-      const box = unionOf(scope.marks.map((id) => boundsOf(scope.state.nodes.get(id))).filter((b) => !!b));
-      if (!box) return { made: null, detail: { ok: false, error: "the marks held have nowhere to stand beside" } };
-      const w2 = Math.min(MAX_W, Math.max(MIN_W, box.maxX - box.minX));
-      const h2 = Math.min(MAX_H, Math.max(MIN_H, box.maxY - box.minY));
-      const x = box.maxX + Math.max(MIN_GAP, (box.maxX - box.minX) * GAP_SHARE);
-      const path = `${m.reading.notation}.mmd`;
-      const made = session.import({ kind: "mermaid", path, name: path, bounds: { minX: x, minY: box.minY, maxX: x + w2, maxY: box.minY + h2 }, code: m.said.text, at });
-      return { made, detail: { ok: !!made, notation: m.reading.notation, diagram: m.said.diagram, text: m.said.text, notes: m.said.notes, reading: describeNotation(m.reading) } };
-    }
-  };
-
-  // src/tools/mermaid-draw.ts
-  var THINGS = { sequence: ["participant", "participants"], "uml-class": ["class", "classes"] };
-  var LINKS = { sequence: ["message", "messages"] };
-  var counted = (n2, [one, many]) => `${n2} ${n2 === 1 ? one : many}`;
-  function withArticle(name) {
-    const acronym = /^[A-Z]{2,}\b/.test(name);
-    const said3 = acronym ? name : name.toLowerCase();
-    return `${!acronym && /^[aeio]/.test(said3) ? "an" : "a"} ${said3}`;
-  }
-  var MERMAID_DRAW = {
-    id: "mermaid-draw",
-    name: "drawing from Mermaid",
-    describe: () => "a Mermaid text, read as a flowchart, a class diagram or a sequence diagram, drawn as marks that read back as the same diagram; the text stays",
-    offers(scope) {
-      if (scope.marks.length !== 1) return [];
-      const id = scope.marks[0];
-      if (!scope.state.artifacts.includes(id)) return [];
-      const node = scope.state.nodes.get(id);
-      const rep = node && codeRepOf(node);
-      if (!rep || rep.data.kind !== "mermaid" || !rep.data.code) return [];
-      const read2 = readMermaid(rep.data.code);
-      if (!read2.notation) return [];
-      const name = notationById(read2.notation)?.name ?? read2.notation;
-      const what = `${counted(read2.nodes.length, THINGS[read2.notation] ?? ["node", "nodes"])} and ${counted(read2.links.length, LINKS[read2.notation] ?? ["link", "links"])} read as ${withArticle(name)}`;
-      return [{
-        key: "mermaid-draw",
-        label: "Draw it",
-        reason: `${what} \u2014 drawn as marks the canvas reads back as the same diagram; the text stays`,
-        base: 0.95,
-        tool: "mermaid-draw",
-        verbs: ["draw it", "ink it"],
-        data: { artifact: id, notation: read2.notation }
-      }];
-    },
-    take(offer) {
-      return { host: "mermaid-draw", detail: offer.data };
-    }
-  };
-
-  // src/tools/route.ts
-  var TIDY_TOLERANCE = 0.5;
-  var LEFT_AS_DRAWN = /* @__PURE__ */ new Set(["sequence"]);
-  function diagramOf(state, ids) {
-    for (const reading7 of notationsOf(state, ids)) {
-      if (reading7.confidence < NOTATION_FLOOR || LEFT_AS_DRAWN.has(reading7.notation)) continue;
-      const tied = reading7.connectors.map((c) => c.id).filter((id) => routable(state.nodes.get(id), state.nodes));
-      if (!tied.length) continue;
-      const toRoute = tied.filter((id) => !routeRepOf(state.nodes.get(id)));
-      const routed = tied.filter((id) => !!routeRepOf(state.nodes.get(id)));
-      const plan = tidyPlanOf(state.nodes, reading7);
-      return { reading: reading7, toRoute, routed, plan, unaligned: plan.ranks.filter((r) => r.spread > TIDY_TOLERANCE) };
-    }
-    return null;
-  }
-  var reasonOf3 = (reading7) => `${describeNotation(reading7)} \u2014 connectors at right angles between their ports; your ink stays faint beneath`;
-  var centreOf8 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
-  function tidyDiagram(session, reading7, at) {
-    let ranks = 0;
-    const plan = tidyPlanOf(session.getState().nodes, reading7);
-    for (const rank2 of plan.ranks) {
-      if (rank2.spread <= TIDY_TOLERANCE) continue;
-      const before = new Map(rank2.ids.map((id) => [id, centreOf8(boundsOf(session.getState().nodes.get(id)))]));
-      session.tidy({ ids: rank2.ids, mode: "align", axis: rank2.axis, at });
-      ranks++;
-      const state2 = session.getState();
-      for (const id of rank2.ids) {
-        const now = boundsOf(state2.nodes.get(id));
-        const was = before.get(id);
-        if (!now) continue;
-        const c = centreOf8(now), dx = c.x - was.x, dy = c.y - was.y;
-        if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) continue;
-        const words = reading7.labels.filter((l) => l.of === id && l.id !== id && state2.contentIds.includes(l.id)).map((l) => l.id);
-        if (words.length) session.move({ ids: words, dx, dy, at });
-      }
-    }
-    const state = session.getState();
-    const ids = reading7.connectors.map((c) => c.id).filter((id) => state.nodes.get(id) && routable(state.nodes.get(id), state.nodes) && !routeRepOf(state.nodes.get(id)));
-    return { ranks, routed: session.route({ ids, at }) };
-  }
-  var ROUTE = {
-    id: "route",
-    name: "routing",
-    describe: () => "connectors drawn at right angles between their ports, or the whole diagram tidied \u2014 its symbols lined up and its connectors routed; the ink kept faint beneath",
-    offers(scope) {
-      if (scope.marks.length < 2) return [];
-      if (scope.marks.some((id) => scope.state.artifacts.includes(id))) return [];
-      const d = diagramOf(scope.state, scope.marks);
-      if (!d) return [];
-      const out = [];
-      const n2 = d.reading.notation;
-      if (d.toRoute.length || d.unaligned.length) {
-        out.push({
-          key: "tidy-diagram",
-          label: "Tidy the diagram",
-          reason: reasonOf3(d.reading),
-          base: 0.32,
-          tool: "route",
-          verbs: ["tidy the diagram", "tidy diagram", "tidy up the diagram"],
-          data: { notation: n2 }
-        });
-      }
-      if (d.toRoute.length) {
-        out.push({
-          key: "route",
-          label: "Route the connectors",
-          reason: reasonOf3(d.reading),
-          base: 0.28,
-          tool: "route",
-          verbs: ["route", "orthogonal", "right angles"],
-          data: { notation: n2 }
-        });
-      }
-      if (d.routed.length) {
-        out.push({
-          key: "unroute",
-          label: "Show the connectors as drawn",
-          reason: `${d.routed.length === 1 ? "the routed connector" : d.routed.length + " routed connectors"} back as you drew ${d.routed.length === 1 ? "it" : "them"} \u2014 the routing taken off, your ink in front again`,
-          base: 0.12,
-          tool: "route",
-          verbs: ["unroute", "as drawn", "show the ink"],
-          data: { notation: n2 }
-        });
-      }
-      return out;
-    },
-    take(offer, scope, session, at) {
-      const notation = offer.data?.notation;
-      const state = session.getState();
-      const d = diagramOf(state, scope.marks);
-      if (!d || notation && d.reading.notation !== notation) return { detail: { ok: false, error: "the marks held no longer read as a diagram with connectors to route" } };
-      if (offer.key === "unroute") return { detail: { ok: true, unrouted: session.route({ ids: d.routed, mode: "raw", at }) } };
-      if (offer.key === "route") return { detail: { ok: true, routed: session.route({ ids: d.toRoute, at }) } };
-      const done = tidyDiagram(session, d.reading, at);
-      return { detail: { ok: true, ...done, notation: d.reading.notation } };
-    }
-  };
-
-  // src/tools/which.ts
-  var TIE_MARGIN = 0.05;
-  function tiedMatches(matches, margin = TIE_MARGIN) {
-    if (!matches.length) return [];
-    const top = Math.max(...matches.map((m) => m.score));
-    return matches.filter((m) => top - m.score <= margin);
-  }
-  var WHICH = {
-    id: "which",
-    name: "which is it",
-    describe: () => "when two definitions match a group about equally, ask the decider which \u2014 its answer joins the readings, held, and is taken only when it is sure",
-    asks: "model",
-    offers(scope) {
-      const decider = scope.host.decider;
-      if (!decider || !scope.marks.length) return [];
-      const matches = scope.summon.suggestions.filter((s) => s.kind === "match").map((s) => ({ artifactId: s.artifactId ?? s.id, name: s.label, score: s.score ?? 0, reasoning: s.reasoning ?? "", ...s.pack ? { pack: s.pack } : {} }));
-      const tied = tiedMatches(matches);
-      if (tied.length < 2) return [];
-      const seen = /* @__PURE__ */ new Set();
-      const candidates = tied.filter((m) => !seen.has(m.name) && !!seen.add(m.name)).map((m) => ({ id: m.name, text: m.reasoning ? `${m.name} \u2014 ${m.reasoning}` : m.name }));
-      if (candidates.length < 2) return [];
-      return [{
-        key: "which",
-        label: "Which is it?",
-        reason: `${candidates.map((c) => c.id).join(" and ")} match about equally \u2014 asks ${decider.name} to choose; its answer joins the readings and the engine's ranking stands unless it is sure`,
-        base: 0.7,
-        tool: "which",
-        asks: "model",
-        verbs: ["which", "which is it", "decide"],
-        data: { ids: scope.marks.slice(), candidates }
-      }];
-    },
-    take: () => ({ host: "which" })
-  };
-
-  // src/tools/trace.ts
-  var TRACE = {
-    id: "trace",
-    name: "tracing a picture",
-    describe: () => "a picture held alone, traced into ink the engine reads as a hand\u2019s drawing, over the picture, which stays",
-    offers(scope) {
-      if (scope.marks.length !== 1) return [];
-      const id = scope.marks[0];
-      if (!scope.state.artifacts.includes(id)) return [];
-      const node = scope.state.nodes.get(id);
-      const p = node && pictureOf(node);
-      if (!p || !p.asset) return [];
-      return [{
-        key: "trace",
-        label: "Trace into ink",
-        reason: "the lines of the picture as strokes of ink over it, which the canvas reads as a hand\u2019s own \u2014 the picture stays, and one undo takes the ink away",
-        base: 0.6,
-        tool: "trace",
-        verbs: ["trace", "trace it", "ink it"],
-        data: { artifact: id, asset: p.asset }
-      }];
-    },
-    take(offer) {
-      return { host: "trace", detail: offer.data };
-    }
-  };
-
-  // src/tools/region.ts
-  var REGION_MIN_HELD = 3;
-  var REGION_MARGIN_SHARE = 0.06;
-  var REGION_MARGIN_MIN = 20;
-  var live3 = (state, id) => {
-    const n2 = state.nodes.get(id);
-    return !!n2 && !getRep(n2, "erased");
-  };
-  function isBox2(state, id) {
-    const n2 = state.nodes.get(id);
-    if (!n2 || !getRep(n2, "stroke")) return false;
-    return topInterpretation(n2) === "rectangle" || cleanOf(n2)?.shape === "rectangle";
-  }
-  function regionFrameOf(state, ids) {
-    const marks = ids.filter((id) => live3(state, id));
-    let best = null;
-    for (const id of marks) {
-      if (!isBox2(state, id)) continue;
-      const b = boundsOf(state.nodes.get(id));
-      if (!b) continue;
-      const others = marks.filter((o) => o !== id);
-      if (!others.length) continue;
-      const inside = others.every((o) => {
-        const ob = standingBoxOf(state.nodes, state.nodes.get(o));
-        return !!ob && shareInside(ob, b) >= REGION_HOLDS;
-      });
-      if (!inside) continue;
-      const area3 = (b.maxX - b.minX) * (b.maxY - b.minY);
-      if (!best || area3 > best.area) best = { frame: id, held: others, area: area3 };
-    }
-    return best ? { frame: best.frame, held: best.held } : null;
-  }
-  function regionRound(state, ids) {
-    let box = null;
-    for (const id of ids) {
-      const n2 = state.nodes.get(id);
-      const b = n2 && live3(state, id) ? standingBoxOf(state.nodes, n2) : void 0;
-      if (!b) continue;
-      box = box ? { minX: Math.min(box.minX, b.minX), minY: Math.min(box.minY, b.minY), maxX: Math.max(box.maxX, b.maxX), maxY: Math.max(box.maxY, b.maxY) } : { ...b };
-    }
-    if (!box) return null;
-    const m = Math.max(REGION_MARGIN_MIN, REGION_MARGIN_SHARE * Math.max(box.maxX - box.minX, box.maxY - box.minY));
-    return { minX: box.minX - m, minY: box.minY - m, maxX: box.maxX + m, maxY: box.maxY + m };
-  }
-  function nextRegionName(state) {
-    const taken = new Set(regionsOfBoard(state).map((r) => r.name.toLowerCase()));
-    for (let n2 = 1; ; n2++) if (!taken.has("region " + n2)) return "Region " + n2;
-  }
-  function makeRegion(session, args) {
-    const state = session.getState();
-    const name = (args.name ?? "").trim() || nextRegionName(state);
-    const found = regionFrameOf(state, args.ids);
-    let bounds = null, from, around = "marks";
-    if (found) {
-      bounds = boundsOf(state.nodes.get(found.frame)) ?? null;
-      from = found.frame;
-      around = "frame";
-    } else if (!args.frameOnly) {
-      bounds = regionRound(state, args.ids);
-    }
-    if (!bounds) return null;
-    const b = bounds;
-    return session.withTool(REGION.id, () => {
-      if (args.summonId && state.summon && state.summon.id === args.summonId) session.dismiss(args.summonId, args.at);
-      if (session.getState().selection.length) session.deselect(args.at);
-      const id = session.region({ name, bounds: b, ...from ? { from } : {}, at: args.at });
-      return id ? { id, name, around, bounds: b } : null;
-    }, args.offer ?? "region");
-  }
-  var REGION = {
-    id: "region",
-    name: "regions",
-    describe: () => "a named rectangle on the board that holds whatever stands inside it \u2014 ink, pictures, text, figures \u2014 and takes it along when it moves; made of a rectangle drawn round things, or typed (region: Monday) round the marks held",
-    offers(scope) {
-      const found = regionFrameOf(scope.state, scope.marks);
-      if (!found || found.held.length < REGION_MIN_HELD) return [];
-      return [{
-        key: "region",
-        label: "Make it a region",
-        reason: "the rectangle holds " + found.held.length + " marks \u2014 make it a place on the board, named, that takes what stands inside it when it moves; your ink stays, and type region: and a name to name it",
-        base: 0.3,
-        tool: "region",
-        verbs: ["make it a region", "make a region", "region"],
-        data: { ids: scope.marks.slice() }
-      }];
-    },
-    take(offer, scope, session, at) {
-      const d = offer.data;
-      const made = makeRegion(session, { ids: d.ids, at, summonId: scope.summon.id, offer: offer.key });
-      return made ? { made: made.id, detail: made } : { detail: null };
-    }
-  };
-
   // src/search/extract.ts
   var sources = /* @__PURE__ */ new Map();
   function registerSearchSource(src) {
@@ -29188,6 +29158,610 @@ Reply with ONLY a JSON object, no prose, no code fences:
     return out.slice(0, MAX_ENTRIES);
   }
 
+  // src/participants/decide-state.ts
+  var DECIDE_STATE_MAX = 4e3;
+  var BESIDE_SHARE = 0.5;
+  var WORDS_SAID = 400;
+  var CANDIDATE_WORDS_SAID = 160;
+  var WRITTEN = /* @__PURE__ */ new Set(["label", "transcript", "text", "figure", "region"]);
+  var NOTATIONS_SAID = 3;
+  var PLURAL = {
+    rectangle: ["box", "boxes"],
+    circle: ["circle", "circles"],
+    triangle: ["triangle", "triangles"],
+    line: ["line", "lines"],
+    arc: ["arc", "arcs"],
+    arrow: ["arrow", "arrows"],
+    dot: ["dot", "dots"],
+    text: ["piece of writing", "pieces of writing"]
+  };
+  var NUMBER = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
+  var count9 = (n2) => n2 < NUMBER.length ? NUMBER[n2] : String(n2);
+  var ORDINAL = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"];
+  var ordinal = (i) => ORDINAL[i] ?? `number ${i + 1}`;
+  function whatIs(state, node) {
+    if (state.artifacts.includes(node.id)) return "thing";
+    const rung = interpretationsOf(node, state.nodes).find(isShapeRungReading);
+    return rung ? rung.label : "ink";
+  }
+  function shapesCounted(state, ids) {
+    const tally2 = /* @__PURE__ */ new Map();
+    for (const id of ids) {
+      const node = state.nodes.get(id);
+      if (!node) continue;
+      const w2 = whatIs(state, node);
+      tally2.set(w2, (tally2.get(w2) ?? 0) + 1);
+    }
+    const said3 = [...tally2].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([w2, n2]) => {
+      if (w2 === "thing") return `${count9(n2)} ${n2 === 1 ? "thing made" : "things made"}`;
+      if (w2 === "ink") return `${count9(n2)} ${n2 === 1 ? "mark the shapes do not place" : "marks the shapes do not place"}`;
+      const [one, many] = PLURAL[w2] ?? [w2, w2 + "s"];
+      return `${count9(n2)} ${n2 === 1 ? one : many}`;
+    });
+    return said3.join(", ") || "nothing";
+  }
+  function unionOf2(boxes) {
+    if (!boxes.length) return null;
+    return boxes.reduce((u, b) => ({ minX: Math.min(u.minX, b.minX), minY: Math.min(u.minY, b.minY), maxX: Math.max(u.maxX, b.maxX), maxY: Math.max(u.maxY, b.maxY) }));
+  }
+  function excerpt(text, max) {
+    if (text.length <= max) return text;
+    const cut = text.lastIndexOf(" ", max - 1);
+    return text.slice(0, cut > max / 2 ? cut : max - 1).trimEnd() + "\u2026";
+  }
+  function withoutIds(text, state) {
+    let out = text;
+    for (const id of state.nodes.keys()) {
+      if (id.length < 4 || !/[^A-Za-z0-9]/.test(id)) continue;
+      for (const form of [id, id.replace(/[^A-Za-z0-9]+/g, "_")]) if (out.includes(form)) out = out.split(form).join("\u2026");
+    }
+    return out;
+  }
+  function writtenOn(state, ids, max = WORDS_SAID) {
+    const regions = new Set(state.regions ?? []);
+    const order2 = [];
+    const take = (id) => {
+      if (!order2.includes(id)) order2.push(id);
+    };
+    for (const id of ids) {
+      take(id);
+      if (regions.has(id)) for (const m of regionMembers(state, id)) take(m);
+    }
+    const said3 = [];
+    for (const id of order2) {
+      for (const e of searchEntriesOf(state, /* @__PURE__ */ new Set([id]))) {
+        if (!WRITTEN.has(e.kind)) continue;
+        const t = e.text.replace(/\s+/g, " ").trim();
+        if (t && !said3.includes(t)) said3.push(t);
+      }
+    }
+    return excerpt(said3.join(" "), max);
+  }
+  function wordsBeside(state, ids, options = {}) {
+    const own = /* @__PURE__ */ new Set([...ids, ...options.exclude ?? []]);
+    const box = unionOf2(ids.map((id) => state.nodes.get(id)).filter((n2) => !!n2).map((n2) => boundsOf(n2)).filter((b) => !!b));
+    if (!box) return "";
+    const m = BESIDE_SHARE * Math.max(box.maxX - box.minX, box.maxY - box.minY, 1);
+    const near = [];
+    for (const id of state.contentIds) {
+      if (own.has(id)) continue;
+      const node = state.nodes.get(id);
+      const b = node && boundsOf(node);
+      if (!b || b.maxX < box.minX - m || b.minX > box.maxX + m || b.maxY < box.minY - m || b.minY > box.maxY + m) continue;
+      if (membersOf(node).some((x) => own.has(x))) continue;
+      near.push(id);
+    }
+    return near.length ? writtenOn(state, near, options.max ?? WORDS_SAID) : "";
+  }
+  var quoted2 = (words) => words ? `\u201C${words}\u201D` : "nothing";
+  function membersOf(node) {
+    return node.edges.filter((e) => e.rel === "has-part").map((e) => e.to);
+  }
+  function definitionWords(state, c, options = {}) {
+    const node = c.artifactId ? state.nodes.get(c.artifactId) : void 0;
+    const examples = node ? getRep(node, "examples")?.data?.accepted?.length ?? 0 : 0;
+    const pack = node ? packDefinitionOf(node) : void 0;
+    if (pack || c.pack) {
+      const from = pack?.pack ?? c.pack ?? "a library pack";
+      const packNode = state.nodes.get(`library:${from}`);
+      const packName = packNode ? wordOf(packNode) : void 0;
+      return withoutIds(`a definition from the ${packName ? `${packName} pack` : `library pack ${from}`}` + (pack?.describes ? `: ${excerpt(pack.describes, CANDIDATE_WORDS_SAID)}` : "") + `; drawn ${count9(examples + 1)} ${examples ? "ways" : "way"}`, state);
+    }
+    if (!node) return "a definition this board no longer holds";
+    const defs = state.artifacts.filter((id) => {
+      const n2 = state.nodes.get(id);
+      return !!n2 && !!getRep(n2, "signature");
+    });
+    const at = defs.indexOf(node.id);
+    const members = membersOf(node).filter((id) => state.nodes.has(id));
+    const on = members.length ? writtenOn(state, members, CANDIDATE_WORDS_SAID) : "";
+    const beside = members.length ? wordsBeside(state, members.concat(node.id), { exclude: options.exclude, max: CANDIDATE_WORDS_SAID }) : "";
+    return withoutIds(`this board's definition, the ${at >= 0 ? `${ordinal(at)} of ${count9(defs.length)}` : "one"} named here` + (members.length ? `, drawn as ${count9(members.length)} ${members.length === 1 ? "mark" : "marks"} (${shapesCounted(state, members)})` : "") + `; ${examples ? `taught ${count9(examples)} more ${examples === 1 ? "example" : "examples"} since` : "taught no other example since"}; written on its drawing: ${quoted2(on)}; written beside it: ${quoted2(beside)}`, state);
+  }
+  function groundOf(state, c) {
+    const node = c.artifactId ? state.nodes.get(c.artifactId) : void 0;
+    return node ? [node.id, ...membersOf(node)] : [];
+  }
+  function candidateWords(state, candidates, held2) {
+    const grounds = candidates.map((c) => groundOf(state, c));
+    return candidates.map((c, i) => definitionWords(state, c, { exclude: [...held2, ...grounds.filter((_, j) => j !== i).flat()] }));
+  }
+  function capped(lines, max) {
+    let text = lines.join("\n");
+    if (text.length <= max) return text;
+    const tail = "\n(more on the board, left out)";
+    const kept3 = lines.slice();
+    while (kept3.length > 1 && kept3.join("\n").length + tail.length > max) kept3.pop();
+    text = kept3.join("\n") + tail;
+    return text.length <= max ? text : text.slice(0, max - 1) + "\u2026";
+  }
+  function decisionStateOf(state, ids, options = {}) {
+    const marks = ids.filter((id) => state.nodes.has(id));
+    const lines = [];
+    for (const l of options.lead ?? []) if (l) lines.push(l);
+    lines.push(`The marks asked about: ${count9(marks.length)} ${marks.length === 1 ? "mark" : "marks"} \u2014 ${shapesCounted(state, marks)}.`);
+    if (options.reading) {
+      const roles = /* @__PURE__ */ new Map();
+      for (const r of options.reading.roles) roles.set(r.role, (roles.get(r.role) ?? 0) + 1);
+      const played = [...roles].filter(([r]) => r !== "unclassified").map(([r, n2]) => `${count9(n2)} ${n2 === 1 ? r : r + "s"}`);
+      if (played.length) lines.push(`They play: ${played.join(", ")}; the drawing reads as a ${options.reading.genre.genre}.`);
+    }
+    const notations = marks.length >= 2 && !marks.some((id) => state.artifacts.includes(id)) ? notationsOf(state, marks).slice(0, NOTATIONS_SAID) : [];
+    if (notations.length) lines.push(`As diagrams they read as: ${notations.map(describeNotation).join("; ")}.`);
+    const defs = (options.candidates ?? []).filter((c) => c.artifactId || c.pack);
+    const grounds = defs.flatMap((c) => groundOf(state, c));
+    const on = writtenOn(state, marks);
+    lines.push(`Written on them: ${quoted2(on)}.`);
+    const beside = wordsBeside(state, marks, { exclude: grounds });
+    lines.push(`Written beside them: ${quoted2(beside)}.`);
+    if (defs.length) {
+      lines.push("Where each candidate came from:");
+      candidateWords(state, defs, marks).forEach((w2, i) => lines.push(`- ${defs[i].name}: ${w2}.`));
+    }
+    return { text: capped(withoutIds(lines.join("\n"), state).split("\n"), DECIDE_STATE_MAX) };
+  }
+
+  // src/tools/which.ts
+  var TIE_MARGIN = 0.05;
+  function tiedMatches(matches, margin = TIE_MARGIN) {
+    if (!matches.length) return [];
+    const top = Math.max(...matches.map((m) => m.score));
+    return matches.filter((m) => top - m.score <= margin);
+  }
+  function whichQuestion(ids, candidates) {
+    return choice("which:" + (ids[0] ?? ""), "which of these is the group of marks?", candidates.slice(), ids.slice());
+  }
+  var WHICH = {
+    id: "which",
+    name: "which is it",
+    describe: () => "when two definitions match a group about equally, ask the decider which \u2014 shown the words of the marks and where each definition came from; its answer joins the readings, held, and is taken only when it is sure",
+    asks: "model",
+    offers(scope) {
+      const decider = scope.host.decider;
+      if (!decider || !scope.marks.length) return [];
+      const matches = scope.summon.suggestions.filter((s) => s.kind === "match").map((s) => ({ artifactId: s.artifactId ?? s.id, name: s.label, score: s.score ?? 0, reasoning: s.reasoning ?? "", ...s.pack ? { pack: s.pack } : {} }));
+      const tied = tiedMatches(matches);
+      if (tied.length < 2) return [];
+      const seen = /* @__PURE__ */ new Set();
+      const kept3 = tied.filter((m) => !seen.has(m.name) && !!seen.add(m.name));
+      const definitions = kept3.map((m) => ({ name: m.name, artifactId: m.artifactId, ...m.pack ? { pack: m.pack } : {} }));
+      const words = candidateWords(scope.state, definitions, scope.marks);
+      const candidates = kept3.map((m, i) => ({ id: m.name, text: `${m.name} \u2014 matches the group ${m.score.toFixed(2)}; ${words[i]}` }));
+      if (candidates.length < 2) return [];
+      return [{
+        key: "which",
+        label: "Which is it?",
+        reason: `${candidates.map((c) => c.id).join(" and ")} match about equally \u2014 asks ${decider.name} to choose, sending it the words of these marks and where each definition came from; its answer joins the readings and the engine's ranking stands unless it is sure`,
+        base: 0.7,
+        tool: "which",
+        asks: "model",
+        verbs: ["which", "which is it", "decide"],
+        data: { ids: scope.marks.slice(), candidates, definitions }
+      }];
+    },
+    take: () => ({ host: "which" })
+  };
+
+  // src/tools/which-notation.ts
+  var NOTATION_OFFER_FROM = 0.15;
+  var NOTATION_QUESTION = "notation:";
+  var PLAIN_WORDS = "a plain diagram \u2014 boxes or shapes joined by lines, no notation in particular (written as a flowchart with no direction)";
+  function notationQuestion(ids, candidates) {
+    return choice(NOTATION_QUESTION + (ids[0] ?? ""), "which kind of diagram is this drawing?", candidates.slice(), ids.slice(), { reading: false });
+  }
+  function notationCandidates(state, ids, known2) {
+    const out = (known2 ? known2.readings : notationsOf(state, ids)).filter((r) => r.notation !== DIAGRAM_NOTATION && r.confidence > 0).map((r) => ({ id: r.notation, text: describeNotation(r) }));
+    if (known2 ? known2.plain : readPlainDiagram(state, ids)) out.push({ id: DIAGRAM_NOTATION, text: PLAIN_WORDS });
+    return out;
+  }
+  var sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
+  function decidedNotationOf(state, ids) {
+    const scope = [...new Set(ids)].filter((id) => state.nodes.has(id));
+    if (scope.length < 2) return null;
+    let found = null;
+    for (const id of scope) {
+      for (const rep of state.nodes.get(id).reps) {
+        if (rep.modality !== "decision") continue;
+        const data = rep.data;
+        const q = data?.question, a = data?.answer;
+        if (!q || !a || q.kind !== "choice" || a.kind !== "choice" || !q.id.startsWith(NOTATION_QUESTION)) continue;
+        if (!sameSet(q.about ?? [], scope)) continue;
+        const lead = leadOf(a);
+        if (!a.pick || a.pick === NO_MATCH || lead < DECIDER_TAKE_AT) continue;
+        const who = rep.source ? state.nodes.get(rep.source) : void 0;
+        found = { notation: a.pick, lead, by: who && wordOf(who) || "the decider" };
+      }
+    }
+    return found;
+  }
+  function readingDecided(state, ids) {
+    const decided = decidedNotationOf(state, ids);
+    if (!decided) return null;
+    const reading7 = decided.notation === DIAGRAM_NOTATION ? readPlainDiagram(state, ids) : notationsOf(state, ids).find((r) => r.notation === decided.notation) ?? null;
+    return reading7 ? { reading: reading7, decided } : null;
+  }
+  function decidedWords(d) {
+    return `${d.by} says it is one (${d.lead.toFixed(2)})`;
+  }
+  var WHICH_NOTATION = {
+    id: "which-notation",
+    name: "which diagram",
+    describe: () => "when no notation reads a drawing surely, or two read it about equally, ask the decider which kind of diagram it is \u2014 held only when it is sure, and then the drawing has Mermaid and tidying",
+    asks: "model",
+    offers(scope) {
+      const decider = scope.host.decider;
+      const s = scope.state;
+      if (!decider || scope.marks.length < 2) return [];
+      if (scope.marks.some((id) => s.artifacts.includes(id))) return [];
+      if (scope.summon.suggestions.some((x) => x.kind === "match")) return [];
+      if (decidedNotationOf(s, scope.marks)) return [];
+      const readings2 = notationsOf(s, scope.marks);
+      const top = readings2[0];
+      if (!top || !(top.confidence > NOTATION_OFFER_FROM)) return [];
+      const under = top.confidence < NOTATION_FLOOR;
+      const tie = !under && readings2.length > 1 && top.confidence - readings2[1].confidence <= TIE_MARGIN;
+      if (!under && !tie) return [];
+      const plain = readPlainDiagram(s, scope.marks);
+      if (!tie && !plain) return [];
+      const candidates = notationCandidates(s, scope.marks, { readings: readings2, plain });
+      if (!candidates.length) return [];
+      return [{
+        key: "which-notation",
+        label: "Which diagram is this?",
+        reason: (under ? `no notation reads it surely (${describeNotation(top)})` : `${candidates.slice(0, 2).map((c) => c.id).join(" and ")} read it about equally`) + ` \u2014 asks ${decider.name} which kind of diagram it is, sending it the words of these marks; held only when it is sure, and then it has Mermaid`,
+        base: 0.6,
+        tool: "which-notation",
+        asks: "model",
+        verbs: ["which diagram", "what diagram", "which notation", "what kind of diagram"],
+        data: { ids: scope.marks.slice(), candidates }
+      }];
+    },
+    take: () => ({ host: "which-notation" })
+  };
+
+  // src/tools/mermaid.ts
+  var MIN_W = 320;
+  var MIN_H = 240;
+  var MAX_W = 900;
+  var MAX_H = 900;
+  var GAP_SHARE = 0.12;
+  var MIN_GAP = 48;
+  function mermaidFor(state, ids, isRead2 = () => false) {
+    const words = (id) => isRead2(id) && !transcriptOf(state.nodes.get(id));
+    const held2 = readingDecided(state, ids);
+    if (held2) {
+      const said3 = toMermaid(held2.reading, { readWith: words });
+      if (said3) return { reading: held2.reading, said: said3, decided: held2.decided };
+    }
+    for (const reading7 of notationsOf(state, ids)) {
+      if (reading7.confidence < NOTATION_FLOOR) continue;
+      const said3 = toMermaid(reading7, { readWith: words });
+      if (said3) return { reading: reading7, said: said3 };
+    }
+    return null;
+  }
+  var mermaidOf = (scope) => mermaidFor(scope.state, scope.marks, scope.host.isRead);
+  function standing(scope, text) {
+    const s = scope.state;
+    return s.artifacts.some((id) => {
+      const n2 = s.nodes.get(id);
+      const rep = n2 && codeRepOf(n2);
+      return !!rep && rep.data.kind === "mermaid" && rep.data.code === text;
+    });
+  }
+  var reasonOf2 = (reading7, decided) => `${describeNotation(reading7)}${decided ? ` \u2014 ${decidedWords(decided)}` : ""} \u2014 as Mermaid text beside it; the drawing stays`;
+  var MERMAID = {
+    id: "mermaid",
+    name: "Mermaid",
+    describe: () => "a drawing that reads as a flowchart, a class diagram or a sequence diagram said as Mermaid text, an artifact beside it that draws the diagram; the drawing stays",
+    offers(scope) {
+      if (scope.marks.length < 2) return [];
+      if (scope.marks.some((id) => scope.state.artifacts.includes(id))) return [];
+      const m = mermaidOf(scope);
+      if (!m || standing(scope, m.said.text)) return [];
+      return [{
+        key: "mermaid",
+        label: "Make it Mermaid",
+        reason: reasonOf2(m.reading, "decided" in m ? m.decided : void 0),
+        base: 0.35,
+        tool: "mermaid",
+        verbs: ["mermaid", "mmd", "as mermaid"],
+        data: { notation: m.reading.notation }
+      }];
+    },
+    take(_offer, scope, session, at) {
+      const m = mermaidOf(scope);
+      if (!m) return { made: null, detail: { ok: false, error: "the marks held no longer read as a diagram" } };
+      const box = unionOf(scope.marks.map((id) => boundsOf(scope.state.nodes.get(id))).filter((b) => !!b));
+      if (!box) return { made: null, detail: { ok: false, error: "the marks held have nowhere to stand beside" } };
+      const w2 = Math.min(MAX_W, Math.max(MIN_W, box.maxX - box.minX));
+      const h2 = Math.min(MAX_H, Math.max(MIN_H, box.maxY - box.minY));
+      const x = box.maxX + Math.max(MIN_GAP, (box.maxX - box.minX) * GAP_SHARE);
+      const path = `${m.reading.notation}.mmd`;
+      const made = session.import({ kind: "mermaid", path, name: path, bounds: { minX: x, minY: box.minY, maxX: x + w2, maxY: box.minY + h2 }, code: m.said.text, at });
+      return { made, detail: { ok: !!made, notation: m.reading.notation, diagram: m.said.diagram, text: m.said.text, notes: m.said.notes, reading: describeNotation(m.reading) } };
+    }
+  };
+
+  // src/tools/mermaid-draw.ts
+  var THINGS = { sequence: ["participant", "participants"], "uml-class": ["class", "classes"] };
+  var LINKS = { sequence: ["message", "messages"] };
+  var counted = (n2, [one, many]) => `${n2} ${n2 === 1 ? one : many}`;
+  function withArticle(name) {
+    const acronym = /^[A-Z]{2,}\b/.test(name);
+    const said3 = acronym ? name : name.toLowerCase();
+    return `${!acronym && /^[aeio]/.test(said3) ? "an" : "a"} ${said3}`;
+  }
+  var MERMAID_DRAW = {
+    id: "mermaid-draw",
+    name: "drawing from Mermaid",
+    describe: () => "a Mermaid text, read as a flowchart, a class diagram or a sequence diagram, drawn as marks that read back as the same diagram; the text stays",
+    offers(scope) {
+      if (scope.marks.length !== 1) return [];
+      const id = scope.marks[0];
+      if (!scope.state.artifacts.includes(id)) return [];
+      const node = scope.state.nodes.get(id);
+      const rep = node && codeRepOf(node);
+      if (!rep || rep.data.kind !== "mermaid" || !rep.data.code) return [];
+      const read2 = readMermaid(rep.data.code);
+      if (!read2.notation) return [];
+      const name = notationById(read2.notation)?.name ?? read2.notation;
+      const what = `${counted(read2.nodes.length, THINGS[read2.notation] ?? ["node", "nodes"])} and ${counted(read2.links.length, LINKS[read2.notation] ?? ["link", "links"])} read as ${withArticle(name)}`;
+      return [{
+        key: "mermaid-draw",
+        label: "Draw it",
+        reason: `${what} \u2014 drawn as marks the canvas reads back as the same diagram; the text stays`,
+        base: 0.95,
+        tool: "mermaid-draw",
+        verbs: ["draw it", "ink it"],
+        data: { artifact: id, notation: read2.notation }
+      }];
+    },
+    take(offer) {
+      return { host: "mermaid-draw", detail: offer.data };
+    }
+  };
+
+  // src/tools/route.ts
+  var TIDY_TOLERANCE = 0.5;
+  var LEFT_AS_DRAWN = /* @__PURE__ */ new Set(["sequence"]);
+  function diagramOf(state, ids) {
+    const held2 = readingDecided(state, ids);
+    const readings2 = held2 ? [held2.reading, ...notationsOf(state, ids).filter((r) => r.notation !== held2.reading.notation)] : notationsOf(state, ids);
+    for (const reading7 of readings2) {
+      if (reading7 !== held2?.reading && reading7.confidence < NOTATION_FLOOR || LEFT_AS_DRAWN.has(reading7.notation)) continue;
+      const tied = reading7.connectors.map((c) => c.id).filter((id) => routable(state.nodes.get(id), state.nodes));
+      if (!tied.length) continue;
+      const toRoute = tied.filter((id) => !routeRepOf(state.nodes.get(id)));
+      const routed = tied.filter((id) => !!routeRepOf(state.nodes.get(id)));
+      const plan = tidyPlanOf(state.nodes, reading7);
+      return { reading: reading7, toRoute, routed, plan, unaligned: plan.ranks.filter((r) => r.spread > TIDY_TOLERANCE) };
+    }
+    return null;
+  }
+  var reasonOf3 = (reading7) => `${describeNotation(reading7)} \u2014 connectors at right angles between their ports; your ink stays faint beneath`;
+  var centreOf8 = (b) => ({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 });
+  function tidyDiagram(session, reading7, at) {
+    let ranks = 0;
+    const plan = tidyPlanOf(session.getState().nodes, reading7);
+    for (const rank2 of plan.ranks) {
+      if (rank2.spread <= TIDY_TOLERANCE) continue;
+      const before = new Map(rank2.ids.map((id) => [id, centreOf8(boundsOf(session.getState().nodes.get(id)))]));
+      session.tidy({ ids: rank2.ids, mode: "align", axis: rank2.axis, at });
+      ranks++;
+      const state2 = session.getState();
+      for (const id of rank2.ids) {
+        const now = boundsOf(state2.nodes.get(id));
+        const was = before.get(id);
+        if (!now) continue;
+        const c = centreOf8(now), dx = c.x - was.x, dy = c.y - was.y;
+        if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) continue;
+        const words = reading7.labels.filter((l) => l.of === id && l.id !== id && state2.contentIds.includes(l.id)).map((l) => l.id);
+        if (words.length) session.move({ ids: words, dx, dy, at });
+      }
+    }
+    const state = session.getState();
+    const ids = reading7.connectors.map((c) => c.id).filter((id) => state.nodes.get(id) && routable(state.nodes.get(id), state.nodes) && !routeRepOf(state.nodes.get(id)));
+    return { ranks, routed: session.route({ ids, at }) };
+  }
+  var ROUTE = {
+    id: "route",
+    name: "routing",
+    describe: () => "connectors drawn at right angles between their ports, or the whole diagram tidied \u2014 its symbols lined up and its connectors routed; the ink kept faint beneath",
+    offers(scope) {
+      if (scope.marks.length < 2) return [];
+      if (scope.marks.some((id) => scope.state.artifacts.includes(id))) return [];
+      const d = diagramOf(scope.state, scope.marks);
+      if (!d) return [];
+      const out = [];
+      const n2 = d.reading.notation;
+      if (d.toRoute.length || d.unaligned.length) {
+        out.push({
+          key: "tidy-diagram",
+          label: "Tidy the diagram",
+          reason: reasonOf3(d.reading),
+          base: 0.32,
+          tool: "route",
+          verbs: ["tidy the diagram", "tidy diagram", "tidy up the diagram"],
+          data: { notation: n2 }
+        });
+      }
+      if (d.toRoute.length) {
+        out.push({
+          key: "route",
+          label: "Route the connectors",
+          reason: reasonOf3(d.reading),
+          base: 0.28,
+          tool: "route",
+          verbs: ["route", "orthogonal", "right angles"],
+          data: { notation: n2 }
+        });
+      }
+      if (d.routed.length) {
+        out.push({
+          key: "unroute",
+          label: "Show the connectors as drawn",
+          reason: `${d.routed.length === 1 ? "the routed connector" : d.routed.length + " routed connectors"} back as you drew ${d.routed.length === 1 ? "it" : "them"} \u2014 the routing taken off, your ink in front again`,
+          base: 0.12,
+          tool: "route",
+          verbs: ["unroute", "as drawn", "show the ink"],
+          data: { notation: n2 }
+        });
+      }
+      return out;
+    },
+    take(offer, scope, session, at) {
+      const notation = offer.data?.notation;
+      const state = session.getState();
+      const d = diagramOf(state, scope.marks);
+      if (!d || notation && d.reading.notation !== notation) return { detail: { ok: false, error: "the marks held no longer read as a diagram with connectors to route" } };
+      if (offer.key === "unroute") return { detail: { ok: true, unrouted: session.route({ ids: d.routed, mode: "raw", at }) } };
+      if (offer.key === "route") return { detail: { ok: true, routed: session.route({ ids: d.toRoute, at }) } };
+      const done = tidyDiagram(session, d.reading, at);
+      return { detail: { ok: true, ...done, notation: d.reading.notation } };
+    }
+  };
+
+  // src/tools/trace.ts
+  var TRACE = {
+    id: "trace",
+    name: "tracing a picture",
+    describe: () => "a picture held alone, traced into ink the engine reads as a hand\u2019s drawing, over the picture, which stays",
+    offers(scope) {
+      if (scope.marks.length !== 1) return [];
+      const id = scope.marks[0];
+      if (!scope.state.artifacts.includes(id)) return [];
+      const node = scope.state.nodes.get(id);
+      const p = node && pictureOf(node);
+      if (!p || !p.asset) return [];
+      return [{
+        key: "trace",
+        label: "Trace into ink",
+        reason: "the lines of the picture as strokes of ink over it, which the canvas reads as a hand\u2019s own \u2014 the picture stays, and one undo takes the ink away",
+        base: 0.6,
+        tool: "trace",
+        verbs: ["trace", "trace it", "ink it"],
+        data: { artifact: id, asset: p.asset }
+      }];
+    },
+    take(offer) {
+      return { host: "trace", detail: offer.data };
+    }
+  };
+
+  // src/tools/region.ts
+  var REGION_MIN_HELD = 3;
+  var REGION_MARGIN_SHARE = 0.06;
+  var REGION_MARGIN_MIN = 20;
+  var live3 = (state, id) => {
+    const n2 = state.nodes.get(id);
+    return !!n2 && !getRep(n2, "erased");
+  };
+  function isBox2(state, id) {
+    const n2 = state.nodes.get(id);
+    if (!n2 || !getRep(n2, "stroke")) return false;
+    return topInterpretation(n2) === "rectangle" || cleanOf(n2)?.shape === "rectangle";
+  }
+  function regionFrameOf(state, ids) {
+    const marks = ids.filter((id) => live3(state, id));
+    let best = null;
+    for (const id of marks) {
+      if (!isBox2(state, id)) continue;
+      const b = boundsOf(state.nodes.get(id));
+      if (!b) continue;
+      const others = marks.filter((o) => o !== id);
+      if (!others.length) continue;
+      const inside = others.every((o) => {
+        const ob = standingBoxOf(state.nodes, state.nodes.get(o));
+        return !!ob && shareInside(ob, b) >= REGION_HOLDS;
+      });
+      if (!inside) continue;
+      const area3 = (b.maxX - b.minX) * (b.maxY - b.minY);
+      if (!best || area3 > best.area) best = { frame: id, held: others, area: area3 };
+    }
+    return best ? { frame: best.frame, held: best.held } : null;
+  }
+  function regionRound(state, ids) {
+    let box = null;
+    for (const id of ids) {
+      const n2 = state.nodes.get(id);
+      const b = n2 && live3(state, id) ? standingBoxOf(state.nodes, n2) : void 0;
+      if (!b) continue;
+      box = box ? { minX: Math.min(box.minX, b.minX), minY: Math.min(box.minY, b.minY), maxX: Math.max(box.maxX, b.maxX), maxY: Math.max(box.maxY, b.maxY) } : { ...b };
+    }
+    if (!box) return null;
+    const m = Math.max(REGION_MARGIN_MIN, REGION_MARGIN_SHARE * Math.max(box.maxX - box.minX, box.maxY - box.minY));
+    return { minX: box.minX - m, minY: box.minY - m, maxX: box.maxX + m, maxY: box.maxY + m };
+  }
+  function nextRegionName(state) {
+    const taken = new Set(regionsOfBoard(state).map((r) => r.name.toLowerCase()));
+    for (let n2 = 1; ; n2++) if (!taken.has("region " + n2)) return "Region " + n2;
+  }
+  function makeRegion(session, args) {
+    const state = session.getState();
+    const name = (args.name ?? "").trim() || nextRegionName(state);
+    const found = regionFrameOf(state, args.ids);
+    let bounds = null, from, around = "marks";
+    if (found) {
+      bounds = boundsOf(state.nodes.get(found.frame)) ?? null;
+      from = found.frame;
+      around = "frame";
+    } else if (!args.frameOnly) {
+      bounds = regionRound(state, args.ids);
+    }
+    if (!bounds) return null;
+    const b = bounds;
+    return session.withTool(REGION.id, () => {
+      if (args.summonId && state.summon && state.summon.id === args.summonId) session.dismiss(args.summonId, args.at);
+      if (session.getState().selection.length) session.deselect(args.at);
+      const id = session.region({ name, bounds: b, ...from ? { from } : {}, at: args.at });
+      return id ? { id, name, around, bounds: b } : null;
+    }, args.offer ?? "region");
+  }
+  var REGION = {
+    id: "region",
+    name: "regions",
+    describe: () => "a named rectangle on the board that holds whatever stands inside it \u2014 ink, pictures, text, figures \u2014 and takes it along when it moves; made of a rectangle drawn round things, or typed (region: Monday) round the marks held",
+    offers(scope) {
+      const found = regionFrameOf(scope.state, scope.marks);
+      if (!found || found.held.length < REGION_MIN_HELD) return [];
+      return [{
+        key: "region",
+        label: "Make it a region",
+        reason: "the rectangle holds " + found.held.length + " marks \u2014 make it a place on the board, named, that takes what stands inside it when it moves; your ink stays, and type region: and a name to name it",
+        base: 0.3,
+        tool: "region",
+        verbs: ["make it a region", "make a region", "region"],
+        data: { ids: scope.marks.slice() }
+      }];
+    },
+    take(offer, scope, session, at) {
+      const d = offer.data;
+      const made = makeRegion(session, { ids: d.ids, at, summonId: scope.summon.id, offer: offer.key });
+      return made ? { made: made.id, detail: made } : { detail: null };
+    }
+  };
+
   // src/semantic/words.ts
   var LIKE_MAX_CHARS = 1200;
   function wordsOfMarks(state, ids) {
@@ -29240,7 +29814,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
   };
 
   // src/tools/builtin.ts
-  var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH, TRACE, REGION, LIKE];
+  var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH, TRACE, REGION, LIKE, WHICH_NOTATION];
   registerTool(CORRECT);
   registerTool(TEXT);
   registerTool(NAME2);
@@ -29266,6 +29840,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
   registerTool(TRACE);
   registerTool(REGION);
   registerTool(LIKE);
+  registerTool(WHICH_NOTATION);
 
   // src/search/tokens.ts
   var SPECIAL = { "\xDF": "ss", "\xE6": "ae", "\u0153": "oe", "\xF8": "o", "\u0111": "d", "\u0142": "l", "\u0131": "i" };
@@ -29467,8 +30042,8 @@ Reply with ONLY a JSON object, no prose, no code fences:
     }
     const head = start > 0 ? "\u2026" : "", tail = end < text.length ? "\u2026" : "";
     const shift = head.length - start;
-    const kept2 = spans.filter((s) => s[0] >= start && s[1] <= end).map((s) => [s[0] + shift, s[1] + shift]);
-    return { text: head + text.slice(start, end) + tail, spans: kept2 };
+    const kept3 = spans.filter((s) => s[0] >= start && s[1] <= end).map((s) => [s[0] + shift, s[1] + shift]);
+    return { text: head + text.slice(start, end) + tail, spans: kept3 };
   }
   function searchBoards(boards, query, options = {}) {
     const q = tokenize(query);
@@ -30002,12 +30577,12 @@ Reply with ONLY a JSON object, no prose, no code fences:
     const leadAt = out.findIndex((x) => eligible(x));
     const heldAt = out.findIndex((x) => x.key === h2.key && eligible(x));
     if (leadAt < 0 || heldAt <= leadAt) return out;
-    const lead = out[leadAt], kept2 = out[heldAt];
-    if (isSpecific(lead) && !isSpecific(kept2)) return out;
+    const lead = out[leadAt], kept3 = out[heldAt];
+    if (isSpecific(lead) && !isSpecific(kept3)) return out;
     const margin = opts.margin ?? STEADY_MARGIN;
-    if (lead.score > kept2.score * (1 + margin)) return out;
+    if (lead.score > kept3.score * (1 + margin)) return out;
     out.splice(heldAt, 1);
-    out.splice(leadAt, 0, { ...kept2, steady: true, because: [`it led here a moment ago, and nothing here beats it by ${Math.round(margin * 100)}%`, ...kept2.because] });
+    out.splice(leadAt, 0, { ...kept3, steady: true, because: [`it led here a moment ago, and nothing here beats it by ${Math.round(margin * 100)}%`, ...kept3.because] });
     return out;
   }
   function topOf2(ranked2, eligible = () => true) {
@@ -30240,7 +30815,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
       if (!top) continue;
       counts.set(top, (counts.get(top) ?? 0) + 1);
     }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([label, count9]) => `${count9}\xD7${label}`).join(" + ");
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([label, count10]) => `${count10}\xD7${label}`).join(" + ");
   }
   function rect(r, round = true) {
     const v = (x) => round ? Math.round(x) : Number(x.toFixed(2));
@@ -31515,6 +32090,24 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
     };
   }
 
+  // src/participants/brief-kind.ts
+  var BRIEF_QUESTION = "brief-kind";
+  var BRIEF_KIND_WORDS = {
+    page: "a page",
+    program: "a program",
+    mermaid: "a Mermaid diagram",
+    answer: "a text answer"
+  };
+  function briefQuestion(options = {}) {
+    const candidates = [
+      { id: "page", text: "a page \u2014 the drawing\u2019s boxes as a web page, its words written into them" },
+      { id: "program", text: "a program \u2014 something that runs: it draws itself, moves, or answers the pointer" },
+      ...options.diagram ? [{ id: "mermaid", text: `a Mermaid diagram \u2014 the drawing said as diagram text; it reads as ${options.diagram}` }] : [],
+      { id: "answer", text: "a text answer \u2014 words that answer a question about the marks; nothing is made" }
+    ];
+    return choice(BRIEF_QUESTION, "what should this brief make from the marks held?", candidates, void 0, { reading: false });
+  }
+
   // src/participants/router.ts
   var SETTLED_BY_TIER1 = {
     read: true,
@@ -31849,9 +32442,9 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
     const hand = (p) => scaled3(p, 1 / scale);
     const world = (p) => scaled3(p, scale);
     const nodes = r.nodes.slice(0, MERMAID_MAX_NODES);
-    const kept2 = new Set(nodes.map((x) => x.id));
+    const kept3 = new Set(nodes.map((x) => x.id));
     if (r.nodes.length > nodes.length) notes.push(`the text holds ${r.nodes.length} entities and the board draws ${MERMAID_MAX_NODES} at most: the first ${MERMAID_MAX_NODES} are drawn`);
-    let among = r.links.filter((l) => kept2.has(l.from) && kept2.has(l.to));
+    let among = r.links.filter((l) => kept3.has(l.from) && kept3.has(l.to));
     const selfLinks = among.filter((l) => l.from === l.to);
     if (selfLinks.length) notes.push(`a relationship from an entity to itself is not drawn \u2014 ${someWords(selfLinks.map((l) => l.from))}`);
     among = among.filter((l) => l.from !== l.to);
@@ -32216,13 +32809,13 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
   var DEG11 = Math.PI / 180;
   function fan(tree, root) {
     const leaves = /* @__PURE__ */ new Map();
-    const count9 = (id) => {
+    const count10 = (id) => {
       const kids = tree.get(id) ?? [];
-      const n2 = kids.length ? kids.reduce((a, k) => a + count9(k), 0) : 1;
+      const n2 = kids.length ? kids.reduce((a, k) => a + count10(k), 0) : 1;
       leaves.set(id, n2);
       return n2;
     };
-    count9(root);
+    count10(root);
     const angle = /* @__PURE__ */ new Map();
     const place2 = (id, from, span) => {
       const kids = tree.get(id) ?? [];
@@ -32252,9 +32845,9 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
     const hand = (p) => scaled3(p, 1 / scale);
     const world = (p) => scaled3(p, scale);
     const nodes = r.nodes.slice(0, MERMAID_MAX_NODES);
-    const kept2 = new Set(nodes.map((x) => x.id));
+    const kept3 = new Set(nodes.map((x) => x.id));
     if (r.nodes.length > nodes.length) notes.push(`the text holds ${r.nodes.length} nodes and the board draws ${MERMAID_MAX_NODES} at most: the first ${MERMAID_MAX_NODES} are drawn`);
-    const links = r.links.filter((l) => kept2.has(l.from) && kept2.has(l.to)).slice(0, MERMAID_MAX_LINKS);
+    const links = r.links.filter((l) => kept3.has(l.from) && kept3.has(l.to)).slice(0, MERMAID_MAX_LINKS);
     if (!nodes.length) {
       notes.push("nothing to draw: the text names no node");
       return { notation: r.notation, direction: r.direction, ids: {}, links: [], notes, refused, bounds: null, lastAt: t - 1 };
@@ -32558,14 +33151,14 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
       const width = BYTES[t.dtype];
       if (!width) throw new StaticModelError(`the tensor \u201C${name}\u201D is dtype ${t.dtype}, which this reader does not take (F32, F16 and BF16 are read)`);
       const [from, to] = t.data_offsets;
-      const count9 = t.shape.reduce((a, b) => a * b, 1);
-      if (!(from >= 0 && to >= from) || to - from !== count9 * width) throw new StaticModelError(`the tensor \u201C${name}\u201D says ${count9} values of ${t.dtype} at bytes ${from}\u2013${to}, which do not fit`);
+      const count10 = t.shape.reduce((a, b) => a * b, 1);
+      if (!(from >= 0 && to >= from) || to - from !== count10 * width) throw new StaticModelError(`the tensor \u201C${name}\u201D says ${count10} values of ${t.dtype} at bytes ${from}\u2013${to}, which do not fit`);
       if (start + to > bytes.length) throw new StaticModelError(`the weights end before the table does \u2014 the file is cut off (the table of \u201C${name}\u201D ends at byte ${start + to}, the file at ${bytes.length})`);
-      const data = new Float32Array(count9);
+      const data = new Float32Array(count10);
       const at = start + from;
-      if (t.dtype === "F32") for (let i = 0; i < count9; i++) data[i] = dv.getFloat32(at + i * 4, true);
-      else if (t.dtype === "F16") for (let i = 0; i < count9; i++) data[i] = half(dv.getUint16(at + i * 2, true));
-      else for (let i = 0; i < count9; i++) data[i] = bf16(dv.getUint16(at + i * 2, true));
+      if (t.dtype === "F32") for (let i = 0; i < count10; i++) data[i] = dv.getFloat32(at + i * 4, true);
+      else if (t.dtype === "F16") for (let i = 0; i < count10; i++) data[i] = half(dv.getUint16(at + i * 2, true));
+      else for (let i = 0; i < count10; i++) data[i] = bf16(dv.getUint16(at + i * 2, true));
       out[name] = { dtype: t.dtype, shape: t.shape, data };
     }
     return out;
@@ -32756,12 +33349,12 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
     });
     (o.extra ?? []).forEach((w2, i) => add7(w2.toLowerCase(), row(mulberry322(seed * 131 + fnv2(w2) + i | 0), null, 0.2)));
     add7("##s", row(mulberry322(seed * 17), null, 0.05));
-    const count9 = rows.length * dim;
+    const count10 = rows.length * dim;
     const width = dtype === "F16" ? 2 : 4;
-    const head = JSON.stringify({ embeddings: { dtype, shape: [rows.length, dim], data_offsets: [0, count9 * width] }, __metadata__: { format: "pt" } });
+    const head = JSON.stringify({ embeddings: { dtype, shape: [rows.length, dim], data_offsets: [0, count10 * width] }, __metadata__: { format: "pt" } });
     const pad = (8 - head.length % 8) % 8;
     const headBytes = new TextEncoder().encode(head + " ".repeat(pad));
-    const bytes = new Uint8Array(8 + headBytes.length + count9 * width);
+    const bytes = new Uint8Array(8 + headBytes.length + count10 * width);
     const dv = new DataView(bytes.buffer);
     dv.setBigUint64(0, BigInt(headBytes.length), true);
     bytes.set(headBytes, 8);

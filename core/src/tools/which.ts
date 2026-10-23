@@ -11,6 +11,8 @@
 // matches are within `TIE_MARGIN`; the asking is the host's.
 
 import type { Tool } from './tool';
+import { candidateWords } from '../participants/decide-state';
+import { choice, type ChoiceQuestion, type DecisionCandidate } from '../participants/decide';
 
 /** How close the second match's score must come to the first's for the two to be a tie worth asking about. */
 export const TIE_MARGIN = 0.05;
@@ -25,10 +27,15 @@ export function tiedMatches<M extends { score: number }>(matches: readonly M[], 
   return matches.filter((m) => top - m.score <= margin);
 }
 
+/** The question *Which is it?* asks: which of the tied definitions the group is, none of these among them — its pick a reading of the group. */
+export function whichQuestion(ids: readonly string[], candidates: readonly DecisionCandidate[]): ChoiceQuestion {
+  return choice('which:' + (ids[0] ?? ''), 'which of these is the group of marks?', candidates.slice(), ids.slice());
+}
+
 export const WHICH: Tool = {
   id: 'which',
   name: 'which is it',
-  describe: () => 'when two definitions match a group about equally, ask the decider which — its answer joins the readings, held, and is taken only when it is sure',
+  describe: () => 'when two definitions match a group about equally, ask the decider which — shown the words of the marks and where each definition came from; its answer joins the readings, held, and is taken only when it is sure',
   asks: 'model',
   offers(scope) {
     const decider = scope.host.decider;
@@ -39,18 +46,25 @@ export const WHICH: Tool = {
     const tied = tiedMatches(matches);
     if (tied.length < 2) return [];
     // A name may stand for two definitions (this board's and a pack's); the seat is asked about names, so each is once.
+    // Each candidate's words say where it came from (the audit's S1): two definitions named from one drawing match
+    // with the same signature reasoning, word for word, so words made of it alone left the seat only the names.
+    // What stands beside a definition's drawing is never the group held nor the other's drawing (candidateWords), and
+    // each run of words is short: a candidate's words are an option, which the relay takes 1,000 characters of.
     const seen = new Set<string>();
-    const candidates = tied.filter((m) => !seen.has(m.name) && !!seen.add(m.name)).map((m) => ({ id: m.name, text: m.reasoning ? `${m.name} — ${m.reasoning}` : m.name }));
+    const kept = tied.filter((m) => !seen.has(m.name) && !!seen.add(m.name));
+    const definitions = kept.map((m) => ({ name: m.name, artifactId: m.artifactId, ...(m.pack ? { pack: m.pack } : {}) }));
+    const words = candidateWords(scope.state, definitions, scope.marks);
+    const candidates = kept.map((m, i) => ({ id: m.name, text: `${m.name} — matches the group ${m.score.toFixed(2)}; ${words[i]}` }));
     if (candidates.length < 2) return [];
     return [{
       key: 'which',
       label: 'Which is it?',
-      reason: `${candidates.map((c) => c.id).join(' and ')} match about equally — asks ${decider.name} to choose; its answer joins the readings and the engine's ranking stands unless it is sure`,
+      reason: `${candidates.map((c) => c.id).join(' and ')} match about equally — asks ${decider.name} to choose, sending it the words of these marks and where each definition came from; its answer joins the readings and the engine's ranking stands unless it is sure`,
       base: 0.7,
       tool: 'which',
       asks: 'model',
       verbs: ['which', 'which is it', 'decide'],
-      data: { ids: scope.marks.slice(), candidates },
+      data: { ids: scope.marks.slice(), candidates, definitions },
     }];
   },
   take: () => ({ host: 'which' }),

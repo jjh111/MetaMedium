@@ -712,11 +712,19 @@ export {
   // What a provider says a model can do, how a reply is budgeted, and a model's name in words (V1-PLAN J5).
   readModels, parseModelList, modelFacts, nearestModelIds, guessVision, whereOf, isOpenRouter, modelWords, maxTokensFor,
   DEFAULT_MAX_TOKENS, MIN_REPLY_TOKENS, OPENROUTER_REASONING, OPENROUTER_APP, MODEL_LIST_TIMEOUT_MS,
+  // A JSON POST that fails in the same sentences, for a transport that is no chat completion (the System One decider).
+  postJson,
 } from './llm/provider';
-export type { ProviderConfig, ProviderKind, ChatMessage, ContentPart, CompletionResult, ModelList, Locality, FailureReason, ModelInfo, ModelCatalog, ModelFacts } from './llm/provider';
+export type { ProviderConfig, ProviderKind, ChatMessage, ContentPart, CompletionResult, ModelList, Locality, FailureReason, ModelInfo, ModelCatalog, ModelFacts, PostJsonOptions } from './llm/provider';
 // The decision seat's transport over a chat completion (V1-PLAN I7): the wire is the seam a native shape swaps in.
 export { createChatDecideTransport, CHAT_DECIDE_WIRE, DEFAULT_DECIDER_MODEL, wireQuestion } from './llm/decide-openrouter';
 export type { DecideWire, ChatDecideOptions, WireOption, WireQuestion } from './llm/decide-openrouter';
+// The decision seat's System One transport (the audit's S2): Cloudflare's Clef, asked through dyna.ink's relay, no key.
+export {
+  createSystemOneDecideTransport, buildSystemOne, readSystemOne,
+  SYSTEMONE_NONE, SYSTEMONE_KEY, SYSTEMONE_MAX_IMAGES, SYSTEMONE_TIMEOUT_MS, SYSTEMONE_WORDS_MAX, SYSTEMONE_STATE_MAX,
+} from './llm/decide-systemone';
+export type { SystemOneOptions, SystemOneRequest, SystemOneBody, SystemOneQuestion } from './llm/decide-systemone';
 
 // Tier 1 — the engine's instant library: what answers with no model and no
 // wait, as a registry a surface and the router read; and the structure of a
@@ -766,10 +774,12 @@ export { isWritingMark, definitionOf, definitionsIn, artifactsIn, writingLine } 
 export type { WritingLine } from './tools/board';
 export { bestWiring, frameTemplatesFor } from './tools/frames';
 export { mermaidFor } from './tools/mermaid';
+// Which diagram is this? (the audit's D2): the decider asked which notation a drawing is, and what a held decision makes of it.
+export { WHICH_NOTATION, notationQuestion, notationCandidates, decidedNotationOf, readingDecided, NOTATION_OFFER_FROM, NOTATION_QUESTION } from './tools/which-notation';
 // Intent words (PLAN-FIELD-PAR FP1, FP8): what a person says for each act, what an act not offered is missing, the board's own acts from the field.
 export { INTENTS, HOST_INTENTS, intentText, wordScore, intentsMatching, intentWordsFor, missingFor, hostIntentOf, intentGloss, intentTexts, nearestIntent } from './tools/intents';
 export type { Intent as FieldIntent, HostIntent, HostAct } from './tools/intents';
-export { tiedMatches, TIE_MARGIN } from './tools/which';
+export { tiedMatches, TIE_MARGIN, whichQuestion } from './tools/which';
 export type { TiedMatch } from './tools/which';
 
 // Context (V1-PLAN §2.2, B2) — what stands beside the hand: the notations and
@@ -888,7 +898,13 @@ export {
   FLAT_MARGIN,
   DECIDER_TAKE_AT,
 } from './participants/decide';
+// What a decision seat is shown of the board: words, never ids (the audit's S1).
+export { decisionStateOf, definitionWords, candidateWords, shapesCounted, wordsBeside, writtenOn, withoutIds, DECIDE_STATE_MAX, WORDS_SAID, CANDIDATE_WORDS_SAID, WRITTEN } from './participants/decide-state';
+// What should this brief make? (the audit's D3): the closed list a decider chooses from on a brief's Enter.
+export { briefQuestion, BRIEF_QUESTION, BRIEF_KIND_WORDS } from './participants/brief-kind';
+export type { StateCandidate, DecisionStateOptions } from './participants/decide-state';
 export type {
+  DecideState,
   DecideSeat,
   DecideOptions,
   DecideTransport,
@@ -999,7 +1015,7 @@ export {
 } from './notations/garment';
 export type { GarmentReading, GarmentMark, GarmentSymbolName, OnEdge as GarmentOnEdge } from './notations/garment';
 // A diagram: nodes joined by connectors tied at both ends, read last, said only when no notation clears its floor (PLAN-FIELD-PAR FP2).
-export { DIAGRAM, DIAGRAM_NOTATION, TIED_LIFT, readDiagram } from './notations/diagram';
+export { DIAGRAM, DIAGRAM_NOTATION, TIED_LIFT, readDiagram, readPlainDiagram } from './notations/diagram';
 export { sayable } from './notations/notation';
 
 // Find (I6, PLAN-IPAD-NOTES): words across every board — folded and cut into words, what a board says

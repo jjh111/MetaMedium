@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '03-seats.js'), 'utf8');
 const S = new Function(
-  src + '\n  return { SEATS, SEAT_WORDS, resolveReaders, resolveWriters, fallbackWords, keyId, keysToKeep, migrateStored, orderChoices, seatsOfPick, pickOf, SEMANTIC_SOURCE, SEMANTIC_MAX_BYTES, semanticSourceOf, semanticNameOf, semanticWords, semanticFailed };'
+  src + '\n  return { SEATS, SEAT_WORDS, resolveReaders, resolveWriters, fallbackWords, keyId, keysToKeep, migrateStored, orderChoices, seatsOfPick, pickOf, SEMANTIC_SOURCE, SEMANTIC_MAX_BYTES, semanticSourceOf, semanticNameOf, semanticWords, semanticFailed, HOUSE_DECIDE, HOUSE_MODELS, HOUSE_DECIDER_MODEL, houseDeciderFor, deciderAtBoot, deciderWords, deciderAsks };'
 )();
 
 const m = (id, o = {}) => ({ id, vision: false, seats: [], size: Infinity, claude: false, local: false, ...o });
@@ -198,4 +198,69 @@ test('a load that fails says why in the person’s words: the host refused, the 
   assert.match(S.semanticFailed({ bytes: 200 * 1048576 }), /too big|more than/);
   assert.match(S.semanticFailed({ reason: 'the weights end before the table does' }), /the weights end before/);
   assert.match(S.semanticFailed({}), /could not/);
+});
+
+// ---- the house decider (the audit's S3): dyna.ink's own, no key ----
+test('dyna.ink, its subdomains and the old address ask dyna.ink’s relay; a look-alike, another github.io page and a file ask nothing', () => {
+  for (const h of ['dyna.ink', 'app.dyna.ink', 'www.dyna.ink', 'DYNA.INK', 'dyna.ink.', 'jjh111.github.io']) assert.equal(S.houseDeciderFor(h), S.HOUSE_DECIDE, h);
+  for (const h of ['notdyna.ink', 'dyna.ink.evil.com', 'evil.github.io', 'github.io', '', undefined, null, 'example.com']) assert.equal(S.houseDeciderFor(h), null, String(h));
+  assert.equal(S.HOUSE_DECIDE, 'https://relay.dyna.ink/decide');
+});
+
+test('a page on this machine may name a relay on this machine — the origin only — and nothing else; a page elsewhere may name none', () => {
+  assert.equal(S.houseDeciderFor('127.0.0.1', 'http://127.0.0.1:5555'), 'http://127.0.0.1:5555/decide');
+  assert.equal(S.houseDeciderFor('localhost', 'http://localhost:8787/'), 'http://localhost:8787/decide');
+  assert.equal(S.houseDeciderFor('127.0.0.1'), null, 'on this machine with nothing named: none — the gate never reaches a model by default');
+  for (const asked of ['https://relay.dyna.ink', 'http://127.0.0.1:5555/decide', 'http://127.0.0.1:5555?key=x', 'http://evil.example:80', 'http://user@127.0.0.1:1', 'http://127.0.0.1:0', 'javascript:alert(1)'])
+    assert.equal(S.houseDeciderFor('127.0.0.1', asked), null, asked);
+  assert.equal(S.houseDeciderFor('dyna.ink', 'http://127.0.0.1:5555'), S.HOUSE_DECIDE, 'dyna.ink never takes another relay from its address');
+  assert.equal(S.houseDeciderFor('example.com', 'http://127.0.0.1:5555'), null);
+});
+
+test('at boot: dyna.ink’s own when nothing is kept; a joined decider rejoins; a decider let go stays let go; none where there is no house', () => {
+  assert.deepEqual(S.deciderAtBoot(undefined, S.HOUSE_DECIDE), { seat: 'house', model: 'clef-flash', chosen: false });
+  assert.deepEqual(S.deciderAtBoot({ provider: 'dyna', model: 'clef-omni' }, S.HOUSE_DECIDE), { seat: 'house', model: 'clef-omni', chosen: true });
+  assert.deepEqual(S.deciderAtBoot({ provider: 'dyna', model: 'gpt-9' }, S.HOUSE_DECIDE), { seat: 'house', model: 'clef-flash', chosen: true });
+  assert.deepEqual(S.deciderAtBoot({ none: true }, S.HOUSE_DECIDE), { seat: null, why: 'none' });
+  assert.deepEqual(S.deciderAtBoot({ baseUrl: 'https://openrouter.ai/api/v1', model: 'typesafe/jev-1.13' }, S.HOUSE_DECIDE), { seat: 'pick' });
+  assert.deepEqual(S.deciderAtBoot({ baseUrl: 'https://openrouter.ai/api/v1', model: 'typesafe/jev-1.13' }, null), { seat: 'pick' });
+  assert.equal(S.deciderAtBoot(undefined, null).seat, null);
+});
+
+test('its row says who, that it needs no key, and how sure it must be — in the person’s words', () => {
+  assert.equal(S.deciderWords('clef-flash', 0.99), 'dyna.ink · Clef-flash — no key needed · used only when 99% sure');
+  assert.equal(S.deciderWords('clef-omni', 0.99), 'dyna.ink · Clef-omni — no key needed · used only when 99% sure');
+  assert.match(S.fallbackWords('decider', { house: true }), /dyna\.ink’s own, with no key, is one tap away/);
+  assert.doesNotMatch(S.fallbackWords('decider'), /dyna\.ink/);
+  assert.equal(S.HOUSE_MODELS['clef-flash'].sees, false);
+  assert.equal(S.HOUSE_MODELS['clef-omni'].sees, true);
+});
+
+test('the house decider and a decider let go are kept as choices, never as a key, and never break the old pick’s migration', () => {
+  const pick = { baseUrl: 'https://openrouter.ai/api/v1', model: 'z-ai/glm-5.3-flash', vision: true };
+  // A device that let the house decider go, and still holds an older device's pick: the pick migrates, the choice stays.
+  const m = S.migrateStored({ pick, key: 'k', seats: { decider: { none: true } } });
+  assert.equal(m.migrated, true);
+  assert.deepEqual(m.seats.decider, { none: true });
+  assert.deepEqual(m.seats.writer, pick);
+  // A device whose decider is the house's has seats already: nothing migrates.
+  assert.equal(S.migrateStored({ pick, seats: { decider: { provider: 'dyna', model: 'clef-flash' } } }).migrated, false);
+  // Neither choice is a seat any joined model holds.
+  assert.deepEqual(S.seatsOfPick({ decider: { provider: 'dyna', model: 'clef-flash' }, writer: pick }, pick), ['writer']);
+  assert.deepEqual(S.seatsOfPick({ decider: { none: true } }, pick), []);
+});
+
+test('what a decider is asked and sent, in words: seated silently, a tap alone and the marks’ words; chosen, a brief’s Enter and the brief too — and never “nothing is kept”', () => {
+  const silent = S.deciderAsks({ house: true, chosen: false, name: 'Clef-flash' });
+  assert.match(silent, /^asked only when you tap Which is it\? or Which diagram is this\?/);
+  assert.match(silent, /sent the words of the marks you ask about, to dyna\.ink’s relay, which asks Cloudflare’s Clef-flash/);
+  assert.doesNotMatch(silent, /brief you typed/);
+  assert.match(silent, /choose it to have it say what a brief should make too/);
+  const chosen = S.deciderAsks({ house: true, chosen: true, name: 'Clef-flash' });
+  assert.match(chosen, /and on a brief’s Enter, when a model will write it, to say what it should make/);
+  assert.match(chosen, /the words of the marks you ask about and the brief you typed/);
+  const own = S.deciderAsks({ chosen: true, where: 'OpenRouter' });
+  assert.match(own, /the brief you typed, to OpenRouter, with your key$/);
+  for (const w of [silent, chosen, own]) assert.doesNotMatch(w, /nothing is kept/);
+  assert.match(S.SEAT_WORDS.decider.job, /which of two matching definitions, which kind of diagram, what a brief should make/);
 });

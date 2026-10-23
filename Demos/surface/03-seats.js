@@ -5,7 +5,10 @@
 //   the device; an old pick and key become the writer seat), orderChoices (local before hosted, quickest first),
 //   seatsOfPick and pickOf (what a kept pick holds, and never a key), and the semantic seat's (I9): SEMANTIC_SOURCE
 //   (where its model is asked for), semanticSourceOf (an address read, never a key), semanticNameOf, semanticWords (what
-//   its row says), semanticFailed (a load that did not work, in words).
+//   its row says), semanticFailed (a load that did not work, in words); and the house decider's (the audit's S3):
+//   HOUSE_DECIDE and HOUSE_MODELS (dyna.ink's own decision model, through its relay, no key), houseDeciderFor (whether
+//   a page may use it, and where), deciderAtBoot (what a page seats at boot, and whether the hand chose it),
+//   deciderWords (what its row says), deciderAsks (when a decider is asked and what it is sent, in words).
 // Uses: NOTHING. Like 07-hand.js and 09-field.js, this fragment names no closure variable, touches no DOM and asks
 //   the session nothing; 04-models.js is the adapter that gathers the joined models, asks, and acts. So it loads on
 //   its own in Node, which is how it is tested:
@@ -23,7 +26,8 @@
 //     with no seat chosen every rule here returns what the surface did before.
 //   - Fallbacks are stated, in order. Reader: the one chosen, else Claude Code while it is seated, else the writer if
 //     it sees, else the smallest model that sees. Writer: the one chosen, else every model with no other seat — and
-//     Claude Code, while it is seated, stands first of all (J4). Decider: none; the engine's ranking is the answer.
+//     Claude Code, while it is seated, stands first of all (J4). Decider: dyna.ink's own where the page may use it and
+//     the hand did not let it go; else none, and the engine's ranking is the answer.
 //   - A decider is never a reader or a writer. It is not in the pool of models at all.
 //   - One key a provider, entered once, used by every seat on it; kept on the device only for a provider whose key
 //     the hand asked to remember; never in a pick, never in the log.
@@ -35,16 +39,16 @@
   const SEAT_WORDS = {
     reader: { job: 'reads handwriting into text — a model that can see, quick and exact (OCR)', needs: 'a model that sees' },
     writer: { job: 'writes — briefs, pages, programs, and says what a group is (What is this?)', needs: 'a model' },
-    decider: { job: 'chooses between what the engine already holds — which of two matching definitions — and only when it is sure', needs: 'a decision model' },
+    decider: { job: 'chooses between what the engine already holds — which of two matching definitions, which kind of diagram, what a brief should make — and only when it is sure', needs: 'a decision model' },
     semantic: { job: 'notes like this, and search beyond the word typed — on this device, nothing sent anywhere', needs: 'a small model that runs here' },
   };
 
-  /** What a seat does when nothing is chosen for it, in one sentence. */
-  function fallbackWords(seat) {
+  /** What a seat does when nothing is chosen for it, in one sentence. `o.house`: dyna.ink's own decider may be seated here. */
+  function fallbackWords(seat, o) {
     switch (seat) {
       case 'reader': return 'nothing chosen — Claude Code reads while it is seated, else the writer if it sees, else the smallest joined model that sees';
       case 'writer': return 'nothing chosen — every joined model that holds no other seat is asked, and Claude Code first while it is seated';
-      case 'decider': return 'nothing chosen — the engine’s ranking stands, and nothing offers to ask a decision model';
+      case 'decider': return 'nothing chosen — the engine’s ranking stands, and nothing offers to ask a decision model' + (o && o.house ? '; dyna.ink’s own, with no key, is one tap away' : '');
       case 'semantic': return 'nothing chosen — search stays by the words typed and nothing offers notes like this; a small model that runs on this device, with no key and no call, would add both';
       default: return '';
     }
@@ -140,6 +144,84 @@
     return 'could not load ' + what;
   }
 
+  // ---- the house decider (the audit's S3): dyna.ink's own, no key ----
+  // On dyna.ink (and its old address) the decider seat is not empty: dyna.ink's relay asks Cloudflare's Clef-flash
+  // through its own Workers AI binding (cloudflare/relay/src/ai.mjs), so the page sends no key and holds none. It is
+  // seated silently at boot when the hand chose no decider — which writes nothing to any board (the seat joins at its
+  // first ask) — and a hand that lets it go (`none`) is remembered, so a reload does not seat it again. Seated so, it
+  // is asked only by a deliberate tap on a pill that names it (Which is it?, Which diagram is this?): a brief's Enter
+  // asks only a decider the hand CHOSE (`chosen` — kept as its pick, or joined), so a brief's words never go anywhere
+  // the hand did not send them. Anywhere else there is none, except a page on this machine that names one
+  // (`?decide=http://127.0.0.1:<port>`, the carry's rule for an address on this machine — the gate's stub).
+
+  /** Where dyna.ink's own decider is asked: its relay's model route. (A constant here, not 24-relay.js's: fragments load in name order.) */
+  const HOUSE_DECIDE = 'https://relay.dyna.ink/decide';
+  /** The models the relay offers, by the short name it is asked with; `sees`: takes pictures. */
+  const HOUSE_MODELS = { 'clef-flash': { name: 'Clef-flash', sees: false }, 'clef-omni': { name: 'Clef-omni', sees: true } };
+  /** The one seated by default: the quickest and the cheapest. */
+  const HOUSE_DECIDER_MODEL = 'clef-flash';
+  /** The hosts whose pages may use dyna.ink's decider: the relay lets their origins in (cloudflare/relay/src/http.mjs). */
+  const HOUSE_HOSTS = ['dyna.ink', 'jjh111.github.io'];
+
+  /** An origin on this machine: http, 127.0.0.1 or localhost, a port — the origin and nothing more (17-carry.js's rule). */
+  function localOriginOf(o) {
+    if (typeof o !== 'string') return null;
+    const m = /^http:\/\/(127\.0\.0\.1|localhost):(\d{1,5})\/?$/.exec(o.trim());
+    return m && +m[2] > 0 && +m[2] < 65536 ? 'http://' + m[1] + ':' + m[2] : null;
+  }
+
+  /**
+   * Where a page served from `hostname` asks dyna.ink's decider, or null: dyna.ink, a subdomain of it and the old
+   * address ask its relay; a page on this machine may name a relay on this machine (`asked`, its `?decide=`); anywhere
+   * else, none — a page another site serves never reaches it.
+   */
+  function houseDeciderFor(hostname, asked) {
+    const host = typeof hostname === 'string' ? hostname.trim().toLowerCase().replace(/\.$/, '') : '';
+    if (HOUSE_HOSTS.includes(host) || host.endsWith('.dyna.ink')) return HOUSE_DECIDE;
+    if (host === '127.0.0.1' || host === 'localhost') {
+      const o = localOriginOf(asked);
+      return o ? o + '/decide' : null;
+    }
+    return null;
+  }
+
+  /**
+   * What a page seats in the decider seat at boot, from what the device kept (`kept`: `mm-seats`' decider) and
+   * whether dyna.ink's own may be used here (`house`, an address or null): `{ seat: 'house', model, chosen }` —
+   * `chosen` when the hand kept it as its pick, else seated silently — `{ seat: 'pick' }` (a decision model the hand
+   * joined, rejoined as before), or `{ seat: null }` — the hand chose none, or there is none here.
+   */
+  function deciderAtBoot(kept, house) {
+    if (kept && kept.none) return { seat: null, why: 'none' };
+    if (kept && kept.baseUrl && kept.model) return { seat: 'pick' };
+    if (!house) return { seat: null, why: 'no house decider here' };
+    const chosen = !!(kept && kept.provider === 'dyna');
+    const model = chosen && HOUSE_MODELS[kept.model] ? kept.model : HOUSE_DECIDER_MODEL;
+    return { seat: 'house', model: model, chosen: chosen };
+  }
+
+  /**
+   * When a decider is asked and what it is sent, in one sentence for its row and its joining (the audit's S10):
+   * the taps that ask it, and — for a decider the hand chose (`o.chosen`) — a brief's Enter too, when a model is here
+   * to write what it decides; the words of the marks (and, chosen, the brief) and where they go — dyna.ink's relay
+   * (`o.house`, `o.name` the model it asks) or the provider (`o.where`), with the hand's key. Never "nothing is kept":
+   * nobody here can say what the provider keeps.
+   */
+  function deciderAsks(o) {
+    const asks = o.chosen
+      ? 'asked when you tap Which is it? or Which diagram is this?, and on a brief’s Enter, when a model will write it, to say what it should make (page:, run: or new: say it instead)'
+      : 'asked only when you tap Which is it? or Which diagram is this?';
+    const sent = o.chosen ? 'the words of the marks you ask about and the brief you typed' : 'the words of the marks you ask about';
+    const to = o.house ? 'dyna.ink’s relay, which asks Cloudflare’s ' + (o.name || 'decision model') : (o.where || 'its provider') + ', with your key';
+    return asks + ' — it is sent ' + sent + ', to ' + to + (o.house && !o.chosen ? ' · choose it to have it say what a brief should make too' : '');
+  }
+
+  /** What the house decider's row says: who, that it needs no key, and how sure it must be before it is taken. */
+  function deciderWords(model, takeAt) {
+    const m = HOUSE_MODELS[model] || HOUSE_MODELS[HOUSE_DECIDER_MODEL];
+    return 'dyna.ink · ' + m.name + ' — no key needed · used only when ' + Math.round((takeAt || 0.99) * 100) + '% sure';
+  }
+
   // ---- keys: one a provider ----
 
   /** A provider's key is held under its address, without a trailing slash or its case. */
@@ -160,10 +242,11 @@
   function migrateStored(stored) {
     const seats = stored && stored.seats && typeof stored.seats === 'object' ? stored.seats : null;
     const keys = stored && stored.keys && typeof stored.keys === 'object' ? stored.keys : {};
-    const had = seats && ['reader', 'writer', 'decider', 'any'].some((k) => seats[k]);
+    // A pick is a model kept for a seat — or dyna.ink's own decider; the decider let go (`{ none: true }`) is a choice, not a pick, and is kept as it is.
+    const had = seats && ['reader', 'writer', 'decider', 'any'].some((k) => seats[k] && ((seats[k].baseUrl && seats[k].model) || seats[k].provider === 'dyna'));
     const pick = stored && stored.pick;
     if (had || !pick || !pick.baseUrl || !pick.model) return { seats: seats || {}, keys: Object.assign({}, keys), migrated: false };
-    const next = { writer: pick };
+    const next = seats && seats.decider && seats.decider.none ? { decider: { none: true }, writer: pick } : { writer: pick };
     if (pick.vision) next.reader = pick;
     const kept = Object.assign({}, keys);
     if (typeof stored.key === 'string' && stored.key) kept[keyId(pick.baseUrl)] = stored.key;
@@ -181,7 +264,7 @@
   /** The seats a model holds, read from the picks kept — the reader, writer and decider, never "any job". */
   function seatsOfPick(seats, pick) {
     if (!seats || !pick) return [];
-    return ['reader', 'writer', 'decider'].filter((k) => seats[k] && keyId(seats[k].baseUrl) === keyId(pick.baseUrl) && seats[k].model === pick.model);
+    return ['reader', 'writer', 'decider'].filter((k) => seats[k] && seats[k].baseUrl && keyId(seats[k].baseUrl) === keyId(pick.baseUrl) && seats[k].model === pick.model);
   }
 
   /** What is kept of a model: where it is, which it is, what its provider said it can do — never a key. */

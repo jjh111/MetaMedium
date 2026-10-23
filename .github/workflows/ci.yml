@@ -43,7 +43,7 @@ jobs:
       # Object storage, and what Pages publishes and with which headers. No dependency needed; the
       # workerd test (`npm ci` in cloudflare/relay) runs in the deploy workflow.
       - name: The Cloudflare relay and site
-        run: node --test ../cloudflare/relay/relay.limits.test.mjs ../cloudflare/relay/relay.worker.test.mjs ../cloudflare/relay/relay.parity.test.mjs ../cloudflare/relay/relay.hands.test.mjs ../cloudflare/site.test.mjs
+        run: node --test ../cloudflare/relay/relay.limits.test.mjs ../cloudflare/relay/relay.decide.test.mjs ../cloudflare/relay/relay.worker.test.mjs ../cloudflare/relay/relay.parity.test.mjs ../cloudflare/relay/relay.hands.test.mjs ../cloudflare/site.test.mjs
       - name: Surface fragments must match the built script
         run: node ../Demos/build-surface.mjs --check
       # …and the check itself, on scratch surfaces: it must refuse a name
@@ -98,7 +98,8 @@ jobs:
       - name: The relay "with Claude" defaults to, on its own
         run: node --test ../Demos/surface/24-relay.test.mjs
       # The seats' rules (PLAN-IPAD-NOTES I7): who reads, who writes, whose key is whose — and which
-      # provider keys stay on the device (keysToKeep) — pure, in Node.
+      # provider keys stay on the device (keysToKeep), and which pages may reach dyna.ink's own
+      # decider (?decide= on this machine only) — pure, in Node.
       - name: The seats' rules, on their own
         run: node --test ../Demos/surface/03-seats.test.mjs
       # The MCP door (Demos/mcp-client.mjs): a fake stdio server behind the bridge, its tools listed

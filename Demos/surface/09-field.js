@@ -78,6 +78,10 @@
    *           are not offered and what it is missing. Read by core's intent table; a thunk, asked
    *           only once the verbs, the library and the verb table have said nothing.
    *
+   * @property {string|null} [decider]  the decision model a brief's Enter asks what the brief should make (the audit's
+   *           D3), by name — one the hand chose — if there is one: the drawing's guess stands at once, and the line says
+   *           a sure answer may make something else. Said only when a model is here to write (`models`).
+   *
    * @property {function(string): ({key:string,score:number}|null)} [meaning]
    *           the act these marks are offered that typed words are nearest in MEANING, when a semantic
    *           seat is held and has read them (PLAN-FIELD-PAR D1): only what was already worked out off
@@ -299,13 +303,16 @@
     // The brief. Tier 1 builds the structure of a page or a diagram at once, with no
     // words; tier 2 — a model — writes the words, and a program.
     if (revising) return models.length ? { kind: 'brief', line: '↵ ' + who + ' changes what the loop covers', command: build(text, true) } : needsModel('changing a page');
+    // With a decider the hand chose and a model to write, Enter also asks the decider what the brief should make, and a
+    // sure answer makes something else instead of the drawing's guess (D3) — which still stands at once. No model, no ask.
+    const unless = c.decider && models.length ? ' — unless ' + c.decider + ' is sure it should be something else' : '';
     if ((c.target ? c.target() : 'program') === 'page') {
       return models.length
-        ? { kind: 'brief', line: '↵ the page’s boxes at once, then ' + who + ' writes the words', command: build(text, false) }
-        : { kind: 'structure', line: '↵ the page’s boxes at once — a model writes the words when one joins', command: build(text, false) };
+        ? { kind: 'brief', line: '↵ the page’s boxes at once, then ' + who + ' writes the words' + unless, command: build(text, false) }
+        : { kind: 'structure', line: '↵ the page’s boxes at once — a model writes the words when one joins' + unless, command: build(text, false) };
     }
     if (!models.length) return needsModel('writing a program');
-    return { kind: 'brief', line: '↵ ' + who + ' writes a program', command: build(text, false) };
+    return { kind: 'brief', line: '↵ ' + who + ' writes a program' + unless, command: build(text, false) };
 
     function take(item) { return { do: 'take', key: item.key, index: items.indexOf(item) }; }
     function build(t, rev) { return { do: 'build', text: t, revising: !!rev }; }

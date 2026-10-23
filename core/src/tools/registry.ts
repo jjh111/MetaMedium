@@ -18,6 +18,7 @@ import type { Session, Summon } from '../session/session';
 import { LOCAL_PARTICIPANT, transcriptOf, wordOf } from '../session/nodes';
 import type { Context, Offer, Taken, Tool, ToolHost, ToolReading, ToolScope, SessionReader } from './tool';
 import { NO_CONTEXT } from './tool';
+import { keepingNotations } from '../notations/notation';
 
 const registry = new Map<string, Tool>();
 const listeners = new Set<() => void>();
@@ -108,7 +109,8 @@ function gather(tools: Iterable<Tool>, each: (tool: Tool) => Offer[]): Offer[] {
  * it — and every key is offered once (the first tool to offer it keeps it).
  */
 export function offersFor(scope: ToolScope, ctx: Context = NO_CONTEXT): Offer[] {
-  return gather(registry.values(), (tool) => tool.offers(scope, ctx));
+  // The tools that read the held marks as notations share one read of them (`keepingNotations`).
+  return keepingNotations(scope.state, () => gather(registry.values(), (tool) => tool.offers(scope, ctx)));
 }
 
 /**
@@ -116,7 +118,7 @@ export function offersFor(scope: ToolScope, ctx: Context = NO_CONTEXT): Offer[] 
  * registry order — each placed in the field by its `place`, not ranked.
  */
 export function completionsFor(scope: ToolScope, ctx: Context = NO_CONTEXT): Offer[] {
-  return gather(registry.values(), (tool) => (tool.completes ? tool.completes(scope, ctx) : []));
+  return keepingNotations(scope.state, () => gather(registry.values(), (tool) => (tool.completes ? tool.completes(scope, ctx) : [])));
 }
 
 /** The tools that offer something for a scope, in registry order. */

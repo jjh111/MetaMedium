@@ -47,7 +47,7 @@
 
 import type { Session, ProposedEdge, ProposedRep } from '../session/session';
 import type { Capability, Locality } from '../session/nodes';
-import { seatOn, type Seating } from './seated';
+import { heldParticipant, seatOn, type Seating } from './seated';
 
 /** The outcome that means *none of these* — always offered, never inferred. */
 export const NO_MATCH = 'no-match';
@@ -96,6 +96,13 @@ export interface ChoiceQuestion extends QuestionBase {
   kind: 'choice';
   /** The closed list. `NO_MATCH` is appended by `choice()` if it is not already here. */
   candidates: DecisionCandidate[];
+  /**
+   * Whether the pick is a reading of what the marks ARE — a `resembles` edge beside the engine's
+   * readings, which a field offers to name with (the default, *Which is it?*). `false` when the pick is
+   * a decision about the marks and not a name for them (*which diagram is this*, *what should this brief
+   * make*): it is held as its decision rep alone, and no reading is claimed.
+   */
+  reading?: boolean;
 }
 
 export interface ScoreQuestion extends QuestionBase {
@@ -149,8 +156,20 @@ export interface NoulAnswer {
 export type DecisionAnswer = ChoiceAnswer | ScoreAnswer | NoulAnswer;
 
 export type DecideResult =
-  | { ok: true; answers: DecisionAnswer[]; via?: string }
+  /** `notes`: what the transport could not read, question by question, in words — a question it left unanswered says why here. */
+  | { ok: true; answers: DecisionAnswer[]; via?: string; notes?: string[] }
   | { ok: false; error: string };
+
+/**
+ * What the seat is shown of the board beside the questions: WORDS — the marks asked about, what they read as,
+ * the words on and beside them, where each candidate came from (`decide-state.ts` writes it) — never a node
+ * id, and short (`DECIDE_STATE_MAX`). `images` are for a seat that sees, and a transport for one that does
+ * not leaves them out. Optional everywhere: a seat asked with no state is asked as it always was.
+ */
+export interface DecideState {
+  text: string;
+  images?: { mime: string; dataUrl: string }[];
+}
 
 /**
  * The seam. Everything above is vendor-neutral; everything a vendor would
@@ -163,7 +182,7 @@ export type DecideResult =
  */
 export type DecideTransport = (
   questions: readonly DecisionQuestion[],
-  opts: { signal?: AbortSignal }
+  opts: { signal?: AbortSignal; state?: DecideState }
 ) => Promise<DecideResult>;
 
 // ---- building questions ----------------------------------------------------
@@ -173,7 +192,8 @@ export function choice(
   id: string,
   ask: string,
   candidates: DecisionCandidate[],
-  about?: string[]
+  about?: string[],
+  options: { reading?: boolean } = {}
 ): ChoiceQuestion {
   const has = candidates.some((c) => c.id === NO_MATCH);
   return {
@@ -182,6 +202,7 @@ export function choice(
     ask,
     about,
     candidates: has ? candidates : [...candidates, { id: NO_MATCH, text: 'none of these' }],
+    ...(options.reading === false ? { reading: false } : {}),
   };
 }
 
@@ -305,6 +326,12 @@ export interface DecisionRow {
   held: boolean;
   /** True when the seat was asked with a floor (`takeAt`) and the answer led by less: not held, the engine's ranking stands. */
   below?: boolean;
+  /**
+   * True when a Choice's answer is *none of these*, picked out (not flat). Its decision rep is kept as evidence
+   * when it was sure enough to hold, but no reading is claimed: a surface says it as nothing held, the engine's
+   * ranking standing.
+   */
+  none?: boolean;
 }
 
 export interface DecideRun {
@@ -321,13 +348,17 @@ export interface DecideRun {
   refused?: string;
   /** What the transport says it was — a model name, a classifier, a hand. */
   via?: string;
+  /** What the transport could not read, in words (a question left unanswered says why here). */
+  notes?: string[];
 }
 
 export interface DecideSeat {
   /**
    * The participant node id on the board as it stands — everything this seat says is attributed to it.
    * A board loaded in place takes the join with it; `seat()`, which `ask` does first, finds the seat
-   * on the board again or joins it there once (`participants/seated.ts`).
+   * on the board again or joins it there once (`participants/seated.ts`). **Lazy** (the audit's S4): a
+   * seat made and never asked writes nothing to the board, so a decider seated at boot leaves every board
+   * it is never asked on as it was — `''` until the board holds its join.
    */
   readonly id: string;
   /** Seat it on the board as it stands and return its participant id — the join the board holds, else one new `join`. Idempotent. */
@@ -340,8 +371,11 @@ export interface DecideSeat {
    * Never throws. A flat answer is returned and not held; an answer about a
    * mark that has gone, or about a board that has been replaced, is refused at
    * the session's own door rather than written into the log.
+   *
+   * `state` is what the seat is shown of the board beside the questions (words, never ids — `decide-state.ts`);
+   * it goes to the transport as it is and is never written to the log.
    */
-  ask(questions: readonly DecisionQuestion[], at: number, signal?: AbortSignal): Promise<DecideRun>;
+  ask(questions: readonly DecisionQuestion[], at: number, signal?: AbortSignal, state?: DecideState): Promise<DecideRun>;
 }
 
 /**
@@ -362,20 +396,22 @@ export function createDecideParticipant(
   const margin = options.flatMargin ?? FLAT_MARGIN;
   const takeAt = options.takeAt ?? 0;
   const seating: Seating = { kind: 'agent', name, capability: tier, locality: options.locality ?? 'local' };
-  let id = session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
-  const seat = (now: number = at): string => (id = seatOn(session, seating, id, now));
+  // Lazily (S4): the board's own join for this seat if it holds one, else nothing until the first ask.
+  let id = heldParticipant(session.getState(), seating) ?? '';
+  const seat = (now: number = at): string => (id = seatOn(session, seating, id || undefined, now));
 
   async function ask(
     questions: readonly DecisionQuestion[],
     now: number,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    shown?: DecideState
   ): Promise<DecideRun> {
     seat(now);
     const snapshot = session.getState().generation;
     const started = Date.now();
     let result: DecideResult;
     try {
-      result = await transport(questions, { signal });
+      result = await transport(questions, shown ? { signal, state: shown } : { signal });
     } catch (e) {
       // A seat that throws is a seat that is not there. The canvas keeps drawing.
       return {
@@ -392,6 +428,7 @@ export function createDecideParticipant(
       return { ok: false, error: result.error, rows: [], unanswered: questions.map((q) => q.id), snapshot, ms };
     }
 
+    const notes = result.notes && result.notes.length ? { notes: result.notes.slice() } : {};
     const byId = new Map(result.answers.map((a) => [a.questionId, a]));
     const rows: DecisionRow[] = [];
     const unanswered: string[] = [];
@@ -408,7 +445,8 @@ export function createDecideParticipant(
       }
       const { flat, why } = isFlat(answer, margin);
       const below = !flat && takeAt > 0 && leadOf(answer) < takeAt;
-      rows.push({ question: q, answer, flat, flatWhy: why, reason: reasonOf(q, answer), held: false, ...(below ? { below: true } : {}) });
+      const none = !flat && answer.kind === 'choice' && answer.pick === NO_MATCH;
+      rows.push({ question: q, answer, flat, flatWhy: why, reason: reasonOf(q, answer), held: false, ...(below ? { below: true } : {}), ...(none ? { none: true } : {}) });
     }
 
     // The snapshot check. A board that has been replaced under the batch takes
@@ -423,6 +461,7 @@ export function createDecideParticipant(
         snapshot,
         ms,
         via: result.via,
+        ...notes,
         refused: `the board was replaced while the seat was answering (generation ${snapshot} → ${state.generation})`,
       };
     }
@@ -434,7 +473,7 @@ export function createDecideParticipant(
       if (!targets.length) continue;
 
       const edges: ProposedEdge[] = [];
-      if (row.answer.kind === 'choice' && row.answer.pick && row.answer.pick !== NO_MATCH) {
+      if (row.answer.kind === 'choice' && row.answer.pick && row.answer.pick !== NO_MATCH && (row.question as ChoiceQuestion).reading !== false) {
         // A Choice about what something IS joins the certainty column beside
         // the engine's own readings — held, attributed, evicting nothing.
         edges.push({
@@ -463,11 +502,11 @@ export function createDecideParticipant(
       const stale = session.getState().staleResult;
       row.held = !stale;
       if (stale) {
-        return { ok: true, rows, unanswered, snapshot, ms, via: result.via, refused: stale.detail };
+        return { ok: true, rows, unanswered, snapshot, ms, via: result.via, ...notes, refused: stale.detail };
       }
     }
 
-    return { ok: true, rows, unanswered, snapshot, ms, via: result.via };
+    return { ok: true, rows, unanswered, snapshot, ms, via: result.via, ...notes };
   }
 
   return { get id() { return id; }, seat, name, tier, ask };

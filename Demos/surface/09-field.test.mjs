@@ -343,6 +343,22 @@ test('a brief with a model joined: tier 1 first for a page, the model for a prog
   assert.deepEqual(program.command, { do: 'build', text: 'a bouncing ball', revising: false });
 });
 
+test('with a decider seated, a brief’s line says the drawing’s guess may be overruled — the command is the same build (D3)', () => {
+  const page = readFieldCommand(ctx({ text: 'website with the copy in the squares', models: ['qwen3'], decider: 'Clef-flash', target: () => 'page' }));
+  assert.equal(page.line, '↵ the page’s boxes at once, then qwen3 writes the words — unless Clef-flash is sure it should be something else');
+  assert.deepEqual(page.command, { do: 'build', text: 'website with the copy in the squares', revising: false });
+  const program = readFieldCommand(ctx({ text: 'a bouncing ball', models: ['qwen3'], decider: 'Clef-flash', target: () => 'program' }));
+  assert.equal(program.line, '↵ qwen3 writes a program — unless Clef-flash is sure it should be something else');
+  // A prefix says what to make: no decider is asked, and the line does not say one might be.
+  const prefixed = readFieldCommand(ctx({ text: 'run: a bouncing ball', models: ['qwen3'], decider: 'Clef-flash' }));
+  assert.doesNotMatch(prefixed.line, /Clef-flash/);
+  // With no model to write, the decider is not asked and the line does not say it might be: a program needs a model,
+  // and a page's boxes stand at once, as ever.
+  assert.equal(readFieldCommand(ctx({ text: 'a bouncing ball', decider: 'Clef-flash', target: () => 'program' })).kind, 'blocked');
+  const alone = readFieldCommand(ctx({ text: 'website with the copy in the squares', decider: 'Clef-flash', target: () => 'page' }));
+  assert.equal(alone.line, '↵ the page’s boxes at once — a model writes the words when one joins');
+});
+
 test('the genre is read at most once, and only when the brief needs it', () => {
   let asked = 0;
   const target = () => { asked++; return 'program'; };

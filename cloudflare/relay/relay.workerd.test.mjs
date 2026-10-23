@@ -187,3 +187,25 @@ test('in workerd: a picture is put by its hash under the room\'s key, comes back
     rmSync(state, { recursive: true, force: true });
   }
 });
+
+// ----- The model routes in workerd: the module loads and lists the models; a decision itself is not asked here -----
+
+test('in workerd: GET /decide lists the decision models and their limits, asking no model', { skip, timeout: 180000 }, async () => {
+  const state = mkdtempSync(path.join(tmpdir(), 'dyna-relay-state-'));
+  const server = await startWorkerd(state);
+  try {
+    const res = await fetch(`${server.url}/decide`, { headers: { origin: 'https://dyna.ink' } });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.deepEqual(body.models.map((m) => m.model), ['clef-flash', 'clef', 'clef-omni']);
+    assert.equal(res.headers.get('access-control-allow-origin'), 'https://dyna.ink');
+    // No Origin and no key: refused before any binding is touched.
+    const bare = await fetch(`${server.url}/decide`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    assert.equal(bare.status, 403);
+  } finally {
+    await server.stop();
+    rmSync(state, { recursive: true, force: true });
+  }
+});
+
+test('in workerd: a decision asked of the real Workers AI', { skip: 'the AI binding is remote — it needs a Cloudflare account and bills it; /decide is held against a fake model in relay.decide.test.mjs, and scripts/record-systemone.mjs records a real reply' }, () => {});
