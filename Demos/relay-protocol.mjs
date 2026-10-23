@@ -6,7 +6,8 @@
 // Cloudflare (cloudflare/relay/src/worker.mjs), and the two cannot drift.
 // Beside them: what a room may let go of first (`compact`), the rooms a relay
 // opens for anyone (`mintRoomName`, `isMintedRoom`), the names a hand claims
-// (`claimCheck`, `handHashOf`, `writerOf`) and a hand's floodgate (`spend`).
+// (`claimCheck`, `handHashOf`, `writerOf`, `claimsToLetGo`), and a room's
+// floodgate (`spend`, `floodgate`: a hand's, its address's and the room's).
 
 /** How many lines a room keeps when nothing says otherwise. */
 export const DEFAULT_MAX_LINES = 5000;
@@ -27,14 +28,63 @@ export function maxLinesFrom(option, env = {}) {
 }
 
 /**
- * What kind of line this is, for the replay: a hello, a writer's own whole
- * log, a whole log handed on by another hand (`via`) in answer to a hello, or
- * an append.
+ * What kind of line this is, for the replay: a hello; a goodbye; a whole log handed on by another hand (`via`) in
+ * answer to a hello (`relayed`); a writer's own whole log in one line (`full`), or the first piece of one too long
+ * for a line (`part`) and its further pieces (`piece`, and the `last`) — core's LiveStore marks each with `set`, the
+ * first piece's clock, and all but the last `more`; a line that only says its hand is here (`here`: no events, no
+ * hello, no whole, no goodbye — never kept, only passed on to the streams open now); or an append.
  */
 export function kindOf(line) {
-  if (line && line.hello) return 'hello';
-  if (line && line.full) return line.via ? 'relayed' : 'full';
+  if (!line || typeof line !== 'object') return 'append';
+  if (line.hello) return 'hello';
+  if (line.bye) return 'bye';
+  const set = setOf(line);
+  if (line.full) return line.via ? 'relayed' : set ? 'part' : 'full';
+  if (!line.via && set) return line.more ? 'piece' : 'last';
+  if (!Array.isArray(line.events) || !line.events.length) return 'here';
   return 'append';
+}
+
+/** The set a writer's own line belongs to — a whole log sent in pieces — or 0 for none. */
+export function setOf(line) {
+  return line && !line.via && typeof line.set === 'number' && Number.isFinite(line.set) && line.set > 0 ? line.set : 0;
+}
+
+/** A line only saying its hand is here: passed on to the streams open now, never kept or replayed (a room's history is not its beats). */
+export const isPresenceOnly = (line) => kindOf(line) === 'here';
+
+/**
+ * The relay's word on its replay to a stream just opened, sent before and after it: a line it replays was written
+ * earlier, maybe by a hand that has gone without a goodbye, so a store takes nobody to be here by it (core's
+ * `RelayReplay`). With no `id:`, so it never moves a client's Last-Event-ID; a store that knows neither ignores both.
+ */
+export const REPLAY_BEGINS = '{"relay":"replay"}';
+export const REPLAY_ENDS = '{"relay":"live"}';
+
+/** A writer's own lines — what its newest whole log stands in place of. */
+const OWN = new Set(['full', 'part', 'piece', 'last', 'append']);
+
+/**
+ * The newest WHOLE log of each hand among `lines`: the id of its newest `full`, or of its newest `part` whose `last`
+ * came after it (a whole sent in pieces counts once it is all there — one begun and never finished stands for
+ * nothing, and what was before it still holds). Lines are records `{ id, participant, kind, set? }`, in order.
+ */
+function newestWholes(lines) {
+  const ends = new Set();
+  const out = new Map();
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const l = lines[i];
+    if (out.has(l.participant)) continue;
+    if (l.kind === 'last') ends.add(l.participant + '\u0000' + l.set);
+    else if (l.kind === 'full' || (l.kind === 'part' && ends.has(l.participant + '\u0000' + l.set))) out.set(l.participant, l.id);
+  }
+  return out;
+}
+
+/** `lines` less each hand's own lines from before its newest whole log, which stands in their place. */
+function sinceWholes(lines) {
+  const whole = newestWholes(lines);
+  return lines.filter((l) => !OWN.has(l.kind) || !whole.has(l.participant) || l.id >= whole.get(l.participant));
 }
 
 /**
@@ -43,9 +93,13 @@ export function kindOf(line) {
  *
  * A `full` replaces what the client holds, so replaying an old one hands a
  * fresh tab a snapshot out of its moment — which is how a tab came up holding
- * part of the room (NOTES-DRAWING-WITH-THE-HAND §C). Only a hand's LAST `full`
- * in the replayed stretch is still true; the appends around it are kept in
- * order, so the result is that hand's log as it stands now.
+ * part of the room (NOTES-DRAWING-WITH-THE-HAND §C). Only a hand's NEWEST whole
+ * log in the replayed stretch is still true — a `full`, or a whole sent in
+ * pieces that is all there — and it stands in place of every own line of that
+ * hand before it; what follows it is kept in order, so the result is that
+ * hand's log as it stands now. A whole in pieces never finished stands for
+ * nothing: it is sent, and a store holds it aside, but what came before it
+ * still holds.
  *
  * A `hello` IS replayed, and deliberately: a hand that said hello into an
  * empty room got no answer, and the replay is how the next hand to arrive
@@ -56,10 +110,7 @@ export function kindOf(line) {
  * only ever true in their own moment.
  */
 export function replay(room, after = 0) {
-  const pending = room.lines.filter((l) => l.id > after);
-  const newest = new Map();
-  for (const l of pending) if (l.kind === 'full') newest.set(l.participant, l.id);
-  return pending.filter((l) => l.kind !== 'full' || newest.get(l.participant) === l.id);
+  return sinceWholes(room.lines.filter((l) => l.id > after));
 }
 // A log handed on by another hand (`relayed`) is replayed as it came and
 // never supersedes the writer's own: it is a copy that may lag the log, and
@@ -87,19 +138,18 @@ export function truncationNotice(room, after = 0) {
 
 /**
  * The lines a room may let go of before it lets go of any history: the ones
- * `replay` would never send to anyone. Those are a hand's own `full` lines
- * that a newer own `full` of the same hand stands after — whoever connects,
- * from whatever id, is sent the newer one and never the older (a client past
- * the newer one is sent neither). Every newcomer's hello is answered by each
- * hand with its whole log, so these are most of what a busy room holds.
- * Pure: the lines kept, in order; replay of what is kept is replay of the
- * lines, for every last-seen id (Demos/relay.test.mjs proves it on random rooms).
- * A copy handed on (`relayed`) is never dropped here: replay sends every one.
+ * `replay` would never send to anyone. Those are a hand's own lines that its
+ * newer whole log stands after — whoever connects, from whatever id, is sent
+ * the newer one and never what it stands in place of (a client past the newer
+ * one is sent neither). Every newcomer's hello is answered by each hand with
+ * its whole log, so these are most of what a busy room holds — a big log's
+ * pieces among them. Pure: the lines kept, in order; replay of what is kept is
+ * replay of the lines, for every last-seen id (Demos/relay.test.mjs proves it
+ * on random rooms). A copy handed on (`relayed`), a hello and a goodbye are
+ * never dropped here: replay sends every one.
  */
 export function compact(lines) {
-  const newest = new Map();
-  for (const l of lines) if (l.kind === 'full') newest.set(l.participant, l.id);
-  return lines.filter((l) => l.kind !== 'full' || newest.get(l.participant) === l.id);
+  return sinceWholes(lines);
 }
 
 // ===== Rooms anyone may open, names a hand claims, and a room's floodgate ===============
@@ -201,10 +251,22 @@ export function claimCheck(claims, line, hash) {
 
 /**
  * How much a hand may send a room: a token bucket of lines and one of characters, each full to begin with and
- * refilled at its rate — about 30 lines in 10 s and 8,000,000 characters a minute, with a burst of the same — so a
- * hand drawing, or carrying a 2,000-mark board in, is never held back, and a hand flooding a room is.
+ * refilled at its rate — about 30 lines in 10 s and 16,000,000 characters a minute, with a burst of the same — so a
+ * hand drawing, or carrying the largest board a page shares (12 MB) in at once, is never held back, and a hand
+ * flooding a room is.
  */
-export const FLOOD = { lines: 30, linesMs: 10_000, chars: 8_000_000, charsMs: 60_000 };
+export const FLOOD = { lines: 30, linesMs: 10_000, chars: 16_000_000, charsMs: 60_000 };
+/**
+ * What one address may send a room, whatever hands it writes as — a hand's secret is the hand's own to choose, so a
+ * new secret and name on every line is a new hand's bucket each time — and what a room takes from all its hands at
+ * once: both under what a room keeps (32,000,000 characters), so no burst flushes its history.
+ */
+export const FLOOD_ADDRESS = { lines: 150, linesMs: 10_000, chars: 24_000_000, charsMs: 60_000 };
+export const FLOOD_ROOM = { lines: 300, linesMs: 10_000, chars: 24_000_000, charsMs: 60_000 };
+/** How many names one address may claim in a room: 30, and one more every 20 s. */
+export const NEW_HANDS = { lines: 30, linesMs: 600_000, chars: 1, charsMs: 1 };
+/** How many claimed names a room keeps. Past it, names with no line left in the room are let go of; if none can be, a new name is refused. */
+export const MAX_CLAIMS = 1000;
 
 /**
  * One line of `chars` characters from a hand whose bucket is `bucket` (undefined for a hand not heard before):
@@ -226,6 +288,49 @@ export function spend(bucket, now, chars, limits = FLOOD) {
   const retryAfter = Math.max(1, Math.ceil(Math.max(waitLines, waitChars) / 1000));
   return { bucket: b, refused: { status: 429, retryAfter, words: 'this hand is sending more than a room takes at once — wait ' + retryAfter + ' s and send again' } };
 }
+
+/** What each of a room's floodgates says when it has no room for a line, in words. */
+const FLOOD_WORDS = {
+  hand: (s) => 'this hand is sending more than a room takes at once — wait ' + s + ' s and send again',
+  address: (s) => 'this address is sending more than a room takes at once — wait ' + s + ' s and send again',
+  room: (s) => 'this room is taking more than it can at once — wait ' + s + ' s and send again',
+  claim: (s) => 'too many new hands from this address in this room just now — wait ' + s + ' s and join again',
+};
+
+/**
+ * One line of `chars` characters through a room's floodgates — `gates`, each `{ kind, bucket, limits }`: the hand's
+ * (`hand`), its address's (`address`), the room's (`room`) and, for a line that claims a new name, its address's
+ * count of new names (`claim`, which counts lines and no characters). Every one must have room, or nothing is spent:
+ * `{ refused }` — `{ status: 429, retryAfter, words }`, the first gate with no room — else `{ buckets }`, one per gate,
+ * to keep. Pure: the caller keeps the buckets.
+ */
+export function floodgate(gates, now, chars) {
+  const buckets = [];
+  for (const g of gates) {
+    const r = spend(g.bucket, now, g.kind === 'claim' ? 0 : chars, g.limits);
+    if (r.refused) return { refused: { status: 429, retryAfter: r.refused.retryAfter, words: (FLOOD_WORDS[g.kind] || FLOOD_WORDS.hand)(r.refused.retryAfter) } };
+    buckets.push(r.bucket);
+  }
+  return { buckets };
+}
+
+/**
+ * A room about to claim one more name while it holds `max` already: the names it may let go of — those no line it
+ * holds was written under (`lines`, records with `participant` and, for a copy handed on, `writer`) — and whether
+ * the new claim fits after. Pure; the caller lets them go. A name whose line is still in the room keeps its claim,
+ * so nobody can take over a hand whose lines a newcomer would still be sent.
+ */
+export function claimsToLetGo(claims, lines, max = MAX_CLAIMS) {
+  const names = typeof claims.keys === 'function' ? [...claims.keys()] : Object.keys(claims);
+  if (names.length < max) return { letGo: [], fits: true };
+  const written = new Set();
+  for (const l of lines) { if (l.participant) written.add(l.participant); if (l.writer) written.add(l.writer); }
+  const letGo = names.filter((n) => !written.has(n));
+  return { letGo, fits: names.length - letGo.length < max };
+}
+
+/** What a room says to a hand new to it when it holds as many names as it keeps and none can be let go of. */
+export const CLAIMS_FULL = { status: 429, retryAfter: 600, words: 'this room holds as many hands as it keeps — open a new room to draw with more people' };
 
 // ===== Pictures in a room (PLAN-IPAD-NOTES A1) =========================================
 // A room carries LOG LINES, and a picture's bytes are not in the log (an `import` event names an

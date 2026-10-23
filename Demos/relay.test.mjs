@@ -10,23 +10,54 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { replay, truncationNotice, startRelay, kindOf, maxLinesFrom, DEFAULT_MAX_LINES } from './relay.mjs';
+import { setOf } from './relay-protocol.mjs';
 
+/** A line as a hand writes it: an append carries an event (a line with none only says its hand is here). */
+const withEvents = (l) => ('events' in l || l.hello || l.full || l.bye ? l : { ...l, events: [{ type: 'mark' }] });
 const room = (...lines) => ({
   name: 'r',
   dropped: 0,
   clients: new Set(),
-  lines: lines.map((l, i) => ({ id: i + 1, data: JSON.stringify(l), participant: l.participant, kind: kindOf(l) })),
+  lines: lines.map(withEvents).map((l, i) => ({ id: i + 1, data: JSON.stringify(l), participant: l.participant, kind: kindOf(l), ...(setOf(l) ? { set: setOf(l) } : {}) })),
 });
 const kinds = (ls) => ls.map((l) => l.participant + ':' + l.kind + l.id);
 
-test('a superseded `full` is never replayed — a snapshot out of its moment installs a past state', () => {
+test('a superseded `full` is never replayed — a snapshot out of its moment installs a past state — nor what it stands in place of', () => {
   const r = room(
     { participant: 'alice', full: true },   // 1 — alice's log as it was
-    { participant: 'alice' },               // 2
+    { participant: 'alice' },               // 2 — an append to it, which 3 holds
     { participant: 'alice', full: true },   // 3 — alice's log as it stands
     { participant: 'bob' },                 // 4
   );
-  assert.deepEqual(kinds(replay(r)), ['alice:append2', 'alice:full3', 'bob:append4']);
+  assert.deepEqual(kinds(replay(r)), ['alice:full3', 'bob:append4']);
+});
+
+test('a whole sent in pieces stands once it is all there, and in place of what came before it; one never finished stands for nothing', () => {
+  const r = room(
+    { participant: 'alice', full: true },                          // 1 — alice's whole, in one line
+    { participant: 'alice' },                                      // 2
+    { participant: 'alice', full: true, more: true, set: 50 },     // 3 — a whole in pieces begins
+    { participant: 'bob' },                                        // 4
+    { participant: 'alice', set: 50, more: true },                 // 5
+    { participant: 'alice', set: 50 },                             // 6 — and is all there
+    { participant: 'alice' },                                      // 7
+    { participant: 'alice', full: true, more: true, set: 90 },     // 8 — another begins, and alice leaves halfway
+    { participant: 'alice', bye: true, events: [] },               // 9
+  );
+  assert.deepEqual(kinds(replay(r)), ['alice:part3', 'bob:append4', 'alice:piece5', 'alice:last6', 'alice:append7', 'alice:part8', 'alice:bye9']);
+  // Before the set at 50 was all there, the whole at 1 still stood — and the pieces were sent, to be held aside.
+  const half = { ...r, lines: r.lines.slice(0, 5) };
+  assert.deepEqual(kinds(replay(half)), ['alice:full1', 'alice:append2', 'alice:part3', 'bob:append4', 'alice:piece5']);
+});
+
+test('a line that only says its hand is here is never kept: it is the one kind a room passes on and forgets', () => {
+  assert.equal(kindOf({ participant: 'a', events: [], at: 1, sid: 's' }), 'here');
+  assert.equal(kindOf({ participant: 'a', events: [], at: 1, hello: true }), 'hello');
+  assert.equal(kindOf({ participant: 'a', events: [], at: 1, bye: true }), 'bye');
+  assert.equal(kindOf({ participant: 'a', events: [], at: 1, full: true }), 'full');
+  assert.equal(kindOf({ participant: 'a', events: [], at: 1, set: 5 }), 'last');
+  assert.equal(kindOf({ participant: 'a', events: [{}], at: 1, set: 5, via: 'b' }), 'append');
+  assert.equal(kindOf({ participant: 'a', events: [{}], at: 1, full: true, set: 5, more: true, via: 'b' }), 'relayed');
 });
 
 test('the last `full` of EACH hand stands, and the appends around it keep their order', () => {
@@ -298,20 +329,28 @@ test('the protocol\'s asset address and verdicts: a hash is 64 lower-case hex di
 // ----- What a room may let go of first, the rooms a relay opens, the names a hand claims, the floodgate -----
 import {
   compact, isMintedRoom, mintRoomName, roomIdleDaysFrom, DEFAULT_ROOM_IDLE_DAYS, claimCheck, writerOf, handHashOf, mintHandSecret,
-  CLAIM_WORDS, MAX_HAND_NAME, spend, FLOOD,
+  CLAIM_WORDS, MAX_HAND_NAME, spend, FLOOD, floodgate, FLOOD_ADDRESS, FLOOD_ROOM, NEW_HANDS, claimsToLetGo, MAX_CLAIMS, CLAIMS_FULL,
 } from './relay-protocol.mjs';
 
-/** A seeded room of random lines: hands, fulls, appends, hellos and copies handed on, some ids already gone. */
+/**
+ * A seeded room of random lines: hands, fulls, appends, hellos, goodbyes, copies handed on, and wholes in pieces —
+ * finished, never finished, interleaved, a piece arriving after a newer whole — some ids already gone.
+ */
 function randomRoom(seed, n = 40) {
   let x = seed >>> 0;
   const rand = () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 2 ** 32; };
   const hands = ['ada', 'bob', 'cleo', 'dan'];
+  const sets = [11, 22, 33];
   const lines = [];
   for (let id = 1; id <= n; id++) {
     const participant = hands[Math.floor(rand() * hands.length)];
     const r = rand();
-    const line = r < 0.35 ? { participant, full: true } : r < 0.45 ? { participant, hello: true } : r < 0.55 ? { participant, full: true, via: hands[Math.floor(rand() * hands.length)] } : { participant };
-    lines.push({ id, data: JSON.stringify(line), participant, kind: kindOf(line) });
+    const set = sets[Math.floor(rand() * sets.length)];
+    const ev = [{ type: 'mark' }];
+    const line = r < 0.2 ? { participant, full: true } : r < 0.28 ? { participant, hello: true } : r < 0.36 ? { participant, full: true, via: hands[Math.floor(rand() * hands.length)] }
+      : r < 0.44 ? { participant, full: true, more: true, set, events: ev } : r < 0.52 ? { participant, set, more: true, events: ev } : r < 0.6 ? { participant, set, events: ev }
+      : r < 0.64 ? { participant, bye: true, events: [] } : { participant, events: ev };
+    lines.push({ id, data: JSON.stringify(line), participant, kind: kindOf(line), ...(setOf(line) ? { set: setOf(line) } : {}) });
   }
   // Some of the oldest lines let go of by the cap, as a relay does.
   const gone = Math.floor(rand() * 6);
@@ -331,16 +370,25 @@ test('compaction drops only what replay would never send: for every last-seen id
   }
 });
 
-test('compaction keeps each hand\'s newest own full, every append, hello and copy, in order', () => {
+test('compaction keeps each hand\'s newest whole and what follows it, every hello, goodbye and copy, in order', () => {
   const r = room(
     { participant: 'alice', full: true },               // 1 — superseded by 4
-    { participant: 'alice' },                           // 2
+    { participant: 'alice' },                           // 2 — an append 4 holds
     { participant: 'bob', full: true },                 // 3 — bob's newest
     { participant: 'alice', full: true },               // 4 — alice's newest
     { participant: 'alice', full: true, via: 'bob' },   // 5 — a copy: kept
     { participant: 'carol', hello: true },              // 6
+    { participant: 'carol', bye: true },                // 7
   );
-  assert.deepEqual(compact(r.lines).map((l) => l.id), [2, 3, 4, 5, 6]);
+  assert.deepEqual(compact(r.lines).map((l) => l.id), [3, 4, 5, 6, 7]);
+  // The pieces of a big whole sent again in answer to each hello go with the whole they were: only the newest stays.
+  const big = room(
+    { participant: 'ann', full: true, more: true, set: 1 }, { participant: 'ann', set: 1, more: true }, { participant: 'ann', set: 1 },
+    { participant: 'fern', hello: true },
+    { participant: 'ann', full: true, more: true, set: 2 }, { participant: 'ann', set: 2, more: true }, { participant: 'ann', set: 2 },
+    { participant: 'ann', full: true, more: true, set: 3 },
+  );
+  assert.deepEqual(compact(big.lines).map((l) => l.id), [4, 5, 6, 7, 8]);
 });
 
 test('a room\'s notice counts what was lost to its cap, never what was compacted away: a client past the last line lost is told nothing', () => {
@@ -417,7 +465,7 @@ test('a name is claimed by the first hand that writes under it with a secret; an
   assert.equal(claimCheck({ 'ada~1': ada }, { participant: 'ada~1' }, eve).status, 409);
 });
 
-test('the floodgate: about thirty lines in ten seconds and eight million characters a minute, refilled as time passes, with when to ask again', () => {
+test('the floodgate: about thirty lines in ten seconds and sixteen million characters a minute, refilled as time passes, with when to ask again', () => {
   let b;
   let t = 1_000_000;
   for (let i = 0; i < FLOOD.lines; i++) { const r = spend(b, t, 100); assert.equal(r.refused, null, 'line ' + i); b = r.bucket; }
@@ -429,13 +477,55 @@ test('the floodgate: about thirty lines in ten seconds and eight million charact
   t += 1000;
   for (let i = 0; i < 3; i++) { const r = spend(b, t, 100); assert.equal(r.refused, null); b = r.bucket; }
   assert.ok(spend(b, t, 100).refused);
-  // Characters: a 6.9M board carried in goes at once; another of the same in the same minute waits.
+  // Characters: the largest board a page shares (12M) carried in goes at once; another of the same in the same minute waits.
   let c;
-  const big = spend(c, t, 6_900_000);
+  const big = spend(c, t, 12_000_000);
   assert.equal(big.refused, null);
   c = big.bucket;
-  const again = spend(c, t, 6_900_000);
+  const again = spend(c, t, 12_000_000);
   assert.equal(again.refused.status, 429);
-  assert.ok(again.refused.retryAfter >= 40 && again.refused.retryAfter <= 60, String(again.refused.retryAfter));
-  assert.equal(spend(again.bucket, t + 60_000, 6_900_000).refused, null);
+  assert.ok(again.refused.retryAfter >= 25 && again.refused.retryAfter <= 35, String(again.refused.retryAfter));
+  assert.equal(spend(again.bucket, t + 60_000, 12_000_000).refused, null);
+});
+
+test('a room\'s floodgates: a hand that takes a new secret and name on every line is still its address, and the room as a whole is held too', () => {
+  const t = 5_000_000;
+  // One address, a new hand every line, lines of 3.9M: the address's bucket stops it well under what a room keeps.
+  let address, roomB;
+  let taken = 0;
+  for (let i = 0; i < 12; i++) {
+    const g = floodgate([{ kind: 'hand', bucket: undefined, limits: FLOOD }, { kind: 'address', bucket: address, limits: FLOOD_ADDRESS }, { kind: 'room', bucket: roomB, limits: FLOOD_ROOM }], t, 3_900_000);
+    if (g.refused) { assert.equal(g.refused.status, 429); assert.match(g.refused.words, /this address is sending more/); continue; }
+    [, address, roomB] = g.buckets;
+    taken++;
+  }
+  assert.ok(taken * 3_900_000 <= FLOOD_ADDRESS.chars && taken * 3_900_000 < 32e6, 'taken ' + taken);
+  // Many addresses: the room's own bucket stops them.
+  let room2;
+  let fromMany = 0;
+  for (let i = 0; i < 12; i++) {
+    const g = floodgate([{ kind: 'hand', bucket: undefined, limits: FLOOD }, { kind: 'address', bucket: undefined, limits: FLOOD_ADDRESS }, { kind: 'room', bucket: room2, limits: FLOOD_ROOM }], t, 3_900_000);
+    if (g.refused) { assert.match(g.refused.words, /this room is taking more/); continue; }
+    room2 = g.buckets[2];
+    fromMany++;
+  }
+  assert.ok(fromMany * 3_900_000 <= FLOOD_ROOM.chars, 'taken ' + fromMany);
+  // New names from one address: thirty, then one every twenty seconds; nothing is spent by a line refused.
+  let names;
+  for (let i = 0; i < NEW_HANDS.lines; i++) { const g = floodgate([{ kind: 'claim', bucket: names, limits: NEW_HANDS }], t, 100); assert.ok(!g.refused); names = g.buckets[0]; }
+  const no = floodgate([{ kind: 'claim', bucket: names, limits: NEW_HANDS }], t, 100);
+  assert.match(no.refused.words, /too many new hands from this address/);
+  assert.ok(!floodgate([{ kind: 'claim', bucket: names, limits: NEW_HANDS }], t + 21_000, 100).refused);
+  const half = floodgate([{ kind: 'hand', bucket: undefined, limits: FLOOD }, { kind: 'claim', bucket: names, limits: NEW_HANDS }], t, 100);
+  assert.ok(half.refused && !half.buckets);
+});
+
+test('a room keeps so many names: past it, the names no line it holds was written under go first; if none can, a new one is refused', () => {
+  const claims = new Map([['ann~1', 'h1'], ['bob~1', 'h2'], ['gone~1', 'h3']]);
+  const lines = [{ participant: 'ann~1' }, { participant: 'cleo~1', writer: 'bob~1' }];
+  assert.deepEqual(claimsToLetGo(claims, lines, 10), { letGo: [], fits: true });
+  assert.deepEqual(claimsToLetGo(claims, lines, 3), { letGo: ['gone~1'], fits: true });
+  assert.deepEqual(claimsToLetGo(claims, lines.concat({ participant: 'gone~1' }), 3), { letGo: [], fits: false });
+  assert.equal(MAX_CLAIMS, 1000);
+  assert.equal(CLAIMS_FULL.status, 429);
 });

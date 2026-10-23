@@ -456,16 +456,24 @@ test('a room named by hand is never forgotten: it sets no alarm, whatever it hol
 test('each use moves a room\'s alarm out again, but no more than once an hour', async () => {
   const env = openEnv();
   const { room } = await (await mint(env)).json();
-  await post(env, room, { participant: 'a' });
+  const mark = { participant: 'a', events: [{ type: 'x' }] };
+  await post(env, room, mark);
   const storage = env.ROOMS.storages.get(room);
   const first = storage.alarm;
   const puts = storage.writes.puts;
-  await post(env, room, { participant: 'a' });
+  await post(env, room, mark);
   assert.equal(storage.alarm, first, 'moved within the hour');
   assert.equal(storage.writes.puts, puts + 1, 'one write for the line, none for the alarm');
   env.ROOMS.rooms.get(room).alarmAt = first - 2 * 3600_000;   // as if the last use were two hours ago
-  await post(env, room, { participant: 'a' });
+  await post(env, room, mark);
   assert.ok(storage.alarm >= first, 'moved out again');
+  // A beat — a line that only says its hand is here — is a use too, and is written nowhere.
+  env.ROOMS.rooms.get(room).alarmAt = first - 2 * 3600_000;
+  const beforeBeat = storage.writes.puts;
+  storage.alarm = null;
+  await post(env, room, { participant: 'a', events: [], at: 5 });
+  assert.equal(storage.writes.puts, beforeBeat, 'nothing written for the beat');
+  assert.ok(storage.alarm >= first, 'the beat moved the alarm out');
 });
 
 // ----- A hand's name is its own: claims, and the forged line --------------------------
@@ -523,18 +531,113 @@ test('a hand that sends more than a room takes is told to wait (429, retry-after
 
 test('a room over its caps lets go first of what replay would never send — each hand\'s own whole logs a newer one stands after — and only then of history', async () => {
   const env = openEnv({ MM_RELAY_MAX_BYTES: '200000' });
-  // Ada's twenty strokes, then every newcomer's hello answered with her whole log, again and again.
-  for (let i = 0; i < 20; i++) await post(env, 'r', { participant: 'ada~1', events: [{ type: 's' + i }], at: i + 1 }, hand(ADA));
-  for (let k = 0; k < 6; k++) await post(env, 'r', { participant: 'ada~1', events: [{ type: 'whole', pad: 'x'.repeat(40000), k }], at: 100 + k, full: true }, hand(ADA));
+  // Ada's twenty strokes, then every newcomer's hello answered with her whole log — which holds them — again and again.
+  const strokes = Array.from({ length: 20 }, (_, i) => ({ type: 's' + i }));
+  for (let i = 0; i < 20; i++) await post(env, 'r', { participant: 'ada~1', events: [strokes[i]], at: i + 1 }, hand(ADA));
+  for (let k = 0; k < 6; k++) await post(env, 'r', { participant: 'ada~1', events: [...strokes, { type: 'whole', pad: 'x'.repeat(40000), k }], at: 100 + k, full: true }, hand(ADA));
   const text = await readUntil(await open(env, 'r'), (t) => t.includes('"k":5'));
   assert.ok(!text.includes('truncated'), 'history was let go of while older whole logs stood: ' + text.slice(0, 300));
   assert.ok(text.includes('"s0"') && text.includes('"s19"'));
   const lines = [...env.ROOMS.storages.get('r').map.keys()].filter((k) => k.startsWith('m:'));
-  // Compaction runs only when the room is over a cap: the newest whole logs since the last time stay, the older ones went.
-  assert.ok(lines.length >= 21 && lines.length <= 22, 'twenty appends and the newest whole log or two: ' + lines.length);
+  // Compaction runs only when the room is over a cap: the newest whole log since the last time stays, with the one
+  // after it; the older whole logs went, and the strokes they held with them.
+  assert.ok(lines.length >= 1 && lines.length <= 2, 'the newest whole log or two: ' + lines.length);
   assert.ok(!text.includes('"k":0') && !text.includes('"k":3'), 'a superseded whole log was replayed');
   // Past what compaction can free, history goes as before, and the room says so.
   for (let k = 0; k < 6; k++) await post(env, 'r', { participant: 'bob~' + k, events: [{ pad: 'y'.repeat(40000) }] }, hand('bob-secret-00000000' + k));
   const later = await readUntil(await open(env, 'r'), (t) => t.includes('bob~5'));
   assert.ok(later.includes('"relay":"truncated"'), later.slice(0, 200));
+});
+
+// ----- What the review found: beats that pushed a room's marks out, and a floodgate a new secret walked past -----
+
+test('a beat — a line that only says its hand is here — reaches the streams open now and is kept nowhere: hours of them leave the board in the room', async () => {
+  const env = openEnv({ MM_RELAY_MAX_LINES: '60' });
+  const { room } = await (await mint(env)).json();
+  assert.equal((await post(env, room, { participant: 'ann~1', events: [{ type: 'the-box' }], at: 1, full: true, sid: 's-ann' }, hand(ADA))).status, 204);
+  const ctl = new AbortController();
+  const watching = await open(env, room, { signal: ctl.signal });
+  // Three pages beating for "hours", every 20 s: 600 beats in a room that keeps 60 lines.
+  let t = Date.now;
+  let clock = Date.now();
+  Date.now = () => clock;
+  try {
+    for (let i = 0; i < 200; i++) {
+      for (const [who, secret] of [['ann~1', ADA], ['fern~1', 'fern-sitting-secret-03'], ['bo~1', 'bo-sitting-secret-0004']]) {
+        assert.equal((await post(env, room, { participant: who, events: [], at: 10 + i, sid: 's-' + who }, hand(secret))).status, 204);
+      }
+      clock += 20_000;
+    }
+  } finally { Date.now = t; }
+  const live = await readUntil(watching, (s) => (s.match(/"bo~1"/g) || []).length >= 3);
+  assert.ok(/"bo~1"/.test(live), 'a beat did not reach a stream open as it came');
+  ctl.abort();
+  const newcomer = await readUntil(await open(env, room), (s) => s.includes('{"relay":"live"}'));
+  assert.ok(newcomer.includes('"the-box"'), 'the board was pushed out of the room by beats');
+  assert.ok(!newcomer.includes('"relay":"truncated"'), newcomer.slice(0, 300));
+  assert.ok(!newcomer.includes('"bo~1"'), 'a beat was replayed');
+  const lines = [...env.ROOMS.storages.get(room).map.keys()].filter((k) => k.startsWith('m:'));
+  assert.equal(lines.length, 1);
+  // The replay is said to begin and end, around the lines, so a store takes nobody to be here by them.
+  assert.ok(newcomer.indexOf('{"relay":"replay"}') < newcomer.indexOf('"the-box"') && newcomer.indexOf('"the-box"') < newcomer.indexOf('{"relay":"live"}'));
+});
+
+test('a new secret and name on every line is still one address: a burst of big lines from it stops well short of flushing the room, and so does the room as a whole', async () => {
+  const env = openEnv();
+  for (let i = 0; i < 20; i++) assert.equal((await post(env, 'r', { participant: 'alice~1', events: [{ type: 'a' + i }], at: i + 1, sid: 's-a' }, hand(ADA))).status, 204);
+  const pad = 'z'.repeat(3_900_000);
+  const statuses = [];
+  for (let i = 0; i < 12; i++) {
+    const secret = ('rotating-secret-' + i).padEnd(22, 'q');
+    const res = await post(env, 'r', { participant: 'flood~' + i, events: [{ pad }], at: 1 }, { headers: { 'x-dyna-hand': secret, 'cf-connecting-ip': '203.0.113.9' } });
+    statuses.push(res.status);
+    if (res.status === 429) assert.match(await res.text(), /this address is sending more than a room takes/);
+  }
+  assert.ok(statuses.includes(429) && statuses.filter((s) => s === 204).length <= 6, statuses.join(','));
+  const text = await readUntil(await open(env, 'r'), (s) => s.includes('{"relay":"live"}'));
+  assert.ok(text.includes('"a0"') && text.includes('"a19"') && !text.includes('"relay":"truncated"'), 'alice\'s history was flushed');
+  // From many addresses at once, the room's own bucket holds.
+  const env2 = openEnv();
+  const many = [];
+  for (let i = 0; i < 12; i++) {
+    const res = await post(env2, 'r', { participant: 'flood~' + i, events: [{ pad }], at: 1 }, { headers: { 'x-dyna-hand': ('another-secret-' + i).padEnd(22, 'q'), 'cf-connecting-ip': '198.51.100.' + i } });
+    many.push(res.status);
+    if (res.status === 429) assert.match(await res.text(), /this room is taking more than it can/);
+  }
+  assert.ok(many.includes(429) && many.filter((s) => s === 204).length <= 6, many.join(','));
+});
+
+test('names claimed from one address are counted, and a room keeps at most so many — those with no line left go first', async () => {
+  const env = openEnv();
+  const statuses = [];
+  for (let i = 0; i < 40; i++) {
+    const res = await post(env, 'r', { participant: 'n~' + i, events: [{ type: 'x' }], at: 1 }, { headers: { 'x-dyna-hand': ('claim-secret-' + i).padEnd(22, 'q'), 'cf-connecting-ip': '203.0.113.7' } });
+    statuses.push(res.status);
+  }
+  assert.equal(statuses.filter((s) => s === 204).length, 30, statuses.join(','));
+  const refused = await post(env, 'r', { participant: 'n~99', events: [{ type: 'x' }], at: 1 }, { headers: { 'x-dyna-hand': 'claim-secret-99'.padEnd(22, 'q'), 'cf-connecting-ip': '203.0.113.7' } });
+  assert.equal(refused.status, 429);
+  assert.match(await refused.text(), /too many new hands from this address/);
+  // A hand already here goes on writing; another address still joins.
+  assert.equal((await post(env, 'r', { participant: 'n~0', events: [{ type: 'y' }], at: 2 }, { headers: { 'x-dyna-hand': 'claim-secret-0'.padEnd(22, 'q'), 'cf-connecting-ip': '203.0.113.7' } })).status, 204);
+  assert.equal((await post(env, 'r', { participant: 'ok~1', events: [{ type: 'z' }], at: 3 }, { headers: { 'x-dyna-hand': 'ok-secret'.padEnd(22, 'q'), 'cf-connecting-ip': '192.0.2.1' } })).status, 204);
+  assert.equal(env.ROOMS.rooms.get('r').claims.size, 31);
+});
+
+test('a room at its most names lets go of the ones no line it holds was written under, and writes that down', async () => {
+  const env = openEnv({ MM_RELAY_MAX_LINES: '50' });
+  const real = Date.now;
+  let clock = real();
+  Date.now = () => clock;
+  try {
+    for (let i = 0; i < 1001; i++) {
+      clock += 100;   // a new hand every tenth of a second, from addresses of their own — under every floodgate
+      const res = await post(env, 'r', { participant: 'n~' + i, events: [{ type: 'x' }], at: 1 }, { headers: { 'x-dyna-hand': ('cap-secret-' + i).padEnd(22, 'q'), 'cf-connecting-ip': '10.0.' + Math.floor(i / 25) + '.' + (i % 25) } });
+      assert.equal(res.status, 204, 'line ' + i);
+    }
+  } finally { Date.now = real; }
+  const room = env.ROOMS.rooms.get('r');
+  assert.ok(room.claims.size <= 1000 && room.claims.has('n~1000') && room.claims.has('n~999') && !room.claims.has('n~0'), String(room.claims.size));
+  const stored = [...env.ROOMS.storages.get('r').map.keys()].filter((k) => k.startsWith('h:'));
+  assert.equal(stored.length, room.claims.size);
 });

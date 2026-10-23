@@ -216,3 +216,30 @@ test('the Worker with a secret: a room opened by POST /rooms is reached with the
     assert.equal((await checkRelay(url, other, { key })).status, 403);
   } finally { await close(); }
 });
+
+test('both relays: a beat reaches the streams open now and is never replayed, and a replay is said to begin and end — so a newcomer takes nobody to be here by an old line', async () => {
+  const { startRelay } = await import('../../Demos/relay.mjs');
+  const node = await startRelay(0);
+  const dev = await startDevRelay({ MM_RELAY_OPEN: '1' });
+  try {
+    for (const url of [`http://127.0.0.1:${node.address().port}`, dev.url]) {
+      const base = `${url}/rooms/beats/events`;
+      const post = (line) => fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(line) });
+      assert.equal((await post({ participant: 'gone~1', events: [{ type: 'the-box' }], at: 1, full: true, sid: 's-g' })).status, 204);
+      const heard = [];
+      const watcher = relayTransport(url, 'beats');
+      watcher.onMessage((l) => heard.push(l));
+      await wait(150);
+      for (let i = 0; i < 5; i++) assert.equal((await post({ participant: 'here~1', events: [], at: 10 + i, sid: 's-h' })).status, 204);
+      assert.ok(await until(() => heard.filter((l) => l.participant === 'here~1').length === 5), url + ': the beats did not reach the open stream');
+      assert.deepEqual(heard.filter((l) => l.relay).map((l) => l.relay), ['replay', 'live'], url);
+      watcher.close();
+      // A newcomer's store: the old line is held, its writer is not taken to be here, and no beat was kept for it.
+      const store = new MM.LiveStore(relayTransport(url, 'beats'), 'new~1', 'beats');
+      assert.ok(await until(async () => ((await store.readLogs())['gone~1'] || []).length === 1), url);
+      await wait(200);
+      assert.deepEqual(store.presence(), [], url + ': ' + JSON.stringify(store.presence()));
+      store.close();
+    }
+  } finally { node.close(); await dev.close(); }
+});

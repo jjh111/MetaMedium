@@ -27,6 +27,8 @@
 // share rooms the way they would on the relay on the internet. And a hand's name is claimed by the hand that
 // first writes under it with a secret of its sitting (`x-dyna-hand`): a line under a name another hand claimed is
 // refused (409), so nobody writes in another's name. The rules are `relay-protocol.mjs`'s, shared with the Worker.
+// A line that only says its hand is here (a beat) is passed on to the streams open now and kept nowhere, and a
+// stream's replay is said to begin and end, so nobody is taken to be here by a line written before it opened.
 //
 // How much a room remembers is settable: `maxLines`, else the environment's
 // MM_RELAY_MAX_LINES, else 5000 lines per room. Past it the lines replay would never send go first (`compact`), then the oldest lines go,
@@ -41,7 +43,8 @@ import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, existsSy
 import path from 'node:path';
 
 import {
-  DEFAULT_MAX_LINES, MAX_LINE_CHARS, kindOf, replay, truncationNotice, maxLinesFrom as maxLinesOf, compact, mintRoomName, HAND_HEADER, handHashOf, claimCheck,
+  DEFAULT_MAX_LINES, MAX_LINE_CHARS, kindOf, setOf, writerOf, replay, truncationNotice, maxLinesFrom as maxLinesOf, compact, mintRoomName, HAND_HEADER, handHashOf, claimCheck,
+  claimsToLetGo, CLAIMS_FULL, REPLAY_BEGINS, REPLAY_ENDS,
   MAX_ASSET_BYTES, assetRoomBytesFrom, assetPathOf, assetCheck, assetSizeVerdict, assetHeaders, sniffImage, ASSET_WORDS,
 } from './relay-protocol.mjs';
 
@@ -168,7 +171,10 @@ export function startRelay(port = Number(process.env.PORT || 8020), opts = {}) {
       // No `id:`, so it does not move the client's Last-Event-ID.
       const notice = truncationNotice(room, after);
       if (notice) res.write(`data: ${JSON.stringify(notice)}\n\n`);
+      // The replay, between the relay's two words for it: nobody is here by a line written before this stream opened.
+      res.write(`data: ${REPLAY_BEGINS}\n\n`);
       for (const l of replay(room, after)) res.write(`id: ${l.id}\ndata: ${l.data}\n\n`);
+      res.write(`data: ${REPLAY_ENDS}\n\n`);
       room.clients.add(res);
       const beat = setInterval(() => res.write(': beat\n\n'), 25000);
       req.on('close', () => { clearInterval(beat); room.clients.delete(res); });
@@ -189,10 +195,29 @@ export function startRelay(port = Number(process.env.PORT || 8020), opts = {}) {
         const hash = await handHashOf(req.headers[HAND_HEADER] || '');
         const verdict = claimCheck(room.claims, line, hash);
         if (!verdict.ok) { plain(res, verdict.status, verdict.words); return; }
-        if (verdict.claim) room.claims.set(verdict.claim, hash);
+        if (verdict.claim) {
+          // A room keeps so many names: past it, the names no line it holds was written under are let go of first.
+          const cap = claimsToLetGo(room.claims, room.lines);
+          for (const n of cap.letGo) room.claims.delete(n);
+          if (!cap.fits) { res.setHeader('retry-after', String(CLAIMS_FULL.retryAfter)); plain(res, CLAIMS_FULL.status, CLAIMS_FULL.words); return; }
+          room.claims.set(verdict.claim, hash);
+        }
+        const kind = kindOf(line);
+        // A line that only says its hand is here is passed on to the streams open now, and kept nowhere: a room's
+        // history is its marks, not its beats, and beats kept would push the marks out of it.
+        if (kind === 'here') {
+          for (const c of room.clients) c.write(`data: ${body}\n\n`);
+          res.writeHead(204); res.end();
+          return;
+        }
         const id = ++room.last;
         const participant = line && typeof line.participant === 'string' ? line.participant : '';
-        room.lines.push({ id, data: body, participant, kind: kindOf(line) });
+        const rec = { id, data: body, participant, kind };
+        const set = setOf(line);
+        if (set) rec.set = set;
+        const writer = writerOf(line);
+        if (writer && writer !== participant) rec.writer = writer;
+        room.lines.push(rec);
         if (room.lines.length > maxLines) room.lines = compact(room.lines);
         if (room.lines.length > maxLines) {
           const n = room.lines.length - maxLines;

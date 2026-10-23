@@ -134,7 +134,8 @@ test('in workerd: keys, the stream, Last-Event-ID, the cap and the truncation wo
     assert.ok(again.text.includes('"ada~1"') && again.text.includes('"relay":"truncated"'), again.text.slice(0, 400));
     assert.equal((await fetch(`${server.url}/rooms/${room}/events?key=${key}`, { method: 'POST', body: JSON.stringify({ participant: 'hal', events: [] }) })).status, 204);
     const ids = (await readSse(`${server.url}/rooms/${room}/events?key=${key}`, { headers: { 'last-event-id': '1000' } }, () => false, 500)).text;
-    assert.ok(!ids.includes('data:'), 'a client past the end was sent lines');
+    // Past the end: nothing but the relay's two words around a replay of nothing.
+    assert.ok(!ids.includes('id:') && ids.split('\n').filter((l) => l.startsWith('data:')).every((l) => /^data: \{"relay":"(replay|live)"\}$/.test(l)), 'a client past the end was sent lines: ' + ids);
   } finally {
     await server.stop();
     rmSync(state, { recursive: true, force: true });

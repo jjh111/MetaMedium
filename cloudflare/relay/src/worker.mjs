@@ -42,16 +42,20 @@
 // ages out — an alarm at its last use and MM_RELAY_ROOM_IDLE_DAYS empties its storage (lines, pictures,
 // claims), its memory and its streams. A room named by hand never does. In every room, a name is claimed by
 // the hand that writes under it first (`x-dyna-hand`, a secret of its sitting, kept as a hash), and a line
-// under a name claimed by another hand is refused (409); a hand sending more than a room takes is told to
-// wait (429); and before a room lets go of history to stay under its caps it lets go of the lines replay
-// would never send (`compact`). The rules are relay-protocol.mjs's.
+// under a name claimed by another hand is refused (409); a hand, an address or the room as a whole sending
+// more than a room takes is told to wait (429), and so is an address claiming new names faster than a room
+// takes them; a room keeps at most MAX_CLAIMS names, letting go first of names no line it holds was written
+// under; before a room lets go of history to stay under its caps it lets go of the lines replay would never
+// send (`compact`); and a line that only says its hand is here is passed on to the open streams and kept
+// nowhere. The rules are relay-protocol.mjs's.
 
 import {
-  kindOf, replay, truncationNotice, maxLinesFrom, MAX_LINE_CHARS, compact, isMintedRoom, roomIdleDaysFrom, HAND_HEADER, handHashOf, claimCheck, writerOf, spend,
+  kindOf, setOf, replay, truncationNotice, maxLinesFrom, MAX_LINE_CHARS, compact, isMintedRoom, roomIdleDaysFrom, HAND_HEADER, handHashOf, claimCheck, writerOf,
+  floodgate, FLOOD, FLOOD_ADDRESS, FLOOD_ROOM, NEW_HANDS, claimsToLetGo, CLAIMS_FULL, REPLAY_BEGINS, REPLAY_ENDS,
   MAX_ASSET_BYTES, assetRoomBytesFrom, assetPathOf, assetCheck, assetFull, assetSizeVerdict, assetHeaders, sniffImage, ASSET_WORDS,
 } from '../../../Demos/relay-protocol.mjs';
 import { secretsOf, keyOpens } from './auth.mjs';
-import { originAllowed, corsHeaders, text, keyOf } from './http.mjs';
+import { originAllowed, corsHeaders, text, keyOf, callerOf } from './http.mjs';
 import { mintRoute } from './mint.mjs';
 import { aiRoute, AI_PATH } from './ai.mjs';
 import { Limits } from './limits.mjs';
@@ -72,7 +76,7 @@ const MAX_ROOM_NAME = 128;
 const BEAT_MS = 25000;
 const HOUR = 3600_000;
 const DAY = 24 * HOUR;
-/** A room's floodgate keeps a bucket per hand; past this many it lets go of the ones full again. */
+/** A room's floodgate keeps a bucket per hand and per address; past this many it lets go of the ones full again. */
 const FLOOD_HANDS = 256;
 
 export default {
@@ -171,7 +175,9 @@ export class Room {
     this.beat = null;
     this.lost = 0;              // the newest line let go of for good (truncationNotice); a line compacted away is not lost
     this.claims = new Map();    // name -> the hash of the secret of the hand that claimed it
-    this.floods = new Map();    // hand (its secret's hash, else its name) -> its bucket (relay-protocol.mjs, `spend`)
+    this.floods = new Map();    // hand (its secret's hash, else its name) -> its bucket (relay-protocol.mjs, `floodgate`)
+    this.addresses = new Map(); // address -> its bucket of lines, and its bucket of new names (`floodgate`)
+    this.roomFlood = null;      // the room's own bucket, across every hand
     this.alarmAt = 0;           // when this room is forgotten, if it is one the relay opened (0: never set)
     this.ready = ctx.blockConcurrencyWhile ? ctx.blockConcurrencyWhile(() => this.load()) : this.load();
   }
@@ -187,7 +193,7 @@ export class Room {
     for (const rec of records.values()) {
       let data = '';
       for (let k = 0; k < rec.n; k++) data += chunks.get(cKey(rec.id, k)) || '';
-      this.lines.push({ id: rec.id, data, participant: rec.participant, kind: rec.kind, n: rec.n });
+      this.lines.push({ id: rec.id, data, participant: rec.participant, kind: rec.kind, n: rec.n, ...(rec.set ? { set: rec.set } : {}), ...(rec.writer ? { writer: rec.writer } : {}) });
       this.chars += data.length;
     }
     for (const rec of (await this.ctx.storage.list({ prefix: 'a:' })).values()) { this.assets.set(rec.hash, rec); this.assetBytes += rec.size; }
@@ -226,6 +232,8 @@ export class Room {
     this.assetBytes = 0;
     this.claims = new Map();
     this.floods = new Map();
+    this.addresses = new Map();
+    this.roomFlood = null;
     this.alarmAt = 0;
   }
 
@@ -304,7 +312,10 @@ export class Room {
     // and no `id:`, as the Node relay sends it, so it never moves Last-Event-ID.
     const notice = truncationNotice({ name: this.name, lines: this.lines, dropped: this.dropped, lost: this.lost }, after);
     if (notice) say(`data: ${JSON.stringify(notice)}\n\n`);
+    // The replay, between the relay's two words for it: nobody is here by a line written before this stream opened.
+    say(`data: ${REPLAY_BEGINS}\n\n`);
     for (const l of replay({ lines: this.lines }, after)) say(`id: ${l.id}\ndata: ${l.data}\n\n`);
+    say(`data: ${REPLAY_ENDS}\n\n`);
     this.clients.add(client);
     writer.closed.catch(() => this.drop(client));
     request.signal?.addEventListener('abort', () => this.drop(client));
@@ -332,20 +343,52 @@ export class Room {
     const hash = await handHashOf(request.headers.get(HAND_HEADER) || '');
     const verdict = claimCheck(this.claims, line, hash);
     if (!verdict.ok) return text(verdict.status, verdict.words);
-    // A hand that sends more than a room takes is told to wait, rather than push the room's history out.
+    // A hand, an address or the room as a whole that sends more than a room takes is told to wait, rather than push
+    // the room's history out — the hand's secret is its own to choose, so a hand that takes a new one on every line
+    // is still its address, and still the room. A line that claims a new name counts against its address's names too.
     const now = Date.now();
     const who = hash || 'name:' + writerOf(line);
-    const gate = spend(this.floods.get(who), now, body.length);
+    const caller = callerOf(request);
+    const at = this.addresses.get(caller) || {};
+    const gates = [
+      { kind: 'hand', bucket: this.floods.get(who), limits: FLOOD },
+      { kind: 'address', bucket: at.lines, limits: FLOOD_ADDRESS },
+      { kind: 'room', bucket: this.roomFlood, limits: FLOOD_ROOM },
+    ];
+    if (verdict.claim) gates.push({ kind: 'claim', bucket: at.claims, limits: NEW_HANDS });
+    const gate = floodgate(gates, now, body.length);
     if (gate.refused) return text(429, gate.refused.words, { 'retry-after': String(gate.refused.retryAfter) });
-    this.floods.set(who, gate.bucket);
+    // A room keeps so many names: past it, the names no line it holds was written under are let go of first.
+    let letGo = [];
+    if (verdict.claim) {
+      const cap = claimsToLetGo(this.claims, this.lines);
+      if (!cap.fits) return text(CLAIMS_FULL.status, CLAIMS_FULL.words, { 'retry-after': String(CLAIMS_FULL.retryAfter) });
+      letGo = cap.letGo;
+      for (const name of letGo) this.claims.delete(name);
+    }
+    this.floods.set(who, gate.buckets[0]);
+    this.addresses.set(caller, verdict.claim ? { lines: gate.buckets[1], claims: gate.buckets[3] } : { ...at, lines: gate.buckets[1] });
+    this.roomFlood = gate.buckets[2];
     if (this.floods.size > FLOOD_HANDS) for (const [k, b] of this.floods) if (now - b.at > 60_000) this.floods.delete(k);
+    if (this.addresses.size > FLOOD_HANDS) for (const [k, b] of this.addresses) if (now - b.lines.at > 600_000) this.addresses.delete(k);
     // Nothing awaited between the check and the claim: two first lines at once cannot both claim a name.
     if (verdict.claim) this.claims.set(verdict.claim, hash);
+    const kind = kindOf(line);
+    // A line that only says its hand is here is passed on to the streams open now and kept nowhere: a room's
+    // history is its marks, not its beats, and beats kept would push the marks out of it.
+    if (kind === 'here') {
+      for (const c of this.clients) c.writer.write(enc.encode(`data: ${body}\n\n`)).catch(() => this.drop(c));
+      if (verdict.claim) await this.ctx.storage.put(hKey(verdict.claim), hash);
+      if (letGo.length) await this.ctx.storage.delete(letGo.map(hKey));
+      return new Response(null, { status: 204 });
+    }
     const id = ++this.last;
     const participant = line && typeof line.participant === 'string' ? line.participant : '';
-    const kind = kindOf(line);
     const n = Math.max(1, Math.ceil(body.length / CHUNK_CHARS));
-    this.lines.push({ id, data: body, participant, kind, n });
+    const set = setOf(line);
+    const writer = writerOf(line);
+    const rec = { id, participant, kind, n, ...(set ? { set } : {}), ...(writer && writer !== participant ? { writer } : {}) };
+    this.lines.push({ ...rec, data: body });
     this.chars += body.length;
     // Past the cap — in lines or in characters, the newest always kept — what replay would never send goes
     // first (`compact`: a hand's own whole logs that a newer one stands after), then the oldest.
@@ -370,11 +413,11 @@ export class Room {
     // To every open stream at once and in order; the write below is awaited, so
     // the 204 means the line is kept.
     for (const c of this.clients) c.writer.write(enc.encode(`id: ${id}\ndata: ${body}\n\n`)).catch(() => this.drop(c));
-    const put = { meta: { last: this.last, dropped: this.dropped, lost: this.lost }, [mKey(id)]: { id, participant, kind, n } };
+    const put = { meta: { last: this.last, dropped: this.dropped, lost: this.lost }, [mKey(id)]: rec };
     for (let k = 0; k < n; k++) put[cKey(id, k)] = body.slice(k * CHUNK_CHARS, (k + 1) * CHUNK_CHARS);
     if (verdict.claim) put[hKey(verdict.claim)] = hash;
     await this.ctx.storage.put(put);
-    const keys = gone.flatMap((l) => [mKey(l.id), ...Array.from({ length: l.n }, (_, k) => cKey(l.id, k))]);
+    const keys = gone.flatMap((l) => [mKey(l.id), ...Array.from({ length: l.n }, (_, k) => cKey(l.id, k))]).concat(letGo.map(hKey));
     for (let i = 0; i < keys.length; i += 128) await this.ctx.storage.delete(keys.slice(i, i + 128));
     return new Response(null, { status: 204 });
   }
