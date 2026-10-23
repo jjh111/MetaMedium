@@ -95,6 +95,8 @@ const XSS_MERGE = `(() => {
   hostile.import({ kind: 'svg', path: 'f.svg', name: 'svg' + P('svgname'), bounds: { minX: 450, minY: 300, maxX: 700, maxY: 400 }, code: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="80"><text x="5" y="40">hi</text><script>parent.__pwnsvg=1<\\/script><foreignObject width="100" height="50"><div xmlns="http://www.w3.org/1999/xhtml">' + P('svgfo') + '</div></foreignObject></svg>', at: at++ });
   hostile.import({ kind: 'mermaid', path: 'd.mmd', name: 'mm' + P('mmname'), bounds: { minX: 100, minY: 450, maxX: 400, maxY: 600 }, code: 'flowchart TD\\n  a["' + P('mmlabel').replace(/"/g, '#quot;') + '"] --> b["x' + P('mmlabel2') + '"]', at: at++ });
   hostile.import({ kind: 'html', path: 'page.html', name: 'pg', bounds: { minX: 450, minY: 450, maxX: 700, maxY: 600 }, code: '<div data-region="r1">page ' + P('htmlcode') + '<a href="javascript:parent.__pwnhref=1">x</a></div>', at: at++ });
+  // A kind no table holds, said over the panel's heading: the last thing made, so the panel inspects it unasked.
+  hostile.import({ kind: 'x' + P('kind'), path: 'k.x', name: 'kd', bounds: { minX: 100, minY: 650, maxX: 400, maxY: 750 }, code: 'k', at: at++ });
   const pid = hostile.join('model', 'm' + P('modelname'), at++, 2, 'hosted');
   hostile.answer({ question: 'q' + P('question'), text: 'ans' + P('answer'), aboutIds: [s2], participantId: pid, at: at++ });
   const merged = MM.mergeLogs({ [session.logName() || 'me']: session.getEvents(), [hname]: hostile.getEvents() }, { me: session.logName() || 'me' });
@@ -236,12 +238,12 @@ export async function runSecurity(browser, servers, { freshContext, screenshot }
       await wait(1200);
       // Open panes, hover and select every artifact, so any injected handler that was going to fire would.
       await page.evaluate(() => { const s = window.__mm.session.getState(); for (const id of s.artifacts) window.__mm.session.select([id], Date.now()); });
-      for (const [x, y] of [[160, 140], [360, 140], [560, 140], [250, 350], [570, 350], [250, 520], [570, 520]]) { await page.mouse.move(x, y); await wait(80); }
+      for (const [x, y] of [[160, 140], [360, 140], [560, 140], [250, 350], [570, 350], [250, 520], [570, 520], [250, 700]]) { await page.mouse.move(x, y); await wait(80); }
       await page.evaluate(() => document.querySelectorAll('details').forEach((d) => (d.open = true)));
       await page.keyboard.press('/'); await wait(200); await page.keyboard.type('lab'); await wait(600); await page.keyboard.press('Escape');
       await wait(400);
       const got = await page.evaluate(() => ({ pwn: window.__pwn || [], svg: window.__pwnsvg || 0, href: window.__pwnhref || 0 }));
-      check('XSS. no injected name, label, region, svg, mermaid or page handler ever ran', got.pwn.length === 0 && got.svg === 0 && got.href === 0 && pwn.length === 0, { got, dialogs: pwn });
+      check('XSS. no injected name, label, region, kind, svg, mermaid or page handler ever ran', got.pwn.length === 0 && got.svg === 0 && got.href === 0 && pwn.length === 0, { got, dialogs: pwn });
     });
 
     // ---- The launch-film example still plays (a shipped program runs in a board of your own) ----

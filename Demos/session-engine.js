@@ -8605,7 +8605,8 @@
     // Who made it: a mark's drawer, an artifact's blesser — never who drew its marks (V1-PLAN L2f).
     const author = authorOf(node);
     const authorName = nameOfParticipant(author);
-    const eyebrow = '<div class="eyebrow">' + (isLive ? kindEyebrow(codeKindOf(node)) : isArtifact ? 'a thing made' : isWordNode ? 'a word' : 'a mark') + '</div>';
+    // Escaped: a kind is whatever the event said, and another hand's event may say anything.
+    const eyebrow = '<div class="eyebrow">' + esc(isLive ? kindEyebrow(codeKindOf(node)) : isArtifact ? 'a thing made' : isWordNode ? 'a word' : 'a mark') + '</div>';
     // What the person reads first (U1a): what it is and what it can become, in a few plain
     // lines. Everything the engine holds about it — ids, tiers, relations, measures — is
     // below, behind details.
