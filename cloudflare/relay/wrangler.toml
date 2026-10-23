@@ -48,3 +48,8 @@ binding = "AI"
 # everyone, past which a decision is refused with 429 and the engine's ranking stands:
 # MM_DECIDE = "limited"
 # MM_AI_DAILY = "20000"
+# Rooms anyone opens from the app (POST /rooms, src/mint.mjs):
+# MM_RELAY_MINT = "0"                  # open no new rooms (503, in words)
+# MM_RELAY_MINT_PER_HOUR = "10"        # rooms one address may open an hour
+# MM_RELAY_MINT_PER_DAY = "500"        # rooms the relay opens a day, in all
+# MM_RELAY_ROOM_IDLE_DAYS = "30"       # a room it opened is forgotten this long after it was last used

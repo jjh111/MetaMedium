@@ -11012,14 +11012,14 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     const gone = [...definitionsSeen.keys()].filter((aid) => !now.has(aid));
     definitionsSeen = now;
     if (changed2.length === 0 && gone.length === 0) return;
-    const sizes = /* @__PURE__ */ new Set();
+    const sizes2 = /* @__PURE__ */ new Set();
     for (const k of now.values()) {
       if (k.text) continue;
       const sig2 = k.signature?.data;
-      if (sig2) sizes.add(shapeCount(sig2));
-      for (const x of k.examples?.data?.accepted ?? []) sizes.add(shapeCount(x));
+      if (sig2) sizes2.add(shapeCount(sig2));
+      for (const x of k.examples?.data?.accepted ?? []) sizes2.add(shapeCount(x));
     }
-    definitionSizes = [...sizes];
+    definitionSizes = [...sizes2];
     for (const c of matchable) {
       for (const aid of gone) c.scores.delete(aid);
       for (const aid of changed2) scoreAgainst(c, aid);
@@ -11687,15 +11687,15 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     } else {
       const along2 = (b) => axis === "row" ? (b.minX + b.maxX) / 2 : (b.minY + b.maxY) / 2;
       const ordered2 = [...targets].sort((a, b) => along2(a.bounds) - along2(b.bounds));
-      const sizes = ordered2.map((t) => axis === "row" ? w2(t.bounds) : h2(t.bounds));
-      const total = sizes.reduce((a, b) => a + b, 0);
+      const sizes2 = ordered2.map((t) => axis === "row" ? w2(t.bounds) : h2(t.bounds));
+      const total = sizes2.reduce((a, b) => a + b, 0);
       const start = axis === "row" ? span.minX : span.minY;
       const end = axis === "row" ? span.maxX : span.maxY;
       const gap = ordered2.length > 1 ? (end - start - total) / (ordered2.length - 1) : 0;
       const cross9 = ordered2.reduce((acc, t) => acc + (axis === "row" ? (t.bounds.minY + t.bounds.maxY) / 2 : (t.bounds.minX + t.bounds.maxX) / 2), 0) / ordered2.length;
       let cursor = start;
       placed2 = ordered2.map((t, i) => {
-        const size2 = sizes[i];
+        const size2 = sizes2[i];
         const half2 = (axis === "row" ? h2(t.bounds) : w2(t.bounds)) / 2;
         const to = axis === "row" ? { minX: cursor, maxX: cursor + size2, minY: cross9 - half2, maxY: cross9 + half2 } : { minX: cross9 - half2, maxX: cross9 + half2, minY: cursor, maxY: cursor + size2 };
         cursor += size2 + gap;
@@ -11972,10 +11972,10 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     if (!fp || topShape3(n2)?.type === "text") return false;
     return !isLetterLike(fp.bounds, strokeScaleOf(n2)) || neverLetter(n2);
   }
-  function letterMeets(letterId, m, mb, r) {
+  function letterMeets(letterId, m, mb2, r) {
     const l = nodes.get(letterId);
     const lb = l && boundsOf(l);
-    if (!l || !lb || boundingBoxDistance(lb, mb) > r) return false;
+    if (!l || !lb || boundingBoxDistance(lb, mb2) > r) return false;
     const paths = inkPathsOf(m);
     for (const [pts] of inkPathsOf(l)) {
       for (const p of pts) if (paths.some(([q, c]) => distanceToPath(p, q, c) <= r)) return true;
@@ -12004,13 +12004,13 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
       for (const id of reach.around(e.point, (cell) => magnetRadius(cell, scale))) {
         if (id === n2.id || run2.includes(id)) continue;
         const m = nodes.get(id);
-        const mb = boundsOf(m);
-        if (!mb || !nonWriting(m)) continue;
+        const mb2 = boundsOf(m);
+        if (!mb2 || !nonWriting(m)) continue;
         const closed = artifacts.includes(id) || (standsClosed(m) ?? false);
-        const r = magnetRadius(closed ? sizeOfBounds3(mb) : Math.min(nSize, sizeOfBounds3(mb)), scale);
-        if (distancePointToBounds(e.point, mb) > r) continue;
-        if (closed && boundsContain(mb, nb)) continue;
-        if (!closed && holders().some((h2) => boundsContain(boundsOf(nodes.get(h2)), mb))) continue;
+        const r = magnetRadius(closed ? sizeOfBounds3(mb2) : Math.min(nSize, sizeOfBounds3(mb2)), scale);
+        if (distancePointToBounds(e.point, mb2) > r) continue;
+        if (closed && boundsContain(mb2, nb)) continue;
+        if (!closed && holders().some((h2) => boundsContain(boundsOf(nodes.get(h2)), mb2))) continue;
         let q = null, d = Infinity;
         for (const [pts, c] of inkPathsOf(m)) {
           for (let i = 1; i < pts.length + (c ? 1 : 0); i++) {
@@ -12035,7 +12035,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
         }
         if (!q || d > r) continue;
         if (d > touch && ((q.x - e.point.x) * e.out.x + (q.y - e.point.y) * e.out.y) / d < 0.5) continue;
-        if (run2.some((l) => l !== n2.id && letterMeets(l, m, mb, r))) continue;
+        if (run2.some((l) => l !== n2.id && letterMeets(l, m, mb2, r))) continue;
         if (closed) meets2.closed = true;
         else meets2.open[k] = true;
       }
@@ -13377,8 +13377,8 @@ function readFlowchart(state, scopeIds) {
   }
   const cores = candidates.filter((c) => !containers.has(c.id) && topCore(c) && readingsOf(c).length);
   if (!cores.length) return null;
-  const sizes = cores.map((c) => c.outline.size).sort((a, b) => a - b);
-  const median4 = sizes[Math.floor(sizes.length / 2)];
+  const sizes2 = cores.map((c) => c.outline.size).sort((a, b) => a - b);
+  const median4 = sizes2[Math.floor(sizes2.length / 2)];
   const rounds = candidates.filter((c) => {
     if (containers.has(c.id) || topCore(c)) return false;
     const r = c.shapes.find((s) => s.symbol === "round");
@@ -14435,10 +14435,10 @@ function readUmlClass(state, scopeIds) {
       continue;
     }
     const ma = markerOf(a.head ? [a.head, ...h2.start.heads.filter((x) => x !== a.head && !x.ids.some((y) => y !== id && classOfMark.has(y)))] : []);
-    const mb = markerOf(b.head ? [b.head, ...h2.end.heads.filter((x) => x !== b.head && !x.ids.some((y) => y !== id && classOfMark.has(y)))] : []);
+    const mb2 = markerOf(b.head ? [b.head, ...h2.end.heads.filter((x) => x !== b.head && !x.ids.some((y) => y !== id && classOfMark.has(y)))] : []);
     const rank2 = (m) => m ? PRECEDENCE.indexOf(m) : Infinity;
-    let [from, to, mf, mt] = [a, b, ma, mb];
-    if (rank2(ma.marker) < rank2(mb.marker)) [from, to, mf, mt] = [b, a, mb, ma];
+    let [from, to, mf, mt] = [a, b, ma, mb2];
+    if (rank2(ma.marker) < rank2(mb2.marker)) [from, to, mf, mt] = [b, a, mb2, ma];
     const kind = mt.marker ?? "link";
     const direction = mt.marker && mf.marker ? "both" : mt.marker ? "forward" : "none";
     const quality = Math.min(from.quality, to.quality);
@@ -17550,8 +17550,8 @@ function readGarment(state, scopeIds) {
   for (const o of open) {
     const pts = strokePointsOf(o.node);
     if (!pts || !nearby(boxOf3(pts))) continue;
-    const m = mid6(pts[0], pts[pts.length - 1]), mb = { minX: m.x, maxX: m.x, minY: m.y, maxY: m.y };
-    const stands = pieces.some((p) => meets2(p, mb) && (outside(m, p.hull) === 0 || distToPath(m, p.ring) <= Math.max(FOLD_NEAR * p.short, NEAR_PX * p.scale)));
+    const m = mid6(pts[0], pts[pts.length - 1]), mb2 = { minX: m.x, maxX: m.x, minY: m.y, maxY: m.y };
+    const stands = pieces.some((p) => meets2(p, mb2) && (outside(m, p.hull) === 0 || distToPath(m, p.ring) <= Math.max(FOLD_NEAR * p.short, NEAR_PX * p.scale)));
     const sh = stands ? shaftOf(state, o.id, o.node, o.scale) : null;
     if (sh && sh.dev <= STRAIGHT_DEV) shafts.push(sh);
     else rest.push(o);
@@ -19727,6 +19727,11 @@ var MemoryStore = class {
 
 // src/store/live.ts
 var SEND_WAIT_MS = 1e4;
+var OWN_WAIT_MS = 6e4;
+var OWN_WAIT_CHARS_PER_MS = 10;
+var LINE_CHARS = 3e6;
+var RETRY_FIRST_MS = 2e3;
+var RETRY_MAX_MS = 3e4;
 var COVER_WAIT_MS = 1500;
 var COVER_STAGGER_MS = 200;
 var timer = (fn, ms) => {
@@ -19776,6 +19781,41 @@ var LiveStore = class {
     this.refused = null;
     /** Whether this store has put MY log on the wire yet, in any form. */
     this.published = false;
+    /** How many of MY log's first events the room is known to hold — what a send that failed is sent again from. */
+    this.confirmed = 0;
+    /** The room's copy of my log is not known to be a prefix of mine (a first send, an undo, a hole): the next send of it is whole. */
+    this.needFull = false;
+    /** Moves whenever my log is replaced rather than grown, so the answer to a send of the old one confirms nothing of the new. */
+    this.mineGen = 0;
+    /** The longest line sent, in characters: halved when a relay says a line of several events is too large. */
+    this.lineChars = LINE_CHARS;
+    /** Events of my log no line can carry (the relay said 413 to them alone): never sent again, said. */
+    this.tooBig = /* @__PURE__ */ new WeakSet();
+    this.tooBigSaid = { n: 0, chars: 0 };
+    /** My lines are not reaching the room just now: the status it last answered (0 for none at all). Cleared when one is taken. */
+    this.failing = null;
+    /** A line of my log is on the wire and not yet answered: the next waits for it (`sendMine`). */
+    this.mineInFlight = false;
+    /** That line has been on the wire longer than SEND_WAIT_MS: said, until it is answered. */
+    this.slow = false;
+    /** The whole of my log is going in pieces: the first piece's `at`, which every piece of it carries as `set` (0: none going). */
+    this.setAt = 0;
+    /** A hello asked for my whole log while a line of it was on its way: it goes once that is answered and no whole is mid-way. */
+    this.wholeAgain = false;
+    /** Another hand's whole log arriving in pieces, held aside until its last piece lands (`LiveLine.set`). */
+    this.pending = /* @__PURE__ */ new Map();
+    /** The relay is replaying what it holds to a stream just opened: nobody is taken to be here from those lines (`RelayReplay`). */
+    this.replaying = false;
+    /** The room will take nothing more from this hand, and why. */
+    this.stopped = null;
+    /** A send again, waiting its time, and how long the last wait was. */
+    this.retryCancel = null;
+    this.backoff = 0;
+    /** The newest `at` applied from each writer's OWN lines — apart from copies, so a copy can never hold its writer back. */
+    this.ownAt = /* @__PURE__ */ new Map();
+    /** Writers a copy of whose log was refused because it would have taken marks away: said once each. */
+    this.copiesRefused = /* @__PURE__ */ new Set();
+    this.offOnline = null;
     this.lastAt = 0;
     /** The line still leaving, when the transport is asynchronous. */
     this.tail = null;
@@ -19785,6 +19825,12 @@ var LiveStore = class {
     this.seat = !!opts.seat;
     this.logs[me] = [];
     this.off = transport.onMessage((line) => this.receive(line));
+    const g = globalThis;
+    if (typeof g.addEventListener === "function") {
+      const on = () => this.resend();
+      g.addEventListener("online", on);
+      this.offOnline = () => g.removeEventListener?.("online", on);
+    }
   }
   capabilities() {
     return { write: true, watch: true };
@@ -19802,14 +19848,27 @@ var LiveStore = class {
   }
   async appendLog(participant, events) {
     if (!events.length) return;
+    if (participant === this.me) {
+      this.grow(events);
+      await this.flushMine();
+      return;
+    }
     const log = this.logs[participant] ??= [];
     for (const ev of events) {
       this.number(participant, log.length, ev);
       log.push(ev);
     }
-    if (participant !== this.me) this.rev++;
-    if (participant === this.me) this.published = true;
+    this.rev++;
     await this.post({ participant, events: events.slice(), at: this.stamp(), sid: this.sitting });
+  }
+  /** My log grew by `events`: held, numbered, and owed to the room until it takes them. */
+  grow(events) {
+    const log = this.logs[this.me];
+    for (const ev of events) {
+      this.number(this.me, log.length, ev);
+      log.push(ev);
+    }
+    this.published = true;
   }
   /**
    * Put MY log on the wire as it stands: `events` is the whole of it, and the
@@ -19830,14 +19889,67 @@ var LiveStore = class {
           break;
         }
       }
-      if (events.length > sent.length) await this.appendLog(this.me, events.slice(sent.length));
+      if (events.length > sent.length) {
+        this.grow(events.slice(sent.length));
+        await this.flushMine();
+      }
       return;
     }
     this.published = true;
     this.unnumber(this.me);
     this.logs[this.me] = events.slice();
     this.logs[this.me].forEach((ev, i) => this.number(this.me, i, ev));
-    await this.post({ participant: this.me, events: events.slice(), at: this.stamp(), full: true, sid: this.sitting });
+    this.replaced();
+    await this.flushMine();
+  }
+  /** My log was replaced, not grown (an undo, a reset, a first send): what the room holds of it is no prefix of it, and it goes whole. */
+  replaced() {
+    this.mineGen++;
+    this.confirmed = 0;
+    this.needFull = true;
+    this.setAt = 0;
+    this.wholeAgain = false;
+  }
+  /**
+   * Bring another hand's log into this room as a copy this hand holds and hands on (`via`) — the marks other people
+   * made on a board this hand shares (a room's board kept as a board of a device, shared again). It is held here as
+   * any copy is, handed on to a newcomer as any copy is, and sent once now, whole; resolves with what the room said.
+   * A copy too long for one line is not sent (a copy goes whole or not at all): `{ ok: false, status: 413 }`.
+   */
+  carry(participant, events) {
+    if (this.closed || participant === this.me || !events.length) return Promise.resolve({ ok: true });
+    let chars = 0;
+    let at = 0;
+    for (const ev of events) {
+      chars += charsOf(ev) + 1;
+      at = Math.max(at, atOf2(ev) || 0);
+    }
+    if (chars > LINE_CHARS) return Promise.resolve({ ok: false, status: 413 });
+    this.unnumber(participant);
+    this.logs[participant] = events.slice();
+    this.logs[participant].forEach((ev, i) => this.number(participant, i, ev));
+    this.carried.set(participant, new Set(events.map(authorKey2).filter((k) => k !== null)));
+    if (!at) at = this.stamp();
+    this.applied.set(participant, Math.max(this.applied.get(participant) ?? 0, at));
+    this.rev++;
+    return this.postFor({ participant, events: events.slice(), at, full: true, via: this.me });
+  }
+  /**
+   * Send again, now, what the room has not taken of this hand's log — the window
+   * came back online, or a person asked. A wait already set is let go of.
+   */
+  resend() {
+    if (this.closed) return Promise.resolve();
+    if (this.retryCancel) {
+      this.retryCancel();
+      this.retryCancel = null;
+    }
+    return this.flushMine();
+  }
+  /** How many of this hand's events the room has not been known to take yet (0 when it holds them all). */
+  unsent() {
+    if (this.needFull) return this.logs[this.me].length;
+    return Math.max(0, this.logs[this.me].length - this.confirmed);
   }
   /**
    * My log as it stands, from the session's events: what was sent, less what
@@ -19914,6 +20026,7 @@ var LiveStore = class {
   refusal() {
     const r = this.refused;
     if (!r) return null;
+    if (r.reason === "origin") return "this site may not use that relay \u2014 the room is not reached";
     if (r.status === 401) return "the relay wants a key for this room and none was given \u2014 the room is not reached";
     if (r.status === 403) return "the relay does not take this key for this room \u2014 the room is not reached";
     if (r.status === 503) return "the relay has no keys set up yet \u2014 the room is not reached";
@@ -19939,9 +20052,31 @@ var LiveStore = class {
     const out = this.collisions().concat(this.misnumberings());
     const f = this.refusal();
     if (f) out.push(f);
+    const s = this.sendTrouble();
+    if (s) out.push(s);
+    for (const name of this.copiesRefused) out.push(`a copy of ${handLabel(name)}\u2019s marks that would have taken some away was refused \u2014 what is held here is kept`);
     const t = this.truncation();
     if (t) out.push(t);
     return out;
+  }
+  /**
+   * What this hand's own lines are going through, as one sentence, or null: the
+   * room stopped taking them (a name another hand holds; a line it could not
+   * read), something too big for any line, or — while it lasts — the room not
+   * answering or asking to be left alone a moment. The last clears itself the
+   * moment a line is taken.
+   */
+  sendTrouble() {
+    if (this.stopped === "claim") return "the room takes nothing more from this hand: its name there is another hand\u2019s \u2014 reload the page to join again";
+    if (this.stopped === "unreadable") return "the room could not read what this hand sent, so nothing more is sent \u2014 reload the page to join again";
+    const big = this.tooBigSaid;
+    if (big.n) {
+      return big.n === 1 ? `something on this board is ${mb(big.chars)} \u2014 more than a room carries in one piece \u2014 and was not shared` : `${big.n} things on this board are more than a room carries in one piece (the largest ${mb(big.chars)}) and were not shared`;
+    }
+    if (this.failing && this.failing.status === 429) return "the room is taking this hand\u2019s lines more slowly \u2014 what you draw is held on this page and sent in a moment";
+    if (this.failing) return "not reaching the room \u2014 what you draw is held on this page and sent when it answers; leaving or closing the page loses it";
+    if (this.slow) return "the room is slow to take what this hand sends \u2014 what you draw is held on this page until it does";
+    return null;
   }
   /**
    * Fires when another participant's events land, with what landed — and,
@@ -19962,8 +20097,17 @@ var LiveStore = class {
   close() {
     if (this.closed) return;
     this.closed = true;
+    this.pending.clear();
     for (const cancel of this.waiting) cancel();
     this.waiting.clear();
+    if (this.retryCancel) {
+      this.retryCancel();
+      this.retryCancel = null;
+    }
+    if (this.offOnline) {
+      this.offOnline();
+      this.offOnline = null;
+    }
     void this.post({ participant: this.me, events: [], at: this.stamp(), bye: true, sid: this.sitting });
     if (this.off) this.off();
     this.off = null;
@@ -19977,47 +20121,297 @@ var LiveStore = class {
   /**
    * Send lines in the order they were written. A synchronous transport sends
    * at once; an asynchronous one (a POST) is waited for before the next line
-   * goes, or two POSTs in flight could reach the relay the wrong way round.
-   * A line that fails is gone — the next whole log carries what it held.
+   * goes, or two POSTs in flight could reach the relay the wrong way round —
+   * but a line that is not of this hand's own log (a hello, a beat, a copy
+   * handed on) never forever: one that has not settled in SEND_WAIT_MS lets the
+   * next line go rather than wedge the hand. Such a line is sent once; what the
+   * room answers to it is heard (a name another hand holds, a key it will not
+   * take) and nothing more. This hand's own log goes by `sendMine`.
    */
   post(line) {
-    if (this.seat && line.participant === this.me && !line.via) line.seat = true;
-    const go = () => {
-      let r;
+    return this.postFor(line).then(() => void 0);
+  }
+  /** `post`, resolving with what the room said of the line. */
+  postFor(line) {
+    let said3 = { ok: true };
+    return this.enqueue(() => {
+      const r = this.sendNow(line);
+      if (isThenable(r)) return r.then((res) => {
+        said3 = res;
+        this.heardBack(res);
+      });
+      said3 = r;
+      this.heardBack(r);
+      return void 0;
+    }).then(() => said3);
+  }
+  /** Run `fn` after whatever is leaving; at once when nothing is. A synchronous `fn` leaves no tail. */
+  enqueue(fn) {
+    const run2 = () => {
       try {
-        r = this.transport.send(line);
+        return fn();
       } catch {
         return void 0;
       }
-      if (!r || typeof r.then !== "function") return void 0;
-      return new Promise((done) => {
-        const timer2 = setTimeout(done, SEND_WAIT_MS);
-        timer2.unref?.();
-        r.then(
-          () => {
-            clearTimeout(timer2);
-            done();
-          },
-          () => {
-            clearTimeout(timer2);
-            done();
-          }
-        );
-      });
     };
-    const settle = (t2) => t2.then(() => {
-      if (this.tail === t2) this.tail = null;
-    });
+    const track = (p) => {
+      const t = p.then(() => void 0, () => void 0).then(() => {
+        if (this.tail === t) this.tail = null;
+      });
+      this.tail = t;
+      return t;
+    };
     if (!this.tail) {
-      const r = go();
-      if (!r) return Promise.resolve();
-      const t2 = settle(r);
-      this.tail = t2;
-      return t2;
+      const r = run2();
+      return isThenable(r) ? track(r) : Promise.resolve();
     }
-    const t = settle(this.tail.then(go));
-    this.tail = t;
-    return t;
+    return track(this.tail.then(run2));
+  }
+  /** Put one line that is not of my own log on the wire: a send that has not settled in SEND_WAIT_MS is taken as gone. */
+  sendNow(line) {
+    if (this.seat && line.participant === this.me && !line.via) line.seat = true;
+    let r;
+    try {
+      r = this.transport.send(line);
+    } catch {
+      return { ok: false, status: 0 };
+    }
+    if (!isThenable(r)) return resultOf(r);
+    return new Promise((done) => {
+      let settled = false;
+      const timer2 = setTimeout(() => {
+        settled = true;
+        done({ ok: true });
+      }, SEND_WAIT_MS);
+      timer2.unref?.();
+      const heard = (res) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer2);
+        done(res);
+      };
+      r.then((v) => heard(resultOf(v)), () => heard({ ok: false, status: 0 }));
+    });
+  }
+  /**
+   * Put one line of my own log on the wire and wait for its answer — never taken as gone because a timer ran out, or
+   * the next line of my log, sent past it, could reach the room first. Only one that has had no answer in
+   * OWN_WAIT_MS (and a millisecond for every ten characters it carries) is taken as lost, and sent again.
+   */
+  sendOwn(next) {
+    const line = next.line;
+    if (this.seat) line.seat = true;
+    let r;
+    try {
+      r = this.transport.send(line);
+    } catch {
+      return { ok: false, status: 0 };
+    }
+    if (!isThenable(r)) return resultOf(r);
+    const wait = OWN_WAIT_MS + Math.ceil(next.size / OWN_WAIT_CHARS_PER_MS);
+    return new Promise((done) => {
+      let settled = false;
+      const heard = (res) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer2);
+        done(res);
+      };
+      const timer2 = setTimeout(() => heard({ ok: false, status: 0 }), wait);
+      timer2.unref?.();
+      r.then((v) => heard(resultOf(v)), () => heard({ ok: false, status: 0 }));
+    });
+  }
+  /** What the room answered to a line that was not MY log: a name another hand holds, or a key it will not take, is said. */
+  heardBack(r) {
+    if (r.ok) return;
+    if (r.status === 409) this.stop("claim");
+    else if (r.status === 401 || r.status === 403) this.refuse(r.status);
+  }
+  refuse(status) {
+    if (!this.refused) this.refused = { relay: "refused", room: this.room, status };
+    this.notify("", []);
+  }
+  stop(why) {
+    if (this.stopped) return;
+    this.stopped = why;
+    if (this.retryCancel) {
+      this.retryCancel();
+      this.retryCancel = null;
+    }
+    this.notify("", []);
+  }
+  /**
+   * Send what MY log owes the room, after whatever is leaving: worked out when
+   * it goes, from what the room is known to hold — so a line that failed is
+   * sent again with what was written since, never left as a hole. While a send
+   * again is waiting its time, nothing goes before it (`resend` lets it go).
+   */
+  flushMine() {
+    if (this.retryCancel) return Promise.resolve();
+    return this.enqueue(() => this.retryCancel ? void 0 : this.sendMine());
+  }
+  /**
+   * My log's lines, ONE AT A TIME: the next goes only once the one before it is answered, so the room holds them in
+   * the order they were written. Two of them in flight could land the wrong way round — a whole log's later piece
+   * before its first, which every board would then take first and drop the first as older. The queue waits for a
+   * line of mine SEND_WAIT_MS at most, so a hello, a beat or a copy handed on may pass a slow one (they change no log
+   * of mine); what follows the slow one goes when it is answered.
+   */
+  sendMine() {
+    for (let n2 = 0; n2 < 1e5; n2++) {
+      if (this.closed || this.stopped || this.refused && this.refused.status !== 503) return void 0;
+      if (this.mineInFlight) return void 0;
+      const next = this.nextOfMine();
+      if (!next) return void 0;
+      const r = this.sendOwn(next);
+      if (!isThenable(r)) {
+        if (!this.settleMine(next, r)) return void 0;
+        continue;
+      }
+      this.mineInFlight = true;
+      let released = false;
+      const answered = r.then((res) => {
+        this.mineInFlight = false;
+        if (this.slow) {
+          this.slow = false;
+          this.notify("", []);
+        }
+        if (!this.settleMine(next, res)) return void 0;
+        if (released) {
+          void this.flushMine();
+          return void 0;
+        }
+        return this.sendMine();
+      });
+      return new Promise((done) => {
+        const timer2 = setTimeout(() => {
+          released = true;
+          if (this.mineInFlight && !this.slow) {
+            this.slow = true;
+            this.notify("", []);
+          }
+          done();
+        }, SEND_WAIT_MS);
+        timer2.unref?.();
+        void r.then(() => clearTimeout(timer2));
+        void answered.then(() => done(), () => done());
+      });
+    }
+    return void 0;
+  }
+  /**
+   * The next line my log owes the room: the whole of it, or what follows what the room holds. A whole too long for
+   * one line goes in pieces, every piece of it carrying `set` (the first piece's `at`) and all but the last `more`.
+   */
+  nextOfMine() {
+    const log = this.logs[this.me];
+    if (this.needFull) {
+      const { events, upto, size: size2 } = this.piece(log, 0);
+      const at = this.stamp();
+      const line = { participant: this.me, events, at, full: true, sid: this.sitting };
+      if (upto < log.length) {
+        line.set = at;
+        line.more = true;
+      }
+      return { line, upto, full: true, gen: this.mineGen, size: size2 };
+    }
+    while (this.confirmed < log.length) {
+      const { events, upto, size: size2 } = this.piece(log, this.confirmed);
+      if (!events.length) {
+        this.confirmed = upto;
+        continue;
+      }
+      const line = { participant: this.me, events, at: this.stamp(), sid: this.sitting };
+      if (this.setAt) {
+        line.set = this.setAt;
+        if (upto < log.length) line.more = true;
+      }
+      return { line, upto, full: false, gen: this.mineGen, size: size2 };
+    }
+    if (this.setAt) return { line: { participant: this.me, events: [], at: this.stamp(), sid: this.sitting, set: this.setAt }, upto: log.length, full: false, gen: this.mineGen, size: 0 };
+    return null;
+  }
+  /** Events of `log` from `from`, up to `lineChars` of them as text (at least one), past any no line can carry. */
+  piece(log, from) {
+    const events = [];
+    let size2 = 0;
+    let i = from;
+    for (; i < log.length; i++) {
+      const ev = log[i];
+      if (this.tooBig.has(ev)) continue;
+      const n2 = charsOf(ev) + 1;
+      if (events.length && size2 + n2 > this.lineChars) break;
+      events.push(ev);
+      size2 += n2;
+    }
+    return { events, upto: i, size: size2 };
+  }
+  /** What became of a line of my log; whether to go on sending. */
+  settleMine(next, r) {
+    if (r.ok) {
+      if (next.gen === this.mineGen) {
+        this.confirmed = Math.max(next.full ? 0 : this.confirmed, next.upto);
+        if (next.full) {
+          this.needFull = false;
+          this.setAt = next.line.more && next.line.set ? next.line.set : 0;
+        } else if (next.line.set && !next.line.more && next.line.set === this.setAt) this.setAt = 0;
+      }
+      if (this.wholeAgain && !this.setAt) {
+        this.wholeAgain = false;
+        this.needFull = true;
+      }
+      this.backoff = 0;
+      if (this.failing) {
+        this.failing = null;
+        this.notify("", []);
+      }
+      return true;
+    }
+    const status = r.status || 0;
+    if (status === 413) {
+      if (next.line.events.length > 1) {
+        this.lineChars = Math.max(1, Math.floor(this.lineChars / 2));
+        return true;
+      }
+      const ev = next.line.events[0];
+      if (ev && !this.tooBig.has(ev)) {
+        this.tooBig.add(ev);
+        this.tooBigSaid = { n: this.tooBigSaid.n + 1, chars: Math.max(this.tooBigSaid.chars, charsOf(ev)) };
+        this.notify("", []);
+      }
+      return true;
+    }
+    if (status === 409) {
+      this.stop("claim");
+      return false;
+    }
+    if (status === 401 || status === 403) {
+      this.refuse(status);
+      return false;
+    }
+    if (status === 400) {
+      this.stop("unreadable");
+      return false;
+    }
+    if (!next.full && next.line.events.some((e) => authorKey2(e) === null)) this.needFull = true;
+    if (!this.failing || this.failing.status !== status) {
+      this.failing = { status };
+      this.notify("", []);
+    }
+    this.scheduleRetry(status === 429 && r.retryAfter ? r.retryAfter * 1e3 : 0);
+    return false;
+  }
+  /** Send again after `ms`, or after the next wait of the backoff — 2 s, doubling to 30 s. */
+  scheduleRetry(ms) {
+    if (this.closed || this.stopped) return;
+    if (this.retryCancel) this.retryCancel();
+    const wait = ms > 0 ? ms : this.backoff = this.backoff ? Math.min(RETRY_MAX_MS, this.backoff * 2) : RETRY_FIRST_MS;
+    const cancel = this.later(() => {
+      if (this.retryCancel === cancel) this.retryCancel = null;
+      void this.flushMine();
+    }, wait);
+    this.retryCancel = cancel;
   }
   /**
    * Answer a hello — each log once (V1-PLAN §9 R4d). My own log, at once:
@@ -20031,7 +20425,9 @@ var LiveStore = class {
    * to hear that I am here.
    */
   answer(asker, ownOnly = false) {
-    void this.post({ participant: this.me, events: this.logs[this.me].slice(), at: this.stamp(), full: true, sid: this.sitting });
+    if (this.mineInFlight || this.setAt) this.wholeAgain = true;
+    else this.needFull = true;
+    void this.flushMine();
     if (ownOnly) return;
     const asked = this.heard;
     const copies = Object.keys(this.logs).filter((n2) => n2 !== this.me && n2 !== asker && this.applied.has(n2));
@@ -20072,9 +20468,17 @@ var LiveStore = class {
   }
   receive(raw) {
     if (this.closed || !raw || typeof raw !== "object") return;
+    if (raw.relay === "replay") {
+      this.replaying = true;
+      return;
+    }
+    if (raw.relay === "live") {
+      this.replaying = false;
+      return;
+    }
     if (raw.relay === "refused") {
       const r = raw;
-      this.refused = { relay: "refused", room: r.room, status: Number(r.status) || 0 };
+      this.refused = { relay: "refused", room: r.room, status: Number(r.status) || 0, ...r.reason === "origin" ? { reason: "origin" } : {} };
       this.notify("", []);
       return;
     }
@@ -20096,7 +20500,7 @@ var LiveStore = class {
       return;
     }
     this.heard++;
-    if (from !== this.me) this.seen.set(from, Date.now());
+    if (from !== this.me && !this.replaying) this.seen.set(from, Date.now());
     if (!line.via && line.seat === true) this.seats.add(line.participant);
     if (sid) {
       const known2 = this.sittings.get(line.participant);
@@ -20112,6 +20516,7 @@ var LiveStore = class {
         this.gone.add(line.participant);
         this.seen.delete(line.participant);
         this.seats.delete(line.participant);
+        this.pending.delete(line.participant);
       }
       this.notify(line.participant, []);
       return;
@@ -20126,12 +20531,55 @@ var LiveStore = class {
       this.notify(line.participant, []);
       return;
     }
-    const events = Array.isArray(line.events) ? line.events : [];
-    const at = typeof line.at === "number" ? line.at : Date.now();
-    if (line.full) {
-      const last = this.applied.get(line.participant);
+    let events = Array.isArray(line.events) ? line.events : [];
+    const lineAt = typeof line.at === "number" ? line.at : Date.now();
+    let at = lineAt;
+    let full = !!line.full;
+    const p = line.participant;
+    if (!line.via && typeof line.set === "number") {
+      const cur = this.pending.get(p);
+      if (line.full) {
+        const last = this.ownAt.get(p);
+        if (last !== void 0 && at < last || cur && at < cur.at) return;
+        const fresh = { set: line.set, at, events: [], keys: /* @__PURE__ */ new Set() };
+        holdPieceOf(fresh, events);
+        if (line.more) {
+          this.pending.set(p, fresh);
+          this.notify(p, []);
+          return;
+        }
+        this.pending.delete(p);
+        events = fresh.events;
+      } else {
+        if (!cur || cur.set !== line.set) {
+          this.notify(p, []);
+          return;
+        }
+        holdPieceOf(cur, events);
+        if (line.more) {
+          this.notify(p, []);
+          return;
+        }
+        this.pending.delete(p);
+        events = cur.events;
+        at = cur.at;
+        full = true;
+      }
+    } else if (!line.via && line.full) {
+      const cur = this.pending.get(p);
+      if (cur && at >= cur.at) this.pending.delete(p);
+    }
+    if (full) {
+      const last = line.via ? this.applied.get(line.participant) : this.ownAt.get(line.participant);
       if (last !== void 0 && at < last) return;
       const held2 = this.logs[line.participant];
+      if (line.via && held2 && held2.length && !accountsFor(held2, events)) {
+        if (!this.copiesRefused.has(line.participant)) {
+          this.copiesRefused.add(line.participant);
+          this.notify("", []);
+        }
+        return;
+      }
       if (!sid) {
         const i = held2 && held2.length ? divergence(held2, events) : -1;
         if (i >= 0) {
@@ -20176,7 +20624,8 @@ var LiveStore = class {
       }
       if (added) this.rev++;
     }
-    this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, at));
+    this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, lineAt));
+    if (!line.via) this.ownAt.set(line.participant, Math.max(this.ownAt.get(line.participant) ?? 0, lineAt));
     this.notify(line.participant, events);
   }
   /**
@@ -20227,6 +20676,45 @@ var LiveStore = class {
     for (const l of this.listeners) l(participant, events);
   }
 };
+var isThenable = (r) => !!r && typeof r.then === "function";
+function holdPieceOf(held2, events) {
+  for (const ev of events) {
+    const k = authorKey2(ev);
+    if (k !== null) {
+      if (held2.keys.has(k)) continue;
+      held2.keys.add(k);
+    }
+    held2.events.push(ev);
+  }
+}
+function resultOf(v) {
+  if (v && typeof v === "object" && typeof v.ok === "boolean") {
+    const r = v;
+    const out = { ok: r.ok, status: Number(r.status) || 0 };
+    if (Number(r.retryAfter) > 0) out.retryAfter = Number(r.retryAfter);
+    return out;
+  }
+  return { ok: true };
+}
+var sizes = /* @__PURE__ */ new WeakMap();
+function charsOf(ev) {
+  let n2 = sizes.get(ev);
+  if (n2 === void 0) {
+    n2 = JSON.stringify(ev).length;
+    sizes.set(ev, n2);
+  }
+  return n2;
+}
+var mb = (chars) => (chars / 1e6).toFixed(1) + " MB";
+function accountsFor(held2, incoming) {
+  let j = 0;
+  for (const ev of held2) {
+    while (j < incoming.length && !sameAt(ev, incoming[j])) j++;
+    if (j >= incoming.length) return false;
+    j++;
+  }
+  return true;
+}
 function authorKey2(ev) {
   return typeof ev.origin === "string" && ev.origin && typeof ev.seq === "number" && Number.isSafeInteger(ev.seq) ? `${ev.origin}#${ev.seq}` : null;
 }
@@ -23671,7 +24159,7 @@ function drawClassDiagramRead(session, read2, opts) {
     notes.push("nothing to draw: the text names no class");
     return { notation: r.notation, direction: r.direction, ids: {}, links: [], notes, refused, bounds: null, lastAt: t - 1 };
   }
-  const sizes = new Map(
+  const sizes2 = new Map(
     nodes.map((n2) => {
       const attrs = n2.members.filter((m) => m.kind === "attribute").map((m) => m.text);
       const methods = n2.members.filter((m) => m.kind === "method").map((m) => m.text);
@@ -23685,7 +24173,7 @@ function drawClassDiagramRead(session, read2, opts) {
     })
   );
   const layout = layoutLayered(
-    nodes.map((n2) => ({ id: n2.id, w: sizes.get(n2.id).w * scale, h: sizes.get(n2.id).h * scale })),
+    nodes.map((n2) => ({ id: n2.id, w: sizes2.get(n2.id).w * scale, h: sizes2.get(n2.id).h * scale })),
     links.map((l) => ({ from: l.left, to: l.right })),
     { direction: r.direction, rankGap: RANK_GAP2 * U * scale, nodeGap: NODE_GAP2 * U * scale }
   );
@@ -23693,14 +24181,14 @@ function drawClassDiagramRead(session, read2, opts) {
   const standing2 = /* @__PURE__ */ new Map();
   for (const n2 of nodes) {
     const c = add5(origin, layout.at.get(n2.id));
-    const z = sizes.get(n2.id);
+    const z = sizes2.get(n2.id);
     standing2.set(n2.id, { id: n2.id, rank: layout.rank.get(n2.id), box: { minX: c.x - z.w * scale / 2, maxX: c.x + z.w * scale / 2, minY: c.y - z.h * scale / 2, maxY: c.y + z.h * scale / 2 } });
   }
   const ids = {};
   const placeholder = [];
   const drawnMarks = [];
   for (const n2 of nodes) {
-    const k = standing2.get(n2.id), z = sizes.get(n2.id);
+    const k = standing2.get(n2.id), z = sizes2.get(n2.id);
     const b = k.box;
     const box = session.addStroke(strokeFor({ shape: "rectangle", x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY }), next(), pid, scale, { content: true });
     k.mark = box;

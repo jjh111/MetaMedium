@@ -211,10 +211,39 @@ input.fileIn { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacit
 #exportPanel .exRow button, #importPanel .exRow button { flex: 1; font-family: var(--mono); font-size: 11px; }
 #exportPanel .exRow + .exRow { margin-top: 7px; }
 #exportPanel .exRow button:disabled { opacity: 0.45; cursor: default; }
-/* The live pane: a room, a name, a relay. */
+/* The live pane: share this board, or — in a room — who is here, the invite, a copy, leave; other ways in under "more". */
+#livePanel { width: min(320px, calc(100vw - 24px)); box-sizing: border-box; max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; }
 #livePanel .mpRow { display: flex; gap: 7px; margin-top: 11px; }
+#livePanel .mpRow[hidden], #livePanel [hidden] { display: none; }
 #livePanel .mpRow button { flex: 1; }
-#livePanel #liveStatus { margin-top: 8px; }
+#livePanel #liveShare, #livePanel #liveInvite { border-color: var(--gold); color: var(--gold); }
+#livePanel #liveStatus:not(:empty) { margin-top: 8px; }
+#livePanel details { margin-top: 12px; border-top: 1px solid var(--edge); padding-top: 8px; }
+#livePanel summary { cursor: pointer; color: var(--dim); font-size: 10.5px; letter-spacing: 0.04em; }
+#livePanel summary:hover { color: var(--gold); }
+#livePanel .lvRoom { font-size: 12px; color: var(--ink); }
+#livePanel .lvWho { list-style: none; margin: 8px 0 0; padding: 0; }
+#livePanel .lvWho li { display: flex; align-items: center; gap: 7px; padding: 2px 0; font-size: 11.5px; color: var(--ink); }
+#livePanel .lvWho li .lvYou { color: var(--dim); font-size: 10.5px; }
+#livePanel #liveKept { margin: 8px 0 0; }
+#livePanel #liveLink { font-family: var(--mono); font-size: 10px; }
+/* A hand's colour, as a dot: the chip in the bar, the Live pane's list, the name prompt. */
+.hueDot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+/* The chip in the bar while in a room: its name and one dot per hand heard. */
+#roomChip { display: inline-flex; align-items: center; gap: 5px; max-width: 220px; overflow: hidden; }
+#roomChip[hidden] { display: none; }
+#roomChip .rcName { overflow: hidden; text-overflow: ellipsis; }
+#roomChip .rcDots { display: inline-flex; gap: 3px; }
+#roomChip .rcMore { font-size: 10px; color: var(--dim); }
+/* The name a guest is asked for, before joining a room by an invite. */
+#namePanel { width: min(300px, calc(100vw - 24px)); box-sizing: border-box; }
+#namePanel .nmLabel { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink); }
+#namePanel .nmSwatch { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--edge); flex: 0 0 auto; }
+#namePanel .mpRow { display: flex; gap: 7px; margin-top: 11px; }
+#namePanel .mpRow button { flex: 1; border-color: var(--gold); color: var(--gold); }
+#namePanel #nameStatus:not(:empty) { margin: 8px 0 0; }
+/* On a phone the bar has room for the dots only; the room's name is in the Live pane a tap away. */
+@media (max-width: 560px) { #roomChip .rcName { display: none; } #roomChip { padding: 5px 8px; } }
 /* The help pane: the QA plan, read into the page. */
 #helpPanel { width: min(420px, calc(100vw - 24px)); max-height: calc(100vh - 80px); overflow-y: auto; overscroll-behavior: contain; font-size: 11.5px; line-height: 1.5; scrollbar-width: thin; }
 #helpPanel .helpBody h2 { font-size: 13px; margin: 6px 0 4px; color: var(--gold); }
@@ -563,7 +592,7 @@ body.panelHidden #inspector { display: none; }
 /* ==========================================================================
    Embed: the surface as a figure inside a page.
    ========================================================================== */
-body.embed .markChip, body.embed #ccBtn, body.embed #undoBtn, body.embed #findBtn { display: none; }
+body.embed .markChip, body.embed #ccBtn, body.embed #undoBtn, body.embed #findBtn, body.embed #roomChip { display: none; }
 body.embed #inspector { width: 250px; font-size: 10.5px; }
 body.embed.summoning #inspector { display: none; }
 

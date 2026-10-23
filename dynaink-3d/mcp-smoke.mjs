@@ -327,18 +327,17 @@ try {
   const badKey = await call('space_answer', { key: 'nosuch', reply: {} });
   check('answering a brief nobody parked is said plainly', /no brief/.test(textOf(badKey)), textOf(badKey));
 
-  // ---- two hands under one name: BOTH are told (DIRECTOR-PLAN-W2 L1, D4) ----
+  // ---- two hands under one name: the second is refused, and told (DIRECTOR-PLAN-W2 L1, D4; MU-5) ----
+  // The relay keeps a name for the hand that claimed it first (its sitting's secret, x-dyna-hand —
+  // Demos/relay-protocol.mjs): the second hand's lines are refused at the door and its store says why,
+  // and the first never hears a line in its name.
   const handLog = heard.filter((h) => /^smoke~/.test(h.participant))[0].participant;
   const twin = new MM.LiveStore(relayTransport(RELAY, ROOM), handLog, ROOM);
   twin.hello();
-  let clash = '';
-  for (let i = 0; i < 30 && !/two hands are both called/.test(clash); i++) {
-    clash = textOf(await call('space_look', {}));
-    if (!/two hands are both called/.test(clash)) await wait(100);
-  }
-  check('a second hand under the hand\'s own name: space_look says so, first', /\nroom says: two hands are both called "smoke~[^"]+" — this one/.test(clash), clash.split('\n').slice(0, 3));
-  await until(() => twin.collisions().length === 1, 3000);
-  check('and the second hand is told as well', twin.collisions().length === 1, twin.collisions());
+  await until(() => twin.notices().some((n) => /its name there is another hand’s/.test(n)), 3000);
+  check('a second hand under the hand\'s own name is refused by the relay, and told why', twin.notices().some((n) => /its name there is another hand’s/.test(n)), twin.notices());
+  const clash = textOf(await call('space_look', {}));
+  check('and the hand itself hears no line in its name: space_look says no two hands', !/two hands are both called/.test(clash), clash.split('\n').slice(0, 3));
   twin.close();
 
   // ---- a room older than the relay remembers (L1) ----------------------------

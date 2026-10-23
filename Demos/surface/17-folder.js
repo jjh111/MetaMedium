@@ -2,7 +2,12 @@
 // Provides: the folder as the canvas — openFolder/openStatic/openStore (discovery into artifacts,
 //   per-participant logs merged), autosave (to the folder), the live budget (liveSet), the grid and
 //   focus views (setViewMode, focusOn), imageUrlFor, folderStatus; a live room (openLive: logs
-//   arriving live over a BroadcastChannel or a relay, merged as they land, and — over a relay — the bytes of
+//   arriving live over a BroadcastChannel or a relay — read as a stream with fetch, the room's key in a header and
+//   never an address, every line POSTed with this page's hand secret, PAGE_HAND, and answered with what became of
+//   it — a line measured in bytes for keepalive, and sent without the hand's header to a relay older than the page;
+//   the board on screen carried in only when asked (`carry`), the other hands' marks on it as copies this hand holds
+//   (othersOf); the page's address made the room's, roomAddress —
+//   merged as they land, and — over a relay — the bytes of
 //   the pictures they name: put on it before a line names them, fetched by hash when one is missing,
 //   roomAssetFetch; PLAN-IPAD-NOTES A1; and tellOtherMoves — another hand's move of marks of mine, said once in the status
 //   line and attributed, A2b; and tellPlayingPrograms/noteStandingPrograms — a program another hand set playing, or one in any
@@ -25,7 +30,8 @@
 //   (savedMark, restoreMark), artifacts, render, input (say, flash), images (downloadText), controls
 //   (syncTiles), the boards pane (renderBoardsPane, roomChanged), the seat (seatRoomOpened: who is heard in a room),
 //   carrying (17-carry.js's rules; 22-carry.js's carryTake; the bundle reader and inflateRaw, 17-bundle.js and 18-out.js;
-//   rememberMark, 03-teach.js).
+//   rememberMark, 03-teach.js); the relay's address rules (24-relay.js: roomSearch, roomHash, withoutKey, roomRelayFor);
+//   the room's presence in the bar and what it says (24-room.js: liveRoomOpened, roomNotices, roomNotSent).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -148,40 +154,141 @@
   }
   /** How long a line waits for the pictures it names to reach the room — under core's own wait on a send. */
   const ROOM_ASSET_WAIT_MS = 8000;
+  /** How long a dropped stream waits before it is opened again, doubling from the first to the last. */
+  const STREAM_RETRY_FIRST_MS = 1000;
+  const STREAM_RETRY_MAX_MS = 30000;
+  /** A stream that has carried nothing — not even the relay's beat, every 25 s — for this long is taken as cut, and opened again. */
+  const STREAM_QUIET_MS = 60000;
+  /** The header a hand's secret goes in (Demos/relay-protocol.mjs, HAND_HEADER). */
+  const HAND_HEADER = 'x-dyna-hand';
+  /** The longest line, in bytes as it travels, that goes with keepalive: a browser holds every keepalive request in flight to 64 KB in all. */
+  const KEEPALIVE_MAX_BYTES = 60000;
+  // This page load's hand secret: 16 random bytes, minted once and kept nowhere a reload would find them — a
+  // sitting (L1), like PAGE_SUFFIX and PAGE_SITTING below. Every line this page posts carries it, and the room
+  // holds the name this page writes under for it alone (relay-protocol.mjs, `claimCheck`): nobody else can write a
+  // line in this hand's name, so nobody can replace its log. Never in a line, a log, an address or storage.
+  const PAGE_HAND = (() => {
+    try {
+      const b = new Uint8Array(16);
+      crypto.getRandomValues(b);
+      let bin = '';
+      for (const x of b) bin += String.fromCharCode(x);
+      return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    } catch (err) { return MM.sittingToken(22); }
+  })();
+  /** Whether this browser can read a stream with fetch — a header (the key), a last id — rather than an EventSource, which can send neither. */
+  const STREAMS_BY_FETCH = typeof fetch === 'function' && typeof ReadableStream === 'function' && typeof TextDecoder === 'function' && typeof Response !== 'undefined' && 'body' in Response.prototype;
   function relayTransport(url, room, key) {
-    // A relay that asks for a key (cloudflare/relay) takes it as `?key=`: an EventSource cannot set a
-    // header. The key is the page's own — from the address or a typed field — and goes nowhere but
-    // this address: never the log, the board, an export, or a cache (`sw.js` does not keep a request with one).
-    const base = url.replace(/\/+$/, '') + '/rooms/' + encodeURIComponent(room) + '/events' + (key ? '?key=' + encodeURIComponent(key) : '');
+    // The key goes in a header — `Authorization: Bearer` — on the stream and on every line, so no address the
+    // network sees carries it (MU-11): fetch reads the stream as Server-Sent Events, which an EventSource cannot do
+    // with a header. Only where fetch cannot stream is there an EventSource, with `?key=` in its address. The key is
+    // the page's own — from an invite's fragment, a typed field or a room just opened — and goes nowhere else: never
+    // the log, the board, an export, or a cache (`sw.js` keeps no request with an authorization header).
+    const base = url.replace(/\/+$/, '') + '/rooms/' + encodeURIComponent(room) + '/events';
+    const auth = key ? { authorization: 'Bearer ' + key } : {};
     const listeners = new Set();
-    let es = null;
     let closed = false;
     let retry = null;
+    let ctl = null;           // the open stream's abort
+    let es = null;            // the fallback's EventSource
+    let lastId = 0;           // the newest line heard, so a stream opened again is sent only what it missed (MU-12)
+    let wait = STREAM_RETRY_FIRST_MS;
+    let streaming = false;
+    let heardAt = 0;
+    // A relay older than this page lists no x-dyna-hand among the headers it allows, so a browser refuses every line
+    // that carries it — with no answer at all, as if the network had gone, while the stream goes on. Until a line with
+    // it has been taken (`handTaken`), one that has no answer while the stream is open is tried once without it; taken
+    // that way, the relay is old, and lines go without the header from here (`noHand`), said once.
+    let handTaken = false;
+    let noHand = false;
     const deliver = (line) => { for (const cb of listeners) cb(line); };
-    // Every line goes to the store — the relay's own word that the room has outlived its buffer
-    // included: the store says it (`notices`), and so does every other hand's.
-    const onLine = (e) => {
+    // One block of the stream: its id moves Last-Event-ID; its data is a line, or the relay's own word (the room
+    // has outlived its buffer), which goes to the store like any line — the store says it (`notices`).
+    const block = (text) => {
+      let id = 0;
+      const data = [];
+      for (const raw of text.split('\n')) {
+        const l = raw.replace(/\r$/, '');
+        if (l.startsWith('id:')) id = Number(l.slice(3).trim()) || 0;
+        else if (l.startsWith('data:')) data.push(l.slice(5).replace(/^ /, ''));
+      }
+      if (id) lastId = id;
+      if (!data.length) return;
       let line;
-      try { line = JSON.parse(e.data); } catch (err) { return; /* not a line */ }
+      try { line = JSON.parse(data.join('\n')); } catch (err) { return; /* not a line */ }
       deliver(line);
     };
-    // An EventSource that is closed for good was refused, and cannot say by what: ask once with a plain
-    // request. A key the relay will not take is said to the store (`{ relay: 'refused' }`) and not asked
-    // again, as Node's transport does; anything else is a hiccup, and the stream is opened again.
-    const refusedOr = () => {
-      fetch(base, { headers: { accept: 'text/event-stream' }, cache: 'no-store' }).then((res) => {
-        const status = res.status;
-        if (res.body) res.body.cancel().catch(() => undefined);
-        if ([401, 403, 503].includes(status)) { closed = true; deliver({ relay: 'refused', room: room, status: status }); return; }
-        if (!closed) retry = setTimeout(open, 3000);
-      }, () => { if (!closed) retry = setTimeout(open, 3000); });
-    };
-    const open = () => {
+    const again = () => {
+      streaming = false;
       if (closed) return;
-      es = new EventSource(base);
-      es.addEventListener('message', onLine);
-      es.addEventListener('error', () => { if (es.readyState === 2 && !closed) refusedOr(); });
+      clearTimeout(retry);
+      retry = setTimeout(open, wait);
+      wait = Math.min(STREAM_RETRY_MAX_MS, wait * 2);
     };
+    // A refusal that will not mend itself — no key, a wrong one, an origin the relay does not serve, a relay with no
+    // keys — is said to the store once (`{ relay: 'refused' }`) and not asked again; anything else is a hiccup, and the
+    // stream is opened again from its last id, later each time.
+    const refused = (status, words) => {
+      closed = true;
+      deliver(Object.assign({ relay: 'refused', room: room, status: status }, status === 403 && /origin/i.test(words || '') ? { reason: 'origin' } : {}));
+    };
+    async function open() {
+      if (closed) return;
+      if (!STREAMS_BY_FETCH) { openEventSource(); return; }
+      const mine = new AbortController();
+      ctl = mine;
+      let res;
+      try {
+        res = await fetch(base, { headers: Object.assign({ accept: 'text/event-stream' }, auth, lastId ? { 'last-event-id': String(lastId) } : {}), cache: 'no-store', signal: mine.signal });
+      } catch (err) { if (ctl === mine) again(); return; }
+      if (res.status !== 200 || !res.body) {
+        const words = await res.text().catch(() => '');
+        if (res.status === 401 || res.status === 403 || res.status === 404 || (res.status === 503 && /no key configured/i.test(words))) refused(res.status, words);
+        else if (ctl === mine) again();
+        return;
+      }
+      streaming = true;
+      heardAt = Date.now();
+      wait = STREAM_RETRY_FIRST_MS;
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          heardAt = Date.now();
+          buf += dec.decode(value, { stream: true });
+          let i;
+          while ((i = buf.indexOf('\n\n')) >= 0) { block(buf.slice(0, i)); buf = buf.slice(i + 2); }
+        }
+      } catch (err) { /* the stream was cut, or let go of */ }
+      if (ctl === mine) again();
+    }
+    function openEventSource() {
+      // The fallback: an EventSource can send no header, so the key is in its address — on this browser only.
+      es = new EventSource(base + (key ? '?key=' + encodeURIComponent(key) : ''));
+      es.addEventListener('message', (e) => {
+        if (e.lastEventId) lastId = Number(e.lastEventId) || lastId;
+        let line;
+        try { line = JSON.parse(e.data); } catch (err) { return; }
+        deliver(line);
+      });
+      es.addEventListener('error', () => { if (es && es.readyState === 2 && !closed) { es = null; again(); } });
+    }
+    // A stream that carries nothing for a minute — a laptop that slept, a phone that changed networks — is opened again.
+    const quiet = setInterval(() => { if (streaming && Date.now() - heardAt > STREAM_QUIET_MS && ctl) ctl.abort(); }, STREAM_QUIET_MS / 4);
+    // Back online: the stream is opened again at once, from its last id (the store sends what it owes on its own).
+    const online = () => {
+      if (closed) return;
+      clearTimeout(retry);
+      wait = STREAM_RETRY_FIRST_MS;
+      if (es) { es.close(); es = null; }
+      if (ctl) ctl.abort();
+      ctl = null;
+      open();
+    };
+    addEventListener('online', online);
     // ----- pictures in the room (PLAN-IPAD-NOTES A1; the rules are 17-assets.js's) -----
     // A header, not `?key=`: a fetch can send one, and an address is kept by logs and caches.
     const assetAuth = key ? { authorization: 'Bearer ' + key } : {};
@@ -230,11 +337,44 @@
         return await assetGet(ref);
       } catch (err) { return null; }
     }
+    /** The bytes a line is as it travels (UTF-8): measured only when its characters alone could pass the keepalive limit. */
+    const bytesOf = (body) => {
+      if (body.length * 3 < KEEPALIVE_MAX_BYTES) return body.length;
+      if (body.length >= KEEPALIVE_MAX_BYTES) return body.length;
+      try { return new TextEncoder().encode(body).length; } catch (err) { return Infinity; }
+    };
+    /**
+     * One line POSTed, and what became of it ({ ok, status, retryAfter }). A small line goes with keepalive, so one sent
+     * as the page goes — the goodbye, the last mark — outlives the page (on a reload the page is still "visible" at
+     * pagehide, so the moment cannot be told); the browser's limit is on bytes, so a line is measured in bytes, and one
+     * the browser would not send with keepalive is sent again at once without. See `noHand` for the hand's header.
+     */
+    function postLine(body, o) {
+      const keepalive = !o.plain && bytesOf(body) < KEEPALIVE_MAX_BYTES;
+      const withHand = !noHand && !o.noHand;
+      const headers = Object.assign({ 'content-type': 'application/json' }, withHand ? { [HAND_HEADER]: PAGE_HAND } : {}, auth);
+      return fetch(base, { method: 'POST', headers: headers, body: body, keepalive: keepalive, cache: 'no-store' })
+        .then(async (res) => {
+          const retryAfter = Number(res.headers.get('retry-after')) || 0;
+          await res.text().catch(() => '');
+          if (res.ok && withHand) handTaken = true;
+          return res.ok ? { ok: true, status: res.status } : Object.assign({ ok: false, status: res.status }, retryAfter > 0 ? { retryAfter: retryAfter } : {});
+        }, () => {
+          if (keepalive) return postLine(body, Object.assign({}, o, { plain: true }));
+          if (withHand && !handTaken && streaming && Date.now() - heardAt < STREAM_QUIET_MS) {
+            return postLine(body, Object.assign({}, o, { noHand: true })).then((r) => {
+              if (r.ok && !noHand) { noHand = true; say('this relay is older than this page — what you draw is shared, but your name in this room is not kept for you alone'); }
+              return r;
+            });
+          }
+          return { ok: false, status: 0 };
+        });
+    }
     open();
     return {
-      // The POST's promise goes back to the store, which sends the next line
-      // only when this one has gone — two POSTs in flight can land the wrong
-      // way round.
+      // The POST's answer goes back to the store, which sends the next line only when this one has gone — two
+      // POSTs in flight can land the wrong way round — and sends again what the relay did not take: the store is
+      // told what became of each line ({ ok, status, retryAfter }), never left to guess.
       send: (line) => {
         // A picture's bytes go first (PLAN-IPAD-NOTES A1): a line that names a picture this tab kept goes only once the
         // room holds the bytes — or after ROOM_ASSET_WAIT_MS, so a slow link never wedges the room (a hand that
@@ -244,12 +384,15 @@
         for (const r of owed) if (refs.indexOf(r) < 0) refs.push(r);
         const todo = refs.filter((r) => !held.has(r));
         const ready = todo.length ? Promise.race([putAssets(todo), new Promise((ok) => setTimeout(ok, ROOM_ASSET_WAIT_MS))]) : Promise.resolve();
-        return ready.catch(() => undefined).then(() => fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(line) })).then(() => undefined, () => undefined);
+        return ready.catch(() => undefined).then(() => postLine(JSON.stringify(line), {}));
       },
       onMessage: (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
-      close: () => { closed = true; clearTimeout(retry); if (es) es.close(); },
-      // The room's pictures: `get` is what 18-images.js asks for a picture this browser holds no bytes for.
-      assets: { get: getAsset },
+      close: () => { closed = true; clearTimeout(retry); clearInterval(quiet); removeEventListener('online', online); if (ctl) ctl.abort(); ctl = null; if (es) es.close(); },
+      // For tests: whether the stream is open now, and the newest line heard.
+      state: () => ({ streaming: streaming, lastId: lastId, byFetch: STREAMS_BY_FETCH }),
+      // The room's pictures: `get` is what 18-images.js asks for a picture this browser holds no bytes for; `put` gives
+      // the room the bytes of pictures this tab holds (a board carried in, its other hands' pictures among them).
+      assets: { get: getAsset, put: putAssets },
     };
   }
   // The merge runs on a microtask, not a timer: a hidden tab throttles timers
@@ -265,10 +408,25 @@
   // sitting, so the same name and the same sitting id.
   const PAGE_SUFFIX = MM.sittingToken();
   const PAGE_SITTING = MM.sittingToken(8);
+  /**
+   * Join a room, or open one: `opts` — `relay` (none: tabs on this machine, a BroadcastChannel), `key` (the room's,
+   * held in memory only), `carry` (the board on screen goes in as this hand's opening log: Share and *with Claude*
+   * carry it, and say so; joining someone's room by a link or a name never does — UX-05), `idleDays` (how long the
+   * relay keeps the room, as it said when it opened it). The page's address becomes the room's (`?live=`, the key in
+   * the fragment), so a reload rejoins.
+   */
   async function openLive(room, opts) {
     opts = opts || {};
     // The board on screen is left only once its store holds all of it (R1).
     if (onBoardHere()) { const v = await readyToLeave(); if (v && v.kind !== 'not-kept') throw new Error(v.words); }
+    // What goes in as this hand's opening log: the board on screen when it is carried, else nothing — except that a page
+    // joining again the room it is in, in the same sitting, sends its log there as it stands: that is the room's already,
+    // and an empty one would take this hand's marks off every board in it.
+    const again = folder.how === 'live' && folder.name === room && (opts.relay || '') === (folder.relay || '');
+    const carried = opts.carry || again ? session.getEvents().filter((e) => !e.by) : [];
+    // The marks other hands made on a board carried in (a room's board kept as a board, shared again) go in too: each
+    // hand's as a copy this hand holds and hands on, under that hand's own name — never as this hand's marks.
+    const copies = opts.carry ? othersOf(session.getEvents()) : [];
     // From here this page's log is the room's: nothing drawn under the room's
     // name is written into the board this browser keeps (L1: a live tab keeps no local log).
     leaveBoard();
@@ -291,16 +449,36 @@
     // What is already drawn keeps the ids it was drawn with: the name applies
     // to what is written next, and the two forms cannot collide.
     session.setLogName(me);
-    const transport = opts.transport || (opts.relay ? relayTransport(opts.relay, room, opts.key || params.get('key') || '') : broadcastTransport(room));
+    const key = opts.key || '';
+    const transport = opts.transport || (opts.relay ? relayTransport(opts.relay, room, key) : broadcastTransport(room));
     const store = new MM.LiveStore(transport, me, room, { sitting: PAGE_SITTING });
     // Which relay carries the room: the seat parks its questions only through one on this machine (V1-PLAN J4).
     folder.relay = opts.relay || '';
+    // The room's key, in memory only — for the invite this page offers, and its own fragment (a reload rejoins).
+    folder.key = key;
+    folder.idleDays = opts.idleDays === undefined ? null : opts.idleDays;
+    folder.transport = transport;
+    // Joined by an invite (its link opened, or pasted): what the relay refuses is said as the link's, in its words.
+    folder.invited = !!opts.invited;
+    roomAddress(room, folder.relay, key);
     // The room's pictures, when its relay keeps them (PLAN-IPAD-NOTES A1): between tabs on one machine the asset store is shared already.
     folder.roomAssets = (transport && transport.assets) || null;
-    // What this hand already drew is its opening log in the room — sent whole,
+    // What this hand carries in is its opening log in the room — sent whole,
     // as a store's first send always is, so joining the same room again in
     // this sitting replaces what the room holds of it instead of doubling it.
-    await store.publish(session.getEvents().filter((e) => !e.by));
+    await store.publish(carried);
+    // What went of the other hands' marks: their pictures' bytes first, where this tab holds them (a copy names what
+    // its writer put, and its writer was never in this room), then each copy; one a room will not carry in one piece
+    // is said, never dropped quietly.
+    if (copies.length && transport && transport.assets && transport.assets.put) {
+      const refs = [...new Set(copies.flatMap(([, evs]) => roomAssetHashes({ events: evs })))].map((h) => 'sha256:' + h);
+      if (refs.length) await Promise.race([transport.assets.put(refs), new Promise((ok) => setTimeout(ok, ROOM_ASSET_WAIT_MS))]).catch(() => undefined);
+    }
+    folder.copiesLeft = [];
+    for (const [name, evs] of copies) {
+      const said = await store.carry(name, evs);
+      if (!said.ok) folder.copiesLeft.push({ name: name, status: said.status || 0, marks: evs.filter((e) => e.type === 'stroke').length });
+    }
     store.subscribe(() => { if (liveMergePending) return; liveMergePending = true; Promise.resolve().then(() => { liveMergePending = false; return mergeLive(); }); });
     // `openStore` counted what it loaded BEFORE the device re-taught its mark,
     // so that teach is this hand's and goes out with its log. Counted again
@@ -314,8 +492,30 @@
     await mergeLive();
     // Who is heard here, for the seat: Claude's hand, offered in the models pane (24-seat.js).
     seatRoomOpened(store);
+    // Who is here, in the bar (24-room.js), and this hand said to be here while the page is seen.
+    liveRoomOpened(store);
     store.hello();
     return folder;
+  }
+  /** The events other hands made, by hand: each hand's own log as it wrote it (its `by` stamp let go of — a log is its writer's own). */
+  function othersOf(events) {
+    const by = new Map();
+    for (const e of events) {
+      if (!e.by) continue;
+      const copy = Object.assign({}, e);
+      delete copy.by;
+      if (!by.has(e.by)) by.set(e.by, []);
+      by.get(e.by).push(copy);
+    }
+    return [...by.entries()];
+  }
+  /** The page's address, as the room's: `?live=` (and a relay that is not this page's own), and the key only in the fragment. */
+  function roomAddress(room, relay, key) {
+    if (EMBED) return;
+    // A room with no key keeps its relay in the query whatever it is, so a reload still finds it; one with a key keeps
+    // only the key in the fragment, and its relay only where it is not this page's own.
+    try { history.replaceState(history.state, '', location.pathname + roomSearch(location.search, room, relay, key ? roomRelayFor(location.hostname) : null) + roomHash(key)); }
+    catch (err) { /* an address this page may not change: the room still holds, and a reload goes back to the board */ }
   }
   /** A name for this hand in a room: the person's name (a preference), and this page load's suffix. */
   function handName() {
@@ -441,7 +641,7 @@
     }
     // What the room says about itself is said here once, the moment it is
     // heard, and then stands in the status line (folderStatus).
-    for (const n of folder.store.notices ? folder.store.notices() : []) {
+    for (const n of roomNotices()) {
       if (folder.noticed.has(n)) continue;
       folder.noticed.add(n);
       say(n);
@@ -1302,7 +1502,7 @@
     const untouched = view.zoom === 1 && view.panX === 0 && view.panY === 0;
     if (board.mode !== 'fresh' && (!o.boot || untouched)) restoreBoardView(id);
     if (o.address && !EMBED) {
-      try { history.replaceState(history.state, '', location.pathname + boardSearch(location.search, id) + location.hash); } catch (err) { /* an address this page may not change */ }
+      try { history.replaceState(history.state, '', location.pathname + boardSearch(location.search, id) + withoutKey(location.hash)); } catch (err) { /* an address this page may not change */ }
     }
     if (!o.boot) markAfterOpen();
     syncBoardFaces();
@@ -1376,7 +1576,9 @@
         // A folder, a repository or a room is on screen: what it has not sent goes first, then the board opens in a page of its own.
         if (folder.store && folder.how !== 'static') await saveNow();
         if (folder.saveTrouble && !o.force) return refuse({ kind: 'unsaved', words: troubleWords(folder.saveTrouble).lead, ways: ['export', 'leave'] });
-        location.assign(location.pathname + boardSearch(location.search, id) + location.hash);
+        // A room keeps what this hand drew only once it has taken it: until then it is on this page alone.
+        if (folder.how === 'live' && !o.force) { const v = await roomNotSent(); if (v) return refuse({ kind: 'unsaved', words: v.words, ways: ['export', 'leave'] }); }
+        location.assign(location.pathname + boardSearch(location.search, id) + withoutKey(location.hash));
         return true;
       }
       const prep = await prepareBoard(id);
@@ -1841,8 +2043,8 @@
       // is where both are said. The store holds them (`notices`): a doubled
       // name — this tab's own included, which both hands that share it hear —
       // and a truncated history.
-      const notes = folder.store.notices ? folder.store.notices() : [];
-      return 'live ' + folder.name + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') +
+      const notes = roomNotices();
+      return 'live ' + roomShort(folder.name) + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') +
         (notes.length ? ' · ' + notes.join(' · ') : '') + (folder.error ? ' · ' + folder.error : '');
     }
     const n = folder.entries.length;

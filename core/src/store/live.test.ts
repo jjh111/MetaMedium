@@ -1,7 +1,7 @@
 // Two hands on one canvas: two logs arriving live, merged like a folder's.
 
 import { describe, it, expect, vi } from 'vitest';
-import { LiveStore, LocalHub, SEND_WAIT_MS } from './live';
+import { LiveStore, LocalHub, SEND_WAIT_MS, OWN_WAIT_MS, LINE_CHARS, RETRY_FIRST_MS } from './live';
 import { mergeLogs } from './merge';
 import { createSession, DEFAULT_SESSION_CONFIG, type SessionEvent } from '../session/session';
 import { rectStroke, circleStroke } from '../test/strokes';
@@ -278,18 +278,24 @@ describe('live logs', () => {
       expect((await store.readLogs())['ada~1']).toEqual(log);
     });
 
-    it('lines leave in the order they were written — and a send that never settles does not wedge the next', async () => {
+    it('lines leave in the order they were written — a line of my log waits for the one before it to be answered, while a hello or a beat passes a slow one', async () => {
       vi.useFakeTimers();
       try {
         const went: string[] = [];
         let release: (() => void) | null = null;
-        const sends: ((line: any) => Promise<void>)[] = [
+        let stuck: ((v: any) => void) | null = null;
+        const sends: ((line: any) => Promise<unknown>)[] = [
           () => new Promise<void>((ok) => { release = ok; }), // the first POST takes its time
           () => Promise.resolve(),
-          () => new Promise<void>(() => {}),                 // this one never settles
-          () => Promise.resolve(),
+          () => new Promise((ok) => { stuck = ok; }),          // this one is not answered for a long while
         ];
-        const slow = { send: (line: any) => { went.push(line.full ? 'full' : 'append:' + line.events.length); return sends[went.length - 1](line); }, onMessage: () => () => {} };
+        const slow = {
+          send: (line: any) => {
+            went.push(line.full ? 'full' : line.hello ? 'hello' : 'append:' + line.events.length);
+            return (sends[went.length - 1] || (() => Promise.resolve()))(line);
+          },
+          onMessage: () => () => {},
+        };
         const store = new LiveStore(slow as any, 'ada~1');
         const ada = named('ada~1');
         ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
@@ -302,12 +308,51 @@ describe('live logs', () => {
         await first; await second;
         expect(went).toEqual(['full', 'append:1']);
         ada.addStroke(rectStroke(700, 100, 200, 120), 1200);
-        const stuck = publish(store, mine(ada));
+        void publish(store, mine(ada));
+        await vi.advanceTimersByTimeAsync(0);
         ada.addStroke(rectStroke(100, 400, 200, 120), 1300);
-        const after = publish(store, mine(ada));
+        void publish(store, mine(ada));
         await vi.advanceTimersByTimeAsync(SEND_WAIT_MS);
-        await stuck; await after;
-        expect(went).toEqual(['full', 'append:1', 'append:1', 'append:1']);
+        // Past its wait the queue goes on — a hello passes the slow line — but the next line of my log does not.
+        store.hello();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(went).toEqual(['full', 'append:1', 'append:1', 'hello']);
+        expect(store.notices()).toEqual(['the room is slow to take what this hand sends — what you draw is held on this page until it does']);
+        expect(store.unsent()).toBe(2);
+        // Answered: what follows it goes, in order.
+        stuck!({ ok: true });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(went).toEqual(['full', 'append:1', 'append:1', 'hello', 'append:1']);
+        expect(store.unsent()).toBe(0);
+        expect(store.notices()).toEqual([]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('a line of my log never answered at all is taken as lost after its wait, and sent again — nothing past it went', async () => {
+      vi.useFakeTimers();
+      try {
+        const went: string[] = [];
+        const t = {
+          send: (line: any) => { went.push(line.full ? 'full:' + line.events.length : 'append:' + line.events.length); return went.length === 2 ? new Promise(() => {}) : Promise.resolve({ ok: true }); },
+          onMessage: () => () => {},
+        };
+        const store = new LiveStore(t as any, 'ada~1');
+        const ada = named('ada~1');
+        ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
+        await publish(store, mine(ada));
+        ada.addStroke(rectStroke(400, 100, 200, 120), 1100);
+        void publish(store, mine(ada));
+        await vi.advanceTimersByTimeAsync(0);
+        ada.addStroke(rectStroke(700, 100, 200, 120), 1200);
+        void publish(store, mine(ada));
+        await vi.advanceTimersByTimeAsync(OWN_WAIT_MS - 1000);
+        expect(went).toEqual(['full:1', 'append:1']);
+        await vi.advanceTimersByTimeAsync(5000 + RETRY_FIRST_MS);
+        // Sent again from where the room's copy is known to stop: both marks, in order.
+        expect(went).toEqual(['full:1', 'append:1', 'append:2']);
+        expect(store.unsent()).toBe(0);
       } finally {
         vi.useRealTimers();
       }
@@ -429,6 +474,409 @@ describe('live logs', () => {
       expect(page.revision()).toBe(rev);
       expect((await page.readLogs())['claude~c1'].length).toBe(held);
       expect(page.presence().find((p) => p.participant === 'claude~c1')?.seat).toBe(true);
+    });
+  });
+
+  // ===== Nothing lost on the wire, and nobody's marks taken by a copy (MU-5, MU-7, MU-8) =====
+  describe('what the room did not take is sent again, and what it never can take is said', () => {
+    const named = (logName: string) => createSession({ ...DEFAULT_SESSION_CONFIG, logName });
+    const mine = (s: ReturnType<typeof createSession>) => s.getEvents().filter((e) => !e.by);
+
+    /**
+     * A relay a test can break: every line POSTed resolves to what `answer` says (a SendResult), and a line it
+     * takes reaches every other store on it, in order — as a relay echoes a line to everyone in the room.
+     */
+    function relay() {
+      const members: ((line: any) => void)[] = [];
+      const posted: any[] = [];
+      let answer: (line: any) => { ok: boolean; status?: number; retryAfter?: number } = () => ({ ok: true });
+      return {
+        posted,
+        set: (fn: typeof answer) => { answer = fn; },
+        transport() {
+          let mineCb: ((line: any) => void) | null = null;
+          return {
+            send: (line: any) => {
+              const r = answer(line);
+              posted.push({ line: JSON.parse(JSON.stringify(line)), ok: r.ok, status: r.status });
+              if (r.ok) { const copy = JSON.parse(JSON.stringify(line)); for (const m of members) if (m !== mineCb) queueMicrotask(() => m(copy)); }
+              return Promise.resolve(r);
+            },
+            onMessage: (cb: any) => { mineCb = cb; members.push(cb); return () => { mineCb = null; }; },
+          };
+        },
+      };
+    }
+    /** A clock a test turns: `later` runs what is due when `run` is called. */
+    function clock() {
+      const due: { fn: () => void; ms: number }[] = [];
+      return {
+        due,
+        later: (fn: () => void, ms: number) => { const job = { fn, ms }; due.push(job); return () => { const i = due.indexOf(job); if (i >= 0) due.splice(i, 1); }; },
+        // Microtasks only, so a test on fake timers can turn it too.
+        run: async () => { const jobs = due.splice(0); for (const j of jobs) j.fn(); for (let i = 0; i < 30; i++) await Promise.resolve(); },
+      };
+    }
+
+    it('a line the room did not take is sent again, from where the room\'s copy stops, and the peer holds every mark in order', async () => {
+      const r = relay();
+      const c = clock();
+      const ada = named('ada~1');
+      const a = new LiveStore(r.transport() as any, 'ada~1', 'r', { later: c.later });
+      const b = new LiveStore(r.transport() as any, 'bob~1', 'r');
+      for (const x of [100, 400, 700]) {
+        ada.addStroke(rectStroke(x, 100, 200, 120), 1000 + x);
+        // The second line never reaches the relay: a phone between networks.
+        r.set((line) => (line.events.length && line.events[0] === undefined ? { ok: true } : x === 400 ? { ok: false, status: 0 } : { ok: true }));
+        await a.publish(mine(ada));
+        await tick();
+      }
+      // The third was not sent past the hole: it waits for the second, and the room is told nothing out of order.
+      expect(a.unsent()).toBe(2);
+      expect(a.notices()).toEqual(['not reaching the room — what you draw is held on this page and sent when it answers; leaving or closing the page loses it']);
+      expect(c.due.map((d) => d.ms)).toEqual([RETRY_FIRST_MS]);
+      r.set(() => ({ ok: true }));
+      await c.run();
+      expect(a.unsent()).toBe(0);
+      expect(a.notices()).toEqual([]);
+      expect((await b.readLogs())['ada~1']).toEqual(mine(ada));
+    });
+
+    it('it waits longer each time the room does not answer — 2 s, 4, 8, … — and at once when the window is back online', async () => {
+      const r = relay();
+      const c = clock();
+      const ada = named('ada~1');
+      const a = new LiveStore(r.transport() as any, 'ada~1', 'r', { later: c.later });
+      r.set(() => ({ ok: false, status: 503 }));
+      ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      await a.publish(mine(ada));
+      await tick();
+      const waits: number[] = [];
+      for (let i = 0; i < 6; i++) { waits.push(c.due[0].ms); await c.run(); }
+      expect(waits).toEqual([2000, 4000, 8000, 16000, 30000, 30000]);
+      // Drawing while it waits sends nothing before the wait is up.
+      const before = r.posted.length;
+      ada.addStroke(rectStroke(400, 100, 200, 120), 1100);
+      await a.publish(mine(ada));
+      expect(r.posted.length).toBe(before);
+      r.set(() => ({ ok: true }));
+      await a.resend();
+      await tick();
+      expect(a.unsent()).toBe(0);
+      expect(c.due).toHaveLength(0);
+    });
+
+    it('a relay that asks for a moment (429) is left alone for as long as it asked', async () => {
+      const r = relay();
+      const c = clock();
+      const a = new LiveStore(r.transport() as any, 'ada~1', 'r', { later: c.later });
+      r.set(() => ({ ok: false, status: 429, retryAfter: 7 }));
+      await a.appendLog('ada~1', eventsOf((s) => s.addStroke(rectStroke(100, 100, 200, 120), 1000)));
+      await tick();
+      expect(c.due.map((d) => d.ms)).toEqual([7000]);
+      expect(a.notices()).toEqual(['the room is taking this hand’s lines more slowly — what you draw is held on this page and sent in a moment']);
+    });
+
+    it('a name another hand holds (409) stops the hand sending, and is said; nothing is retried', async () => {
+      const r = relay();
+      const c = clock();
+      const a = new LiveStore(r.transport() as any, 'ada~1', 'r', { later: c.later });
+      r.set(() => ({ ok: false, status: 409 }));
+      await a.appendLog('ada~1', eventsOf((s) => s.addStroke(rectStroke(100, 100, 200, 120), 1000)));
+      await tick();
+      expect(c.due).toHaveLength(0);
+      expect(a.notices()).toEqual(['the room takes nothing more from this hand: its name there is another hand’s — reload the page to join again']);
+      const n = r.posted.length;
+      r.set(() => ({ ok: true }));
+      await a.appendLog('ada~1', eventsOf((s) => s.addStroke(rectStroke(400, 100, 200, 120), 1100)));
+      expect(r.posted.length).toBe(n);
+    });
+
+    it('a whole log longer than a line goes as a `full` and appends cut between events, and a peer holds all of it', async () => {
+      const r = relay();
+      const ada = named('ada~1');
+      const a = new LiveStore(r.transport() as any, 'ada~1', 'r');
+      const b = new LiveStore(r.transport() as any, 'bob~1', 'r');
+      const pad = 'x'.repeat(Math.ceil(LINE_CHARS / 3));
+      for (let i = 0; i < 8; i++) ada.label({ nodeId: ada.addStroke(rectStroke(100 + i * 300, 100, 200, 120), 1000 + i), text: pad + i, at: 2000 + i });
+      const log = mine(ada);
+      expect(JSON.stringify(log).length).toBeGreaterThan(2 * LINE_CHARS);
+      await a.publish(log);
+      await tick(); await tick();
+      const lines = r.posted.map((p) => p.line);
+      expect(lines.length).toBeGreaterThan(2);
+      expect(lines.every((l) => JSON.stringify(l).length < LINE_CHARS + 2000)).toBe(true);
+      expect(lines[0].full).toBe(true);
+      expect(lines.slice(1).every((l) => !l.full)).toBe(true);
+      expect((await b.readLogs())['ada~1']).toEqual(log);
+    });
+
+    it('one thing no line can carry (413) is let go of and said, and the rest of the log still goes', async () => {
+      const r = relay();
+      const ada = named('ada~1');
+      const a = new LiveStore(r.transport() as any, 'ada~1', 'r');
+      const b = new LiveStore(r.transport() as any, 'bob~1', 'r');
+      r.set((line) => (JSON.stringify(line).length > 400_000 ? { ok: false, status: 413 } : { ok: true }));
+      ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      const huge = ada.addStroke(rectStroke(400, 100, 200, 120), 1100);
+      expect(ada.label({ nodeId: huge, text: 'y'.repeat(500_000), at: 1200 })).not.toBe(null);
+      ada.addStroke(rectStroke(700, 100, 200, 120), 1300);
+      await a.publish(mine(ada));
+      await tick(); await tick();
+      const held = (await b.readLogs())['ada~1'];
+      expect(held).toEqual(mine(ada).filter((e) => e.type !== 'label'));
+      expect(a.notices()).toEqual(['something on this board is 0.5 MB — more than a room carries in one piece — and was not shared']);
+      expect(a.unsent()).toBe(0);
+    });
+
+    it('a line of my log slow past its wait that then fails is sent again with what followed it — a hole is never left', async () => {
+      vi.useFakeTimers();
+      try {
+        let settle: ((v: any) => void) | null = null;
+        const posted: any[] = [];
+        const t = {
+          send: (line: any) => { posted.push(line.full ? 'full:' + line.events.length : 'append:' + line.events.length); return posted.length === 2 ? new Promise((ok) => { settle = ok; }) : Promise.resolve({ ok: true }); },
+          onMessage: () => () => {},
+        };
+        const c = clock();
+        const ada = named('ada~1');
+        const a = new LiveStore(t as any, 'ada~1', 'r', { later: c.later });
+        ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
+        await a.publish(mine(ada));
+        ada.addStroke(rectStroke(400, 100, 200, 120), 1100);
+        const slow = a.publish(mine(ada));
+        await vi.advanceTimersByTimeAsync(SEND_WAIT_MS);
+        await slow;
+        ada.addStroke(rectStroke(700, 100, 200, 120), 1200);
+        await a.publish(mine(ada));
+        // The third mark waits behind the second: it is not sent past it.
+        expect(posted).toEqual(['full:1', 'append:1']);
+        settle!({ ok: false, status: 0 });
+        await vi.advanceTimersByTimeAsync(0);
+        await c.run();
+        expect(posted).toEqual(['full:1', 'append:1', 'append:2']);
+        expect(a.unsent()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('a copy handed on may only add: one that leaves out marks held here is refused and said — the writer\'s own whole log still replaces', async () => {
+      const w = wire();
+      const store = new LiveStore(w.transport as any, 'me~1');
+      const ada = named('ada~1');
+      ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      ada.addStroke(rectStroke(400, 100, 200, 120), 1100);
+      const log = mine(ada);
+      w.deliver({ participant: 'ada~1', events: log, at: 2000, full: true, sid: 's-ada' });
+      // Eve hands on "a copy" of Ada's log with nothing in it, stamped far in the future.
+      w.deliver({ participant: 'ada~1', events: [], at: 9e12, full: true, sid: 's-ada', via: 'eve~1' });
+      expect((await store.readLogs())['ada~1']).toEqual(log);
+      expect(store.notices()).toEqual(['a copy of ada’s marks that would have taken some away was refused — what is held here is kept']);
+      // A copy that only adds is taken, and its clock holds the writer back from nothing: her undo still lands.
+      const more = named('ada~1');
+      more.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      more.addStroke(rectStroke(400, 100, 200, 120), 1100);
+      more.addStroke(rectStroke(700, 100, 200, 120), 1200);
+      w.deliver({ participant: 'ada~1', events: mine(more), at: 9e12, full: true, sid: 's-ada', via: 'eve~1' });
+      expect((await store.readLogs())['ada~1']).toHaveLength(3);
+      w.deliver({ participant: 'ada~1', events: log.slice(0, 1), at: 3000, full: true, sid: 's-ada' });
+      expect((await store.readLogs())['ada~1']).toEqual(log.slice(0, 1));
+      // A copy that holds what is held as a suffix holds — the room's early lines gone — is taken in its place.
+      const fresh = new LiveStore(wire().transport as any, 'n~1');
+      const w2 = wire();
+      const late = new LiveStore(w2.transport as any, 'late~1');
+      w2.deliver({ participant: 'ada~1', events: mine(more).slice(2), at: 2500, sid: 's-ada' });
+      w2.deliver({ participant: 'ada~1', events: mine(more), at: 2500, full: true, sid: 's-ada', via: 'bob~1' });
+      expect((await late.readLogs())['ada~1']).toEqual(mine(more));
+      expect(late.notices()).toEqual([]);
+      fresh.close();
+    });
+  });
+
+  // ===== A whole in pieces, one line of my log at a time, and who is here now (the rooms lane's review) =====
+  describe('a whole log in pieces arrives whole or not at all, and a hand is here only by what is heard now', () => {
+    const named = (logName: string) => createSession({ ...DEFAULT_SESSION_CONFIG, logName });
+    const mine = (s: ReturnType<typeof createSession>) => s.getEvents().filter((e) => !e.by);
+    /** A log too long for one line: `n` marks, each labelled with a third of a line of text. */
+    const bigLog = (logName: string, n: number) => {
+      const s = named(logName);
+      const pad = 'x'.repeat(Math.ceil(LINE_CHARS / 3));
+      for (let i = 0; i < n; i++) s.label({ nodeId: s.addStroke(rectStroke(100 + i * 300, 100, 200, 120), 1000 + i), text: pad + i, at: 2000 + i });
+      return s;
+    };
+
+    it('on a slow uplink a whole log\'s first piece is answered before its second goes, so a peer holds all of it — the second never overtakes it', async () => {
+      vi.useFakeTimers();
+      try {
+        // A relay that takes a line when its body has finished arriving: a line takes a second a 200,000 characters.
+        const members: ((line: any) => void)[] = [];
+        const order: string[] = [];
+        const uplink = {
+          send: (line: any) => new Promise((ok) => {
+            const ms = Math.ceil(JSON.stringify(line).length / 200);
+            setTimeout(() => {
+              order.push((line.full ? 'full' : 'append') + ':' + line.events.length);
+              const copy = JSON.parse(JSON.stringify(line));
+              for (const m of members) m(copy);
+              ok({ ok: true });
+            }, ms);
+          }),
+          onMessage: (cb: any) => { members.push(cb); return () => undefined; },
+        };
+        const ann = new LiveStore(uplink as any, 'ann~1', 'r');
+        const fern = new LiveStore({ send: () => undefined, onMessage: (cb: any) => { members.push(cb); return () => undefined; } } as any, 'fern~1', 'r');
+        // Three big marks that fill the first piece (about 14 s on this uplink), and a smaller one that is the second (1.5 s).
+        const s = named('ann~1');
+        const pad = 'x'.repeat(Math.floor(LINE_CHARS / 3.2));
+        for (let i = 0; i < 3; i++) s.label({ nodeId: s.addStroke(rectStroke(100 + i * 300, 100, 200, 120), 1000 + i), text: pad + i, at: 2000 + i });
+        s.label({ nodeId: s.addStroke(rectStroke(100, 400, 200, 120), 3000), text: 'y'.repeat(300_000), at: 3001 });
+        const log = mine(s);
+        void ann.publish(log);
+        await vi.advanceTimersByTimeAsync(60_000);
+        expect(order).toEqual(['full:7', 'append:1']);
+        expect((await fern.readLogs())['ann~1']).toEqual(log);
+        expect(ann.unsent()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('a peer that holds the whole is never cut to a first piece: the pieces are held aside until the last, and a whole never finished leaves it as it was', async () => {
+      const w = wire();
+      const fern = new LiveStore(w.transport as any, 'fern~1');
+      const ann = named('ann~1');
+      for (let i = 0; i < 4; i++) ann.addStroke(rectStroke(100 + i * 300, 100, 200, 120), 1000 + i);
+      const log = mine(ann);
+      w.deliver({ participant: 'ann~1', events: log, at: 1000, full: true, sid: 's-ann' });
+      const rev = fern.revision();
+      // The same whole again, in two pieces (an answer to a hello): nothing changes while it comes, nothing when it is in.
+      w.deliver({ participant: 'ann~1', events: log.slice(0, 2), at: 2000, full: true, more: true, set: 2000, sid: 's-ann' });
+      expect((await fern.readLogs())['ann~1']).toEqual(log);
+      w.deliver({ participant: 'ann~1', events: log.slice(2), at: 2001, set: 2000, sid: 's-ann' });
+      expect((await fern.readLogs())['ann~1']).toEqual(log);
+      expect(fern.revision()).toBe(rev);
+      // A piece of that whole heard again, later, changes nothing: it is no longer waited for.
+      w.deliver({ participant: 'ann~1', events: log.slice(3), at: 2001, set: 2000, sid: 's-ann' });
+      expect((await fern.readLogs())['ann~1']).toEqual(log);
+      // An undo sent in pieces: taken only when its last piece lands.
+      w.deliver({ participant: 'ann~1', events: log.slice(0, 2), at: 3000, full: true, more: true, set: 3000, sid: 's-ann' });
+      expect((await fern.readLogs())['ann~1']).toHaveLength(4);
+      w.deliver({ participant: 'ann~1', events: log.slice(2, 3), at: 3001, set: 3000, sid: 's-ann' });
+      expect((await fern.readLogs())['ann~1']).toEqual(log.slice(0, 3));
+      // A whole begun and never finished — its writer left halfway: what was held stands.
+      w.deliver({ participant: 'ann~1', events: log.slice(0, 1), at: 4000, full: true, more: true, set: 4000, sid: 's-ann' });
+      w.deliver({ participant: 'ann~1', events: [], at: 4001, bye: true, sid: 's-ann' });
+      w.deliver({ participant: 'ann~1', events: [], at: 4002, set: 4000, sid: 's-ann' });
+      expect((await fern.readLogs())['ann~1']).toEqual(log.slice(0, 3));
+      // A newer whole begun while one is coming takes its place; a piece of the one given up is dropped.
+      w.deliver({ participant: 'ann~1', events: log.slice(0, 1), at: 5000, full: true, more: true, set: 5000, sid: 's-ann' });
+      w.deliver({ participant: 'ann~1', events: log.slice(0, 1), at: 6000, full: true, more: true, set: 6000, sid: 's-ann' });
+      w.deliver({ participant: 'ann~1', events: log.slice(1, 4), at: 6001, set: 5000, sid: 's-ann' });
+      expect((await fern.readLogs())['ann~1']).toEqual(log.slice(0, 3));
+      w.deliver({ participant: 'ann~1', events: log.slice(1, 2), at: 6002, set: 6000, sid: 's-ann' });
+      expect((await fern.readLogs())['ann~1']).toEqual(log.slice(0, 2));
+    });
+
+    it('a big log goes as pieces of one set, and a hello heard mid-way does not begin it again: the whole goes once more after its last piece', async () => {
+      const posted: any[] = [];
+      let hear: ((line: any) => void) | null = null;
+      let gate: (() => void) | null = null;
+      const t = {
+        send: (line: any) => {
+          posted.push({ full: !!line.full, set: line.set, more: !!line.more, n: line.events.length });
+          // The second piece takes its time, and a newcomer says hello while it does.
+          return posted.length === 2 ? new Promise((ok) => { gate = () => ok({ ok: true }); }) : Promise.resolve({ ok: true });
+        },
+        onMessage: (cb: any) => { hear = cb; return () => undefined; },
+      };
+      const ann = new LiveStore(t as any, 'ann~1', 'r');
+      const log = mine(bigLog('ann~1', 8));
+      void ann.publish(log);
+      await tick();
+      expect(posted).toHaveLength(2);
+      hear!({ participant: 'cleo~1', events: [], at: 1, hello: true, sid: 's-cleo' });
+      await tick();
+      expect(posted).toHaveLength(2);
+      gate!();
+      for (let i = 0; i < 10; i++) await tick();
+      const first = posted[0].set;
+      const ofFirst = posted.filter((p) => p.set === first);
+      expect(first).toBeGreaterThan(0);
+      expect(ofFirst[0].full && ofFirst[0].more).toBe(true);
+      expect(ofFirst.slice(1).every((p) => !p.full)).toBe(true);
+      expect(ofFirst[ofFirst.length - 1].more).toBe(false);
+      expect(ofFirst.slice(0, -1).every((p) => p.more)).toBe(true);
+      // Then the whole once more, as a set of its own, for the hand that said hello.
+      const after = posted.slice(ofFirst.length);
+      expect(after.length).toBeGreaterThan(1);
+      expect(after[0].full && after[0].set !== first).toBe(true);
+      expect(ann.unsent()).toBe(0);
+    });
+
+    it('nobody is taken to be here by a line the relay replays — only by what is heard after it', async () => {
+      const w = wire();
+      const store = new LiveStore(w.transport as any, 'me~1');
+      w.deliver({ relay: 'replay' });
+      w.deliver({ participant: 'gone~1', events: eventsOf((s) => s.addStroke(rectStroke(100, 100, 200, 120), 1000)), at: 1000, sid: 's-gone' });
+      w.deliver({ relay: 'live' });
+      expect(store.presence()).toEqual([]);
+      expect((await store.readLogs())['gone~1']).toHaveLength(1);
+      w.deliver({ participant: 'here~1', events: [], at: 2000, sid: 's-here' });
+      expect(store.presence().map((p) => p.participant)).toEqual(['here~1']);
+    });
+
+    it('a window back online sends at once what the room did not take — before the backoff is due', async () => {
+      const g = globalThis as any;
+      const had = g.addEventListener;
+      const listeners: Record<string, (() => void)[]> = {};
+      g.addEventListener = (type: string, fn: () => void) => { (listeners[type] ??= []).push(fn); };
+      g.removeEventListener = (type: string, fn: () => void) => { listeners[type] = (listeners[type] || []).filter((f) => f !== fn); };
+      try {
+        const posted: any[] = [];
+        let up = false;
+        const t = { send: (line: any) => { posted.push(line); return Promise.resolve(up ? { ok: true } : { ok: false, status: 0 }); }, onMessage: () => () => undefined };
+        const due: number[] = [];
+        const store = new LiveStore(t as any, 'ann~1', 'r', { later: (_fn, ms) => { due.push(ms); return () => undefined; } });
+        await store.appendLog('ann~1', eventsOf((s) => s.addStroke(rectStroke(100, 100, 200, 120), 1000)));
+        await tick();
+        expect(store.unsent()).toBe(1);
+        expect(due).toEqual([RETRY_FIRST_MS]);
+        const before = posted.length;
+        up = true;
+        for (const fn of listeners.online || []) fn();
+        await tick(); await tick();
+        expect(posted.length).toBe(before + 1);
+        expect(store.unsent()).toBe(0);
+        store.close();
+        expect(listeners.online || []).toHaveLength(0);
+      } finally {
+        if (had === undefined) { delete g.addEventListener; delete g.removeEventListener; } else g.addEventListener = had;
+      }
+    });
+
+    it('another hand\'s marks on a board shared go in as a copy this hand holds and hands on — under their own name, never this hand\'s', async () => {
+      const hub = new LocalHub();
+      const fern = new LiveStore(hub.connect(), 'fern~2', 'r');
+      const dora = new LiveStore(hub.connect(), 'dora~1', 'r');
+      const ann = named('ann~1');
+      ann.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      ann.addStroke(rectStroke(400, 100, 200, 120), 1100);
+      const said = await fern.carry('ann~1', mine(ann));
+      await tick(); await tick();
+      expect(said.ok).toBe(true);
+      expect((await fern.readLogs())['ann~1']).toEqual(mine(ann));
+      expect((await dora.readLogs())['ann~1']).toEqual(mine(ann));
+      expect(dora.presence().map((p) => p.participant)).toEqual(['fern~2']);
+      // A newcomer, later, is handed the copy by the hand that holds it — ann is not here to answer for it.
+      const cleo = new LiveStore(hub.connect(), 'cleo~1', 'r');
+      cleo.hello();
+      await new Promise((r) => setTimeout(r, 2500));
+      expect((await cleo.readLogs())['ann~1']).toEqual(mine(ann));
+      // A copy too long for one line is not sent: said back, so the page can say it.
+      const big = mine(bigLog('bea~1', 4));
+      expect(await fern.carry('bea~1', big)).toEqual({ ok: false, status: 413 });
+      expect((await dora.readLogs())['bea~1']).toBeUndefined();
     });
   });
 });

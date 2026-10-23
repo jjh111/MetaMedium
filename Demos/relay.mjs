@@ -22,8 +22,16 @@
 // files under `assetDir` (MM_RELAY_ASSET_DIR) that a restarted relay finds again. The rules are
 // `relay-protocol.mjs`'s, shared with the Worker.
 //
+// It also opens rooms (`POST /rooms`): a name of `r-` and 128 random bits, `{ room, key: null, idleDays: null }` —
+// this relay keeps no keys, and a room lasts as long as the process — so a page on this machine and the gate
+// share rooms the way they would on the relay on the internet. And a hand's name is claimed by the hand that
+// first writes under it with a secret of its sitting (`x-dyna-hand`): a line under a name another hand claimed is
+// refused (409), so nobody writes in another's name. The rules are `relay-protocol.mjs`'s, shared with the Worker.
+// A line that only says its hand is here (a beat) is passed on to the streams open now and kept nowhere, and a
+// stream's replay is said to begin and end, so nobody is taken to be here by a line written before it opened.
+//
 // How much a room remembers is settable: `maxLines`, else the environment's
-// MM_RELAY_MAX_LINES, else 5000 lines per room. Past it the oldest lines go,
+// MM_RELAY_MAX_LINES, else 5000 lines per room. Past it the lines replay would never send go first (`compact`), then the oldest lines go,
 // and a hand that connects after is told the room is older than the relay
 // remembers — every hand's store says so (store/live.ts, `truncation`), and
 // the hands still in the room answer its hello: each with its own log, and
@@ -35,7 +43,8 @@ import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, existsSy
 import path from 'node:path';
 
 import {
-  DEFAULT_MAX_LINES, kindOf, replay, truncationNotice, maxLinesFrom as maxLinesOf,
+  DEFAULT_MAX_LINES, MAX_LINE_CHARS, kindOf, setOf, writerOf, replay, truncationNotice, maxLinesFrom as maxLinesOf, compact, mintRoomName, HAND_HEADER, handHashOf, claimCheck,
+  claimsToLetGo, CLAIMS_FULL, REPLAY_BEGINS, REPLAY_ENDS,
   MAX_ASSET_BYTES, assetRoomBytesFrom, assetPathOf, assetCheck, assetSizeVerdict, assetHeaders, sniffImage, ASSET_WORDS,
 } from './relay-protocol.mjs';
 import { DECIDE_WORDS } from './decide-protocol.mjs';
@@ -49,8 +58,9 @@ export const maxLinesFrom = (option, env = process.env) => maxLinesOf(option, en
 
 const cors = (res) => {
   res.setHeader('access-control-allow-origin', '*');
-  res.setHeader('access-control-allow-headers', 'content-type, last-event-id, authorization');
+  res.setHeader('access-control-allow-headers', 'content-type, last-event-id, authorization, ' + HAND_HEADER);
   res.setHeader('access-control-allow-methods', 'GET, HEAD, POST, PUT, OPTIONS');
+  res.setHeader('access-control-expose-headers', 'retry-after');
 };
 const plain = (res, status, words) => { res.writeHead(status, { 'content-type': 'text/plain; charset=utf-8' }); res.end(words); };
 
@@ -104,8 +114,8 @@ export function startRelay(port = Number(process.env.PORT || 8020), opts = {}) {
   const maxLines = maxLinesFrom(opts.maxLines);
   const assetCap = assetRoomBytesFrom(opts.assetRoomBytes, process.env);
   const assets = assetStore(opts.assetDir || process.env.MM_RELAY_ASSET_DIR || '');
-  const rooms = new Map(); // room -> { name, lines: [{ id, data, participant, kind }], clients: Set<res>, dropped }
-  const roomOf = (name) => rooms.get(name) || rooms.set(name, { name, lines: [], clients: new Set(), dropped: 0 }).get(name);
+  const rooms = new Map(); // room -> { name, lines: [{ id, data, participant, kind }], clients: Set<res>, dropped, lost, last, claims }
+  const roomOf = (name) => rooms.get(name) || rooms.set(name, { name, lines: [], clients: new Set(), dropped: 0, lost: 0, last: 0, claims: new Map() }).get(name);
   /** A picture: put (verified), got, or asked after. Never a line, never the room's stream. */
   const asset = (req, res, a) => {
     if (a.room === null || !a.room || a.room.length > 128) { plain(res, 400, ASSET_WORDS.room); return; }
@@ -143,6 +153,14 @@ export function startRelay(port = Number(process.env.PORT || 8020), opts = {}) {
     if (url.pathname === '/decide' || url.pathname === '/extract') { res.writeHead(501, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify({ ok: false, error: DECIDE_WORDS.noModel })); return; }
     const a = assetPathOf(url.pathname);
     if (a) { asset(req, res, a); return; }
+    // A room opened for whoever asks: this relay keeps no keys and forgets a room when it stops.
+    if (url.pathname === '/rooms') {
+      if (req.method === 'GET') { res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify({ idleDays: null, opens: true })); return; }
+      if (req.method !== 'POST') { plain(res, 405, 'a room is opened with POST /rooms'); return; }
+      res.writeHead(201, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+      res.end(JSON.stringify({ room: mintRoomName(), key: null, idleDays: null }));
+      return;
+    }
     if (!m) { res.writeHead(404); res.end('rooms/<room>/events, rooms/<room>/assets/<sha256>'); return; }
     const room = roomOf(decodeURIComponent(m[1]));
     if (req.method === 'GET') {
@@ -156,23 +174,57 @@ export function startRelay(port = Number(process.env.PORT || 8020), opts = {}) {
       // No `id:`, so it does not move the client's Last-Event-ID.
       const notice = truncationNotice(room, after);
       if (notice) res.write(`data: ${JSON.stringify(notice)}\n\n`);
+      // The replay, between the relay's two words for it: nobody is here by a line written before this stream opened.
+      res.write(`data: ${REPLAY_BEGINS}\n\n`);
       for (const l of replay(room, after)) res.write(`id: ${l.id}\ndata: ${l.data}\n\n`);
+      res.write(`data: ${REPLAY_ENDS}\n\n`);
       room.clients.add(res);
       const beat = setInterval(() => res.write(': beat\n\n'), 25000);
       req.on('close', () => { clearInterval(beat); room.clients.delete(res); });
       return;
     }
     if (req.method === 'POST') {
+      // Read up to the cap; past it the rest is counted and let go of, then refused in words (413) — a hand
+      // told so lets that line go, where a cut connection reads as no answer and is tried again for ever.
       let body = '';
-      req.on('data', (c) => { body += c; if (body.length > 4e6) req.destroy(); });
-      req.on('end', () => {
+      let size = 0;
+      req.setEncoding('utf8');
+      req.on('data', (c) => { size += c.length; if (size <= MAX_LINE_CHARS) body += c; else if (size > 4 * MAX_LINE_CHARS) req.destroy(); });
+      req.on('end', async () => {
+        if (size > MAX_LINE_CHARS) { plain(res, 413, 'a line is smaller than that'); return; }
         let line;
         try { line = JSON.parse(body); } catch { res.writeHead(400); res.end('a line is JSON'); return; }
-        const id = (room.lines.length ? room.lines[room.lines.length - 1].id : 0) + 1;
+        // Whose name the line is written under (relay-protocol.mjs): a name another hand claimed is refused.
+        const hash = await handHashOf(req.headers[HAND_HEADER] || '');
+        const verdict = claimCheck(room.claims, line, hash);
+        if (!verdict.ok) { plain(res, verdict.status, verdict.words); return; }
+        if (verdict.claim) {
+          // A room keeps so many names: past it, the names no line it holds was written under are let go of first.
+          const cap = claimsToLetGo(room.claims, room.lines);
+          for (const n of cap.letGo) room.claims.delete(n);
+          if (!cap.fits) { res.setHeader('retry-after', String(CLAIMS_FULL.retryAfter)); plain(res, CLAIMS_FULL.status, CLAIMS_FULL.words); return; }
+          room.claims.set(verdict.claim, hash);
+        }
+        const kind = kindOf(line);
+        // A line that only says its hand is here is passed on to the streams open now, and kept nowhere: a room's
+        // history is its marks, not its beats, and beats kept would push the marks out of it.
+        if (kind === 'here') {
+          for (const c of room.clients) c.write(`data: ${body}\n\n`);
+          res.writeHead(204); res.end();
+          return;
+        }
+        const id = ++room.last;
         const participant = line && typeof line.participant === 'string' ? line.participant : '';
-        room.lines.push({ id, data: body, participant, kind: kindOf(line) });
+        const rec = { id, data: body, participant, kind };
+        const set = setOf(line);
+        if (set) rec.set = set;
+        const writer = writerOf(line);
+        if (writer && writer !== participant) rec.writer = writer;
+        room.lines.push(rec);
+        if (room.lines.length > maxLines) room.lines = compact(room.lines);
         if (room.lines.length > maxLines) {
           const n = room.lines.length - maxLines;
+          room.lost = room.lines[n - 1].id;
           room.lines.splice(0, n);
           room.dropped += n;
         }

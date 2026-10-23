@@ -518,6 +518,10 @@ export async function runHand(browser, servers, { freshContext, screenshot }) {
       await letGo(page);
       const before = await page.evaluate(() => { const mm = window.__mm, s = mm.session.getState(); return { me: mm.folder().me, ids: s.contentIds.slice(), marks: s.contentIds.length }; });
       sittingBefore = before.me; idsBefore = before.ids;
+      // What the tab drew is in the room before it reloads: a page sends its last line as it goes with keepalive, which
+      // the gate's own request routing (its model guard) cancels with the page — a browser with none in front delivers it.
+      await page.evaluate(() => window.__mm.sendRoom && window.__mm.sendRoom());
+      await page.waitForFunction(() => !window.__mm.room || window.__mm.room().unsent === 0, null, { timeout: 10000 }).catch(() => {});
       await page.reload({ waitUntil: 'load', timeout: 60000 });
       await ready();
       await inRoom();
@@ -554,7 +558,9 @@ export async function runHand(browser, servers, { freshContext, screenshot }) {
       const look = await lookUntil((l) => /labelled “outlet”/.test(markLine(l, boxB) || ''));
       const refused = textOf(await hand.call('canvas_label', { id: boxB, text: 'mine now' }));
       check(`H1.17. §6 (synthetic strokes): after the reload, a mark drawn before it labels — "${line1}" before Enter, and it says ${first}; held with the hand's circle, "${line2}"; the hand's look: "${(markLine(look, boxB) || '').slice(0, 100)}", the circle still “${labels.sun}”; the hand's own label on his mark is refused (${refused.slice(-60)})`,
-        opened && /^↵ write “gate” on (it|them) — on (yours|your \d+)/.test(line1) && first === 'gate' && held && /^↵ write “outlet” on (it|them) — on (yours|your \d+), not the (mark|\d+ marks) claude made$/.test(line2) && labels.box === 'outlet' && labels.sun === 'sun'
+        // Held alone or with what it hangs together with: since the tab's last marks before the reload reach the room (the
+        // rooms lane: they used to be lost as the page went), the loop round it was taken up and is no ink to gather by.
+        opened && /^↵ write “gate” on (it|them)(?: — on (?:yours|your \d+|each of your \d+ marks)|$)/.test(line1) && first === 'gate' && held && /^↵ write “outlet” on (it|them) — on (yours|your \d+), not the (mark|\d+ marks) claude made$/.test(line2) && labels.box === 'outlet' && labels.sun === 'sun'
           && /labelled “outlet”/.test(markLine(look, boxB) || '') && /by john/.test(markLine(look, boxB) || '') && !/“mine now” on/.test(refused) && /john/.test(refused),
         { line1, first, line2, labels, look: markLine(look, boxB), refused });
       await letGo(page);

@@ -33,6 +33,8 @@
       <canvas id="markGlyph" width="34" height="22"></canvas><span id="markName">check</span>
     </div>
     <button id="findBtn" aria-pressed="false" title="Find a word on any board (/ or ⌘K): labels, names, typed text, figures, Mermaid, and what was read from writing">find</button>
+    <!-- While this page is in a shared room: the room, and one dot per hand heard in it, in its colour. A tap opens the Live pane. -->
+    <button id="roomChip" hidden aria-pressed="false" title="Who is drawing here — tap for the invite link, a copy of the board, or to leave"></button>
     <button id="undoBtn" title="Undo (⌘Z)">undo</button>
     <button id="ccBtn" aria-pressed="false" title="Controls" aria-label="Controls"><i></i><i></i><i></i><i></i></button>
   </div>
@@ -153,11 +155,38 @@
   <div id="packsStatus" class="hint" aria-live="polite"></div>
 </div>
 <div id="livePanel" hidden>
-  <input id="liveRoom" placeholder="room" autocomplete="off" spellcheck="false" />
-  <input id="liveName" placeholder="your name in the room" autocomplete="off" spellcheck="false" />
-  <input id="liveRelay" placeholder="relay URL — empty for other tabs on this machine" autocomplete="off" spellcheck="false" />
-  <div class="mpRow"><button id="liveJoin">Join</button><button id="liveClaude" title="the room Claude Code joins through node Demos/mcp.mjs: room “claude”, relay on this machine">with Claude</button></div>
-  <div id="liveStatus" class="hint"></div>
+  <!-- In a room: who is here, the invite, a copy of the board, and the way out. -->
+  <div id="liveHere" hidden>
+    <div class="lvRoom"><span class="lvRoomName" id="liveRoomName"></span></div>
+    <ul class="lvWho" id="liveWho"></ul>
+    <p class="hint" id="liveKept"></p>
+    <div class="mpRow"><button id="liveInvite" title="a link that brings someone into this room, with its key in it — send it only to whoever you want drawing here">Copy invite link</button></div>
+    <div class="mpRow"><button id="liveSaveCopy" title="the board as it stands in this room, kept in this browser as a board of your own">Save a copy to my boards</button><button id="liveLeave">Leave</button></div>
+    <div class="mpRow" id="liveLeaveRow" hidden><button id="liveLeaveAnyway" title="what the room has not taken yet is lost">Leave anyway</button></div>
+    <input id="liveLink" hidden readonly aria-label="the invite link" />
+  </div>
+  <!-- Not in a room: share the board on screen. -->
+  <div id="liveAway">
+    <p class="hint">Anyone you send the link to draws on this board with you, live, from any browser.</p>
+    <div class="mpRow"><button id="liveShare">Share this board</button></div>
+    <div class="mpRow" id="liveEmptyRow" hidden><button id="liveShareEmpty">Share an empty board instead</button></div>
+  </div>
+  <details id="liveMore">
+    <summary>more ways in</summary>
+    <input id="liveRoom" placeholder="a room’s name" autocomplete="off" spellcheck="false" />
+    <input id="liveName" placeholder="your name in the room" autocomplete="off" spellcheck="false" />
+    <input id="liveRelay" placeholder="relay address — empty for other tabs on this machine" autocomplete="off" spellcheck="false" />
+    <div class="mpRow"><button id="liveJoin">Join</button><button id="liveClaude" title="the room Claude Code joins through node Demos/mcp.mjs: room “claude”, relay on this machine">with Claude</button></div>
+  </details>
+  <div id="liveStatus" class="hint" aria-live="polite"></div>
+</div>
+<!-- A guest who came by an invite and has no name kept here is asked one before joining. -->
+<div id="namePanel" hidden>
+  <p class="hint">You were invited to draw on a shared board.</p>
+  <label class="nmLabel" for="nameInput"><span class="nmSwatch" id="nameSwatch"></span>Your name in this room</label>
+  <input id="nameInput" autocomplete="nickname" spellcheck="false" maxlength="40" enterkeyhint="go" />
+  <div class="mpRow"><button id="nameJoin">Join</button></div>
+  <div id="nameStatus" class="hint" aria-live="polite"></div>
 </div>
 
 <div id="grid" hidden></div>

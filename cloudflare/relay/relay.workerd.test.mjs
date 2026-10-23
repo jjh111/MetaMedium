@@ -31,9 +31,10 @@ const SECRET = 'workerd-test-secret';
 const freePort = () => new Promise((resolve) => { const s = createServer().listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => resolve(p)); }); });
 
 /** wrangler dev over a state folder; resolves with { url, stop } once it says it is ready. */
-async function startWorkerd(state) {
+async function startWorkerd(state, vars = {}) {
   const port = await freePort();
-  const child = spawn(wrangler, ['dev', '--local', '--ip', '127.0.0.1', '--port', String(port), '--persist-to', state, '--var', 'MM_RELAY_SECRET:' + SECRET, '--var', 'MM_RELAY_MAX_LINES:5'],
+  const more = Object.entries(vars).flatMap(([k, v]) => ['--var', k + ':' + v]);
+  const child = spawn(wrangler, ['dev', '--local', '--ip', '127.0.0.1', '--port', String(port), '--persist-to', state, '--var', 'MM_RELAY_SECRET:' + SECRET, '--var', 'MM_RELAY_MAX_LINES:5', ...more],
     { cwd: here, env: { ...process.env, WRANGLER_SEND_METRICS: 'false', CI: '1' }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   let log = '';
   child.stdout.on('data', (d) => { log += d; });
@@ -98,10 +99,11 @@ test('in workerd: keys, the stream, Last-Event-ID, the cap and the truncation wo
     const got = await live;
     assert.ok(got.text.includes('id: 4\n') && !got.text.includes('"now"'), got.text);
 
-    // The cap: five lines kept, the room says how many went.
+    // The cap: five lines kept, the room says how many went — alice's superseded whole log went first, and is not
+    // counted as lost (replay never sent it): the hello and her newest whole log are the two lost.
     for (let i = 0; i < 4; i++) await post({ participant: 'erin', events: [{ type: 'n' + i }] });
     const capped = await readSse(`${events()}?key=${key}`, {}, (t) => t.includes('"n3"'));
-    assert.ok(capped.text.includes('"relay":"truncated"') && /"dropped":3/.test(capped.text) && /"kept":5/.test(capped.text), capped.text);
+    assert.ok(capped.text.includes('"relay":"truncated"') && /"dropped":2/.test(capped.text) && /"kept":5/.test(capped.text), capped.text);
 
     // A big line in SQLite-backed storage, whole; one over the cap refused; a line is JSON.
     const big = { participant: 'fay', events: [{ type: 'big', pad: 'é'.repeat(2.5e6) }], at: 9 };
@@ -132,7 +134,8 @@ test('in workerd: keys, the stream, Last-Event-ID, the cap and the truncation wo
     assert.ok(again.text.includes('"ada~1"') && again.text.includes('"relay":"truncated"'), again.text.slice(0, 400));
     assert.equal((await fetch(`${server.url}/rooms/${room}/events?key=${key}`, { method: 'POST', body: JSON.stringify({ participant: 'hal', events: [] }) })).status, 204);
     const ids = (await readSse(`${server.url}/rooms/${room}/events?key=${key}`, { headers: { 'last-event-id': '1000' } }, () => false, 500)).text;
-    assert.ok(!ids.includes('data:'), 'a client past the end was sent lines');
+    // Past the end: nothing but the relay's two words around a replay of nothing.
+    assert.ok(!ids.includes('id:') && ids.split('\n').filter((l) => l.startsWith('data:')).every((l) => /^data: \{"relay":"(replay|live)"\}$/.test(l)), 'a client past the end was sent lines: ' + ids);
   } finally {
     await server.stop();
     rmSync(state, { recursive: true, force: true });
@@ -203,6 +206,48 @@ test('in workerd: GET /decide lists the decision models and their limits, asking
     const bare = await fetch(`${server.url}/decide`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
     assert.equal(bare.status, 403);
   } finally {
+    await server.stop();
+    rmSync(state, { recursive: true, force: true });
+  }
+});
+
+test('in workerd: a room opened by POST /rooms is joined with the key it gave, a forged line in a hand\'s name is refused, and the room is forgotten when its idle time is up', { skip, timeout: 180000 }, async () => {
+  const { HAND_HEADER } = await import('../../Demos/relay-protocol.mjs');
+  const state = mkdtempSync(path.join(tmpdir(), 'dyna-relay-mint-'));
+  // An idle time of about three seconds, so the alarm the real runtime keeps can be seen to fire.
+  const server = await startWorkerd(state, { MM_RELAY_ROOM_IDLE_DAYS: String(3 / 86400) });
+  const hands = [];
+  try {
+    const opened = await fetch(`${server.url}/rooms`, { method: 'POST', headers: { origin: 'https://dyna.ink' } });
+    assert.equal(opened.status, 201);
+    assert.equal(opened.headers.get('access-control-allow-origin'), 'https://dyna.ink');
+    const { room, key, idleDays } = await opened.json();
+    assert.match(room, /^r-[A-Za-z0-9_-]{22}$/);
+    assert.equal(key, await keyForRoom(SECRET, room));
+    assert.ok(idleDays > 0 && idleDays < 1);
+    assert.equal((await checkRelay(server.url, room, { key })).ok, true);
+    assert.equal((await checkRelay(server.url, 'claude', { key })).status, 403);
+    // Two hands draw in it; a third with the key forges a whole log in the first's name, and is refused.
+    const mk = (name) => { const s = new MM.LiveStore(relayTransport(server.url, room, { key, hand: name.replace('~', '-') + '-hand-secret-000' }), name, room); hands.push(s); return s; };
+    const ada = MM.createSession({ ...MM.DEFAULT_SESSION_CONFIG, logName: 'ada~1' });
+    const a = mk('ada~1');
+    const b = mk('bob~1');
+    await wait(400);
+    ada.addStroke(MM.strokeFor({ shape: 'rectangle', x: 0, y: 0, w: 100, h: 80 }), 1000, undefined, 1);
+    await a.publish(ada.getEvents());
+    assert.ok(await until(async () => ((await b.readLogs())['ada~1'] || []).length === 1), 'bob never held ada\'s mark');
+    const forged = await fetch(`${server.url}/rooms/${room}/events`, { method: 'POST', headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json', [HAND_HEADER]: 'eve-hand-secret-00000' }, body: JSON.stringify({ participant: 'ada~1', events: [], at: 9e12, full: true, sid: a.sitting }) });
+    assert.equal(forged.status, 409);
+    await wait(300);
+    assert.equal(((await b.readLogs())['ada~1'] || []).length, 1, 'ada\'s mark did not stand');
+    for (const s of hands.splice(0)) s.close();
+    // Left alone past its idle time, the room is forgotten: a newcomer hears nothing of it.
+    await wait(5000);
+    const after = await readSse(`${server.url}/rooms/${room}/events?key=${key}`, {}, () => false, 800);
+    assert.equal(after.status, 200);
+    assert.ok(!after.text.includes('ada~1'), 'the room was not forgotten: ' + after.text.slice(0, 300));
+  } finally {
+    for (const s of hands) s.close();
     await server.stop();
     rmSync(state, { recursive: true, force: true });
   }
