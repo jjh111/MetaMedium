@@ -17,7 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { siteFiles, headersText, LEFT_OUT, whyLeftOut, headerRules, headersFor, ruleMatches, stampCommit, STAMPED, buildSite } from './build-site.mjs';
+import { siteFiles, headersText, LEFT_OUT, whyLeftOut, headerRules, headersFor, ruleMatches, stampCommit, STAMPED, buildSite, metaPolicy, withPolicy } from './build-site.mjs';
 import { publishedLinks, fileCandidates } from '../e2e/links.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -198,6 +198,46 @@ test('the deployed commit is named in the app\'s pages of the built site, and no
     assert.ok(!/dynaink-commit/.test(readFileSync(path.join(out, 'index.html'), 'utf8')), 'the whitepaper names no commit');
     assert.deepEqual(STAMPED.map((f) => read(f)), before, 'the build wrote into the repository');
     assert.ok(!existsSync(path.join(out, 'dynaink-3d')) && !existsSync(path.join(out, 'CLAUDE.md')) && !existsSync(path.join(out, 'core')), 'what is left out is not in the build');
+  } finally { rmSync(out, { recursive: true, force: true }); }
+});
+
+test('the app\'s pages carry its policy in themselves in the built site — so it holds at an address no _headers rule names', () => {
+  // What a <meta> cannot say stays the header's; everything else is csp.txt, word for word.
+  const meta = metaPolicy(csp);
+  assert.ok(!/frame-ancestors/.test(meta), 'frame-ancestors is ignored in a <meta> (and the browser says so)');
+  assert.equal(meta, csp.split(';').map((d) => d.trim()).filter((d) => !d.startsWith('frame-ancestors')).join('; '));
+  for (const d of ['default-src', 'script-src', 'connect-src', 'worker-src', 'frame-src', 'object-src', 'base-uri']) assert.match(meta, new RegExp('(^|; )' + d + ' '), d);
+  for (const f of STAMPED) {
+    const page = read(f);
+    assert.ok(!/http-equiv="Content-Security-Policy"/i.test(page), f + ' carries a policy in the repository — GitHub Pages and the gate serve it as it is');
+    const carried = withPolicy(page, csp);
+    const tags = carried.match(/<meta http-equiv="Content-Security-Policy" content="([^"]*)">/g) || [];
+    assert.equal(tags.length, 1, f);
+    assert.equal(/content="([^"]*)"/.exec(tags[0])[1], meta, f + ': the policy as csp.txt says it');
+    // Right after the charset: before the stylesheet, the manifest and every script, or it would not cover them.
+    const at = carried.indexOf(tags[0]);
+    assert.ok(at > carried.indexOf('<meta charset'), f);
+    assert.ok(!/<(?:script|link|style|base)\b/i.test(carried.slice(0, at).replace(/<!--[\s\S]*?-->/g, '')), f + ': something loads before the policy');
+    assert.equal(withPolicy(carried, csp), carried, 'carried again, replaced, not doubled');
+  }
+  assert.throws(() => withPolicy('<html><head></head></html>', csp), /charset/);
+  assert.throws(() => withPolicy('<head><script src="x.js"></script>\n<meta charset="UTF-8">\n', csp), /before its charset/);
+  // Why: _headers matches the path as asked, still encoded; the file is found decoded, its slashes merged. These are the app
+  // under the floor alone, which says nothing of scripts or connections — the page's own policy is what holds there.
+  const rules = headerRules(headersText());
+  const floor = headersFor(rules, '/').get('content-security-policy');
+  for (const p of ['/ap%70/', '//app/', '/Demos//session-engine', '/Demos/session-engin%65']) {
+    assert.equal(headersFor(rules, p).get('content-security-policy'), floor, p + ' — if a rule names it now, this test can say so');
+  }
+  const out = mkdtempSync(path.join(tmpdir(), 'dyna-policy-'));
+  try {
+    buildSite({ out });
+    for (const f of STAMPED) {
+      const built = readFileSync(path.join(out, f), 'utf8');
+      assert.equal((/<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(built) || [])[1], meta, f + ' in the built site');
+      assert.ok(!/dynaink-commit/.test(built), 'no commit asked for, none named');
+    }
+    assert.ok(!/http-equiv="Content-Security-Policy"/i.test(readFileSync(path.join(out, 'index.html'), 'utf8')), 'the whitepaper keeps the floor alone: Google Fonts, GoatCounter');
   } finally { rmSync(out, { recursive: true, force: true }); }
 });
 

@@ -127,7 +127,8 @@ export async function startPages(dir, { transformHeaders = (t) => t } = {}) {
   const server = createServer((req, res) => {
     let url, pathname;
     try {
-      url = new URL(req.url, 'http://127.0.0.1');
+      // Joined, not resolved: //app/ is a path whose first segment is empty, never a host called app.
+      url = new URL('http://127.0.0.1' + (req.url.startsWith('/') ? req.url : '/' + req.url));
       pathname = url.pathname.split('/').map((s) => { try { return decodeURIComponent(s); } catch { return s; } }).join('/').replace(/\/+/g, '/');
     } catch { res.writeHead(400).end('bad address'); return; }
     const send = (status, headers, file) => {

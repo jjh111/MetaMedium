@@ -12,7 +12,9 @@
 // listening for a policy violation in every frame of every page:
 //
 //   P1  the build is served as Pages serves it: the app's policy once on the app's addresses, the
-//       floor on the rest, the redirects, what is left out a 404, the commit named in the app;
+//       floor on the rest, the redirects, what is left out a 404, the commit named in the app, and
+//       the app's policy in the app's pages themselves — at /ap%70/, //app/ and /Demos//session-engine
+//       too, addresses Pages answers with the app under the floor alone;
 //   P2  every address the whitepaper, its 404 page and the README link answers on it;
 //   P3  /app/?fresh=1 opens under the policy, and its worker controls it;
 //   P4  an example opens as a board of its own;
@@ -20,11 +22,16 @@
 //       behaviour steps in its worker, made from a blob: (P5b);
 //   P6  the whitepaper loads under the floor, its embeds of the app opened;
 //   P7  the old address opens, through Pages' 308, under the app's policy, and its worker controls it;
-//   P8  with the server gone, /app/ opens from its worker's cache, and so does the old address;
+//   P8  one visit, then no network: in a browser of its own, on a server of its own (an origin no
+//       earlier step has a worker on), /app/, the old address and the whitepaper's "Open it" are
+//       each visited once, the server is stopped, and the address the browser shows reloads from
+//       the worker's cache — with the page's other addresses;
 //   P9  nothing anywhere broke the policy — the scenario's verdict;
 //   P10 the listener hears a violation made on purpose (so P9's silence means something);
 //   P11 the same build served with 'unsafe-eval' taken out of the app's policy is caught: the
-//       program's frame says so — what P9 would say if csp.txt lost it.
+//       program's frame says so — what P9 would say if csp.txt lost it;
+//   P12 the app opened at //app/ with a room on a relay csp.txt does not name: the policy the page
+//       carries refuses it in the page, and nothing is asked of that host.
 //
 // Requests to any other host are refused in the browser (the CDNs, the fonts): a policy is
 // checked before a request leaves the page, so a host the policy refuses is still heard, and the
@@ -35,7 +42,7 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildSite, headersText, headerRules, headersFor } from '../cloudflare/build-site.mjs';
+import { buildSite, headersText, headerRules, headersFor, metaPolicy } from '../cloudflare/build-site.mjs';
 import { startPages } from './pages.mjs';
 import { publishedLinks } from './links.mjs';
 import { isModelRequest } from './guards.mjs';
@@ -46,6 +53,12 @@ const root = resolve(here, '..');
 const APP_CSP = readFileSync(join(root, 'cloudflare', 'pages', 'csp.txt'), 'utf8').trim();
 /** The floor every other page gets, read from _headers as Pages reads it. */
 const SITE_CSP = headersFor(headerRules(headersText()), '/').get('content-security-policy') || null;
+/** The app's policy as the app's pages carry it in themselves (frame-ancestors is the header's alone). */
+const META_CSP = metaPolicy(APP_CSP);
+/** The policy a page carries in a <meta>, or null. */
+const pagePolicy = (body) => { const m = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/i.exec(body || ''); return m ? m[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&') : null; };
+/** Addresses Pages answers with the app while no rule in _headers names them: the path is matched as asked, the file found decoded. */
+const CRAFTED = ['/ap%70/', '//app/', '/Demos//session-engine'];
 /** The example P4 opens, and how many marks its board holds at least. */
 const EXAMPLE = { id: 'molecule', marks: 5 };
 
@@ -65,6 +78,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  */
 async function hearViolations(context, origin) {
   const heard = [];
+  heard.refused = []; // what the browser was stopped from asking of another host — after the policy let it through
   await context.exposeBinding('__mmPolicyViolation', ({ frame }, v) => { heard.push({ via: 'event', frame: frame ? frame.url() : '', ...v }); });
   await context.addInitScript(() => {
     addEventListener('securitypolicyviolation', (e) => {
@@ -81,6 +95,7 @@ async function hearViolations(context, origin) {
   await context.route('**/*', (route) => {
     const url = route.request().url();
     if (url.startsWith(origin + '/') || isModelRequest(url, [origin])) return route.fallback();
+    heard.refused.push(url);
     return route.abort('blockedbyclient');
   });
   return heard;
@@ -128,14 +143,15 @@ async function head(origin, path) {
 
 // ===== P. The app under production's headers ======================================
 
-async function prodTest(browser, ctx, site, commit) {
+async function prodTest(browser, ctx, site, commit, out) {
   const { freshContext, steps } = ctx;
+  const extra = [];
   const check = (name, ok, detail) => steps.push({ name, ok: !!ok, detail });
   const origin = site.origin;
 
   // ---- P1. Served as Pages serves it -------------------------------------------------------------
   const h = {};
-  for (const p of ['/app/', '/app?x=1', '/', '/Demos/session-engine.html?fresh=1', '/Demos/session-engine', '/CLAUDE.md', '/dynaink-3d/', '/test-llm.html', '/robots.txt']) h[p] = await head(origin, p);
+  for (const p of ['/app/', '/app?x=1', '/', '/Demos/session-engine.html?fresh=1', '/Demos/session-engine', '/CLAUDE.md', '/dynaink-3d/', '/test-llm.html', '/robots.txt', ...CRAFTED]) h[p] = await head(origin, p);
   const once = (v) => typeof v === 'string' && !v.includes(', ');
   const named = (b) => (/<meta name="dynaink-commit" content="([0-9a-f]+)">/.exec(b) || [])[1] || null;
   const p1 = {
@@ -146,8 +162,10 @@ async function prodTest(browser, ctx, site, commit) {
     leftOut: ['/CLAUDE.md', '/dynaink-3d/', '/test-llm.html'].every((p) => h[p].status === 404),
     robots: h['/robots.txt'].status === 200,
     commit: named(h['/app/'].body) === commit && named(h['/Demos/session-engine'].body) === commit && named(h['/'].body) === null,
+    inPage: pagePolicy(h['/app/'].body) === META_CSP && pagePolicy(h['/Demos/session-engine'].body) === META_CSP && pagePolicy(h['/'].body) === null,
+    crafted: CRAFTED.every((p) => h[p].status === 200 && /<meta name="dynaink-version"/.test(h[p].body) && h[p].csp === SITE_CSP && pagePolicy(h[p].body) === META_CSP),
   };
-  check(`P1. the built site is served as Pages serves it — the app's policy alone and no-referrer once at /app/, the floor and HTTPS for six months on the whitepaper, /app?x=1 to /app/?x=1, the old address by a 308 to /Demos/session-engine, what is left out a 404, the commit ${commit.slice(0, 7)} named in the app's pages`,
+  check(`P1. the built site is served as Pages serves it — the app's policy alone and no-referrer once at /app/, the floor and HTTPS for six months on the whitepaper, /app?x=1 to /app/?x=1, the old address by a 308 to /Demos/session-engine, what is left out a 404, the commit ${commit.slice(0, 7)} named in the app's pages, and the app's policy carried in them — at ${CRAFTED.join(', ')} too, where the header is the floor alone`,
     Object.values(p1).every(Boolean), { ...p1, headers: Object.fromEntries(Object.entries(h).map(([k, v]) => [k, { ...v, body: v.body ? v.body.length + ' chars' : '' }])) });
 
   // ---- P2. Every linked address answers ----------------------------------------------------------
@@ -245,22 +263,16 @@ async function prodTest(browser, ctx, site, commit) {
       r7 && r7.status() === 200 && r7.headers()['content-security-policy'] === APP_CSP && at7 === '/Demos/session-engine?fresh=1' && ready7 && sw7.controlled && sw7.scope === `${origin}/Demos/`,
       { status: r7 && r7.status(), at: at7, ready: ready7, sw: sw7 });
 
-    // ---- P8. The server gone: both addresses open from their workers' caches ----------------------
-    await site.stop();
-    const offline = {};
-    for (const [label, path] of [['app', '/app/'], ['old', '/Demos/session-engine'], ['old .html', '/Demos/session-engine.html']]) {
-      const r = await page.goto(origin + path, { waitUntil: 'load', timeout: 30000 }).catch((e) => ({ error: String(e.message || e).split('\n')[0] }));
-      const ok = r && !r.error && r.status() === 200 && r.fromServiceWorker();
-      const ready = ok ? await waitReady(page, 30000).then(() => true, () => false) : false;
-      offline[label] = { path, ok, ready, csp: ok ? r.headers()['content-security-policy'] === APP_CSP : false, error: r && r.error, status: r && !r.error ? r.status() : null };
+    // ---- P8. One visit, then no network: in browsers of their own, on servers of their own ---------
+    const offline = await oneVisitOffline(browser, ctx, out);
+    extra.push(...offline.guards);
+    for (const o of offline.results) {
+      check(`P8. ${o.label}: visited once at ${o.first}, the server stopped, and ${o.shown} reloads from the worker's cache (${o.reload.ready ? 'opened' : 'did not open' + (o.reload.error ? ': ' + o.reload.error : '')})${o.also.length ? ' — and so do ' + o.also.map((a) => `${a.path} (${a.ready ? 'opened' : 'did not open'})`).join(', ') : ''}, each under the app's policy`,
+        o.controlled && [o.reload, ...o.also].every((a) => a.ok && a.ready && a.csp && a.inPage), o);
     }
-    check(`P8. with the server gone, /app/ opens from its worker's cache (${offline.app.ready ? 'opened' : 'did not open'}), and so does the old address — at /Demos/session-engine (${offline.old.ready ? 'opened' : 'did not open'}) and at /Demos/session-engine.html (${offline['old .html'].ready ? 'opened' : 'did not open'}), each under the app's policy`,
-      Object.values(offline).every((o) => o.ok && o.ready && o.csp), offline);
 
     // ---- P9. Nothing broke the policy ---------------------------------------------------------------
-    // Back on the app, from its cache, for P10's page.
-    await page.goto(`${origin}/app/`, { waitUntil: 'load', timeout: 30000 }).then(() => waitReady(page, 30000)).catch(() => {});
-    const violations = heard.slice();
+    const violations = heard.concat(offline.heard);
     check(`P9. no page and no frame broke a policy — ${violations.length ? violations.length + ' violation(s): ' + violations.slice(0, 4).map((v) => v.via === 'event' ? `${v.directive} ${v.blocked} in ${v.frame}` : v.text).join(' · ') : 'none heard'}`,
       violations.length === 0, { violations });
 
@@ -274,6 +286,93 @@ async function prodTest(browser, ctx, site, commit) {
   } catch (err) {
     check('P. the production scenario ran to its end', false, String(err && err.stack ? err.stack : err));
     if (ctx.screenshot) await ctx.screenshot(page, 'prod');
+  }
+  return [guards, ...extra];
+}
+
+// ===== P8. One visit, then no network =========================================================
+
+/**
+ * A person's case: one visit online, nothing else first (no whitepaper whose embeds put the old
+ * address's worker in place), then no network, and a reload of the address the browser is left
+ * showing — which on Pages is the page without its .html, and for "Open it" a board's own. Each
+ * address in a browser of its own, on a server of its own, so its origin has no worker from any
+ * earlier step. Then the page's other addresses, still offline.
+ */
+async function oneVisitOffline(browser, ctx, out) {
+  const cases = [
+    { label: 'the app', first: '/app/?fresh=1', also: ['/app/'], worker: '/app/' },
+    { label: 'the old address', first: '/Demos/session-engine.html?fresh=1', also: ['/Demos/session-engine', '/Demos/session-engine.html'], worker: '/Demos/' },
+    { label: 'the whitepaper\'s "Open it"', first: '/Demos/session-engine.html?example=story', also: [], worker: '/Demos/', pin: false },
+  ];
+  const results = [];
+  const heard = [];
+  const guards = [];
+  for (const c of cases) {
+    const site = await startPages(out);
+    const g = await ctx.freshContext(browser, { origins: [site.origin], label: 'prod-offline' });
+    guards.push(g);
+    const h = await hearViolations(g.context, site.origin);
+    const page = await g.context.newPage();
+    const r = { label: c.label, first: c.first, shown: null, controlled: false, reload: {}, also: [] };
+    const open = async (how) => {
+      const res = await how().catch((e) => ({ error: String(e.message || e).split('\n')[0] }));
+      const ok = !!res && !res.error && res.status() === 200 && res.fromServiceWorker();
+      const ready = ok ? await waitReady(page, 30000, { pin: false }).then(() => true, () => false) : false;
+      const body = ok ? await page.content().catch(() => '') : '';
+      return { ok, ready, csp: ok ? res.headers()['content-security-policy'] === APP_CSP : false, inPage: pagePolicy(body) === META_CSP, status: res && !res.error ? res.status() : null, error: res && res.error };
+    };
+    try {
+      await page.goto(site.origin + c.first, { waitUntil: 'load', timeout: 60000 });
+      await waitReady(page, 60000, { pin: c.pin });
+      if (c.pin === false) await page.waitForFunction(() => !/[?&]example=/.test(location.search), null, { timeout: 20000, polling: 100 }).catch(() => {});
+      const sw = await workerOf(page);
+      r.controlled = !!sw.controlled && sw.scope === site.origin + c.worker;
+      r.shown = page.url().slice(site.origin.length);
+      await site.stop();
+      r.reload = await open(() => page.reload({ waitUntil: 'load', timeout: 30000 }));
+      for (const path of c.also) r.also.push({ path, ...(await open(() => page.goto(site.origin + path, { waitUntil: 'load', timeout: 30000 }))) });
+    } catch (err) {
+      r.error = String(err && err.stack ? err.stack : err);
+    } finally {
+      await site.stop().catch(() => {});
+    }
+    heard.push(...h);
+    results.push(r);
+  }
+  return { results, heard, guards };
+}
+
+// ===== P12. The policy holds at an address no rule names ======================================
+
+/**
+ * /ap%70/, //app/ and /Demos//session-engine are the app on Pages, under the floor alone: `_headers`
+ * matches the path as it was asked for, the file is found with it decoded and its slashes merged.
+ * The app opens a room on whatever relay its address names, so such a link would put the app, on
+ * dyna.ink's origin and with what that origin keeps, in a room on a stranger's relay with nothing
+ * to stop it — but for the policy the page carries in itself. Here it is opened so, and the relay
+ * must be refused in the page: a violation heard for its host, and nothing asked of it.
+ */
+async function craftedAddressTest(browser, ctx, site) {
+  const { freshContext, steps } = ctx;
+  const check = (name, ok, detail) => steps.push({ name, ok: !!ok, detail });
+  const STRANGER = 'relay.stranger.invalid';
+  const guards = await freshContext(browser, { origins: [site.origin], label: 'prod-crafted' });
+  const heard = await hearViolations(guards.context, site.origin);
+  const page = await guards.context.newPage();
+  try {
+    const r = await page.goto(`${site.origin}//app/?fresh=1&nosw=1&live=prod-crafted&relay=https://${STRANGER}`, { waitUntil: 'load', timeout: 60000 });
+    const served = r ? r.headers()['content-security-policy'] : null;
+    const ready = await waitReady(page, 60000, { pin: false }).then(() => true, () => false);
+    const at = new URL(page.url()).pathname;
+    for (const until = Date.now() + 8000; Date.now() < until && !heard.some((v) => (v.blocked || v.text || '').includes(STRANGER)); ) await sleep(100);
+    const refusedHere = heard.filter((v) => v.via === 'event' && /^connect-src/.test(v.directive) && v.blocked.includes(STRANGER));
+    const others = heard.filter((v) => !(v.blocked || v.text || '').includes(STRANGER));
+    const asked = heard.refused.filter((u) => u.includes(STRANGER));
+    check(`P12. the app opened at ${at} — served under the floor alone — with a room on a relay csp.txt does not name: the policy the page carries refuses it in the page (${refusedHere.length} connect-src violation(s) for ${STRANGER}), and ${asked.length ? asked.length + ' request(s) still left for it' : 'nothing was asked of it'}`,
+      ready && at === '//app/' && served === SITE_CSP && refusedHere.length > 0 && asked.length === 0 && others.length === 0, { served, at, ready, refusedHere, others, asked });
+  } catch (err) {
+    check('P12. the crafted address ran to its end', false, String(err && err.stack ? err.stack : err));
   }
   return guards;
 }
@@ -321,8 +420,11 @@ export async function runProd(browser, servers, ctx) {
     measured.files = files.length;
     site = await startPages(out);
     t = Date.now();
-    guards.push(await prodTest(browser, c, site, commit));
+    guards.push(...(await prodTest(browser, c, site, commit, out)));
     measured['prod s'] = +((Date.now() - t) / 1000).toFixed(1);
+    t = Date.now();
+    guards.push(await craftedAddressTest(browser, c, site));
+    measured['crafted s'] = +((Date.now() - t) / 1000).toFixed(1);
     t = Date.now();
     guards.push(await brokenPolicyTest(browser, c, out));
     measured['control s'] = +((Date.now() - t) / 1000).toFixed(1);

@@ -73,10 +73,14 @@ export function siteFiles(repo = root) {
     .sort();
 }
 
+/** The app's policy, pages/csp.txt: one line, one home. */
+export function appPolicy() {
+  return readFileSync(path.join(here, 'pages', 'csp.txt'), 'utf8').trim();
+}
+
 /** The `_headers` file: the template with the app's policy (pages/csp.txt) put in. */
 export function headersText() {
-  const csp = readFileSync(path.join(here, 'pages', 'csp.txt'), 'utf8').trim();
-  return readFileSync(path.join(here, 'pages', 'headers.template'), 'utf8').replaceAll('{{APP_CSP}}', csp);
+  return readFileSync(path.join(here, 'pages', 'headers.template'), 'utf8').replaceAll('{{APP_CSP}}', appPolicy());
 }
 
 // ===== _headers, read as Pages reads it ===============================================
@@ -134,10 +138,40 @@ export function headersFor(rules, pathname, base = {}) {
   return out;
 }
 
-// ===== the commit, named in the app's pages ===========================================
+// ===== the app's pages: its policy carried in the page, and the commit named ===========
 
-/** The pages the deployed commit is named in: the app at its address and at its old one. */
+/** The app's pages, at its address and at its old one: each carries the app's policy in itself, and names the deployed commit. */
 export const STAMPED = ['app/index.html', 'Demos/session-engine.html'];
+
+/** What a browser ignores in a policy a page carries in a <meta> (and says so in the console): these stay the header's. */
+const NOT_IN_META = ['frame-ancestors', 'report-uri', 'report-to', 'sandbox'];
+
+/** The app's policy as a page carries it in a <meta>: csp.txt, less what a <meta> cannot say. */
+export function metaPolicy(csp = appPolicy()) {
+  return csp.split(';').map((d) => d.trim()).filter((d) => d && !NOT_IN_META.includes(d.split(/\s+/)[0].toLowerCase())).join('; ');
+}
+
+/**
+ * A page that carries the app's policy in itself — `<meta http-equiv="Content-Security-Policy">`
+ * right after its charset, before anything it loads — so the policy holds at whatever address the
+ * page is served. `_headers` matches its rules against the path as it was asked for, still encoded,
+ * while Pages finds the file with the path decoded and its slashes merged: /ap%70/, //app/ and
+ * /Demos//session-engine are this page under the floor alone, which says nothing of scripts or
+ * connections — and the app opens a room on any relay its address names. With the policy in the
+ * page, a relay csp.txt does not name is refused there too, and so are its frames (a frame made from
+ * the page inherits every policy it has). Where a header sends the same policy, both are enforced
+ * and say the same. Written into the built site only; the frame-ancestors the header keeps.
+ */
+export function withPolicy(html, csp = appPolicy()) {
+  const said = metaPolicy(csp).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  const tag = `<meta http-equiv="Content-Security-Policy" content="${said}">`;
+  if (/<meta http-equiv="Content-Security-Policy"[^>]*>/i.test(html)) return html.replace(/<meta http-equiv="Content-Security-Policy"[^>]*>/i, tag);
+  const m = /^([ \t]*)<meta charset="[^"]*">[^\n]*\n/im.exec(html);
+  if (!m) throw new Error('the page has no <meta charset> to carry the policy after');
+  const head = html.slice(0, m.index);
+  if (/<(?:script|link|style|base)\b/i.test(head.replace(/<!--[\s\S]*?-->/g, ''))) throw new Error('the page loads something before its charset, which the policy would not cover');
+  return html.slice(0, m.index + m[0].length) + m[1] + tag + '\n' + html.slice(m.index + m[0].length);
+}
 
 /**
  * A page with `<meta name="dynaink-commit" content="<sha>">` beside its version: the commit this
@@ -158,7 +192,8 @@ export function stampCommit(html, commit) {
 
 /**
  * Write the site into `out` (emptied first), with the Pages files and robots.txt; returns the
- * files written. `commit`: the commit's hex name, stamped into STAMPED in `out` only.
+ * files written. The app's pages (STAMPED) carry its policy in `out`; `commit`, the commit's hex
+ * name, is stamped into them there too. Nothing is written into the repository.
  */
 export function buildSite({ repo = root, out = path.join(here, 'dist'), commit = null } = {}) {
   if (commit !== null) stampCommit('<meta name="dynaink-version">\n', commit); // refuse a bad name before anything is written
@@ -169,11 +204,11 @@ export function buildSite({ repo = root, out = path.join(here, 'dist'), commit =
     mkdirSync(path.dirname(path.join(out, f)), { recursive: true });
     cpSync(path.join(repo, f), path.join(out, f));
   }
-  if (commit !== null) {
-    for (const f of STAMPED) {
-      const at = path.join(out, f);
-      writeFileSync(at, stampCommit(readFileSync(at, 'utf8'), commit));
-    }
+  const csp = appPolicy();
+  for (const f of STAMPED) {
+    const at = path.join(out, f);
+    const page = withPolicy(readFileSync(at, 'utf8'), csp);
+    writeFileSync(at, commit !== null ? stampCommit(page, commit) : page);
   }
   writeFileSync(path.join(out, '_headers'), headersText());
   cpSync(path.join(here, 'pages', '_redirects'), path.join(out, '_redirects'));

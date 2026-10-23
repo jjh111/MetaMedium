@@ -26,6 +26,11 @@
   Content-Security-Policy: object-src 'none'; base-uri 'self'; frame-ancestors 'self'
 
 # The app, at its address and at its old one (the whitepaper embeds the old one).
+# The two app pages also carry this policy in themselves, a <meta> after their charset
+# (build-site.mjs's withPolicy, in the built site only): these rules match the path as it was asked
+# for, still encoded, while the page is found with it decoded and its slashes merged, so /ap%70/,
+# //app/ and /Demos//session-engine are the app under the floor alone — and the policy still holds.
+# frame-ancestors is the header's alone (a <meta> cannot say it).
 # What each source is for:
 #   script-src   the page's own bundle and fragments; the run, mermaid and js frames carry inline
 #                scripts, a program's code is run with `new Function` (13-kinds.js) in a frame whose
