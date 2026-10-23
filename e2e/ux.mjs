@@ -24,6 +24,7 @@
 //        the minimap (UX-15); a sentence said for a while lets go when the hand draws again (UX-16)
 //   X7   the field stays where it opened while words are typed, and goes with the marks it holds when the view zooms or
 //        pans — never left over them (UX-06)
+//   X8   the double-click the standing line names, inside a waiting loop, opens the field — not the text editor over it
 //
 // It opens its own contexts (a desktop, a phone with touch, and one that asks for reduced motion), each with the
 // gate's guards, so it runs like keep and boards.
@@ -524,6 +525,26 @@ export async function runUx(browser, servers, { freshContext }) {
     check(`X7. the field stays where it opened while words are typed (${opened.field ? opened.field.left + ',' + opened.field.top : '—'} → ${typed.field ? typed.field.left + ',' + typed.field.top : '—'}), and when the view zooms or pans it goes with the marks it holds, never over them (zoomed: ${zoomed.over ? 'over' : 'beside'}, panned: ${panned.over ? 'over' : 'beside'})`,
       opened.open && typed.open && still && zoomed.open && !zoomed.over && panned.open && !panned.over &&
       (zoomed.held.top !== opened.held.top || zoomed.held.right !== opened.held.right) && (panned.held.top !== zoomed.held.top || panned.held.left !== zoomed.held.left), { opened, typed, zoomed, panned });
+    await guards.context.close();
+  });
+
+  // ---- X8. the double-click the standing line names, inside a waiting loop, opens the field and nothing else ---------
+  await record('X8', async () => {
+    const { page, guards } = await open(DESKTOP, APP, 'ux-loop');
+    await draw(page, box(450, 330, 80, 60));
+    await draw(page, box(600, 330, 80, 60));
+    const ring = Array.from({ length: 91 }, (_, i) => { const a = i / 90 * Math.PI * 2 * 1.04; return { x: 565 + 200 * Math.cos(a), y: 360 + 110 * Math.sin(a) }; });
+    await draw(page, ring);
+    await page.waitForTimeout(300);
+    const line = await page.evaluate(() => document.getElementById('status').textContent);
+    await page.mouse.dblclick(565, 430);
+    await page.waitForTimeout(500);
+    const got = await page.evaluate(() => {
+      const s = window.__mm.session.getState(), e = document.getElementById('textEditor'), a = document.activeElement;
+      return { summon: !!s.summon, editor: !!e && !e.hidden, focus: a ? (a.id || a.className || a.tagName) : null };
+    });
+    check(`X8. the line says “${(line.match(/double-click[^·]*/) || [''])[0].trim()}”, and that double-click opens the field on the loop — no text editor over it (${got.editor ? 'editor open' : 'no editor'}), the typing the field's (${got.focus})`,
+      /double-click inside the loop/.test(line) && got.summon && !got.editor && /filter/.test(String(got.focus)), { line, got });
     await guards.context.close();
   });
 

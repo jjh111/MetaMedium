@@ -4575,6 +4575,7 @@
 
   let lastTap = null; // the last tap on empty ground, for the double-tap
   const DOUBLE_TAP_MS = 400;
+  let loopTakenAt = 0; // when a double-tap inside a waiting loop took it up: the dblclick that follows is not 'type here'
 
   // How sure the rung must be that a short stroke is an arrow before its size stops making it a letter (UX-07).
   const ARROW_TIES_AT = 0.6;
@@ -4641,7 +4642,7 @@
       const inside = b && w.x >= b.minX && w.x <= b.maxX && w.y >= b.minY && w.y <= b.maxY;
       const again = lastTap && now - lastTap.t < DOUBLE_TAP_MS && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 24;
       lastTap = { x: e.clientX, y: e.clientY, t: now };
-      if (inside && again) { lastTap = null; session.summonHeld(now); render(session.getState()); return; }
+      if (inside && again) { lastTap = null; loopTakenAt = now; session.summonHeld(now); render(session.getState()); return; }
       if (inside) { render(session.getState()); return; }
     }
     lastTap = { x: e.clientX, y: e.clientY, t: now };
@@ -16275,7 +16276,8 @@
 // Provides: text as an element — typeText (a text artifact at a point), editText (a new version of one),
 //   beginTextEdit/commitTextEdit (the editor on the canvas, opened by a double-click on empty ground or
 //   from the panel), wordToText (a written word becomes a text artifact, on request), strikeOnText/foldIntoText/textNear (text folds back from ink).
-// Uses: core, view, artifacts (frames), render, palette (minimapRect, panelRect — a new text stands clear of them, UX-15).
+// Uses: core, view, artifacts (frames), render, palette (minimapRect, panelRect — a new text stands clear of them, UX-15),
+//   input (loopTakenAt, DOUBLE_TAP_MS — the double-click that took up a waiting loop does not also open the editor).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -16516,6 +16518,9 @@
   // Double-click on empty ground: type here. A double-click on ink is nothing —
   // a dot is drawn, not tapped, and a tap is the dead state.
   canvas.addEventListener('dblclick', (e) => {
+    // The double-click that took up a waiting loop opened the field: it is not also "type here" (the standing line
+    // says "double-click inside the loop", and the editor used to open over the field and take the typing).
+    if (Date.now() - loopTakenAt < DOUBLE_TAP_MS + 200) return;
     const w = screenToWorld(e.clientX, e.clientY);
     const under = nodeAt(w.x, w.y);
     // A double-click on a text — typed, or writing taken as text — edits it in place.

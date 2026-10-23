@@ -558,6 +558,7 @@
 
   let lastTap = null; // the last tap on empty ground, for the double-tap
   const DOUBLE_TAP_MS = 400;
+  let loopTakenAt = 0; // when a double-tap inside a waiting loop took it up: the dblclick that follows is not 'type here'
 
   // How sure the rung must be that a short stroke is an arrow before its size stops making it a letter (UX-07).
   const ARROW_TIES_AT = 0.6;
@@ -624,7 +625,7 @@
       const inside = b && w.x >= b.minX && w.x <= b.maxX && w.y >= b.minY && w.y <= b.maxY;
       const again = lastTap && now - lastTap.t < DOUBLE_TAP_MS && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 24;
       lastTap = { x: e.clientX, y: e.clientY, t: now };
-      if (inside && again) { lastTap = null; session.summonHeld(now); render(session.getState()); return; }
+      if (inside && again) { lastTap = null; loopTakenAt = now; session.summonHeld(now); render(session.getState()); return; }
       if (inside) { render(session.getState()); return; }
     }
     lastTap = { x: e.clientX, y: e.clientY, t: now };

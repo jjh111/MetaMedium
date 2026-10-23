@@ -2,7 +2,8 @@
 // Provides: text as an element — typeText (a text artifact at a point), editText (a new version of one),
 //   beginTextEdit/commitTextEdit (the editor on the canvas, opened by a double-click on empty ground or
 //   from the panel), wordToText (a written word becomes a text artifact, on request), strikeOnText/foldIntoText/textNear (text folds back from ink).
-// Uses: core, view, artifacts (frames), render, palette (minimapRect, panelRect — a new text stands clear of them, UX-15).
+// Uses: core, view, artifacts (frames), render, palette (minimapRect, panelRect — a new text stands clear of them, UX-15),
+//   input (loopTakenAt, DOUBLE_TAP_MS — the double-click that took up a waiting loop does not also open the editor).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -243,6 +244,9 @@
   // Double-click on empty ground: type here. A double-click on ink is nothing —
   // a dot is drawn, not tapped, and a tap is the dead state.
   canvas.addEventListener('dblclick', (e) => {
+    // The double-click that took up a waiting loop opened the field: it is not also "type here" (the standing line
+    // says "double-click inside the loop", and the editor used to open over the field and take the typing).
+    if (Date.now() - loopTakenAt < DOUBLE_TAP_MS + 200) return;
     const w = screenToWorld(e.clientX, e.clientY);
     const under = nodeAt(w.x, w.y);
     // A double-click on a text — typed, or writing taken as text — edits it in place.
