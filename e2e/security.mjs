@@ -52,8 +52,15 @@ const BUILD_AND_MERGE = `(() => {
     "tryIt('blob', function(){ URL.createObjectURL(new Blob([''])); });",
     "tryIt('fn', function(){ (new Function('return this'))().fetch('/exfil?c=fn'); });",
     "tryIt('proto', function(){ var p = Object.getPrototypeOf(self); while (p) { var v = p.indexedDB; if (v) throw 0; p = Object.getPrototypeOf(p); } });",
+    // import() is SYNTAX, not a global a denylist can seal — a module GET governed
+    // by script-src. The host frame's CSP names no network host in script-src, so
+    // it is refused and no /exfil request is ever seen (the robust fix for C6/C1).
+    "try { Promise.resolve(import('/exfil?c=import&data=SECRET')).catch(function(){}); } catch (e) {}",
     "if (reach.length) { try { fetch('/exfil?reach=' + reach.join(',')); } catch (e) {} }",
     'self.__reached = reach.join(",");',
+    // The force IS the count of capabilities reached, so a body that never moves
+    // proves NONE was reachable — the gate reads that force (C1.2), not only the
+    // fetch side-channel, which a sealed fetch would hide.
     'return { fx: reach.length, fy: 0 };',
   ].join('\\n');
   const jsId = hostile.import({ kind: 'js', path: 'fish.js', name: 'fish', bounds: { minX: 1000, minY: 100, maxX: 1120, maxY: 180 }, code: jsCode, at: at++ });
@@ -139,12 +146,20 @@ export async function runSecurity(browser, servers, { freshContext, screenshot }
           playedHereRun: window.__mm.playedHere(x.runId),
           author: window.__mm.clockAuthor(x.jsId),
           bodies: window.__mm.runtime().bodies.size,
-          reached: null,
+          // Whether the foreign run frame actually EXECUTED: its code calls
+          // mm.report, so a reported part proves it ran. Zero = it never ran.
+          reportedRun: window.__mm.reportedRegions(x.runId).length,
+          status: (document.getElementById('status') && document.getElementById('status').textContent) || '',
         };
       }, ids);
       check('C1.1. the log says another hand’s js and run are playing (a pure function of the log, on every board)', st.clockPlaying && st.runPlaying, st);
       check('C1.1. but this hand did not play them here, so they do not run — no worker body, consent denied', !st.playedHereJs && !st.playedHereRun && st.bodies === 0, st);
+      // The run side asserts EXECUTION, not the consent flag: the foreign run
+      // program would report a part if it ran, so no reported part is proof the
+      // opaque frame never executed its code (finding 4).
+      check('C1.1. another hand’s run program did not execute — it reported no part', st.reportedRun === 0, { reportedRun: st.reportedRun });
       check('C1.1. and the board says, in the person’s words, who it is playing for', st.author === 'eve', { author: st.author });
+      check('C1.1. the status line says the programs are standing by and how to run them', /play it here/.test(st.status), { status: st.status });
       check('C1.1. nothing was fetched while another hand’s program sat there unplayed', seen.length === 0, { seen });
     });
 
@@ -159,10 +174,15 @@ export async function runSecurity(browser, servers, { freshContext, screenshot }
       const st = await page.evaluate((x) => {
         const s = window.__mm.session.getState();
         const body = window.__mm.runtime().bodies.get(x.jsId);
-        return { playedHere: window.__mm.playedHere(x.jsId), ran: !!body, clock: s.clocks[x.jsId] };
+        // The behaviour returns a force equal to the number of capabilities it
+        // reached, so a body that never gained velocity proves it reached none —
+        // read directly from the force, not through the fetch side-channel a
+        // sealed fetch would hide (finding 3).
+        return { playedHere: window.__mm.playedHere(x.jsId), ran: !!body, clock: s.clocks[x.jsId], vx: body ? body.vx : null, x: body ? body.x : null };
       }, ids);
       check('C1.2. played here, the worker runs — consent is this hand’s deliberate act', st.playedHere && st.ran, st);
-      check('C1.2. and it reached NOTHING: no fetch, XHR, EventSource, indexedDB, caches, channel, nested worker or blob — the box’s private records never leave', seen.length === 0, { seen });
+      check('C1.2. the behaviour reached no capability — its force stayed zero, so the body never moved (read from the force, not the fetch channel)', st.ran && Math.abs(st.vx) < 1e-9 && Math.abs(st.x) < 1e-9, { vx: st.vx, x: st.x });
+      check('C1.2. and no network GET left the worker — fetch, XHR, EventSource and a dynamic import() beacon all refused — the box’s private records never leave', seen.length === 0, { seen });
     });
 
     // ---- C1.3. Undo per hand still stops it ----
@@ -195,6 +215,9 @@ export async function runSecurity(browser, servers, { freshContext, screenshot }
       const csp = await page.evaluate(() => {
         for (const f of document.querySelectorAll('iframe')) {
           const doc = f.getAttribute('srcdoc') || '';
+          // The behaviour worker's own host iframe carries connect-src 'none'
+          // too; this record is about the RUN frame, so skip the worker host.
+          if (/new Worker\(/.test(doc)) continue;
           const m = doc.match(/Content-Security-Policy"\s+content="([^"]*)"/);
           if (m && /connect-src 'none'/.test(m[1].replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"'))) return m[1];
         }
