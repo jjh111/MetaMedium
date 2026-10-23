@@ -21,7 +21,7 @@ import { spawnSync } from 'node:child_process';
 
 import {
   parseVersion, compareVersions, bumpVersion, releaseTagVersion, unitOf, groupByUnit,
-  changelogSection, insertSection, keyShapesIn, releaseState,
+  changelogSection, insertSection, keyShapesIn, releaseState, unseenRelease,
 } from './release.mjs';
 import { make } from './build-app.mjs';
 
@@ -272,6 +272,56 @@ test('it refuses a dirty tree, a version not greater than the last, and a key in
   assert.notDeepEqual(withKey.head, clean.head);
 });
 
+test('it refuses a clone that cannot see the last release — no tag v<VERSION>, one HEAD does not descend from, a shallow clone — and says what to run', () => {
+  // The tag gone: a repository made without its tags.
+  let r = smallRepo('0.1.0');
+  r.commit('R7: something to release');
+  git(r.dir, 'tag', '-d', 'v0.1.0');
+  let before = r.state();
+  let out = release(r.dir, '0.2.0', '--dry-run');
+  assert.equal(out.status, 1, 'a dry run with no tag for VERSION passed');
+  assert.match(out.stderr, /VERSION says 0\.1\.0 was released, but this clone holds no tag v0\.1\.0 — [^\n]*run git fetch --tags and try again/);
+  assert.ok(!/--unshallow/.test(out.stderr), 'a whole clone is not told to unshallow — git refuses that');
+  out = release(r.dir, '0.2.0');
+  assert.equal(out.status, 1, 'the real run went ahead with no tag for VERSION');
+  assert.match(out.stderr, /no tag v0\.1\.0/);
+  assert.deepEqual(r.state(), before, 'the refusal left something behind');
+  assert.equal(readFileSync(join(r.dir, 'VERSION'), 'utf8'), '0.1.0\n');
+  // The tag on a line HEAD does not descend from.
+  git(r.dir, 'checkout', '-q', '-b', 'side', 'HEAD~1');
+  writeFileSync(join(r.dir, 'side.txt'), 'side\n');
+  git(r.dir, 'add', 'side.txt');
+  git(r.dir, 'commit', '-q', '-m', 'a side line');
+  git(r.dir, 'tag', '-a', 'v0.1.0', '-m', 'dyna.ink 0.1.0');
+  git(r.dir, 'checkout', '-q', 'master');
+  assert.match(unseenRelease(r.dir, '0.1.0'), /the tag v0\.1\.0 is here but HEAD does not descend from it/);
+  assert.equal(release(r.dir, '0.2.0', '--dry-run').status, 1);
+
+  // A shallow clone, as CI checks out: the advice is the command that mends it.
+  r = smallRepo('0.1.0');
+  r.commit('R7: one');
+  r.commit('R7: two');
+  const shallow = tmp('shallow');
+  const c = spawnSync('git', ['clone', '--quiet', '--depth', '1', '--no-tags', 'file://' + r.dir, shallow], { env: ENV, encoding: 'utf8' });
+  assert.equal(c.status, 0, c.stderr);
+  out = release(shallow, '0.2.0', '--dry-run');
+  assert.equal(out.status, 1, 'a shallow clone with no tags passed');
+  assert.match(out.stderr, /holds no tag v0\.1\.0 and is shallow — [^\n]*run git fetch --tags --unshallow and try again/);
+  git(shallow, 'fetch', '-q', '--tags', '--unshallow');
+  out = release(shallow, '0.2.0', '--dry-run');
+  assert.equal(out.status, 0, 'after the fetch it advised, still refused: ' + out.stderr);
+  assert.match(out.stdout, /Since v0\.1\.0: 2 commits/, 'the section starts at the last release');
+
+  // Nothing released yet: VERSION 0.0.0 needs no tag.
+  r = smallRepo('0.0.0');
+  git(r.dir, 'tag', '-d', 'v0.0.0');
+  r.commit('R7: the first');
+  assert.equal(unseenRelease(r.dir, '0.0.0'), null);
+  out = release(r.dir, '0.1.0', '--dry-run');
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(out.stdout, /From the beginning: 2 commits/);
+});
+
 test('--since says where the section starts', () => {
   const r = smallRepo('0.1.0');
   r.commit('R7: one');
@@ -287,12 +337,23 @@ test('--since says where the section starts', () => {
 
 test('a dry run on a scratch clone of this repository prints the release and changes nothing', () => {
   const dir = tmp('clone');
-  const c = spawnSync('git', ['clone', '--quiet', '--no-hardlinks', root, dir], { env: ENV, encoding: 'utf8' });
+  // By file://, through git's transport: a clone by path of a shallow repository's worktree is not marked shallow, and its log fails.
+  const c = spawnSync('git', ['clone', '--quiet', '--no-hardlinks', 'file://' + root, dir], { env: ENV, encoding: 'utf8' });
   assert.equal(c.status, 0, c.stderr);
   const state = releaseState(dir);
   const next = bumpVersion(state.last.version, 'minor');
   const snap = () => ({ status: git(dir, 'status', '--porcelain'), head: git(dir, 'rev-parse', 'HEAD'), tags: git(dir, 'tag', '-l') });
   const before = snap();
+  // A clone of a checkout that is shallow or tagless — CI's is both — cannot see the release VERSION names,
+  // and the dry run says so and what to run. Given the tag (at HEAD, here: nothing else is in this clone), it goes on.
+  if (unseenRelease(dir, state.version)) {
+    const refused = release(dir, next, '--dry-run');
+    assert.equal(refused.status, 1, 'a clone that cannot see the last release passed');
+    assert.match(refused.stderr, new RegExp(`VERSION says ${state.version.replace(/\./g, '\\.')} was released, but [^\\n]*run git fetch --tags`));
+    assert.deepEqual(snap(), before, 'the refused dry run changed the clone');
+    git(dir, 'tag', '-a', `v${state.version}`, '-m', `as released (the test's own tag)`);
+    before.tags = git(dir, 'tag', '-l');
+  }
   const out = release(dir, next, '--dry-run');
   assert.equal(out.status, 0, out.stderr + out.stdout);
   assert.match(out.stdout, /dry run/);

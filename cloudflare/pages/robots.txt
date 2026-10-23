@@ -1,0 +1,8 @@
+# dyna.ink — what a search engine may read. cloudflare/build-site.mjs puts this at the site's root.
+# The whitepaper, the app and the demos are for reading. An address with a query on the app is a
+# board, a room or a replay — and a room's address carries its key — so it is nobody's to index.
+User-agent: *
+Allow: /
+Disallow: /app/?
+Disallow: /Demos/session-engine?
+Disallow: /Demos/session-engine.html?

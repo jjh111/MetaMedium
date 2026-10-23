@@ -81,5 +81,23 @@ self.addEventListener('fetch', (e) => {
     }
     return res;
     // Only this worker's own cache answers: the origin's others may hold another release's copy of the same file.
-  }).catch(() => caches.open(CACHE).then((c) => c.match(key, { ignoreSearch: true })).then((hit) => hit || Response.error())));
+  }).catch(() => caches.open(CACHE).then((c) => kept(c, key, req, url)).then((hit) => (hit ? asPage(hit, req) : Response.error()))));
 });
+
+// What this worker's cache holds for a request. A page asked for without its .html — the address Cloudflare
+// Pages leaves a person on, since it sends session-engine.html on to session-engine with a 308 — is the page
+// kept as session-engine.html when nothing is kept under its own address: the install keeps the shell under its
+// file's name, and after one visit the address the browser shows, reloads and restores is the other one.
+function kept(c, key, req, url) {
+  return c.match(key, { ignoreSearch: true }).then((hit) => {
+    if (hit || req.mode !== 'navigate' || /\/$|\.[A-Za-z0-9]+$/.test(url.pathname)) return hit;
+    return c.match(key + '.html', { ignoreSearch: true });
+  });
+}
+
+// Cloudflare Pages sends session-engine.html on to session-engine with a 308, so the page kept on install was
+// fetched through a redirect — and a browser refuses a redirected response for a navigation, so with no network
+// the old address (and its manifest's start_url) would not open. Answered as the same page, its headers kept.
+function asPage(res, req) {
+  return res.redirected && req.mode === 'navigate' ? new Response(res.body, { status: res.status, statusText: res.statusText, headers: res.headers }) : res;
+}

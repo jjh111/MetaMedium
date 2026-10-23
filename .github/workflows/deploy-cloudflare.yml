@@ -1,8 +1,20 @@
 name: Deploy to Cloudflare
 
 # dyna.ink: the site (Cloudflare Pages) and the room relay (a Worker with a Durable Object).
-# cloudflare/README.md is what John sets up once; this does the rest on every push to master.
+# cloudflare/README.md is what John sets up once; this does the rest.
 # GitHub Pages keeps publishing as before — this is a second home, not a move.
+#
+# When: after CI has passed on a push to master — never on a push alone, so a change that breaks
+# the engine, the bundles, the browser gate or WebKit is never deployed — and it deploys the very
+# commit CI passed (the run's head_sha, not whatever master is by then). Or by hand, from master
+# (Actions → Deploy to Cloudflare → Run workflow). A CI run that failed or was cancelled, a CI run
+# for a pull request, and a branch called master in someone's fork deploy nothing.
+#
+# And only while that commit is still master's tip. CI runs finish in any order — the browser gate
+# takes minutes, and a failed run can be re-run days later — and the concurrency group below only
+# queues deploys in the order they arrive, so an older commit's CI finishing last would put dyna.ink
+# back on it. A commit master has moved past is not deployed (the run says so and stays green): the
+# tip's own CI deploys the tip. A deploy by hand takes master as it stands, and needs no check.
 #
 # Secrets: CLOUDFLARE_API_TOKEN (Pages: Edit, Workers Scripts: Edit) and CLOUDFLARE_ACCOUNT_ID.
 # With either absent — a fork, a repository not yet set up — every deploy step is skipped and
@@ -10,9 +22,14 @@ name: Deploy to Cloudflare
 # And, optional, MM_RELAY_SECRET: put on the Worker after each deploy when it is set (from stdin,
 # never on a command line or in a log); with none, the Worker keeps the secret it has. The Pages
 # project is made the first time, so the whole setup can be done from a browser.
+#
+# Wrangler is the relay's lockfile's (cloudflare/relay/package-lock.json), for the site and the
+# Worker alike: one version, pinned, and no action that installs another.
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [master]
   workflow_dispatch:
 
@@ -26,27 +43,46 @@ permissions:
 jobs:
   site:
     name: dyna.ink — the site (Pages)
-    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # The commit CI passed (workflow_run), or master as it stands (by hand).
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
-      - name: Is there a Cloudflare account to deploy to?
+      - name: Is there a Cloudflare account to deploy to, and is this commit still master's tip?
         id: have
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
         run: |
-          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "yes=true" >> "$GITHUB_OUTPUT"; else echo "yes=false" >> "$GITHUB_OUTPUT"; echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set — nothing to deploy, which is fine."; fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "yes=false" >> "$GITHUB_OUTPUT"; echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set — nothing to deploy, which is fine."; exit 0; fi
+          if [ "$EVENT" = "workflow_run" ]; then
+            tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/master" --jq .sha) || { echo "Could not read which commit master is at now, so nothing was deployed."; exit 1; }
+            if [ "$tip" != "$DEPLOY_SHA" ]; then echo "yes=false" >> "$GITHUB_OUTPUT"; echo "master has moved on to $tip since CI passed $DEPLOY_SHA — nothing deployed: $tip is deployed by its own CI, so dyna.ink never goes back to an older commit."; exit 0; fi
+          fi
+          echo "yes=true" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         if: steps.have.outputs.yes == 'true'
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
       - uses: actions/setup-node@v4
         if: steps.have.outputs.yes == 'true'
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: cloudflare/relay/package-lock.json
       - name: The site's own checks
         if: steps.have.outputs.yes == 'true'
         run: node --test cloudflare/site.test.mjs
-      - name: Build the site
+      - name: Build the site, naming the commit in the app's pages
         if: steps.have.outputs.yes == 'true'
-        run: node cloudflare/build-site.mjs
+        run: node cloudflare/build-site.mjs --commit "$DEPLOY_SHA"
       - name: Wrangler, from the relay's lockfile
         if: steps.have.outputs.yes == 'true'
         working-directory: cloudflare/relay
@@ -58,25 +94,39 @@ jobs:
           if "$W" pages project list | grep -qw dyna-ink; then echo "the Pages project dyna-ink is there"; else "$W" pages project create dyna-ink --production-branch=master; fi
       - name: Deploy to Pages
         if: steps.have.outputs.yes == 'true'
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy cloudflare/dist --project-name=dyna-ink --branch=master --commit-dirty=true
+        run: |
+          W=cloudflare/relay/node_modules/.bin/wrangler
+          "$W" pages deploy cloudflare/dist --project-name=dyna-ink --branch=master --commit-hash="$DEPLOY_SHA" --commit-dirty=true
 
   relay:
     name: dyna.ink — the room relay (Worker)
-    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
-      - name: Is there a Cloudflare account to deploy to?
+      - name: Is there a Cloudflare account to deploy to, and is this commit still master's tip?
         id: have
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
         run: |
-          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "yes=true" >> "$GITHUB_OUTPUT"; else echo "yes=false" >> "$GITHUB_OUTPUT"; echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set — nothing to deploy, which is fine."; fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "yes=false" >> "$GITHUB_OUTPUT"; echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set — nothing to deploy, which is fine."; exit 0; fi
+          if [ "$EVENT" = "workflow_run" ]; then
+            tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/master" --jq .sha) || { echo "Could not read which commit master is at now, so nothing was deployed."; exit 1; }
+            if [ "$tip" != "$DEPLOY_SHA" ]; then echo "yes=false" >> "$GITHUB_OUTPUT"; echo "master has moved on to $tip since CI passed $DEPLOY_SHA — nothing deployed: $tip is deployed by its own CI, so dyna.ink never goes back to an older commit."; exit 0; fi
+          fi
+          echo "yes=true" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         if: steps.have.outputs.yes == 'true'
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
       - uses: actions/setup-node@v4
         if: steps.have.outputs.yes == 'true'
         with:
@@ -91,12 +141,8 @@ jobs:
           npm test
       - name: Deploy the Worker
         if: steps.have.outputs.yes == 'true'
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: cloudflare/relay
-          command: deploy
+        working-directory: cloudflare/relay
+        run: npx wrangler deploy
       - name: The relay's secret, from MM_RELAY_SECRET when it is set
         if: steps.have.outputs.yes == 'true'
         working-directory: cloudflare/relay

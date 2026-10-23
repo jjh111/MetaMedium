@@ -14,7 +14,7 @@ exits nonzero if anything in it failed.
 
 ```bash
 cd e2e && npm ci && npx playwright install chromium   # once
-node run.mjs            # from anywhere: the default fourteen (canvas, keep, boards, carry, app, pencil, models, seat, hand, walk, budgets, shard, demo, demo2)
+node run.mjs            # from anywhere: the default fifteen (canvas, keep, boards, carry, app, prod, pencil, models, seat, hand, walk, budgets, shard, demo, demo2)
 cd e2e && npm run e2e   # the same thing
 
 npx playwright install webkit                   # once, for WebKit
@@ -40,6 +40,7 @@ guessing. Pick scenarios by name to run one: `node e2e/run.mjs canvas`,
 | `carry` | carry your boards to the new home (RENAME-PLAN N1) — `carry.mjs`, written here: two static servers of its own beside the gate's make three origins, the old address (A), dyna.ink (B) and a stranger (C) | `app/?nosw=1&carryTo=<B>` on A, the window it opens on B, a page on C, and a second context for the file |
 | `big` | a 2,000-mark board saved and opened again (opt-in, minutes) | the same page, with the board from `core/bench/board.mjs` |
 | `app` | one app address — `app.mjs`, written here: `/app/` installs, opens with the server gone, and is versioned per release | `app/` over the static server, then a server of its own it can take away, then a copy of the site it releases again |
+| `prod` | the app as production serves it — `prod.mjs`, written here: the site Cloudflare Pages publishes (`cloudflare/build-site.mjs`) built into a folder of its own and served as Pages serves it (`pages.mjs`: `_headers` applied by the site test's own reader, the `.html` taken off with a 308, `_redirects`, the 404 page — checked against `wrangler pages dev`), a policy violation listened for in every frame of every page; the app, an example, a program that calls `new Function`, a behaviour in its blob worker, the whitepaper and its embeds, the old address, both addresses offline — and a control that serves the same build with `'unsafe-eval'` taken out and must be caught | `app/?fresh=1` on the built site, then the whitepaper and the old address in the same context, the server taken away; a second server and context for the control |
 | `pencil` | pencil and tablet — `pencil.mjs`, written here: the pen and fingers synthesised in the page as iPadOS delivers them, and the keyboard as it tells the page | `Demos/session-engine.html?nosw=1` at 1180 × 820, in one context, reloaded once |
 | `models` | a hosted model is asked, and says why when it cannot be (V1-PLAN J5) — `models.mjs`, written here: the models pane and the field driven with the real pointer against `startModelStub` (`servers.mjs`), an OpenAI-compatible endpoint on 127.0.0.1 answering in OpenRouter's recorded shapes (`core/src/llm/fixtures/`); nothing on this machine is probed — Ollama's list is a stand-in in the page, LM Studio does not answer | `app/`, in one context, reloaded once |
 | `seat` | the canvas's seat — `seat.mjs`, written here: Claude Code over MCP as the model the field asks, with a relay of its own, `Demos/mcp.mjs` as the answerer over stdio and `Demos/seat-watch.mjs` beside it | `Demos/session-engine.html?live=claude&relay=…&nosw=1`, in one context, reloaded once, and a second page for *with Claude* |
@@ -48,8 +49,8 @@ guessing. Pick scenarios by name to run one: `node e2e/run.mjs canvas`,
 
 `--browser chromium` (the default) or `--browser webkit` picks the engine, and
 the run's `e2e.json` records which as `browser` / `browserVersion`. `smoke` is
-**opt-in**: a bare `node run.mjs` runs the fourteen Chromium scenarios (`canvas`,
-`keep`, `boards`, `carry`, `app`, `pencil`, `models`, `seat`, `hand`, `walk`, `budgets`, `shard`, `demo`, `demo2`) and
+**opt-in**: a bare `node run.mjs` runs the fifteen Chromium scenarios (`canvas`,
+`keep`, `boards`, `carry`, `app`, `prod`, `pencil`, `models`, `seat`, `hand`, `walk`, `budgets`, `shard`, `demo`, `demo2`) and
 nothing else, so the default gate needs no second engine installed. CI's
 `webkit` job runs `smoke`, `pencil`, `keep` and `carry` on WebKit.
 
