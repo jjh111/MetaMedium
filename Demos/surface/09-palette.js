@@ -12,7 +12,7 @@
 //   prompts (runPrompt → a page or a program, runAsk, runDraw); the library (libraryEntries/reuseEntry/
 //   applyLibrary, targetOf); renderSummon/refreshPalette/paintField.
 // Uses: core (hand, lastPen), ui, field (readFieldCommand, verbFor, libraryMatch, typedWord — pure,
-//   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading,
+//   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading, keepFromHouse,
 //   askModelsAbout, offerModel), seatpane (writers, readers, deciderHost, briefDeciderHost, askDecider, askDeciderNotation, askDeciderBrief — who is asked, by seat), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
 //   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
 //   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
@@ -1445,7 +1445,8 @@
           if (res.ok) {
             const short = res.unfilled && res.unfilled.length ? ' — left ' + res.unfilled.join(', ') + ' empty' : '';
             say(modelWords(agent) + ' ' + (res.revised ? 'changed' : 'built') + ' ' + (res.revised ? (res.changed || res.filled) : res.filled).join(', ') + short);
-          } else {
+          } else if (!keepFromHouse(agent, res.error, { what: 'the page’s words', needs: 'model', need: 'needs a model', ids: [artifactId], run: (live) => { if (live.length) writePage(artifactId, brief, revising, addressed, fallbackIds); } })) {
+            // (dyna.ink's own could not write them just now: kept, above, for a model of the person's — the boxes stand meanwhile.)
             say(modelWords(agent) + ' could not build (' + res.error + ') — the drawing is untouched');
             // A model that answered unusably is a thing you need to SEE to fix.
             if (res.raw) window.__mm.lastRaw = res.raw;
@@ -1516,7 +1517,7 @@
     writers().forEach((agent) => {
       withWork('ask:' + agentKey(agent), ids, modelWords(agent) + ' · answering', agent.ask(q, ids, Date.now())).then((res) => {
         noteOutcome(agent, res.ok, res.ok ? 'answered beside the marks' : res.error);
-        if (!res.ok) say(modelWords(agent) + ' could not answer (' + res.error + ')');
+        if (!res.ok && !keepFromHouse(agent, res.error, { what: 'An answer', needs: 'model', need: 'needs a model', ids: ids, run: (live) => runAsk({ enclosedIds: live }, q) })) say(modelWords(agent) + ' could not answer (' + res.error + ')');
         render(session.getState());
       });
     });

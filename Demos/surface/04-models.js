@@ -3,13 +3,16 @@
 //   and what the canvas does with no model (the tools registry's own, renderTools);
 //   the work-in-progress register (withWork); askModelsAbout/cancelReading — a model is asked only by a deliberate act;
 //   (V1-PLAN J5) what a provider says a model can do (factsOf), each model's last call and try it (noteOutcome),
-//   an ask kept until a model that can answer it is here (keepAsk, keptFor, needFor), one local model suggested a job,
+//   an ask kept until a model that can answer it is here (keepAsk, keptFor, needFor) — and one dyna.ink's own could not answer
+//   just now, kept for a model of the person's (keepFromHouse) — one local model suggested a job,
 //   and a model's name and a reading in words (modelWords, readingWords);
 //   (V1-PLAN I7) who is asked, by seat — writers() here, readers() in 06-handwriting.js, the rules in 03-seats.js, the pane,
 //   the keys and the decider in 04-seatpane.js; recordingTransport, a decision transport whose calls are kept for the
-//   decider's row (dyna.ink's own decider's).
+//   decider's row (dyna.ink's own decider's); and the pane's lead when dyna.ink's own writer or reader is asked
+//   (renderHouseLead: "Using dyna.ink's own models — no key needed", what is sent where, and *more* — the rest of the
+//   pane — under it), and looking for models on this machine only when asked on a public origin (UX-DEP-1).
 // Uses: core, ui, teach (togglePanel), render, palette (refreshPalette), input (say), seats (03-seats.js: the rules),
-//   seatpane (04-seatpane.js: assignSeat, joinDecider, keyFor, holdKey, commitKey, renderSeats, seatsOf).
+//   seatpane (04-seatpane.js: assignSeat, joinDecider, keyFor, holdKey, commitKey, renderSeats, seatsOf, isHouse, seatHouse).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -38,6 +41,17 @@
   const mpStatus = document.getElementById('mpStatus');
   const mpList = document.getElementById('mpList');
   const mpLocal = document.getElementById('mpLocal');
+  /**
+   * Whether the pane looks for models on this machine as it opens (03-seats.js, probesOnOpen): on a page served from this
+   * machine, yes, as ever; on a public origin only when the person taps *Find models on this machine* — on a phone nothing
+   * answers there, and every look was three failed requests (UX-DEP-1).
+   */
+  const PROBE_ON_OPEN = probesOnOpen(location.hostname);
+  if (!PROBE_ON_OPEN) {
+    const detect = document.getElementById('mpDetect');
+    if (detect) { detect.textContent = 'Find models on this machine'; detect.title = 'look for Ollama (:11434) and LM Studio (:1234) running on this computer — nothing is looked for until you tap'; }
+    mpLocal.innerHTML = '<div class="note">Ollama or LM Studio running on this computer can join — tap Find models on this machine to look.</div>';
+  }
 
   const DEFAULT_MODEL = { openRouter: 'anthropic/claude-opus-5', anthropic: 'claude-opus-5', custom: '' };
   const agents = [];       // AgentParticipant[] — several models can coexist
@@ -222,11 +236,25 @@
   }
   /** The ask kept for this field, if one waits there. */
   function keptFor(summon) { return keptAsk && summon && keptAsk.summonId === summon.id ? keptAsk : null; }
+  /** A house model's failure that is the house's, not the ask's: refused for now (429 — the day spent, too many asks), the relay failing or out of reach, too slow. */
+  const HOUSE_CANNOT = /^(HTTP (429|5\d\d)\b|could not reach |timed out)/;
+  /**
+   * dyna.ink's own could not answer an ask just now (the day's budget spent, too many asks, the relay down): the ask
+   * is not lost — it is kept, as one asked with no model here is (J5), said once, and runs when a model of the
+   * person's joins (never the house again: `notHouse`). Returns whether it was kept; else the caller says the failure.
+   */
+  function keepFromHouse(agent, error, ask) {
+    if (!isHouse(agent) || !error || error === 'cancelled' || !HOUSE_CANNOT.test(error)) return false;
+    keepAsk(Object.assign({}, ask, { notHouse: true, sentence: modelWords(agent) + ' could not answer — ' + error + ' — kept: it runs when a model of yours joins' }));
+    return true;
+  }
   /** A model joined (or learned it can see): the kept ask runs if it can answer it. */
   function runKeptAsk(agent) {
     if (!keptAsk || !agent) return false;
     // A model joined (or learned it can see): the ask runs if some seat now can answer it — the reader for a read, the writer for the rest (I7).
     if (keptAsk.needs === 'sees' ? !readers().length : !writers().length) return false;
+    // Kept because dyna.ink's own could not answer it: it runs for a model of the person's, never the house again.
+    if (keptAsk.notHouse && (keptAsk.needs === 'sees' ? readers() : writers()).every(isHouse)) return false;
     const ask = keptAsk;
     keptAsk = null;
     const s = session.getState();
@@ -465,8 +493,10 @@
     if (i >= 0) agents.splice(i, 1);
     factsOf.delete(agentKey(agent)); lastCall.delete(agentKey(agent)); asking.delete(agentKey(agent)); sendOf.delete(agentKey(agent));
     // The session keeps the join in its history; it simply stops being asked. Its seats are let go, and a key no joined model
-    // on its provider still uses is forgotten, as it was.
+    // on its provider still uses is forgotten, as it was — and dyna.ink's own takes a seat left empty again, where the house
+    // answered and the hand did not let it go (04-seatpane.js).
     forgetSeats(agent);
+    seatHouse();
     mpStatus.textContent = modelWords(agent) + ' left.';
     renderAgents();
     renderLocal();
@@ -489,7 +519,9 @@
   // Each joined model, in words (J5): what it is, where, whether it sees and how much it reads — the tooltip says
   // what its provider said, or why that is a guess — its last call, kept until the next, and *try it*.
   function renderAgents() {
+    // dyna.ink's own writer and reader are not the hand's joined models: their rows are the seats', and the pane's lead.
     mpList.innerHTML = agents.map((a, i) => {
+      if (isHouse(a)) return '';
       const f = factsOf.get(agentKey(a));
       const tags = [a.config.kind === 'mcp' ? 'mcp' : MM.providerLocality(a.config)];
       if (isModel(a)) tags.push(a.config.vision ? 'sees' : 'text only');
@@ -507,6 +539,36 @@
     mpList.querySelectorAll('[data-leave]').forEach((b) => { b.onclick = () => leave(agents[Number(b.dataset.leave)]); });
     mpList.querySelectorAll('[data-try]').forEach((b) => { b.onclick = () => tryModel(agents[Number(b.dataset.try)]); });
     renderSeats();
+    renderHouseLead();
+  }
+
+  // ===== The pane's lead: dyna.ink's own models (the audit's UX-04) ==========
+  // When dyna.ink's own writer or reader is the one asked, the pane leads with what the person has — no key needed —
+  // and what is sent where, in one line; everything else (Claude Code, the seats, models on this machine, the key form,
+  // the joined models, what the canvas does with no model) stands under *more*, open on a tap. With none of the house
+  // asked, there is no lead and the pane is as it was.
+  const houseLeadEl = document.createElement('div');
+  houseLeadEl.id = 'mpHouse';
+  houseLeadEl.className = 'mpHouse';
+  houseLeadEl.hidden = true;
+  (function placeLead() {
+    const head = panel.querySelector(':scope > .paneHead');
+    panel.insertBefore(houseLeadEl, head ? head.nextSibling : panel.firstChild);
+  })();
+  let moreOpen = false;
+  function renderHouseLead() {
+    const asked = writers().some(isHouse) || readers().some(isHouse);
+    houseLeadEl.hidden = !asked;
+    panel.classList.toggle('houseLed', asked);
+    panel.classList.toggle('moreOpen', asked && moreOpen);
+    if (!asked) return;
+    const lead = houseLead();
+    const jobs = [writers().some(isHouse) ? 'writes' : '', readers().some(isHouse) ? 'reads handwriting' : ''].filter(Boolean).join(' and ');
+    houseLeadEl.innerHTML = '<div class="mpHouseHead">' + esc(lead.head) + '</div>' +
+      '<div class="note">' + esc(lead.line) + '</div>' +
+      '<div class="note mpHouseJobs">' + esc('It ' + jobs + ' for you, asked only when you ask — What is this?, Read the writing, a brief.') + '</div>' +
+      '<button type="button" class="ghost mpMore" aria-expanded="' + (moreOpen ? 'true' : 'false') + '">' + esc(lead.more) + (moreOpen ? ' ▴' : ' ▾') + '</button>';
+    houseLeadEl.querySelector('.mpMore').onclick = () => { moreOpen = !moreOpen; renderHouseLead(); };
   }
 
   // *Try it* (J5): one tiny prompt, a deliberate act, and the reply — or the failure, in full — in the row.
@@ -700,7 +762,7 @@
   }
   modelBtn.onclick = () => {
     togglePanel(panel, modelBtn);
-    if (!panel.hasAttribute('hidden')) probeLocal();
+    if (!panel.hasAttribute('hidden') && PROBE_ON_OPEN) probeLocal();
   };
   document.getElementById('mpClose').onclick = () => closePanel(panel, modelBtn);
 
@@ -765,7 +827,7 @@
 
   function offerModel(why) {
     if (panel.hasAttribute('hidden')) openPane(panel, modelBtn);
-    probeLocal();
+    if (PROBE_ON_OPEN) probeLocal();
     mpStatus.textContent = why || 'That needs a model.';
   }
 
@@ -809,6 +871,7 @@
         // The row keeps what it came to; the status line says it once — a reading in words, a failure in full (J5).
         const words = res.ok ? res.readings.map((r) => readingWords(r.label)).join(', ') : '';
         noteOutcome(agent, res.ok, res.ok ? 'reads it as ' + words : res.error);
+        if (!res.ok && keepFromHouse(agent, res.error, { what: 'What is this?', needs: 'model', need: 'needs a model', ids: ids.slice(), run: (live) => askModelsAbout(live) })) { refreshPalette(); return; }
         say(res.ok
           ? modelWords(agent) + ' reads it as ' + words
           : modelWords(agent) + ' could not read it — ' + res.error);

@@ -1679,13 +1679,16 @@
 //   and what the canvas does with no model (the tools registry's own, renderTools);
 //   the work-in-progress register (withWork); askModelsAbout/cancelReading — a model is asked only by a deliberate act;
 //   (V1-PLAN J5) what a provider says a model can do (factsOf), each model's last call and try it (noteOutcome),
-//   an ask kept until a model that can answer it is here (keepAsk, keptFor, needFor), one local model suggested a job,
+//   an ask kept until a model that can answer it is here (keepAsk, keptFor, needFor) — and one dyna.ink's own could not answer
+//   just now, kept for a model of the person's (keepFromHouse) — one local model suggested a job,
 //   and a model's name and a reading in words (modelWords, readingWords);
 //   (V1-PLAN I7) who is asked, by seat — writers() here, readers() in 06-handwriting.js, the rules in 03-seats.js, the pane,
 //   the keys and the decider in 04-seatpane.js; recordingTransport, a decision transport whose calls are kept for the
-//   decider's row (dyna.ink's own decider's).
+//   decider's row (dyna.ink's own decider's); and the pane's lead when dyna.ink's own writer or reader is asked
+//   (renderHouseLead: "Using dyna.ink's own models — no key needed", what is sent where, and *more* — the rest of the
+//   pane — under it), and looking for models on this machine only when asked on a public origin (UX-DEP-1).
 // Uses: core, ui, teach (togglePanel), render, palette (refreshPalette), input (say), seats (03-seats.js: the rules),
-//   seatpane (04-seatpane.js: assignSeat, joinDecider, keyFor, holdKey, commitKey, renderSeats, seatsOf).
+//   seatpane (04-seatpane.js: assignSeat, joinDecider, keyFor, holdKey, commitKey, renderSeats, seatsOf, isHouse, seatHouse).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -1714,6 +1717,17 @@
   const mpStatus = document.getElementById('mpStatus');
   const mpList = document.getElementById('mpList');
   const mpLocal = document.getElementById('mpLocal');
+  /**
+   * Whether the pane looks for models on this machine as it opens (03-seats.js, probesOnOpen): on a page served from this
+   * machine, yes, as ever; on a public origin only when the person taps *Find models on this machine* — on a phone nothing
+   * answers there, and every look was three failed requests (UX-DEP-1).
+   */
+  const PROBE_ON_OPEN = probesOnOpen(location.hostname);
+  if (!PROBE_ON_OPEN) {
+    const detect = document.getElementById('mpDetect');
+    if (detect) { detect.textContent = 'Find models on this machine'; detect.title = 'look for Ollama (:11434) and LM Studio (:1234) running on this computer — nothing is looked for until you tap'; }
+    mpLocal.innerHTML = '<div class="note">Ollama or LM Studio running on this computer can join — tap Find models on this machine to look.</div>';
+  }
 
   const DEFAULT_MODEL = { openRouter: 'anthropic/claude-opus-5', anthropic: 'claude-opus-5', custom: '' };
   const agents = [];       // AgentParticipant[] — several models can coexist
@@ -1898,11 +1912,25 @@
   }
   /** The ask kept for this field, if one waits there. */
   function keptFor(summon) { return keptAsk && summon && keptAsk.summonId === summon.id ? keptAsk : null; }
+  /** A house model's failure that is the house's, not the ask's: refused for now (429 — the day spent, too many asks), the relay failing or out of reach, too slow. */
+  const HOUSE_CANNOT = /^(HTTP (429|5\d\d)\b|could not reach |timed out)/;
+  /**
+   * dyna.ink's own could not answer an ask just now (the day's budget spent, too many asks, the relay down): the ask
+   * is not lost — it is kept, as one asked with no model here is (J5), said once, and runs when a model of the
+   * person's joins (never the house again: `notHouse`). Returns whether it was kept; else the caller says the failure.
+   */
+  function keepFromHouse(agent, error, ask) {
+    if (!isHouse(agent) || !error || error === 'cancelled' || !HOUSE_CANNOT.test(error)) return false;
+    keepAsk(Object.assign({}, ask, { notHouse: true, sentence: modelWords(agent) + ' could not answer — ' + error + ' — kept: it runs when a model of yours joins' }));
+    return true;
+  }
   /** A model joined (or learned it can see): the kept ask runs if it can answer it. */
   function runKeptAsk(agent) {
     if (!keptAsk || !agent) return false;
     // A model joined (or learned it can see): the ask runs if some seat now can answer it — the reader for a read, the writer for the rest (I7).
     if (keptAsk.needs === 'sees' ? !readers().length : !writers().length) return false;
+    // Kept because dyna.ink's own could not answer it: it runs for a model of the person's, never the house again.
+    if (keptAsk.notHouse && (keptAsk.needs === 'sees' ? readers() : writers()).every(isHouse)) return false;
     const ask = keptAsk;
     keptAsk = null;
     const s = session.getState();
@@ -2141,8 +2169,10 @@
     if (i >= 0) agents.splice(i, 1);
     factsOf.delete(agentKey(agent)); lastCall.delete(agentKey(agent)); asking.delete(agentKey(agent)); sendOf.delete(agentKey(agent));
     // The session keeps the join in its history; it simply stops being asked. Its seats are let go, and a key no joined model
-    // on its provider still uses is forgotten, as it was.
+    // on its provider still uses is forgotten, as it was — and dyna.ink's own takes a seat left empty again, where the house
+    // answered and the hand did not let it go (04-seatpane.js).
     forgetSeats(agent);
+    seatHouse();
     mpStatus.textContent = modelWords(agent) + ' left.';
     renderAgents();
     renderLocal();
@@ -2165,7 +2195,9 @@
   // Each joined model, in words (J5): what it is, where, whether it sees and how much it reads — the tooltip says
   // what its provider said, or why that is a guess — its last call, kept until the next, and *try it*.
   function renderAgents() {
+    // dyna.ink's own writer and reader are not the hand's joined models: their rows are the seats', and the pane's lead.
     mpList.innerHTML = agents.map((a, i) => {
+      if (isHouse(a)) return '';
       const f = factsOf.get(agentKey(a));
       const tags = [a.config.kind === 'mcp' ? 'mcp' : MM.providerLocality(a.config)];
       if (isModel(a)) tags.push(a.config.vision ? 'sees' : 'text only');
@@ -2183,6 +2215,36 @@
     mpList.querySelectorAll('[data-leave]').forEach((b) => { b.onclick = () => leave(agents[Number(b.dataset.leave)]); });
     mpList.querySelectorAll('[data-try]').forEach((b) => { b.onclick = () => tryModel(agents[Number(b.dataset.try)]); });
     renderSeats();
+    renderHouseLead();
+  }
+
+  // ===== The pane's lead: dyna.ink's own models (the audit's UX-04) ==========
+  // When dyna.ink's own writer or reader is the one asked, the pane leads with what the person has — no key needed —
+  // and what is sent where, in one line; everything else (Claude Code, the seats, models on this machine, the key form,
+  // the joined models, what the canvas does with no model) stands under *more*, open on a tap. With none of the house
+  // asked, there is no lead and the pane is as it was.
+  const houseLeadEl = document.createElement('div');
+  houseLeadEl.id = 'mpHouse';
+  houseLeadEl.className = 'mpHouse';
+  houseLeadEl.hidden = true;
+  (function placeLead() {
+    const head = panel.querySelector(':scope > .paneHead');
+    panel.insertBefore(houseLeadEl, head ? head.nextSibling : panel.firstChild);
+  })();
+  let moreOpen = false;
+  function renderHouseLead() {
+    const asked = writers().some(isHouse) || readers().some(isHouse);
+    houseLeadEl.hidden = !asked;
+    panel.classList.toggle('houseLed', asked);
+    panel.classList.toggle('moreOpen', asked && moreOpen);
+    if (!asked) return;
+    const lead = houseLead();
+    const jobs = [writers().some(isHouse) ? 'writes' : '', readers().some(isHouse) ? 'reads handwriting' : ''].filter(Boolean).join(' and ');
+    houseLeadEl.innerHTML = '<div class="mpHouseHead">' + esc(lead.head) + '</div>' +
+      '<div class="note">' + esc(lead.line) + '</div>' +
+      '<div class="note mpHouseJobs">' + esc('It ' + jobs + ' for you, asked only when you ask — What is this?, Read the writing, a brief.') + '</div>' +
+      '<button type="button" class="ghost mpMore" aria-expanded="' + (moreOpen ? 'true' : 'false') + '">' + esc(lead.more) + (moreOpen ? ' ▴' : ' ▾') + '</button>';
+    houseLeadEl.querySelector('.mpMore').onclick = () => { moreOpen = !moreOpen; renderHouseLead(); };
   }
 
   // *Try it* (J5): one tiny prompt, a deliberate act, and the reply — or the failure, in full — in the row.
@@ -2376,7 +2438,7 @@
   }
   modelBtn.onclick = () => {
     togglePanel(panel, modelBtn);
-    if (!panel.hasAttribute('hidden')) probeLocal();
+    if (!panel.hasAttribute('hidden') && PROBE_ON_OPEN) probeLocal();
   };
   document.getElementById('mpClose').onclick = () => closePanel(panel, modelBtn);
 
@@ -2441,7 +2503,7 @@
 
   function offerModel(why) {
     if (panel.hasAttribute('hidden')) openPane(panel, modelBtn);
-    probeLocal();
+    if (PROBE_ON_OPEN) probeLocal();
     mpStatus.textContent = why || 'That needs a model.';
   }
 
@@ -2485,6 +2547,7 @@
         // The row keeps what it came to; the status line says it once — a reading in words, a failure in full (J5).
         const words = res.ok ? res.readings.map((r) => readingWords(r.label)).join(', ') : '';
         noteOutcome(agent, res.ok, res.ok ? 'reads it as ' + words : res.error);
+        if (!res.ok && keepFromHouse(agent, res.error, { what: 'What is this?', needs: 'model', need: 'needs a model', ids: ids.slice(), run: (live) => askModelsAbout(live) })) { refreshPalette(); return; }
         say(res.ok
           ? modelWords(agent) + ' reads it as ' + words
           : modelWords(agent) + ' could not read it — ' + res.error);
@@ -2500,12 +2563,15 @@
 //   who is asked (writers; readers is 06-handwriting.js's, both by 03-seats.js's rules), one key a provider (keyFor,
 //   holdKey, commitKey), the decider (joinDecider, joinHouseDecider — dyna.ink's own, no key — seatHouseDecider at boot,
 //   askDecider for Which is it?, askDeciderNotation for Which diagram is this?, askDeciderBrief for what a brief makes,
-//   deciderHost, and briefDeciderHost — the decider a brief's Enter may ask: only one the hand chose), what a reload brings back
-//   (rejoinRemembered: the old pick and key become the writer seat, once), the pane's seats section (renderSeats; the
-//   form's For: forSeat) and seatsNow for tests. (The semantic seat's row is 03-semantic.js's; this pane only draws it.)
+//   deciderHost, and briefDeciderHost — the decider a brief's Enter may ask: only one the hand chose), dyna.ink's own writer
+//   and reader (the audit's UX-04: probeHouse — the one look at each house route's list, which calls no model, before
+//   anything of the house is seated — seatHouse, joinHouse, noHouse, houseBack, isHouse, houseAgents), what a reload brings
+//   back (rejoinRemembered: the old pick and key become the writer seat, once), the pane's seats section (renderSeats; the
+//   form's For: forSeat), the models tile's face (modelsFace) and seatsNow for tests. (The semantic seat's row is
+//   03-semantic.js's; this pane only draws it. The pane's lead and its *more* are 04-models.js's.)
 // Uses: core (MM, store, params), seats (03-seats.js — every rule), models (agents, join, joinHosted, factsFor, applyFacts,
 //   recording, recordingTransport, lastCall, noteOutcome, callLine, isModel, modelWords, withWork, workSignal, factsOf, tryModel, renderAgents,
-//   probeLocal, the pane's elements), input (say), render (render), palette (refreshPalette).
+//   probeLocal, sendOf, runKeptAsk, renderHouseLead, the pane's elements), core (EMBED), input (say), render (render), palette (refreshPalette).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -2526,6 +2592,18 @@
   let decider = null;                  // { config, seat: DecideSeat, pseudo: { id, config }, name, meta, transport, house?, model?, sees?, chosen }
   /** Where this page may ask dyna.ink's own decider (its relay's model route), or null (03-seats.js, houseDeciderFor). */
   const HOUSE = houseDeciderFor(location.hostname, params.get('decide'));
+  /** Where this page may ask dyna.ink's own writer and reader (its relay's chat route, OpenAI's shape), or null (houseAiFor). */
+  const HOUSE_CHAT = houseAiFor(location.hostname, params.get('ai'));
+  /**
+   * Whether each house route answered the page's one look at its list (`probeHouse`, which calls no model): nothing of
+   * the house is seated until it does, and nothing at all when it never does — the relay may not be there yet.
+   */
+  const houseUp = { decide: false, ai: false, catalog: null, asked: false };
+  /** dyna.ink's own writer and reader, once seated: the agent in each, or null. */
+  const houseAgents = { writer: null, reader: null };
+  const houseSeatOf = new Map();       // agent key → 'writer' | 'reader', for the house's own agents
+  /** Whether a joined model is dyna.ink's own writer or reader — the last resort of every rule (03-seats.js). */
+  function isHouse(a) { return !!a && houseSeatOf.has(agentKey(a)); }
   let pendingPicks = [];               // picks that wait for a key: { pick, seats }
 
   // ---- what an older device kept, and what this one keeps ----
@@ -2581,8 +2659,10 @@
   /** The joined models as the rules read them. */
   function seatModels() {
     return agents.map((a) => ({
-      id: agentKey(a), vision: !!(a.config && a.config.vision), seats: [...(seatsOfAgent.get(agentKey(a)) || [])], size: sizeOf(a),
+      id: agentKey(a), vision: !!(a.config && a.config.vision), size: sizeOf(a),
+      seats: isHouse(a) ? [houseSeatOf.get(agentKey(a))] : [...(seatsOfAgent.get(agentKey(a)) || [])],
       claude: isSeatAgent(a), local: !!a.config && a.config.kind !== 'mcp' && MM.providerLocality(a.config) === 'local',
+      house: isHouse(a),
     }));
   }
   const agentById = (key) => agents.find((a) => agentKey(a) === key) || null;
@@ -2626,7 +2706,8 @@
   function unseat(seat) {
     if (seat === 'decider') { leaveDecider(); return; }
     const a = holderOf(seat);
-    if (a) letGoOf(a, seat); else delete seatPicks[seat];
+    // dyna.ink's own let go (`none`) stays let go: choosing nothing of one's own is not asking for the house back.
+    if (a) letGoOf(a, seat); else if (!(seatPicks[seat] && seatPicks[seat].none)) delete seatPicks[seat];
     saveSeats();
     renderAgents();
     syncTiles();
@@ -2685,7 +2766,8 @@
    * chose); taken by the hand (not quiet), it is said, kept as the hand's choice, and chosen.
    */
   function joinHouseDecider(model, quiet, chosen) {
-    if (!HOUSE) return null;
+    // Only once the relay answered the page's look at the decider's list: before then, and when it never does, none.
+    if (!HOUSE || !houseUp.decide) return null;
     const m = HOUSE_MODELS[model] ? model : HOUSE_DECIDER_MODEL;
     if (decider && decider.house && decider.model === m) {
       // Seated silently, and now taken by the hand: the same seat, chosen — kept, and said.
@@ -2724,7 +2806,7 @@
     leaveDecider(true);
     seatPicks.decider = { none: true };
     saveSeats();
-    mpStatus.textContent = 'No decider — ' + fallbackWords('decider', { house: !!HOUSE }) + '.';
+    mpStatus.textContent = 'No decider — ' + fallbackWords('decider', { house: !!HOUSE && houseUp.decide }) + '.';
     renderSeats(); syncTiles(); refreshPalette();
   }
 
@@ -2909,6 +2991,104 @@
     mpStatus.textContent = d.name + (res.ok && res.answers.length ? ' answered.' : ' did not answer — ' + (res.ok ? 'not in the shape asked' : res.error));
   }
 
+  // ===== dyna.ink's own writer and reader (the audit's UX-04) ===================
+  // With no model joined, the product's headline acts were dead ends on the public site: a brief built boxes that said
+  // "a box", and What is this? and Read the writing were kept for a model that needed a key or a terminal. dyna.ink's
+  // relay asks a Workers AI model by binding, at an OpenAI-compatible route (`/ai/v1`, cloudflare/relay/src/ai.mjs), so
+  // the house writer and reader are models like any other here — core's own transport, `complete`, no key — joined
+  // LAZILY (core's `lazy`: nothing is written to a board until the first ask), seated silently, and only once the house
+  // answers. Every rule asks them last (03-seats.js): a model of the person's, or Claude Code seated, is asked instead.
+  // Nothing here asks a model: who is asked, by what act, is unchanged (§6.3).
+
+  /**
+   * The page's one look at each house route, at boot — the decider's list (`GET /decide`) and the writer's and reader's
+   * (`GET /ai/v1/models`), neither of which calls a model — and the house seated where each answered. Not in an embed
+   * (a figure) or a replay. Said nowhere: a relay that is not there leaves the page as it was.
+   */
+  async function probeHouse() {
+    if (houseUp.asked || EMBED) return;
+    houseUp.asked = true;
+    const looks = [];
+    if (HOUSE) {
+      looks.push(fetch(HOUSE, { method: 'GET', credentials: 'omit', signal: AbortSignal.timeout(HOUSE_PROBE_MS) })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => { if (j && j.ok) { houseUp.decide = true; seatHouseDecider(); } })
+        .catch(() => { /* not there: no house decider, nothing said */ }));
+    }
+    if (HOUSE_CHAT) {
+      looks.push(MM.readModels({ baseUrl: HOUSE_CHAT }, { timeoutMs: HOUSE_PROBE_MS })
+        .then((c) => { if (c.ok && c.models.length) { houseUp.ai = true; houseUp.catalog = c; seatHouse(); } }));
+    }
+    await Promise.all(looks);
+    renderSeats(); renderHouseLead(); syncTiles(); refreshPalette();
+  }
+
+  /** Seat dyna.ink's own writer and reader where the house answered, the person chose nothing of theirs and did not let it go (houseAtBoot). Silent. */
+  function seatHouse() {
+    if (!houseUp.ai || !houseUp.catalog) return;
+    for (const seat of ['writer', 'reader']) {
+      if (houseAgents[seat] || !houseAtBoot(seatPicks, seat, HOUSE_CHAT).seat) continue;
+      const got = MM.modelFacts(HOUSE_SEATS[seat].model, houseUp.catalog, MM.whereOf(HOUSE_CHAT));
+      if (got.ok) joinHouse(seat, got.facts);
+    }
+  }
+
+  /** One house model, joined as any model is — core's transport, each call kept for its row — but lazily, under its own name, and kept nowhere. */
+  function joinHouse(seat, facts) {
+    const s = HOUSE_SEATS[seat];
+    const config = { kind: 'openai-compatible', baseUrl: HOUSE_CHAT, model: s.model, timeoutMs: HOUSE_WAIT_MS };
+    applyFacts(config, facts);
+    config.title = s.name;
+    const holder = {};
+    const send = recording(holder);
+    const agent = MM.createAgentParticipant(session, config, Date.now(), { transport: send, name: s.join, locality: 'hosted', lazy: true });
+    holder.agent = agent;
+    sendOf.set(agentKey(agent), send);
+    factsOf.set(agentKey(agent), facts);
+    houseSeatOf.set(agentKey(agent), seat);
+    houseAgents[seat] = agent;
+    agents.push(agent);
+    renderAgents(); renderHouseLead(); syncTiles(); refreshPalette();
+    // An ask the hand made before any model was here was kept for one (J5): the house answering is a model joining.
+    runKeptAsk(agent);
+    return agent;
+  }
+
+  /** A house model leaves its seat: it stops being asked. (Its join, if an ask made one, stays in the board's history, as every model's does.) */
+  function leaveHouse(seat) {
+    const a = houseAgents[seat];
+    if (!a) return;
+    houseAgents[seat] = null;
+    const i = agents.indexOf(a);
+    if (i >= 0) agents.splice(i, 1);
+    houseSeatOf.delete(agentKey(a)); factsOf.delete(agentKey(a)); lastCall.delete(agentKey(a)); asking.delete(agentKey(a)); sendOf.delete(agentKey(a));
+    renderAgents(); renderHouseLead(); syncTiles(); refreshPalette();
+  }
+
+  /** The hand lets dyna.ink's own writer or reader go: none, kept on this device, so a reload does not seat it again. */
+  function noHouse(seat) {
+    leaveHouse(seat);
+    seatPicks[seat] = { none: true };
+    saveSeats();
+    mpStatus.textContent = 'No ' + HOUSE_SEATS[seat].name + ' — ' + fallbackWords(seat) + '.';
+    renderSeats();
+  }
+
+  /** The hand takes dyna.ink's own writer or reader back after letting it go. */
+  function houseBack(seat) {
+    if (seatPicks[seat] && seatPicks[seat].none) { delete seatPicks[seat]; saveSeats(); }
+    seatHouse();
+    mpStatus.textContent = houseAgents[seat] ? houseWords(seat) + ' — ' + houseSends(seat) + '.' : 'dyna.ink’s own ' + seat + ' is not here just now.';
+    renderSeats();
+  }
+
+  /** The models tile's face: the person's own models by name, dyna.ink's own once, and a decider of theirs. */
+  function modelsFace() {
+    const own = agents.filter((a) => !isHouse(a)).map((a) => modelWords(a));
+    const house = houseAgents.writer || houseAgents.reader || (decider && decider.house) ? ['dyna.ink’s own'] : [];
+    return own.concat(house, decider && !decider.house ? [decider.name + ' (decider)'] : []);
+  }
+
   // ===== Coming back (V1-PLAN I7) ============================================
   // Every seat kept comes back as it was. A model rejoins the way it joined: its provider asked again what it can do, a
   // remembered Ollama or LM Studio pick asked for where it runs, a hosted pick with the provider's key from this device —
@@ -2916,8 +3096,9 @@
   // seat waiting for the key the hand types once.
   async function rejoinRemembered() {
     // The decider seat at boot: a decision model the hand joined rejoins below; else dyna.ink's own, silently, where
-    // this page may ask it and the hand did not let it go (seatHouseDecider) — which writes nothing to any board.
-    seatHouseDecider();
+    // this page may ask it, the hand did not let it go, and the relay answered the page's look at its list
+    // (probeHouse → seatHouseDecider) — which writes nothing to any board. dyna.ink's own writer and reader the same.
+    probeHouse();
     const jobs = new Map();
     for (const k of ['writer', 'reader', 'decider', 'any']) {
       const p = seatPicks[k];
@@ -3033,19 +3214,26 @@
           body = tryIt + '<button class="ghost" data-seat-leave="decider">leave</button>';
           call = callOf(agentKey(decider.pseudo));
         } else {
-          who = 'nothing chosen'; note = fallbackWords('decider', { house: !!HOUSE });
-          body = (HOUSE ? '<button class="ghost" data-seat-house="decider" title="' + esc(deciderWords(HOUSE_DECIDER_MODEL, MM.DECIDER_TAKE_AT)) + '">dyna.ink’s own</button>' : '') + '<button class="ghost" data-seat-set="decider">choose a model</button>';
+          who = 'nothing chosen'; note = fallbackWords('decider', { house: !!HOUSE && houseUp.decide });
+          body = (HOUSE && houseUp.decide ? '<button class="ghost" data-seat-house="decider" title="' + esc(deciderWords(HOUSE_DECIDER_MODEL, MM.DECIDER_TAKE_AT)) + '">dyna.ink’s own</button>' : '') + '<button class="ghost" data-seat-set="decider">choose a model</button>';
         }
       } else {
         const held = holderOf(seat);
-        const pool = agents.filter((a) => isModel(a) && !isSeatAgent(a) && (seat === 'writer' || a.config.vision));
+        // dyna.ink's own, in this seat — and whether it is the one asked now (the rules ask it last).
+        const house = houseAgents[seat];
+        const now = seat === 'reader' ? readerNow : writerNow;
+        const houseAsked = !held && !!house && now.who.includes(agentKey(house));
+        const pool = agents.filter((a) => isModel(a) && !isSeatAgent(a) && !isHouse(a) && (seat === 'writer' || a.config.vision));
         const rows = orderedPool(pool);
         body = '<select class="seatPick" data-seat-pick="' + seat + '"><option value="">' + (held ? '— nothing (let go of it)' : '— nothing chosen') + '</option>' +
           rows.map((r) => '<option value="' + esc(r.id) + '"' + (held && agentKey(held) === r.id ? ' selected' : '') + '>' + esc(r.name) + (r.local ? ' · local' : ' · hosted') + '</option>').join('') + '</select>' +
           '<button class="ghost" data-seat-set="' + seat + '" title="join a model for this seat — the key already entered is used">another…</button>' +
-          (held ? '<button class="ghost" data-seat-try="' + seat + '">try it</button>' : '');
+          (held || houseAsked ? '<button class="ghost" data-seat-try="' + seat + '">try it</button>' : '') +
+          (house && !held ? '<button class="ghost" data-seat-none="' + seat + '" title="no ' + esc(HOUSE_SEATS[seat].name) + ': nothing is sent there — remembered on this device">none</button>' : '') +
+          (!house && houseUp.ai && seatPicks[seat] && seatPicks[seat].none ? '<button class="ghost" data-seat-house="' + seat + '" title="' + esc(houseWords(seat)) + '">dyna.ink’s own</button>' : '');
         if (held) { who = agentWords(held); call = callOf(agentKey(held)); }
-        else { who = 'nothing chosen'; note = fallbackWords(seat) + (names(seat === 'reader' ? readerNow : writerNow) ? ' — now: ' + names(seat === 'reader' ? readerNow : writerNow) : ''); }
+        else if (houseAsked) { who = houseWords(seat); note = houseSends(seat); call = callOf(agentKey(house)); }
+        else { who = 'nothing chosen'; note = fallbackWords(seat, { house: !!house }) + (names(now) ? ' — now: ' + names(now) : ''); }
       }
       html += '<div class="seatRow" data-seat="' + seat + '"><div class="seatHead"><b>' + seat + '</b><span class="seatJob">' + esc(w.job) + '</span></div>' +
         (body ? '<div class="seatBody">' + body + '</div>' : '') +
@@ -3068,11 +3256,13 @@
       b.onclick = () => { mpFor.value = b.dataset.seatSet; syncProviderFields(); mpModel.focus(); mpStatus.textContent = 'Name the model for the ' + b.dataset.seatSet + ' seat below — a key already entered is used.'; };
     });
     seatsPane.querySelectorAll('[data-seat-try]').forEach((b) => {
-      b.onclick = () => { const seat = b.dataset.seatTry; if (seat === 'decider') tryDecider(); else tryModel(holderOf(seat)); };
+      b.onclick = () => { const seat = b.dataset.seatTry; if (seat === 'decider') tryDecider(); else tryModel(holderOf(seat) || houseAgents[seat]); };
     });
     seatsPane.querySelectorAll('[data-seat-leave]').forEach((b) => { b.onclick = () => unseat(b.dataset.seatLeave); });
-    seatsPane.querySelectorAll('[data-seat-none]').forEach((b) => { b.onclick = () => noDecider(); });
-    seatsPane.querySelectorAll('[data-seat-house]').forEach((b) => { b.onclick = () => joinHouseDecider(decider && decider.house ? decider.model : HOUSE_DECIDER_MODEL, false); });
+    seatsPane.querySelectorAll('[data-seat-none]').forEach((b) => { b.onclick = () => (b.dataset.seatNone === 'decider' ? noDecider() : noHouse(b.dataset.seatNone)); });
+    seatsPane.querySelectorAll('[data-seat-house]').forEach((b) => {
+      b.onclick = () => (b.dataset.seatHouse === 'decider' ? joinHouseDecider(decider && decider.house ? decider.model : HOUSE_DECIDER_MODEL, false) : houseBack(b.dataset.seatHouse));
+    });
   }
   /** Choices for a seat's select: local before hosted, the quickest last call first (03-seats.js). */
   function orderedPool(pool) {
@@ -3089,7 +3279,9 @@
       reader: who(holderOf('reader')),
       writer: who(holderOf('writer')),
       decider: decider ? { model: decider.config.model, name: decider.name, local: !decider.house && MM.providerLocality(decider.config) === 'local', house: !!decider.house, sees: !!decider.sees, chosen: !!decider.chosen } : null,
-      any: agents.filter((a) => isModel(a) && !isSeatAgent(a) && !(seatsOfAgent.get(agentKey(a)) || new Set()).size).map(who),
+      any: agents.filter((a) => isModel(a) && !isSeatAgent(a) && !isHouse(a) && !(seatsOfAgent.get(agentKey(a)) || new Set()).size).map(who),
+      // dyna.ink's own writer and reader: whether each route answered the page's look at its list, and who is seated.
+      house: { decide: houseUp.decide, ai: houseUp.ai, writer: who(houseAgents.writer), reader: who(houseAgents.reader), joined: ['writer', 'reader'].filter((k) => houseAgents[k] && houseAgents[k].id) },
       keys: [...heldKeys.keys()],
       remembered: [...rememberedKeys],
       pending: pendingPicks.map((p) => ({ model: p.pick.model, seats: p.seats.slice() })),
@@ -3574,7 +3766,7 @@
 //   sheet, asked in batches of a sheet's lines, progress on the marks, Esc stops), readPictureFrom (a picture's text, beside it),
 //   boardWriting (the board's lines, for *Read the board*), linesPanel (what each line said, for the panel), readScopeHooks
 //   (where a region's marks join a read), readStats (what each call cost).
-// Uses: core (prefs), models (agents, withWork, workSignal, factsOf, keepAsk, noteOutcome, modelWords), render (logKey), input (say, flash), seat (isSeatAgent: the seat reads while seated),
+// Uses: core (prefs), models (agents, withWork, workSignal, factsOf, keepAsk, keepFromHouse — a read dyna.ink's own could not answer is kept, noteOutcome, modelWords), render (logKey), input (say, flash), seat (isSeatAgent: the seat reads while seated),
 //   seats (03-seats.js: resolveReaders — who reads, by seat; seatModels, agentById in 04-seatpane.js), images (assetGet), text (TEXT_DIR, TEXT_W, TEXT_H, textCount).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -3658,6 +3850,8 @@
       withWork('write:' + agentKey(agent) + ':' + node.id, [node.id], modelWords(agent) + ' · reading the writing', agent.read({ nodeId: node.id, image: image, at: Date.now() })).then((res) => {
         // The row keeps what the read came to; the status line says it once (J5).
         noteOutcome(agent, res.ok, res.ok ? 'read “' + res.transcripts[0].text + '”' : res.error);
+        // dyna.ink's own could not read it just now: kept for a model of the person's that sees, not lost.
+        if (!res.ok && keepFromHouse(agent, res.error, { what: 'Read the writing', needs: 'sees', need: 'needs a model that can see', ids: [node.id], run: (live) => live.forEach((id) => readOne(session.getState().nodes.get(id), true)) })) return;
         say(res.ok
           ? modelWords(agent) + ' read “' + res.transcripts[0].text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : '')
           : modelWords(agent) + ' could not read it — ' + res.error);
@@ -3701,7 +3895,7 @@
             nodes.slice(1).forEach((n) => readWith.set(n.id, first.id));
           }
           say(modelWords(agent) + ' read “' + top.text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : ''));
-        } else {
+        } else if (!keepFromHouse(agent, res.error, { what: 'Read the writing', needs: 'sees', need: 'needs a model that can see', ids: ids.slice(), run: (live) => readLine(live, true) })) {
           say(modelWords(agent) + ' could not read it — ' + res.error);
           if (res.raw) window.__mm.lastRaw = res.raw;
         }
@@ -3848,6 +4042,7 @@
     let asked = 0, read = 0, stopped = false;
     const failures = [];
     let cost = null;
+    let lastError = '';
     for (const batch of batches) {
       if (session.getState().generation !== generation) { say('the board changed under the read — stopped'); return; }
       const first = asked + 1, last = asked + batch.length;
@@ -3874,6 +4069,7 @@
       readStats.push({ kind: 'lines', lines: batch.length, ok: okCount, bytes: bytes, ms: ms, perLine: perLine, w: sheet.width, h: sheet.height, said: said });
       cost = { lines: okCount, bytes: bytes, perLine: perLine };
       noteOutcome(agent, !!res.ok, res.ok ? 'read ' + okCount + ' line' + (okCount === 1 ? '' : 's') + ' · ' + kb(bytes) + ' · ' + (perLine / 1000).toFixed(1) + ' s a line' : res.error);
+      if (!res.ok) lastError = res.error;
       if (!res.ok && res.raw) window.__mm.lastRaw = res.raw;
       asked = last;
       render(session.getState());
@@ -3883,6 +4079,8 @@
     }
     const who = modelWords(agent);
     const why = failures.slice(0, 3).map((f) => 'line ' + f.n + ': ' + f.error).join('; ') + (failures.length > 3 ? '; …' : '');
+    // dyna.ink's own could not read a line just now: the read is kept for a model of the person's that sees, not lost.
+    if (!stopped && !read && keepFromHouse(agent, lastError, { what: 'Read these', needs: 'sees', need: 'needs a model that can see', ids: todo.flatMap((l) => l.ids), run: (live) => readLines(live) })) return;
     if (stopped) say('stopped — ' + who + ' read ' + read + ' of ' + total + ' lines');
     else if (read === total) say(who + ' read ' + (total === 1 ? '1 line' : total + ' lines') + (cost && batches.length === 1 ? ' — ' + kb(cost.bytes) + ', ' + (cost.perLine / 1000).toFixed(1) + ' s a line' : ''));
     else if (!read) say(who + ' could not read ' + (total === 1 ? 'the line' : total + ' lines') + ' — ' + why);
@@ -3962,6 +4160,7 @@
     noteOutcome(agent, !!res.ok, res.ok ? 'read the picture · ' + n + ' line' + (n === 1 ? '' : 's') + ' · ' + kb(bytes) + ' · ' + (ms / 1000).toFixed(1) + ' s' : res.error);
     if (!res.ok) {
       if (res.raw) window.__mm.lastRaw = res.raw;
+      if (keepFromHouse(agent, res.error, { what: 'Read the picture', needs: 'sees', need: 'needs a model that can see', ids: [artifactId], run: () => { readPictureFrom(artifactId, asset, name); } })) return false;
       if (res.error !== 'cancelled') say(modelWords(agent) + ' could not read the picture — ' + res.error);
       return false;
     }
@@ -4855,7 +5054,7 @@
 //   (readingUnder: its readings ranked by MM.rank, as the field ranks — V1-PLAN §2.2),
 //   a hand's label on its own mark (labelsDrawn), a region's frame under everything (renderRegions, 12-regions.js), match chips,
 //   the working dot, the explanation plane and its layout, the status line (one sentence).
-// Uses: core, view, artifacts, snap, models, palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
+// Uses: core, view, artifacts, snap, models, seatpane (isHouse: dyna.ink's own are not named in the standing line), palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
 //   packs (packShort — a match chip says its pack; a pack this build lacks is said in the standing line),
 //   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet),
 //   selection (dragPreview, dragFollowers — what follows a drag is drawn where it will stand, V1-PLAN E2).
@@ -5920,7 +6119,9 @@
     if (fs) parts.push(fs);
     // A pack this board names that this build cannot give it is said, never hidden (V1-PLAN B3).
     if (s.packNotices.length) parts.push(s.packNotices.map((n) => n.reason === 'unknown' ? n.pack + ' is not in this build' : '“' + n.pack + '” is no pack').join(', ') + ' — its definitions are not matched here');
-    if (agents.length) parts.push(agents.map((a) => modelWords(a) + (a.config && a.config.kind !== 'mcp' ? ' · ' + MM.providerLocality(a.config) : '')).join(', '));
+    // The hand's own models; dyna.ink's own, seated silently, are said in the models pane and on its tile, not here.
+    const own = agents.filter((a) => !isHouse(a));
+    if (own.length) parts.push(own.map((a) => modelWords(a) + (a.config && a.config.kind !== 'mcp' ? ' · ' + MM.providerLocality(a.config) : '')).join(', '));
     if (ws) parts.push('⋯ ' + ws);
     if (hint) parts.push(hint);
     // The standing line is a ladder (SURFACE-v10-PLAN D5): the next move, in a
@@ -6961,7 +7162,7 @@
 //   prompts (runPrompt → a page or a program, runAsk, runDraw); the library (libraryEntries/reuseEntry/
 //   applyLibrary, targetOf); renderSummon/refreshPalette/paintField.
 // Uses: core (hand, lastPen), ui, field (readFieldCommand, verbFor, libraryMatch, typedWord — pure,
-//   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading,
+//   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading, keepFromHouse,
 //   askModelsAbout, offerModel), seatpane (writers, readers, deciderHost, briefDeciderHost, askDecider, askDeciderNotation, askDeciderBrief — who is asked, by seat), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
 //   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
 //   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
@@ -8394,7 +8595,8 @@
           if (res.ok) {
             const short = res.unfilled && res.unfilled.length ? ' — left ' + res.unfilled.join(', ') + ' empty' : '';
             say(modelWords(agent) + ' ' + (res.revised ? 'changed' : 'built') + ' ' + (res.revised ? (res.changed || res.filled) : res.filled).join(', ') + short);
-          } else {
+          } else if (!keepFromHouse(agent, res.error, { what: 'the page’s words', needs: 'model', need: 'needs a model', ids: [artifactId], run: (live) => { if (live.length) writePage(artifactId, brief, revising, addressed, fallbackIds); } })) {
+            // (dyna.ink's own could not write them just now: kept, above, for a model of the person's — the boxes stand meanwhile.)
             say(modelWords(agent) + ' could not build (' + res.error + ') — the drawing is untouched');
             // A model that answered unusably is a thing you need to SEE to fix.
             if (res.raw) window.__mm.lastRaw = res.raw;
@@ -8465,7 +8667,7 @@
     writers().forEach((agent) => {
       withWork('ask:' + agentKey(agent), ids, modelWords(agent) + ' · answering', agent.ask(q, ids, Date.now())).then((res) => {
         noteOutcome(agent, res.ok, res.ok ? 'answered beside the marks' : res.error);
-        if (!res.ok) say(modelWords(agent) + ' could not answer (' + res.error + ')');
+        if (!res.ok && !keepFromHouse(agent, res.error, { what: 'An answer', needs: 'model', need: 'needs a model', ids: ids, run: (live) => runAsk({ enclosedIds: live }, q) })) say(modelWords(agent) + ' could not answer (' + res.error + ')');
         render(session.getState());
       });
     });
@@ -16424,7 +16626,7 @@
 //   view, theme, hand, auto-read, folder, import, export, models, teach, live, reset, help, boards, packs);
 //   syncTiles() writes every tile's face from state; openPane/closePanes keep one pane open at a time.
 // Uses: core (prefs, themeMode, hand, draws), hand (handFace, nextHand), input (palmHere), snap (snapMode), folder (viewMode, folder; the boards adapter:
-//   boardOnScreenName, resetBoard), models (agents, deciderHost), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude),
+//   boardOnScreenName, resetBoard), models (agents, deciderHost; modelsFace, the tile's face — 04-seatpane.js), teach (teachPanel), handwriting (autoRead), packs (packsFace), seat (withClaude),
 //   relay (roomShort), room (24-room.js: renderLivePane, joinTyped, syncRoomChip — the Live pane's first rows and the chip in the bar); the page's
 //   version (folder's pageVersion: its <meta name="dynaink-version">, V1-PLAN R7, or on a page an older worker kept the
 //   tag's old name, RENAME-PLAN N3b; boards' versionWords), said at the head of the help pane, and under it the
@@ -16482,7 +16684,7 @@
     ui.tile(tiles.folder, folder.store ? (folder.how === 'git' ? 'repo' : folder.how === 'static' ? 'site' : 'folder') : 'folder', folder.store ? (folder.name || 'open') : 'open…', { on: !!folder.store, why: 'a folder is the canvas: its files are artifacts, your ink is saved beside them' });
     ui.tile(tiles.imp, 'import', '…', { why: 'photos from your library, a picture from the camera, or a file of a known kind — pictures are kept with the board and drawn on it, under your ink. Drop or paste works too' });
     ui.tile(tiles.exp, 'export', '…', { why: 'the board as SVG or PNG, or the session as its log' });
-    const seated = agents.map((a) => modelWords(a)).concat(deciderHost() ? [deciderHost().name + ' (decider)'] : []);
+    const seated = modelsFace(); // the hand's own models, dyna.ink's own once, a decider of theirs (04-seatpane.js)
     ui.tile(tiles.models, 'models', seated.length ? seated.join(', ') : 'none', { on: seated.length > 0, why: 'a model joins as a participant, in a seat if you give it one; it is asked only when you ask' });
     ui.tile(tiles.teach, 'mark', s.commandMark ? s.commandMark.name : 'check ✓', { on: !!s.commandMark, why: 'the mark that turns a circled group into a selection; teach your own' });
     ui.tile(tiles.reset, 'reset', 'fresh board', { why: 'a fresh board under the same name — what this one holds goes to the trash, from which it comes back whole' });

@@ -329,7 +329,18 @@ input.fileIn { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacit
 #packsPanel .pkItem button { margin-top: 5px; padding: 2px 8px; font-size: 10.5px; }
 #packsPanel #packsStatus:not(:empty) { margin: 9px 0 0; }
 
-/* The model pane. */
+/* The model pane. It fits the screen and scrolls: the key form and Join are always reachable (the audit's UX-02). */
+#modelPanel { max-height: calc(100dvh - 64px); overflow-y: auto; overscroll-behavior: contain; }
+/* With dyna.ink's own models asked, the pane leads with them; the rest — Claude Code, the seats, models on this
+   machine, the key form, the joined models — stands under *more* (04-models.js, renderHouseLead). */
+#modelPanel .mpHouse[hidden] { display: none; }
+#modelPanel .mpHouseHead { font-size: 12px; color: var(--agent); margin-bottom: 4px; }
+#modelPanel .mpHouse .note { color: var(--dim); font-size: 10.5px; line-height: 1.45; margin-top: 3px; }
+#modelPanel .mpHouse .mpMore { display: block; margin-top: 8px; padding: 3px 9px; font-size: 10.5px; }
+#modelPanel.houseLed:not(.moreOpen) > .mpSection,
+#modelPanel.houseLed:not(.moreOpen) > #mpList,
+#modelPanel.houseLed:not(.moreOpen) > .mpAdvanced { display: none; }
+#modelPanel.houseLed .mpHouse + .mpSection { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--edge); }
 #modelPanel .mpRow { display: flex; gap: 7px; margin-top: 11px; }
 #modelPanel .mpRow button { flex: 1; }
 #modelPanel button.ghost { flex: 0 0 auto; padding-left: 11px; padding-right: 11px; }
