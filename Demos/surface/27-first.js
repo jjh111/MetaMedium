@@ -6,7 +6,8 @@
 //   - the words for the hand in use (tapWords): a finger or a pen double-taps, a mouse double-clicks — read from the
 //     last pointer's own pointerType, else whether the screen's main pointer is coarse; never the user agent;
 //   - a board opened whole from an example inspects nothing until the hand points at a mark or draws (restAfterOpen,
-//     resting; UX-11), and a thing just made is brought into view (bringIntoView; UX-13);
+//     resting; UX-11) — one bigger than the screen opens on its program or its first part, and says so (restWords) —
+//     and a thing just made is brought into view (bringIntoView; UX-13);
 //   - a said sentence lets go when the hand draws again (UX-16);
 //   - reduced motion (motionReduced; the critic's C4): prefers-reduced-motion, read once and on change — the working
 //     dot and the find ring hold still, and an example's program waits for the person's own play.
@@ -86,11 +87,38 @@
   // over the drawing. Opened, it is fitted to the free ground and nothing is inspected until the hand points at a mark
   // or the board changes; the panel says what the board holds and how to begin.
   let restAt = null;
+  let restBigger = null; // what a board too big for the screen opened on: 'program' | 'part', else null
   function restAfterOpen() {
     const evs = session.getEvents();
     restAt = { events: evs, len: evs.length };
     hoverId = null;
     fitAll();
+    // A board bigger than the screen even at the farthest zoom (the storyboard on a phone: 8% left half of it off the
+    // screen) opens on what it is for — its playing program, else its first region, else its first thing made — whole,
+    // and says the rest is there (restWords).
+    restBigger = null;
+    const s = session.getState();
+    const boxes = s.contentIds.map((id) => s.nodes.get(id) && MM.boundsOf(s.nodes.get(id))).filter(Boolean);
+    if (!boxes.length || shownWhole(union(boxes))) return;
+    const film = s.live.find((id) => s.clocks[id] && s.clocks[id].playing);
+    const first = film || (s.regions || [])[0] || s.artifacts[0];
+    const b = first && s.nodes.get(first) && MM.boundsOf(s.nodes.get(first));
+    if (!b) return;
+    fitTo(b);
+    restBigger = film ? 'program' : 'part';
+  }
+  /** What the opening sentence adds for a board bigger than the screen, in the words for the hand in use; else ''. */
+  function restWords() {
+    if (!restBigger) return '';
+    return ' · bigger than this screen — it opens on ' + (restBigger === 'program' ? 'its program' : 'its first part') + '; ' +
+      (tapWords() === 'double-tap' ? 'pinch' : 'zoom out') + ' or use the map in the corner to see the rest';
+  }
+  /** Whether a world box stands whole in the free ground, a margin inside its edges. */
+  function shownWhole(b) {
+    const free = usableViewport();
+    const a = worldToScreen(b.minX, b.minY), z = worldToScreen(b.maxX, b.maxY);
+    const M = 16;
+    return a.x >= free.left + M && a.y >= free.top + M && z.x <= free.right - M && z.y <= free.bottom - M;
   }
   /** Whether nothing is to be inspected: the board as it was opened, nothing pointed at. */
   function resting() {
@@ -112,9 +140,7 @@
     if (!boxes.length) return false;
     const b = union(boxes);
     const free = usableViewport();
-    const a = worldToScreen(b.minX, b.minY), z = worldToScreen(b.maxX, b.maxY);
-    const M = 16;
-    if (a.x >= free.left + M && a.y >= free.top + M && z.x <= free.right - M && z.y <= free.bottom - M) return false;
+    if (shownWhole(b)) return false;
     const zoom = view.zoom;
     fitTo(b);
     if (view.zoom > zoom) {

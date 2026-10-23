@@ -22,7 +22,7 @@
 //   core (params, EMBED, session), folder (boardMode), view (fitAll, fitTo), render (union, viewportWorld),
 //   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1; consentedHere),
 //   inspector (isProgram), the first hour (27-first.js: motionReduced — under reduced motion the film waits for a play;
-//   restAfterOpen — an example opens fitted, nothing inspected).
+//   restAfterOpen, restWords — an example opens fitted, nothing inspected; one bigger than the screen on its program, said).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -360,7 +360,7 @@
   }
   /** The sentence an opened example says: a flash — or, when its film waits for a play (C4), said for longer with that. */
   function exampleOpened(words) {
-    const held = examples.heldBack || '';
+    const held = (examples.heldBack || '') + restWords();
     examples.heldBack = '';
     if (held) say(words + held); else flash(words);
   }

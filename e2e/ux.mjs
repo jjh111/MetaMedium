@@ -13,7 +13,8 @@
 //        screen, the line says "double-tap" — and "double-click" once a mouse is used; the sheet leaves on the first
 //        stroke and stays gone after an undo (UX-03)
 //   X4   an example opens fitted to the free ground — every mark clear of the panel — with nothing inspected until
-//        the hand points at a mark (UX-11), on the desktop and on the phone
+//        the hand points at a mark (UX-11), on the desktop and on the phone; X4c one too big for a phone opens on its
+//        film, whole, and says the rest is there
 //   X5   reduced motion (C4): with the preference, the working dot and the find ring hold still between frames,
 //        and the film's program waits for the person's own play; without it, they move and it plays; X5d the waiting film
 //        is started by *play it here* in the panel and *Play … here* in the field; X5c a tank the person did not start
@@ -131,7 +132,8 @@ export async function runUx(browser, servers, { freshContext }) {
     });
     const page = await guards.context.newPage();
     await page.goto(origin + '/' + address, { waitUntil: 'load', timeout: 60000 });
-    await waitReady(page);
+    // An address that opens an example fits it itself: the view is not pinned to the world under it (a race with the open).
+    await waitReady(page, 60000, { pin: !/[?&]example=/.test(address) });
     await page.waitForTimeout(300);
     return { page, guards };
   };
@@ -288,6 +290,24 @@ export async function runUx(browser, servers, { freshContext }) {
       await guards.context.close();
     });
   }
+
+  // ---- X4c. a board bigger than the screen opens on what it is for, and says the rest is there ---------------------
+  await record('X4c', async () => {
+    const { page, guards } = await open(Object.assign({ reducedMotion: 'no-preference' }, PHONE), 'app/?nosw=1&example=story', 'ux-story-phone');
+    await page.waitForFunction(() => /a board of your own/.test(document.getElementById('status').textContent || ''), null, { timeout: 20000 });
+    await page.waitForTimeout(300);
+    const got = await page.evaluate(() => {
+      const mm = window.__mm, s = mm.session.getState(), free = mm.usableViewport();
+      const film = s.live.find((id) => s.clocks[id] && s.clocks[id].playing);
+      const b = film && mm.MM.boundsOf(s.nodes.get(film));
+      const a = b && mm.worldToScreen(b.minX, b.minY), z = b && mm.worldToScreen(b.maxX, b.maxY);
+      const whole = !!a && a.x >= free.left - 1 && a.y >= free.top - 1 && z.x <= free.right + 1 && z.y <= free.bottom + 1;
+      return { film: !!film, whole, box: a && { left: Math.round(a.x), top: Math.round(a.y), right: Math.round(z.x), bottom: Math.round(z.y) }, zoom: mm.view.zoom, status: document.getElementById('status').textContent };
+    });
+    check(`X4c. at 390 px the storyboard — too big for a phone at the farthest zoom — opens on its film, whole on the screen (${got.box ? got.box.left + '–' + got.box.right : '—'}), and the line says the rest is there (${got.status.slice(0, 120)})`,
+      got.film && got.whole && /bigger than this screen/.test(got.status) && /pinch/.test(got.status), got);
+    await guards.context.close();
+  });
 
   // ---- X5. reduced motion -----------------------------------------------------------------------------------------
   await record('X5', async () => {
