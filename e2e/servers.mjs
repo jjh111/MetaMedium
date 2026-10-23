@@ -321,6 +321,10 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
   let houseRefusal = null;   // { status, error }: what the next chats are refused with, as the relay says it
   let houseDown = 0;         // a status the list answers with (the house not answering): 0 answers it
   let houseShape = 'response';
+  // The house decider's list (GET /decide, which calls no model): every look kept, and a status it answers with (the
+  // relay not deployed, or the route off) — 0 answers it.
+  const decideLooks = [];
+  let decideDown = 0;
   const cors = {
     'access-control-allow-origin': '*',
     'access-control-allow-headers': 'authorization, content-type, http-referer, x-title, x-dyna-room',
@@ -334,7 +338,12 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
     const auth = req.headers.authorization || '';
     const keyWas = auth === `Bearer ${key}` ? 'the stub\'s' : auth ? 'another' : 'none';
     if (url.pathname === '/decide') {
-      if (req.method === 'GET') { send(200, { ok: true, route: 'decide', models: [{ model: 'clef-flash', name: 'Clef-flash', sees: false }] }); return; }
+      if (req.method === 'GET') {
+        decideLooks.push({ at: Date.now(), origin: req.headers.origin || null });
+        if (decideDown) { send(decideDown, { ok: false, error: 'dyna.ink’s own decider is not on this relay' }); return; }
+        send(200, { ok: true, route: 'decide', models: [{ model: 'clef-flash', name: 'Clef-flash', sees: false }] });
+        return;
+      }
       if (req.method !== 'POST') { send(405, { ok: false, error: 'POST a decision' }); return; }
       const raw = await readBody(req);
       let body = null;
@@ -492,6 +501,10 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
     houseRefuse: (r) => { houseRefusal = r || null; },
     /** The house's list answers with this status from now on (the house not answering), or 0 to answer it. */
     houseDown: (status) => { houseDown = status || 0; },
+    /** Every look at the house decider's list (GET /decide), oldest first. */
+    decideLooks: () => decideLooks.map((c) => ({ ...c })),
+    /** The house decider's list answers with this status from now on (the relay not there, or its route off), or 0 to answer it. */
+    decideDown: (status) => { decideDown = status || 0; },
     /** How the house's model spells its reply from now on, before the relay makes it OpenAI's: 'response' (Workers AI's own) or 'choices'. */
     houseShape: (x) => { houseShape = x === 'choices' ? 'choices' : 'response'; },
     stop: () => new Promise((ok) => { server.closeAllConnections?.(); server.close(ok); }),

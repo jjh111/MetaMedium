@@ -106,13 +106,20 @@
 //        land in its name; it joins the board at that first ask, once
 //   M48  Read the writing sends the house reader one picture of the ink, and the words land on the mark
 //   M49  a brief on Enter: the page's boxes stand at once, and the house writer writes the page's words into them
-//   M50  the day's budget spent: the 429 is said in the relay's words and the ask is not lost — kept, it runs when a model
-//        of the person's joins, and the house is not asked again
+//   M50  the day's budget spent: the 429 is said in the relay's words — in the status line and in the field, never "needs
+//        a model" — and the ask is not lost: kept, it runs when a model of the person's joins, and the house is not asked
+//        again; M50d an ask kept so and asked again once the house answers is let go — the field stops saying it waits;
+//        M50e a program's brief (run:) and M50f a draw: the house could not answer are kept too, nothing left half made
 //   M51  the key is nowhere: no request to the house carried one, and the stub's key is in no store, cache, DOM or address
 //   M52  "none" lets the house writer go, remembered: a reload seats the reader alone, What is this? is kept for a model
 //        as before; "dyna.ink’s own" takes it back
+//   M54  auto-read on, with only dyna.ink's own reader to read: nothing is sent — a stroke of writing, and the board's
+//        unread words, go nowhere; dyna.ink's own is asked only when the person asks
+//   M55  "none" on the reader: Read the writing sends no picture to dyna.ink — not to its writer either, which sees — and
+//        is kept for a model; "dyna.ink’s own" takes it back and the kept read runs on the reader
 //   M53  the house not answering (its list refused): nothing is seated, there is no lead, and What is this? is kept for a
-//        model as it always was — the one GET, and no chat
+//        model as it always was — the one GET, and no chat; M53b the house decider waits for its list too: refused, it is
+//        not seated and nothing is asked of it; answered on a reload, it is
 
 import { startModelStub, STUB_KEY, REASONING_ONLY, JEV } from './servers.mjs';
 import { isModelRequest } from './guards.mjs';
@@ -299,6 +306,8 @@ async function takePill(page, words) {
 }
 
 const statusLine = (page) => page.evaluate(() => (document.getElementById('status').textContent || '').trim());
+/** What the open field says of an ask it kept (the `.need` line), or null when nothing waits there. */
+const needLine = (page) => page.evaluate(() => { const el = document.querySelector('#summon .need'); return el && !el.hidden && el.textContent.trim() ? el.textContent.replace(/\s+/g, ' ').trim() : null; });
 const paneOpen = (page) => page.evaluate(() => !document.getElementById('modelPanel').hasAttribute('hidden'));
 const paneStatus = (page) => page.evaluate(() => (document.getElementById('mpStatus').textContent || '').trim());
 
@@ -1798,9 +1807,11 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
         said = await statusLine(p8);
         kept = await p8.evaluate(() => window.__mm.keptAsk());
         refusedCalls = houseChats(since).length;
-        check(`M50. the day's budget spent: the 429 is said in the relay's own words — "${said.slice(0, 170)}" — and the ask is kept, not lost (${JSON.stringify(kept)})`,
-          held && took && refusedCalls === 1 && /^dyna\.ink’s writer could not answer — HTTP 429 — rate limited: “today’s writing and reading on dyna\.ink are spent/.test(said) && /kept: it runs when a model of yours joins/.test(said) && !!kept && kept.what === 'What is this?',
-          { said, kept, refusedCalls });
+        const need = await needLine(p8);
+        check(`M50. the day's budget spent: the 429 is said in the relay's own words — "${said.slice(0, 170)}" — in the field too, never "needs a model" ("${need}"), and the ask is kept, not lost (${JSON.stringify(kept)})`,
+          held && took && refusedCalls === 1 && /^dyna\.ink’s writer could not answer just now — today’s writing and reading on dyna\.ink are spent/.test(said) && !/HTTP|429/.test(said) && /kept: it runs when a model of yours joins/.test(said) && !!kept && kept.what === 'What is this?' &&
+            !!need && /^What is this\? — today’s writing and reading on dyna\.ink are spent/.test(need) && /kept for a model of yours/.test(need) && !/needs a model/.test(need),
+          { said, kept, refusedCalls, need });
         await letGo(p8);
       } finally { stub.houseRefuse(null); }
       // A model of the person's joins: the kept ask runs on it, and the house is not asked again.
@@ -1820,6 +1831,85 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       await openModels(p8);
       await pressRow(p8, 'GLM 4.7 Flash', 'leave');
       await closeModels(p8);
+    });
+
+    await record('M50d', async () => {
+      // Too many asks just now: kept — then, the minute past, asked again on the same marks and answered by the house:
+      // the ask kept is let go, the field no longer says it waits, and a model joining later would not ask it again.
+      const since = stub.house().length;
+      const held = await holdAt(p8, MOLECULE_AT.x, MOLECULE_AT.y);
+      stub.houseRefuse({ status: 429, error: 'too many asks of dyna.ink’s writer and reader from here — try again in a minute' });
+      let first = null, need = null;
+      try {
+        const took = held && await takePill(p8, 'What is this?');
+        const end = Date.now() + 8000;
+        while (Date.now() < end && houseChats(since).length < 1) await sleep(50);
+        await sleep(300);
+        first = { took, kept: await p8.evaluate(() => window.__mm.keptAsk()) };
+        need = await needLine(p8);
+      } finally { stub.houseRefuse(null); }
+      const again = await takePill(p8, 'What is this?');
+      const end = Date.now() + 8000;
+      while (Date.now() < end && houseChats(since).length < 2) await sleep(50);
+      await sleep(400);
+      const after = { kept: await p8.evaluate(() => window.__mm.keptAsk()), need: await needLine(p8), said: await statusLine(p8) };
+      await letGo(p8);
+      check(`M50d. asked again once the house answers, the ask kept is let go — first "${need}", then the field says nothing waits (${JSON.stringify(after.need)}) and nothing is kept (${JSON.stringify(after.kept)}); "${after.said.slice(0, 80)}"`,
+        held && first.took && !!first.kept && first.kept.what === 'What is this?' && !!need && /too many asks of dyna\.ink’s writer and reader from here — try again in a minute/.test(need) &&
+          again && houseChats(since).length === 2 && after.kept === null && after.need === null && /dyna\.ink’s writer reads it as/.test(after.said),
+        { first, need, after, chats: houseChats(since).map((c) => c.job + (c.refused ? ' refused' : '')) });
+    });
+
+    await record('M50e', async () => {
+      // A program's brief the house could not write: its bless taken back, the brief kept — never lost, nothing half made.
+      await p8.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
+      await sleep(150);
+      const ids = await p8.evaluate(() => { const d = window.__draw; d.stroke(d.circle(500, 300, 60)); return window.__mm.session.getState().contentIds.slice(-1); });
+      await sleep(150);
+      const since = stub.house().length, arts = await artifactCount(p8);
+      stub.houseRefuse({ status: 429, error: 'today’s writing and reading on dyna.ink are spent — try again tomorrow, or bring your own model under models' });
+      let kept = null, said = '', after = 0;
+      try {
+        await holdIds(p8, ids);
+        await p8.fill('#summon input.filter', 'run: a bouncing ball');
+        await sleep(150);
+        await p8.press('#summon input.filter', 'Enter');
+        const end = Date.now() + 8000;
+        while (Date.now() < end && houseChats(since).length < 1) await sleep(50);
+        await sleep(400);
+        kept = await p8.evaluate(() => window.__mm.keptAsk());
+        said = await statusLine(p8);
+        after = await artifactCount(p8);
+      } finally { stub.houseRefuse(null); }
+      await letGo(p8);
+      const asked = houseChats(since);
+      check(`M50e. a program's brief (run:) the house could not write is kept, not lost (${JSON.stringify(kept)}), and nothing is left half made (${after - arts} things made): "${said.slice(0, 160)}"`,
+        asked.length === 1 && asked[0].job === 'program' && !!kept && kept.what === 'the program' && after === arts &&
+          /^dyna\.ink’s writer could not answer just now — today’s writing and reading on dyna\.ink are spent/.test(said) && /nothing was made meanwhile/.test(said) && /kept: it runs when a model of yours joins/.test(said),
+        { kept, said, made: after - arts, asked: asked.map((c) => c.job) });
+    });
+
+    await record('M50f', async () => {
+      // A draw: the house could not answer: kept as well.
+      const ids = await p8.evaluate(() => window.__mm.session.getState().contentIds.slice(-1));
+      const since = stub.house().length;
+      stub.houseRefuse({ status: 503, error: 'dyna.ink’s writer failed — overloaded' });
+      let kept = null, said = '';
+      try {
+        await holdIds(p8, ids);
+        await p8.fill('#summon input.filter', 'draw: a sun beside it');
+        await sleep(150);
+        await p8.press('#summon input.filter', 'Enter');
+        const end = Date.now() + 8000;
+        while (Date.now() < end && houseChats(since).length < 1) await sleep(50);
+        await sleep(400);
+        kept = await p8.evaluate(() => window.__mm.keptAsk());
+        said = await statusLine(p8);
+      } finally { stub.houseRefuse(null); }
+      await letGo(p8);
+      check(`M50f. a draw: the house could not answer is kept, not lost (${JSON.stringify(kept)}): "${said.slice(0, 140)}"`,
+        houseChats(since).length === 1 && !!kept && kept.what === 'Drawing' && /^dyna\.ink’s writer could not answer just now — dyna\.ink’s writer failed — overloaded/.test(said) && /kept: it runs when a model of yours joins/.test(said),
+        { kept, said });
     });
 
     await record('M51', async () => {
@@ -1871,6 +1961,59 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
         { back: back.house, keptBack, calls: houseChats(since).map((c) => c.job) });
     });
 
+    await record('M54', async () => {
+      // Auto-read is the hand's tile, and it asks a model of theirs: never dyna.ink's own, seated with no act.
+      await p8.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
+      await sleep(150);
+      const board = await p8.evaluate(drawBoard, MOLECULE_AT);
+      await sleep(200);
+      const since = stub.house().length;
+      const seats = await seatsOf(p8);
+      await p8.evaluate(() => window.__mm.setAutoRead(true));
+      try {
+        await p8.evaluate(() => { const d = window.__draw; d.stroke(d.word(700, 600, 200, 44, 6)); });
+        await sleep(1500);
+      } finally { await p8.evaluate(() => window.__mm.setAutoRead(false)); }
+      const sent = houseChats(since);
+      const read = await p8.evaluate((id) => { const mm = window.__mm, n = mm.session.getState().nodes.get(id); return !!(n && mm.MM.transcriptsOf(n)[0]); }, board.word);
+      check(`M54. auto-read on with only dyna.ink's own reader seated (${JSON.stringify(seats.readers)}): a word written and the board's unread words send nothing (${sent.length} asks), and nothing is read (${read})`,
+        JSON.stringify(seats.readers) === '["reader"]' && sent.length === 0 && !read, { readers: seats.readers, sent: sent.map((c) => c.job + '/' + c.model) });
+    });
+
+    await record('M55', async () => {
+      // "none" on the reader: no picture of the ink goes to dyna.ink, not even to its writer, which sees.
+      await openModels(p8);
+      if (!(await p8.evaluate(() => document.getElementById('modelPanel').classList.contains('moreOpen')))) await p8.click('#mpHouse .mpMore');
+      await p8.locator('.seatRow[data-seat="reader"] [data-seat-none="reader"]').click({ timeout: 5000 });
+      await sleep(150);
+      const now = await seatsOf(p8);
+      await closeModels(p8);
+      await p8.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
+      await sleep(150);
+      const board = await p8.evaluate(drawBoard, MOLECULE_AT);
+      await sleep(200);
+      const since = stub.house().length;
+      const wordAt = await p8.evaluate((id) => { const b = window.__mm.MM.boundsOf(window.__mm.session.getState().nodes.get(id)); return window.__mm.worldToScreen((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2); }, board.word);
+      const held = await holdAt(p8, wordAt.x, wordAt.y);
+      const took = held && (await takePill(p8, /^writing( \d\.\d\d)?$/) || await takePill(p8, 'Read the writing') || await takePill(p8, 'Read as writing'));
+      await sleep(600);
+      const kept = await p8.evaluate(() => window.__mm.keptAsk());
+      const sent = houseChats(since);
+      check(`M55. "none" on the reader (writer ${now.house.writer && now.house.writer.sees ? 'sees' : 'does not see'}; readers ${JSON.stringify(now.readers)}): Read the writing sends nothing to dyna.ink (${sent.map((c) => c.model + ' ' + c.images + ' picture').join(', ') || 'none'}) and is kept for a model (${JSON.stringify(kept)})`,
+        !now.house.reader && !!now.house.writer && JSON.stringify(now.readers) === '[]' && held && took && sent.length === 0 && !!kept && kept.what === 'Read the writing',
+        { now: now.house, readers: now.readers, sent, kept });
+      await openModels(p8);
+      if (!(await p8.evaluate(() => document.getElementById('modelPanel').classList.contains('moreOpen')))) await p8.click('#mpHouse .mpMore');
+      await p8.locator('.seatRow[data-seat="reader"] [data-seat-house="reader"]').click({ timeout: 5000 });
+      const word = await until(p8, (id) => { const mm = window.__mm, n = mm.session.getState().nodes.get(id); const t = n && mm.MM.transcriptsOf(n)[0]; return t ? t.text : null; }, board.word, 8000);
+      await sleep(200);
+      await closeModels(p8);
+      await letGo(p8);
+      const back = houseChats(since);
+      check(`M55b. "dyna.ink’s own" takes the reader back, and the read kept runs on it — ${back.map((c) => c.job + ' of ' + c.model + ', ' + c.images + ' picture').join('; ')} — “${word}”`,
+        back.length === 1 && back[0].model === 'reader' && back[0].images === 1 && word === 'hello', { back: back.map((c) => ({ job: c.job, model: c.model, images: c.images })), word });
+    });
+
     // The house not answering — its list refused, as a relay with no Workers AI binding refuses it — in a device of its own.
     const guards9 = await freshContext(browser, { origins: [servers.staticOrigin, stub.origin], label: 'models-house-down' });
     guardsAll.push(guards9);
@@ -1905,6 +2048,50 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
             !pane.led && !pane.lead && pane.key && !!writer && writer.who === 'nothing chosen' && ids.length === 5 && held && took && !!kept && kept.what === 'What is this?' && /needs a model/.test(said) && houseChats().length === chatsBefore,
           { seats: seats.house, pane, writer, kept, said });
       } finally { stub.houseDown(0); }
+    });
+
+    await record('M53b', async () => {
+      // The house decider waits for its list as the writer and reader do: refused (the relay not there yet), it is not
+      // seated and nothing is asked of it — and on a reload that finds it answering, it is.
+      const both = `${url}?ai=${encodeURIComponent(stub.origin)}&decide=${encodeURIComponent(stub.origin)}`;
+      stub.houseDown(501);
+      stub.decideDown(503);
+      const looks = stub.decideLooks().length, posts = stub.systemOne().length;
+      let seats = null, row = null, pills = [], kept = null;
+      try {
+        await p9.goto(both, { waitUntil: 'load', timeout: 60000 });
+        await waitReady(p9);
+        await p9.evaluate(installDraw);
+        const end = Date.now() + 5000;
+        while (Date.now() < end && stub.decideLooks().length - looks < 1) await sleep(50);
+        await sleep(400);
+        seats = await seatsOf(p9);
+        await openModels(p9);
+        if (!(await p9.evaluate(() => document.getElementById('modelPanel').classList.contains('moreOpen')))) await p9.click('#mpHouse .mpMore').catch(() => {});
+        row = await seatRow(p9, 'decider');
+        await closeModels(p9);
+        await p9.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
+        await sleep(150);
+        await p9.evaluate(drawMolecule, MOLECULE_AT);
+        await sleep(200);
+        const held = await holdAt(p9, MOLECULE_AT.x, MOLECULE_AT.y);
+        pills = held ? await p9.evaluate(() => [...document.querySelectorAll('#summon .pill.item')].map((x) => x.textContent.trim())) : [];
+        if (held) await takePill(p9, 'What is this?');
+        await sleep(400);
+        kept = await p9.evaluate(() => window.__mm.keptAsk());
+        await letGo(p9);
+      } finally { stub.decideDown(0); stub.houseDown(0); }
+      check(`M53b. the house decider's list refused: one look (${stub.decideLooks().length - looks}), no decider seated (${JSON.stringify(seats && seats.decider)}), its row "${row && row.who}", no Which is it? among ${pills.length} pills, and nothing asked of it (${stub.systemOne().length - posts} posts)`,
+        stub.decideLooks().length - looks === 1 && !!seats && seats.decider === null && seats.house.decide === false && !!row && !/Clef/.test(row.who) &&
+          !pills.some((t) => /Which is it|Which diagram/.test(t)) && stub.systemOne().length === posts && !!kept && kept.what === 'What is this?',
+        { decider: seats && seats.decider, house: seats && seats.house, row, pills, posts: stub.systemOne().length - posts });
+      // The control: answered on a reload, the house decider is seated — so the refusal above is what kept it out.
+      await p9.reload({ waitUntil: 'load' });
+      await waitReady(p9);
+      const up = await until(p9, () => (window.__mm.seats().decider ? true : null), null, 8000);
+      const seatsUp = await seatsOf(p9);
+      check(`M53b2. answered on a reload, the house decider is seated (${JSON.stringify(seatsUp.decider)})`,
+        !!up && !!seatsUp.decider && seatsUp.decider.house === true && seatsUp.house.decide === true, { decider: seatsUp.decider });
     });
   } catch (err) {
     check(`the scenario threw: ${String(err && err.message ? err.message : err).split('\n')[0]}`, false, { stack: String(err && err.stack) });
