@@ -14,6 +14,7 @@ import { diagramOf } from './route';
 import { createDecideParticipant, createStubDecideTransport, DECIDER_TAKE_AT } from '../participants/decide';
 import { interpretationsOf } from '../session/interpretations';
 import { BUILTIN_TOOLS } from './builtin';
+import { registerNotation, notationsOf, keepingNotations } from '../notations/notation';
 
 const line = (a: Point, b: Point, n = 40): Point[] => Array.from({ length: n }, (_, i) => ({ x: a.x + ((b.x - a.x) * i) / (n - 1), y: a.y + ((b.y - a.y) * i) / (n - 1) }));
 const circle = (cx: number, cy: number, r: number, n = 110): Point[] => Array.from({ length: n + 1 }, (_, i) => ({ x: cx + r * Math.cos((i / n) * Math.PI * 2), y: cy + r * Math.sin((i / n) * Math.PI * 2) }));
@@ -134,5 +135,33 @@ describe('Which diagram is this?', () => {
     expect(mermaidFor(s.getState(), ids)).toBeNull();
     await decide(s, ids.slice(0, 2), 'flowchart', 0.995);
     expect(decidedNotationOf(s.getState(), ids)).toBeNull();
+  });
+});
+
+describe('a seated decider costs the field no second read of the notations', () => {
+  it('while the field is offered, every notation reads the held marks once — the Mermaid, routing and Which diagram tools share it', () => {
+    const s = createSession();
+    const ids = boxesAndLine(s);
+    hold(s, ids);
+    let reads = 0;
+    // A notation that counts how often it is asked, and reads nothing: it stands for the costly read of each real one.
+    const off = registerNotation({ id: 'counting', name: 'Counting', describes: 'counts its reads', symbols: [], connectors: [], read: () => { reads++; return null; } });
+    try {
+      offered(s, {});
+      const without = reads;
+      reads = 0;
+      expect(which(s).length).toBe(1);
+      expect(reads).toBe(1);
+      expect(without).toBeLessThanOrEqual(1);
+      // Outside an offering, each ask reads again: nothing is kept past the call that asked.
+      reads = 0;
+      notationsOf(s.getState(), ids);
+      notationsOf(s.getState(), ids);
+      expect(reads).toBe(2);
+      // And within one, a board other than the one offered on is read again — getState hands out a new board each time.
+      reads = 0;
+      keepingNotations(s.getState(), () => { notationsOf(s.getState(), ids); notationsOf(s.getState(), ids); });
+      expect(reads).toBe(2);
+    } finally { off(); }
   });
 });
