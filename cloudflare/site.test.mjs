@@ -272,6 +272,19 @@ test('the deploy workflow deploys only what CI passed on master, the commit CI r
     assert.match(job, /runs-on: ubuntu-24\.04\n    timeout-minutes: 15\n/, 'a pinned runner and a timeout');
     assert.match(job, /DEPLOY_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \|\| github\.sha \}\}/, 'the commit CI ran');
     assert.match(job, /- uses: actions\/checkout@v4\n {8}if: steps\.have\.outputs\.yes == 'true'\n {8}with:\n {10}ref: \$\{\{ env\.DEPLOY_SHA \}\}/, 'checked out at that commit');
+    // Its steps: the first decides, and every one after it waits on that decision — each step, not a count of lines.
+    const steps = job.split('\n    steps:\n')[1].split(/\n(?= {6}- )/);
+    assert.match(steps[0], /^ {6}- name: [^\n]*\n {8}id: have\n/, 'the first step is the check');
+    assert.ok(steps.length >= 5, 'the job has its steps');
+    for (const step of steps.slice(1)) assert.match(step, /\n {8}if: steps\.have\.outputs\.yes == 'true'\n/, 'a step that does not wait on the check: ' + step.split('\n')[0].trim());
+    // …which deploys a commit CI ran only while it is master's tip: CI runs finish in any order and an old one can be
+    // re-run, so without this an older commit's CI finishing last would put production back on it.
+    const have = steps[0];
+    assert.match(have, /GH_TOKEN: \$\{\{ github\.token \}\}/, 'the check reads master with the run\'s own token');
+    assert.match(have, /if \[ "\$EVENT" = "workflow_run" \]; then/, 'the tip is asked after CI, not for a deploy by hand');
+    assert.match(have, /tip=\$\(gh api "repos\/\$GITHUB_REPOSITORY\/commits\/master" --jq \.sha\) \|\| \{[^}]*exit 1; \}/, 'master\'s tip is read, and a failure to read it deploys nothing, out loud');
+    assert.match(have, /if \[ "\$tip" != "\$DEPLOY_SHA" \]; then echo "yes=false" >> "\$GITHUB_OUTPUT"; echo "[^"]+"; exit 0; fi/, 'a commit master has moved past is not deployed, and the run says so');
+    assert.ok(have.indexOf('CLOUDFLARE_API_TOKEN') < have.indexOf('gh api'), 'with no secrets, nothing is asked of GitHub');
   }
   assert.match(wf, /node cloudflare\/build-site\.mjs --commit "\$DEPLOY_SHA"/, 'the built app names the commit it was built from');
   // One wrangler, the relay's lockfile's: no action that installs a version of its own.
@@ -287,7 +300,6 @@ test('the deploy workflow deploys only what CI passed on master, the commit CI r
   assert.match(wf, /printf '%s' "\$MM_RELAY_SECRET" \| npx wrangler secret put MM_RELAY_SECRET/, 'put on the Worker from stdin, never on a command line');
   assert.match(wf, /if \[ -z "\$MM_RELAY_SECRET" \]; then[^\n]*exit 0; fi/, 'no secret set: the Worker keeps the one it has');
   assert.ok(!/echo "\$MM_RELAY_SECRET"/.test(wf), 'the secret is never echoed into a log');
-  assert.equal(wf.split('\n').filter((l) => /^\s+if: steps\.have\.outputs\.yes == 'true'/.test(l)).length >= 8, true, 'every step after the check waits on it');
   // A secret is never read in an `if:` (GitHub cannot), only through the env of the job.
   assert.ok(!/if:.*secrets\./.test(wf));
   assert.ok(!/[A-Za-z0-9_-]{40,}/.test(wf.replace(/https?:\/\/\S+/g, '')), 'something key-shaped in the workflow');

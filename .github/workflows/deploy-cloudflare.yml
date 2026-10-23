@@ -10,6 +10,12 @@ name: Deploy to Cloudflare
 # (Actions → Deploy to Cloudflare → Run workflow). A CI run that failed or was cancelled, a CI run
 # for a pull request, and a branch called master in someone's fork deploy nothing.
 #
+# And only while that commit is still master's tip. CI runs finish in any order — the browser gate
+# takes minutes, and a failed run can be re-run days later — and the concurrency group below only
+# queues deploys in the order they arrive, so an older commit's CI finishing last would put dyna.ink
+# back on it. A commit master has moved past is not deployed (the run says so and stays green): the
+# tip's own CI deploys the tip. A deploy by hand takes master as it stands, and needs no check.
+#
 # Secrets: CLOUDFLARE_API_TOKEN (Pages: Edit, Workers Scripts: Edit) and CLOUDFLARE_ACCOUNT_ID.
 # With either absent — a fork, a repository not yet set up — every deploy step is skipped and
 # the run is green: the first step says whether there is anything to deploy with.
@@ -49,10 +55,18 @@ jobs:
       # The commit CI passed (workflow_run), or master as it stands (by hand).
       DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
-      - name: Is there a Cloudflare account to deploy to?
+      - name: Is there a Cloudflare account to deploy to, and is this commit still master's tip?
         id: have
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
         run: |
-          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "yes=true" >> "$GITHUB_OUTPUT"; else echo "yes=false" >> "$GITHUB_OUTPUT"; echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set — nothing to deploy, which is fine."; fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "yes=false" >> "$GITHUB_OUTPUT"; echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set — nothing to deploy, which is fine."; exit 0; fi
+          if [ "$EVENT" = "workflow_run" ]; then
+            tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/master" --jq .sha) || { echo "Could not read which commit master is at now, so nothing was deployed."; exit 1; }
+            if [ "$tip" != "$DEPLOY_SHA" ]; then echo "yes=false" >> "$GITHUB_OUTPUT"; echo "master has moved on to $tip since CI passed $DEPLOY_SHA — nothing deployed: $tip is deployed by its own CI, so dyna.ink never goes back to an older commit."; exit 0; fi
+          fi
+          echo "yes=true" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         if: steps.have.outputs.yes == 'true'
         with:
@@ -97,10 +111,18 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
-      - name: Is there a Cloudflare account to deploy to?
+      - name: Is there a Cloudflare account to deploy to, and is this commit still master's tip?
         id: have
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
         run: |
-          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "yes=true" >> "$GITHUB_OUTPUT"; else echo "yes=false" >> "$GITHUB_OUTPUT"; echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set — nothing to deploy, which is fine."; fi
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "yes=false" >> "$GITHUB_OUTPUT"; echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set — nothing to deploy, which is fine."; exit 0; fi
+          if [ "$EVENT" = "workflow_run" ]; then
+            tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/master" --jq .sha) || { echo "Could not read which commit master is at now, so nothing was deployed."; exit 1; }
+            if [ "$tip" != "$DEPLOY_SHA" ]; then echo "yes=false" >> "$GITHUB_OUTPUT"; echo "master has moved on to $tip since CI passed $DEPLOY_SHA — nothing deployed: $tip is deployed by its own CI, so dyna.ink never goes back to an older commit."; exit 0; fi
+          fi
+          echo "yes=true" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         if: steps.have.outputs.yes == 'true'
         with:
