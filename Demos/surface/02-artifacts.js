@@ -23,12 +23,17 @@
   //    run script at an OPAQUE origin that cannot reach the page, its storage or
   //    its keys — and, since C6, each srcdoc carries a CSP (`connect-src 'none'`,
   //    13-kinds.js `frameCSP`) so a playing program cannot phone out.
-  //  - the `js` worker (13-kinds.js) is the ONE same-origin code path: a blob
-  //    Worker runs at the PAGE's origin. So it is defended twice: nothing runs
-  //    there until this hand played it HERE (the consent gate, C1), and before
-  //    any code loads the worker strips network, storage, channels and nested
-  //    workers (`WORKER_HARDEN`), keeping only Math/performance/Function/
-  //    postMessage — it cannot open the person's boards or beacon out.
+  //  - the `js` worker (13-kinds.js) runs arbitrary behaviour code, and is
+  //    defended three ways, any one of which alone contains it: nothing runs
+  //    there until this hand played it HERE (the consent gate, C1); the worker
+  //    is created inside an OPAQUE-ORIGIN sandboxed iframe carrying a strict CSP
+  //    (`WORKER_HOST_CSP`: `connect-src 'none'`, and a `script-src` with no
+  //    network host, so even `import()` — syntax a denylist cannot reach — is
+  //    refused, and the null origin makes `indexedDB` throw); and before any
+  //    code loads the worker also strips network, storage, channels and nested
+  //    workers at the prototype chain and the global (`WORKER_HARDEN`), keeping
+  //    only Math/performance/Function/postMessage. It cannot open the person's
+  //    boards or beacon out — so there is no same-origin arbitrary-code path.
   const frames = new Map(); // artifactId -> { wrap, iframe, codeAt }
   // Text made from writing is flipped over to show the ink it came from (v10 F8). Runtime only.
   const flipped = new Set();
@@ -130,9 +135,12 @@
       // (in the log AND consented here); `inLog` is what the log says, for the
       // badge that it is playing for someone else.
       const inLog = !!(s.clocks[id] && s.clocks[id].playing);
-      const playing = inLog && (kind !== 'run' || consentedHere(id));
+      const isProg = kind === 'js' || kind === 'run';
+      const playing = inLog && (!isProg || consentedHere(id));
       f.wrap.classList.toggle('playing', playing);
-      f.wrap.classList.toggle('playing-elsewhere', inLog && !playing && kind === 'run');
+      // A program playing for another hand — a `js` behaviour as much as a run
+      // frame — wears a dashed edge so it reads as standing by, not running.
+      f.wrap.classList.toggle('playing-elsewhere', inLog && isProg && !consentedHere(id));
       f.wrap.classList.toggle('writing', isWritingArtifact(node));
       f.wrap.classList.toggle('flipped', flipped.has(id));
 

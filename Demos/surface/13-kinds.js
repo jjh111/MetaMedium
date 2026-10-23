@@ -467,18 +467,28 @@
   const RUN_DT = 1 / 60;
   const RUN_SPEED_CAP = 400; // world units per second, the cap `steer` uses
 
-  // Defence in depth (C1): the worker is a plain blob worker at the page's
-  // own origin, so a `js` behaviour could in principle open the person's
-  // IndexedDB boards or beacon out. A behaviour needs NONE of that — it
-  // returns a force from a world object — so before any code is loaded the
-  // worker takes away network, storage, channels and nested workers at every
-  // place each lives: the prototype chain of the global AND the global name,
-  // each overridden with a throwing getter so prototype-walking, the Function
-  // constructor and shadowing all hit the same wall. URL.createObjectURL goes
-  // too, so even if a Worker constructor were missed a blob-worker route is
-  // dead. The behaviour keeps only what it uses: Math, performance, Function,
-  // postMessage. This runs in the worker string, so it holds in every engine,
-  // not only where a sandbox attribute would.
+  // A behaviour runs arbitrary code, and needs NONE of the web platform — it
+  // returns a force from a world object — so the worker is sealed in two
+  // independent ways, either of which alone stops a `js` artifact opening the
+  // person's boards or phoning out (C1, C6):
+  //
+  //  1. It runs in an OPAQUE-ORIGIN sandboxed iframe (ensureWorker) carrying a
+  //     strict CSP (`WORKER_HOST_CSP`): `connect-src 'none'` kills fetch, XHR,
+  //     WebSocket, EventSource and a beacon; `script-src` names no network host
+  //     (only inline, eval and blob:), so `import('https://host/?data=…')` — a
+  //     GET governed by script-src, which a denylist of globals can never reach
+  //     because it is syntax, not a property — is refused; and the null origin
+  //     makes `indexedDB` throw, so `mm-boards` is unreachable. The blob worker
+  //     inherits the frame's CSP, so this is a real wall even on a dev origin
+  //     with no page CSP of its own.
+  //  2. Before any code loads, the worker string also strips network, storage,
+  //     channels and nested workers at every place each lives (`WORKER_HARDEN`):
+  //     the prototype chain of the global AND the global name, each a throwing
+  //     getter, so prototype-walking, the Function constructor and shadowing all
+  //     hit the same wall; `URL.createObjectURL` goes too. It cannot block
+  //     `import()`/`eval` (realm syntax), which is why the CSP above is the
+  //     primary wall and this is defence in depth — but it holds in any engine,
+  //     and keeps only Math, performance, Function, postMessage.
   const WORKER_HARDEN = [
     '(function(){',
     '  var G = self;',
@@ -523,7 +533,10 @@
   ].join('\n');
 
   const runtime = {
-    worker: null,
+    worker: null,        // the opaque-origin iframe hosting the behaviour worker
+    nonce: '',           // tags messages to/from that host, so no other frame is heard
+    ready: false,        // the host said its worker is up
+    outbox: [],          // messages posted before the host was ready, flushed on ready
     loaded: new Map(),   // artifactId -> code rep `at` the worker holds
     pending: new Map(),  // artifactId -> watchdog timer for the step in flight
     bodies: new Map(),   // artifactId -> { x, y, vx, vy, heading, age, tick } — offsets from the frame, runtime only
@@ -544,21 +557,76 @@
     if (runtime.log.length > 40) runtime.log.shift();
   }
 
-  function ensureWorker() {
-    if (runtime.worker) return runtime.worker;
-    const url = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
-    const w = new Worker(url);
-    w.onmessage = (e) => onWorkerMessage(e.data);
-    w.onerror = (e) => { flash('runtime: ' + (e.message || 'error')); };
-    runtime.worker = w;
-    runtime.loaded.clear();
-    return w;
+  // The CSP the behaviour worker runs under (its host iframe's): no network of
+  // any kind (`connect-src 'none'`), no module may load from any host
+  // (`script-src` names none, so `import()` is refused), nothing but the inline
+  // bootstrap, eval (the host compiles the behaviour with `new Function`) and
+  // the worker blob. The blob worker inherits this, so it holds on a dev origin
+  // that carries no page CSP of its own.
+  const WORKER_HOST_CSP =
+    "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; connect-src 'none'; worker-src blob:; base-uri 'none'; form-action 'none'";
+
+  // The host document: an opaque-origin sandboxed iframe (allow-scripts, no
+  // allow-same-origin) that makes the real worker from a blob and relays
+  // messages to and from the page, each tagged with a per-host nonce. Because
+  // it is opaque-origin the worker's `indexedDB` throws, and because of the CSP
+  // it cannot reach the network at all.
+  function workerHostDoc(nonce) {
+    return '<!doctype html><html><head><meta charset="utf-8">' +
+      '<meta http-equiv="Content-Security-Policy" content="' + WORKER_HOST_CSP.replace(/"/g, '&quot;') + '">' +
+      '</head><body><script>' +
+      'var WSRC=' + JSON.stringify(WORKER_SRC).replace(/<\//g, '<\\/') + ';' +
+      'var N=' + JSON.stringify(nonce) + ';' +
+      'var w=new Worker(URL.createObjectURL(new Blob([WSRC],{type:"text/javascript"})));' +
+      'w.onmessage=function(e){parent.postMessage({__mmw:N,m:e.data},"*");};' +
+      'w.onerror=function(e){parent.postMessage({__mmw:N,err:(e&&e.message)||"error"},"*");};' +
+      'onmessage=function(e){var d=e.data;if(!d||d.__mmw!==N)return;if(d.kill){try{w.terminate();}catch(_){}return;}w.postMessage(d.m);};' +
+      'parent.postMessage({__mmw:N,ready:true},"*");' +
+      '<\/script></body></html>';
   }
 
-  /** Terminate and forget: after a hang, nothing in the old worker can be trusted. */
+  // The page hears the host once, by the host window's identity AND its nonce,
+  // so a run or mermaid frame posting the same shape is never taken for it.
+  addEventListener('message', (e) => {
+    const host = runtime.worker;
+    if (!host || !host.contentWindow || e.source !== host.contentWindow) return;
+    const d = e.data;
+    if (!d || d.__mmw !== runtime.nonce) return;
+    if (d.ready) { runtime.ready = true; const q = runtime.outbox; runtime.outbox = []; for (const m of q) workerPost(m); return; }
+    if (d.err) { flash('runtime: ' + (d.err || 'error')); return; }
+    if (d.m) onWorkerMessage(d.m);
+  });
+
+  /** Post to the behaviour worker through its host, or queue it until the host is up. */
+  function workerPost(m) {
+    const host = runtime.worker;
+    if (host && runtime.ready && host.contentWindow) host.contentWindow.postMessage({ __mmw: runtime.nonce, m: m }, '*');
+    else runtime.outbox.push(m);
+  }
+
+  function ensureWorker() {
+    if (runtime.worker) return runtime.worker;
+    runtime.nonce = 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+    runtime.ready = false;
+    runtime.outbox = [];
+    const host = document.createElement('iframe');
+    host.setAttribute('sandbox', 'allow-scripts');
+    host.setAttribute('aria-hidden', 'true');
+    host.style.cssText = 'position:absolute;width:0;height:0;border:0;left:-9999px;top:-9999px;';
+    host.srcdoc = workerHostDoc(runtime.nonce);
+    (document.body || document.documentElement).appendChild(host);
+    runtime.worker = host;
+    runtime.loaded.clear();
+    return host;
+  }
+
+  /** Drop the host iframe and forget: after a hang, nothing it held can be trusted. */
   function dropWorker() {
-    if (runtime.worker) runtime.worker.terminate();
+    const host = runtime.worker;
+    if (host) { try { if (host.contentWindow) host.contentWindow.postMessage({ __mmw: runtime.nonce, kill: true }, '*'); } catch (e) {} try { host.remove(); } catch (e) {} }
     runtime.worker = null;
+    runtime.ready = false;
+    runtime.outbox = [];
     runtime.loaded.clear();
     for (const t of runtime.pending.values()) clearTimeout(t);
     runtime.pending.clear();
@@ -745,11 +813,11 @@
       if (runtime.raf) { runtime.raf.cancel(); runtime.raf = 0; }
       return;
     }
-    const w = ensureWorker();
+    ensureWorker();
     for (const r of want) {
       if (runtime.loaded.get(r.id) !== r.key && !runtime.pending.has(r.id)) {
         runtime.loaded.set(r.id, r.key); // in flight; a 'loaded' reply confirms
-        w.postMessage({ type: 'load', id: r.id, code: r.code, at: r.key });
+        workerPost({ type: 'load', id: r.id, code: r.code, at: r.key });
       }
     }
     if (!runtime.raf) runtime.raf = nextFrame(runLoop);
@@ -758,10 +826,10 @@
   /** One step for one artifact: the world posted, the watchdog armed. Returns false when a step is already in flight. */
   function sendStep(s, r, bodies) {
     if (runtime.pending.has(r.id)) return false; // one step in flight per artifact
-    const w = ensureWorker();
+    ensureWorker();
     if (runtime.loaded.get(r.id) !== r.key) {
       runtime.loaded.set(r.id, r.key);
-      w.postMessage({ type: 'load', id: r.id, code: r.code, at: r.key });
+      workerPost({ type: 'load', id: r.id, code: r.code, at: r.key });
     }
     if (!runtime.bodies.has(r.id)) runtime.bodies.set(r.id, { x: 0, y: 0, vx: 0, vy: 0, heading: 0, age: 0, tick: 0 });
     const me = bodies.get(r.id);
@@ -772,7 +840,7 @@
     body.tick = runtime.tick;
     const clock = s.clocks[r.id];
     runtimeNote('out', { type: 'step', id: r.id, tick: runtime.tick });
-    w.postMessage({
+    workerPost({
       type: 'step', id: r.id, tick: runtime.tick, seed: clock ? clock.seed : 1,
       world: { t: body.age, dt: RUN_DT, me: me, others: others, walls: [] },
     });

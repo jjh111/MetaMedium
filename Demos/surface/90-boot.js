@@ -183,6 +183,12 @@
   // render so the grant is in place when the paint decides whether to run.
   session.subscribe(trackConsent);
   session.subscribe(render);
+  // After the paint and consent: a board a load brought in — a room's first
+  // sync, a file, an example, a carry, an embed, or this browser's own board
+  // on a reload — may hold a `js`/`run` play that grants nothing here (C1). Say
+  // so once, in the person's words; the panel offers *Play it here*. Silent on
+  // a board with no standing program, so no other scenario's status changes.
+  session.subscribe(noteStandingPrograms);
   // The library packs the board uses (V1-PLAN §2.3, B3): the pane and the tile follow its log, and so
   // does the pen — a pack naming a notation offers its ports while in use, and takes them back after.
   session.subscribe(packsHeard);
