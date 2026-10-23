@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { AI_CHAT_MODELS, AI_CHAT_WAIT_MS } from '../ai-protocol.mjs';
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '03-seats.js'), 'utf8');
 const S = new Function(
@@ -335,7 +336,10 @@ test('their rows and the pane’s lead say what they are and what is sent where,
   for (const w of [S.houseWords('writer'), S.houseSends('writer'), S.houseSends('reader'), S.houseWaits('reader'), lead.head, lead.line, lead.more]) assert.doesNotMatch(w, /\b(seat|tier|session|participant|artifact|log|event)\b|@cf|127\.0\.0\.1|:\d{2,5}\b/i, w);
   assert.equal(S.HOUSE_SEATS.writer.model, 'writer');
   assert.equal(S.HOUSE_SEATS.reader.model, 'reader');
-  assert.ok(S.HOUSE_WAIT_MS > 60000, 'the page waits longer than the relay does, so the relay’s sentence is the one heard');
+  assert.ok(S.HOUSE_WAIT_MS > AI_CHAT_WAIT_MS, 'the page waits longer than the relay does, so the relay’s sentence is the one heard');
+  // The page asks the relay by the short names the relay knows, and calls them what the relay's list calls them.
+  assert.deepEqual(Object.values(S.HOUSE_SEATS).map((x) => x.model).sort(), Object.keys(AI_CHAT_MODELS).sort());
+  for (const k of Object.keys(AI_CHAT_MODELS)) assert.equal(S.HOUSE_SEATS[k].name, AI_CHAT_MODELS[k].name, k);
   assert.ok(S.HOUSE_PROBE_MS > 0);
 });
 
