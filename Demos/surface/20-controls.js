@@ -64,7 +64,7 @@
     ui.tile(tiles.imp, 'import', '…', { why: 'photos from your library, a picture from the camera, or a file of a known kind — pictures are kept with the board and drawn on it, under your ink. Drop or paste works too' });
     ui.tile(tiles.exp, 'export', '…', { why: 'the board as a file to keep or send: with its pictures, as a picture or a page, or as a board file to open again' });
     const seated = agents.map((a) => modelWords(a)).concat(deciderHost() ? [deciderHost().name + ' (decider)'] : []);
-    ui.tile(tiles.models, 'models', seated.length ? seated.join(', ') : 'none', { on: seated.length > 0, why: 'a model joins as a participant, in a seat if you give it one; it is asked only when you ask' });
+    ui.tile(tiles.models, 'models', seated.length ? seated.join(', ') : 'none', { on: seated.length > 0, why: 'a model reads your writing and makes what you ask for — in a seat if you give it one; it is asked only when you ask' });
     ui.tile(tiles.teach, 'mark', s.commandMark ? s.commandMark.name : 'check ✓', { on: !!s.commandMark, why: 'the mark that turns a circled group into a selection; teach your own' });
     ui.tile(tiles.reset, 'reset', 'fresh board', { why: 'a fresh board under the same name — what this one holds goes to the trash, from which it comes back whole' });
     ui.tile(tiles.help, 'help', '?', { why: 'how to use the canvas, on one page: draw, hold, choose — and models, boards, rooms, your mark, the shortcuts' });

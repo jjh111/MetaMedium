@@ -1,6 +1,6 @@
 // ===== packs (the pane) =====
 // Provides: the library packs pane under the bar (V1-PLAN §2.3, §9 B3) — every pack this build ships
-//   (never a test pack), each with what it adds, whether this board uses it, and *use* / *stop using*;
+//   (never a test pack), each with what it does in the person's words (packDoes) and what it adds, whether this board uses it, and *use* / *stop using*;
 //   the packs this board names that this build lacks, said, with *stop using*. packsFace (the tile's
 //   face), packShort and packSaid (how a match says its pack), renderPacksPane, packsHeard (the session's
 //   listener, subscribed by the boot, which also has the pen follow the board's packs — MM.followPacks).
@@ -39,6 +39,23 @@
     const names = (s.packs || []).map(packShort).concat((s.packNotices || []).map((n) => n.pack + '?'));
     return names.length ? names.join(', ') : 'none';
   }
+
+  /**
+   * What a pack does, in the person's words. A pack's own `describes` is core's and says it in the engine's
+   * ("the flowchart notation in use: its ports on the pen"); the pane says what the hand will notice instead.
+   * Keyed by the pack's id, which is never shown; a pack this table does not know says its own line.
+   */
+  const PACK_DOES = {
+    basics: 'a bubble, and a molecule of three bubbles joined by two bonds — already known, nothing to teach',
+    flowchart: 'lines snap to where a flowchart’s shapes join, and drawing clean and flows come first beside a flowchart',
+    'uml-class': 'lines snap to the sides of a class, and drawing clean and lining up come first beside a class diagram',
+    sequence: 'messages snap to the lifelines, and drawing clean and lining up come first beside a sequence diagram',
+    state: 'arrows snap to the border of each state and to the start dot, and drawing clean and lining up come first beside a state diagram',
+    er: 'lines snap to the border of each entity, and drawing clean and lining up come first beside an ER diagram',
+    mindmap: 'branches snap to the border of each idea, and drawing clean and lining up come first beside a mind map',
+    garment: 'drawing clean and the sizes — and printing the piece at its real size — come first beside a pattern piece',
+  };
+  function packDoes(p) { return PACK_DOES[p.id] || p.describes; }
 
   /** What a pack adds, in a line: its definitions by name, its notation's symbols, its connectors. */
   function packHolds(p) {
@@ -85,7 +102,7 @@
       top.appendChild(document.createTextNode(' '));
       top.appendChild(ui.chip('version ' + p.version, { cls: 'pkRef', why: 'what a pack holds under one version never changes' }));
       if (used) { top.appendChild(document.createTextNode(' ')); top.appendChild(ui.chip('in use', { cls: 'pkUsed', why: 'this board uses it' })); }
-      row.appendChild(pkEl('div', 'pkWhat', p.describes));
+      row.appendChild(pkEl('div', 'pkWhat', packDoes(p)));
       const holds = packHolds(p);
       if (holds) row.appendChild(pkEl('div', 'pkHolds', holds));
       const b = row.appendChild(pkEl('button', '', used ? 'stop using' : 'use'));

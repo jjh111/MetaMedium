@@ -820,7 +820,7 @@
       const node = s.nodes.get(id), b0 = MM.boundsOf(node), pl = bodyPlacement(id);
       const b = pl ? { minX: b0.minX + pl.dx, maxX: b0.maxX + pl.dx, minY: b0.minY + pl.dy, maxY: b0.maxY + pl.dy } : b0;
       ctx.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
-      const w = ctx.measureText((MM.wordOf(node) || '') + '  ·  live').width;
+      const w = ctx.measureText(MM.wordOf(node) || '').width + wpx(40);
       const chrome = { minX: b.minX - wpx(24), minY: b.minY - wpx(40), maxX: Math.max(b.maxX, b.minX + w) + wpx(24), maxY: b.maxY + wpx(24) };
       if (boxMeets(chrome, vb)) out.add(id);
     }

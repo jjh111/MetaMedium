@@ -6,7 +6,7 @@
 // Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models,
 //   palette (contextFor, paletteItems, afforded — what stands beside a selection, and what it put first),
 //   packs (packSaid — a definition from a library pack says its pack), clocks (tankHeldStill — a tank held still under
-//   reduced motion offers *play it here*).
+//   reduced motion offers *play it here*), first (tapWords — a board at rest says "point at one" only to a mouse).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -145,7 +145,7 @@
       const marks = s.contentIds.length - s.artifacts.length, made = s.artifacts.length;
       showPanel('<div class="eyebrow">this board</div>' +
         '<div class="empty">' + esc([marks ? marks + ' mark' + (marks === 1 ? '' : 's') : '', made ? made + ' thing' + (made === 1 ? '' : 's') + ' made' : ''].filter(Boolean).join(' · ')) + '</div>' +
-        '<div class="why">press and hold a mark to see what it is and what it can become — or point at one</div>');
+        '<div class="why">press and hold a mark to see what it is and what it can become' + (tapWords() === 'double-click' ? ' — or point at one' : '') + '</div>');
       return;
     }
 
@@ -343,7 +343,7 @@
         // A label is its maker's word and a name is a bless — neither is the shape rung, whatever tier the maker sits at.
         const basis = g.interpretations[0].basis;
         html += '<div class="srchead"><span class="by">' + esc(g.label) + '</span>' +
-          '<span class="tier">' + (basis === 'label' ? 'label · its maker' : basis === 'name' ? 'named' : tier === 0 ? 'tier 0 · shape' : tier === 2 ? 'tier 2 · model' : 'tier ' + tier) + '</span></div>';
+          '<span class="tier">' + (basis === 'label' ? 'label · its maker' : basis === 'name' ? 'named' : tier === 0 ? 'measured from the ink' : tier === 1 ? 'read by the canvas' : tier === 1.5 ? 'a decision model' : tier === 2 ? 'a model’s reading' : 'a reading') + '</span></div>';
         g.interpretations.forEach((r, i) => {
           html += '<div class="read' + (i === 0 ? ' top' : '') + (r.blessed ? ' blessed' : '') + '">' +
             '<span class="type">' + esc(r.label) + '</span>' +

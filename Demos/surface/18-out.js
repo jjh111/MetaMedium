@@ -294,7 +294,7 @@
     const b = await boardBundleOf(evs);
     const name = bundleName(boardOnScreenName());
     const held = b.assets ? plural(b.assets, 'picture') : 'no pictures';
-    const said = name + ' — the whole board, its ' + plural(evs.length, 'event') + ' and ' + held + ' in one file; boards ▸ from a file… opens it whole' +
+    const said = name + ' — the whole board, its ' + plural(evs.length, 'change') + ' and ' + held + ' in one file; boards ▸ from a file… opens it whole' +
       (b.missing ? ' · ' + plural(b.missing, 'picture') + ' this device does not hold could not be put in it' : '');
     return { name: name, blob: new Blob(b.zip.parts, { type: 'application/zip' }), assets: b.assets, missing: b.missing, events: evs.length, said: said };
   }

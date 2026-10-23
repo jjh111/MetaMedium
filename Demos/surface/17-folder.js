@@ -1518,7 +1518,7 @@
   /** A big board: say so, and let the line paint before the replay holds the thread. */
   function boardOpening(n) {
     if (n < 400) return Promise.resolve();
-    say('opening the board kept in this browser — ' + n + ' events…', 600000);
+    say('opening the board kept in this browser — ' + n.toLocaleString('en') + ' changes to read…', 600000);
     return new Promise((resolve) => {
       let done = false;
       const go = () => { if (!done) { done = true; resolve(); } };
@@ -2044,7 +2044,7 @@
       // name — this tab's own included, which both hands that share it hear —
       // and a truncated history.
       const notes = roomNotices();
-      return 'live ' + roomShort(folder.name) + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') +
+      return 'in room ' + roomShort(folder.name) + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') +
         (notes.length ? ' · ' + notes.join(' · ') : '') + (folder.error ? ' · ' + folder.error : '');
     }
     const n = folder.entries.length;

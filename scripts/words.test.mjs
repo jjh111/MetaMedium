@@ -67,10 +67,6 @@ const ALLOWLIST = [
     files: ['Demos/surface/04-models.js'], at: /:11434|127\.0\.0\.1|participant/, optional: true,
   },
   {
-    why: 'the models tile’s tooltip stands in the house-models lane’s hunk of 20-controls.js (the tile’s face is theirs this cycle)',
-    files: ['Demos/surface/20-controls.js'], at: /^a model joins as a participant/, optional: true,
-  },
-  {
     why: 'the door, under the models pane’s *advanced*: an MCP server of your own through a bridge you start in a terminal — a developer’s way in, and its placeholder is the address that bridge listens on',
     files: ['Demos/surface/24-seat.js'], at: /^http:\/\/127\.0\.0\.1:8030 — the door$/,
   },
@@ -100,27 +96,39 @@ function shownOf(s) {
 
 /** A string of code, not words: a program the surface builds for a frame, a style, a selector. */
 const isCode = (s) => /^\s*(?:\/\/|\/\*|var |let |const |function\b|return\b|if \(|for \(|try \{|\}|\{|#[\w-]+[ ,.{]|\.[\w-]+[ ,{])/.test(s) || /=>|\);\s*$|;\s*$|\{[^}]*:[^}]*;/.test(s);
+/** Two words, as a person reads them: side by side, or either side of a number or a dot (`tier 0 · shape`). */
+const WORDS = /[a-z]{2,}(?:\s+|\s*[\d·—–]+\s*)+[a-z]{2,}/i;
 /** A line that puts a single word on screen: an eyebrow, a tile, a row, the status line, a pill's label. */
 const SHOWS_ONE_WORD = /eyebrow|ui\.tile\(|ui\.row\(|\bsay\(|\bflash\(|textContent|label:|\.title\s*=|'<span class="k">/;
 
-/** Every piece of words a person sees in each file, with where it stands. */
-function pieces() {
+/** Every piece of words a person sees in one fragment's source, with where it stands. */
+function piecesOfSource(file, src) {
   const out = [];
-  for (const file of FRAGMENTS) {
-    const src = read(file);
+  {
     for (const [a, b] of stringRanges(src)) {
       const s = src.slice(a, b);
       if (!s.trim() || isCode(s)) continue;
       const line = lineOf(src, a);
+      // A piece of a sentence joined round a value — `'in room ' + name`, `' events…'`, `plural(n, 'event')`, a
+      // fallback `|| 'artifact'` said where the name would be — is words a person reads, however few of them it holds.
+      const before = src.slice(src.lastIndexOf('\n', a - 1) + 1, a - 1);
+      const inSentence = /^\s|\s$/.test(s) || /\bplural\w*\([^()]*,\s*$/.test(before) || /(?:\|\||\?\?)\s*$/.test(before);
       for (const p of shownOf(s)) {
-        const words = /[a-z]{2,}\s+[a-z]{2,}/i.test(p);
+        const words = WORDS.test(p);
         // One word compared in code (folder.how === 'live') is a mode's name, never shown.
         const compared = /[!=]==?\s*$/.test(src.slice(Math.max(0, a - 6), a - 1)) || /^\s*[!=]==?/.test(src.slice(b + 1, b + 6));
-        if (!words && (compared || !(BANNED.some((x) => x.re.test(p)) && /^[\w@:.?=-]+$/.test(p) && SHOWS_ONE_WORD.test(lineAround(src, a))))) continue;
+        if (!words && (compared || !(BANNED.some((x) => x.re.test(p)) && (inSentence || (/^[\w@:.?=-]+$/.test(p) && SHOWS_ONE_WORD.test(lineAround(src, a))))))) continue;
         out.push({ file, line, text: p });
       }
     }
   }
+  return out;
+}
+
+/** Every piece of words a person sees in each file, with where it stands. */
+function pieces() {
+  const out = [];
+  for (const file of FRAGMENTS) out.push(...piecesOfSource(file, read(file)));
   {
     const html = read(PAGE);
     let seen = html.replace(/<!--[\s\S]*?-->/g, (c) => c.replace(/[^\n]/g, ' '));
@@ -161,6 +169,21 @@ test('what a string shows is its words and its titles — never its markup, and 
   assert.ok(isCode('  var t0 = performance.now(), last = t0;'));
   assert.ok(isCode('#out .node rect,#out .node polygon{fill:transparent}'));
   assert.ok(!isCode('the board as a picture'));
+});
+
+test('a word joined into a sentence round a value is read, and a key, a mode or a compared word is not', () => {
+  const src = [
+    "say('in room ' + room + ' · you are ' + me);",
+    "return 'live ' + roomShort(name) + ' · you are ' + me;",
+    "const said = name + ' — its ' + plural(n, 'event') + ' in one file';",
+    "const what = wordOf(node) || 'artifact';",
+    "html += '<span class=\"tier\">' + (tier === 0 ? 'tier 0 · shape' : 'tier ' + tier) + '</span>';",
+    "if (folder.how === 'live') go();",
+    "const ch = new BroadcastChannel('mm-live:' + room);",
+    "params.has('live');",
+  ].join('\n');
+  const read = piecesOfSource('x.js', src).map((p) => p.text).filter((t) => BANNED.some((b) => b.re.test(t)));
+  assert.deepEqual(read, ['live', 'event', 'artifact', 'tier 0 · shape', 'tier']);
 });
 
 test('the banned words are found where a person reads them', () => {

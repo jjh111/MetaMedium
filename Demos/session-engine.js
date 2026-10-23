@@ -282,9 +282,9 @@
       const eats = (vertical ? (side === 'left' ? p.right - v.left : v.right - p.left) / vw
         : (side === 'top' ? p.bottom - v.top : v.bottom - p.top) / vh);
       if (!hugs) { docks.push({ id: p.id, edge: 'none', why: 'floats, ' + Math.round(hug[side]) + 'px off the ' + side }); continue; }
-      if (cover < DOCK_COVER) { docks.push({ id: p.id, edge: 'none', why: 'covers ' + Math.round(cover * 100) + '% of the ' + side + ' edge' }); continue; }
+      if (cover < DOCK_COVER) { docks.push({ id: p.id, edge: 'none', why: 'covers ' + Math.round(cover * 100) + '% of the ' + side + ' side' }); continue; }
       if (eats > DOCK_MAX) { docks.push({ id: p.id, edge: 'none', why: 'would eat ' + Math.round(eats * 100) + '% of the canvas' }); continue; }
-      docks.push({ id: p.id, edge: side, why: 'covers ' + Math.round(cover * 100) + '% of the ' + side + ' edge' });
+      docks.push({ id: p.id, edge: side, why: 'covers ' + Math.round(cover * 100) + '% of the ' + side + ' side' });
       if (side === 'left') free.left = Math.max(free.left, p.right);
       else if (side === 'right') free.right = Math.min(free.right, p.left);
       else if (side === 'top') free.top = Math.max(free.top, p.bottom);
@@ -5599,7 +5599,7 @@
       const node = s.nodes.get(id), b0 = MM.boundsOf(node), pl = bodyPlacement(id);
       const b = pl ? { minX: b0.minX + pl.dx, maxX: b0.maxX + pl.dx, minY: b0.minY + pl.dy, maxY: b0.maxY + pl.dy } : b0;
       ctx.font = wpx(11).toFixed(2) + "px 'Space Grotesk', system-ui, sans-serif";
-      const w = ctx.measureText((MM.wordOf(node) || '') + '  ·  live').width;
+      const w = ctx.measureText(MM.wordOf(node) || '').width + wpx(40);
       const chrome = { minX: b.minX - wpx(24), minY: b.minY - wpx(40), maxX: Math.max(b.maxX, b.minX + w) + wpx(24), maxY: b.maxY + wpx(24) };
       if (boxMeets(chrome, vb)) out.add(id);
     }
@@ -7834,8 +7834,8 @@
     filter.className = 'filter';
     filter.setAttribute('autocomplete', 'off');
     filter.setAttribute('spellcheck', 'false');
-    const onArt = sum.onArtifact ? (MM.wordOf(s.nodes.get(sum.onArtifact.artifactId)) || 'artifact') : null;
-    filter.placeholder = onArt ? 'on ' + onArt + ' — type what to change…' : sum.enclosedIds.length + ' mark' + (sum.enclosedIds.length === 1 ? '' : 's') + ' — a verb, a name, or what to make…';
+    const onArt = sum.onArtifact ? (MM.wordOf(s.nodes.get(sum.onArtifact.artifactId)) || null) : undefined;
+    filter.placeholder = onArt ? 'on ' + onArt + ' — type what to change…' : onArt === null ? 'on the thing made — type what to change…' : sum.enclosedIds.length + ' mark' + (sum.enclosedIds.length === 1 ? '' : 's') + ' — a verb, a name, or what to make…';
     filter.onkeydown = onPaletteKey;
     filter.oninput = () => { paletteNavigated = false; paletteIndex = -1; paintField(filter.value); meaningSoon(filter.value); };
     top.appendChild(filter);
@@ -8456,7 +8456,7 @@
 // Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models,
 //   palette (contextFor, paletteItems, afforded — what stands beside a selection, and what it put first),
 //   packs (packSaid — a definition from a library pack says its pack), clocks (tankHeldStill — a tank held still under
-//   reduced motion offers *play it here*).
+//   reduced motion offers *play it here*), first (tapWords — a board at rest says "point at one" only to a mouse).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -8595,7 +8595,7 @@
       const marks = s.contentIds.length - s.artifacts.length, made = s.artifacts.length;
       showPanel('<div class="eyebrow">this board</div>' +
         '<div class="empty">' + esc([marks ? marks + ' mark' + (marks === 1 ? '' : 's') : '', made ? made + ' thing' + (made === 1 ? '' : 's') + ' made' : ''].filter(Boolean).join(' · ')) + '</div>' +
-        '<div class="why">press and hold a mark to see what it is and what it can become — or point at one</div>');
+        '<div class="why">press and hold a mark to see what it is and what it can become' + (tapWords() === 'double-click' ? ' — or point at one' : '') + '</div>');
       return;
     }
 
@@ -8793,7 +8793,7 @@
         // A label is its maker's word and a name is a bless — neither is the shape rung, whatever tier the maker sits at.
         const basis = g.interpretations[0].basis;
         html += '<div class="srchead"><span class="by">' + esc(g.label) + '</span>' +
-          '<span class="tier">' + (basis === 'label' ? 'label · its maker' : basis === 'name' ? 'named' : tier === 0 ? 'tier 0 · shape' : tier === 2 ? 'tier 2 · model' : 'tier ' + tier) + '</span></div>';
+          '<span class="tier">' + (basis === 'label' ? 'label · its maker' : basis === 'name' ? 'named' : tier === 0 ? 'measured from the ink' : tier === 1 ? 'read by the canvas' : tier === 1.5 ? 'a decision model' : tier === 2 ? 'a model’s reading' : 'a reading') + '</span></div>';
         g.interpretations.forEach((r, i) => {
           html += '<div class="read' + (i === 0 ? ' top' : '') + (r.blessed ? ' blessed' : '') + '">' +
             '<span class="type">' + esc(r.label) + '</span>' +
@@ -14542,7 +14542,7 @@
   /** A big board: say so, and let the line paint before the replay holds the thread. */
   function boardOpening(n) {
     if (n < 400) return Promise.resolve();
-    say('opening the board kept in this browser — ' + n + ' events…', 600000);
+    say('opening the board kept in this browser — ' + n.toLocaleString('en') + ' changes to read…', 600000);
     return new Promise((resolve) => {
       let done = false;
       const go = () => { if (!done) { done = true; resolve(); } };
@@ -15068,7 +15068,7 @@
       // name — this tab's own included, which both hands that share it hear —
       // and a truncated history.
       const notes = roomNotices();
-      return 'live ' + roomShort(folder.name) + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') +
+      return 'in room ' + roomShort(folder.name) + ' · you are ' + handLabel(folder.me) + (here.length ? ' · with ' + here.join(', ') : ' · alone so far') +
         (notes.length ? ' · ' + notes.join(' · ') : '') + (folder.error ? ' · ' + folder.error : '');
     }
     const n = folder.entries.length;
@@ -16107,7 +16107,7 @@
     const b = await boardBundleOf(evs);
     const name = bundleName(boardOnScreenName());
     const held = b.assets ? plural(b.assets, 'picture') : 'no pictures';
-    const said = name + ' — the whole board, its ' + plural(evs.length, 'event') + ' and ' + held + ' in one file; boards ▸ from a file… opens it whole' +
+    const said = name + ' — the whole board, its ' + plural(evs.length, 'change') + ' and ' + held + ' in one file; boards ▸ from a file… opens it whole' +
       (b.missing ? ' · ' + plural(b.missing, 'picture') + ' this device does not hold could not be put in it' : '');
     return { name: name, blob: new Blob(b.zip.parts, { type: 'application/zip' }), assets: b.assets, missing: b.missing, events: evs.length, said: said };
   }
@@ -16536,7 +16536,7 @@
     ui.tile(tiles.imp, 'import', '…', { why: 'photos from your library, a picture from the camera, or a file of a known kind — pictures are kept with the board and drawn on it, under your ink. Drop or paste works too' });
     ui.tile(tiles.exp, 'export', '…', { why: 'the board as a file to keep or send: with its pictures, as a picture or a page, or as a board file to open again' });
     const seated = agents.map((a) => modelWords(a)).concat(deciderHost() ? [deciderHost().name + ' (decider)'] : []);
-    ui.tile(tiles.models, 'models', seated.length ? seated.join(', ') : 'none', { on: seated.length > 0, why: 'a model joins as a participant, in a seat if you give it one; it is asked only when you ask' });
+    ui.tile(tiles.models, 'models', seated.length ? seated.join(', ') : 'none', { on: seated.length > 0, why: 'a model reads your writing and makes what you ask for — in a seat if you give it one; it is asked only when you ask' });
     ui.tile(tiles.teach, 'mark', s.commandMark ? s.commandMark.name : 'check ✓', { on: !!s.commandMark, why: 'the mark that turns a circled group into a selection; teach your own' });
     ui.tile(tiles.reset, 'reset', 'fresh board', { why: 'a fresh board under the same name — what this one holds goes to the trash, from which it comes back whole' });
     ui.tile(tiles.help, 'help', '?', { why: 'how to use the canvas, on one page: draw, hold, choose — and models, boards, rooms, your mark, the shortcuts' });
@@ -17515,7 +17515,7 @@
 
 // ===== packs (the pane) =====
 // Provides: the library packs pane under the bar (V1-PLAN §2.3, §9 B3) — every pack this build ships
-//   (never a test pack), each with what it adds, whether this board uses it, and *use* / *stop using*;
+//   (never a test pack), each with what it does in the person's words (packDoes) and what it adds, whether this board uses it, and *use* / *stop using*;
 //   the packs this board names that this build lacks, said, with *stop using*. packsFace (the tile's
 //   face), packShort and packSaid (how a match says its pack), renderPacksPane, packsHeard (the session's
 //   listener, subscribed by the boot, which also has the pen follow the board's packs — MM.followPacks).
@@ -17554,6 +17554,23 @@
     const names = (s.packs || []).map(packShort).concat((s.packNotices || []).map((n) => n.pack + '?'));
     return names.length ? names.join(', ') : 'none';
   }
+
+  /**
+   * What a pack does, in the person's words. A pack's own `describes` is core's and says it in the engine's
+   * ("the flowchart notation in use: its ports on the pen"); the pane says what the hand will notice instead.
+   * Keyed by the pack's id, which is never shown; a pack this table does not know says its own line.
+   */
+  const PACK_DOES = {
+    basics: 'a bubble, and a molecule of three bubbles joined by two bonds — already known, nothing to teach',
+    flowchart: 'lines snap to where a flowchart’s shapes join, and drawing clean and flows come first beside a flowchart',
+    'uml-class': 'lines snap to the sides of a class, and drawing clean and lining up come first beside a class diagram',
+    sequence: 'messages snap to the lifelines, and drawing clean and lining up come first beside a sequence diagram',
+    state: 'arrows snap to the border of each state and to the start dot, and drawing clean and lining up come first beside a state diagram',
+    er: 'lines snap to the border of each entity, and drawing clean and lining up come first beside an ER diagram',
+    mindmap: 'branches snap to the border of each idea, and drawing clean and lining up come first beside a mind map',
+    garment: 'drawing clean and the sizes — and printing the piece at its real size — come first beside a pattern piece',
+  };
+  function packDoes(p) { return PACK_DOES[p.id] || p.describes; }
 
   /** What a pack adds, in a line: its definitions by name, its notation's symbols, its connectors. */
   function packHolds(p) {
@@ -17600,7 +17617,7 @@
       top.appendChild(document.createTextNode(' '));
       top.appendChild(ui.chip('version ' + p.version, { cls: 'pkRef', why: 'what a pack holds under one version never changes' }));
       if (used) { top.appendChild(document.createTextNode(' ')); top.appendChild(ui.chip('in use', { cls: 'pkUsed', why: 'this board uses it' })); }
-      row.appendChild(pkEl('div', 'pkWhat', p.describes));
+      row.appendChild(pkEl('div', 'pkWhat', packDoes(p)));
       const holds = packHolds(p);
       if (holds) row.appendChild(pkEl('div', 'pkHolds', holds));
       const b = row.appendChild(pkEl('button', '', used ? 'stop using' : 'use'));

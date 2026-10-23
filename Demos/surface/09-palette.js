@@ -949,8 +949,8 @@
     filter.className = 'filter';
     filter.setAttribute('autocomplete', 'off');
     filter.setAttribute('spellcheck', 'false');
-    const onArt = sum.onArtifact ? (MM.wordOf(s.nodes.get(sum.onArtifact.artifactId)) || 'artifact') : null;
-    filter.placeholder = onArt ? 'on ' + onArt + ' — type what to change…' : sum.enclosedIds.length + ' mark' + (sum.enclosedIds.length === 1 ? '' : 's') + ' — a verb, a name, or what to make…';
+    const onArt = sum.onArtifact ? (MM.wordOf(s.nodes.get(sum.onArtifact.artifactId)) || null) : undefined;
+    filter.placeholder = onArt ? 'on ' + onArt + ' — type what to change…' : onArt === null ? 'on the thing made — type what to change…' : sum.enclosedIds.length + ' mark' + (sum.enclosedIds.length === 1 ? '' : 's') + ' — a verb, a name, or what to make…';
     filter.onkeydown = onPaletteKey;
     filter.oninput = () => { paletteNavigated = false; paletteIndex = -1; paintField(filter.value); meaningSoon(filter.value); };
     top.appendChild(filter);
