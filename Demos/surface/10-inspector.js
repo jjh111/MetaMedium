@@ -5,7 +5,8 @@
 // Provides too: firstLoopHtml (the empty board's steps, also the first-run sheet's, 27-first.js).
 // Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models,
 //   palette (contextFor, paletteItems, afforded — what stands beside a selection, and what it put first),
-//   packs (packSaid — a definition from a library pack says its pack).
+//   packs (packSaid — a definition from a library pack says its pack), clocks (tankHeldStill — a tank held still under
+//   reduced motion offers *play it here*).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -57,13 +58,16 @@
     // clock the log says is playing, but that another hand set, stands as its
     // source and offers *Play it here* — one tap, this hand's own play.
     const elsewhere = c && c.playing && isProgram(s, id) && !consentedHere(id);
+    // Under reduced motion a tank this hand did not start here holds still (C4, 14-clocks.js): its play is the person's.
+    const still = !elsewhere && c && c.playing && !isProgram(s, id) && tankHeldStill(s, id);
     const who = elsewhere ? session.clockAuthor(id) : null;
     const stateText = !c ? 'not played'
       : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : 'played — not running in this tab yet')
+      : still ? 'playing — held still here, since this device asks for less motion'
       : c.playing ? 'playing · t = ' + tankTime(id).toFixed(1) + 's' : 'paused' + (c.reason ? ' — ' + c.reason : '') + ' · t = ' + tankTime(id).toFixed(1) + 's';
     return '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>' +
       '<div class="acts">' +
-      (elsewhere
+      (elsewhere || still
         ? '<button class="mini" data-act="clock-play-here" data-id="' + esc(id) + '">play it here</button>'
         : c && c.playing
         ? '<button class="mini" data-act="clock-pause" data-id="' + esc(id) + '">pause</button>'

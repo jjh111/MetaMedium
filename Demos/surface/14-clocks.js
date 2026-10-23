@@ -2,7 +2,8 @@
 // Provides: the tank — definitions and their instances as bodies, the fixed-step loop, determinism
 //   (positions are a function of the log and the clock's time), bodyPlacement(id) for render,
 //   tankTime/tankCount for the panel, stepTank for tests.
-// Uses: core (session, state, MM), render (render), kinds (runtimeBroken).
+// Provides too: tankHeldStill(s, id) — under reduced motion a tank this hand did not start here holds still (C4).
+// Uses: core (session, state, MM), render (render), kinds (runtimeBroken), the first hour (27-first.js: motionReduced).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -255,8 +256,31 @@
     return null;
   }
 
+  // ===== Less motion (the critic's C4) ======================================
+  // Under prefers-reduced-motion nothing moves that the person did not start: a tank plays here only when this
+  // hand played it live, in this sitting — a play this tab wrote (no `by`), appended as the person tapped it. A
+  // play that came in with a loaded board (a reload, a file, an example, a room's line) holds the tank still where
+  // it stands, and the panel offers *play it here*, the person's own play. Runtime only, like the consent gate
+  // (13-kinds.js): the log still says the clock plays, on every board. A new events array (a load, an undo) keeps
+  // a play this hand gave while the latest play is still its own.
+  const tankStartedHere = new Set();
+  let tankSeenArr = null, tankSeenLen = 0;
+  function trackTankPlays(s) {
+    const evs = session.getEvents();
+    if (evs !== tankSeenArr) {
+      tankSeenArr = evs; tankSeenLen = evs.length;
+      for (const id of [...tankStartedHere]) { const c = s.clocks[id]; if (!(c && c.playing && session.clockAuthor(id) === null)) tankStartedHere.delete(id); }
+      return;
+    }
+    for (let i = tankSeenLen; i < evs.length; i++) { const ev = evs[i]; if (ev && ev.type === 'clock' && ev.op === 'play' && !ev.by) tankStartedHere.add(ev.nodeId); }
+    tankSeenLen = evs.length;
+  }
+  /** Whether a playing tank holds still here: the person asked for less motion and did not start it in this tab. */
+  function tankHeldStill(s, id) { return motionReduced() && !tankStartedHere.has(id); }
+
   /** Called from every render: keep the tanks true to the log, and run the loop while anything plays. */
   function syncTank(s) {
+    trackTankPlays(s);
     const stamp = logStamp();
     const changed = stamp !== tank.logStamp;
     tank.logStamp = stamp;
@@ -286,7 +310,7 @@
     }
     for (const defId of tank.defs.keys()) if (!wanted.has(defId)) tank.defs.delete(defId);
     refreshPlacements();
-    const playing = [...wanted].some((id) => s.clocks[id].playing);
+    const playing = [...wanted].some((id) => s.clocks[id].playing && !tankHeldStill(s, id));
     if (playing && !tank.raf) { tank.last = performance.now(); tank.acc = 0; tank.raf = nextFrame(tankLoop); }
     if (!playing && tank.raf) { tank.raf.cancel(); tank.raf = 0; }
   }
@@ -296,7 +320,7 @@
     // syncTank, and a loop that looked stopped from there started a second
     // one and zeroed the accumulator — the tank ran at half speed.
     const s = session.getState();
-    const playing = Object.keys(s.clocks).filter((id) => s.clocks[id].playing && tank.defs.has(id));
+    const playing = Object.keys(s.clocks).filter((id) => s.clocks[id].playing && tank.defs.has(id) && !tankHeldStill(s, id));
     if (!playing.length) { tank.raf = 0; return; }
     tank.acc += Math.min(MAX_FRAME_MS, now - tank.last);
     tank.last = now;

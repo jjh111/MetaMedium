@@ -15,7 +15,8 @@
 //   X4   an example opens fitted to the free ground — every mark clear of the panel — with nothing inspected until
 //        the hand points at a mark (UX-11), on the desktop and on the phone
 //   X5   reduced motion (C4): with the preference, the working dot and the find ring hold still between frames,
-//        and the film's program waits for the person's own play; without it, they move and it plays
+//        and the film's program waits for the person's own play; without it, they move and it plays; X5c a tank the
+//        person did not start in this tab holds still, with *play it here* in the panel
 //   X6   polish: Make it Mermaid's card is brought into view (UX-13); the export pane's buttons fit it, with plain
 //        labels and the file's name in each tooltip (UX-12); over the grid the panel stands aside, the View group's
 //        tile is "layout", and at 390 px the zoom tile keeps *fit* (UX-14); a new text and its editor stand clear of
@@ -312,6 +313,45 @@ export async function runUx(browser, servers, { freshContext }) {
     }
     check(`X5b. the film's example under reduced motion waits for the person's own play — ${film.reduced.runsHere} of ${film.reduced.programs} running, said: “${film.reduced.status.slice(0, 80)}” — and without the preference it plays (${film.normal.runsHere} of ${film.normal.programs})`,
       film.reduced.programs > 0 && film.reduced.runsHere === 0 && /less motion/.test(film.reduced.status) && film.normal.runsHere === film.normal.programs && film.normal.programs > 0, film);
+  });
+
+  // ---- X5c. a tank the person did not start holds still under reduced motion ---------------------------------------
+  await record('X5c', async () => {
+    const tanks = {};
+    for (const [label, options] of [['reduced', Object.assign({ reducedMotion: 'reduce' }, DESKTOP)], ['normal', Object.assign({ reducedMotion: 'no-preference' }, DESKTOP)]]) {
+      const { page, guards } = await open(options, APP, 'ux-tank-' + label);
+      // A definition: a box held and blessed, its clock played by this hand — then the board opened again (a reload,
+      // a file, an example): the play came in with the board, and the person did not start it here.
+      await draw(page, box(420, 400, 160, 110));
+      await hold(page, 420, 450);
+      const defId = await page.evaluate(() => {
+        const mm = window.__mm, s = mm.session.getState();
+        const id = mm.session.bless({ summonId: s.summon.id, name: 'drifter', at: Date.now() });
+        mm.session.clock({ nodeId: id, op: 'play', at: Date.now() });
+        return id;
+      });
+      await page.waitForTimeout(400);
+      const startedHere = await page.evaluate((id) => ({ t: window.__mm.tank().time(id), still: window.__mm.tankHeldStill(id) }), defId);
+      // The page opened again with this board (what a reload of a kept board does): the play is in the log, not this tab's.
+      const events = await page.evaluate(() => JSON.parse(JSON.stringify(window.__mm.session.getEvents())));
+      await page.reload({ waitUntil: 'load' });
+      await waitReady(page);
+      await page.evaluate((evs) => { window.__mm.session.load(evs); }, events);
+      await page.waitForTimeout(200);
+      const a = await page.evaluate((id) => window.__mm.tank().time(id), defId);
+      await page.waitForTimeout(500);
+      const b = await page.evaluate((id) => ({ t: window.__mm.tank().time(id), still: window.__mm.tankHeldStill(id), playing: !!(window.__mm.session.getState().clocks[id] || {}).playing }), defId);
+      // The panel offers the person's own play.
+      const offer = await page.evaluate(() => { const btn = document.querySelector('#inspector button[data-act="clock-play-here"]'); return btn ? (btn.click(), true) : false; });
+      await page.waitForTimeout(500);
+      const c = await page.evaluate((id) => ({ t: window.__mm.tank().time(id), still: window.__mm.tankHeldStill(id) }), defId);
+      tanks[label] = { startedHere, loaded: { a, b }, offer, played: c };
+      await guards.context.close();
+    }
+    const r = tanks.reduced, n = tanks.normal;
+    check(`X5c. under reduced motion a tank played here moves (t ${r.startedHere.t.toFixed(2)} s); opened again with the board, it holds still though the board says it plays (t ${r.loaded.a.toFixed(2)} → ${r.loaded.b.t.toFixed(2)} s) and the panel offers “play it here”, which moves it (t ${r.played.t.toFixed(2)} s); without the preference the opened tank plays on (t ${n.loaded.a.toFixed(2)} → ${n.loaded.b.t.toFixed(2)} s)`,
+      r.startedHere.t > 0 && !r.startedHere.still && r.loaded.b.playing && r.loaded.b.still && r.loaded.a === r.loaded.b.t && r.offer && !r.played.still && r.played.t > r.loaded.b.t &&
+      !n.loaded.b.still && n.loaded.b.t > n.loaded.a, tanks);
   });
 
   // ---- X6. polish ---------------------------------------------------------------------------------------------------

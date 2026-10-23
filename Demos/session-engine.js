@@ -4734,7 +4734,8 @@
     else if (act === 'split') session.splitWord(id, Date.now());
     else if (act === 'clock-play') session.clock({ nodeId: id, op: 'play', at: Date.now() });
     // Play another hand's program HERE: this hand's own play, so the code runs in this tab only by the person's tap (C1).
-    else if (act === 'clock-play-here') playHere(id);
+    // A program another hand set playing — or a tank held still under reduced motion (C4) — plays by this hand's own play.
+    else if (act === 'clock-play-here') { if (!playHere(id)) { session.clock({ nodeId: id, op: 'play', at: Date.now() }); flash('playing it here'); } }
     else if (act === 'clock-pause') session.clock({ nodeId: id, op: 'pause', at: Date.now() });
     else if (act === 'clock-reset') session.clock({ nodeId: id, op: 'reset', at: Date.now() });
     else if (act === 'behave-use') {
@@ -8454,7 +8455,8 @@
 // Provides too: firstLoopHtml (the empty board's steps, also the first-run sheet's, 27-first.js).
 // Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models,
 //   palette (contextFor, paletteItems, afforded — what stands beside a selection, and what it put first),
-//   packs (packSaid — a definition from a library pack says its pack).
+//   packs (packSaid — a definition from a library pack says its pack), clocks (tankHeldStill — a tank held still under
+//   reduced motion offers *play it here*).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -8506,13 +8508,16 @@
     // clock the log says is playing, but that another hand set, stands as its
     // source and offers *Play it here* — one tap, this hand's own play.
     const elsewhere = c && c.playing && isProgram(s, id) && !consentedHere(id);
+    // Under reduced motion a tank this hand did not start here holds still (C4, 14-clocks.js): its play is the person's.
+    const still = !elsewhere && c && c.playing && !isProgram(s, id) && tankHeldStill(s, id);
     const who = elsewhere ? session.clockAuthor(id) : null;
     const stateText = !c ? 'not played'
       : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : 'played — not running in this tab yet')
+      : still ? 'playing — held still here, since this device asks for less motion'
       : c.playing ? 'playing · t = ' + tankTime(id).toFixed(1) + 's' : 'paused' + (c.reason ? ' — ' + c.reason : '') + ' · t = ' + tankTime(id).toFixed(1) + 's';
     return '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>' +
       '<div class="acts">' +
-      (elsewhere
+      (elsewhere || still
         ? '<button class="mini" data-act="clock-play-here" data-id="' + esc(id) + '">play it here</button>'
         : c && c.playing
         ? '<button class="mini" data-act="clock-pause" data-id="' + esc(id) + '">pause</button>'
@@ -10272,7 +10277,8 @@
 // Provides: the tank — definitions and their instances as bodies, the fixed-step loop, determinism
 //   (positions are a function of the log and the clock's time), bodyPlacement(id) for render,
 //   tankTime/tankCount for the panel, stepTank for tests.
-// Uses: core (session, state, MM), render (render), kinds (runtimeBroken).
+// Provides too: tankHeldStill(s, id) — under reduced motion a tank this hand did not start here holds still (C4).
+// Uses: core (session, state, MM), render (render), kinds (runtimeBroken), the first hour (27-first.js: motionReduced).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -10525,8 +10531,31 @@
     return null;
   }
 
+  // ===== Less motion (the critic's C4) ======================================
+  // Under prefers-reduced-motion nothing moves that the person did not start: a tank plays here only when this
+  // hand played it live, in this sitting — a play this tab wrote (no `by`), appended as the person tapped it. A
+  // play that came in with a loaded board (a reload, a file, an example, a room's line) holds the tank still where
+  // it stands, and the panel offers *play it here*, the person's own play. Runtime only, like the consent gate
+  // (13-kinds.js): the log still says the clock plays, on every board. A new events array (a load, an undo) keeps
+  // a play this hand gave while the latest play is still its own.
+  const tankStartedHere = new Set();
+  let tankSeenArr = null, tankSeenLen = 0;
+  function trackTankPlays(s) {
+    const evs = session.getEvents();
+    if (evs !== tankSeenArr) {
+      tankSeenArr = evs; tankSeenLen = evs.length;
+      for (const id of [...tankStartedHere]) { const c = s.clocks[id]; if (!(c && c.playing && session.clockAuthor(id) === null)) tankStartedHere.delete(id); }
+      return;
+    }
+    for (let i = tankSeenLen; i < evs.length; i++) { const ev = evs[i]; if (ev && ev.type === 'clock' && ev.op === 'play' && !ev.by) tankStartedHere.add(ev.nodeId); }
+    tankSeenLen = evs.length;
+  }
+  /** Whether a playing tank holds still here: the person asked for less motion and did not start it in this tab. */
+  function tankHeldStill(s, id) { return motionReduced() && !tankStartedHere.has(id); }
+
   /** Called from every render: keep the tanks true to the log, and run the loop while anything plays. */
   function syncTank(s) {
+    trackTankPlays(s);
     const stamp = logStamp();
     const changed = stamp !== tank.logStamp;
     tank.logStamp = stamp;
@@ -10556,7 +10585,7 @@
     }
     for (const defId of tank.defs.keys()) if (!wanted.has(defId)) tank.defs.delete(defId);
     refreshPlacements();
-    const playing = [...wanted].some((id) => s.clocks[id].playing);
+    const playing = [...wanted].some((id) => s.clocks[id].playing && !tankHeldStill(s, id));
     if (playing && !tank.raf) { tank.last = performance.now(); tank.acc = 0; tank.raf = nextFrame(tankLoop); }
     if (!playing && tank.raf) { tank.raf.cancel(); tank.raf = 0; }
   }
@@ -10566,7 +10595,7 @@
     // syncTank, and a loop that looked stopped from there started a second
     // one and zeroed the accumulator — the tank ran at half speed.
     const s = session.getState();
-    const playing = Object.keys(s.clocks).filter((id) => s.clocks[id].playing && tank.defs.has(id));
+    const playing = Object.keys(s.clocks).filter((id) => s.clocks[id].playing && tank.defs.has(id) && !tankHeldStill(s, id));
     if (!playing.length) { tank.raf = 0; return; }
     tank.acc += Math.min(MAX_FRAME_MS, now - tank.last);
     tank.last = now;
@@ -19601,10 +19630,11 @@
   });
 
   // The first hour (the UX pass), for tests: the first-run sheet, the one Escape, the hand's word, reduced motion,
-  // whether nothing is inspected, a thing brought into view, and where the open field stands.
+  // whether nothing is inspected, a thing brought into view, where the open field stands, and a tank held still.
   Object.assign(window.__mm, {
     firstRun: () => firstRunState(), escapeStep: (focus) => escapeStep(focus || document.activeElement), tapWords: tapWords,
     motionReduced: motionReduced, resting: resting, bringIntoView: bringIntoView,
+    tankHeldStill: (id) => tankHeldStill(session.getState(), id),
   });
 
   // Mermaid (V1-PLAN D2, D3), for tests: the library a frame loads (a stand-in, or the CDN's again), what a frame said of itself, what Draw it drew.

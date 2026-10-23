@@ -168,10 +168,11 @@
   });
 
   // The first hour (the UX pass), for tests: the first-run sheet, the one Escape, the hand's word, reduced motion,
-  // whether nothing is inspected, a thing brought into view, and where the open field stands.
+  // whether nothing is inspected, a thing brought into view, where the open field stands, and a tank held still.
   Object.assign(window.__mm, {
     firstRun: () => firstRunState(), escapeStep: (focus) => escapeStep(focus || document.activeElement), tapWords: tapWords,
     motionReduced: motionReduced, resting: resting, bringIntoView: bringIntoView,
+    tankHeldStill: (id) => tankHeldStill(session.getState(), id),
   });
 
   // Mermaid (V1-PLAN D2, D3), for tests: the library a frame loads (a stand-in, or the CDN's again), what a frame said of itself, what Draw it drew.
