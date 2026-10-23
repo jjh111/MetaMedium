@@ -4735,7 +4735,7 @@
     else if (act === 'clock-play') session.clock({ nodeId: id, op: 'play', at: Date.now() });
     // Play another hand's program HERE: this hand's own play, so the code runs in this tab only by the person's tap (C1).
     // A program another hand set playing — or a tank held still under reduced motion (C4) — plays by this hand's own play.
-    else if (act === 'clock-play-here') { if (!playHere(id)) { session.clock({ nodeId: id, op: 'play', at: Date.now() }); flash('playing it here'); } }
+    else if (act === 'clock-play-here') playItHere(id);
     else if (act === 'clock-pause') session.clock({ nodeId: id, op: 'pause', at: Date.now() });
     else if (act === 'clock-reset') session.clock({ nodeId: id, op: 'reset', at: Date.now() });
     else if (act === 'behave-use') {
@@ -6900,7 +6900,8 @@
 //   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading,
 //   askModelsAbout, offerModel), seatpane (writers, readers, deciderHost, briefDeciderHost, askDecider, askDeciderNotation, askDeciderBrief — who is asked, by seat), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
 //   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
-//   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
+//   clocks (definitionOf, tankHeldStill), kinds (consentedHere, playHere — a clock not moving here is offered
+//   *Play it here*, playHereInstead/playItHere, which 07-input.js's panel button takes too), inspector (isProgram), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
 //   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
 //   hand opened the field), hand (handOfPointer), controls (escapeStep — the field's Escape is the ladder's),
 //   the first hour (27-first.js: bringIntoView — Make it Mermaid's card brought into view).
@@ -6964,6 +6965,28 @@
   /** A reading, for the top row: what it stands on ranks it, exactly as it ranks an offer. */
   function readingItem(o) {
     return Object.assign({ certain: true, tier: 1, group: o.grounds.on, groupConf: o.grounds.confidence, groupWhy: o.grounds.why, base: MM.baseOn(o.grounds) }, o);
+  }
+
+  /**
+   * A clock the log says plays that does not move in this tab — another hand's program (the consent gate, C1), an
+   * example's film or a tank held still because this device asks for less motion (C4): *Pause* would pause what the
+   * person does not see moving, so the field offers *Play it here*, the person's own play, in its place.
+   */
+  function playHereInstead(it) {
+    const o = it.offer;
+    if (!o || o.tool !== 'clocks' || !o.data || o.data.op !== 'pause') return it;
+    const s = session.getState(), id = o.data.nodeId;
+    if (!(isProgram(s, id) ? !consentedHere(id) : tankHeldStill(s, id))) return it;
+    const name = o.label.replace(/^Pause /, '');
+    return Object.assign({}, it, {
+      key: 'clock-here:' + id, label: 'Play ' + name + ' here', verbs: ['play', 'run', 'start', 'go', 'play here'],
+      why: 'it is not moving here — ' + (isProgram(s, id) ? 'a program runs in this tab only when you play it' : 'this device asks for less motion') + '; this plays it, here',
+      run: () => session.withTool('clocks', () => playItHere(id), 'clock-here:' + id),
+    });
+  }
+  /** Play a clock here by this hand's own play: a program another hand set playing, or anything held still (C1, C4). */
+  function playItHere(id) {
+    if (!playHere(id)) { session.clock({ nodeId: id, op: 'play', at: Date.now() }); flash('playing it here'); }
   }
 
   /** An offer as a pill: its reason the tooltip, what it stands on after that, a dot when it asks a model. */
@@ -7112,7 +7135,7 @@
     });
 
     // --- What it AFFORDS: every tool's offer for this scope, in the registry's order. ---
-    const offers = MM.offersFor(scope).map(offerItem);
+    const offers = MM.offersFor(scope).map(offerItem).map(playHereInstead);
     // What the marks are as a diagram: each notation above the floor, ranked with the rest of the readings (N1).
     const notated = notationsHeld(marks).map((r) => notationItem(r, offers));
     // An act as particular to these marks as a reading (Fold “…” into the text)
@@ -8538,10 +8561,12 @@
     // Under reduced motion a tank this hand did not start here holds still (C4, 14-clocks.js): its play is the person's.
     const still = !elsewhere && c && c.playing && !isProgram(s, id) && tankHeldStill(s, id);
     const who = elsewhere ? session.clockAuthor(id) : null;
+    // A program's time is its own (a run program keeps none the tank could say); a tank's is said.
+    const t = isProgram(s, id) && codeKindOf(s.nodes.get(id)) === 'run' ? '' : ' · t = ' + tankTime(id).toFixed(1) + 's';
     const stateText = !c ? 'not played'
-      : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : 'played — not running in this tab yet')
+      : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : motionReduced() ? 'waiting for you to play it — this device asks for less motion' : 'played — not running in this tab yet')
       : still ? 'playing — held still here, since this device asks for less motion'
-      : c.playing ? 'playing · t = ' + tankTime(id).toFixed(1) + 's' : 'paused' + (c.reason ? ' — ' + c.reason : '') + ' · t = ' + tankTime(id).toFixed(1) + 's';
+      : c.playing ? 'playing' + t : 'paused' + (c.reason ? ' — ' + c.reason : '') + t;
     return '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>' +
       '<div class="acts">' +
       (elsewhere || still
@@ -8701,7 +8726,8 @@
           '<button class="mini" data-act="export-code" data-id="' + esc(id) + '">save as .' + esc(kind === 'text' ? 'txt' : kind) + '</button></div>';
       }
       // The clock: nothing runs until a hand plays it, and a stop says why. An act, so it stands above details.
-      if (kind === 'js') {
+      // A program too: one the log says plays but that does not run in this tab offers *play it here* (C1, C4).
+      if (kind === 'js' || kind === 'run') {
         top += clockRows(s, id);
       }
     }
@@ -17119,7 +17145,7 @@
       if (made) {
         grantPlayingPrograms();
         // Unless the person asked for less motion (C4): then it waits for their own play, and the opening's sentence says so.
-        examples.heldBack = motionReduced() && standingPrograms().length ? ' · the film waits for you — this device asks for less motion; open it and tap “play it here”' : '';
+        examples.heldBack = motionReduced() && standingPrograms().length ? ' · the film waits for you — this device asks for less motion; press and hold it, then “Play … here”' : '';
         // Opened fitted to the free ground, nothing inspected until the hand points or draws (27-first.js; UX-11).
         restAfterOpen();
       }

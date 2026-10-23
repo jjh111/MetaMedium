@@ -304,7 +304,7 @@
       if (made) {
         grantPlayingPrograms();
         // Unless the person asked for less motion (C4): then it waits for their own play, and the opening's sentence says so.
-        examples.heldBack = motionReduced() && standingPrograms().length ? ' · the film waits for you — this device asks for less motion; open it and tap “play it here”' : '';
+        examples.heldBack = motionReduced() && standingPrograms().length ? ' · the film waits for you — this device asks for less motion; press and hold it, then “Play … here”' : '';
         // Opened fitted to the free ground, nothing inspected until the hand points or draws (27-first.js; UX-11).
         restAfterOpen();
       }

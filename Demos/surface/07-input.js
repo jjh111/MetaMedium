@@ -718,7 +718,7 @@
     else if (act === 'clock-play') session.clock({ nodeId: id, op: 'play', at: Date.now() });
     // Play another hand's program HERE: this hand's own play, so the code runs in this tab only by the person's tap (C1).
     // A program another hand set playing — or a tank held still under reduced motion (C4) — plays by this hand's own play.
-    else if (act === 'clock-play-here') { if (!playHere(id)) { session.clock({ nodeId: id, op: 'play', at: Date.now() }); flash('playing it here'); } }
+    else if (act === 'clock-play-here') playItHere(id);
     else if (act === 'clock-pause') session.clock({ nodeId: id, op: 'pause', at: Date.now() });
     else if (act === 'clock-reset') session.clock({ nodeId: id, op: 'reset', at: Date.now() });
     else if (act === 'behave-use') {

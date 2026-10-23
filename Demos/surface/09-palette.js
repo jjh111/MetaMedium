@@ -15,7 +15,8 @@
 //   09-field.js), view (usableViewport, viewportRect), models (agents, withWork, cancelReading,
 //   askModelsAbout, offerModel), seatpane (writers, readers, deciderHost, briefDeciderHost, askDecider, askDeciderNotation, askDeciderBrief — who is asked, by seat), snap (snapMode), render (nameOfParticipant, logKey, paintReference),
 //   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
-//   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
+//   clocks (definitionOf, tankHeldStill), kinds (consentedHere, playHere — a clock not moving here is offered
+//   *Play it here*, playHereInstead/playItHere, which 07-input.js's panel button takes too), inspector (isProgram), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
 //   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
 //   hand opened the field), hand (handOfPointer), controls (escapeStep — the field's Escape is the ladder's),
 //   the first hour (27-first.js: bringIntoView — Make it Mermaid's card brought into view).
@@ -79,6 +80,28 @@
   /** A reading, for the top row: what it stands on ranks it, exactly as it ranks an offer. */
   function readingItem(o) {
     return Object.assign({ certain: true, tier: 1, group: o.grounds.on, groupConf: o.grounds.confidence, groupWhy: o.grounds.why, base: MM.baseOn(o.grounds) }, o);
+  }
+
+  /**
+   * A clock the log says plays that does not move in this tab — another hand's program (the consent gate, C1), an
+   * example's film or a tank held still because this device asks for less motion (C4): *Pause* would pause what the
+   * person does not see moving, so the field offers *Play it here*, the person's own play, in its place.
+   */
+  function playHereInstead(it) {
+    const o = it.offer;
+    if (!o || o.tool !== 'clocks' || !o.data || o.data.op !== 'pause') return it;
+    const s = session.getState(), id = o.data.nodeId;
+    if (!(isProgram(s, id) ? !consentedHere(id) : tankHeldStill(s, id))) return it;
+    const name = o.label.replace(/^Pause /, '');
+    return Object.assign({}, it, {
+      key: 'clock-here:' + id, label: 'Play ' + name + ' here', verbs: ['play', 'run', 'start', 'go', 'play here'],
+      why: 'it is not moving here — ' + (isProgram(s, id) ? 'a program runs in this tab only when you play it' : 'this device asks for less motion') + '; this plays it, here',
+      run: () => session.withTool('clocks', () => playItHere(id), 'clock-here:' + id),
+    });
+  }
+  /** Play a clock here by this hand's own play: a program another hand set playing, or anything held still (C1, C4). */
+  function playItHere(id) {
+    if (!playHere(id)) { session.clock({ nodeId: id, op: 'play', at: Date.now() }); flash('playing it here'); }
   }
 
   /** An offer as a pill: its reason the tooltip, what it stands on after that, a dot when it asks a model. */
@@ -227,7 +250,7 @@
     });
 
     // --- What it AFFORDS: every tool's offer for this scope, in the registry's order. ---
-    const offers = MM.offersFor(scope).map(offerItem);
+    const offers = MM.offersFor(scope).map(offerItem).map(playHereInstead);
     // What the marks are as a diagram: each notation above the floor, ranked with the rest of the readings (N1).
     const notated = notationsHeld(marks).map((r) => notationItem(r, offers));
     // An act as particular to these marks as a reading (Fold “…” into the text)

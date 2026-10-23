@@ -15,8 +15,9 @@
 //   X4   an example opens fitted to the free ground — every mark clear of the panel — with nothing inspected until
 //        the hand points at a mark (UX-11), on the desktop and on the phone
 //   X5   reduced motion (C4): with the preference, the working dot and the find ring hold still between frames,
-//        and the film's program waits for the person's own play; without it, they move and it plays; X5c a tank the
-//        person did not start in this tab holds still, with *play it here* in the panel
+//        and the film's program waits for the person's own play; without it, they move and it plays; X5d the waiting film
+//        is started by *play it here* in the panel and *Play … here* in the field; X5c a tank the person did not start
+//        in this tab holds still, with *play it here* in the panel
 //   X6   polish: Make it Mermaid's card is brought into view (UX-13); the export pane's buttons fit it, with plain
 //        labels and the file's name in each tooltip (UX-12); over the grid the panel stands aside, the View group's
 //        tile is "layout", and at 390 px the zoom tile keeps *fit* (UX-14); a new text and its editor stand clear of
@@ -326,12 +327,31 @@ export async function runUx(browser, servers, { freshContext }) {
       film[label] = await page.evaluate(() => {
         const mm = window.__mm, s = mm.session.getState();
         const playing = s.live.filter((id) => s.clocks[id] && s.clocks[id].playing);
-        return { programs: playing.length, runsHere: playing.filter((id) => mm.playedHere(id)).length, status: document.getElementById('status').textContent };
+        const id = playing[0], b = id && mm.MM.boundsOf(s.nodes.get(id));
+        const a = b && mm.worldToScreen(b.minX, b.minY), z = b && mm.worldToScreen(b.maxX, b.maxY);
+        return { programs: playing.length, runsHere: playing.filter((id) => mm.playedHere(id)).length, status: document.getElementById('status').textContent,
+          id, at: a && { x: Math.round((a.x + z.x) / 2), y: Math.round((a.y + z.y) / 2) } };
       });
+      if (label === 'reduced' && film.reduced.at) {
+        // The person starts it as a person would: pointed at, the panel offers “play it here”; held, the field offers
+        // “Play … here” and no Pause for what is not moving — and taken, the film runs here.
+        const at = film.reduced.at;
+        await page.mouse.move(at.x, at.y); await page.waitForTimeout(250);
+        film.reduced.panel = await page.evaluate(() => !!document.querySelector('#inspector button[data-act="clock-play-here"]'));
+        await hold(page, at.x, at.y);
+        const pills = await page.evaluate(() => [...document.querySelectorAll('#summon .pill.item')].map((b) => b.textContent.trim()));
+        film.reduced.pills = pills;
+        const pill = page.locator('#summon .pill.item', { hasText: / here$/ }).first();
+        if (await pill.count()) { await pill.click(); await page.waitForTimeout(400); }
+        film.reduced.played = await page.evaluate((id) => window.__mm.playedHere(id), film.reduced.id);
+      }
       await guards.context.close();
     }
     check(`X5b. the film's example under reduced motion waits for the person's own play — ${film.reduced.runsHere} of ${film.reduced.programs} running, said: “${film.reduced.status.slice(0, 80)}” — and without the preference it plays (${film.normal.runsHere} of ${film.normal.programs})`,
       film.reduced.programs > 0 && film.reduced.runsHere === 0 && /less motion/.test(film.reduced.status) && film.normal.runsHere === film.normal.programs && film.normal.programs > 0, film);
+    const r = film.reduced;
+    check(`X5d. the film waiting under reduced motion is started as a person starts it: pointed at, the panel offers “play it here” (${r.panel ? 'yes' : 'no'}); held, the field offers ${(r.pills || []).filter((p) => /^(Play|Pause)/.test(p)).map((p) => '“' + p + '”').join(', ') || 'no play'} — and taken, it runs here (${r.played ? 'running' : 'not running'})`,
+      !!r.panel && (r.pills || []).some((p) => /^Play .* here$/.test(p)) && !(r.pills || []).some((p) => /^Pause /.test(p)) && !!r.played, r);
   });
 
   // ---- X5c. a tank the person did not start holds still under reduced motion ---------------------------------------
