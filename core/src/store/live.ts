@@ -97,6 +97,25 @@ export interface LiveLine {
    * never carries it, because presence is the sender's.
    */
   seat?: boolean;
+  /**
+   * A whole log too long for one line goes as pieces (`LINE_CHARS`): the first a `full`, the rest appends, every one
+   * of them carrying `set` — the first piece's `at` — and every one but the last `more`. A store holds the pieces
+   * aside and takes them as the whole only when the last lands, so what it held is never cut to the first piece
+   * while the rest is on its way, and a whole that never finishes (its writer left halfway) leaves what was held as
+   * it was. A piece of a whole a store no longer waits for — a newer whole began, the writer said goodbye — is
+   * dropped. Only ever on a writer's own lines, never on a copy handed on.
+   */
+  set?: number;
+  more?: boolean;
+}
+
+/**
+ * The relay's word on where its replay to a stream that has just opened begins and ends (`replay`, then `live`): a
+ * line it replays was written earlier — maybe by a hand that left with no goodbye — and says nothing of who is here
+ * NOW, so presence is not taken from it. A relay that says neither is taken as live throughout.
+ */
+export interface RelayReplay {
+  relay: 'replay' | 'live';
 }
 
 /**
@@ -147,7 +166,7 @@ export interface LiveTransport {
    * promise may resolve to a `SendResult`; anything else is a line that went.
    */
   send(line: LiveLine): void | SendResult | Promise<unknown>;
-  onMessage(cb: (line: LiveLine | RelayNotice | RelayRefusal) => void): () => void;
+  onMessage(cb: (line: LiveLine | RelayNotice | RelayRefusal | RelayReplay) => void): () => void;
   close?(): void;
 }
 
@@ -168,8 +187,19 @@ export interface LiveStoreOptions {
   seat?: boolean;
 }
 
-/** How long a line that has not yet gone holds back the next one. */
+/**
+ * How long a line that has not yet gone holds back the next one — a hello, a beat, a copy handed on. The next line
+ * of this hand's OWN log waits for the one before it to be answered, however long that takes (`OWN_WAIT_MS`): two
+ * of a hand's own lines in flight can reach the relay the wrong way round, and a whole log's first piece, slow on a
+ * slow uplink, would land after its second and be dropped by every board as older.
+ */
 export const SEND_WAIT_MS = 10_000;
+/**
+ * How long a line of this hand's own log is waited on before it is taken as lost and sent again: a minute, and a
+ * millisecond for every ten characters it carries — a 3 MB piece is given six minutes, an uplink of 10 KB/s.
+ */
+export const OWN_WAIT_MS = 60_000;
+const OWN_WAIT_CHARS_PER_MS = 10;
 
 /**
  * The longest line this store sends, in characters: a whole log longer goes as
@@ -265,6 +295,18 @@ export class LiveStore implements Store {
   private tooBigSaid: { n: number; chars: number } = { n: 0, chars: 0 };
   /** My lines are not reaching the room just now: the status it last answered (0 for none at all). Cleared when one is taken. */
   private failing: { status: number } | null = null;
+  /** A line of my log is on the wire and not yet answered: the next waits for it (`sendMine`). */
+  private mineInFlight = false;
+  /** That line has been on the wire longer than SEND_WAIT_MS: said, until it is answered. */
+  private slow = false;
+  /** The whole of my log is going in pieces: the first piece's `at`, which every piece of it carries as `set` (0: none going). */
+  private setAt = 0;
+  /** A hello asked for my whole log while a line of it was on its way: it goes once that is answered and no whole is mid-way. */
+  private wholeAgain = false;
+  /** Another hand's whole log arriving in pieces, held aside until its last piece lands (`LiveLine.set`). */
+  private pending = new Map<string, { set: number; at: number; events: SessionEvent[]; keys: Set<string> }>();
+  /** The relay is replaying what it holds to a stream just opened: nobody is taken to be here from those lines (`RelayReplay`). */
+  private replaying = false;
   /** The room will take nothing more from this hand, and why. */
   private stopped: 'claim' | 'unreadable' | null = null;
   /** A send again, waiting its time, and how long the last wait was. */
@@ -371,6 +413,31 @@ export class LiveStore implements Store {
     this.mineGen++;
     this.confirmed = 0;
     this.needFull = true;
+    this.setAt = 0;
+    this.wholeAgain = false;
+  }
+
+  /**
+   * Bring another hand's log into this room as a copy this hand holds and hands on (`via`) — the marks other people
+   * made on a board this hand shares (a room's board kept as a board of a device, shared again). It is held here as
+   * any copy is, handed on to a newcomer as any copy is, and sent once now, whole; resolves with what the room said.
+   * A copy too long for one line is not sent (a copy goes whole or not at all): `{ ok: false, status: 413 }`.
+   */
+  carry(participant: string, events: readonly SessionEvent[]): Promise<SendResult> {
+    if (this.closed || participant === this.me || !events.length) return Promise.resolve({ ok: true });
+    let chars = 0;
+    let at = 0;
+    for (const ev of events) { chars += charsOf(ev) + 1; at = Math.max(at, atOf(ev) || 0); }
+    if (chars > LINE_CHARS) return Promise.resolve({ ok: false, status: 413 });
+    this.unnumber(participant);
+    this.logs[participant] = events.slice();
+    this.logs[participant].forEach((ev, i) => this.number(participant, i, ev));
+    this.carried.set(participant, new Set(events.map(authorKey).filter((k): k is string => k !== null)));
+    // The writer's clock is its events' own: the newest of them.
+    if (!at) at = this.stamp();
+    this.applied.set(participant, Math.max(this.applied.get(participant) ?? 0, at));
+    this.rev++;
+    return this.postFor({ participant, events: events.slice(), at, full: true, via: this.me });
   }
 
   /**
@@ -527,9 +594,11 @@ export class LiveStore implements Store {
         ? `something on this board is ${mb(big.chars)} — more than a room carries in one piece — and was not shared`
         : `${big.n} things on this board are more than a room carries in one piece (the largest ${mb(big.chars)}) and were not shared`;
     }
-    if (!this.failing) return null;
-    if (this.failing.status === 429) return 'the room is taking this hand’s lines more slowly — the rest is sent in a moment';
-    return 'not reaching the room — what you draw is kept here and sent when it answers';
+    // Held in this page's memory and nowhere else: said plainly, because leaving or closing the page loses it.
+    if (this.failing && this.failing.status === 429) return 'the room is taking this hand’s lines more slowly — what you draw is held on this page and sent in a moment';
+    if (this.failing) return 'not reaching the room — what you draw is held on this page and sent when it answers; leaving or closing the page loses it';
+    if (this.slow) return 'the room is slow to take what this hand sends — what you draw is held on this page until it does';
+    return null;
   }
 
   /**
@@ -550,6 +619,7 @@ export class LiveStore implements Store {
   close(): void {
     if (this.closed) return;
     this.closed = true;
+    this.pending.clear();
     for (const cancel of this.waiting) cancel();
     this.waiting.clear();
     if (this.retryCancel) { this.retryCancel(); this.retryCancel = null; }
@@ -570,18 +640,25 @@ export class LiveStore implements Store {
    * Send lines in the order they were written. A synchronous transport sends
    * at once; an asynchronous one (a POST) is waited for before the next line
    * goes, or two POSTs in flight could reach the relay the wrong way round —
-   * but never forever: a send that has not settled in SEND_WAIT_MS lets the
-   * next line go rather than wedge the hand. A line of someone else's (a hello,
-   * a beat, a copy handed on) is sent once; what the room answers to it is
-   * heard (a name another hand holds, a key it will not take) and nothing more.
+   * but a line that is not of this hand's own log (a hello, a beat, a copy
+   * handed on) never forever: one that has not settled in SEND_WAIT_MS lets the
+   * next line go rather than wedge the hand. Such a line is sent once; what the
+   * room answers to it is heard (a name another hand holds, a key it will not
+   * take) and nothing more. This hand's own log goes by `sendMine`.
    */
   private post(line: LiveLine): Promise<void> {
+    return this.postFor(line).then(() => undefined);
+  }
+  /** `post`, resolving with what the room said of the line. */
+  private postFor(line: LiveLine): Promise<SendResult> {
+    let said: SendResult = { ok: true };
     return this.enqueue(() => {
       const r = this.sendNow(line);
-      if (isThenable(r)) return r.then((res) => { this.heardBack(res); });
+      if (isThenable(r)) return r.then((res) => { said = res; this.heardBack(res); });
+      said = r;
       this.heardBack(r);
       return undefined;
-    });
+    }).then(() => said);
   }
 
   /** Run `fn` after whatever is leaving; at once when nothing is. A synchronous `fn` leaves no tail. */
@@ -600,12 +677,8 @@ export class LiveStore implements Store {
     return track(this.tail.then(run));
   }
 
-  /**
-   * Put one line on the wire and hear what became of it. A send that has not
-   * settled in SEND_WAIT_MS is taken as gone — and if it then turns out not to
-   * have gone, `late` is told, so what it carried is sent again.
-   */
-  private sendNow(line: LiveLine, late?: () => void): SendResult | Promise<SendResult> {
+  /** Put one line that is not of my own log on the wire: a send that has not settled in SEND_WAIT_MS is taken as gone. */
+  private sendNow(line: LiveLine): SendResult | Promise<SendResult> {
     // A seat's hand says so on every line of its own — never on a copy it hands on.
     if (this.seat && line.participant === this.me && !line.via) line.seat = true;
     let r: unknown;
@@ -616,11 +689,37 @@ export class LiveStore implements Store {
       const timer = setTimeout(() => { settled = true; done({ ok: true }); }, SEND_WAIT_MS);
       (timer as unknown as { unref?: () => void }).unref?.();
       const heard = (res: SendResult) => {
-        if (settled) { if (!res.ok && late) late(); return; }
+        if (settled) return;
         settled = true;
         clearTimeout(timer);
         done(res);
       };
+      (r as Promise<unknown>).then((v) => heard(resultOf(v)), () => heard({ ok: false, status: 0 }));
+    });
+  }
+
+  /**
+   * Put one line of my own log on the wire and wait for its answer — never taken as gone because a timer ran out, or
+   * the next line of my log, sent past it, could reach the room first. Only one that has had no answer in
+   * OWN_WAIT_MS (and a millisecond for every ten characters it carries) is taken as lost, and sent again.
+   */
+  private sendOwn(next: MineLine): SendResult | Promise<SendResult> {
+    const line = next.line;
+    if (this.seat) line.seat = true;
+    let r: unknown;
+    try { r = this.transport.send(line); } catch { return { ok: false, status: 0 }; }
+    if (!isThenable(r)) return resultOf(r);
+    const wait = OWN_WAIT_MS + Math.ceil(next.size / OWN_WAIT_CHARS_PER_MS);
+    return new Promise<SendResult>((done) => {
+      let settled = false;
+      const heard = (res: SendResult) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        done(res);
+      };
+      const timer = setTimeout(() => heard({ ok: false, status: 0 }), wait);
+      (timer as unknown as { unref?: () => void }).unref?.();
       (r as Promise<unknown>).then((v) => heard(resultOf(v)), () => heard({ ok: false, status: 0 }));
     });
   }
@@ -655,37 +754,77 @@ export class LiveStore implements Store {
     return this.enqueue(() => (this.retryCancel ? undefined : this.sendMine()));
   }
 
+  /**
+   * My log's lines, ONE AT A TIME: the next goes only once the one before it is answered, so the room holds them in
+   * the order they were written. Two of them in flight could land the wrong way round — a whole log's later piece
+   * before its first, which every board would then take first and drop the first as older. The queue waits for a
+   * line of mine SEND_WAIT_MS at most, so a hello, a beat or a copy handed on may pass a slow one (they change no log
+   * of mine); what follows the slow one goes when it is answered.
+   */
   private sendMine(): void | Promise<void> {
     for (let n = 0; n < 100_000; n++) {
-      if (this.stopped || (this.refused && this.refused.status !== 503)) return undefined;
+      if (this.closed || this.stopped || (this.refused && this.refused.status !== 503)) return undefined;
+      if (this.mineInFlight) return undefined;
       const next = this.nextOfMine();
       if (!next) return undefined;
-      const late = () => { this.needFull = true; this.scheduleRetry(0); };
-      const r = this.sendNow(next.line, late);
-      if (isThenable(r)) return r.then((res) => (this.settleMine(next, res) ? this.sendMine() : undefined));
-      if (!this.settleMine(next, r)) return undefined;
+      const r = this.sendOwn(next);
+      if (!isThenable(r)) {
+        if (!this.settleMine(next, r)) return undefined;
+        continue;
+      }
+      this.mineInFlight = true;
+      let released = false;
+      const answered = r.then((res) => {
+        this.mineInFlight = false;
+        if (this.slow) { this.slow = false; this.notify('', []); }
+        if (!this.settleMine(next, res)) return undefined;
+        // Past its wait the queue went on without it: what follows goes on its own turn.
+        if (released) { void this.flushMine(); return undefined; }
+        return this.sendMine();
+      });
+      return new Promise<void>((done) => {
+        const timer = setTimeout(() => {
+          released = true;
+          if (this.mineInFlight && !this.slow) { this.slow = true; this.notify('', []); }
+          done();
+        }, SEND_WAIT_MS);
+        (timer as unknown as { unref?: () => void }).unref?.();
+        // This line answered, its wait is over; whatever follows it has a wait of its own.
+        void r.then(() => clearTimeout(timer));
+        void answered.then(() => done(), () => done());
+      });
     }
     return undefined;
   }
 
-  /** The next line my log owes the room: the whole of it (in pieces, the first a `full`), or what follows what the room holds. */
+  /**
+   * The next line my log owes the room: the whole of it, or what follows what the room holds. A whole too long for
+   * one line goes in pieces, every piece of it carrying `set` (the first piece's `at`) and all but the last `more`.
+   */
   private nextOfMine(): MineLine | null {
     const log = this.logs[this.me];
     if (this.needFull) {
-      const { events, upto } = this.piece(log, 0);
-      return { line: { participant: this.me, events, at: this.stamp(), full: true, sid: this.sitting }, upto, full: true, gen: this.mineGen };
+      const { events, upto, size } = this.piece(log, 0);
+      const at = this.stamp();
+      const line: LiveLine = { participant: this.me, events, at, full: true, sid: this.sitting };
+      if (upto < log.length) { line.set = at; line.more = true; }
+      return { line, upto, full: true, gen: this.mineGen, size };
     }
     while (this.confirmed < log.length) {
-      const { events, upto } = this.piece(log, this.confirmed);
+      const { events, upto, size } = this.piece(log, this.confirmed);
       // Only events no line can carry, already said: the room is owed nothing of them.
       if (!events.length) { this.confirmed = upto; continue; }
-      return { line: { participant: this.me, events, at: this.stamp(), sid: this.sitting }, upto, full: false, gen: this.mineGen };
+      const line: LiveLine = { participant: this.me, events, at: this.stamp(), sid: this.sitting };
+      if (this.setAt) { line.set = this.setAt; if (upto < log.length) line.more = true; }
+      return { line, upto, full: false, gen: this.mineGen, size };
     }
+    // A whole going in pieces whose last events no line can carry still says it is done, with a last piece of nothing.
+    if (this.setAt) return { line: { participant: this.me, events: [], at: this.stamp(), sid: this.sitting, set: this.setAt }, upto: log.length, full: false, gen: this.mineGen, size: 0 };
     return null;
   }
 
   /** Events of `log` from `from`, up to `lineChars` of them as text (at least one), past any no line can carry. */
-  private piece(log: readonly SessionEvent[], from: number): { events: SessionEvent[]; upto: number } {
+  private piece(log: readonly SessionEvent[], from: number): { events: SessionEvent[]; upto: number; size: number } {
     const events: SessionEvent[] = [];
     let size = 0;
     let i = from;
@@ -697,7 +836,7 @@ export class LiveStore implements Store {
       events.push(ev);
       size += n;
     }
-    return { events, upto: i };
+    return { events, upto: i, size };
   }
 
   /** What became of a line of my log; whether to go on sending. */
@@ -705,8 +844,12 @@ export class LiveStore implements Store {
     if (r.ok) {
       if (next.gen === this.mineGen) {
         this.confirmed = Math.max(next.full ? 0 : this.confirmed, next.upto);
-        if (next.full) this.needFull = false;
+        // A whole's first piece taken: what follows of it carries its set, until its last piece is taken too.
+        if (next.full) { this.needFull = false; this.setAt = next.line.more && next.line.set ? next.line.set : 0; }
+        else if (next.line.set && !next.line.more && next.line.set === this.setAt) this.setAt = 0;
       }
+      // A hello heard while a line of mine was on its way asked for the whole of my log: it goes once no whole is mid-way.
+      if (this.wholeAgain && !this.setAt) { this.wholeAgain = false; this.needFull = true; }
       this.backoff = 0;
       if (this.failing) { this.failing = null; this.notify('', []); }
       return true;
@@ -758,8 +901,11 @@ export class LiveStore implements Store {
    * to hear that I am here.
    */
   private answer(asker: string, ownOnly = false): void {
-    // My own log, whole — sent as my log always is, so an answer the room did not take is sent again.
-    this.needFull = true;
+    // My own log, whole — sent as my log always is, so an answer the room did not take is sent again. While a line of
+    // it is on its way, or a whole of it is going in pieces, the whole goes once that is done: begun again at every
+    // hello, a big log on a slow uplink would never finish.
+    if (this.mineInFlight || this.setAt) this.wholeAgain = true;
+    else this.needFull = true;
     void this.flushMine();
     if (ownOnly) return;
     const asked = this.heard;
@@ -805,8 +951,11 @@ export class LiveStore implements Store {
     this.notify(name, []);
   }
 
-  private receive(raw: LiveLine | RelayNotice | RelayRefusal | null | undefined): void {
+  private receive(raw: LiveLine | RelayNotice | RelayRefusal | RelayReplay | null | undefined): void {
     if (this.closed || !raw || typeof raw !== 'object') return;
+    // Where the relay's replay to a stream just opened begins and ends: nobody is here by a line written before.
+    if ((raw as RelayReplay).relay === 'replay') { this.replaying = true; return; }
+    if ((raw as RelayReplay).relay === 'live') { this.replaying = false; return; }
     if ((raw as RelayRefusal).relay === 'refused') {
       const r = raw as RelayRefusal;
       this.refused = { relay: 'refused', room: r.room, status: Number(r.status) || 0, ...(r.reason === 'origin' ? { reason: 'origin' as const } : {}) };
@@ -843,7 +992,8 @@ export class LiveStore implements Store {
       return;
     }
     this.heard++;
-    if (from !== this.me) this.seen.set(from, Date.now());
+    // Who is here is who is heard NOW: a line the relay replays was written earlier, by a hand that may have gone.
+    if (from !== this.me && !this.replaying) this.seen.set(from, Date.now());
     // A hand that answers briefs at the seat, said by itself — a copy handed on says nothing of its writer.
     if (!line.via && line.seat === true) this.seats.add(line.participant);
     if (sid) {
@@ -864,6 +1014,8 @@ export class LiveStore implements Store {
         this.gone.add(line.participant);
         this.seen.delete(line.participant);
         this.seats.delete(line.participant);
+        // A whole it was sending in pieces will not be finished: what is held of it stays as it was.
+        this.pending.delete(line.participant);
       }
       this.notify(line.participant, []);
       return;
@@ -880,9 +1032,44 @@ export class LiveStore implements Store {
       this.notify(line.participant, []);
       return;
     }
-    const events = Array.isArray(line.events) ? line.events : [];
-    const at = typeof line.at === 'number' ? line.at : Date.now();
-    if (line.full) {
+    let events = Array.isArray(line.events) ? line.events : [];
+    const lineAt = typeof line.at === 'number' ? line.at : Date.now();
+    let at = lineAt;
+    let full = !!line.full;
+    // A whole log arriving in pieces (`LiveLine.set`): held aside, and taken as the whole only when its last piece
+    // lands — what is held here is never cut to a first piece while the rest is on its way, and a whole that never
+    // finishes leaves what was held as it was. A piece of a whole no longer waited for is dropped.
+    const p = line.participant;
+    if (!line.via && typeof line.set === 'number') {
+      const cur = this.pending.get(p);
+      if (line.full) {
+        const last = this.ownAt.get(p);
+        if ((last !== undefined && at < last) || (cur && at < cur.at)) return;
+        const fresh = { set: line.set, at, events: [] as SessionEvent[], keys: new Set<string>() };
+        holdPieceOf(fresh, events);
+        if (line.more) {
+          this.pending.set(p, fresh);
+          this.notify(p, []);
+          return;
+        }
+        this.pending.delete(p);
+        events = fresh.events;
+      } else {
+        if (!cur || cur.set !== line.set) { this.notify(p, []); return; }
+        holdPieceOf(cur, events);
+        if (line.more) { this.notify(p, []); return; }
+        // The last piece: the whole, as one.
+        this.pending.delete(p);
+        events = cur.events;
+        at = cur.at;
+        full = true;
+      }
+    } else if (!line.via && line.full) {
+      // A newer whole of its own in one line: a whole it was sending in pieces is given up.
+      const cur = this.pending.get(p);
+      if (cur && at >= cur.at) this.pending.delete(p);
+    }
+    if (full) {
       // A `full` REPLACES what is held, so it must be the present. A relay
       // replays its buffer to a connecting client, and a peer's copy of a log
       // can lag the log itself; a snapshot out of its moment would install a
@@ -957,8 +1144,8 @@ export class LiveStore implements Store {
       }
       if (added) this.rev++;
     }
-    this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, at));
-    if (!line.via) this.ownAt.set(line.participant, Math.max(this.ownAt.get(line.participant) ?? 0, at));
+    this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, lineAt));
+    if (!line.via) this.ownAt.set(line.participant, Math.max(this.ownAt.get(line.participant) ?? 0, lineAt));
     this.notify(line.participant, events);
   }
 
@@ -1020,9 +1207,23 @@ interface MineLine {
   upto: number;
   full: boolean;
   gen: number;
+  /** How many characters it carries, which is how long it is waited on (`OWN_WAIT_MS`). */
+  size: number;
 }
 
 const isThenable = (r: unknown): r is Promise<unknown> => !!r && typeof (r as { then?: unknown }).then === 'function';
+
+/** A piece of a whole arriving in pieces, held: each event once (a piece sent again carries what the last carried). */
+function holdPieceOf(held: { events: SessionEvent[]; keys: Set<string> }, events: readonly SessionEvent[]): void {
+  for (const ev of events) {
+    const k = authorKey(ev);
+    if (k !== null) {
+      if (held.keys.has(k)) continue;
+      held.keys.add(k);
+    }
+    held.events.push(ev);
+  }
+}
 
 /** What a transport's answer says: a `SendResult` as it is, anything else a line that went. */
 function resultOf(v: unknown): SendResult {

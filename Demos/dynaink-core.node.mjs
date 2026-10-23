@@ -19682,6 +19682,8 @@ var MemoryStore = class {
 
 // src/store/live.ts
 var SEND_WAIT_MS = 1e4;
+var OWN_WAIT_MS = 6e4;
+var OWN_WAIT_CHARS_PER_MS = 10;
 var LINE_CHARS = 3e6;
 var RETRY_FIRST_MS = 2e3;
 var RETRY_MAX_MS = 3e4;
@@ -19747,6 +19749,18 @@ var LiveStore = class {
     this.tooBigSaid = { n: 0, chars: 0 };
     /** My lines are not reaching the room just now: the status it last answered (0 for none at all). Cleared when one is taken. */
     this.failing = null;
+    /** A line of my log is on the wire and not yet answered: the next waits for it (`sendMine`). */
+    this.mineInFlight = false;
+    /** That line has been on the wire longer than SEND_WAIT_MS: said, until it is answered. */
+    this.slow = false;
+    /** The whole of my log is going in pieces: the first piece's `at`, which every piece of it carries as `set` (0: none going). */
+    this.setAt = 0;
+    /** A hello asked for my whole log while a line of it was on its way: it goes once that is answered and no whole is mid-way. */
+    this.wholeAgain = false;
+    /** Another hand's whole log arriving in pieces, held aside until its last piece lands (`LiveLine.set`). */
+    this.pending = /* @__PURE__ */ new Map();
+    /** The relay is replaying what it holds to a stream just opened: nobody is taken to be here from those lines (`RelayReplay`). */
+    this.replaying = false;
     /** The room will take nothing more from this hand, and why. */
     this.stopped = null;
     /** A send again, waiting its time, and how long the last wait was. */
@@ -19848,6 +19862,32 @@ var LiveStore = class {
     this.mineGen++;
     this.confirmed = 0;
     this.needFull = true;
+    this.setAt = 0;
+    this.wholeAgain = false;
+  }
+  /**
+   * Bring another hand's log into this room as a copy this hand holds and hands on (`via`) — the marks other people
+   * made on a board this hand shares (a room's board kept as a board of a device, shared again). It is held here as
+   * any copy is, handed on to a newcomer as any copy is, and sent once now, whole; resolves with what the room said.
+   * A copy too long for one line is not sent (a copy goes whole or not at all): `{ ok: false, status: 413 }`.
+   */
+  carry(participant, events) {
+    if (this.closed || participant === this.me || !events.length) return Promise.resolve({ ok: true });
+    let chars = 0;
+    let at = 0;
+    for (const ev of events) {
+      chars += charsOf(ev) + 1;
+      at = Math.max(at, atOf2(ev) || 0);
+    }
+    if (chars > LINE_CHARS) return Promise.resolve({ ok: false, status: 413 });
+    this.unnumber(participant);
+    this.logs[participant] = events.slice();
+    this.logs[participant].forEach((ev, i) => this.number(participant, i, ev));
+    this.carried.set(participant, new Set(events.map(authorKey2).filter((k) => k !== null)));
+    if (!at) at = this.stamp();
+    this.applied.set(participant, Math.max(this.applied.get(participant) ?? 0, at));
+    this.rev++;
+    return this.postFor({ participant, events: events.slice(), at, full: true, via: this.me });
   }
   /**
    * Send again, now, what the room has not taken of this hand's log — the window
@@ -19988,9 +20028,10 @@ var LiveStore = class {
     if (big.n) {
       return big.n === 1 ? `something on this board is ${mb(big.chars)} \u2014 more than a room carries in one piece \u2014 and was not shared` : `${big.n} things on this board are more than a room carries in one piece (the largest ${mb(big.chars)}) and were not shared`;
     }
-    if (!this.failing) return null;
-    if (this.failing.status === 429) return "the room is taking this hand\u2019s lines more slowly \u2014 the rest is sent in a moment";
-    return "not reaching the room \u2014 what you draw is kept here and sent when it answers";
+    if (this.failing && this.failing.status === 429) return "the room is taking this hand\u2019s lines more slowly \u2014 what you draw is held on this page and sent in a moment";
+    if (this.failing) return "not reaching the room \u2014 what you draw is held on this page and sent when it answers; leaving or closing the page loses it";
+    if (this.slow) return "the room is slow to take what this hand sends \u2014 what you draw is held on this page until it does";
+    return null;
   }
   /**
    * Fires when another participant's events land, with what landed — and,
@@ -20011,6 +20052,7 @@ var LiveStore = class {
   close() {
     if (this.closed) return;
     this.closed = true;
+    this.pending.clear();
     for (const cancel of this.waiting) cancel();
     this.waiting.clear();
     if (this.retryCancel) {
@@ -20035,20 +20077,28 @@ var LiveStore = class {
    * Send lines in the order they were written. A synchronous transport sends
    * at once; an asynchronous one (a POST) is waited for before the next line
    * goes, or two POSTs in flight could reach the relay the wrong way round —
-   * but never forever: a send that has not settled in SEND_WAIT_MS lets the
-   * next line go rather than wedge the hand. A line of someone else's (a hello,
-   * a beat, a copy handed on) is sent once; what the room answers to it is
-   * heard (a name another hand holds, a key it will not take) and nothing more.
+   * but a line that is not of this hand's own log (a hello, a beat, a copy
+   * handed on) never forever: one that has not settled in SEND_WAIT_MS lets the
+   * next line go rather than wedge the hand. Such a line is sent once; what the
+   * room answers to it is heard (a name another hand holds, a key it will not
+   * take) and nothing more. This hand's own log goes by `sendMine`.
    */
   post(line) {
+    return this.postFor(line).then(() => void 0);
+  }
+  /** `post`, resolving with what the room said of the line. */
+  postFor(line) {
+    let said3 = { ok: true };
     return this.enqueue(() => {
       const r = this.sendNow(line);
       if (isThenable(r)) return r.then((res) => {
+        said3 = res;
         this.heardBack(res);
       });
+      said3 = r;
       this.heardBack(r);
       return void 0;
-    });
+    }).then(() => said3);
   }
   /** Run `fn` after whatever is leaving; at once when nothing is. A synchronous `fn` leaves no tail. */
   enqueue(fn) {
@@ -20072,12 +20122,8 @@ var LiveStore = class {
     }
     return track(this.tail.then(run2));
   }
-  /**
-   * Put one line on the wire and hear what became of it. A send that has not
-   * settled in SEND_WAIT_MS is taken as gone — and if it then turns out not to
-   * have gone, `late` is told, so what it carried is sent again.
-   */
-  sendNow(line, late) {
+  /** Put one line that is not of my own log on the wire: a send that has not settled in SEND_WAIT_MS is taken as gone. */
+  sendNow(line) {
     if (this.seat && line.participant === this.me && !line.via) line.seat = true;
     let r;
     try {
@@ -20094,14 +20140,40 @@ var LiveStore = class {
       }, SEND_WAIT_MS);
       timer2.unref?.();
       const heard = (res) => {
-        if (settled) {
-          if (!res.ok && late) late();
-          return;
-        }
+        if (settled) return;
         settled = true;
         clearTimeout(timer2);
         done(res);
       };
+      r.then((v) => heard(resultOf(v)), () => heard({ ok: false, status: 0 }));
+    });
+  }
+  /**
+   * Put one line of my own log on the wire and wait for its answer — never taken as gone because a timer ran out, or
+   * the next line of my log, sent past it, could reach the room first. Only one that has had no answer in
+   * OWN_WAIT_MS (and a millisecond for every ten characters it carries) is taken as lost, and sent again.
+   */
+  sendOwn(next) {
+    const line = next.line;
+    if (this.seat) line.seat = true;
+    let r;
+    try {
+      r = this.transport.send(line);
+    } catch {
+      return { ok: false, status: 0 };
+    }
+    if (!isThenable(r)) return resultOf(r);
+    const wait = OWN_WAIT_MS + Math.ceil(next.size / OWN_WAIT_CHARS_PER_MS);
+    return new Promise((done) => {
+      let settled = false;
+      const heard = (res) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer2);
+        done(res);
+      };
+      const timer2 = setTimeout(() => heard({ ok: false, status: 0 }), wait);
+      timer2.unref?.();
       r.then((v) => heard(resultOf(v)), () => heard({ ok: false, status: 0 }));
     });
   }
@@ -20134,36 +20206,85 @@ var LiveStore = class {
     if (this.retryCancel) return Promise.resolve();
     return this.enqueue(() => this.retryCancel ? void 0 : this.sendMine());
   }
+  /**
+   * My log's lines, ONE AT A TIME: the next goes only once the one before it is answered, so the room holds them in
+   * the order they were written. Two of them in flight could land the wrong way round — a whole log's later piece
+   * before its first, which every board would then take first and drop the first as older. The queue waits for a
+   * line of mine SEND_WAIT_MS at most, so a hello, a beat or a copy handed on may pass a slow one (they change no log
+   * of mine); what follows the slow one goes when it is answered.
+   */
   sendMine() {
     for (let n2 = 0; n2 < 1e5; n2++) {
-      if (this.stopped || this.refused && this.refused.status !== 503) return void 0;
+      if (this.closed || this.stopped || this.refused && this.refused.status !== 503) return void 0;
+      if (this.mineInFlight) return void 0;
       const next = this.nextOfMine();
       if (!next) return void 0;
-      const late = () => {
-        this.needFull = true;
-        this.scheduleRetry(0);
-      };
-      const r = this.sendNow(next.line, late);
-      if (isThenable(r)) return r.then((res) => this.settleMine(next, res) ? this.sendMine() : void 0);
-      if (!this.settleMine(next, r)) return void 0;
+      const r = this.sendOwn(next);
+      if (!isThenable(r)) {
+        if (!this.settleMine(next, r)) return void 0;
+        continue;
+      }
+      this.mineInFlight = true;
+      let released = false;
+      const answered = r.then((res) => {
+        this.mineInFlight = false;
+        if (this.slow) {
+          this.slow = false;
+          this.notify("", []);
+        }
+        if (!this.settleMine(next, res)) return void 0;
+        if (released) {
+          void this.flushMine();
+          return void 0;
+        }
+        return this.sendMine();
+      });
+      return new Promise((done) => {
+        const timer2 = setTimeout(() => {
+          released = true;
+          if (this.mineInFlight && !this.slow) {
+            this.slow = true;
+            this.notify("", []);
+          }
+          done();
+        }, SEND_WAIT_MS);
+        timer2.unref?.();
+        void r.then(() => clearTimeout(timer2));
+        void answered.then(() => done(), () => done());
+      });
     }
     return void 0;
   }
-  /** The next line my log owes the room: the whole of it (in pieces, the first a `full`), or what follows what the room holds. */
+  /**
+   * The next line my log owes the room: the whole of it, or what follows what the room holds. A whole too long for
+   * one line goes in pieces, every piece of it carrying `set` (the first piece's `at`) and all but the last `more`.
+   */
   nextOfMine() {
     const log = this.logs[this.me];
     if (this.needFull) {
-      const { events, upto } = this.piece(log, 0);
-      return { line: { participant: this.me, events, at: this.stamp(), full: true, sid: this.sitting }, upto, full: true, gen: this.mineGen };
+      const { events, upto, size: size2 } = this.piece(log, 0);
+      const at = this.stamp();
+      const line = { participant: this.me, events, at, full: true, sid: this.sitting };
+      if (upto < log.length) {
+        line.set = at;
+        line.more = true;
+      }
+      return { line, upto, full: true, gen: this.mineGen, size: size2 };
     }
     while (this.confirmed < log.length) {
-      const { events, upto } = this.piece(log, this.confirmed);
+      const { events, upto, size: size2 } = this.piece(log, this.confirmed);
       if (!events.length) {
         this.confirmed = upto;
         continue;
       }
-      return { line: { participant: this.me, events, at: this.stamp(), sid: this.sitting }, upto, full: false, gen: this.mineGen };
+      const line = { participant: this.me, events, at: this.stamp(), sid: this.sitting };
+      if (this.setAt) {
+        line.set = this.setAt;
+        if (upto < log.length) line.more = true;
+      }
+      return { line, upto, full: false, gen: this.mineGen, size: size2 };
     }
+    if (this.setAt) return { line: { participant: this.me, events: [], at: this.stamp(), sid: this.sitting, set: this.setAt }, upto: log.length, full: false, gen: this.mineGen, size: 0 };
     return null;
   }
   /** Events of `log` from `from`, up to `lineChars` of them as text (at least one), past any no line can carry. */
@@ -20179,14 +20300,21 @@ var LiveStore = class {
       events.push(ev);
       size2 += n2;
     }
-    return { events, upto: i };
+    return { events, upto: i, size: size2 };
   }
   /** What became of a line of my log; whether to go on sending. */
   settleMine(next, r) {
     if (r.ok) {
       if (next.gen === this.mineGen) {
         this.confirmed = Math.max(next.full ? 0 : this.confirmed, next.upto);
-        if (next.full) this.needFull = false;
+        if (next.full) {
+          this.needFull = false;
+          this.setAt = next.line.more && next.line.set ? next.line.set : 0;
+        } else if (next.line.set && !next.line.more && next.line.set === this.setAt) this.setAt = 0;
+      }
+      if (this.wholeAgain && !this.setAt) {
+        this.wholeAgain = false;
+        this.needFull = true;
       }
       this.backoff = 0;
       if (this.failing) {
@@ -20252,7 +20380,8 @@ var LiveStore = class {
    * to hear that I am here.
    */
   answer(asker, ownOnly = false) {
-    this.needFull = true;
+    if (this.mineInFlight || this.setAt) this.wholeAgain = true;
+    else this.needFull = true;
     void this.flushMine();
     if (ownOnly) return;
     const asked = this.heard;
@@ -20294,6 +20423,14 @@ var LiveStore = class {
   }
   receive(raw) {
     if (this.closed || !raw || typeof raw !== "object") return;
+    if (raw.relay === "replay") {
+      this.replaying = true;
+      return;
+    }
+    if (raw.relay === "live") {
+      this.replaying = false;
+      return;
+    }
     if (raw.relay === "refused") {
       const r = raw;
       this.refused = { relay: "refused", room: r.room, status: Number(r.status) || 0, ...r.reason === "origin" ? { reason: "origin" } : {} };
@@ -20318,7 +20455,7 @@ var LiveStore = class {
       return;
     }
     this.heard++;
-    if (from !== this.me) this.seen.set(from, Date.now());
+    if (from !== this.me && !this.replaying) this.seen.set(from, Date.now());
     if (!line.via && line.seat === true) this.seats.add(line.participant);
     if (sid) {
       const known2 = this.sittings.get(line.participant);
@@ -20334,6 +20471,7 @@ var LiveStore = class {
         this.gone.add(line.participant);
         this.seen.delete(line.participant);
         this.seats.delete(line.participant);
+        this.pending.delete(line.participant);
       }
       this.notify(line.participant, []);
       return;
@@ -20348,9 +20486,45 @@ var LiveStore = class {
       this.notify(line.participant, []);
       return;
     }
-    const events = Array.isArray(line.events) ? line.events : [];
-    const at = typeof line.at === "number" ? line.at : Date.now();
-    if (line.full) {
+    let events = Array.isArray(line.events) ? line.events : [];
+    const lineAt = typeof line.at === "number" ? line.at : Date.now();
+    let at = lineAt;
+    let full = !!line.full;
+    const p = line.participant;
+    if (!line.via && typeof line.set === "number") {
+      const cur = this.pending.get(p);
+      if (line.full) {
+        const last = this.ownAt.get(p);
+        if (last !== void 0 && at < last || cur && at < cur.at) return;
+        const fresh = { set: line.set, at, events: [], keys: /* @__PURE__ */ new Set() };
+        holdPieceOf(fresh, events);
+        if (line.more) {
+          this.pending.set(p, fresh);
+          this.notify(p, []);
+          return;
+        }
+        this.pending.delete(p);
+        events = fresh.events;
+      } else {
+        if (!cur || cur.set !== line.set) {
+          this.notify(p, []);
+          return;
+        }
+        holdPieceOf(cur, events);
+        if (line.more) {
+          this.notify(p, []);
+          return;
+        }
+        this.pending.delete(p);
+        events = cur.events;
+        at = cur.at;
+        full = true;
+      }
+    } else if (!line.via && line.full) {
+      const cur = this.pending.get(p);
+      if (cur && at >= cur.at) this.pending.delete(p);
+    }
+    if (full) {
       const last = line.via ? this.applied.get(line.participant) : this.ownAt.get(line.participant);
       if (last !== void 0 && at < last) return;
       const held2 = this.logs[line.participant];
@@ -20405,8 +20579,8 @@ var LiveStore = class {
       }
       if (added) this.rev++;
     }
-    this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, at));
-    if (!line.via) this.ownAt.set(line.participant, Math.max(this.ownAt.get(line.participant) ?? 0, at));
+    this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, lineAt));
+    if (!line.via) this.ownAt.set(line.participant, Math.max(this.ownAt.get(line.participant) ?? 0, lineAt));
     this.notify(line.participant, events);
   }
   /**
@@ -20458,6 +20632,16 @@ var LiveStore = class {
   }
 };
 var isThenable = (r) => !!r && typeof r.then === "function";
+function holdPieceOf(held2, events) {
+  for (const ev of events) {
+    const k = authorKey2(ev);
+    if (k !== null) {
+      if (held2.keys.has(k)) continue;
+      held2.keys.add(k);
+    }
+    held2.events.push(ev);
+  }
+}
 function resultOf(v) {
   if (v && typeof v === "object" && typeof v.ok === "boolean") {
     const r = v;
