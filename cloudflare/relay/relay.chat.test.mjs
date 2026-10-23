@@ -373,6 +373,34 @@ test(`a caller’s share of the day: past ${AI_CHAT_PER_DAY.caller} from one add
   } finally { mock.restoreAll(); }
 });
 
+test(`a room’s key is no way past an address’s share: rooms opened from one address and asked with their keys stop at ${AI_CHAT_PER_DAY.caller} for the day`, async () => {
+  const env = envWith({ MM_AI_CHAT_DAILY: String(AI_CHAT_PER_DAY.caller * 10), MM_RELAY_MINT_PER_HOUR: '50' });
+  const ip = '203.0.113.99';
+  const rooms = [];
+  // As many rooms as it takes to ask past the share within one minute — each opened by POST /rooms, as any page may.
+  for (let i = 0; i * AI_CHAT_PER_MINUTE.room <= AI_CHAT_PER_DAY.caller; i++) {
+    const opened = await worker.fetch(new Request('http://relay/rooms', { method: 'POST', headers: { origin: APP, 'cf-connecting-ip': ip } }), env);
+    assert.equal(opened.status, 201);
+    rooms.push(await opened.json());
+  }
+  const statuses = {};
+  let shareSaid = null;
+  for (const r of rooms) {
+    for (let j = 0; j < AI_CHAT_PER_MINUTE.room; j++) {
+      const res = await post(env, chat(), { authorization: 'Bearer ' + r.key, 'x-dyna-room': r.room, 'cf-connecting-ip': ip });
+      statuses[res.status] = (statuses[res.status] || 0) + 1;
+      if (res.status === 429 && !shareSaid) shareSaid = await said(res);
+    }
+  }
+  assert.equal(statuses[200], AI_CHAT_PER_DAY.caller, JSON.stringify(statuses));
+  assert.equal(shareSaid, AI_WORDS.share);
+  assert.equal(env.AI.calls.length, AI_CHAT_PER_DAY.caller);
+  // Another address, with a key or none, is still answered.
+  const other = await keyForRoom(SECRET, 'another');
+  assert.equal((await post(env, chat(), { authorization: 'Bearer ' + other, 'x-dyna-room': 'another', 'cf-connecting-ip': '198.51.100.20' })).status, 200);
+  assert.equal((await post(env, chat(), { 'cf-connecting-ip': '198.51.100.21' })).status, 200);
+});
+
 test('with no LIMITS binding the route fails closed, with no AI binding it says so — the list too — and no model is asked', async () => {
   const env = envWith();
   delete env.LIMITS;

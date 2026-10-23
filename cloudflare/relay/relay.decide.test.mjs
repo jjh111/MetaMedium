@@ -277,6 +277,24 @@ test(`a caller’s share of the day: past ${DECIDE_PER_DAY.caller} from one addr
   } finally { mock.restoreAll(); }
 });
 
+test('a room’s key is no way past an address’s share of the decisions: counted by the address whatever key it holds', async () => {
+  const env = envWith({ MM_AI_DAILY: String(DECIDE_PER_DAY.caller * 3) });
+  let now = Date.UTC(2026, 9, 23, 0, 0, 30);
+  mock.method(Date, 'now', () => now);
+  mock.method(console, 'log', () => {});
+  try {
+    const key = await keyForRoom(SECRET, 'claude');
+    for (let i = 0; i < DECIDE_PER_DAY.caller; i++) {
+      if (i && i % DECIDE_PER_MINUTE.room === 0) now += 61_000;
+      assert.equal((await post(env, wire().body, { authorization: 'Bearer ' + key, 'x-dyna-room': 'claude', 'cf-connecting-ip': '2001:db8:7::1' })).status, 200, `call ${i + 1}`);
+    }
+    now += 61_000;
+    const over = await post(env, wire().body, { authorization: 'Bearer ' + key, 'x-dyna-room': 'claude', 'cf-connecting-ip': '2001:db8:7::2' });
+    assert.equal(over.status, 429);
+    assert.equal(await said(over), DECIDE_WORDS.share);
+  } finally { mock.restoreAll(); }
+});
+
 test('with no LIMITS binding the route fails closed, and with no AI binding it says so — no model asked', async () => {
   const env = envWith();
   delete env.LIMITS;

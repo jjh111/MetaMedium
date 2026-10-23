@@ -15,7 +15,8 @@
 //     `DECIDE_PER_DAY.caller` a day, its share of the budget — an IPv6 address by its /64 (`callerKey`), because one
 //     machine holds a whole /64 and would otherwise be 2^64 callers;
 //   * a hand with a room's key (`Authorization: Bearer` and `X-Dyna-Room`, checked as the rooms check one), limited
-//     per room — `DECIDE_PER_MINUTE.room` a minute; `keyed` admits only these;
+//     per room — `DECIDE_PER_MINUTE.room` a minute — and by its address's share of the day like any caller (a key is
+//     free to mint, so a share by key is no share); `keyed` admits only these;
 //   * nothing else: a request with no Origin and no key is refused, because an Origin is easy to leave out and a
 //     script anywhere would otherwise ask the account's Workers AI for free;
 //   * and every call, whoever asks, counts against one budget a day (`MM_AI_DAILY`, `DEFAULT_AI_DAILY`), past which
@@ -161,14 +162,13 @@ async function modelRoute(request, env, cors, route) {
   const why = route === 'extract' ? extractCheck(body) : decideCheck(body);
   if (why) return no(400, why, cors);
 
-  // Every call that will reach a model counts against the day's budget — one budget for both routes — and a caller
-  // with no key against its own share of it first, so one machine cannot spend the day for everyone.
+  // Every call that will reach a model counts against the day's budget — one budget for both routes — and against
+  // its address's share of it first, a room's key or none: a key is free to have (POST /rooms mints one for any page of
+  // the app), so a share by key would let one machine mint rooms and spend the day for everyone.
   let budget;
   try {
-    if (!asker.keyed) {
-      const share = await hit(env, 'ai-share', 'ip:' + callerKey(callerOf(request)), { limit: DECIDE_PER_DAY.caller, windowMs: DAY });
-      if (!share.ok) return no(429, DECIDE_WORDS.share, { ...cors, 'retry-after': String(share.retryAfter || 3600) });
-    }
+    const share = await hit(env, 'ai-share', 'ip:' + callerKey(callerOf(request)), { limit: DECIDE_PER_DAY.caller, windowMs: DAY });
+    if (!share.ok) return no(429, DECIDE_WORDS.share, { ...cors, 'retry-after': String(share.retryAfter || 3600) });
     budget = await hit(env, 'ai-budget', 'day', { limit: aiDailyFrom(env), windowMs: DAY });
   } catch { return no(503, DECIDE_WORDS.uncounted, cors); }
   if (!budget.ok) return no(429, DECIDE_WORDS.spent, { ...cors, 'retry-after': String(budget.retryAfter || 3600) });
@@ -243,14 +243,13 @@ async function chatRoute(request, env, cors) {
   const m = models[body.model];
   if (!m.id) return refuse(503, AI_WORDS.notSet(body.model), cors);
 
-  // Every call that will reach a model counts against the day's budget for chat, and a caller with no key against its
-  // own share of it first, so one machine cannot spend the day for everyone.
+  // Every call that will reach a model counts against the day's budget for chat, and against its address's share of it
+  // first — a room's key or none: a key is free to have (POST /rooms mints one for any page of the app), so a share by
+  // key would let one machine mint rooms and spend the day for everyone.
   let budget;
   try {
-    if (!asker.keyed) {
-      const share = await hit(env, 'ai-chat-share', who, { limit: AI_CHAT_PER_DAY.caller, windowMs: DAY });
-      if (!share.ok) return refuse(429, AI_WORDS.share, { ...cors, 'retry-after': String(share.retryAfter || 3600) });
-    }
+    const share = await hit(env, 'ai-chat-share', 'ip:' + callerKey(callerOf(request)), { limit: AI_CHAT_PER_DAY.caller, windowMs: DAY });
+    if (!share.ok) return refuse(429, AI_WORDS.share, { ...cors, 'retry-after': String(share.retryAfter || 3600) });
     budget = await hit(env, 'ai-chat-budget', 'day', { limit: aiChatDailyFrom(env), windowMs: DAY });
   } catch { return refuse(503, AI_WORDS.uncounted, cors); }
   if (!budget.ok) return refuse(429, AI_WORDS.spent, { ...cors, 'retry-after': String(budget.retryAfter || 3600) });
