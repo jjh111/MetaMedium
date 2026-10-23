@@ -84,10 +84,15 @@
 //   M40  a refusal from the relay (429, today's decisions spent) is said in the status line and kept in the seat's row
 //   M41  Which diagram is this? on two boxes and a line no notation reads surely: offered, asked once, held as a decision
 //        (no reading claimed) — and then Make it Mermaid is offered
-//   M42  a brief's Enter asks the decider what it should make before any writer is asked: page, program, a text answer and
-//        none of these (no Mermaid for marks that read as no diagram), the brief's words in the state; sure of a program,
-//        a program is written where the drawing alone would have made a page — and nothing is held on the board for it
-//   M43  under the floor the drawing decides, and the status line says so; a prefix (`run:`) asks no decider at all
+//   M42  seated silently, it is never asked on a brief's Enter: the page's boxes stand at once and the writer is asked, no
+//        call to the decider; chosen by a tap but with no model to write, still none — and the line never names it
+//   M43  chosen, with a writer: a brief's page stands at once while a slow decider thinks, and a stroke drawn meanwhile
+//        keeps it — sure of a program, it says the hand drew since and the page stands, the writer asked for the page;
+//        with nothing drawn since, sure of a program, the page is taken back and the writer is asked for a program, which
+//        lands — one body each, the brief's words in its state, options page, program, answer and none of these
+//   M44  under the floor the drawing decides: the page stands and the writer is asked for its words; `run:` asks no decider
+//   M45  Make it Mermaid beside a flowchart, then a brief on it: the decider's body carries no id in any spelling, not the
+//        hand's own name, and no Mermaid text
 
 import { startModelStub, STUB_KEY, REASONING_ONLY, JEV } from './servers.mjs';
 import { isModelRequest } from './guards.mjs';
@@ -1268,8 +1273,9 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       await sleep(300);
       const joins = await p7.evaluate(() => window.__mm.session.getEvents().filter((e) => e.type === 'join').map((e) => e.name || e.participantName || e.kind));
       const fetched = await p7.evaluate(() => window.__decideFetches.length);
-      check(`M37. on a page that may use it, dyna.ink's own decider is seated with no key and no word said — its row: "${row && row.who}" — and nothing is asked at boot, on a hold (${pills.length} pills) or on a model's join ("${joined.slice(0, 40)}"); no join of it on the board`,
-        !!seats.decider && seats.decider.house === true && seats.decider.name === 'Clef-flash' && seats.decider.model === 'clef-flash' && !!row && row.who === HOUSE_WORDS && row.tryable &&
+      check(`M37. on a page that may use it, dyna.ink's own decider is seated with no key and no word said — its row: "${row && row.who}" · "${row && row.fallback.slice(0, 80)}…" — and nothing is asked at boot, on a hold (${pills.length} pills) or on a model's join ("${joined.slice(0, 40)}"); no join of it on the board`,
+        !!seats.decider && seats.decider.house === true && seats.decider.chosen === false && seats.decider.name === 'Clef-flash' && seats.decider.model === 'clef-flash' && !!row && row.who === HOUSE_WORDS && row.tryable &&
+          /^asked only when you tap Which is it\? or Which diagram is this\?/.test(row.fallback) && !/nothing is kept/.test(row.fallback) &&
           held && ids.length === 5 && /^GLM 5\.3 Flash joined/.test(joined) && house().length === 0 && fetched === 0 && !joins.some((j) => /Clef/.test(String(j))),
         { seats: seats.decider, row, held, pills, joined, joins, bodies: house().length, fetched });
       const kept = await p7.evaluate(() => JSON.parse(localStorage.getItem('mm-seats') || 'null'));
@@ -1289,7 +1295,8 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       const body = calls[0] && calls[0].body;
       const ids = await nodeIds(p7);
       const raw = calls[0] ? calls[0].raw : '';
-      const leaked = ids.filter((id) => raw.includes(id));
+      // Every id the board holds, as it is and as Mermaid writes it (`stroke_hand_a1b2_7`).
+      const leaked = ids.flatMap((id) => [id, id.replace(/[^A-Za-z0-9]+/g, '_')]).filter((id) => raw.includes(id));
       const fetches = await p7.evaluate(() => window.__decideFetches.slice());
       const rows = await p7.evaluate((list) => {
         const mm = window.__mm, s = mm.session.getState();
@@ -1410,66 +1417,188 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
       await page.press('#summon input.filter', 'Enter');
     };
 
+    /** When the newest thing made holds code: the page's own clock, for "at once". */
+    const codeStoodAt = (page, since) => until(page, (n) => {
+      const st = window.__mm.session.getState();
+      return st.artifacts.slice(n).some((id) => (st.nodes.get(id).reps || []).some((r) => r.modality === 'code')) ? Date.now() : null;
+    }, since, 4000);
+    const artifactCount = (page) => page.evaluate(() => window.__mm.session.getState().artifacts.length);
+    const freshBoard = async () => { await p7.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); }); await sleep(150); };
+    const fieldLine = (page) => page.evaluate(() => ((document.querySelector('#summon .reading') || {}).textContent || '').trim());
+    const typeBrief = async (ids, text) => { await holdIds(p7, ids); await p7.fill('#summon input.filter', text); await sleep(200); return fieldLine(p7); };
+    const waitChats = async (since, n = 1, ms = 10000) => { const end = Date.now() + ms; while (Date.now() < end && chats(since).length < n) await sleep(60); };
+
     await record('M42', async () => {
-      await p7.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
+      // dyna.ink's own, seated silently at boot (M37), and a writer joined: a brief's Enter is the writer's, and the decider hears nothing of it.
+      await freshBoard();
+      let ids = await twoBoxes(p7);
       await sleep(150);
-      const ids = await twoBoxes(p7);
-      await sleep(150);
-      const drawn = await p7.evaluate((list) => window.__mm.session.read(list).genre.genre, ids);
-      await watchStatus(p7);
-      const before = house().length, chatsBefore = chats().length;
-      const eventsBefore = await p7.evaluate(() => window.__mm.session.getEvents().length);
-      stub.systemOneLead('program');
-      try {
-        await sendBrief(p7, ids, 'a timer that counts down from ten');
-        const end = Date.now() + 10000;
-        while (Date.now() < end && chats(chatsBefore).length < 1) await sleep(60);
-        await sleep(600);
-      } finally { stub.systemOneLead(null); }
-      const calls = house(before);
-      const body = calls[0] && calls[0].body;
-      const q1 = body && body.questions.q1;
-      const asked = chats(chatsBefore);
-      const said = await statusSaid(p7);
-      const firstWriterAt = asked[0] ? asked[0].at : Infinity;
-      const added = await p7.evaluate((n) => window.__mm.session.getEvents().slice(n).map((e) => e.type + (e.type === 'propose' ? ':' + (e.reps || []).map((r) => r.modality).join('+') : '')), eventsBefore);
-      check(`M42. a brief's Enter asks the decider first — one body, its options ${q1 ? Object.keys(q1.criteria).join(', ') : '?'}, the brief in its state — and, sure of a program, a program is written where the drawing (${drawn}) would have made a page: ${said.filter((x) => /Clef-flash|wr|build/.test(x)).slice(0, 4).join(' | ')}`,
-        drawn === 'layout' && calls.length === 1 && !!q1 && JSON.stringify(Object.keys(q1.criteria)) === '["page","program","answer","none_of_these"]' && /a timer that counts down from ten/.test(body.state) &&
-          calls[0].at <= firstWriterAt && asked.length >= 1 && said.some((x) => /^Clef-flash says a program \(0\.99\) — so it makes that/.test(x)) &&
-          said.some((x) => /could not write it|wrote /.test(x)) && !said.some((x) => /could not build|built /.test(x)) && !added.some((x) => /decision/.test(x)),
-        { calls: calls.length, criteria: q1 && Object.keys(q1.criteria), said, asked: asked.map((c) => c.job), added });
+      const before = house().length, chatsBefore = chats().length, artsBefore = await artifactCount(p7);
+      const line = await typeBrief(ids, 'my notes on the bakery’s new page');
+      const t0 = await p7.evaluate(() => Date.now());
+      await p7.press('#summon input.filter', 'Enter');
+      const stood = await codeStoodAt(p7, artsBefore);
+      await waitChats(chatsBefore);
+      await sleep(300);
+      const asked = chats(chatsBefore).map((c) => c.job);
+      check(`M42. seated silently, dyna.ink's decider is never asked on a brief's Enter — no call (${house(before).length}); the page's boxes stood ${stood ? stood - t0 : '?'} ms after Enter; the writer asked: ${asked.join(', ')}; the line: "${line}"`,
+        house(before).length === 0 && !!stood && stood - t0 < 1500 && asked.includes('page') && !/Clef-flash/.test(line),
+        { calls: house(before).length, stood: stood && stood - t0, asked, line });
       await letGo(p7);
+      // Chosen by a tap, but with no model here to write what it decides: still nothing is sent, and the boxes stand at once.
+      await openModels(p7);
+      await pressRow(p7, 'GLM 5.3 Flash', 'leave');
+      await p7.locator('.seatRow[data-seat="decider"] [data-seat-house]').click({ timeout: 5000 });
+      await sleep(150);
+      const row = await seatRow(p7, 'decider');
+      const seats = await seatsOf(p7);
+      await closeModels(p7);
+      await freshBoard();
+      ids = await twoBoxes(p7);
+      await sleep(150);
+      const before2 = house().length, arts2 = await artifactCount(p7);
+      const line2 = await typeBrief(ids, 'my notes on the bakery’s new page');
+      const t1 = await p7.evaluate(() => Date.now());
+      await p7.press('#summon input.filter', 'Enter');
+      const stood2 = await codeStoodAt(p7, arts2);
+      await sleep(400);
+      check(`M42b. chosen by a tap (its row: "${row && row.fallback.slice(0, 120)}…"), but with no model to write: a brief's Enter still sends nothing (${house(before2).length}), the boxes stand ${stood2 ? stood2 - t1 : '?'} ms after Enter, and the line says nothing of the decider: "${line2}"`,
+        !!seats.decider && seats.decider.chosen === true && !!row && /on a brief’s Enter/.test(row.fallback) && /the brief you typed/.test(row.fallback) &&
+          house(before2).length === 0 && !!stood2 && stood2 - t1 < 1500 && line2 === '↵ the page’s boxes at once — a model writes the words when one joins',
+        { seats: seats.decider, row, calls: house(before2).length, stood: stood2 && stood2 - t1, line: line2 });
+      await letGo(p7);
+      // The writer back, for what follows.
+      const joined = await joinCustom(p7, stub.baseUrl, 'z-ai/glm-5.3-flash', STUB_KEY, false, 'writer');
+      await closeModels(p7);
+      check(`M42c. the writer joins again: "${joined.slice(0, 60)}"`, /^GLM 5\.3 Flash joined/.test(joined), { joined });
     });
 
     await record('M43', async () => {
-      await p7.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
+      // Chosen, with a writer, and a decider that takes a second and a half: the page stands the moment Enter is pressed,
+      // and a stroke drawn while the decider thinks keeps it.
+      await freshBoard();
+      let ids = await twoBoxes(p7);
       await sleep(150);
+      await watchStatus(p7);
+      const before = house().length, chatsBefore = chats().length, arts = await artifactCount(p7);
+      stub.systemOneLead('program');
+      stub.systemOneDelay(1500);
+      let stood = null, t0 = 0, line = '', marksBefore = 0, drew = false;
+      try {
+        line = await typeBrief(ids, 'a timer that counts down from ten');
+        t0 = await p7.evaluate(() => Date.now());
+        await p7.press('#summon input.filter', 'Enter');
+        stood = await codeStoodAt(p7, arts);
+        await sleep(300);
+        marksBefore = await p7.evaluate(() => window.__mm.session.getState().contentIds.length);
+        await p7.evaluate(() => { const d = window.__draw; d.stroke(d.line({ x: 520, y: 520 }, { x: 760, y: 560 }, 30)); });
+        drew = (await p7.evaluate(() => window.__mm.session.getState().contentIds.length)) > marksBefore;
+        await waitChats(chatsBefore, 1, 8000);
+        await sleep(500);
+      } finally { stub.systemOneDelay(0); }
+      const calls = house(before);
+      const body = calls[0] && calls[0].body;
+      const q1 = body && body.questions.q1;
+      const said = await statusSaid(p7);
+      const asked = chats(chatsBefore).map((c) => c.job);
+      const page = await p7.evaluate((n) => { const st = window.__mm.session.getState(); return st.artifacts.slice(n).map((id) => (st.nodes.get(id).reps.filter((r) => r.modality === 'code').pop() || { data: {} }).data.kind); }, arts);
+      check(`M43. chosen, with a writer: the line says it may be overruled ("${line}"); the page's boxes stood ${stood ? stood - t0 : '?'} ms after Enter, before the decider answered; a stroke drawn while it thought keeps them — "${said.filter((x) => /drawn since/.test(x)).join(' | ').slice(0, 150)}" — and the writer is asked for the page (${asked.join(', ')})`,
+        /unless Clef-flash is sure it should be something else$/.test(line) && !!stood && stood - t0 < 1200 && drew && calls.length === 1 && !!q1 &&
+          JSON.stringify(Object.keys(q1.criteria)) === '["page","program","answer","none_of_these"]' && /a timer that counts down from ten/.test(body.state) &&
+          said.some((x) => /^Clef-flash is sure it should be a program, but you have drawn since — the page the drawing made stands/.test(x)) &&
+          asked.includes('page') && !asked.includes('program') && page.includes('html'),
+        { stood: stood && stood - t0, drew, calls: calls.length, criteria: q1 && Object.keys(q1.criteria), said, asked, page });
+      await letGo(p7);
+      // With nothing drawn since, a sure "program" takes the page back and the writer writes a program — which lands.
+      await freshBoard();
+      ids = await twoBoxes(p7);
+      await sleep(150);
+      await watchStatus(p7);
+      const before2 = house().length, chats2 = chats().length, arts2 = await artifactCount(p7);
+      try {
+        await typeBrief(ids, 'a timer that counts down from ten');
+        await p7.press('#summon input.filter', 'Enter');
+        await waitChats(chats2, 1, 8000);
+        await sleep(800);
+      } finally { stub.systemOneLead(null); }
+      const said2 = await statusSaid(p7);
+      const asked2 = chats(chats2).map((c) => c.job);
+      const made = await p7.evaluate((n) => { const st = window.__mm.session.getState(); return st.artifacts.slice(n).map((id) => { const c = st.nodes.get(id).reps.filter((r) => r.modality === 'code').pop(); return c ? { kind: c.data.kind, code: c.data.code } : null; }); }, arts2);
+      check(`M43b. sure of a program with nothing drawn since: the page is taken back and a program is written and lands — ${said2.filter((x) => /Clef-flash|wrote/.test(x)).join(' | ').slice(0, 170)} — the writer asked: ${asked2.join(', ')}; made: ${JSON.stringify(made.map((m) => m && m.kind))}`,
+        house(before2).length === 1 && said2.some((x) => /^Clef-flash says a program \(0\.99\) — so it makes that/.test(x)) && said2.some((x) => /^GLM 5\.3 Flash wrote countdown/.test(x)) &&
+          asked2.includes('program') && !asked2.includes('page') && made.length === 1 && !!made[0] && made[0].kind === 'run' && /mm\.report\("face"/.test(made[0].code),
+        { said: said2, asked: asked2, made });
+      await letGo(p7);
+    });
+
+    await record('M44', async () => {
+      await freshBoard();
       let ids = await twoBoxes(p7);
       await sleep(150);
       await watchStatus(p7);
       stub.decideAt(0.97);
       stub.systemOneLead('program');
-      const before = house().length, chatsBefore = chats().length;
+      const before = house().length, chatsBefore = chats().length, arts = await artifactCount(p7);
       try {
-        await sendBrief(p7, ids, 'an invoice for the corner shop');
-        const end = Date.now() + 10000;
-        while (Date.now() < end && chats(chatsBefore).length < 1) await sleep(60);
-        await sleep(600);
+        await typeBrief(ids, 'an invoice for the corner shop');
+        await p7.press('#summon input.filter', 'Enter');
+        await waitChats(chatsBefore, 1, 8000);
+        await sleep(500);
       } finally { stub.decideAt(0.995); stub.systemOneLead(null); }
       const said = await statusSaid(p7);
-      const arts = await p7.evaluate(() => window.__mm.session.getState().artifacts.length);
-      check(`M43. under the floor the drawing decides — ${said.filter((x) => /Clef-flash/.test(x)).join(' | ').slice(0, 160)} — and a page is built`,
-        house(before).length === 1 && said.some((x) => /^Clef-flash is only 0\.97 sure of a program — under 0\.99, so the drawing decides: a page/.test(x)) && arts >= 1 &&
-          !said.some((x) => /could not write it|wrote /.test(x)),
-        { said, arts });
+      const asked = chats(chatsBefore).map((c) => c.job);
+      const kinds = await p7.evaluate((n) => { const st = window.__mm.session.getState(); return st.artifacts.slice(n).map((id) => (st.nodes.get(id).reps.filter((r) => r.modality === 'code').pop() || { data: {} }).data.kind); }, arts);
+      check(`M44. under the floor the drawing decides — ${said.filter((x) => /Clef-flash/.test(x)).join(' | ').slice(0, 160)} — the page's boxes stand (${kinds.join(', ')}) and the writer is asked for its words (${asked.join(', ')})`,
+        house(before).length === 1 && said.some((x) => /^Clef-flash is only 0\.97 sure of a program — under 0\.99, so the drawing decides: a page/.test(x)) &&
+          kinds.includes('html') && asked.includes('page') && !asked.includes('program'),
+        { said, asked, kinds });
       await letGo(p7);
-      await p7.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
-      await sleep(150);
+      await freshBoard();
       ids = await twoBoxes(p7);
       const before2 = house().length;
       await sendBrief(p7, ids, 'run: a spinner that turns');
       await sleep(800);
-      check('M43b. a prefix says what a brief makes: `run:` asks no decider', house(before2).length === 0, { calls: house(before2).length });
+      check('M44b. a prefix says what a brief makes: `run:` asks no decider', house(before2).length === 0, { calls: house(before2).length });
+      await letGo(p7);
+    });
+
+    await record('M45', async () => {
+      // A flowchart, its Mermaid made beside it — whose text names every mark by its own id, made safe — then a brief on it.
+      await freshBoard();
+      const ids = await p7.evaluate(() => {
+        const s = window.__mm.session;
+        const line = (a, b, n = 40) => Array.from({ length: n }, (_, i) => ({ x: a.x + ((b.x - a.x) * i) / (n - 1), y: a.y + ((b.y - a.y) * i) / (n - 1) }));
+        const box = (x, y) => [...line({ x, y }, { x: x + 160, y }), ...line({ x: x + 160, y }, { x: x + 160, y: y + 100 }), ...line({ x: x + 160, y: y + 100 }, { x, y: y + 100 }), ...line({ x, y: y + 100 }, { x, y })];
+        const arrow = (a, b) => { const pts = line(a, b); const t = pts[pts.length - 1]; return [...pts, { x: t.x - 14, y: t.y - 10 }, t, { x: t.x - 14, y: t.y + 10 }]; };
+        let t = Date.now();
+        const add = (pts) => { s.addStroke(pts, (t += 40), undefined, 1); const st = s.getState(); return st.contentIds[st.contentIds.length - 1]; };
+        return [add(box(300, 200)), add(box(600, 200)), add(box(900, 200)), add(arrow({ x: 462, y: 250 }, { x: 598, y: 250 })), add(arrow({ x: 762, y: 250 }, { x: 898, y: 250 }))];
+      });
+      await sleep(200);
+      await holdIds(p7, ids);
+      const tookMermaid = await takePill(p7, 'Make it Mermaid');
+      await sleep(400);
+      const mermaid = await p7.evaluate(() => { const st = window.__mm.session.getState(); return st.artifacts.map((id) => (st.nodes.get(id).reps.filter((r) => r.modality === 'code').pop() || { data: {} }).data).find((d) => d.kind === 'mermaid'); });
+      await letGo(p7);
+      const before = house().length, chatsBefore = chats().length;
+      stub.systemOneLead('page');
+      try {
+        await sendBrief(p7, ids, 'a page about the orders');
+        const end = Date.now() + 8000;
+        while (Date.now() < end && house(before).length < 1) await sleep(60);
+        await waitChats(chatsBefore, 1, 8000);
+        await sleep(300);
+      } finally { stub.systemOneLead(null); }
+      const raw = (house(before)[0] || {}).raw || '';
+      const all = await nodeIds(p7);
+      const forms = all.flatMap((id) => [id, id.replace(/[^A-Za-z0-9]+/g, '_')]);
+      const leaked = forms.filter((f) => raw.includes(f));
+      const me = await p7.evaluate(() => window.__mm.session.logName() || '');
+      const meForms = me ? [me, me.replace(/[^A-Za-z0-9]+/g, '_')] : [];
+      check(`M45. Make it Mermaid beside a flowchart (${tookMermaid ? 'taken' : 'not taken'}; its text names ${mermaid ? (mermaid.code.match(/stroke_/g) || []).length : 0} marks by id), then a brief on it: one body, carrying no id in any spelling (${leaked.length} found), not the hand's own name, and no Mermaid text`,
+        tookMermaid && !!mermaid && /stroke_/.test(mermaid.code) && house(before).length === 1 && raw.length > 0 && leaked.length === 0 &&
+          !meForms.some((f) => raw.includes(f)) && !/flowchart (TD|LR)|-->/.test(raw),
+        { leaked, me, mermaid: mermaid && mermaid.code.slice(0, 200), state: (house(before)[0] || { body: {} }).body.state });
       await letGo(p7);
     });
   } catch (err) {

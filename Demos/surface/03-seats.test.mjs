@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '03-seats.js'), 'utf8');
 const S = new Function(
-  src + '\n  return { SEATS, SEAT_WORDS, resolveReaders, resolveWriters, fallbackWords, keyId, keysToKeep, migrateStored, orderChoices, seatsOfPick, pickOf, SEMANTIC_SOURCE, SEMANTIC_MAX_BYTES, semanticSourceOf, semanticNameOf, semanticWords, semanticFailed, HOUSE_DECIDE, HOUSE_MODELS, HOUSE_DECIDER_MODEL, houseDeciderFor, deciderAtBoot, deciderWords };'
+  src + '\n  return { SEATS, SEAT_WORDS, resolveReaders, resolveWriters, fallbackWords, keyId, keysToKeep, migrateStored, orderChoices, seatsOfPick, pickOf, SEMANTIC_SOURCE, SEMANTIC_MAX_BYTES, semanticSourceOf, semanticNameOf, semanticWords, semanticFailed, HOUSE_DECIDE, HOUSE_MODELS, HOUSE_DECIDER_MODEL, houseDeciderFor, deciderAtBoot, deciderWords, deciderAsks };'
 )();
 
 const m = (id, o = {}) => ({ id, vision: false, seats: [], size: Infinity, claude: false, local: false, ...o });
@@ -218,9 +218,9 @@ test('a page on this machine may name a relay on this machine — the origin onl
 });
 
 test('at boot: dyna.ink’s own when nothing is kept; a joined decider rejoins; a decider let go stays let go; none where there is no house', () => {
-  assert.deepEqual(S.deciderAtBoot(undefined, S.HOUSE_DECIDE), { seat: 'house', model: 'clef-flash' });
-  assert.deepEqual(S.deciderAtBoot({ provider: 'dyna', model: 'clef-omni' }, S.HOUSE_DECIDE), { seat: 'house', model: 'clef-omni' });
-  assert.deepEqual(S.deciderAtBoot({ provider: 'dyna', model: 'gpt-9' }, S.HOUSE_DECIDE), { seat: 'house', model: 'clef-flash' });
+  assert.deepEqual(S.deciderAtBoot(undefined, S.HOUSE_DECIDE), { seat: 'house', model: 'clef-flash', chosen: false });
+  assert.deepEqual(S.deciderAtBoot({ provider: 'dyna', model: 'clef-omni' }, S.HOUSE_DECIDE), { seat: 'house', model: 'clef-omni', chosen: true });
+  assert.deepEqual(S.deciderAtBoot({ provider: 'dyna', model: 'gpt-9' }, S.HOUSE_DECIDE), { seat: 'house', model: 'clef-flash', chosen: true });
   assert.deepEqual(S.deciderAtBoot({ none: true }, S.HOUSE_DECIDE), { seat: null, why: 'none' });
   assert.deepEqual(S.deciderAtBoot({ baseUrl: 'https://openrouter.ai/api/v1', model: 'typesafe/jev-1.13' }, S.HOUSE_DECIDE), { seat: 'pick' });
   assert.deepEqual(S.deciderAtBoot({ baseUrl: 'https://openrouter.ai/api/v1', model: 'typesafe/jev-1.13' }, null), { seat: 'pick' });
@@ -248,4 +248,19 @@ test('the house decider and a decider let go are kept as choices, never as a key
   // Neither choice is a seat any joined model holds.
   assert.deepEqual(S.seatsOfPick({ decider: { provider: 'dyna', model: 'clef-flash' }, writer: pick }, pick), ['writer']);
   assert.deepEqual(S.seatsOfPick({ decider: { none: true } }, pick), []);
+});
+
+test('what a decider is asked and sent, in words: seated silently, a tap alone and the marks’ words; chosen, a brief’s Enter and the brief too — and never “nothing is kept”', () => {
+  const silent = S.deciderAsks({ house: true, chosen: false, name: 'Clef-flash' });
+  assert.match(silent, /^asked only when you tap Which is it\? or Which diagram is this\?/);
+  assert.match(silent, /sent the words of the marks you ask about, to dyna\.ink’s relay, which asks Cloudflare’s Clef-flash/);
+  assert.doesNotMatch(silent, /brief you typed/);
+  assert.match(silent, /choose it to have it say what a brief should make too/);
+  const chosen = S.deciderAsks({ house: true, chosen: true, name: 'Clef-flash' });
+  assert.match(chosen, /and on a brief’s Enter, when a model will write it, to say what it should make/);
+  assert.match(chosen, /the words of the marks you ask about and the brief you typed/);
+  const own = S.deciderAsks({ chosen: true, where: 'OpenRouter' });
+  assert.match(own, /the brief you typed, to OpenRouter, with your key$/);
+  for (const w of [silent, chosen, own]) assert.doesNotMatch(w, /nothing is kept/);
+  assert.match(S.SEAT_WORDS.decider.job, /which of two matching definitions, which kind of diagram, what a brief should make/);
 });

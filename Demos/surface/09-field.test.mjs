@@ -352,8 +352,11 @@ test('with a decider seated, a brief’s line says the drawing’s guess may be 
   // A prefix says what to make: no decider is asked, and the line does not say one might be.
   const prefixed = readFieldCommand(ctx({ text: 'run: a bouncing ball', models: ['qwen3'], decider: 'Clef-flash' }));
   assert.doesNotMatch(prefixed.line, /Clef-flash/);
-  // With no model to write a program, the decider changes nothing: it needs a model.
+  // With no model to write, the decider is not asked and the line does not say it might be: a program needs a model,
+  // and a page's boxes stand at once, as ever.
   assert.equal(readFieldCommand(ctx({ text: 'a bouncing ball', decider: 'Clef-flash', target: () => 'program' })).kind, 'blocked');
+  const alone = readFieldCommand(ctx({ text: 'website with the copy in the squares', decider: 'Clef-flash', target: () => 'page' }));
+  assert.equal(alone.line, '↵ the page’s boxes at once — a model writes the words when one joins');
 });
 
 test('the genre is read at most once, and only when the brief needs it', () => {

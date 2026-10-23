@@ -3,7 +3,7 @@
 //   who is asked (writers; readers is 06-handwriting.js's, both by 03-seats.js's rules), one key a provider (keyFor,
 //   holdKey, commitKey), the decider (joinDecider, joinHouseDecider — dyna.ink's own, no key — seatHouseDecider at boot,
 //   askDecider for Which is it?, askDeciderNotation for Which diagram is this?, askDeciderBrief for what a brief makes,
-//   deciderHost), what a reload brings back
+//   deciderHost, and briefDeciderHost — the decider a brief's Enter may ask: only one the hand chose), what a reload brings back
 //   (rejoinRemembered: the old pick and key become the writer seat, once), the pane's seats section (renderSeats; the
 //   form's For: forSeat) and seatsNow for tests. (The semantic seat's row is 03-semantic.js's; this pane only draws it.)
 // Uses: core (MM, store, params), seats (03-seats.js — every rule), models (agents, join, joinHosted, factsFor, applyFacts,
@@ -26,7 +26,7 @@
   const heldKeys = new Map();          // keyId → key: entered on this page, or restored from this device
   const rememberedKeys = new Set();    // keyIds whose key the hand asked to keep on this device
   let seatPicks = {};
-  let decider = null;                  // { config, seat: DecideSeat, pseudo: { id, config }, name, meta, transport, house?, model?, sees? }
+  let decider = null;                  // { config, seat: DecideSeat, pseudo: { id, config }, name, meta, transport, house?, model?, sees?, chosen }
   /** Where this page may ask dyna.ink's own decider (its relay's model route), or null (03-seats.js, houseDeciderFor). */
   const HOUSE = houseDeciderFor(location.hostname, params.get('decide'));
   let pendingPicks = [];               // picks that wait for a key: { pick, seats }
@@ -168,40 +168,59 @@
   }
   /** The decider as the tools are told it: its name, and whether it sees (a picture job is offered only to one that does). */
   function deciderHost() { return decider ? { name: decider.name, sees: !!decider.sees } : null; }
+  /**
+   * The decider a brief's Enter may ask what the brief should make (the audit's D3), or null: only one the hand CHOSE —
+   * joined, or dyna.ink's own taken by a tap and kept — never dyna.ink's own seated silently at boot, so a brief's
+   * words go nowhere the hand did not send them. (The pills that ask a decider name it, and asking is their tap.)
+   */
+  function briefDeciderHost() { return decider && decider.chosen ? deciderHost() : null; }
+  /** When the seated decider is asked and what it is sent, in words (03-seats.js, deciderAsks). */
+  function deciderAsksNow() {
+    if (!decider) return '';
+    return deciderAsks({ house: !!decider.house, chosen: !!decider.chosen, name: decider.name, where: decider.house ? '' : MM.whereOf(decider.config.baseUrl).name });
+  }
 
   /**
    * dyna.ink's own decider (the audit's S3): Cloudflare's Clef-flash, asked through dyna.ink's relay, which holds the
    * model by binding — no key on this page, none typed, none sent. No list to read, no key to hold. `quiet`: seated at
    * boot, where nothing is said and nothing is kept (the seat joins a board only at its first ask, so seating it writes
-   * nothing); taken by the hand, it is said and kept as the hand's choice.
+   * nothing) — `chosen` then says whether the hand kept it as its pick (a brief's Enter asks only a decider the hand
+   * chose); taken by the hand (not quiet), it is said, kept as the hand's choice, and chosen.
    */
-  function joinHouseDecider(model, quiet) {
+  function joinHouseDecider(model, quiet, chosen) {
     if (!HOUSE) return null;
     const m = HOUSE_MODELS[model] ? model : HOUSE_DECIDER_MODEL;
-    if (decider && decider.house && decider.model === m) return decider.pseudo;
+    if (decider && decider.house && decider.model === m) {
+      // Seated silently, and now taken by the hand: the same seat, chosen — kept, and said.
+      if (!quiet && !decider.chosen) { decider.chosen = true; keepHouseChoice(m); }
+      return decider.pseudo;
+    }
     if (decider) leaveDecider(true);
     const words = HOUSE_MODELS[m];
     const config = { kind: 'systemone', baseUrl: HOUSE, model: m, title: words.name, vision: words.sees };
     const pseudo = { id: 'decider:dyna ' + m, config: config };
     const transport = recordingTransport({ agent: pseudo }, MM.createSystemOneDecideTransport({ endpoint: HOUSE, model: m, sees: words.sees }));
     const seat = makeDeciderSeat(transport, words.name, config, 'hosted');
-    decider = { config: config, seat: seat, pseudo: pseudo, name: words.name, meta: { provider: 'dyna' }, transport: transport, house: true, model: m, sees: words.sees };
-    if (!quiet) {
-      seatPicks.decider = { provider: 'dyna', model: m };
-      saveSeats();
-      mpStatus.textContent = deciderWords(m, MM.DECIDER_TAKE_AT) + ' — it is the decider.';
-      say(words.name + ' is the decider — dyna.ink’s own, no key; asked only when you tap it, its answer taken only when it is ' + Math.round(MM.DECIDER_TAKE_AT * 100) + '% sure');
-    }
+    decider = { config: config, seat: seat, pseudo: pseudo, name: words.name, meta: { provider: 'dyna' }, transport: transport, house: true, model: m, sees: words.sees, chosen: !quiet || !!chosen };
+    if (!quiet) keepHouseChoice(m);
+    else { renderSeats(); syncTiles(); refreshPalette(); }
+    return pseudo;
+  }
+  /** dyna.ink's own, taken by the hand: kept as its pick, and said — when it is asked and what it is sent. */
+  function keepHouseChoice(m) {
+    seatPicks.decider = { provider: 'dyna', model: m };
+    saveSeats();
+    mpStatus.textContent = deciderWords(m, MM.DECIDER_TAKE_AT) + ' — it is the decider.';
+    say(HOUSE_MODELS[m].name + ' is the decider — dyna.ink’s own, no key; ' + deciderAsksNow() + '; its answer is taken only when it is ' + Math.round(MM.DECIDER_TAKE_AT * 100) + '% sure');
     renderSeats();
     syncTiles();
     refreshPalette();
-    return pseudo;
   }
   /** At boot, after the seats kept have rejoined: dyna.ink's own decider, silently, unless the hand chose one or chose none (03-seats.js, deciderAtBoot). */
   function seatHouseDecider() {
     if (decider) return;
     const plan = deciderAtBoot(seatPicks.decider, HOUSE);
-    if (plan.seat === 'house') joinHouseDecider(plan.model, true);
+    if (plan.seat === 'house') joinHouseDecider(plan.model, true, plan.chosen);
   }
   /** The hand lets the decider seat go: none, kept, so a reload does not seat dyna.ink's own again. */
   function noDecider() {
@@ -230,13 +249,13 @@
       const transport = MM.createChatDecideTransport(config, { complete: recording(holder) });
       const name = MM.modelWords(config);
       const seat = makeDeciderSeat(transport, name, config);
-      decider = { config: config, seat: seat, pseudo: pseudo, name: name, meta: meta || {}, transport: transport };
+      decider = { config: config, seat: seat, pseudo: pseudo, name: name, meta: meta || {}, transport: transport, chosen: true };
       factsOf.set(agentKey(pseudo), got.first.facts);
       seatPicks.decider = pickOf(config, meta ? { provider: meta.provider, endpoint: meta.endpoint } : undefined);
       saveSeats();
       mpStatus.textContent = name + ' joined as the decider — ' + got.first.facts.said + '.';
-      // The choice the unit asked to be said: why the decider is never asked on its own.
-      say(name + ' is the decider — asked only when you tap “Which is it?” on a tie between two definitions, never on its own; its answer is taken only when it is ' + MM.DECIDER_TAKE_AT + ' sure');
+      // The choice the unit asked to be said: when the decider is asked and what it is sent — never on its own.
+      say(name + ' is the decider — ' + deciderAsksNow() + '; never on its own, and its answer is taken only when it is ' + Math.round(MM.DECIDER_TAKE_AT * 100) + '% sure');
       if (got.later) got.later.then((catalog) => { if (decider && decider.seat === seat && catalog && catalog.ok) { const f = MM.modelFacts(config.model, catalog, got.where); if (f.ok) { applyFacts(config, f.facts); factsOf.set(agentKey(pseudo), f.facts); refreshPicks(config); renderSeats(); } } });
       renderSeats();
       syncTiles();
@@ -268,7 +287,7 @@
    * chosen between), holds (false: a sure answer is taken without being held on the board), done(of | null, stopped)
    * (called once whatever came of it), key and workOn (the work's key and the marks its dot stands on) }. The state is
    * words, never ids (core's decisionStateOf); what is sent is the question, its options and that state, to the
-   * decider's address alone.
+   * decider's address alone. Returns the call's AbortController (Esc reaches it as any work does), or false.
    */
   function runDecision(job) {
     const done = (of, stopped) => { if (job.done) job.done(of, !!stopped); };
@@ -307,7 +326,7 @@
       renderSeats();
       done(chosen);
     }).finally(() => workControllers.delete(key));
-    return true;
+    return ctl;
   }
 
   /**
@@ -352,11 +371,13 @@
   }
 
   /**
-   * What should this brief make? (the audit's D3) — asked on the Enter that sends a brief, before any writer is asked,
-   * when a decider is seated and no prefix said it (`page:`, `run:` …): a page, a program, a Mermaid diagram (only when
-   * the marks read as one: `opts.diagram`, its words), a text answer, or none of these. Nothing is held on the board —
-   * the answer chooses what is made, and only when it is sure (DECIDER_TAKE_AT); else what the drawing says stands
-   * (`opts.otherwise`, its words). `done(kind | null, stopped)` always follows: the kind taken, or null.
+   * What should this brief make? (the audit's D3) — asked on the Enter that sends a brief, before any writer is asked
+   * (09-palette.js's decideBrief: only a decider the hand chose, only with a model here to write it, never with a
+   * prefix — `page:`, `run:` …): a page, a program, a Mermaid diagram (only when the marks read as one: `opts.diagram`,
+   * its words), a text answer, or none of these. The state is read now, from the marks as they stand, and holds the
+   * brief typed. Nothing is held on the board — the answer chooses what is made, and only when it is sure
+   * (DECIDER_TAKE_AT); else what the drawing says stands (`opts.otherwise`, its words). `done(kind | null, stopped)`
+   * follows, never before this returns: the kind taken, or null. Returns the call's AbortController, or false.
    */
   function askDeciderBrief(sum, brief, opts, done) {
     const s = session.getState();
@@ -505,11 +526,13 @@
         if (decider && decider.house) {
           // dyna.ink's own: what it is, that it needs no key, and what it is sent (the audit's S10).
           who = deciderWords(decider.model, MM.DECIDER_TAKE_AT);
-          note = 'asked only when you tap it; sent the words of the marks you ask about, to dyna.ink’s relay, which asks Cloudflare’s ' + decider.name + '; nothing is kept';
-          body = tryIt + '<button class="ghost" data-seat-set="decider" title="a decision model of your own, with its key">another…</button><button class="ghost" data-seat-none="decider" title="no decider: the engine’s ranking stands, and nothing offers to ask one — remembered on this device">none</button>';
+          note = deciderAsksNow();
+          body = tryIt + (decider.chosen ? '' : '<button class="ghost" data-seat-house="decider" title="keep dyna.ink’s own as your decider, remembered on this device — and let it say, on a brief’s Enter, what the brief should make">choose it</button>') +
+            '<button class="ghost" data-seat-set="decider" title="a decision model of your own, with its key">another…</button><button class="ghost" data-seat-none="decider" title="no decider: the engine’s ranking stands, and nothing offers to ask one — remembered on this device">none</button>';
           call = callOf(agentKey(decider.pseudo));
         } else if (decider) {
           who = decider.name + ' · ' + MM.providerLocality(decider.config) + ' · taken only at ' + MM.DECIDER_TAKE_AT;
+          note = deciderAsksNow();
           body = tryIt + '<button class="ghost" data-seat-leave="decider">leave</button>';
           call = callOf(agentKey(decider.pseudo));
         } else {
@@ -552,7 +575,7 @@
     });
     seatsPane.querySelectorAll('[data-seat-leave]').forEach((b) => { b.onclick = () => unseat(b.dataset.seatLeave); });
     seatsPane.querySelectorAll('[data-seat-none]').forEach((b) => { b.onclick = () => noDecider(); });
-    seatsPane.querySelectorAll('[data-seat-house]').forEach((b) => { b.onclick = () => joinHouseDecider(HOUSE_DECIDER_MODEL, false); });
+    seatsPane.querySelectorAll('[data-seat-house]').forEach((b) => { b.onclick = () => joinHouseDecider(decider && decider.house ? decider.model : HOUSE_DECIDER_MODEL, false); });
   }
   /** Choices for a seat's select: local before hosted, the quickest last call first (03-seats.js). */
   function orderedPool(pool) {
@@ -568,7 +591,7 @@
     return {
       reader: who(holderOf('reader')),
       writer: who(holderOf('writer')),
-      decider: decider ? { model: decider.config.model, name: decider.name, local: !decider.house && MM.providerLocality(decider.config) === 'local', house: !!decider.house, sees: !!decider.sees } : null,
+      decider: decider ? { model: decider.config.model, name: decider.name, local: !decider.house && MM.providerLocality(decider.config) === 'local', house: !!decider.house, sees: !!decider.sees, chosen: !!decider.chosen } : null,
       any: agents.filter((a) => isModel(a) && !isSeatAgent(a) && !(seatsOfAgent.get(agentKey(a)) || new Set()).size).map(who),
       keys: [...heldKeys.keys()],
       remembered: [...rememberedKeys],

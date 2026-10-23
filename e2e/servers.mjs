@@ -181,6 +181,11 @@ const ANSWERS = {
   try: 'ok',
   // The decision seat's call: answered by the stub itself, from the questions it was sent (`decideReply`).
   decide: null,
+  // A program, in the contract `parseProgram` reads: a part it reports, and nothing that reaches past its frame.
+  program: JSON.stringify({ name: 'countdown', parts: ['face'], code: 'mm.report("face", 0, 0, 10, 10);' }),
+  // A page's words and an answer: nothing a page can be built from, as ever — the job is told apart so a record can say which was asked.
+  page: 'ok',
+  ask: 'ok',
   other: 'ok',
 };
 
@@ -193,6 +198,9 @@ function jobOf(system) {
   if (/offer INTERPRETATIONS/.test(system)) return 'what';
   if (/connection check/i.test(system)) return 'try';
   if (/decision seat/i.test(system)) return 'decide';
+  if (/you write a PROGRAM that renders it/.test(system)) return 'program';
+  if (/drew a layout and asked you to build it/.test(system)) return 'page';
+  if (/answering a question about specific marks/.test(system)) return 'ask';
   return 'other';
 }
 
@@ -302,6 +310,7 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
   let systemOneSpelling = 'A';
   let systemOneRefusal = null;   // { status, error }: what the next calls are refused with, as the relay says it
   let systemOneForced = null;    // the option that leads from now on, where a question offers it
+  let systemOneDelayMs = 0;      // how long the house decider takes to answer
   // The reader of notes (I8): how long it takes to answer a sheet, and a line it leaves out of its reply (0: none).
   let readDelayMs = 0;
   let readSkipLine = 0;
@@ -325,6 +334,7 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
       try { body = JSON.parse(raw); } catch { /* kept as it came */ }
       systemOne.push({ at: Date.now(), raw, body, origin: req.headers.origin || null, authorization: req.headers.authorization || null, cookie: req.headers.cookie || null, referer: req.headers.referer || null });
       if (!body) { send(400, { ok: false, error: 'the body is not JSON' }); return; }
+      if (systemOneDelayMs) await new Promise((r) => setTimeout(r, systemOneDelayMs));
       if (systemOneRefusal) { send(systemOneRefusal.status, { ok: false, error: systemOneRefusal.error }); return; }
       const r = systemOneReply(body, decideP, systemOneSpelling, systemOneForced);
       decisions.push(...r.decided.map((d) => ({ ...d, via: 'systemone' })));
@@ -419,6 +429,8 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
     systemOneLead: (key) => { systemOneForced = key || null; },
     /** Refuse the house decider's next calls as the relay would (`{ status, error }`), or null to answer again. */
     systemOneRefuse: (r) => { systemOneRefusal = r || null; },
+    /** How long the house decider takes to answer from now on, in ms (0: at once). */
+    systemOneDelay: (ms) => { systemOneDelayMs = ms; },
     /** How long the stub's reader takes to answer a sheet or a picture from now on, in ms (0: at once). */
     readDelay: (ms) => { readDelayMs = ms; },
     /** The line the stub's reader leaves out of its reply to a sheet from now on (1-based; 0: none). */
