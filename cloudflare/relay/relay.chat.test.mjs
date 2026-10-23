@@ -288,10 +288,16 @@ test('who may ask: another origin no; no Origin and no key no; a room’s key ye
   const wrong = await post(env, chat(), { authorization: 'Bearer nope', 'x-dyna-room': 'claude' });
   assert.equal(wrong.status, 403);
   assert.match(await said(wrong), /not the key for room “claude”/);
-  const keyedOnly = envWith({ MM_AI_CHAT: 'keyed' });
+  const keyedOnly = envWith({ MM_AI_CHAT: 'keyed', MM_DECIDE: 'keyed' });
   const anon = await post(keyedOnly, chat());
   assert.equal(anon.status, 401);
   assert.equal(await said(anon), AI_WORDS.keyed);
+  // Where only a room's key may ask, the lists say so to a page with none — so it seats nothing it could not ask — and answer one with it.
+  for (const path of ['/ai/v1/models', '/decide']) {
+    assert.equal((await worker.fetch(new Request('http://relay' + path, { headers: { origin: APP } }), keyedOnly)).status, 401, path);
+    const k = await keyForRoom(SECRET, 'claude');
+    assert.equal((await worker.fetch(new Request('http://relay' + path, { headers: { origin: APP, authorization: 'Bearer ' + k, 'x-dyna-room': 'claude' } }), keyedOnly)).status, 200, path);
+  }
   // Off: the post and the list both say so, so a page that asks the list seats nothing.
   for (const vars of [{ MM_AI_CHAT: 'off' }, { MM_DECIDE: 'off' }]) {
     const off = envWith(vars);

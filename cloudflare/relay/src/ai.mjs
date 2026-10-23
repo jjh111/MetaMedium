@@ -117,11 +117,23 @@ function closedWhy(mode, env, words) {
   return null;
 }
 
+/** For a GET of a route's list: the route closed, or — where only a room's key may ask — a caller without one, as `[status, words]`; else null. */
+async function listClosedWhy(request, env, mode, words) {
+  const closed = closedWhy(mode, env, words);
+  if (closed) return closed;
+  if (mode !== 'keyed') return null;
+  const asker = await askerOf(request, env);
+  return asker.keyed ? null : [401, words.keyed];
+}
+
 async function modelRoute(request, env, cors, route) {
   const models = route === 'extract' ? EXTRACT_MODELS : DECIDE_MODELS;
   const mode = env.MM_DECIDE || 'limited';
+  if (request.method === 'GET' || request.method === 'HEAD') {
+    const shut = await listClosedWhy(request, env, mode, DECIDE_WORDS);
+    return shut ? no(shut[0], shut[1], cors) : json(200, decideCatalog(route), cors);
+  }
   const closed = closedWhy(mode, env, DECIDE_WORDS);
-  if (request.method === 'GET' || request.method === 'HEAD') return closed ? no(closed[0], closed[1], cors) : json(200, decideCatalog(route), cors);
   if (request.method !== 'POST') return no(405, DECIDE_WORDS.method, cors);
   if (closed) return no(closed[0], closed[1], cors);
 
@@ -194,8 +206,8 @@ const refuse = (status, message, headers = {}) => json(status, chatError(status,
 /** `GET /ai/v1/models`: the house models and the limits — no model is called. Closed when every ask would be refused. */
 async function chatModelsRoute(request, env, cors) {
   if (request.method !== 'GET' && request.method !== 'HEAD') return refuse(405, AI_WORDS.method, cors);
-  const closed = closedWhy(chatModeOf(env), env, AI_WORDS);
-  if (closed) return refuse(closed[0], closed[1], cors);
+  const shut = await listClosedWhy(request, env, chatModeOf(env), AI_WORDS);
+  if (shut) return refuse(shut[0], shut[1], cors);
   return json(200, chatCatalog(env), cors);
 }
 
