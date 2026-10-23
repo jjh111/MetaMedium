@@ -10,6 +10,7 @@ import { spawn } from 'node:child_process';
 import { join, normalize, extname, resolve, dirname } from 'node:path';
 import { connect } from 'node:net';
 import { fileURLToPath } from 'node:url';
+import { chatCatalog, chatCheck, chatModelsFrom, chatTextBytes, chatInput, chatReply, chatError, chatImages, AI_CHAT_LIMITS, AI_WORDS } from '../Demos/ai-protocol.mjs';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -314,9 +315,19 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
   // The reader of notes (I8): how long it takes to answer a sheet, and a line it leaves out of its reply (0: none).
   let readDelayMs = 0;
   let readSkipLine = 0;
+  // dyna.ink's own writer and reader (the relay's /ai/v1, Demos/ai-protocol.mjs): every request kept whole — the list's
+  // GETs and each chat's body, with the headers a key or a cookie would ride in.
+  const house = [];
+  let houseRefusal = null;   // { status, error }: what the next chats are refused with, as the relay says it
+  let houseDown = 0;         // a status the list answers with (the house not answering): 0 answers it
+  let houseShape = 'response';
+  // The house decider's list (GET /decide, which calls no model): every look kept, and a status it answers with (the
+  // relay not deployed, or the route off) — 0 answers it.
+  const decideLooks = [];
+  let decideDown = 0;
   const cors = {
     'access-control-allow-origin': '*',
-    'access-control-allow-headers': 'authorization, content-type, http-referer, x-title',
+    'access-control-allow-headers': 'authorization, content-type, http-referer, x-title, x-dyna-room',
     'access-control-allow-methods': 'GET, POST, OPTIONS',
     'access-control-max-age': '600',
   };
@@ -327,7 +338,12 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
     const auth = req.headers.authorization || '';
     const keyWas = auth === `Bearer ${key}` ? 'the stub\'s' : auth ? 'another' : 'none';
     if (url.pathname === '/decide') {
-      if (req.method === 'GET') { send(200, { ok: true, route: 'decide', models: [{ model: 'clef-flash', name: 'Clef-flash', sees: false }] }); return; }
+      if (req.method === 'GET') {
+        decideLooks.push({ at: Date.now(), origin: req.headers.origin || null });
+        if (decideDown) { send(decideDown, { ok: false, error: 'dyna.ink’s own decider is not on this relay' }); return; }
+        send(200, { ok: true, route: 'decide', models: [{ model: 'clef-flash', name: 'Clef-flash', sees: false }] });
+        return;
+      }
       if (req.method !== 'POST') { send(405, { ok: false, error: 'POST a decision' }); return; }
       const raw = await readBody(req);
       let body = null;
@@ -339,6 +355,50 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
       const r = systemOneReply(body, decideP, systemOneSpelling, systemOneForced);
       decisions.push(...r.decided.map((d) => ({ ...d, via: 'systemone' })));
       send(200, { ok: true, model: body.model, ms: 4, answers: r.answers });
+      return;
+    }
+    if (url.pathname === '/ai/v1/models') {
+      house.push({ at: Date.now(), method: req.method, path: url.pathname, origin: req.headers.origin || null, authorization: req.headers.authorization || null, cookie: req.headers.cookie || null });
+      if (houseDown) { send(houseDown, chatError(houseDown, AI_WORDS.noModel)); return; }
+      send(200, chatCatalog({}));
+      return;
+    }
+    if (url.pathname === '/ai/v1/chat/completions') {
+      const raw = req.method === 'POST' ? await readBody(req) : '';
+      let body = null;
+      try { body = JSON.parse(raw); } catch { /* kept as it came */ }
+      const messages = body && Array.isArray(body.messages) ? body.messages : [];
+      const system = messages.filter((m) => m.role === 'system').map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n');
+      const user = messages.filter((m) => m.role === 'user').flatMap((m) => (typeof m.content === 'string' ? [m.content] : (m.content || []).filter((x) => x && x.type === 'text').map((x) => x.text))).join('\n');
+      const rec = {
+        at: Date.now(), method: req.method, path: url.pathname, raw, body, model: body && body.model, job: jobOf(system), images: chatImages(body).length,
+        max_tokens: body ? body.max_tokens ?? null : null, origin: req.headers.origin || null, authorization: req.headers.authorization || null, cookie: req.headers.cookie || null,
+        lines: (/sheet of (\d+) numbered line/.exec(user) || [])[1] ? Number(/sheet of (\d+) numbered line/.exec(user)[1]) : null,
+      };
+      house.push(rec);
+      if (req.method !== 'POST') { send(405, chatError(405, AI_WORDS.method)); return; }
+      if (!body) { send(400, chatError(400, AI_WORDS.notJson)); return; }
+      // The relay's own checks: a body the page sends that the relay would refuse fails here as it would there.
+      if (chatTextBytes(body, Buffer.byteLength(raw)) > AI_CHAT_LIMITS.text) { send(413, chatError(413, AI_WORDS.tooWordy(AI_CHAT_LIMITS.text))); return; }
+      const models = chatModelsFrom({});
+      const why = chatCheck(body, models);
+      if (why) { rec.refused = why; send(400, chatError(400, why)); return; }
+      if (houseRefusal) { send(houseRefusal.status, chatError(houseRefusal.status, houseRefusal.error)); return; }
+      // What the model says, by the job its system prompt names — as the stub's own models answer — and a page's words
+      // for every region the brief names, so a page is built.
+      let content = ANSWERS[rec.job];
+      if (rec.job === 'read' || content === null) content = REPLIES['openrouter-glm'].body.choices[0].message.content;
+      if (rec.job === 'read-lines') content = JSON.stringify(Array.from({ length: rec.lines || 0 }, (_, i) => ({ line: i + 1, ...NOTES.lines[i % NOTES.lines.length] })));
+      if (rec.job === 'read-picture') content = JSON.stringify({ lines: NOTES.picture });
+      if (rec.job === 'page') {
+        const ids = [...new Set((user.match(/\br\d+\b/g) || []))];
+        content = JSON.stringify({ theme: { background: '#fffdf8', color: '#1d2a33', accent: '#2a7f8f', fontFamily: 'system-ui' }, regions: Object.fromEntries(ids.map((id, i) => [id, { tag: 'section', html: '<h2>Good dogs ' + (i + 1) + '</h2><p>Written by dyna.ink’s writer.</p>' }])) });
+      }
+      const out = houseShape === 'choices'
+        ? { choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 } }
+        : { response: content, usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 } };
+      const reply = chatReply(out, body.model, chatInput(body, models[body.model]).max_tokens);
+      send(200, reply.body);
       return;
     }
     if (req.method === 'GET' && url.pathname === '/v1/models') {
@@ -435,6 +495,18 @@ export async function startModelStub({ key = STUB_KEY } = {}) {
     readDelay: (ms) => { readDelayMs = ms; },
     /** The line the stub's reader leaves out of its reply to a sheet from now on (1-based; 0: none). */
     readSkip: (n) => { readSkipLine = n; },
+    /** Every request to dyna.ink's own writer and reader (`/ai/v1/…`), oldest first: the list's GETs and each chat's body as sent and parsed, its job, its pictures, and the headers a key or a cookie would ride in. */
+    house: () => house.map((c) => ({ ...c })),
+    /** Refuse the house's next chats as the relay would (`{ status, error }`), or null to answer again. */
+    houseRefuse: (r) => { houseRefusal = r || null; },
+    /** The house's list answers with this status from now on (the house not answering), or 0 to answer it. */
+    houseDown: (status) => { houseDown = status || 0; },
+    /** Every look at the house decider's list (GET /decide), oldest first. */
+    decideLooks: () => decideLooks.map((c) => ({ ...c })),
+    /** The house decider's list answers with this status from now on (the relay not there, or its route off), or 0 to answer it. */
+    decideDown: (status) => { decideDown = status || 0; },
+    /** How the house's model spells its reply from now on, before the relay makes it OpenAI's: 'response' (Workers AI's own) or 'choices'. */
+    houseShape: (x) => { houseShape = x === 'choices' ? 'choices' : 'response'; },
     stop: () => new Promise((ok) => { server.closeAllConnections?.(); server.close(ok); }),
   };
 }

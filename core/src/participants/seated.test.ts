@@ -15,6 +15,8 @@ import { wordOf } from '../session/nodes';
 import { PRESETS } from '../llm/provider';
 import { circleStroke } from '../test/strokes';
 import type { SessionEvent } from '../session/session';
+import { mergeLogs } from '../store/merge';
+import { othersJoined } from './seated';
 
 const local = { ...PRESETS.ollama, model: 'qwen3' } as const;
 const other = { ...PRESETS.ollama, model: 'gemma3' } as const;
@@ -114,6 +116,26 @@ describe('a model joined on one board is asked on the next', () => {
     expect(joins(s)).toHaveLength(1);
   });
 
+  it('made lazily (a model the page seats on its own, unasked), it writes nothing until its first ask — and joins once', async () => {
+    const { s, mark } = boardWithMark();
+    const before = s.getEvents().length;
+    const agent = createAgentParticipant(s, local, 1100, { transport: says('a circle'), lazy: true, name: 'dyna.ink writer' });
+    expect(s.getEvents()).toHaveLength(before); // made, and the board only looked at: nothing written
+    expect(agent.id).toBe('');
+    const res = await agent.ask('what is it?', [mark], 1200);
+    expect(res.ok).toBe(true);
+    expect(joins(s)).toHaveLength(1);
+    expect(agent.id).not.toBe('');
+    expect(wordOf(s.getState().nodes.get(agent.id)!)).toBe('dyna.ink writer');
+    expect((await agent.ask('and now?', [mark], 1300)).ok).toBe(true);
+    expect(joins(s)).toHaveLength(1);
+    // Made lazily on a board that already holds its join: it is that participant, and writes nothing.
+    const kept = s.getEvents().slice();
+    const again = createAgentParticipant(s, local, 1400, { transport: says('x'), lazy: true, name: 'dyna.ink writer' });
+    expect(again.id).toBe(agent.id);
+    expect(s.getEvents()).toHaveLength(kept.length);
+  });
+
   it('a bridge, which wraps an agent, keeps up with it', async () => {
     const { s } = boardWithMark();
     const bridge = createBridgeParticipant(s, 1100, { name: 'hand' });
@@ -151,5 +173,106 @@ describe('the canvas\'s own seat (Claude Code) is seated the same way', () => {
     expect(seat.id).toBe(now);
     expect(s.getState().participants).toContain(now);
     expect(joins(s)).toHaveLength(1);
+  });
+});
+
+describe('a join written by seating is not a hand\'s act, and is never another hand\'s', () => {
+  const reading = (label: string): Transport => async () => ({ ok: true, text: JSON.stringify([{ label, confidence: 0.8, reasoning: 'r' }]), model: 'stub' });
+  const readsOf = (s: ReturnType<typeof createSession>, id: string) => {
+    const n = s.getState().nodes.get(id);
+    return n ? n.edges.filter((e) => e.rel === 'resembles' && e.via).map((e) => `${e.to} · ${e.via}`) : [];
+  };
+
+  it('undo while a lazily seated model thinks takes back the person\'s last act — never its join — and the answer lands', async () => {
+    const s = createSession();
+    s.setLogName('john~a1');
+    const a = s.addStroke(circleStroke(300, 300, 40), 1000);
+    const stray = s.addStroke(circleStroke(600, 300, 40), 1100);
+    let release!: () => void;
+    const held: Transport = () => new Promise((ok) => { release = () => ok({ ok: true, text: JSON.stringify([{ label: 'a bubble', confidence: 0.8, reasoning: 'round' }]), model: 'stub' }); });
+    const agent = createAgentParticipant(s, local, 1200, { transport: held, lazy: true, name: 'dyna.ink writer' });
+    const asked = agent.interpret([a], 1300);
+    const join = s.getEvents().slice(-1)[0];
+    expect(join.type).toBe('join');
+    expect((join as { seated?: boolean }).seated).toBe(true);
+    expect(s.lastAct().map((e) => e.type)).toEqual(['stroke']);
+    s.undo();
+    expect(s.getState().contentIds).toEqual([a]); // the stray mark went, as the person meant
+    expect(s.getState().contentIds).not.toContain(stray);
+    expect(s.getState().participants).toContain(agent.id);
+    release();
+    const res = await asked;
+    expect(res.ok).toBe(true);
+    expect(readsOf(s, a).length).toBeGreaterThan(0);
+  });
+
+  it('on a board with no log name too: the undo renumbers the seated join, and the answer still lands, in its name', async () => {
+    const s = createSession();
+    const a = s.addStroke(circleStroke(300, 300, 40), 1000);
+    const stray = s.addStroke(circleStroke(600, 300, 40), 1100);
+    let release!: () => void;
+    const held: Transport = () => new Promise((ok) => { release = () => ok({ ok: true, text: JSON.stringify([{ label: 'a bubble', confidence: 0.8, reasoning: 'round' }]), model: 'stub' }); });
+    const agent = createAgentParticipant(s, local, 1200, { transport: held, lazy: true, name: 'dyna.ink writer' });
+    const asked = agent.interpret([a], 1300);
+    const joinedAs = agent.id;
+    const generation = s.getState().generation;
+    s.undo();
+    expect(s.getState().contentIds).toEqual([a]);
+    expect(s.getState().contentIds).not.toContain(stray);
+    expect(s.getState().generation).toBe(generation); // only the seated join was renumbered
+    const now = s.getState().participants.find((p) => wordOf(s.getState().nodes.get(p)!) === 'dyna.ink writer');
+    expect(now).toBeDefined();
+    expect(now).not.toBe(joinedAs);
+    release();
+    const res = await asked;
+    expect(res.ok).toBe(true);
+    expect(agent.id).toBe(now);
+    expect(readsOf(s, a).some((r) => r.endsWith(' · ' + now))).toBe(true);
+  });
+
+  it('a join the hand made itself is still its act: only a seated join is passed over', () => {
+    const s = createSession();
+    s.setLogName('john~a1');
+    s.addStroke(circleStroke(300, 300, 40), 1000);
+    s.join('agent', 'qwen3', 1100, 2);
+    expect(s.lastAct().map((e) => e.type)).toEqual(['join']);
+  });
+
+  it('in a room, a page\'s seat never takes another hand\'s participant of the same name, so that hand\'s undo leaves its readings', async () => {
+    const ann = createSession();
+    ann.setLogName('ann~a1');
+    const a1 = ann.addStroke(circleStroke(300, 300, 40), 1000);
+    const annAgent = createAgentParticipant(ann, local, 1001, { transport: reading('ann-reading'), lazy: true, name: 'dyna.ink writer' });
+    await annAgent.interpret([a1], 1100);
+    const annLog = ann.getEvents().slice();
+
+    const me = createSession();
+    me.setLogName('john~b2');
+    me.load(mergeLogs({ 'ann~a1': annLog, 'john~b2': [] }, { me: 'john~b2' }));
+    const m1 = me.addStroke(circleStroke(600, 300, 40), 1200);
+    const mine = createAgentParticipant(me, local, 1201, { transport: reading('john-reading'), lazy: true, name: 'dyna.ink writer' });
+    expect(mine.id).toBe(''); // ann's participant of that name is hers, not this page's
+    expect((await mine.interpret([m1], 1300)).ok).toBe(true);
+    expect(mine.id).not.toBe(annAgent.id);
+    const myLog = me.getEvents().filter((e) => !e.by);
+    expect(myLog.filter((e) => e.type === 'join')).toHaveLength(1);
+
+    // ann's board drops her own join and reading (a log she rewrote): my reading stands on every board.
+    const annWithout = annLog.filter((e) => e.type !== 'join' && e.type !== 'propose');
+    const again = createSession();
+    again.setLogName('john~b2');
+    again.load(mergeLogs({ 'ann~a1': annWithout, 'john~b2': myLog }, { me: 'john~b2' }));
+    expect(readsOf(again, m1).length).toBeGreaterThan(0);
+  });
+
+  it('othersJoined names the participants a merge stamped `by`, and nothing of this hand\'s own', () => {
+    const ann = createSession();
+    ann.setLogName('ann~a1');
+    ann.join('agent', 'x', 1000, 2);
+    const me = createSession();
+    me.setLogName('john~b2');
+    me.join('agent', 'x', 1100, 2);
+    const merged = mergeLogs({ 'ann~a1': ann.getEvents().slice(), 'john~b2': me.getEvents().slice() }, { me: 'john~b2' });
+    expect([...othersJoined(merged)]).toEqual(['participant:ann~a1:1']);
   });
 });

@@ -48,6 +48,7 @@ import {
   MAX_ASSET_BYTES, assetRoomBytesFrom, assetPathOf, assetCheck, assetSizeVerdict, assetHeaders, sniffImage, ASSET_WORDS,
 } from './relay-protocol.mjs';
 import { DECIDE_WORDS } from './decide-protocol.mjs';
+import { AI_WORDS, chatError } from './ai-protocol.mjs';
 
 // The protocol — what a room keeps, what a client is sent, what it is owed — is
 // `relay-protocol.mjs`, shared with the Worker (cloudflare/relay).
@@ -151,6 +152,8 @@ export function startRelay(port = Number(process.env.PORT || 8020), opts = {}) {
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
     // The model routes are the Worker's (cloudflare/relay/src/ai.mjs, Workers AI by binding): this relay asks no model, and says so.
     if (url.pathname === '/decide' || url.pathname === '/extract') { res.writeHead(501, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify({ ok: false, error: DECIDE_WORDS.noModel })); return; }
+    // dyna.ink's own writer and reader too, in OpenAI's error shape (Demos/ai-protocol.mjs): a page that asks this relay's list seats none.
+    if (url.pathname === '/ai' || url.pathname.startsWith('/ai/')) { res.writeHead(501, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(chatError(501, AI_WORDS.noModel))); return; }
     const a = assetPathOf(url.pathname);
     if (a) { asset(req, res, a); return; }
     // A room opened for whoever asks: this relay keeps no keys and forgets a room when it stops.

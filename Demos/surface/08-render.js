@@ -3,7 +3,7 @@
 //   (readingUnder: its readings ranked by MM.rank, as the field ranks — V1-PLAN §2.2),
 //   a hand's label on its own mark (labelsDrawn), a region's frame under everything (renderRegions, 12-regions.js), match chips,
 //   the working dot, the explanation plane and its layout, the status line (one sentence).
-// Uses: core, view, artifacts, snap, models, palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
+// Uses: core, view, artifacts, snap, models, seatpane (isHouse: dyna.ink's own are not named in the standing line), palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
 //   packs (packShort — a match chip says its pack; a pack this build lacks is said in the standing line),
 //   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet),
 //   selection (dragPreview, dragFollowers — what follows a drag is drawn where it will stand, V1-PLAN E2).
@@ -1068,7 +1068,9 @@
     if (fs) parts.push(fs);
     // A pack this board names that this build cannot give it is said, never hidden (V1-PLAN B3).
     if (s.packNotices.length) parts.push(s.packNotices.map((n) => n.reason === 'unknown' ? n.pack + ' is not in this build' : '“' + n.pack + '” is no pack').join(', ') + ' — its definitions are not matched here');
-    if (agents.length) parts.push(agents.map((a) => modelWords(a) + (a.config && a.config.kind !== 'mcp' ? ' · ' + MM.providerLocality(a.config) : '')).join(', '));
+    // The hand's own models; dyna.ink's own, seated silently, are said in the models pane and on its tile, not here.
+    const own = agents.filter((a) => !isHouse(a));
+    if (own.length) parts.push(own.map((a) => modelWords(a) + (a.config && a.config.kind !== 'mcp' ? ' · ' + MM.providerLocality(a.config) : '')).join(', '));
     if (ws) parts.push('⋯ ' + ws);
     if (hint) parts.push(hint);
     // The standing line is a ladder (SURFACE-v10-PLAN D5): the next move, in a

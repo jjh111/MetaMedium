@@ -18,7 +18,7 @@ import { describeSession, describeSignature, describeReading } from './serialize
 import { frameOf, regionsOf } from '../session/regions';
 import { planFor } from '../parse/plan';
 import { getRep } from '../session/nodes';
-import { seatOn, type Seating } from './seated';
+import { heldParticipant, othersJoined, ownParticipant, seatOn, type Seating } from './seated';
 import { validateRegions, type RegionContent, type Theme } from '../parse/scaffold';
 import { type DrawnShape, parseShapes, strokeFor, MAX_DRAWN } from '../session/synthesize';
 import type { Behaviour, Term, Verb } from '../behave/verbs';
@@ -812,6 +812,13 @@ export interface AgentOptions {
   name?: string;
   tier?: Capability;
   locality?: Locality;
+  /**
+   * Join lazily: write no `join` when made — the board's own join for it if it holds one, else nothing until the
+   * first ask seats it (`seat()`). For a model a page seats on its own, unasked — dyna.ink's own writer and reader,
+   * seated silently where the page may use them — so seating it writes nothing to a board the hand only looked at,
+   * as the decision seat is made. Its `id` is '' until then.
+   */
+  lazy?: boolean;
 }
 
 export function createAgentParticipant(
@@ -825,10 +832,16 @@ export function createAgentParticipant(
   // Join at the provider's tier (2: a model) with its locality, so surfaces
   // can group readings by voice and the router can ask the cheaper first.
   const seating: Seating = { kind: 'agent', name, capability: options.tier ?? providerTier(config), locality: options.locality ?? providerLocality(config) };
-  let id = session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
+  let id = options.lazy
+    ? ownParticipant(session, seating)
+    : session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
   // A board loaded in place takes this join with it (`participants/seated.ts`): every ask seats the agent
   // on the board it is asked on first — found there if the board holds its join, joined once if not.
-  const seat = (now: number = at): string => (id = seatOn(session, seating, id, now));
+  const seat = (now: number = at): string => (id = seatOn(session, seating, id || undefined, now));
+  // Who writes the answer, found again when it is written: an undo on a board with no log name renumbers what stands
+  // after the act it takes back — a seated join among it (undo passes it over) — so the id the ask began with may
+  // now be another number for the same participant. Found by what it is, on this hand's own log; never a new join.
+  const me = (): string => (id = heldParticipant(session.getState(), seating, id || undefined, othersJoined(session.getEvents())) ?? id);
 
   // A model thinks for a long time — a cold local one for minutes — and the
   // human keeps drawing. Every result therefore says which board it was asked
@@ -874,7 +887,7 @@ export function createAgentParticipant(
     // itself for a single stroke. Every reading becomes its own held edge.
     const target = targets[0];
     session.propose({
-      participantId: id,
+      participantId: me(),
       nodeId: target,
       edges: readingsToEdges(readings, isCluster),
       at: now,
@@ -912,7 +925,7 @@ export function createAgentParticipant(
     if (!text) return { ok: false, error: 'empty answer' };
 
     const explanationId = session.answer({
-      participantId: id,
+      participantId: me(),
       question: q,
       text,
       aboutIds: targets,
@@ -1047,7 +1060,7 @@ export function createAgentParticipant(
     }
 
     const accepted = session.attachCode({
-      participantId: id,
+      participantId: me(),
       nodeId: args.artifactId,
       code,
       language: 'html',
@@ -1101,7 +1114,7 @@ export function createAgentParticipant(
     // confidence like every other reading on the canvas.
     if (args.hold !== false) {
       session.propose({
-        participantId: id,
+        participantId: me(),
         nodeId: args.nodeId,
         edges: [],
         reps: transcripts.map((t) => ({ modality: 'transcript', data: { text: t.text }, confidence: t.confidence })),
@@ -1146,7 +1159,7 @@ export function createAgentParticipant(
         ? line.ids.map((nid, j) => ({ nid, reps: [{ modality: 'transcript', data: { text: words[j], line: top.text }, confidence: top.confidence }] }))
         : [{ nid: line.nodeId, reps: readings.map((t) => ({ modality: 'transcript', data: { text: t.text }, confidence: t.confidence })) }];
       for (const t of targets) {
-        session.propose({ participantId: id, nodeId: t.nid, edges: [], reps: t.reps, at: args.at, expect: { generation } });
+        session.propose({ participantId: me(), nodeId: t.nid, edges: [], reps: t.reps, at: args.at, expect: { generation } });
         const stale = session.getState().staleResult;
         if (stale) return { ok: false, transcripts: readings, error: stale.detail };
       }
@@ -1215,12 +1228,12 @@ export function createAgentParticipant(
       // Spaced in time so the retroactive command mark can still tell "just
       // drawn" apart, and attributed so the surface can say who drew it.
       // Declared content: a drawn shape never lassoes, commands or erases.
-      const made = session.addStroke(points, at, id, 1, { content: true });
+      const made = session.addStroke(points, at, me(), 1, { content: true });
       ids.push(made);
       at += 1;
       // Its reason sits beside the mark, as an answer does: attributed,
       // erasable, and never mistaken for ink.
-      if (s.why) session.answer({ participantId: id, question: prompt, text: s.why, aboutIds: [made], at });
+      if (s.why) session.answer({ participantId: me(), question: prompt, text: s.why, aboutIds: [made], at });
       at += 1;
     }
     if (ids.length === 0) return { ok: false, ids: [], shapes, error: 'every shape had no size', raw: result.text };
@@ -1253,7 +1266,7 @@ export function createAgentParticipant(
     const parsed = parseProgram(result.text);
     if (!parsed) return { ok: false, error: 'no program in the reply', raw: result.text };
     if (parsed.reuse) return { ok: true, reuse: parsed.reuse, raw: result.text };
-    const accepted = session.attachCode({ participantId: id, nodeId: args.artifactId, code: parsed.code!, kind: 'run', prompt, at: args.at, expect: { generation } });
+    const accepted = session.attachCode({ participantId: me(), nodeId: args.artifactId, code: parsed.code!, kind: 'run', prompt, at: args.at, expect: { generation } });
     if (!accepted) return { ok: false, error: staleWhy('the canvas did not accept the program'), raw: result.text };
     return { ok: true, name: parsed.name, parts: parsed.parts, code: parsed.code, raw: result.text };
   }
@@ -1269,7 +1282,7 @@ export function createAgentParticipant(
     // for the clauses it left — "the engine knows this" beats a round trip.
     const local = parseBehaviour(words);
     if (local.unparsed.length === 0 && local.behaviour) {
-      session.behave({ nodeId: args.nodeId, behaviour: local.behaviour, participantId: id, at: args.at });
+      session.behave({ nodeId: args.nodeId, behaviour: local.behaviour, participantId: me(), at: args.at });
       return { ok: true, behaviour: local.behaviour, via: 'table', unread: [] };
     }
 
@@ -1285,7 +1298,7 @@ export function createAgentParticipant(
     );
     if (!result.ok) {
       // The model failed; whatever the table read still stands, attributed to it.
-      if (local.behaviour) session.behave({ nodeId: args.nodeId, behaviour: local.behaviour, participantId: id, at: args.at });
+      if (local.behaviour) session.behave({ nodeId: args.nodeId, behaviour: local.behaviour, participantId: me(), at: args.at });
       return { ok: !!local.behaviour, behaviour: local.behaviour, via: local.behaviour ? 'table' : 'none', unread: local.unparsed, error: result.error };
     }
     const reply = parseBehaviourReply(result.text);
@@ -1293,7 +1306,7 @@ export function createAgentParticipant(
     const terms = [...local.terms, ...reply.terms.filter((t) => !seen.has(`${t.verb}:${t.target ?? ''}`))];
     if (terms.length === 0) return { ok: false, behaviour: null, via: 'none', unread: reply.unread.length ? reply.unread : local.unparsed, error: 'nothing in the reply maps onto a verb', raw: result.text };
     const behaviour: Behaviour = { terms, source: 'model' };
-    session.behave({ nodeId: args.nodeId, behaviour, participantId: id, at: args.at });
+    session.behave({ nodeId: args.nodeId, behaviour, participantId: me(), at: args.at });
     return { ok: true, behaviour, via: 'model', unread: reply.unread, raw: result.text };
   }
 

@@ -109,12 +109,32 @@ export function systemOneAnswers(input, p = 0.995) {
 }
 
 /**
+ * What a chat model answers, written as the fakes answer it (never a real model's reply): Workers AI's own shape,
+ * `{ response, usage }` — or, with `spelling: 'choices'`, OpenAI's — saying, by what it was asked: a reading of the
+ * words in a picture (`[{"text":"hello",…}]`) when a picture came; a reading of a group (`[{"label":…}]`) when the
+ * system prompt asks for interpretations; else `ok`. Enough to work on the page's writer and reader on this machine.
+ */
+export function chatAnswer(input, { spelling = 'response', text } = {}) {
+  const messages = (input && input.messages) || [];
+  const system = messages.filter((m) => m.role === 'system').map((m) => (typeof m.content === 'string' ? m.content : '')).join('\n');
+  const picture = messages.some((m) => Array.isArray(m.content) && m.content.some((p) => p && p.type === 'image_url'));
+  const said = text !== undefined ? text
+    : picture ? JSON.stringify([{ text: 'hello', confidence: 0.92 }])
+      : /offer INTERPRETATIONS/.test(system) ? JSON.stringify([{ label: 'a fake reading', confidence: 0.7, reasoning: 'the relay’s fake model — never a real one' }])
+        : 'ok';
+  const usage = { prompt_tokens: 12, completion_tokens: 3, total_tokens: 15 };
+  return spelling === 'choices'
+    ? { id: 'fake', object: 'chat.completion', choices: [{ index: 0, message: { role: 'assistant', content: said }, finish_reason: 'stop' }], usage }
+    : { response: said, usage };
+}
+
+/**
  * A stand-in for the Workers AI binding: `run(model, input)` answers from `book` — a function `(model, input)` that
  * returns (or resolves to) the reply and throws to fail, or a map of `@cf/…` id to reply — and keeps every call
- * (`calls`: the model and the input as asked). With no book it answers as `systemOneAnswers` does. Nothing is
- * reached: no network, no account.
+ * (`calls`: the model and the input as asked). With no book it answers a chat (`messages`) as `chatAnswer` does and a
+ * decision as `systemOneAnswers` does. Nothing is reached: no network, no account.
  */
-export function fakeAI(book = (model, input) => systemOneAnswers(input)) {
+export function fakeAI(book = (model, input) => (input && Array.isArray(input.messages) ? chatAnswer(input) : systemOneAnswers(input))) {
   const calls = [];
   return {
     calls,

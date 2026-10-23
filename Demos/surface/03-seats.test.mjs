@@ -15,10 +15,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { AI_CHAT_MODELS, AI_CHAT_WAIT_MS } from '../ai-protocol.mjs';
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '03-seats.js'), 'utf8');
 const S = new Function(
-  src + '\n  return { SEATS, SEAT_WORDS, resolveReaders, resolveWriters, fallbackWords, keyId, keysToKeep, migrateStored, orderChoices, seatsOfPick, pickOf, SEMANTIC_SOURCE, SEMANTIC_MAX_BYTES, semanticSourceOf, semanticNameOf, semanticWords, semanticFailed, HOUSE_DECIDE, HOUSE_MODELS, HOUSE_DECIDER_MODEL, houseDeciderFor, deciderAtBoot, deciderWords, deciderAsks };'
+  src + '\n  return { SEATS, SEAT_WORDS, resolveReaders, resolveWriters, fallbackWords, keyId, keysToKeep, migrateStored, orderChoices, seatsOfPick, pickOf, SEMANTIC_SOURCE, SEMANTIC_MAX_BYTES, semanticSourceOf, semanticNameOf, semanticWords, semanticFailed, HOUSE_DECIDE, HOUSE_MODELS, HOUSE_DECIDER_MODEL, houseDeciderFor, deciderAtBoot, deciderWords, deciderAsks, HOUSE_AI, HOUSE_SEATS, HOUSE_WAIT_MS, HOUSE_PROBE_MS, houseAiFor, houseAtBoot, houseWords, houseSends, houseWaits, houseLead, houseCannotWords, probesOnOpen };'
 )();
 
 const m = (id, o = {}) => ({ id, vision: false, seats: [], size: Infinity, claude: false, local: false, ...o });
@@ -263,4 +264,114 @@ test('what a decider is asked and sent, in words: seated silently, a tap alone a
   assert.match(own, /the brief you typed, to OpenRouter, with your key$/);
   for (const w of [silent, chosen, own]) assert.doesNotMatch(w, /nothing is kept/);
   assert.match(S.SEAT_WORDS.decider.job, /which of two matching definitions, which kind of diagram, what a brief should make/);
+});
+
+// ---- dyna.ink's own writer and reader (the audit's UX-04): no key, and always the last resort ----
+const hw = (o = {}) => m('house-writer', { house: true, seats: ['writer'], vision: true, ...o });
+const hr = (o = {}) => m('house-reader', { house: true, seats: ['reader'], vision: true, ...o });
+
+test('dyna.ink’s own writer writes only when nothing of the person’s would: a model joined for any job, a writer seat chosen, or Claude Code seated, is asked instead', () => {
+  assert.deepEqual(S.resolveWriters([hw(), hr()]).who, ['house-writer']);
+  assert.match(S.resolveWriters([hw(), hr()]).why, /dyna\.ink’s own writer/);
+  assert.deepEqual(S.resolveWriters([hw(), m('any')]).who, ['any'], 'a model of the person’s, for any job, wins');
+  assert.deepEqual(S.resolveWriters([hw(), m('w', { seats: ['writer'] })]).who, ['w'], 'a writer the person chose wins');
+  assert.deepEqual(S.resolveWriters([hw(), m('seat', { claude: true })]).who, ['seat'], 'Claude Code seated stands first, and the house is not asked beside it');
+  assert.deepEqual(S.resolveWriters([hr()]).who, [], 'the house reader is no writer');
+  assert.deepEqual(S.resolveWriters([hw(), m('r', { seats: ['reader'] })]).who, ['house-writer'], 'a model the person keeps only for reading writes nothing, so the house still does');
+});
+
+test('dyna.ink’s own reader reads only when nothing of the person’s would: their reader, Claude Code seated, their writer that sees, any model of theirs that sees', () => {
+  assert.deepEqual(S.resolveReaders([hw(), hr()]).who, ['house-reader']);
+  assert.match(S.resolveReaders([hr()]).why, /dyna\.ink’s own reader/);
+  assert.deepEqual(S.resolveReaders([hr(), m('r', { vision: true, seats: ['reader'] })]).who, ['r']);
+  assert.deepEqual(S.resolveReaders([hr(), m('seat', { claude: true, vision: true })]).who, ['seat']);
+  assert.deepEqual(S.resolveReaders([hr(), m('w', { vision: true, seats: ['writer'] })]).who, ['w']);
+  assert.deepEqual(S.resolveReaders([hr(), m('a', { vision: true, size: 9 })]).who, ['a']);
+  assert.deepEqual(S.resolveReaders([hr(), m('t', { seats: ['writer'] })]).who, ['house-reader'], 'a writer of theirs that cannot see does not stand in the house’s way');
+  assert.deepEqual(S.resolveReaders([hw()]).who, [], 'with the reader let go, nothing of dyna.ink’s reads — its writer is sent no picture, whatever it can see');
+  assert.equal(S.resolveReaders([hw()]).why, 'no model that sees');
+  assert.deepEqual(S.resolveReaders([hw({ vision: false })]).who, []);
+});
+
+test('dyna.ink, its subdomains and the old address ask dyna.ink’s relay for the writer and reader; a page on this machine may name a relay on this machine with ?ai=; elsewhere none', () => {
+  assert.equal(S.HOUSE_AI, 'https://relay.dyna.ink/ai/v1');
+  for (const h of ['dyna.ink', 'app.dyna.ink', 'jjh111.github.io']) assert.equal(S.houseAiFor(h), S.HOUSE_AI, h);
+  for (const h of ['notdyna.ink', 'dyna.ink.evil.com', 'evil.github.io', '', null]) assert.equal(S.houseAiFor(h), null, String(h));
+  assert.equal(S.houseAiFor('127.0.0.1', 'http://127.0.0.1:5555'), 'http://127.0.0.1:5555/ai/v1');
+  assert.equal(S.houseAiFor('localhost', 'http://localhost:8787/'), 'http://localhost:8787/ai/v1');
+  assert.equal(S.houseAiFor('127.0.0.1'), null, 'nothing named on this machine: none — the gate never reaches a model by default');
+  for (const asked of ['https://relay.dyna.ink', 'http://127.0.0.1:5555/ai/v1', 'http://127.0.0.1:5555?key=x', 'http://evil.example:80']) assert.equal(S.houseAiFor('127.0.0.1', asked), null, asked);
+  assert.equal(S.houseAiFor('dyna.ink', 'http://127.0.0.1:5555'), S.HOUSE_AI, 'dyna.ink never takes another relay from its address');
+  // The decider's rule is the same rule.
+  assert.equal(S.houseDeciderFor('127.0.0.1', 'http://127.0.0.1:5555'), 'http://127.0.0.1:5555/decide');
+});
+
+test('once the house answers, its writer and reader are seated where the person chose nothing — never where they let it go, kept a model for the seat, or (the writer) joined one for any job', () => {
+  const pick = { baseUrl: 'https://openrouter.ai/api/v1', model: 'z-ai/glm-5.3-flash' };
+  assert.deepEqual(S.houseAtBoot(undefined, 'writer', S.HOUSE_AI), { seat: true, why: 'nothing of yours chosen' });
+  assert.equal(S.houseAtBoot({}, 'reader', S.HOUSE_AI).seat, true);
+  assert.deepEqual(S.houseAtBoot({ writer: { none: true } }, 'writer', S.HOUSE_AI), { seat: false, why: 'none' });
+  assert.equal(S.houseAtBoot({ writer: { none: true } }, 'reader', S.HOUSE_AI).seat, true, 'each seat is let go by itself');
+  assert.deepEqual(S.houseAtBoot({ writer: pick }, 'writer', S.HOUSE_AI), { seat: false, why: 'pick' });
+  assert.equal(S.houseAtBoot({ any: pick }, 'writer', S.HOUSE_AI).seat, false);
+  assert.equal(S.houseAtBoot({ any: pick, writer: pick }, 'reader', S.HOUSE_AI).seat, true, 'a model kept for writing leaves the reader seat to the house — the rules ask theirs first if it sees');
+  assert.equal(S.houseAtBoot({ decider: { provider: 'dyna', model: 'clef-flash' } }, 'writer', S.HOUSE_AI).seat, true);
+  assert.deepEqual(S.houseAtBoot(undefined, 'writer', null), { seat: false, why: 'no house here' });
+});
+
+test('their rows and the pane’s lead say what they are and what is sent where, in the person’s words — no key, and never what Cloudflare keeps', () => {
+  assert.equal(S.houseWords('writer'), 'dyna.ink’s writer — no key needed');
+  assert.equal(S.houseWords('reader'), 'dyna.ink’s reader — no key needed');
+  assert.match(S.houseSends('writer'), /the brief you typed and the words of the marks you ask about, to dyna\.ink’s relay, which asks Cloudflare’s models; dyna\.ink keeps none of it$/);
+  assert.match(S.houseSends('reader'), /a picture of the ink you ask it to read/);
+  const lead = S.houseLead();
+  assert.equal(lead.head, 'Using dyna.ink’s own models — no key needed');
+  assert.match(lead.line, /goes to dyna\.ink’s relay, which asks Cloudflare’s models; dyna\.ink keeps none of it\.$/);
+  assert.equal(lead.more, 'more — bring your own model');
+  assert.match(S.fallbackWords('writer', { house: true }), /dyna\.ink’s own writer writes, with no key/);
+  assert.match(S.fallbackWords('reader', { house: true }), /dyna\.ink’s own reader reads, with no key/);
+  assert.doesNotMatch(S.fallbackWords('writer'), /dyna\.ink/);
+  assert.equal(S.houseWaits('writer'), 'dyna.ink’s writer stands by — asked only when nothing of yours would write');
+  assert.equal(S.houseWaits('reader'), 'dyna.ink’s reader stands by — asked only when nothing of yours would read');
+  // None of the words a person meets here is a word of the code's.
+  for (const w of [S.houseWords('writer'), S.houseSends('writer'), S.houseSends('reader'), S.houseWaits('reader'), lead.head, lead.line, lead.more]) assert.doesNotMatch(w, /\b(seat|tier|session|participant|artifact|log|event)\b|@cf|127\.0\.0\.1|:\d{2,5}\b/i, w);
+  assert.equal(S.HOUSE_SEATS.writer.model, 'writer');
+  assert.equal(S.HOUSE_SEATS.reader.model, 'reader');
+  assert.ok(S.HOUSE_WAIT_MS > AI_CHAT_WAIT_MS, 'the page waits longer than the relay does, so the relay’s sentence is the one heard');
+  // The page asks the relay by the short names the relay knows, and calls them what the relay's list calls them.
+  assert.deepEqual(Object.values(S.HOUSE_SEATS).map((x) => x.model).sort(), Object.keys(AI_CHAT_MODELS).sort());
+  for (const k of Object.keys(AI_CHAT_MODELS)) assert.equal(S.HOUSE_SEATS[k].name, AI_CHAT_MODELS[k].name, k);
+  assert.ok(S.HOUSE_PROBE_MS > 0);
+});
+
+test('a seat let go of dyna.ink’s own stays let go across an old pick’s migration, unless the pick takes that seat', () => {
+  const pick = { baseUrl: 'https://openrouter.ai/api/v1', model: 'z-ai/glm-4.7-flash', vision: false };
+  const got = S.migrateStored({ pick, key: null, seats: { reader: { none: true }, writer: { none: true } } });
+  assert.equal(got.migrated, true);
+  assert.deepEqual(got.seats.writer, pick, 'the pick takes the writer seat');
+  assert.deepEqual(got.seats.reader, { none: true }, 'a pick that cannot see leaves the reader let go');
+  assert.deepEqual(S.seatsOfPick({ reader: { none: true }, writer: pick }, pick), ['writer']);
+});
+
+test('the pane looks for models on this machine as it opens only on a page served from this machine; on a public origin it waits to be asked', () => {
+  for (const h of ['localhost', '127.0.0.1', '[::1]', '']) assert.equal(S.probesOnOpen(h), true, h);
+  for (const h of ['dyna.ink', 'app.dyna.ink', 'jjh111.github.io', 'example.com', '192.168.1.4']) assert.equal(S.probesOnOpen(h), false, h);
+});
+
+test('what dyna.ink’s own could not do just now is said in the relay’s own words, never a status code', () => {
+  assert.equal(S.houseCannotWords('HTTP 429 — rate limited: “too many asks of dyna.ink’s writer and reader from here — try again in a minute”'),
+    'too many asks of dyna.ink’s writer and reader from here — try again in a minute');
+  assert.equal(S.houseCannotWords('HTTP 429 — rate limited'), 'too many asks just now — try again in a minute');
+  assert.equal(S.houseCannotWords('HTTP 504 — the provider timed out: “dyna.ink’s writer did not answer in 60 s”'), 'dyna.ink’s writer did not answer in 60 s');
+  assert.equal(S.houseCannotWords('timed out — no answer from relay.dyna.ink in 75 s'), 'it took too long to answer — try again');
+  assert.equal(S.houseCannotWords('HTTP 503 — no provider is available right now'), 'dyna.ink’s relay is not answering just now — try again soon');
+  assert.match(S.houseCannotWords('could not reach relay.dyna.ink — offline, …'), /could not be reached/);
+  for (const e of ['HTTP 429 — rate limited', 'HTTP 503 — x', 'timed out — y', 'could not reach z']) assert.doesNotMatch(S.houseCannotWords(e), /HTTP|\d{3}/, e);
+});
+
+test('dyna.ink’s own let go from a seat is said so: nothing of the ink goes there, and what reads or writes instead', () => {
+  assert.match(S.fallbackWords('reader', { letGo: true }), /no picture of the ink is sent there/);
+  assert.doesNotMatch(S.fallbackWords('reader', { letGo: true }), /the writer if it sees/, 'never "the writer", which a person reads as dyna.ink’s writer standing there');
+  assert.match(S.fallbackWords('writer', { letGo: true }), /nothing is written by dyna\.ink/);
+  assert.equal(S.fallbackWords('reader'), S.fallbackWords('reader', { letGo: false }));
 });

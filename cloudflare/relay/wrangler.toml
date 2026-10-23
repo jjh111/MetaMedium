@@ -48,6 +48,14 @@ binding = "AI"
 # everyone, past which a decision is refused with 429 and the engine's ranking stands:
 # MM_DECIDE = "limited"
 # MM_AI_DAILY = "20000"
+# dyna.ink's own writer and reader (/ai/v1/chat/completions, Demos/ai-protocol.mjs): the Workers AI model each short
+# name asks (the page never names one), who may ask — off | keyed | limited, following MM_DECIDE when unset — and how
+# many calls a day across everyone (a budget of its own: a chat call costs far more than a decision). Some newer models
+# may need the Workers Paid plan.
+# MM_AI_WRITER = "@cf/qwen/qwen3.8-27b"
+# MM_AI_READER = "@cf/qwen/qwen3.8-27b"
+# MM_AI_CHAT = "limited"
+# MM_AI_CHAT_DAILY = "2000"
 # Rooms anyone opens from the app (POST /rooms, src/mint.mjs):
 # MM_RELAY_MINT = "0"                  # open no new rooms (503, in words)
 # MM_RELAY_MINT_PER_HOUR = "10"        # rooms one address may open an hour

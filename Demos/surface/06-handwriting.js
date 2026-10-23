@@ -5,8 +5,8 @@
 //   sheet, asked in batches of a sheet's lines, progress on the marks, Esc stops), readPictureFrom (a picture's text, beside it),
 //   boardWriting (the board's lines, for *Read the board*), linesPanel (what each line said, for the panel), readScopeHooks
 //   (where a region's marks join a read), readStats (what each call cost).
-// Uses: core (prefs), models (agents, withWork, workSignal, factsOf, keepAsk, noteOutcome, modelWords), render (logKey), input (say, flash), seat (isSeatAgent: the seat reads while seated),
-//   seats (03-seats.js: resolveReaders — who reads, by seat; seatModels, agentById in 04-seatpane.js), images (assetGet), text (TEXT_DIR, TEXT_W, TEXT_H, textCount).
+// Uses: core (prefs), models (agents, withWork, workSignal, factsOf, keepAsk, keepFromHouse — a read dyna.ink's own could not answer is kept, noteOutcome, modelWords), render (logKey), input (say, flash), seat (isSeatAgent: the seat reads while seated),
+//   seats (03-seats.js: resolveReaders — who reads, by seat; seatModels, agentById, isHouse in 04-seatpane.js — auto-read never asks dyna.ink's own), images (assetGet), text (TEXT_DIR, TEXT_W, TEXT_H, textCount).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -89,6 +89,8 @@
       withWork('write:' + agentKey(agent) + ':' + node.id, [node.id], modelWords(agent) + ' · reading the writing', agent.read({ nodeId: node.id, image: image, at: Date.now() })).then((res) => {
         // The row keeps what the read came to; the status line says it once (J5).
         noteOutcome(agent, res.ok, res.ok ? 'read “' + res.transcripts[0].text + '”' : res.error);
+        // dyna.ink's own could not read it just now: kept for a model of the person's that sees, not lost.
+        if (keepFromHouse(agent, res, { what: 'Read the writing', needs: 'sees', need: 'needs a model that can see', ids: [node.id], run: (live) => live.forEach((id) => readOne(session.getState().nodes.get(id), true)) })) return;
         say(res.ok
           ? modelWords(agent) + ' read “' + res.transcripts[0].text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : '')
           : modelWords(agent) + ' could not read it — ' + res.error);
@@ -121,6 +123,7 @@
     who.forEach((agent) => {
       withWork('write:' + agentKey(agent) + ':' + first.id, ids, modelWords(agent) + ' · reading the line', agent.read({ nodeId: first.id, about: nodes.map((n) => n.id), image: image, at: Date.now(), hold: false })).then((res) => {
         noteOutcome(agent, res.ok, res.ok ? 'read “' + res.transcripts[0].text + '”' : res.error);
+        const kept = keepFromHouse(agent, res, { what: 'Read the writing', needs: 'sees', need: 'needs a model that can see', ids: ids.slice(), run: (live) => readLine(live, true) });
         if (res.ok) {
           const top = res.transcripts[0];
           const words = top.text.trim().split(/\s+/);
@@ -132,7 +135,7 @@
             nodes.slice(1).forEach((n) => readWith.set(n.id, first.id));
           }
           say(modelWords(agent) + ' read “' + top.text + '”' + (res.transcripts.length > 1 ? ' (or ' + res.transcripts.slice(1).map((t) => '“' + t.text + '”').join(', ') + ')' : ''));
-        } else {
+        } else if (!kept) {
           say(modelWords(agent) + ' could not read it — ' + res.error);
           if (res.raw) window.__mm.lastRaw = res.raw;
         }
@@ -144,7 +147,10 @@
   }
 
   function readWriting(s) {
-    if (!readers().length) return;
+    // Reading as it is written asks a model of the person's — never dyna.ink's own, which is asked only when the person
+    // asks (its row says so): a stroke sending pictures of every word on the board to dyna.ink's relay is no ask.
+    const who = readers();
+    if (!who.length || who.some(isHouse)) return;
     const ids = s.contentIds.filter((id) => !s.artifacts.includes(id));
     for (const aid of s.artifacts) for (const e of s.nodes.get(aid).edges) if (e.rel === 'has-part') ids.push(e.to);
     for (const id of ids) {
@@ -279,6 +285,7 @@
     let asked = 0, read = 0, stopped = false;
     const failures = [];
     let cost = null;
+    let lastError = '';
     for (const batch of batches) {
       if (session.getState().generation !== generation) { say('the board changed under the read — stopped'); return; }
       const first = asked + 1, last = asked + batch.length;
@@ -305,6 +312,7 @@
       readStats.push({ kind: 'lines', lines: batch.length, ok: okCount, bytes: bytes, ms: ms, perLine: perLine, w: sheet.width, h: sheet.height, said: said });
       cost = { lines: okCount, bytes: bytes, perLine: perLine };
       noteOutcome(agent, !!res.ok, res.ok ? 'read ' + okCount + ' line' + (okCount === 1 ? '' : 's') + ' · ' + kb(bytes) + ' · ' + (perLine / 1000).toFixed(1) + ' s a line' : res.error);
+      if (!res.ok) lastError = res.error;
       if (!res.ok && res.raw) window.__mm.lastRaw = res.raw;
       asked = last;
       render(session.getState());
@@ -314,6 +322,8 @@
     }
     const who = modelWords(agent);
     const why = failures.slice(0, 3).map((f) => 'line ' + f.n + ': ' + f.error).join('; ') + (failures.length > 3 ? '; …' : '');
+    // dyna.ink's own could not read a line just now: the read is kept for a model of the person's that sees, not lost.
+    if (!stopped && keepFromHouse(agent, { ok: read > 0, error: lastError }, { what: 'Read these', needs: 'sees', need: 'needs a model that can see', ids: todo.flatMap((l) => l.ids), run: (live) => readLines(live) })) return;
     if (stopped) say('stopped — ' + who + ' read ' + read + ' of ' + total + ' lines');
     else if (read === total) say(who + ' read ' + (total === 1 ? '1 line' : total + ' lines') + (cost && batches.length === 1 ? ' — ' + kb(cost.bytes) + ', ' + (cost.perLine / 1000).toFixed(1) + ' s a line' : ''));
     else if (!read) say(who + ' could not read ' + (total === 1 ? 'the line' : total + ' lines') + ' — ' + why);
@@ -391,8 +401,9 @@
     const n = res.ok ? res.lines.length : 0;
     readStats.push({ kind: 'picture', lines: n, ok: n, bytes: bytes, ms: ms, perLine: n ? +(ms / n).toFixed(1) : ms, w: w, h: h, said: [] });
     noteOutcome(agent, !!res.ok, res.ok ? 'read the picture · ' + n + ' line' + (n === 1 ? '' : 's') + ' · ' + kb(bytes) + ' · ' + (ms / 1000).toFixed(1) + ' s' : res.error);
+    if (!res.ok && res.raw) window.__mm.lastRaw = res.raw;
+    if (keepFromHouse(agent, res, { what: 'Read the picture', needs: 'sees', need: 'needs a model that can see', ids: [artifactId], run: () => { readPictureFrom(artifactId, asset, name); } })) return false;
     if (!res.ok) {
-      if (res.raw) window.__mm.lastRaw = res.raw;
       if (res.error !== 'cancelled') say(modelWords(agent) + ' could not read the picture — ' + res.error);
       return false;
     }
