@@ -674,6 +674,16 @@ export interface Session {
    */
   isMine(nodeId: string, participantId?: string): boolean;
   /**
+   * Who last set an artifact's clock, as a person — the name shown on the
+   * board, without a sitting's suffix — or null when it was this hand's own,
+   * the engine's, or no clock has been set (C1). A `js` behaviour and a
+   * playing `run` program run arbitrary code, so a surface asks this to tell
+   * its hand that a program is playing for someone ELSE before it offers to
+   * run it here. Pure: read from the log, never stored on the clock, so state
+   * stays a pure function of the log.
+   */
+  clockAuthor(nodeId: string): string | null;
+  /**
    * Install (or clear) the mark that resolves a lasso. An event, not a setting:
    * teaching is part of the session's history and replays with it.
    */
@@ -4493,6 +4503,23 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     isMine: (nodeId, participantId) => {
       const node = nodes.get(nodeId);
       return !!node && samePerson(authorOf(node), participantId ?? LOCAL_PARTICIPANT);
+    },
+    clockAuthor: (nodeId) => {
+      // The last clock event for this artifact says who set it. A stored
+      // event keeps `by` but not the `participantId` that `applyEvent` stamps
+      // on the fly, so attribute it the same way `applyEvent` would: a `by`
+      // with no participant (or the local one) is that hand; otherwise the
+      // participant it names. The board's own hand reads as null — a program
+      // this hand played is simply playing here, not "someone else's".
+      for (let i = events.length - 1; i >= 0; i--) {
+        const ev = events[i];
+        if (ev.type === 'clock' && ev.nodeId === nodeId) {
+          const pid = (ev as { participantId?: string }).participantId;
+          const hand = ev.by && (pid === undefined || pid === LOCAL_PARTICIPANT) ? handId(ev.by) : (pid ?? LOCAL_PARTICIPANT);
+          return hand === LOCAL_PARTICIPANT ? null : personOf(hand);
+        }
+      }
+      return null;
     },
     teachCommandMark: (mark, at) => void dispatch({ type: 'teach', mark, at }),
     use: (pack, at, participantId) => {

@@ -5,7 +5,9 @@
 //   arriving live over a BroadcastChannel or a relay, merged as they land, and — over a relay — the bytes of
 //   the pictures they name: put on it before a line names them, fetched by hash when one is missing,
 //   roomAssetFetch; PLAN-IPAD-NOTES A1; and tellOtherMoves — another hand's move of marks of mine, said once in the status
-//   line and attributed, A2b); and the boards this
+//   line and attributed, A2b; and tellPlayingPrograms/noteStandingPrograms — a program another hand set playing, or one in any
+//   loaded log, said once: it does not run here until this hand plays it, C1, reading the consent gate consentedHere/isProgram
+//   from kinds/inspector; noteStandingPrograms is a session subscriber, for every board a load brings in); and the boards this
 //   browser keeps when there is no folder (V1-PLAN R3, R1) — the adapter over 17-board.js's journal
 //   and 17-boards.js's list: IndexedDB (openBoard, persistBoard, flushBoard, forgetLocalLog; the list:
 //   switchBoard, newBoard, renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash,
@@ -54,6 +56,9 @@
     // status line.
     noticed: new Set(),
     movesSaid: new Set(),
+    // Programs another hand set playing, said once each (C1): this tab does not run another hand's code by itself.
+    playsSaid: new Set(),
+    standingArr: null, // the events array noteStandingPrograms last announced for (a load changes it)
     // What the merge said about a folder's logs: a log name two DIFFERENT
     // events were both numbered under (L1b) — two writers under one name. A
     // live room says it through its store; a folder has only the merge.
@@ -270,6 +275,7 @@
     if (folder.store && folder.store.close) folder.store.close();
     folder.noticed = new Set();
     folder.movesSaid = new Set();
+    folder.playsSaid = new Set();
     // A hand in a room is one SITTING: a second tab of the same person is a
     // second log, or their lines would be taken for its own. The name is the
     // person's; the suffix is this page load's. Held in memory only: a
@@ -354,6 +360,67 @@
   }
 
   /**
+   * A program another hand set playing arrives in the room (C1): the log says
+   * it plays, but this tab does not start another hand's code — it stands as
+   * its source and waits for *Play it here*. Said once per program, in plain
+   * words; the panel offers the tap. Said only for a program a PERSON other
+   * than this one played (clockAuthor), never for your own, and never on a
+   * first sync that rebuilds the board (the room already held it).
+   */
+  function tellPlayingPrograms(report) {
+    if (report.rebuilt) { const s = session.getState(); for (const id of s.live) if (s.clocks[id] && s.clocks[id].playing && session.clockAuthor(id)) folder.playsSaid.add(id); return; }
+    const s = session.getState();
+    for (const id of s.live) {
+      const c = s.clocks[id];
+      if (!c || !c.playing || folder.playsSaid.has(id)) continue;
+      if (consentedHere(id) || !isProgram(s, id)) continue;
+      const who = session.clockAuthor(id);
+      if (!who) continue;
+      folder.playsSaid.add(id);
+      say(who + ' set “' + (MM.wordOf(s.nodes.get(id)) || 'a program') + '” playing — it does not run here until you play it; open it and tap “play it here”');
+    }
+  }
+
+  /**
+   * A board was loaded — a room's first sync, `from a file…`, an example, a
+   * carry, an embed, or this browser's own board on a reload or a switch — and
+   * its log may say a `js` behaviour or a `run` program is playing. A loaded
+   * play grants nothing (C1): the program does not run here until this hand
+   * plays it, so say so once, in the person's words, however it arrived — the
+   * panel already offers *Play it here* on each. Fired on a change of the
+   * events array only (a load), so a live room append is left to
+   * `tellPlayingPrograms`; the common room-join rebuild comes through the
+   * `session.load` inside the merge, so it is covered here. Silent on a board
+   * with no standing program, so no other scenario's status line changes.
+   */
+  function noteStandingPrograms() {
+    const evs = session.getEvents();
+    if (evs === folder.standingArr) return; // appended live — tellPlayingPrograms owns that
+    folder.standingArr = evs;
+    const s = session.getState();
+    // Forget any announced program that is no longer standing by, so one
+    // replayed into a later board is announced afresh.
+    for (const id of [...folder.playsSaid]) {
+      const c = s.clocks[id];
+      if (!(s.live.includes(id) && c && c.playing && !consentedHere(id))) folder.playsSaid.delete(id);
+    }
+    let others = 0, mine = 0, who = null, word = null;
+    for (const id of s.live) {
+      const c = s.clocks[id];
+      if (!c || !c.playing || consentedHere(id) || !isProgram(s, id) || folder.playsSaid.has(id)) continue;
+      folder.playsSaid.add(id);
+      if (session.clockAuthor(id)) { others++; who = who || session.clockAuthor(id); word = word || MM.wordOf(s.nodes.get(id)); }
+      else mine++;
+    }
+    if (!others && !mine) return;
+    const tap = 'open it and tap “play it here” to run it here';
+    if (others === 1 && !mine) say(who + ' set “' + (word || 'a program') + '” playing — it does not run here until you play it; ' + tap);
+    else if (others && !mine) say(others + ' programs are playing for others — ' + tap);
+    else if (!others && mine) say('a program you played earlier is standing by — ' + tap);
+    else say((others + mine) + ' programs are standing by, not running here yet — ' + tap);
+  }
+
+  /**
    * A line landed: merge it — only when a log another hand wrote changed.
    * A hello, a goodbye, the relay's word, a whole log already held change no
    * log and do no work here; what the room says about itself is still said.
@@ -370,7 +437,7 @@
       folder.mergedRevision = rev;
       const report = folder.merge.sync(folder.store.heldLogs());
       changed = report.how !== 'none';
-      if (changed) tellOtherMoves(report);
+      if (changed) { tellOtherMoves(report); tellPlayingPrograms(report); }
     }
     // What the room says about itself is said here once, the moment it is
     // heard, and then stands in the status line (folderStatus).

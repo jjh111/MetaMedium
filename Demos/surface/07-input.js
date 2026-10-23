@@ -695,6 +695,8 @@
     else if (act === 'read') { const n = state.nodes.get(id); if (n && !readers().length) keepRead({ line: [], single: [id] }); else if (n && !readOne(n, true)) say('nothing there to read'); }
     else if (act === 'split') session.splitWord(id, Date.now());
     else if (act === 'clock-play') session.clock({ nodeId: id, op: 'play', at: Date.now() });
+    // Play another hand's program HERE: this hand's own play, so the code runs in this tab only by the person's tap (C1).
+    else if (act === 'clock-play-here') playHere(id);
     else if (act === 'clock-pause') session.clock({ nodeId: id, op: 'pause', at: Date.now() });
     else if (act === 'clock-reset') session.clock({ nodeId: id, op: 'reset', at: Date.now() });
     else if (act === 'behave-use') {

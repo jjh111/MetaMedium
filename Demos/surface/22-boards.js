@@ -18,7 +18,8 @@
 //   renameBoard, duplicateBoard, trashBoard, restoreBoard, planEmptyTrash, emptyTrash, boardFromFile,
 //   rereadBoards, boardEntryName, exportLogNow, readLogText), input (flash, say), the
 //   inspector's element (the panel's start), boards list (exampleUrl, exampleRows, exampleName, starterOf),
-//   core (params, EMBED, session), folder (boardMode), view (fitAll, fitTo), render (union, viewportWorld).
+//   core (params, EMBED, session), folder (boardMode), view (fitAll, fitTo), render (union, viewportWorld),
+//   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -292,7 +293,13 @@
       } catch (err) { report('could not read the “' + row.name + '” example (' + ((err && err.message) || err) + ') — it opens once this page has been online'); return false; }
       if (!read.events) { report(read.refused || 'the “' + row.name + '” example is not a board’s log'); return false; }
       const events = read.events;
-      return await newBoard({ name: exampleName([...boards.entries.values()], row), events: events, force: !!o.force, said: o.said || ((v) => say(v.words)) });
+      const made = await newBoard({ name: exampleName([...boards.entries.values()], row), events: events, force: !!o.force, said: o.said || ((v) => say(v.words)) });
+      // A shipped example IS the program shown — the launch film — and its code
+      // is dyna.ink's own, from the site's own origin, so this hand's board of
+      // its own may run it without a tap (the consent gate, C1). A deliberate,
+      // narrow grant, made only here; a loaded board of someone else's gets none.
+      if (made) grantPlayingPrograms();
+      return made;
     } finally { examples.opening = false; }
   }
   /**
@@ -319,6 +326,9 @@
       // Unless the reader has drawn on the figure before the log arrived: theirs stands.
       if (session.getEvents().length) return;
       session.load(read.events);
+      // The embed shows the example's own program (the whitepaper's film): its
+      // code is dyna.ink's, from the site's own origin, so it runs here (C1).
+      grantPlayingPrograms();
       fitAll();
       // A board too big for a narrow frame (a phone's) stops at the least zoom and is cut wherever the fit
       // lands; its first region, whole, reads better — on the storyboard, the film.

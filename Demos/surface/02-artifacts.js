@@ -1,6 +1,6 @@
 // ===== artifacts =====
 // Provides: the live plane: frames of iframes for artifacts with code, syncStage, regionsUnderInk, pointerFrameAt.
-// Uses: core, view.
+// Uses: core, view, kinds (documentForKind, syncRuntime, the consent gate consentedHere — a run frame plays only when this hand played it here).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -13,12 +13,27 @@
   // inside the shared transform. The ink canvas sits ON TOP of it, so the boxes
   // you drew stay visible as the outlines of what they produced (MVP.md §3.3).
   //
-  // SANDBOX POSTURE, deliberate (MVP.md risk #5): `allow-same-origin` WITHOUT
-  // `allow-scripts`. Same-origin is what lets ink hit-test into the artifact's
-  // own DOM, which is the novel capability here. Granting both together is the
-  // known sandbox escape, and running arbitrary generated JS is not needed to
-  // prove the loop — so scripts stay off, and this is a choice to revisit
-  // explicitly rather than a default that drifted.
+  // SANDBOX POSTURE, deliberate (MVP.md risk #5):
+  //  - html/svg/text/picture frames: `allow-same-origin` WITHOUT `allow-scripts`.
+  //    Same-origin is what lets ink hit-test into the artifact's own DOM, the
+  //    novel capability here; granting both is the known escape, so scripts stay
+  //    off. An injected `<img onerror>`, an svg `<script>`, a page's code or a
+  //    Mermaid label never runs (it is inert markup in a script-less frame).
+  //  - run/mermaid frames: `allow-scripts` WITHOUT `allow-same-origin`, so they
+  //    run script at an OPAQUE origin that cannot reach the page, its storage or
+  //    its keys — and, since C6, each srcdoc carries a CSP (`connect-src 'none'`,
+  //    13-kinds.js `frameCSP`) so a playing program cannot phone out.
+  //  - the `js` worker (13-kinds.js) runs arbitrary behaviour code, and is
+  //    defended three ways, any one of which alone contains it: nothing runs
+  //    there until this hand played it HERE (the consent gate, C1); the worker
+  //    is created inside an OPAQUE-ORIGIN sandboxed iframe carrying a strict CSP
+  //    (`WORKER_HOST_CSP`: `connect-src 'none'`, and a `script-src` with no
+  //    network host, so even `import()` — syntax a denylist cannot reach — is
+  //    refused, and the null origin makes `indexedDB` throw); and before any
+  //    code loads the worker also strips network, storage, channels and nested
+  //    workers at the prototype chain and the global (`WORKER_HARDEN`), keeping
+  //    only Math/performance/Function/postMessage. It cannot open the person's
+  //    boards or beacon out — so there is no same-origin arbitrary-code path.
   const frames = new Map(); // artifactId -> { wrap, iframe, codeAt }
   // Text made from writing is flipped over to show the ink it came from (v10 F8). Runtime only.
   const flipped = new Set();
@@ -113,14 +128,25 @@
       f.wrap.style.width = fr.w + 'px';
       f.wrap.style.height = fr.h + 'px';
       f.wrap.classList.toggle('broken', !!runtimeBroken(id));
-      f.wrap.classList.toggle('playing', !!(s.clocks[id] && s.clocks[id].playing));
+      // A program runs in THIS tab only when this hand played it HERE (C1): the
+      // log may say a clock is playing on every hand's board, but another
+      // hand's play does not start arbitrary code in your tab — it stands as
+      // its source and offers *Play it here*. `playing` is the executing state
+      // (in the log AND consented here); `inLog` is what the log says, for the
+      // badge that it is playing for someone else.
+      const inLog = !!(s.clocks[id] && s.clocks[id].playing);
+      const isProg = kind === 'js' || kind === 'run';
+      const playing = inLog && (!isProg || consentedHere(id));
+      f.wrap.classList.toggle('playing', playing);
+      // A program playing for another hand — a `js` behaviour as much as a run
+      // frame — wears a dashed edge so it reads as standing by, not running.
+      f.wrap.classList.toggle('playing-elsewhere', inLog && isProg && !consentedHere(id));
       f.wrap.classList.toggle('writing', isWritingArtifact(node));
       f.wrap.classList.toggle('flipped', flipped.has(id));
 
       // What renders is the WIRED code when a frame feeds this member.
       const wired = wiredCodeOf(s, id);
       const code = wired !== null ? wired : rep.data.code;
-      const playing = !!(s.clocks[id] && s.clocks[id].playing);
       // A figure's document carries the board's own ink colour, baked in when
       // it was written — an iframe cannot inherit a token from the page — so
       // the THEME is part of what the document is made of. Without it in the
@@ -163,7 +189,7 @@
     for (const [id, f] of frames) {
       if (f.parked || f.kind !== 'run' || !f.iframe) continue;
       const c = state.clocks[id];
-      if (!c || !c.playing) continue;
+      if (!c || !c.playing || !consentedHere(id)) continue;
       const node = state.nodes.get(id);
       const fr = node && MM.frameOf(node);
       if (!fr) continue;

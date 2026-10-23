@@ -1,8 +1,10 @@
 // ===== kinds =====
 // Provides: documentForKind (the renderers: every kind as a document ink can address), the mermaid harness (mermaidFrom, mermaidStates), postPointer (a hand forwarded into a playing frame), the worker runtime
 //   (a blessed `js` artifact's code runs in a worker with a budget; a throw or a hang pauses its clock
-//   with the reason), runtimeOffset, runtimeBroken, syncRuntime.
-// Uses: core (session, esc), artifacts (frames, documentFor).
+//   with the reason), runtimeOffset, runtimeBroken, syncRuntime, the consent gate (trackConsent, consentedHere,
+//   grantPlayingPrograms — this tab runs a program only when this hand played it here, C1), frameCSP (a run or
+//   mermaid frame cannot phone out), WORKER_HARDEN (the js worker keeps only Math/performance/Function/postMessage).
+// Uses: core (session, esc), artifacts (frames, documentFor), render (render).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -121,6 +123,39 @@
   // the frame: the program reports its parts as named rectangles, and the
   // canvas reads them back through postMessage.
   const THREE_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+
+  // ===== A program's frame cannot phone out (C6) ===========================
+  // run and mermaid frames are opaque-origin sandboxes: they cannot reach the
+  // page, its storage or its keys. But they can still `fetch` — under the
+  // app's own CSP that reaches the allowlisted hosts — so a program drawn by
+  // someone else could beacon out. A CSP meta inside the srcdoc closes it:
+  // `connect-src 'none'` (no fetch, XHR, WebSocket, EventSource or beacon),
+  // and nothing loads but what the frame actually needs — the pinned library
+  // by <script>, the launch film's video and the frame's own data: assets.
+  // The library host is derived from the URLs the frame is given, so a test's
+  // stand-in library (served from the gate's own origin) still loads and the
+  // CDNs stay in one home. img/media are held to the page's own origin and
+  // data:/blob:, so no <img> or <video> GET can beacon to a stranger either.
+  function originOf(u) { try { return new URL(u, location.href).origin; } catch (e) { return null; } }
+  function frameCSP(scriptUrls) {
+    const self = location.origin && location.origin !== 'null' ? location.origin : '';
+    const hosts = {};
+    for (const u of scriptUrls || []) { const o = originOf(u); if (o && o !== 'null') hosts[o] = 1; }
+    if (self) hosts[self] = 1;
+    const script = Object.keys(hosts).join(' ');
+    const sameAssets = (self ? self + ' ' : '') + 'data: blob:';
+    const content =
+      "default-src 'none'; " +
+      'script-src ' + (script ? script + ' ' : '') + "'unsafe-inline' 'unsafe-eval' blob:; " +
+      "style-src 'unsafe-inline'; " +
+      'img-src ' + sameAssets + '; ' +
+      'media-src ' + sameAssets + '; ' +
+      'font-src ' + sameAssets + '; ' +
+      "connect-src 'none'; " +
+      'worker-src blob:; ' +
+      "base-uri 'none'; form-action 'none'";
+    return '<meta http-equiv="Content-Security-Policy" content="' + content.replace(/"/g, '&quot;') + '">';
+  }
   const reported = new Map(); // artifactId -> [{ id, x, y, w, h }] in frame pixels
   const RUN_HARNESS = [
     '// three.js is loaded beside this script, not before it: a program that draws in 2D',
@@ -208,7 +243,7 @@
   function runDocument(id, code, w, h) {
     const safe = (s) => JSON.stringify(String(s)).replace(/<\//g, '<\\/');
     const script = RUN_HARNESS.replace('__W__', Math.round(w)).replace('__H__', Math.round(h)).replace('__ID__', safe(id)).replace('__CODE__', safe(code)).replace('__THREE__', JSON.stringify(THREE_CDN));
-    return '<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:transparent;overflow:hidden;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px}</style>' +
+    return '<!doctype html><html><head><meta charset="utf-8">' + frameCSP([THREE_CDN]) + '<style>html,body{margin:0;background:transparent;overflow:hidden;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px}</style>' +
       '</head><body><script>' + script + '<\/script></body></html>';
   }
 
@@ -321,7 +356,7 @@
       '#out .flowchart-link,#out .edgePath path,#out path.relation,#out .messageLine0,#out .messageLine1,#out .actor-line,#out .divider path{stroke:' + ink + ' !important;}' +
       '#out marker path,#out marker circle,#out .arrowMarkerPath,#out #arrowhead path{fill:' + ink + ' !important;stroke:' + ink + ' !important;}' +
       '#out .edgeLabel,#out .edgeLabel rect,#out .labelBkg,#out .cluster rect{fill:transparent !important;background:transparent !important;}';
-    return '<!doctype html><html><head><meta charset="utf-8"><style>' + css + '</style></head><body>' +
+    return '<!doctype html><html><head><meta charset="utf-8">' + frameCSP(mermaidSourcesNow()) + '<style>' + css + '</style></head><body>' +
       '<div id="mmroot"><pre id="src">' + esc(text) + '</pre><p id="note" hidden></p><div id="out" hidden></div></div>' +
       '<script>' + script + '<\/script></body></html>';
   }
@@ -432,7 +467,47 @@
   const RUN_DT = 1 / 60;
   const RUN_SPEED_CAP = 400; // world units per second, the cap `steer` uses
 
+  // A behaviour runs arbitrary code, and needs NONE of the web platform — it
+  // returns a force from a world object — so the worker is sealed in two
+  // independent ways, either of which alone stops a `js` artifact opening the
+  // person's boards or phoning out (C1, C6):
+  //
+  //  1. It runs in an OPAQUE-ORIGIN sandboxed iframe (ensureWorker) carrying a
+  //     strict CSP (`WORKER_HOST_CSP`): `connect-src 'none'` kills fetch, XHR,
+  //     WebSocket, EventSource and a beacon; `script-src` names no network host
+  //     (only inline, eval and blob:), so `import('https://host/?data=…')` — a
+  //     GET governed by script-src, which a denylist of globals can never reach
+  //     because it is syntax, not a property — is refused; and the null origin
+  //     makes `indexedDB` throw, so `mm-boards` is unreachable. The blob worker
+  //     inherits the frame's CSP, so this is a real wall even on a dev origin
+  //     with no page CSP of its own.
+  //  2. Before any code loads, the worker string also strips network, storage,
+  //     channels and nested workers at every place each lives (`WORKER_HARDEN`):
+  //     the prototype chain of the global AND the global name, each a throwing
+  //     getter, so prototype-walking, the Function constructor and shadowing all
+  //     hit the same wall; `URL.createObjectURL` goes too. It cannot block
+  //     `import()`/`eval` (realm syntax), which is why the CSP above is the
+  //     primary wall and this is defence in depth — but it holds in any engine,
+  //     and keeps only Math, performance, Function, postMessage.
+  const WORKER_HARDEN = [
+    '(function(){',
+    '  var G = self;',
+    '  var gone = ["fetch","XMLHttpRequest","WebSocket","EventSource","importScripts","Worker","SharedWorker","ServiceWorker","BroadcastChannel","MessageChannel","indexedDB","caches","navigator","openDatabase","WebTransport","RTCPeerConnection","Notification","PushManager"];',
+    '  function deny(name){ return function(){ throw new Error(name + " is not available to a behaviour"); }; }',
+    '  function seal(obj, name){ try { Object.defineProperty(obj, name, { configurable: false, enumerable: false, get: deny(name) }); return true; } catch (e) { try { delete obj[name]; return true; } catch (e2) { try { obj[name] = undefined; } catch (e3) {} return false; } } }',
+    '  for (var i = 0; i < gone.length; i++){',
+    '    var n = gone[i];',
+    '    var p = G;',
+    '    while (p){ if (Object.prototype.hasOwnProperty.call(p, n)) seal(p, n); p = Object.getPrototypeOf(p); }',
+    '    seal(G, n);',
+    '  }',
+    '  try { if (G.URL && G.URL.createObjectURL) G.URL.createObjectURL = deny("URL.createObjectURL"); } catch (e) {}',
+    '  try { if (G.URL && G.URL.revokeObjectURL) G.URL.revokeObjectURL = function(){}; } catch (e) {}',
+    '})();',
+  ].join('\n');
+
   const WORKER_SRC = [
+    WORKER_HARDEN,
     'const fns = new Map();',
     'function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}',
     'onmessage = (e) => {',
@@ -458,7 +533,10 @@
   ].join('\n');
 
   const runtime = {
-    worker: null,
+    worker: null,        // the opaque-origin iframe hosting the behaviour worker
+    nonce: '',           // tags messages to/from that host, so no other frame is heard
+    ready: false,        // the host said its worker is up
+    outbox: [],          // messages posted before the host was ready, flushed on ready
     loaded: new Map(),   // artifactId -> code rep `at` the worker holds
     pending: new Map(),  // artifactId -> watchdog timer for the step in flight
     bodies: new Map(),   // artifactId -> { x, y, vx, vy, heading, age, tick } — offsets from the frame, runtime only
@@ -479,21 +557,76 @@
     if (runtime.log.length > 40) runtime.log.shift();
   }
 
-  function ensureWorker() {
-    if (runtime.worker) return runtime.worker;
-    const url = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
-    const w = new Worker(url);
-    w.onmessage = (e) => onWorkerMessage(e.data);
-    w.onerror = (e) => { flash('runtime: ' + (e.message || 'error')); };
-    runtime.worker = w;
-    runtime.loaded.clear();
-    return w;
+  // The CSP the behaviour worker runs under (its host iframe's): no network of
+  // any kind (`connect-src 'none'`), no module may load from any host
+  // (`script-src` names none, so `import()` is refused), nothing but the inline
+  // bootstrap, eval (the host compiles the behaviour with `new Function`) and
+  // the worker blob. The blob worker inherits this, so it holds on a dev origin
+  // that carries no page CSP of its own.
+  const WORKER_HOST_CSP =
+    "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; connect-src 'none'; worker-src blob:; base-uri 'none'; form-action 'none'";
+
+  // The host document: an opaque-origin sandboxed iframe (allow-scripts, no
+  // allow-same-origin) that makes the real worker from a blob and relays
+  // messages to and from the page, each tagged with a per-host nonce. Because
+  // it is opaque-origin the worker's `indexedDB` throws, and because of the CSP
+  // it cannot reach the network at all.
+  function workerHostDoc(nonce) {
+    return '<!doctype html><html><head><meta charset="utf-8">' +
+      '<meta http-equiv="Content-Security-Policy" content="' + WORKER_HOST_CSP.replace(/"/g, '&quot;') + '">' +
+      '</head><body><script>' +
+      'var WSRC=' + JSON.stringify(WORKER_SRC).replace(/<\//g, '<\\/') + ';' +
+      'var N=' + JSON.stringify(nonce) + ';' +
+      'var w=new Worker(URL.createObjectURL(new Blob([WSRC],{type:"text/javascript"})));' +
+      'w.onmessage=function(e){parent.postMessage({__mmw:N,m:e.data},"*");};' +
+      'w.onerror=function(e){parent.postMessage({__mmw:N,err:(e&&e.message)||"error"},"*");};' +
+      'onmessage=function(e){var d=e.data;if(!d||d.__mmw!==N)return;if(d.kill){try{w.terminate();}catch(_){}return;}w.postMessage(d.m);};' +
+      'parent.postMessage({__mmw:N,ready:true},"*");' +
+      '<\/script></body></html>';
   }
 
-  /** Terminate and forget: after a hang, nothing in the old worker can be trusted. */
+  // The page hears the host once, by the host window's identity AND its nonce,
+  // so a run or mermaid frame posting the same shape is never taken for it.
+  addEventListener('message', (e) => {
+    const host = runtime.worker;
+    if (!host || !host.contentWindow || e.source !== host.contentWindow) return;
+    const d = e.data;
+    if (!d || d.__mmw !== runtime.nonce) return;
+    if (d.ready) { runtime.ready = true; const q = runtime.outbox; runtime.outbox = []; for (const m of q) workerPost(m); return; }
+    if (d.err) { flash('runtime: ' + (d.err || 'error')); return; }
+    if (d.m) onWorkerMessage(d.m);
+  });
+
+  /** Post to the behaviour worker through its host, or queue it until the host is up. */
+  function workerPost(m) {
+    const host = runtime.worker;
+    if (host && runtime.ready && host.contentWindow) host.contentWindow.postMessage({ __mmw: runtime.nonce, m: m }, '*');
+    else runtime.outbox.push(m);
+  }
+
+  function ensureWorker() {
+    if (runtime.worker) return runtime.worker;
+    runtime.nonce = 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+    runtime.ready = false;
+    runtime.outbox = [];
+    const host = document.createElement('iframe');
+    host.setAttribute('sandbox', 'allow-scripts');
+    host.setAttribute('aria-hidden', 'true');
+    host.style.cssText = 'position:absolute;width:0;height:0;border:0;left:-9999px;top:-9999px;';
+    host.srcdoc = workerHostDoc(runtime.nonce);
+    (document.body || document.documentElement).appendChild(host);
+    runtime.worker = host;
+    runtime.loaded.clear();
+    return host;
+  }
+
+  /** Drop the host iframe and forget: after a hang, nothing it held can be trusted. */
   function dropWorker() {
-    if (runtime.worker) runtime.worker.terminate();
+    const host = runtime.worker;
+    if (host) { try { if (host.contentWindow) host.contentWindow.postMessage({ __mmw: runtime.nonce, kill: true }, '*'); } catch (e) {} try { host.remove(); } catch (e) {} }
     runtime.worker = null;
+    runtime.ready = false;
+    runtime.outbox = [];
     runtime.loaded.clear();
     for (const t of runtime.pending.values()) clearTimeout(t);
     runtime.pending.clear();
@@ -563,12 +696,90 @@
     };
   }
 
-  /** The playing `js` artifacts, each with code the worker holds. */
+  // ===== Consent: this tab runs only what this hand played here (C1) =======
+  // A `js` behaviour and a playing `run` program run arbitrary code. The log
+  // may say a clock is `playing` — a pure function of the log, true on every
+  // hand's board — but THIS tab executes a program only when this hand played
+  // it HERE: a `clock{op:'play'}` this hand wrote live in this session. A play
+  // that arrived inside a loaded log — a room line, `from a file…`, a folder,
+  // a carry, an embed — grants nothing, so another hand's program never starts
+  // by itself; the person taps *Play it here* (a play of their own) to run it.
+  // This is runtime only (like paint culling): it governs what this tab runs,
+  // never the session state, so undo per hand still stops it — undo drops this
+  // hand's play, the clock stops, the loop stops.
+  const grantedHere = new Set();
+  let consentArr = null, consentLen = 0;
+  function trackConsent(s) {
+    const evs = session.getEvents();
+    if (evs !== consentArr) {
+      // A NEW events array — a load, an undo, a room rebase that cut, a reset.
+      // Nothing LOADED is granted (another hand's program, or your own from a
+      // file/reload, waits for *Play it here*), but a grant this hand already
+      // gave survives an unrelated change: it is kept only while the artifact
+      // is still live and playing AND the latest play is still this hand's
+      // own (`clockAuthor` null). So undoing an unrelated stroke leaves a
+      // running program running, while undoing this hand's OWN play drops the
+      // grant — the clock falls to whatever is left and it stops here.
+      consentArr = evs; consentLen = evs.length;
+      for (const id of [...grantedHere]) {
+        const c = s.clocks[id];
+        if (!(s.live.includes(id) && c && c.playing && session.clockAuthor(id) === null)) grantedHere.delete(id);
+      }
+    } else {
+      // Appended live: a `clock{op:'play'}` THIS hand wrote (no `by` — every
+      // other hand's line is stamped on arrival) grants its artifact. A room
+      // line that only appends keeps the same array, so a foreign play lands
+      // here too — and is refused, because it carries `by`.
+      for (let i = consentLen; i < evs.length; i++) {
+        const ev = evs[i];
+        if (ev && ev.type === 'clock' && ev.op === 'play' && !ev.by) grantedHere.add(ev.nodeId);
+      }
+      consentLen = evs.length;
+      for (const id of [...grantedHere]) if (!s.live.includes(id) && !s.clocks[id]) grantedHere.delete(id);
+    }
+  }
+  /** Whether this tab may run this artifact's code: this hand played it here. */
+  function consentedHere(id) { return grantedHere.has(id); }
+  /**
+   * Play a program HERE — the person's one tap when it is playing for another
+   * hand (C1). It writes this hand's OWN `clock{op:'play'}`, so the consent is
+   * the person's deliberate act, kept in the log as any play is: undo per hand
+   * takes it back, and every peer sees this hand played it too. The live append
+   * is what `trackConsent` grants on, so the program then runs here.
+   */
+  function playHere(id) {
+    const s = session.getState();
+    if (!s.live.includes(id)) return false;
+    session.clock({ nodeId: id, op: 'play', at: Date.now() });
+    const who = session.clockAuthor(id);
+    flash('playing it here' + (who ? ' — it was playing for ' + who : ''));
+    return true;
+  }
+  /**
+   * Trust the programs a shipped example or the whitepaper's embed opens with:
+   * their code is dyna.ink's own, loaded from the site's own origin, and the
+   * example IS the program shown (the launch film). A deliberate, narrow grant
+   * made only by the example-open path (22-boards.js), never by a load.
+   */
+  function grantPlayingPrograms() {
+    const s = session.getState();
+    let any = false;
+    for (const id of Object.keys(s.clocks)) {
+      if (!s.clocks[id].playing || grantedHere.has(id)) continue;
+      const node = s.nodes.get(id);
+      const rep = node && codeRepOf(node);
+      const kind = rep && (rep.data.kind || 'html');
+      if (kind === 'js' || kind === 'run') { grantedHere.add(id); any = true; }
+    }
+    if (any) render(session.getState());
+  }
+
+  /** The playing `js` artifacts THIS hand played here, each with code the worker holds. */
   function runnable(s) {
     const out = [];
     for (const id of s.live) {
       const c = s.clocks[id];
-      if (!c || !c.playing) continue;
+      if (!c || !c.playing || !consentedHere(id)) continue;
       const node = s.nodes.get(id);
       const rep = node && codeRepOf(node);
       if (!rep || (rep.data.kind || 'html') !== 'js') continue;
@@ -602,11 +813,11 @@
       if (runtime.raf) { runtime.raf.cancel(); runtime.raf = 0; }
       return;
     }
-    const w = ensureWorker();
+    ensureWorker();
     for (const r of want) {
       if (runtime.loaded.get(r.id) !== r.key && !runtime.pending.has(r.id)) {
         runtime.loaded.set(r.id, r.key); // in flight; a 'loaded' reply confirms
-        w.postMessage({ type: 'load', id: r.id, code: r.code, at: r.key });
+        workerPost({ type: 'load', id: r.id, code: r.code, at: r.key });
       }
     }
     if (!runtime.raf) runtime.raf = nextFrame(runLoop);
@@ -615,10 +826,10 @@
   /** One step for one artifact: the world posted, the watchdog armed. Returns false when a step is already in flight. */
   function sendStep(s, r, bodies) {
     if (runtime.pending.has(r.id)) return false; // one step in flight per artifact
-    const w = ensureWorker();
+    ensureWorker();
     if (runtime.loaded.get(r.id) !== r.key) {
       runtime.loaded.set(r.id, r.key);
-      w.postMessage({ type: 'load', id: r.id, code: r.code, at: r.key });
+      workerPost({ type: 'load', id: r.id, code: r.code, at: r.key });
     }
     if (!runtime.bodies.has(r.id)) runtime.bodies.set(r.id, { x: 0, y: 0, vx: 0, vy: 0, heading: 0, age: 0, tick: 0 });
     const me = bodies.get(r.id);
@@ -629,7 +840,7 @@
     body.tick = runtime.tick;
     const clock = s.clocks[r.id];
     runtimeNote('out', { type: 'step', id: r.id, tick: runtime.tick });
-    w.postMessage({
+    workerPost({
       type: 'step', id: r.id, tick: runtime.tick, seed: clock ? clock.seed : 1,
       world: { t: body.age, dt: RUN_DT, me: me, others: others, walls: [] },
     });
