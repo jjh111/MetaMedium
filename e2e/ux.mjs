@@ -223,22 +223,27 @@ export async function runUx(browser, servers, { freshContext }) {
       const r = el && !el.hidden ? el.getBoundingClientRect() : null;
       const start = el && el.querySelector('button[data-example-start]');
       const sr = start ? start.getBoundingClientRect() : null;
+      const steps = el && el.querySelector('.firstLoop');
+      const st = steps ? steps.getBoundingClientRect() : null;
       return {
         panelHidden: document.body.classList.contains('panelHidden'), sheet: !!r, steps: el ? el.querySelectorAll('.firstLoop li').length : 0,
         startShown: !!sr && sr.width > 0 && sr.top >= 0 && sr.bottom <= innerHeight && sr.left >= 0 && sr.right <= innerWidth,
+        startHeight: sr ? Math.round(sr.height) : 0, on: st && { x: Math.round(st.left + st.width / 2), y: Math.round(st.top + st.height / 2) },
         status: document.getElementById('status').textContent, state: window.__mm.firstRun(),
       };
     });
-    check(`X3. a phone at 390 px opens with the panel closed, and the three steps and “start from an example” stand as a sheet at the foot of the screen, whole on it; the line says “double-tap” (${first.status})`,
-      first.panelHidden && first.sheet && first.steps === 3 && first.startShown && /double-tap empty ground/.test(first.status) && !/double-click/.test(first.status), first);
-    // The first stroke: the sheet leaves; the mouse drew it, so the line says double-click now — by the pointer, not the device.
-    await draw(page, box(100, 300, 120, 80));
-    const drawn = await page.evaluate(() => ({ state: window.__mm.firstRun(), hidden: document.getElementById('firstRun').hidden, words: window.__mm.tapWords() }));
+    check(`X3. a phone at 390 px opens with the panel closed, and the three steps and “start from an example” stand as a sheet at the foot of the screen, whole on it, its button a finger's size (${first.startHeight} px); the line says “double-tap” (${first.status})`,
+      first.panelHidden && first.sheet && first.steps === 3 && first.startShown && first.startHeight >= 36 && /double-tap empty ground/.test(first.status) && !/double-click/.test(first.status), first);
+    // The first stroke, begun on the sheet's words and drawn up the screen: it is the canvas's, and the sheet leaves; the
+    // mouse drew it, so the line says double-click now — by the pointer, not the device.
+    const up = first.on ? lerp(first.on, { x: first.on.x + 20, y: first.on.y - 260 }, 30) : [];
+    if (up.length) await draw(page, up);
+    const drawn = await page.evaluate(() => ({ state: window.__mm.firstRun(), hidden: document.getElementById('firstRun').hidden, words: window.__mm.tapWords(), marks: window.__mm.session.getState().contentIds.length }));
     await page.evaluate(() => window.__mm.session.undo());
     await page.waitForTimeout(200);
     const undone = await page.evaluate(() => ({ state: window.__mm.firstRun(), hidden: document.getElementById('firstRun').hidden, empty: !window.__mm.session.getState().contentIds.length, status: document.getElementById('status').textContent }));
-    check(`X3b. the sheet leaves on the first stroke and stays gone once the stroke is undone (${drawn.state.why}, then ${undone.state.why}); drawn with a mouse, the line's word is “${drawn.words}” (${undone.status})`,
-      drawn.hidden && undone.hidden && undone.empty && drawn.words === 'double-click' && /double-click empty ground/.test(undone.status), { drawn, undone });
+    check(`X3b. a stroke begun on the sheet draws (${drawn.marks} mark) and the sheet leaves, and stays gone once the stroke is undone (${drawn.state.why}, then ${undone.state.why}); drawn with a mouse, the line's word is “${drawn.words}” (${undone.status})`,
+      drawn.marks === 1 && drawn.hidden && undone.hidden && undone.empty && drawn.words === 'double-click' && /double-click empty ground/.test(undone.status), { drawn, undone });
     // A finger's tap after the mouse: the word follows the pointer again.
     await page.tap('#undoBtn');
     const tapped = await page.evaluate(() => window.__mm.tapWords());
@@ -481,6 +486,14 @@ export async function runUx(browser, servers, { freshContext }) {
     const after = await page.evaluate(() => document.getElementById('status').textContent);
     check(`X6e. a sentence said for a while (“${said.slice(0, 50)}”) lets go once the hand draws again (now: ${after.slice(0, 70)})`,
       /using the Basics pack/.test(said) && !/using the Basics pack/.test(after), { said, after });
+
+    // On a board that reads as no diagram the Mermaid text row is not there to press (it did nothing, and said nothing).
+    await page.evaluate(() => window.__mm.session.load([]));
+    await page.waitForTimeout(150);
+    await openPaneBy(page, 'exportPanel', '#exportBtn', false);
+    const noDiagram = await page.evaluate(() => { const r = document.getElementById('exMermaid'); return { hidden: r.hidden, shown: r.getClientRects().length > 0 }; });
+    await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+    check(`X6g. on an empty board the export pane has no Mermaid text row (${noDiagram.shown ? 'shown' : 'not shown'})`, noDiagram.hidden && !noDiagram.shown, noDiagram);
     await guards.context.close();
   });
 
