@@ -18,7 +18,7 @@ import { describeSession, describeSignature, describeReading } from './serialize
 import { frameOf, regionsOf } from '../session/regions';
 import { planFor } from '../parse/plan';
 import { getRep } from '../session/nodes';
-import { heldParticipant, seatOn, type Seating } from './seated';
+import { ownParticipant, seatOn, type Seating } from './seated';
 import { validateRegions, type RegionContent, type Theme } from '../parse/scaffold';
 import { type DrawnShape, parseShapes, strokeFor, MAX_DRAWN } from '../session/synthesize';
 import type { Behaviour, Term, Verb } from '../behave/verbs';
@@ -833,7 +833,7 @@ export function createAgentParticipant(
   // can group readings by voice and the router can ask the cheaper first.
   const seating: Seating = { kind: 'agent', name, capability: options.tier ?? providerTier(config), locality: options.locality ?? providerLocality(config) };
   let id = options.lazy
-    ? heldParticipant(session.getState(), seating) ?? ''
+    ? ownParticipant(session, seating)
     : session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
   // A board loaded in place takes this join with it (`participants/seated.ts`): every ask seats the agent
   // on the board it is asked on first — found there if the board holds its join, joined once if not.

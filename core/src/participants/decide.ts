@@ -47,7 +47,7 @@
 
 import type { Session, ProposedEdge, ProposedRep } from '../session/session';
 import type { Capability, Locality } from '../session/nodes';
-import { heldParticipant, seatOn, type Seating } from './seated';
+import { ownParticipant, seatOn, type Seating } from './seated';
 
 /** The outcome that means *none of these* — always offered, never inferred. */
 export const NO_MATCH = 'no-match';
@@ -397,7 +397,7 @@ export function createDecideParticipant(
   const takeAt = options.takeAt ?? 0;
   const seating: Seating = { kind: 'agent', name, capability: tier, locality: options.locality ?? 'local' };
   // Lazily (S4): the board's own join for this seat if it holds one, else nothing until the first ask.
-  let id = heldParticipant(session.getState(), seating) ?? '';
+  let id = ownParticipant(session, seating);
   const seat = (now: number = at): string => (id = seatOn(session, seating, id || undefined, now));
 
   async function ask(

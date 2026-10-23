@@ -12766,7 +12766,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     notify();
     return report;
   }
-  const ownAct = (ev) => ev.by === void 0 && ev.type !== "tick";
+  const ownAct = (ev) => ev.by === void 0 && ev.type !== "tick" && !(ev.type === "join" && ev.seated);
   function highestUnder(name) {
     let at = -1;
     let best = -1;
@@ -12869,7 +12869,7 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
   }
   return {
     addStroke: (points, at, participantId, scale, options) => dispatch({ type: "stroke", points, at, participantId, scale, content: options?.content }),
-    join: (kind, name, at, capability, locality) => dispatch({ type: "join", kind, name, at, capability, ...locality ? { locality } : {} }),
+    join: (kind, name, at, capability, locality, options) => dispatch({ type: "join", kind, name, at, capability, ...locality ? { locality } : {}, ...options?.seated ? { seated: true } : {} }),
     propose: ({ expect, ...args }) => void guarded({ type: "propose", ...args }, expect),
     answer: ({ expect, ...args }) => guarded({ type: "answer", ...args }, expect),
     label: (args) => guarded({ type: "label", ...args }),
@@ -26493,18 +26493,30 @@ function kindOf3(state, id) {
   const kind = rep?.data?.kind;
   return kind === "human" || kind === "agent" || kind === "engine" ? kind : null;
 }
-function heldParticipant(state, seating, was) {
+function othersJoined(events) {
+  const others = /* @__PURE__ */ new Set();
+  for (const ev of events) {
+    if (ev.type !== "join" || ev.by === void 0 || !ev.origin || typeof ev.seq !== "number") continue;
+    others.add(`participant:${ev.origin}:${ev.seq}`);
+  }
+  return others;
+}
+function heldParticipant(state, seating, was, others) {
   const is = (id) => {
     const node = state.nodes.get(id);
+    if (others && others.has(id)) return false;
     return !!node && kindOf3(state, id) === seating.kind && wordOf(node) === seating.name && node.capability === seating.capability;
   };
   if (was && state.participants.includes(was) && is(was)) return was;
   return state.participants.find(is) ?? null;
 }
 function seatOn(session, seating, was, at) {
-  const held2 = heldParticipant(session.getState(), seating, was);
+  const held2 = heldParticipant(session.getState(), seating, was, othersJoined(session.getEvents()));
   if (held2) return held2;
-  return session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
+  return session.join(seating.kind, seating.name, at, seating.capability, seating.locality, { seated: true });
+}
+function ownParticipant(session, seating) {
+  return heldParticipant(session.getState(), seating, void 0, othersJoined(session.getEvents())) ?? "";
 }
 
 // src/participants/decide.ts
@@ -26578,7 +26590,7 @@ function createDecideParticipant(session, transport, at = 0, options = {}) {
   const margin = options.flatMargin ?? FLAT_MARGIN;
   const takeAt = options.takeAt ?? 0;
   const seating = { kind: "agent", name, capability: tier, locality: options.locality ?? "local" };
-  let id = heldParticipant(session.getState(), seating) ?? "";
+  let id = ownParticipant(session, seating);
   const seat = (now = at) => id = seatOn(session, seating, id || void 0, now);
   async function ask(questions, now, signal, shown2) {
     seat(now);
@@ -30907,7 +30919,7 @@ function createAgentParticipant(session, config, at = 0, options = {}) {
   const send = options.transport ?? ((c, m, o) => complete(c, m, o));
   const name = options.name ?? providerLabel(config);
   const seating = { kind: "agent", name, capability: options.tier ?? providerTier(config), locality: options.locality ?? providerLocality(config) };
-  let id = options.lazy ? heldParticipant(session.getState(), seating) ?? "" : session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
+  let id = options.lazy ? ownParticipant(session, seating) : session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
   const seat = (now = at) => id = seatOn(session, seating, id || void 0, now);
   const staleWhy = (fallback) => session.getState().staleResult?.detail ?? fallback;
   async function interpret(nodeIds, now, signal) {
@@ -33598,10 +33610,12 @@ export {
   offsetPolygon,
   onToolsChange,
   otherHandMoves,
+  othersJoined,
   otsu,
   outlineOf,
   outwardOf,
   ownLog,
+  ownParticipant,
   ownSitesOf,
   packBench,
   packDefinitionOf,

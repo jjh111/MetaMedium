@@ -848,7 +848,7 @@ export type { BehaveResult, ProgramResult } from './participants/agent';
 export type { AgentParticipant, AgentReading, InterpretResult, AskResult, GenerateResult, ReadResult, ReadLineResult, ReadLinesResult, ReadPictureResult, TranscriptReading, DrawResult, RegionFill } from './participants/agent';
 export { writingLinesIn, lineIsRead, batchesOf, sheetOf, linesBrief, parseLineReadings, parsePictureLines, LINES_PER_CALL, LINE_PX, SHEET_MAX_PX, READ_LINES_PROMPT, READ_PICTURE_PROMPT } from './participants/readlines';
 export type { ReadLine, LinesSheet, LinesSheetRow } from './participants/readlines';
-export { seatOn, heldParticipant } from './participants/seated';
+export { seatOn, heldParticipant, othersJoined, ownParticipant } from './participants/seated';
 export type { Seating } from './participants/seated';
 export { describeSession, describeSignature, describeRegions, describeAddressed, describeReading } from './participants/serialize';
 export type { ReadingLike, DescribeReadingOptions } from './participants/serialize';

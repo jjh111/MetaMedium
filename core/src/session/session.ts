@@ -334,7 +334,15 @@ type SessionEventUnion =
   | { type: 'bless'; summonId: string; name?: string; suggestionId?: string; at: number; participantId?: string }
   | { type: 'dismiss'; summonId: string; at: number; participantId?: string }
   | { type: 'erase'; nodeId: string; at: number; participantId?: string }
-  | { type: 'join'; kind: ParticipantKind; name: string; at: number; capability?: Capability; locality?: Locality }
+  | {
+      type: 'join'; kind: ParticipantKind; name: string; at: number; capability?: Capability; locality?: Locality;
+      /**
+       * Written by seating a model where it was asked (`participants/seated.ts`: the first ask on a board writes
+       * its join), not by a hand's act: undo never takes it back, so a person's undo takes back what they did —
+       * never the invisible join a model's ask wrote, with the answer still on its way (which was then refused).
+       */
+      seated?: true;
+    }
   | { type: 'propose'; participantId: string; nodeId: string; edges: ProposedEdge[]; reps?: ProposedRep[]; at: number }
   /**
    * A word a hand puts on its OWN ink (the notes, §B). Not a bless — the
@@ -630,8 +638,11 @@ export const DEFAULT_SESSION_CONFIG: SessionConfig = {
 
 export interface Session {
   addStroke(points: Point[], at: number, participantId?: string, scale?: number, options?: { content?: boolean }): string;
-  /** Register a participant (human or AI agent). Returns its node id. */
-  join(kind: ParticipantKind, name: string, at: number, capability?: Capability, locality?: Locality): string;
+  /**
+   * Register a participant (human or AI agent). Returns its node id. `options.seated`: written by seating a model
+   * where it is asked (`participants/seated.ts`), not by a hand's act — undo never takes it back.
+   */
+  join(kind: ParticipantKind, name: string, at: number, capability?: Capability, locality?: Locality, options?: { seated?: boolean }): string;
   /**
    * Offer attributed, inferred edges on a node — the channel LLM tiers use.
    * Refused, with a reason on `state.staleResult`, when the node is gone or
@@ -4360,10 +4371,13 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   // changed), and the mark came back at the next line. Undo takes back this
   // hand's own last act: found among the events of its own log — the ones no
   // merge stamped `by` — by the order it wrote them, never by where they
-  // stand. Ticks are not acts and stay, as they always did.
+  // stand. Ticks are not acts and stay, as they always did; nor is a model's
+  // join written by seating it where it was asked (`seated`): the person's
+  // undo takes back what the person did, and the model stays on the board its
+  // answer is on its way to.
 
-  /** Whether an event is this hand's to take back: its own log's (no `by`), and not a tick. */
-  const ownAct = (ev: SessionEvent) => ev.by === undefined && ev.type !== 'tick';
+  /** Whether an event is this hand's to take back: its own log's (no `by`), not a tick, not a seated join. */
+  const ownAct = (ev: SessionEvent) => ev.by === undefined && ev.type !== 'tick' && !(ev.type === 'join' && ev.seated);
 
   /** Where this hand's event with the highest number under `name` stands, or -1. */
   function highestUnder(name: string): number {
@@ -4496,7 +4510,8 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
   return {
     addStroke: (points, at, participantId, scale, options) =>
       dispatch({ type: 'stroke', points, at, participantId, scale, content: options?.content }) as string,
-    join: (kind, name, at, capability, locality) => dispatch({ type: 'join', kind, name, at, capability, ...(locality ? { locality } : {}) }) as string,
+    join: (kind, name, at, capability, locality, options) =>
+      dispatch({ type: 'join', kind, name, at, capability, ...(locality ? { locality } : {}), ...(options?.seated ? { seated: true as const } : {}) }) as string,
     propose: ({ expect, ...args }) => void guarded({ type: 'propose', ...args }, expect),
     answer: ({ expect, ...args }) => guarded({ type: 'answer', ...args }, expect),
     label: (args) => guarded({ type: 'label', ...args }),

@@ -14,7 +14,7 @@
 //
 // Pure functions of the state, and one door onto the session; nothing here asks a model anything.
 
-import type { Session, SessionState } from '../session/session';
+import type { Session, SessionEvent, SessionState } from '../session/session';
 import { getRep, wordOf, localityOf, type Capability, type Locality, type ParticipantKind } from '../session/nodes';
 
 /** What a participant is, as a board holds it: who it says it is, at which tier, where it runs. */
@@ -34,15 +34,34 @@ function kindOf(state: SessionState, id: string): ParticipantKind | null {
 }
 
 /**
+ * The participants another hand's log joined, by the id each join mints (`participant:<log>:<number>`): what a
+ * merge stamped `by`. **A seat is never seated on one** (undo per hand, V1-PLAN L2j): two pages that seat a model
+ * under one name — dyna.ink's own writer, on every page of a room — would otherwise share the first hand's
+ * participant, and that hand's undo of its own join would take the other's readings off every board with it.
+ * A join with no log name mints a counter, which names nothing here; it is never another's on a board that merges
+ * no other log.
+ */
+export function othersJoined(events: readonly SessionEvent[]): Set<string> {
+  const others = new Set<string>();
+  for (const ev of events) {
+    if (ev.type !== 'join' || ev.by === undefined || !ev.origin || typeof ev.seq !== 'number') continue;
+    others.add(`participant:${ev.origin}:${ev.seq}`);
+  }
+  return others;
+}
+
+/**
  * The participant this board already holds for `seating`, or null. `was` — the id it held when last
  * seen — is kept when it still names the same participant; otherwise the first participant on the
  * board of the same kind, name and tier is the one (a board reopened holds its own join for the
  * model, under whatever number the board gave it). **An id alone is never taken for a participant**: the
- * counter that made it is the board's, so another board's `participant:3` may be another model.
+ * counter that made it is the board's, so another board's `participant:3` may be another model. `others`
+ * (`othersJoined`): participants another hand joined, never taken.
  */
-export function heldParticipant(state: SessionState, seating: Seating, was?: string): string | null {
+export function heldParticipant(state: SessionState, seating: Seating, was?: string, others?: ReadonlySet<string>): string | null {
   const is = (id: string): boolean => {
     const node = state.nodes.get(id);
+    if (others && others.has(id)) return false;
     return !!node && kindOf(state, id) === seating.kind && wordOf(node) === seating.name && node.capability === seating.capability;
   };
   if (was && state.participants.includes(was) && is(was)) return was;
@@ -50,13 +69,19 @@ export function heldParticipant(state: SessionState, seating: Seating, was?: str
 }
 
 /**
- * The participant for `seating` on this session's board: the one it already holds, else a new `join`
- * (one event, in this hand's log). Idempotent — the second call finds the first's join.
+ * The participant for `seating` on this session's board: the one it already holds — joined in this hand's own
+ * log, never another hand's (`othersJoined`) — else a new `join` (one event, in this hand's log, `seated`: written
+ * by seating, not by a hand's act, so undo never takes it back). Idempotent — the second call finds the first's join.
  */
 export function seatOn(session: Session, seating: Seating, was: string | undefined, at: number): string {
-  const held = heldParticipant(session.getState(), seating, was);
+  const held = heldParticipant(session.getState(), seating, was, othersJoined(session.getEvents()));
   if (held) return held;
-  return session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
+  return session.join(seating.kind, seating.name, at, seating.capability, seating.locality, { seated: true });
+}
+
+/** The participant a lazily made seat starts from: this board's own join for it, never another hand's, or ''. */
+export function ownParticipant(session: Session, seating: Seating): string {
+  return heldParticipant(session.getState(), seating, undefined, othersJoined(session.getEvents())) ?? '';
 }
 
 /** What `localityOf` says of a node, for a surface that reads a participant it did not make. */
