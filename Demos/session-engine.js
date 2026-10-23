@@ -854,11 +854,14 @@
     semantic: { job: 'notes like this, and search beyond the word typed — on this device, nothing sent anywhere', needs: 'a small model that runs here' },
   };
 
-  /** What a seat does when nothing is chosen for it, in one sentence. `o.house`: dyna.ink's own decider may be seated here. */
+  /** What a seat does when nothing is chosen for it, in one sentence. `o.house`: dyna.ink's own decider may be seated here; `o.letGo`: dyna.ink's own was let go from it. */
   function fallbackWords(seat, o) {
     // `o.house`: dyna.ink's own writer or reader is seated here (the house answered), and was not let go.
     if (o && o.house && seat === 'reader') return 'nothing of yours chosen — dyna.ink’s own reader reads, with no key; Claude Code seated, or a model of yours that sees, reads instead';
     if (o && o.house && seat === 'writer') return 'nothing of yours chosen — dyna.ink’s own writer writes, with no key; a model you join, or Claude Code seated, writes instead';
+    // `o.letGo`: the person let dyna.ink's own go from this seat — nothing of it is sent there, its writer included.
+    if (o && o.letGo && seat === 'reader') return 'nothing is read by dyna.ink, and no picture of the ink is sent there — Claude Code reads while it is seated, else a model of yours that sees; with none, a read is kept for one';
+    if (o && o.letGo && seat === 'writer') return 'nothing is written by dyna.ink — a model of yours writes, and Claude Code first while it is seated; with none, an ask is kept for one';
     switch (seat) {
       case 'reader': return 'nothing chosen — Claude Code reads while it is seated, else the writer if it sees, else the smallest joined model that sees';
       case 'writer': return 'nothing chosen — every joined model that holds no other seat is asked, and Claude Code first while it is seated';
@@ -3118,7 +3121,7 @@
     leaveHouse(seat);
     seatPicks[seat] = { none: true };
     saveSeats();
-    mpStatus.textContent = 'No ' + HOUSE_SEATS[seat].name + ' — ' + fallbackWords(seat) + '.';
+    mpStatus.textContent = 'No ' + HOUSE_SEATS[seat].name + ' — ' + fallbackWords(seat, { letGo: true }) + '.';
     renderSeats();
   }
 
@@ -3282,7 +3285,7 @@
         if (held) { who = agentWords(held); call = callOf(agentKey(held)); }
         else if (houseAsked) { who = houseWords(seat); note = houseSends(seat); call = callOf(agentKey(house)); }
         else if (house) { who = 'nothing chosen'; note = (names(now) ? 'now: ' + names(now) + ' — ' : '') + houseWaits(seat); }
-        else { who = 'nothing chosen'; note = fallbackWords(seat) + (names(now) ? ' — now: ' + names(now) : ''); }
+        else { who = 'nothing chosen'; note = fallbackWords(seat, { letGo: !!(seatPicks[seat] && seatPicks[seat].none) }) + (names(now) ? ' — now: ' + names(now) : ''); }
       }
       html += '<div class="seatRow" data-seat="' + seat + '"><div class="seatHead"><b>' + seat + '</b><span class="seatJob">' + esc(w.job) + '</span></div>' +
         (body ? '<div class="seatBody">' + body + '</div>' : '') +

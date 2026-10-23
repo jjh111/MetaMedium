@@ -516,7 +516,7 @@
     leaveHouse(seat);
     seatPicks[seat] = { none: true };
     saveSeats();
-    mpStatus.textContent = 'No ' + HOUSE_SEATS[seat].name + ' — ' + fallbackWords(seat) + '.';
+    mpStatus.textContent = 'No ' + HOUSE_SEATS[seat].name + ' — ' + fallbackWords(seat, { letGo: true }) + '.';
     renderSeats();
   }
 
@@ -680,7 +680,7 @@
         if (held) { who = agentWords(held); call = callOf(agentKey(held)); }
         else if (houseAsked) { who = houseWords(seat); note = houseSends(seat); call = callOf(agentKey(house)); }
         else if (house) { who = 'nothing chosen'; note = (names(now) ? 'now: ' + names(now) + ' — ' : '') + houseWaits(seat); }
-        else { who = 'nothing chosen'; note = fallbackWords(seat) + (names(now) ? ' — now: ' + names(now) : ''); }
+        else { who = 'nothing chosen'; note = fallbackWords(seat, { letGo: !!(seatPicks[seat] && seatPicks[seat].none) }) + (names(now) ? ' — now: ' + names(now) : ''); }
       }
       html += '<div class="seatRow" data-seat="' + seat + '"><div class="seatHead"><b>' + seat + '</b><span class="seatJob">' + esc(w.job) + '</span></div>' +
         (body ? '<div class="seatBody">' + body + '</div>' : '') +

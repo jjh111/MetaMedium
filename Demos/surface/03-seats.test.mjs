@@ -368,3 +368,10 @@ test('what dyna.ink’s own could not do just now is said in the relay’s own w
   assert.match(S.houseCannotWords('could not reach relay.dyna.ink — offline, …'), /could not be reached/);
   for (const e of ['HTTP 429 — rate limited', 'HTTP 503 — x', 'timed out — y', 'could not reach z']) assert.doesNotMatch(S.houseCannotWords(e), /HTTP|\d{3}/, e);
 });
+
+test('dyna.ink’s own let go from a seat is said so: nothing of the ink goes there, and what reads or writes instead', () => {
+  assert.match(S.fallbackWords('reader', { letGo: true }), /no picture of the ink is sent there/);
+  assert.doesNotMatch(S.fallbackWords('reader', { letGo: true }), /the writer if it sees/, 'never "the writer", which a person reads as dyna.ink’s writer standing there');
+  assert.match(S.fallbackWords('writer', { letGo: true }), /nothing is written by dyna\.ink/);
+  assert.equal(S.fallbackWords('reader'), S.fallbackWords('reader', { letGo: false }));
+});
