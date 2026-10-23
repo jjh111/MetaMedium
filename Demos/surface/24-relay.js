@@ -1,9 +1,10 @@
 // ===== relay =====
 // Provides: where a room's relay is and what a room's address carries — the pure half: CLAUDE_RELAY_LOCAL and
 //   CLAUDE_RELAY_HOSTED (the two addresses), roomRelayFor (the relay a page shares a board through, from the
-//   hostname it is served from — the hosted one on dyna.ink, else the one on this machine), claudeRelayFor (the
-//   same, for *with Claude*; PLAN-IPAD-NOTES A2), ownRelay (whether an address is the product's own relay),
-//   onThisMachine, relayFromAddress (whether a page may take the relay its address names); and an invite
+//   hostname it is served from — the hosted one on every address the app is published at, else the one on this
+//   machine), claudeRelayFor (for *with Claude*: the hosted one on dyna.ink only; PLAN-IPAD-NOTES A2), ownRelay
+//   (whether an address is the product's own relay), onThisMachine, relayFromAddress (whether a page may take the
+//   relay its address names); and an invite
 //   (the rooms lane, MU-1/MU-2): inviteLink (the link a person sends), inviteOf (what a page's address says
 //   of a room — the room, the relay, the key from the fragment or an old link's query, whether it came by an
 //   invite), roomSearch / roomHash (the address a page in a room keeps, so a reload rejoins), withoutKey (a
@@ -17,12 +18,14 @@
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
 //
-// On the dyna.ink origin a room's relay — the one *Share this board* opens a room on, and the one *with
-// Claude* looks for — is the hosted relay, https://relay.dyna.ink (cloudflare/README.md): a person on an iPad
-// has no relay on the device. Everywhere else — this machine, the GitHub Pages address, a file — it is the
-// relay on this machine, as it always was. A relay typed into the pane always wins; one named in a page's
-// address (`?relay=`) is taken only where it cannot send the page's ink somewhere unasked: the page is on this
-// machine, the relay is, or it is the product's own.
+// Where the app is published — dyna.ink and its subdomains, and the GitHub Pages address it has until dyna.ink is
+// the address — the relay *Share this board* opens a room on is the hosted relay, https://relay.dyna.ink
+// (cloudflare/README.md, which serves those origins): a person on an iPad has no relay on the device. Everywhere
+// else — this machine, a file, a page served across a network at home — it is the relay on this machine, as it
+// always was. *With Claude* looks for the hosted relay on dyna.ink only (A2), the local one elsewhere, where the
+// Claude Code hand runs. A relay typed into the pane always wins; one named in a page's address (`?relay=`) is
+// taken only where it cannot send the page's ink somewhere unasked: the page is on this machine, the relay is, the
+// relay is on the very host the page came from, or it is the product's own.
 //
 // THE KEY TRAVELS ONLY IN THE FRAGMENT. A room on a relay that keeps keys has one (the HMAC of its name under a
 // secret only the relay holds); an invite carries it after `#key=`, which no browser sends to any server and no
@@ -32,14 +35,19 @@
   const CLAUDE_RELAY_LOCAL = 'http://127.0.0.1:8020';
   const CLAUDE_RELAY_HOSTED = 'https://relay.dyna.ink';
 
-  /** The relay a page served from `hostname` opens and joins rooms through: the hosted one on dyna.ink and its subdomains, else the one on this machine. */
+  /** A hostname as one compares it: lower case, no trailing dot; '' for what is not text. */
+  const hostOf = (hostname) => (typeof hostname === 'string' ? hostname.trim().toLowerCase().replace(/\.$/, '') : '');
+  const onDynaInk = (host) => host === 'dyna.ink' || host.endsWith('.dyna.ink');
+  /** The app's GitHub Pages address, which the hosted relay serves until dyna.ink is the address (cloudflare/relay/src/http.mjs, ORIGINS). */
+  const PAGES_HOST = 'jjh111.github.io';
+
+  /** The relay a page served from `hostname` opens and joins rooms through: the hosted one where the app is published, else the one on this machine. */
   function roomRelayFor(hostname) {
-    if (typeof hostname !== 'string') return CLAUDE_RELAY_LOCAL;
-    const host = hostname.trim().toLowerCase().replace(/\.$/, '');
-    return host === 'dyna.ink' || host.endsWith('.dyna.ink') ? CLAUDE_RELAY_HOSTED : CLAUDE_RELAY_LOCAL;
+    const host = hostOf(hostname);
+    return onDynaInk(host) || host === PAGES_HOST ? CLAUDE_RELAY_HOSTED : CLAUDE_RELAY_LOCAL;
   }
-  /** The relay *with Claude* defaults to: the room's relay, by the same rule. */
-  function claudeRelayFor(hostname) { return roomRelayFor(hostname); }
+  /** The relay *with Claude* defaults to: the hosted one on dyna.ink, else the one on this machine — where a Claude Code hand runs (A2). */
+  function claudeRelayFor(hostname) { return onDynaInk(hostOf(hostname)) ? CLAUDE_RELAY_HOSTED : CLAUDE_RELAY_LOCAL; }
 
   /** Whether a hostname is this machine: localhost, 127.x.x.x, [::1]. */
   function onThisMachine(hostname) {
@@ -50,8 +58,10 @@
 
   /**
    * The relay a page's address names (`?relay=`), when the page may take it: the page is on this machine (a person
-   * developing, the gate), the relay is (a room on this machine, as `?live=claude&relay=http://127.0.0.1:8020`), or
-   * it is the product's own. Else null — an invite cannot send a page on dyna.ink to a relay of someone's choosing.
+   * developing, the gate), the relay is (a room on this machine, as `?live=claude&relay=http://127.0.0.1:8020`), the
+   * relay is on the host the page itself came from (two machines at home: `http://<host>:8020` beside the page served
+   * from `<host>`), or it is the product's own. Else null — an invite cannot send a page on dyna.ink to a relay of
+   * someone's choosing.
    */
   function relayFromAddress(pageHost, given) {
     if (typeof given !== 'string' || !given.trim()) return null;
@@ -60,7 +70,8 @@
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
     if (u.username || u.password || u.search || u.hash) return null;
     const relay = (u.protocol + '//' + u.host + u.pathname).replace(/\/+$/, '');
-    if (onThisMachine(pageHost) || onThisMachine(u.hostname) || ownRelay(relay)) return relay;
+    const page = hostOf(pageHost);
+    if (onThisMachine(pageHost) || onThisMachine(u.hostname) || (page && hostOf(u.hostname) === page) || ownRelay(relay)) return relay;
     return null;
   }
 

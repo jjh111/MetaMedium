@@ -11,13 +11,16 @@
 //   B         opens the link in a fresh context, is asked "Your name in this room", types fern, and sees ann's box;
 //             fern draws, and ann sees it in fern's colour with fern in the bar; fern's undo takes back only hers;
 //   A         reloads, and is back in the room with nothing doubled;
-//   B         goes offline, draws, comes back online — and ann has the mark;
+//   B         goes offline, draws, is refused Leave in words (it would lose the mark), comes back online — and ann has
+//             the mark at once;
 //   a stranger with the key forges a whole log in ann's name (the relay refuses it: 409) and an empty copy of her
 //             earlier log (fern's board refuses it: a copy may only add) — ann's box stands on fern's board;
 //   C (cleo)  pastes the invite into the pane's Join with a board of her own on screen: she is in the room and her
 //             board did not come in; she leaves, and her board is back;
-//   D         opens the link with a wrong key, and is told so;
-//   fern      saves a copy of the room to her boards, and it opens as a board of her own;
+//   D         opens the link with a wrong key, and is told so in the words of someone who clicked a link;
+//   a guest   with no name who puts the name prompt away and reloads is asked again, and an empty room is said to be;
+//   fern      saves a copy of the room to her boards, and it opens as a board of her own; shared again, every mark on it
+//             goes in — ann's as ann's — and a guest of the new room sees them all;
 //   a board   too big to carry is said before anything is sent, with the way to share an empty one;
 //   and the key is in no storage, no cache, no export, no text on the page and no address a request went to.
 
@@ -103,7 +106,7 @@ export async function runRoom(browser, servers, ctx) {
     await page.click('#liveBtn');
     await page.waitForFunction(() => !document.getElementById('livePanel').hasAttribute('hidden'), null, { timeout: 5000 });
   };
-  let A = null, B = null, C = null, D = null, E = null;
+  let A = null, B = null, C = null, D = null, E = null, G = null, H = null;
   let invite = '';
   let key = '';
   let roomName = '';
@@ -146,16 +149,19 @@ export async function runRoom(browser, servers, ctx) {
       await waitReady(B.page);
       const asked = await until(B.page, () => { const p = document.getElementById('namePanel'); return p && !p.hasAttribute('hidden'); }, null, 10000);
       const prompt = await B.page.evaluate(() => ({ label: (document.querySelector('#namePanel .nmLabel') || {}).textContent || '', inRoom: window.__mm.room().inRoom }));
+      const blank = await B.page.evaluate(() => getComputedStyle(document.getElementById('nameSwatch')).backgroundColor);
       await B.page.fill('#nameInput', 'fern');
       const swatch = await B.page.evaluate(() => getComputedStyle(document.getElementById('nameSwatch')).backgroundColor);
+      // The colour her marks will be drawn in, as the page draws it (normalised through an element, as the bar's dots are).
+      const fernHue = await B.page.evaluate(() => { const d = document.createElement('i'); document.body.appendChild(d); d.style.background = window.__mm.handColour('fern'); const c = getComputedStyle(d).backgroundColor; d.remove(); return c; });
       await B.page.press('#nameInput', 'Enter');
       const joined = await until(B.page, () => window.__mm.room().inRoom && window.__mm.session.getState().contentIds.length === 1);
       const st = await room(B.page);
       const marks = await strokes(B.page);
       const addr = await B.page.evaluate(() => location.search);
       check(`R2. fern opens the link in a browser of her own: asked “${prompt.label.trim()}” before joining (the colour her name draws in beside it: ${swatch}), joins as fern, and sees ann's box — ann's, not hers`,
-        asked && /Your name in this room/.test(prompt.label) && !prompt.inRoom && /rgb/.test(swatch) && joined && /^fern~/.test(st.me) && marks.length === 1 && /hand:ann[~_]/.test(marks[0].by) && !addr.includes(key),
-        { prompt, st, marks, addr: addr.replace(key, '<key>') });
+        asked && /Your name in this room/.test(prompt.label) && !prompt.inRoom && swatch === fernHue && swatch !== blank && joined && /^fern~/.test(st.me) && marks.length === 1 && /hand:ann[~_]/.test(marks[0].by) && !addr.includes(key),
+        { prompt, st, marks, swatch, fernHue, blank, addr: addr.replace(key, '<key>') });
     });
 
     // ---- R3. fern draws; ann sees it in fern's colour, and fern in the bar ----------------------------------------------
@@ -173,13 +179,18 @@ export async function runRoom(browser, servers, ctx) {
         landed && !!fernsMark && fernsMark.colour === fernColour && bar && dots.length === 2 && dots.includes(chipColour), { marks, fernColour, dots });
     });
 
-    // ---- R4. fern's undo takes back only hers -------------------------------------------------------------------------
+    // ---- R4. fern's undo takes back only hers — ann drew after her, so the board's last act is ann's -----------------
     await record('R4', async () => {
+      await waitReady(A.page);
+      await draw(A.page);
+      const both = await until(B.page, () => window.__mm.session.getState().contentIds.length === 3);
       await B.page.click('#undoBtn');
-      const onA = await until(A.page, () => window.__mm.session.getState().contentIds.length === 1);
+      const onA = await until(A.page, () => window.__mm.session.getState().contentIds.length === 2);
+      await sleep(300);
       const a = await strokes(A.page), b = await strokes(B.page);
-      check(`R4. fern's undo takes back fern's box and only hers: ann's box stands on both boards`,
-        onA && a.length === 1 && /hand:ann[~_]|participant:local|^$/.test(a[0].by) && b.length === 1 && /hand:ann[~_]/.test(b[0].by), { a, b });
+      const annsOnB = b.filter((m) => /hand:ann[~_]/.test(m.by)).length;
+      check(`R4. ann draws a second box after fern's, so the board's last act is ann's — and fern's undo takes back fern's box and only hers: ann's two boxes stand on both boards`,
+        both && onA && a.length === 2 && a.every((m) => !/fern/.test(m.by)) && b.length === 2 && annsOnB === 2, { a, b });
     });
 
     // ---- R5. ann reloads, and is back in the room with nothing doubled --------------------------------------------------
@@ -191,7 +202,7 @@ export async function runRoom(browser, servers, ctx) {
       A.context.on('request', onReq);
       await A.page.reload({ waitUntil: 'load' });
       await waitReady(A.page);
-      const back = await until(A.page, () => window.__mm.room().inRoom && window.__mm.session.getState().contentIds.length >= 1);
+      const back = await until(A.page, () => window.__mm.room().inRoom && window.__mm.session.getState().contentIds.length >= 2);
       await sleep(600);
       const st = await room(A.page);
       const marks = await strokes(A.page);
@@ -200,24 +211,43 @@ export async function runRoom(browser, servers, ctx) {
       // browser's: here the gate's own request routing, its model guard, cancels a routed request with its page; a page with
       // no routing in front of it delivers it, which was checked by hand against this relay.)
       const bye = posted.some((v) => v.includes('"bye":true') && v.includes(annBefore));
-      check(`R5. ann reloads: back in the room at once (no name asked — hers is kept), a new sitting (${annBefore} → ${st.me}), her box once, not twice — and the sitting that went said goodbye as it went (${bye})`,
-        back && !prompted && st.room === roomName && st.keyed && st.me !== annBefore && /^ann~/.test(st.me) && marks.length === 1 && bye, { st, marks, bye, posted });
+      check(`R5. ann reloads: back in the room at once (no name asked — hers is kept), a new sitting (${annBefore} → ${st.me}), her two boxes once each, not twice — and the sitting that went said goodbye as it went (${bye})`,
+        back && !prompted && st.room === roomName && st.keyed && st.me !== annBefore && /^ann~/.test(st.me) && marks.length === 2 && bye, { st, marks, bye, posted });
       A.context.off('request', onReq);
     });
 
-    // ---- R6. fern goes offline, draws, comes back: ann has the mark -----------------------------------------------------
+    // ---- R6. fern goes offline, draws, tries to leave, comes back: Leave is refused in words, and ann has the mark ------
     await record('R6', async () => {
       await B.context.setOffline(true);
       await sleep(300);
       await draw(B.page);
       const kept = await until(B.page, () => window.__mm.room().unsent > 0, null, 15000);
-      const toldB = await until(B.page, () => /not reaching the room/.test(document.getElementById('status').textContent || ''), null, 15000);
-      const stillOne = (await strokes(A.page)).length === 1;
+      const toldB = await until(B.page, () => /not reaching the room — what you draw is held on this page/.test(document.getElementById('status').textContent || ''), null, 15000);
+      const stillTwo = (await strokes(A.page)).length === 2;
+      // Leave, offline: refused — what she drew is on this page alone — with the way to leave anyway.
+      await openPane(B.page);
+      await B.page.click('#liveLeave');
+      const refused = await until(B.page, () => /has not reached it — it is on this page alone, and leaving now loses it/.test(document.getElementById('liveStatus').textContent || '')
+        && !document.getElementById('liveLeaveRow').hidden, null, 10000);
+      const stillIn = (await room(B.page)).inRoom;
+      // Back online right after a try of the backoff failed, so its next try is seconds away: it goes at once all the same.
+      let failures = 0;
+      const onFail = (r) => { if (r.method() === 'POST' && r.url().includes('/events')) failures++; };
+      B.context.on('requestfailed', onFail);
+      const before = failures;
+      const end = Date.now() + 20000;
+      while (failures === before && Date.now() < end) await sleep(100);
+      const tried = failures > before;
+      await sleep(400);
+      B.context.off('requestfailed', onFail);
       await B.context.setOffline(false);
-      const landed = await until(A.page, () => window.__mm.session.getState().contentIds.length === 2, null, 30000);
+      const back = Date.now();
+      const landed = await until(A.page, () => window.__mm.session.getState().contentIds.length === 3, null, 30000);
+      const took = Date.now() - back;
       const sent = await until(B.page, () => window.__mm.room().unsent === 0 && !window.__mm.room().notices.some((n) => /not reaching/.test(n)), null, 15000);
-      check(`R6. fern goes offline and draws: her page keeps the mark and says so; back online, it is sent, and ann has it — nothing lost on the wire`,
-        kept && toldB && stillOne && landed && sent, { b: await room(B.page) });
+      await B.page.evaluate(() => { document.getElementById('liveLeaveRow').hidden = true; });
+      check(`R6. fern goes offline and draws: her page holds the mark and says so; Leave is refused in words (“…leaving now loses it”) with “Leave anyway” beside it; back online it goes at once (${took} ms, before the backoff's next try), and ann has it — nothing lost on the wire`,
+        kept && toldB && stillTwo && refused && stillIn && tried && landed && took < 1500 && sent, { b: await room(B.page), took, tried });
     });
 
     // ---- R7. a forged line in ann's name is refused, and ann's ink stands ----------------------------------------------
@@ -231,8 +261,8 @@ export async function runRoom(browser, servers, ctx) {
       await sleep(800);
       const b = await strokes(B.page), a = await strokes(A.page);
       const told = (await room(B.page)).notices;
-      check(`R7. a stranger with the key forges an empty whole log in ann's name — the relay refuses it (${own.status}: “${ownWords}”) — and an empty copy of her earlier log under its own (${copy.status}): fern's board refuses that, says so, and ann's box stands on both boards`,
-        own.status === 409 && copy.status === 204 && b.filter((m) => /hand:ann[~_]/.test(m.by)).length === 1 && a.length === 2 && told.some((n) => /a copy of ann’s marks that would have taken some away was refused/.test(n)), { a, b, told });
+      check(`R7. a stranger with the key forges an empty whole log in ann's name — the relay refuses it (${own.status}: “${ownWords}”) — and an empty copy of her earlier log under its own (${copy.status}): fern's board refuses that, says so, and ann's boxes stand on both boards`,
+        own.status === 409 && copy.status === 204 && b.filter((m) => /hand:ann[~_]/.test(m.by)).length === 2 && a.length === 3 && told.some((n) => /a copy of ann’s marks that would have taken some away was refused/.test(n)), { a, b, told });
     });
 
     // ---- R8. cleo pastes the invite into Join with a board of her own: she is in, her board did not come; she leaves ----
@@ -249,12 +279,12 @@ export async function runRoom(browser, servers, ctx) {
       await C.page.fill('#liveRoom', invite);
       await C.page.fill('#liveName', 'cleo');
       await C.page.click('#liveJoin');
-      const joined = await until(C.page, () => window.__mm.room().inRoom && window.__mm.session.getState().contentIds.length === 2);
+      const joined = await until(C.page, () => window.__mm.room().inRoom && window.__mm.session.getState().contentIds.length === 3);
       await sleep(500);
       const onA = (await strokes(A.page)).length;
       const marks = await strokes(C.page);
-      check(`R8. cleo, with a box of her own on screen, pastes the invite into the pane's Join: she is in the room as cleo, sees its two marks, and her box did not come in with her (ann still holds ${onA})`,
-        joined && marks.length === 2 && marks.every((m) => !/cleo/.test(m.by)) && onA === 2 && /^cleo~/.test((await room(C.page)).me), { marks, onA });
+      check(`R8. cleo, with a box of her own on screen, pastes the invite into the pane's Join: she is in the room as cleo, sees its three marks, and her box did not come in with her (ann still holds ${onA})`,
+        joined && marks.length === 3 && marks.every((m) => !/cleo/.test(m.by)) && onA === 3 && /^cleo~/.test((await room(C.page)).me), { marks, onA });
       await C.page.evaluate(() => window.__mm.leaveRoom());
       await C.page.waitForLoadState('load');
       await waitReady(C.page);
@@ -271,9 +301,36 @@ export async function runRoom(browser, servers, ctx) {
       const wrong = invite.replace(/#key=.*$/, '#key=' + 'W'.repeat(43));
       await D.page.goto(wrong, { waitUntil: 'load', timeout: 60000 });
       await waitReady(D.page);
-      const said = await until(D.page, () => /does not take this key for this room/.test(document.getElementById('status').textContent || ''), null, 15000);
+      const said = await until(D.page, () => /this invite link does not open the room — ask whoever sent it for a new link/.test(document.getElementById('status').textContent || ''), null, 15000);
       const text = await statusText(D.page);
-      check(`R9. a link with a wrong key is refused, and the page says so in words: “${text.slice(0, 120)}”`, said && !text.includes('W'.repeat(43)), { text });
+      check(`R9. a link with a wrong key is refused, and the page says so in the words of someone who clicked a link: “${text.slice(0, 120)}”`, said && !text.includes('W'.repeat(43)) && !/relay|key/.test(text.replace(/invite link/, '')), { text });
+    });
+
+    // ---- R9b. a guest with no name who puts the prompt away and reloads is asked again — never joins as "hand" — and an
+    //      empty room a link opens is said to be empty, with why it may be ----------------------------------------------
+    await record('R9b', async () => {
+      H = await contextOf(browser, freshContext, servers, relay, 'room-anon');
+      guardsList.push(H.guards);
+      const made = await (await fetch(`${relay.url}/rooms`, { method: 'POST' })).json();
+      H.page = await H.context.newPage();
+      const link = `${app}?live=${encodeURIComponent(made.room)}&relay=${encodeURIComponent(relay.url)}#key=${encodeURIComponent(made.key)}`;
+      await H.page.goto(link, { waitUntil: 'load', timeout: 60000 });
+      await waitReady(H.page);
+      const shown = () => until(H.page, () => { const p = document.getElementById('namePanel'); return p && !p.hasAttribute('hidden'); }, null, 10000);
+      const first = await shown();
+      await H.page.click('#namePanel .paneClose');
+      const away = await until(H.page, () => document.getElementById('namePanel').hasAttribute('hidden'), null, 5000);
+      await H.page.reload({ waitUntil: 'load' });
+      await waitReady(H.page);
+      const again = await shown();
+      const notIn = !(await room(H.page)).inRoom;
+      await H.page.fill('#nameInput', 'ida');
+      await H.page.press('#nameInput', 'Enter');
+      const joined = await until(H.page, () => window.__mm.room().inRoom, null, 15000);
+      const me = (await room(H.page)).me;
+      const empty = await until(H.page, () => /nothing is in this room yet — a room is forgotten 30 days after it was last used/.test(document.getElementById('status').textContent || ''), null, 15000);
+      check(`R9b. a guest with no name puts the prompt away and reloads: asked again (${first}, ${away}, ${again}), not in the room until she gives one, then in as ${me} — and the empty room is said to be empty, with why it may be`,
+        first && away && again && notIn && joined && /^ida~/.test(me) && empty, { me, status: await statusText(H.page) });
     });
 
     // ---- R10. fern saves a copy of the room to her boards, and it opens as a board of her own --------------------------
@@ -285,16 +342,31 @@ export async function runRoom(browser, servers, ctx) {
       const entry = await B.page.evaluate(() => window.__mm.boards().list.find((e) => /^Shared board/.test(e.name)));
       const errorsBefore = B.guards.pageErrors.length;
       const p2 = await B.context.newPage();
-      await p2.goto(`${app}?nosw=1&board=${encodeURIComponent(entry ? entry.id : 'none')}`, { waitUntil: 'load', timeout: 60000 });
+      await p2.goto(`${app}?nosw=1&relay=${encodeURIComponent(relay.url)}&board=${encodeURIComponent(entry ? entry.id : 'none')}`, { waitUntil: 'load', timeout: 60000 });
       await waitReady(p2);
-      await until(p2, () => window.__mm.session.getState().contentIds.length === 2, null, 10000);
+      await until(p2, () => window.__mm.session.getState().contentIds.length === 3, null, 10000);
       const opened = await p2.evaluate(() => ({ marks: window.__mm.session.getState().contentIds.length, inRoom: window.__mm.room().inRoom, name: window.__mm.boards().name, byOthers: window.__mm.session.getEvents().filter((e) => e.by).length }));
       await draw(p2);
       const drawn = await p2.evaluate(() => window.__mm.session.getState().contentIds.length);
+      check(`R10. the Live pane says who is here (${pane.who.join(', ')}) and how long the room is kept (“${pane.kept}”); fern saves a copy to her boards — “${entry && entry.name}” — and it opens as a board of her own: the room's three marks, ann's still stamped as hers, no error, and a mark drawn on it`,
+        pane.who.length >= 2 && pane.who.some((w) => /fern/.test(w)) && /kept 30 days after it was last used/.test(pane.kept) && saved && !!entry && opened.marks === 3 && !opened.inRoom && opened.byOthers > 0
+          && drawn === 4 && B.guards.pageErrors.length === errorsBefore, { pane, entry, opened, drawn });
+      // ---- R10b. that copy shared again: every mark on it goes into the new room — ann's as ann's — and a guest sees them all
+      await p2.evaluate(() => window.__mm.shareBoard());
+      const shared = await until(p2, () => window.__mm.room().inRoom, null, 15000);
+      const words = await statusText(p2);
+      const onFern = (await strokes(p2)).length;
+      const link = p2.url();
+      G = await contextOf(browser, freshContext, servers, relay, 'room-gia', { name: 'gia' });
+      guardsList.push(G.guards);
+      G.page = await G.context.newPage();
+      await G.page.goto(link, { waitUntil: 'load', timeout: 60000 });
+      await waitReady(G.page);
+      const all = await until(G.page, () => window.__mm.room().inRoom && window.__mm.session.getState().contentIds.length === 4, null, 15000);
+      const seen = await strokes(G.page);
       await p2.close();
-      check(`R10. the Live pane says who is here (${pane.who.join(', ')}) and how long the room is kept (“${pane.kept}”); fern saves a copy to her boards — “${entry && entry.name}” — and it opens as a board of her own: the room's two marks, ann's still stamped as hers, no error, and a mark drawn on it`,
-        pane.who.length >= 2 && pane.who.some((w) => /fern/.test(w)) && /kept 30 days after it was last used/.test(pane.kept) && saved && !!entry && opened.marks === 2 && !opened.inRoom && opened.byOthers > 0
-          && drawn === 3 && B.guards.pageErrors.length === errorsBefore, { pane, entry, opened, drawn });
+      check(`R10b. fern shares that copy: “${words.slice(0, 70)}” — the four marks stay on her screen, and a guest of the new room sees all four, ann's still ann's`,
+        shared && /this board is shared — 4 marks went into the room/.test(words) && onFern === 4 && all && seen.length === 4 && seen.filter((m) => /hand:ann[~_]/.test(m.by)).length === 2, { words, onFern, seen });
     });
 
     // ---- R11. a board too big to carry is said before anything is sent ---------------------------------------------------
@@ -340,7 +412,7 @@ export async function runRoom(browser, servers, ctx) {
   } catch (err) {
     check(`the scenario itself fell over: ${String(err && err.message ? err.message : err).split('\n')[0]}`, false, { stack: String(err && err.stack) });
   } finally {
-    if (steps.some((s) => !s.ok)) for (const [n, c] of [['ann', A], ['fern', B], ['cleo', C], ['dan', D], ['big', E]]) if (c && c.page && !c.page.isClosed()) await screenshot(c.page, 'room-' + n).catch(() => {});
+    if (steps.some((s) => !s.ok)) for (const [n, c] of [['ann', A], ['fern', B], ['cleo', C], ['dan', D], ['big', E], ['gia', G], ['ida', H]]) if (c && c.page && !c.page.isClosed()) await screenshot(c.page, 'room-' + n).catch(() => {});
     await relay.close().catch(() => {});
   }
   return { steps, guards: guardsList };

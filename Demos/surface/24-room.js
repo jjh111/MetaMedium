@@ -7,9 +7,11 @@
 //   joinTyped (the pane's Join: a room's name, or an invite link pasted), syncRoomChip (the chip in the bar: the room
 //   and one dot per hand heard, in its colour), liveRoomOpened (who is here followed; this hand said to be here every
 //   ROOM_BEAT_MS while the page is seen, and a goodbye when it goes), BOOT_ROOM (what the page's address said of a
-//   room as it loaded), roomKeyFor (the key this page knows for a room), roomState (for tests).
-// Uses: relay (24-relay.js: roomRelayFor, relayFromAddress, inviteLink, inviteOf, leaveSearch, roomShort, carryVerdict,
-//   idleWords), core (prefs, params, esc, session, EMBED), ui (00-ui.js: ui.pane), folder (folder, openLive, roomAddress,
+//   room as it loaded), roomKeyFor (the key this page knows for a room), roomNotices (what the room says, as this page
+//   says it — a key refused on a page that came by an invite is the link's), roomNotSent (what this hand drew that the
+//   room has not taken yet: leaving now would lose it), roomState (for tests).
+// Uses: relay (24-relay.js: roomRelayFor, relayFromAddress, onThisMachine, inviteLink, inviteOf, leaveSearch, roomShort,
+//   carryVerdict, idleWords), core (prefs, params, esc, session, EMBED), ui (00-ui.js: ui.pane), folder (folder, openLive, roomAddress,
 //   saveNow, handLabel, boards, boardsListed, openBoardsList, writeNewBoard, mintBoardId; 17-boards.js: newBoardEntry),
 //   render (handColour), input (say, flash), teach (closePanel), controls (livePanel, syncTiles, openPane).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -33,7 +35,12 @@
   const BOOT_ROOM = inviteOf(location.search, location.hash);
   let roomBeat = 0;
   let roomLeftOnHide = false;
+  /** How long a guest who came by an invite waits to hear the room before an empty one is said to be empty. */
+  const ROOM_EMPTY_MS = 6000;
+  /** How long Leave waits for what this hand drew to reach the room before it says it has not. */
+  const ROOM_LEAVE_WAIT_MS = 2500;
   const liveEls = {
+    leaveRow: document.getElementById('liveLeaveRow'), leaveAnyway: document.getElementById('liveLeaveAnyway'),
     here: document.getElementById('liveHere'), away: document.getElementById('liveAway'), name: document.getElementById('liveRoomName'),
     who: document.getElementById('liveWho'), kept: document.getElementById('liveKept'), invite: document.getElementById('liveInvite'),
     save: document.getElementById('liveSaveCopy'), leave: document.getElementById('liveLeave'), link: document.getElementById('liveLink'),
@@ -101,6 +108,8 @@
     const inRoom = inLiveRoom();
     if (liveEls.here) liveEls.here.hidden = !inRoom;
     if (liveEls.away) liveEls.away.hidden = inRoom;
+    // "Leave anyway" stands only while what this hand drew has not reached the room.
+    if (liveEls.leaveRow && !(inRoom && folder.store.unsent && folder.store.unsent())) liveEls.leaveRow.hidden = true;
     if (!inRoom) return;
     liveEls.name.textContent = (folder.relay ? 'a shared board' : 'a board between tabs on this machine') + ' · ' + roomShort(folder.name);
     liveEls.who.innerHTML = whoIsHere().map((h) => '<li><i class="hueDot" style="background:' + h.colour + '"></i>' + esc(h.label) +
@@ -120,9 +129,49 @@
     }, () => { /* said nothing: the pane says nothing of how long */ });
   }
 
+  /**
+   * What the room says about itself, as this page says it: a key the relay will not take, on a page that came by an
+   * invite, is the link's — the person clicked a link and knows of no relay or key.
+   */
+  function roomNotices() {
+    const all = folder.store && folder.store.notices ? folder.store.notices() : [];
+    if (!folder.invited) return all;
+    return all.map((n) => (/relay (does not take this key|wants a key)/.test(n) ? 'this invite link does not open the room — ask whoever sent it for a new link' : n));
+  }
+
+  /**
+   * What this hand drew that the room has not taken yet, given a moment to go: null when the room holds it all, else
+   * the sentence — it is on this page alone, and leaving the page loses it.
+   */
+  async function roomNotSent() {
+    const st = folder.store;
+    if (!st || folder.how !== 'live' || !st.unsent || !st.unsent()) return null;
+    if (st.resend) st.resend();
+    const until = Date.now() + ROOM_LEAVE_WAIT_MS;
+    while (st.unsent() && Date.now() < until) await new Promise((ok) => setTimeout(ok, 100));
+    if (!st.unsent()) return null;
+    return { words: 'what you drew since the room last answered has not reached it — it is on this page alone, and leaving now loses it; save a copy to your boards first, or leave anyway' };
+  }
+
+  /** A guest who came by an invite into a room the relay opened, and hears nothing in it: said — rooms are forgotten after a while unused. */
+  function sayIfEmpty(store) {
+    if (!folder.invited || !/^r-[A-Za-z0-9_-]{22}$/.test(folder.name)) return;
+    setTimeout(() => {
+      if (folder.store !== store || folder.how !== 'live') return;
+      const held = store.heldLogs();
+      const any = Object.keys(held).some((n) => n !== folder.me && held[n].length);
+      const someone = store.presence().some((p) => Date.now() - p.at < ROOM_HEARD_MS);
+      if (any || someone || session.getState().contentIds.length) return;
+      const d = Number(folder.idleDays);
+      const after = d >= 1 ? Math.round(d) + ' day' + (Math.round(d) === 1 ? '' : 's') : 'a short while';
+      say('nothing is in this room yet' + (d > 0 ? ' — a room is forgotten ' + after + ' after it was last used, so if this one held a board, ask whoever sent the link for a new one' : ''));
+    }, ROOM_EMPTY_MS);
+  }
+
   /** Every room this page joins: who is here followed, in the bar and the pane, and this hand said to be here while it is seen. */
   function liveRoomOpened(store) {
     learnRoomKept();
+    sayIfEmpty(store);
     store.subscribe(() => {
       syncRoomChip();
       if (livePanel && !livePanel.hasAttribute('hidden')) renderLivePane();
@@ -144,14 +193,18 @@
   addEventListener('pagehide', () => { if (inLiveRoom()) { roomLeftOnHide = true; folder.store.close(); } });
   addEventListener('pageshow', (e) => { if (e.persisted && roomLeftOnHide) location.reload(); });
 
-  /** The board on screen, as the text a room carries: how big it is. */
+  /** The board on screen, as the text a room carries — every mark on it, the other hands' too: how big it is. */
   function boardCarryChars() {
-    try { return JSON.stringify(session.getEvents().filter((e) => !e.by)).length; } catch (err) { return Infinity; }
+    try { return JSON.stringify(session.getEvents()).length; } catch (err) { return Infinity; }
   }
-  /** What a relay that would not open a room said, in words. */
-  function mintRefusal(status, words) {
+  /** What a relay that would not open a room said, in words. `relay`: where it was asked. */
+  function mintRefusal(status, words, relay) {
     const said = String(words || '').trim();
     const plain = said && said.length < 200 && !/[<>]/.test(said) ? said : '';
+    // Asked of the relay on this machine from a page that is not on it: there is none to share through from here.
+    let local = false;
+    try { local = onThisMachine(new URL(relay).hostname); } catch (err) { local = false; }
+    if (status === 0 && local && !onThisMachine(location.hostname)) return 'sharing from this address goes through a relay on this machine, and none answered — run one there, or share from the app’s own address';
     if (status === 0) return 'the relay did not answer — check the connection, and try again';
     if (status === 403 && /origin/i.test(said)) return 'this site may not use that relay to open a room';
     if (status === 404 || status === 405 || status === 501) return 'that relay does not open rooms — it is older than this page';
@@ -184,18 +237,22 @@
       try {
         res = await fetch(relay.replace(/\/+$/, '') + '/rooms', { method: 'POST', cache: 'no-store' });
         words = await res.text();
-      } catch (err) { liveSay(mintRefusal(0, ''), true); return false; }
+      } catch (err) { liveSay(mintRefusal(0, '', relay), true); return false; }
       let made = null;
       if (res.status === 201) { try { made = JSON.parse(words); } catch (err) { made = null; } }
       if (!made || typeof made.room !== 'string' || !made.room) { liveSay(res.status === 201 ? 'the relay opened a room but did not say which' : mintRefusal(res.status, words), true); return false; }
-      const marks = o.empty ? 0 : session.getState().contentIds.length;
       try {
         await openLive(made.room, { relay, key: typeof made.key === 'string' ? made.key : '', carry: !o.empty, idleDays: made.idleDays });
       } catch (err) { liveSay('could not open the room — ' + (err.message || err), true); return false; }
       syncTiles();
       renderLivePane();
       liveSay('');
-      say((o.empty ? 'an empty board is shared' : marks ? 'this board is shared — ' + marks + ' mark' + (marks === 1 ? '' : 's') + ' went into the room with you' : 'this board is shared') + '; copy the invite link to bring someone in');
+      // What went in, counted from the room's board as it now stands — less the marks of any hand a room would not
+      // carry, which stand on this page only and are said.
+      const left = folder.copiesLeft || [];
+      const marks = Math.max(0, session.getState().contentIds.length - left.reduce((n, c) => n + c.marks, 0));
+      const notCarried = left.length ? ' · ' + left.map((c) => handLabel(c.name)).join(', ') + '’s marks are too big to carry in one piece and did not go in — they stay on this page only' : '';
+      say((o.empty ? 'an empty board is shared' : marks ? 'this board is shared — ' + marks + ' mark' + (marks === 1 ? '' : 's') + ' went into the room with you' : 'this board is shared') + '; copy the invite link to bring someone in' + notCarried);
       return true;
     } finally {
       if (liveEls.share) liveEls.share.disabled = false;
@@ -232,10 +289,23 @@
     }
   }
 
-  /** Leave: what this hand has not sent goes, a goodbye, and the board opened last comes back. */
-  async function leaveLiveRoom() {
-    if (!inLiveRoom()) return;
+  /**
+   * Leave: what this hand has not sent goes, a goodbye, and the board opened last comes back. What the room has not
+   * taken yet is said first, and Leave waits for a second tap (`o.force`): leaving would lose it.
+   */
+  async function leaveLiveRoom(o) {
+    o = o || {};
+    if (!inLiveRoom()) return false;
     try { await saveNow(); } catch (err) { /* said in the line already */ }
+    if (liveEls.leaveRow) liveEls.leaveRow.hidden = true;
+    if (!o.force) {
+      const v = await roomNotSent();
+      if (v) {
+        liveSay(v.words, true);
+        if (liveEls.leaveRow) liveEls.leaveRow.hidden = false;
+        return false;
+      }
+    }
     roomLeftOnHide = true;
     folder.store.close();
     location.assign(location.pathname + leaveSearch(location.search));
@@ -289,7 +359,7 @@
     setTimeout(() => input.focus(), 0);
   }
 
-  /** Join a room with what the page is told: say where, and that joining brought nothing in. */
+  /** Join a room with what the page is told: say where, and that joining brought nothing in. `opts.invited`: it came by an invite. */
   function joinRoom(room, opts, how) {
     return openLive(room, opts).then(() => {
       syncTiles();
@@ -313,16 +383,11 @@
     } else if (inv.key || inv.invited) relay = roomRelayFor(location.hostname);
     // An old link's ?key= leaves the address at once — before a name is asked — for the fragment.
     if (inv.keyInQuery) roomAddress(inv.room, relay, inv.key);
-    const go = () => joinRoom(inv.room, relay ? { relay, key: inv.key } : {});
-    if (inv.invited && !prefs.get('hand-name', '') && arrived()) askRoomName(go);
+    const go = () => joinRoom(inv.room, relay ? { relay, key: inv.key, invited: inv.invited } : {});
+    // A guest who came by an invite with no name kept is asked one — on a reload too, after a prompt put away, or the
+    // others would see "hand". A person who has joined has a name kept, so a page reloaded in its room is not asked.
+    if (inv.invited && !prefs.get('hand-name', '')) askRoomName(go);
     else go();
-  }
-  /** Whether this page was opened, rather than reloaded or come back to: a name is asked of a guest arriving, never of a page reloaded in its room. */
-  function arrived() {
-    try {
-      const nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
-      return !nav || nav.type === 'navigate' || nav.type === 'prerender';
-    } catch (err) { return true; }
   }
 
   /** The pane's Join: a room's name typed — or an invite link pasted, which carries its room, its relay and its key. */
@@ -342,7 +407,7 @@
       if (!relay) relay = inv.relay ? relayFromAddress(location.hostname, inv.relay) || '' : (inv.key || inv.invited) ? roomRelayFor(location.hostname) : '';
       if (inv.relay && !relay) { liveSay('that link names a relay this page does not use'); return Promise.resolve(false); }
     } else key = roomKeyFor(room);
-    return joinRoom(room, relay ? { relay, key } : {});
+    return joinRoom(room, relay ? { relay, key, invited: !!(inv && inv.invited) } : {});
   }
 
   if (liveEls.share) liveEls.share.onclick = () => { shareBoard(); };
@@ -350,6 +415,7 @@
   if (liveEls.invite) liveEls.invite.onclick = () => { copyInvite(); };
   if (liveEls.save) liveEls.save.onclick = () => { saveRoomCopy(); };
   if (liveEls.leave) liveEls.leave.onclick = () => { leaveLiveRoom(); };
+  if (liveEls.leaveAnyway) liveEls.leaveAnyway.onclick = () => { leaveLiveRoom({ force: true }); };
   if (liveEls.chip) liveEls.chip.onclick = () => {
     if (livePanel.hasAttribute('hidden')) { openPane(livePanel, liveEls.chip); renderLivePane(); } else closePanel(livePanel, liveEls.chip);
   };

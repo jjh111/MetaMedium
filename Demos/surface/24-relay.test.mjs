@@ -39,7 +39,7 @@ test('a hostname is judged whole, in any case, with or without the dot a name ma
   assert.equal(A.claudeRelayFor('dyna.ink.'), 'https://relay.dyna.ink');
 });
 
-test('everywhere else it stays on this machine', () => {
+test('*with Claude* stays on this machine everywhere but dyna.ink — where a Claude Code hand runs', () => {
   assert.equal(A.CLAUDE_RELAY_LOCAL, 'http://127.0.0.1:8020');
   for (const host of ['127.0.0.1', 'localhost', '[::1]', 'jjh111.github.io', '192.168.1.20', 'example.com', '']) {
     assert.equal(A.claudeRelayFor(host), 'http://127.0.0.1:8020', host);
@@ -73,10 +73,16 @@ test('a relay address with a key in it is never judged own, so the key is never 
 
 // ----- A room anyone opens and shares (the rooms lane: MU-1, MU-2, MU-11) -----
 
-test('a page shares a board through the hosted relay on dyna.ink, and through the one on this machine everywhere else — the rule *with Claude* follows', () => {
-  for (const host of ['dyna.ink', 'www.dyna.ink', 'app.dyna.ink', 'DYNA.INK', 'dyna.ink.']) assert.equal(A.roomRelayFor(host), 'https://relay.dyna.ink', host);
-  for (const host of ['127.0.0.1', 'localhost', 'jjh111.github.io', 'notdyna.ink', 'dyna.ink.evil.com', '', undefined]) assert.equal(A.roomRelayFor(host), 'http://127.0.0.1:8020', String(host));
-  for (const host of ['dyna.ink', 'jjh111.github.io', 'localhost']) assert.equal(A.claudeRelayFor(host), A.roomRelayFor(host));
+test('a page shares a board through the hosted relay wherever the app is published — dyna.ink and the GitHub Pages address — and through the one on this machine everywhere else', () => {
+  for (const host of ['dyna.ink', 'www.dyna.ink', 'app.dyna.ink', 'DYNA.INK', 'dyna.ink.', 'jjh111.github.io', 'JJH111.GITHUB.IO']) assert.equal(A.roomRelayFor(host), 'https://relay.dyna.ink', host);
+  for (const host of ['127.0.0.1', 'localhost', 'notdyna.ink', 'dyna.ink.evil.com', 'evil.github.io', 'jjh111.github.io.evil.com', '192.168.1.20', '', undefined]) assert.equal(A.roomRelayFor(host), 'http://127.0.0.1:8020', String(host));
+  // Every published origin the hosted relay serves (cloudflare/relay/src/http.mjs) shares through it, never through this machine.
+  const http = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../cloudflare/relay/src/http.mjs'), 'utf8');
+  const origins = JSON.parse(/ORIGINS = (\[[^\]]*\])/.exec(http)[1].replace(/'/g, '"'));
+  for (const o of origins) assert.equal(A.roomRelayFor(new URL(o).hostname), 'https://relay.dyna.ink', o);
+  // *With Claude* follows it on dyna.ink, and stays on this machine on the GitHub Pages address (A2).
+  for (const host of ['dyna.ink', 'localhost']) assert.equal(A.claudeRelayFor(host), A.roomRelayFor(host));
+  assert.equal(A.claudeRelayFor('jjh111.github.io'), 'http://127.0.0.1:8020');
 });
 
 test('this machine is localhost, 127.x and [::1] — never a name that only starts like one', () => {
@@ -91,6 +97,12 @@ test('a relay named in a page\'s address is taken only where it cannot send the 
   // Any page takes a relay on this machine, and the product's own.
   assert.equal(A.relayFromAddress('jjh111.github.io', 'http://127.0.0.1:8020'), 'http://127.0.0.1:8020');
   assert.equal(A.relayFromAddress('dyna.ink', 'https://relay.dyna.ink'), 'https://relay.dyna.ink');
+  // Two machines at home: a page served from a host takes a relay on that same host — any port, in any case.
+  assert.equal(A.relayFromAddress('192.168.1.10', 'http://192.168.1.10:8020'), 'http://192.168.1.10:8020');
+  assert.equal(A.relayFromAddress('johns-mac.local', 'http://Johns-Mac.local:8020'), 'http://johns-mac.local:8020');
+  // …and not one on another host of that network, nor a host that only ends like it.
+  assert.equal(A.relayFromAddress('192.168.1.10', 'http://192.168.1.11:8020'), null);
+  assert.equal(A.relayFromAddress('mac.local', 'http://evil-mac.local:8020'), null);
   // A page on dyna.ink does not take a stranger's relay from a link, nor an address with a login, a query or a fragment in it.
   for (const r of ['https://evil.example', 'https://relay.dyna.ink.evil.example', 'https://u:p@relay.dyna.ink', 'https://relay.dyna.ink/?key=x', 'javascript:alert(1)', 'not a url', '', null]) {
     assert.equal(A.relayFromAddress('dyna.ink', r), null, String(r));
