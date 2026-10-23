@@ -206,6 +206,30 @@ describe('a join written by seating is not a hand\'s act, and is never another h
     expect(readsOf(s, a).length).toBeGreaterThan(0);
   });
 
+  it('on a board with no log name too: the undo renumbers the seated join, and the answer still lands, in its name', async () => {
+    const s = createSession();
+    const a = s.addStroke(circleStroke(300, 300, 40), 1000);
+    const stray = s.addStroke(circleStroke(600, 300, 40), 1100);
+    let release!: () => void;
+    const held: Transport = () => new Promise((ok) => { release = () => ok({ ok: true, text: JSON.stringify([{ label: 'a bubble', confidence: 0.8, reasoning: 'round' }]), model: 'stub' }); });
+    const agent = createAgentParticipant(s, local, 1200, { transport: held, lazy: true, name: 'dyna.ink writer' });
+    const asked = agent.interpret([a], 1300);
+    const joinedAs = agent.id;
+    const generation = s.getState().generation;
+    s.undo();
+    expect(s.getState().contentIds).toEqual([a]);
+    expect(s.getState().contentIds).not.toContain(stray);
+    expect(s.getState().generation).toBe(generation); // only the seated join was renumbered
+    const now = s.getState().participants.find((p) => wordOf(s.getState().nodes.get(p)!) === 'dyna.ink writer');
+    expect(now).toBeDefined();
+    expect(now).not.toBe(joinedAs);
+    release();
+    const res = await asked;
+    expect(res.ok).toBe(true);
+    expect(agent.id).toBe(now);
+    expect(readsOf(s, a).some((r) => r.endsWith(' · ' + now))).toBe(true);
+  });
+
   it('a join the hand made itself is still its act: only a seated join is passed over', () => {
     const s = createSession();
     s.setLogName('john~a1');

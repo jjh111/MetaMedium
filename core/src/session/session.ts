@@ -4432,8 +4432,13 @@ export function createSession(config: SessionConfig = DEFAULT_SESSION_CONFIG): S
     // authorship mints its ids off the replay's counter, and they may now name
     // other marks — the board is replaced for what was asked about it, as a
     // load or a merge's cut replaces it (ticks mint nothing).
+    // A seated join is passed over too: on a board with no log name it is the one thing an undo can leave standing
+    // after the act it takes back (it is no act of the hand's), and what it renumbers is only that participant —
+    // which an ask in flight finds again by what it is when it writes (`participants/agent.ts`, `me`), so its answer
+    // still lands on the marks it was asked about.
     for (let i = first + 1; i < events.length; i++) {
-      if (dropped.has(i) || events[i].type === 'tick' || mintKeyOf(events[i]) !== null) continue;
+      const ev = events[i];
+      if (dropped.has(i) || ev.type === 'tick' || (ev.type === 'join' && ev.seated) || mintKeyOf(ev) !== null) continue;
       generation++;
       break;
     }

@@ -12806,7 +12806,8 @@ function createSession(config = DEFAULT_SESSION_CONFIG) {
     const first = take[0];
     const dropped = new Set(take);
     for (let i = first + 1; i < events.length; i++) {
-      if (dropped.has(i) || events[i].type === "tick" || mintKeyOf(events[i]) !== null) continue;
+      const ev = events[i];
+      if (dropped.has(i) || ev.type === "tick" || ev.type === "join" && ev.seated || mintKeyOf(ev) !== null) continue;
       generation++;
       break;
     }
@@ -26592,6 +26593,7 @@ function createDecideParticipant(session, transport, at = 0, options = {}) {
   const seating = { kind: "agent", name, capability: tier, locality: options.locality ?? "local" };
   let id = ownParticipant(session, seating);
   const seat = (now = at) => id = seatOn(session, seating, id || void 0, now);
+  const me = () => id = heldParticipant(session.getState(), seating, id || void 0, othersJoined(session.getEvents())) ?? id;
   async function ask(questions, now, signal, shown2) {
     seat(now);
     const snapshot = session.getState().generation;
@@ -26666,7 +26668,7 @@ function createDecideParticipant(session, transport, at = 0, options = {}) {
         reasoning: row.reason
       };
       session.propose({
-        participantId: id,
+        participantId: me(),
         nodeId: targets[0],
         edges,
         reps: [rep],
@@ -30921,6 +30923,7 @@ function createAgentParticipant(session, config, at = 0, options = {}) {
   const seating = { kind: "agent", name, capability: options.tier ?? providerTier(config), locality: options.locality ?? providerLocality(config) };
   let id = options.lazy ? ownParticipant(session, seating) : session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
   const seat = (now = at) => id = seatOn(session, seating, id || void 0, now);
+  const me = () => id = heldParticipant(session.getState(), seating, id || void 0, othersJoined(session.getEvents())) ?? id;
   const staleWhy = (fallback) => session.getState().staleResult?.detail ?? fallback;
   async function interpret(nodeIds, now, signal) {
     seat(now);
@@ -30951,7 +30954,7 @@ ${question}` }
     }
     const target = targets[0];
     session.propose({
-      participantId: id,
+      participantId: me(),
       nodeId: target,
       edges: readingsToEdges(readings2, isCluster),
       at: now,
@@ -30986,7 +30989,7 @@ Question: ${q}` }
     const text = result2.text.trim();
     if (!text) return { ok: false, error: "empty answer" };
     const explanationId = session.answer({
-      participantId: id,
+      participantId: me(),
       question: q,
       text,
       aboutIds: targets,
@@ -31017,12 +31020,12 @@ Question: ${q}` }
     const inside = [];
     for (const r of reading7.roles) {
       if (r.role !== "container" || r.targets.length < 2) continue;
-      const me = idOf(r.id);
-      if (!me) continue;
+      const me2 = idOf(r.id);
+      if (!me2) continue;
       for (const c of session.read(r.targets).concepts) {
         const members = [...new Set(Object.values(c.roles ?? {}).flat())].map(idOf).filter((x) => !!x);
         const who = members.length ? members.join(", ") : r.targets.map(idOf).filter(Boolean).join(", ");
-        inside.push(`  within ${me}: ${who} read as a ${c.concept} (${c.confidence.toFixed(2)}) \u2014 ${c.reasoning}`);
+        inside.push(`  within ${me2}: ${who} read as a ${c.concept} (${c.confidence.toFixed(2)}) \u2014 ${c.reasoning}`);
       }
     }
     const brief = describeReading(reading7, { idOf }) + (inside.length ? `
@@ -31086,7 +31089,7 @@ ${brief}`, ids: planned.ids, build: planned.build };
       };
     }
     const accepted = session.attachCode({
-      participantId: id,
+      participantId: me(),
       nodeId: args.artifactId,
       code,
       language: "html",
@@ -31133,7 +31136,7 @@ ${brief}`, ids: planned.ids, build: planned.build };
     if (transcripts.length === 0) return { ok: false, transcripts: [], error: "no readable transcript in reply", raw: result2.text };
     if (args.hold !== false) {
       session.propose({
-        participantId: id,
+        participantId: me(),
         nodeId: args.nodeId,
         edges: [],
         reps: transcripts.map((t) => ({ modality: "transcript", data: { text: t.text }, confidence: t.confidence })),
@@ -31172,7 +31175,7 @@ ${brief}`, ids: planned.ids, build: planned.build };
       const each = line.ids.length > 1 && words.length === line.ids.length;
       const targets = each ? line.ids.map((nid, j) => ({ nid, reps: [{ modality: "transcript", data: { text: words[j], line: top.text }, confidence: top.confidence }] })) : [{ nid: line.nodeId, reps: readings2.map((t) => ({ modality: "transcript", data: { text: t.text }, confidence: t.confidence })) }];
       for (const t of targets) {
-        session.propose({ participantId: id, nodeId: t.nid, edges: [], reps: t.reps, at: args.at, expect: { generation } });
+        session.propose({ participantId: me(), nodeId: t.nid, edges: [], reps: t.reps, at: args.at, expect: { generation } });
         const stale = session.getState().staleResult;
         if (stale) return { ok: false, transcripts: readings2, error: stale.detail };
       }
@@ -31237,10 +31240,10 @@ The human asks: ${prompt2}` }
     for (const s of shapes) {
       const points = strokeFor(s);
       if (!points) continue;
-      const made = session.addStroke(points, at2, id, 1, { content: true });
+      const made = session.addStroke(points, at2, me(), 1, { content: true });
       ids.push(made);
       at2 += 1;
-      if (s.why) session.answer({ participantId: id, question: prompt2, text: s.why, aboutIds: [made], at: at2 });
+      if (s.why) session.answer({ participantId: me(), question: prompt2, text: s.why, aboutIds: [made], at: at2 });
       at2 += 1;
     }
     if (ids.length === 0) return { ok: false, ids: [], shapes, error: "every shape had no size", raw: result2.text };
@@ -31279,7 +31282,7 @@ The human typed: ${prompt2}` }
     const parsed = parseProgram(result2.text);
     if (!parsed) return { ok: false, error: "no program in the reply", raw: result2.text };
     if (parsed.reuse) return { ok: true, reuse: parsed.reuse, raw: result2.text };
-    const accepted = session.attachCode({ participantId: id, nodeId: args.artifactId, code: parsed.code, kind: "run", prompt: prompt2, at: args.at, expect: { generation } });
+    const accepted = session.attachCode({ participantId: me(), nodeId: args.artifactId, code: parsed.code, kind: "run", prompt: prompt2, at: args.at, expect: { generation } });
     if (!accepted) return { ok: false, error: staleWhy("the canvas did not accept the program"), raw: result2.text };
     return { ok: true, name: parsed.name, parts: parsed.parts, code: parsed.code, raw: result2.text };
   }
@@ -31291,7 +31294,7 @@ The human typed: ${prompt2}` }
     if (!state.artifacts.includes(args.nodeId)) return { ok: false, behaviour: null, via: "none", unread: [], error: "not a definition" };
     const local = parseBehaviour(words);
     if (local.unparsed.length === 0 && local.behaviour) {
-      session.behave({ nodeId: args.nodeId, behaviour: local.behaviour, participantId: id, at: args.at });
+      session.behave({ nodeId: args.nodeId, behaviour: local.behaviour, participantId: me(), at: args.at });
       return { ok: true, behaviour: local.behaviour, via: "table", unread: [] };
     }
     const names = state.artifacts.map((a) => state.nodes.get(a)).map((n2) => n2 ? getRep(n2, "word")?.data : void 0).filter((w2) => !!w2);
@@ -31308,7 +31311,7 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
       { signal: args.signal }
     );
     if (!result2.ok) {
-      if (local.behaviour) session.behave({ nodeId: args.nodeId, behaviour: local.behaviour, participantId: id, at: args.at });
+      if (local.behaviour) session.behave({ nodeId: args.nodeId, behaviour: local.behaviour, participantId: me(), at: args.at });
       return { ok: !!local.behaviour, behaviour: local.behaviour, via: local.behaviour ? "table" : "none", unread: local.unparsed, error: result2.error };
     }
     const reply = parseBehaviourReply(result2.text);
@@ -31316,7 +31319,7 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
     const terms = [...local.terms, ...reply.terms.filter((t) => !seen.has(`${t.verb}:${t.target ?? ""}`))];
     if (terms.length === 0) return { ok: false, behaviour: null, via: "none", unread: reply.unread.length ? reply.unread : local.unparsed, error: "nothing in the reply maps onto a verb", raw: result2.text };
     const behaviour = { terms, source: "model" };
-    session.behave({ nodeId: args.nodeId, behaviour, participantId: id, at: args.at });
+    session.behave({ nodeId: args.nodeId, behaviour, participantId: me(), at: args.at });
     return { ok: true, behaviour, via: "model", unread: reply.unread, raw: result2.text };
   }
   return { get id() {

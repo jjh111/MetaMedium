@@ -47,7 +47,7 @@
 
 import type { Session, ProposedEdge, ProposedRep } from '../session/session';
 import type { Capability, Locality } from '../session/nodes';
-import { ownParticipant, seatOn, type Seating } from './seated';
+import { heldParticipant, othersJoined, ownParticipant, seatOn, type Seating } from './seated';
 
 /** The outcome that means *none of these* — always offered, never inferred. */
 export const NO_MATCH = 'no-match';
@@ -399,6 +399,8 @@ export function createDecideParticipant(
   // Lazily (S4): the board's own join for this seat if it holds one, else nothing until the first ask.
   let id = ownParticipant(session, seating);
   const seat = (now: number = at): string => (id = seatOn(session, seating, id || undefined, now));
+  // Found again when a row is written: an undo may renumber a seated join on a board with no log name (agent.ts's `me`).
+  const me = (): string => (id = heldParticipant(session.getState(), seating, id || undefined, othersJoined(session.getEvents())) ?? id);
 
   async function ask(
     questions: readonly DecisionQuestion[],
@@ -492,7 +494,7 @@ export function createDecideParticipant(
         reasoning: row.reason,
       };
       session.propose({
-        participantId: id,
+        participantId: me(),
         nodeId: targets[0],
         edges,
         reps: [rep],
