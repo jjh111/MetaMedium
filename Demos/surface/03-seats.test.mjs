@@ -19,7 +19,7 @@ import { AI_CHAT_MODELS, AI_CHAT_WAIT_MS } from '../ai-protocol.mjs';
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '03-seats.js'), 'utf8');
 const S = new Function(
-  src + '\n  return { SEATS, SEAT_WORDS, resolveReaders, resolveWriters, fallbackWords, keyId, keysToKeep, migrateStored, orderChoices, seatsOfPick, pickOf, SEMANTIC_SOURCE, SEMANTIC_MAX_BYTES, semanticSourceOf, semanticNameOf, semanticWords, semanticFailed, HOUSE_DECIDE, HOUSE_MODELS, HOUSE_DECIDER_MODEL, houseDeciderFor, deciderAtBoot, deciderWords, deciderAsks, HOUSE_AI, HOUSE_SEATS, HOUSE_WAIT_MS, HOUSE_PROBE_MS, houseAiFor, houseAtBoot, houseWords, houseSends, houseWaits, houseLead, probesOnOpen };'
+  src + '\n  return { SEATS, SEAT_WORDS, resolveReaders, resolveWriters, fallbackWords, keyId, keysToKeep, migrateStored, orderChoices, seatsOfPick, pickOf, SEMANTIC_SOURCE, SEMANTIC_MAX_BYTES, semanticSourceOf, semanticNameOf, semanticWords, semanticFailed, HOUSE_DECIDE, HOUSE_MODELS, HOUSE_DECIDER_MODEL, houseDeciderFor, deciderAtBoot, deciderWords, deciderAsks, HOUSE_AI, HOUSE_SEATS, HOUSE_WAIT_MS, HOUSE_PROBE_MS, houseAiFor, houseAtBoot, houseWords, houseSends, houseWaits, houseLead, houseCannotWords, probesOnOpen };'
 )();
 
 const m = (id, o = {}) => ({ id, vision: false, seats: [], size: Infinity, claude: false, local: false, ...o });
@@ -288,7 +288,8 @@ test('dyna.ink’s own reader reads only when nothing of the person’s would: t
   assert.deepEqual(S.resolveReaders([hr(), m('w', { vision: true, seats: ['writer'] })]).who, ['w']);
   assert.deepEqual(S.resolveReaders([hr(), m('a', { vision: true, size: 9 })]).who, ['a']);
   assert.deepEqual(S.resolveReaders([hr(), m('t', { seats: ['writer'] })]).who, ['house-reader'], 'a writer of theirs that cannot see does not stand in the house’s way');
-  assert.deepEqual(S.resolveReaders([hw()]).who, ['house-writer'], 'with the reader let go, the house writer reads when it sees');
+  assert.deepEqual(S.resolveReaders([hw()]).who, [], 'with the reader let go, nothing of dyna.ink’s reads — its writer is sent no picture, whatever it can see');
+  assert.equal(S.resolveReaders([hw()]).why, 'no model that sees');
   assert.deepEqual(S.resolveReaders([hw({ vision: false })]).who, []);
 });
 
@@ -355,4 +356,15 @@ test('a seat let go of dyna.ink’s own stays let go across an old pick’s migr
 test('the pane looks for models on this machine as it opens only on a page served from this machine; on a public origin it waits to be asked', () => {
   for (const h of ['localhost', '127.0.0.1', '[::1]', '']) assert.equal(S.probesOnOpen(h), true, h);
   for (const h of ['dyna.ink', 'app.dyna.ink', 'jjh111.github.io', 'example.com', '192.168.1.4']) assert.equal(S.probesOnOpen(h), false, h);
+});
+
+test('what dyna.ink’s own could not do just now is said in the relay’s own words, never a status code', () => {
+  assert.equal(S.houseCannotWords('HTTP 429 — rate limited: “too many asks of dyna.ink’s writer and reader from here — try again in a minute”'),
+    'too many asks of dyna.ink’s writer and reader from here — try again in a minute');
+  assert.equal(S.houseCannotWords('HTTP 429 — rate limited'), 'too many asks just now — try again in a minute');
+  assert.equal(S.houseCannotWords('HTTP 504 — the provider timed out: “dyna.ink’s writer did not answer in 60 s”'), 'dyna.ink’s writer did not answer in 60 s');
+  assert.equal(S.houseCannotWords('timed out — no answer from relay.dyna.ink in 75 s'), 'it took too long to answer — try again');
+  assert.equal(S.houseCannotWords('HTTP 503 — no provider is available right now'), 'dyna.ink’s relay is not answering just now — try again soon');
+  assert.match(S.houseCannotWords('could not reach relay.dyna.ink — offline, …'), /could not be reached/);
+  for (const e of ['HTTP 429 — rate limited', 'HTTP 503 — x', 'timed out — y', 'could not reach z']) assert.doesNotMatch(S.houseCannotWords(e), /HTTP|\d{3}/, e);
 });

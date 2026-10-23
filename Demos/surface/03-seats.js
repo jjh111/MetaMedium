@@ -11,7 +11,8 @@
 //   deciderWords (what its row says), deciderAsks (when a decider is asked and what it is sent, in words); and dyna.ink's
 //   own writer and reader (the audit's UX-04): HOUSE_AI, HOUSE_SEATS and HOUSE_WAIT_MS (where they are asked and how long
 //   for), houseAiFor (whether a page may use them, and where), houseAtBoot (whether one is seated once the house answers),
-//   houseWords, houseSends, houseWaits and houseLead (what their rows and the pane's lead say, in words), and probesOnOpen (whether the
+//   houseWords, houseSends, houseWaits and houseLead (what their rows and the pane's lead say, in words), houseCannotWords (what
+//   it could not do just now, in the relay's own words), and probesOnOpen (whether the
 //   pane looks for models on this machine as it opens, or waits for the person to ask — UX-DEP-1).
 // Uses: NOTHING. Like 07-hand.js and 09-field.js, this fragment names no closure variable, touches no DOM and asks
 //   the session nothing; 04-models.js is the adapter that gathers the joined models, asks, and acts. So it loads on
@@ -29,7 +30,8 @@
 //   - A seat chosen NARROWS who is asked; a seat left alone changes nothing. That is the whole of the migration:
 //     with no seat chosen every rule here returns what the surface did before.
 //   - Fallbacks are stated, in order. Reader: the one chosen, else Claude Code while it is seated, else the writer if
-//     it sees, else the smallest model that sees, else dyna.ink's own reader. Writer: the one chosen, else every model
+//     it sees, else the smallest model that sees, else dyna.ink's own reader (only the house's READER: the house writer
+//     never reads, so a reader let go sends no picture to dyna.ink). Writer: the one chosen, else every model
 //     with no other seat — and Claude Code, while it is seated, stands first of all (J4) — else dyna.ink's own writer.
 //     dyna.ink's own (`house` on a model) is always the LAST resort: a person's own choice always wins, and a model of
 //     theirs, or Claude Code seated, is asked instead of it. Decider: dyna.ink's own where the page may use it and the
@@ -79,8 +81,8 @@
     if (writer) return { who: [writer.id], why: 'no reader seat — the writer sees' };
     const any = own.filter((m) => m.seats.length === 0).sort((a, b) => (a.size === b.size ? 0 : a.size < b.size ? -1 : 1));
     if (any.length) return { who: [any[0].id], why: 'no reader seat — the smallest model that sees' };
-    const house = seers.filter((m) => m.house);
-    const reader = house.find((m) => m.seats.includes('reader')) || house[0];
+    // Only dyna.ink's own READER reads: let it go and no picture of the ink goes to dyna.ink, whatever its writer can see.
+    const reader = seers.find((m) => m.house && m.seats.includes('reader'));
     if (reader) return { who: [reader.id], why: 'nothing of yours chosen — dyna.ink’s own reader' };
     return { who: [], why: 'no model that sees' };
   }
@@ -305,6 +307,22 @@
       line: 'What you ask — a brief and the words of the marks, or a picture of the ink to read — goes to dyna.ink’s relay, which asks Cloudflare’s models; dyna.ink keeps none of it.',
       more: 'more — bring your own model',
     };
+  }
+
+  /**
+   * What dyna.ink's own could not do just now, in the person's words, from the failure the transport said
+   * (`HTTP 429 — rate limited: “…”`, `timed out — …`, `could not reach …`): the relay's own sentence when it gave one —
+   * it is written for the person (Demos/ai-protocol.mjs, AI_WORDS) — else what kind of failure it was. Never a status
+   * code: the field and the status line say this where a model is seated and only busy, never "needs a model".
+   */
+  function houseCannotWords(error) {
+    const e = String(error || '');
+    const said = /“([^”]+)”/.exec(e);
+    if (/^HTTP 429\b/.test(e)) return said ? said[1] : 'too many asks just now — try again in a minute';
+    if (/^HTTP 50[48]\b|^HTTP 52[24]\b|^timed out/.test(e)) return said ? said[1] : 'it took too long to answer — try again';
+    if (/^HTTP 5\d\d\b/.test(e)) return said ? said[1] : 'dyna.ink’s relay is not answering just now — try again soon';
+    if (/^could not reach /.test(e)) return 'dyna.ink’s relay could not be reached — try again when you are online';
+    return e;
   }
 
   /**
