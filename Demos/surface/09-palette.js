@@ -736,6 +736,12 @@
   const FIELD_M = 8;         // the margin the field keeps off every edge
   const FIELD_TOP = 52;      // under the bar, when the usable rect cannot hold it
   let fieldAnchor = null;    // where the hand was when this field opened, on screen
+  // Where this field was put when it opened, kept while it is open (the UX pass, UX-06): placed again on every
+  // paint from its new height, it jumped 419 px between "make" and "make " as the pills changed under the hand.
+  // `edge` is the edge that stands still — its top when it opened below or beside the held marks, its bottom when
+  // it opened above them — so it grows away from what it holds. Let go only when the field would leave the screen
+  // or cover chrome (the panel, the minimap); null while no field is open.
+  let fieldKept = null;      // { x, w, edge: 'top' | 'bottom', y }: y is the edge's place on screen
 
   /** Pure: fit `size` at `want` inside `soft` if it fits there, inside `hard` otherwise. */
   function fitSpan(want, size, soft, hard) {
@@ -842,33 +848,70 @@
    * the list's own scroll height, so a list already scrolled keeps its place;
    * when the field fits, nothing is set and the stylesheet's rule stands.
    */
-  function fitFieldHeight(v, u) {
+  function fitFieldHeight(v, u, cap) {
     const list = summonEl.querySelector('.list');
     if (!list) return;
-    const room = Math.max(u.height - FIELD_M * 2, v.height - FIELD_TOP - FIELD_M);
+    // `cap`: the room a kept field has from its standing edge to the screen's (placeField).
+    const room = Math.min(Math.max(u.height - FIELD_M * 2, v.height - FIELD_TOP - FIELD_M), cap === undefined ? Infinity : cap);
     const natural = summonEl.offsetHeight - list.offsetHeight + list.scrollHeight;
     if (natural <= room) {
       if (list.classList.contains('held')) { list.classList.remove('held'); list.style.maxHeight = ''; }
       return;
     }
-    const cap = Math.max(FIELD_LIST_MIN, Math.floor(list.scrollHeight - (natural - room))) + 'px';
-    if (list.style.maxHeight !== cap) list.style.maxHeight = cap;
+    const px = Math.max(FIELD_LIST_MIN, Math.floor(list.scrollHeight - (natural - room))) + 'px';
+    if (list.style.maxHeight !== px) list.style.maxHeight = px;
     list.classList.add('held');
+  }
+
+  /**
+   * Pure: whether a field kept at `box` (`h` tall) still stands — whole on screen and off the chrome. The held
+   * marks are not chrome: a kept field grows away from them, and covering them is what moving it would do.
+   */
+  function keptFieldStands(box, h, v, chrome) {
+    const r = { left: box.x, top: box.y, right: box.x + box.w, bottom: box.y + h };
+    if (r.left < v.left + FIELD_M - 2 || r.right > v.right - FIELD_M + 2 || r.top < v.top + FIELD_M - 2 || r.bottom > v.bottom - FIELD_M + 2) return false;
+    return !chrome.some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top);
   }
 
   /** Place the field where it stands now. Touches left/top/width, and the list's height when it must scroll — NOTHING else. */
   function placeField() {
     const v = viewportRect(), u = usableViewport();
+    // Kept where it opened while that still stands (UX-06): the list scrolls in the room its standing edge leaves
+    // rather than the field moving, and only a field that would leave the screen or cover the chrome is placed again.
+    if (fieldKept) {
+      const k = fieldKept;
+      const cap = k.edge === 'top' ? v.bottom - FIELD_M - k.y : k.y - Math.max(v.top + FIELD_M, u.top + FIELD_M);
+      if (k.w <= v.width - FIELD_M * 2 && cap > FIELD_LIST_MIN) {
+        summonEl.style.width = k.w + 'px';
+        fitFieldHeight(v, u, cap);
+        const h = summonEl.offsetHeight;
+        const box = { x: k.x, y: k.edge === 'top' ? k.y : k.y - h, w: k.w };
+        if (keptFieldStands(box, h, v, [panelRect(), minimapRect()].filter(Boolean))) {
+          summonEl.style.left = box.x + 'px';
+          summonEl.style.top = box.y + 'px';
+          return box;
+        }
+      }
+      fieldKept = null;
+    }
     // Width first: the height below is whatever the content comes to at that
     // width, measured rather than assumed.
     const avoid = fieldAvoids();
     const first = fieldBox(fieldAnchor, { viewport: v, usable: u, height: 0, hand: hand, avoid: avoid });
     summonEl.style.width = first.w + 'px';
     fitFieldHeight(v, u);
-    const box = fieldBox(fieldAnchor, { viewport: v, usable: u, height: summonEl.offsetHeight, hand: hand, avoid: avoid });
+    const h = summonEl.offsetHeight;
+    const box = fieldBox(fieldAnchor, { viewport: v, usable: u, height: h, hand: hand, avoid: avoid });
     summonEl.style.left = box.x + 'px';
     summonEl.style.top = box.y + 'px';
     summonEl.style.width = box.w + 'px';
+    // Kept from here on, once it has its pills (the first placing is of an empty field): above the held marks it
+    // grows up, away from them; anywhere else its top stands.
+    if (!summonEl.querySelector('.list')) return box;
+    const s = session.getState();
+    const held = s.summon ? heldBoxOf(s.summon) : null;
+    const above = !!held && box.y + h <= held.top + 1;
+    fieldKept = { x: box.x, w: box.w, edge: above ? 'bottom' : 'top', y: above ? box.y + h : box.y };
     return box;
   }
 
@@ -880,7 +923,7 @@
 
   function renderSummon(s) {
     document.body.classList.toggle('summoning', !!s.summon);
-    if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; fieldAnchor = null; return; }
+    if (!s.summon) { summonEl.style.display = 'none'; summonEl.className = ''; shownSummonId = null; fieldAnchor = null; fieldKept = null; return; }
     const sum = s.summon;
     // The same field, rendered again: its content already stands and rebuilding
     // it would throw away the caret — but the space it stands in may have
@@ -888,6 +931,7 @@
     if (shownSummonId === sum.id) { placeField(); return; }
     shownSummonId = sum.id;
     fieldAnchor = fieldAnchorFor(sum);
+    fieldKept = null;
     paletteContext = contextFor(sum.enclosedIds);
     paletteItems = rankItems(conversionsFor(s), paletteContext);
     paletteIndex = -1;
@@ -1095,19 +1139,13 @@
   }
 
   /**
-   * The pills just rewrapped and the field grew: re-place it only if its foot
-   * has gone off the bottom. Re-placing on every keystroke would walk the
-   * field up the screen under the hand.
+   * The pills just rewrapped and the field grew: it stays where it opened, growing away from what it holds, its
+   * pills scrolling in the room a keyboard leaves (R6) — placed again only when it would leave the screen or
+   * cover the panel or the minimap (UX-06, placeField's kept place). Re-placing on every keystroke walked the
+   * field about under the hand.
    */
   function keepFieldOnScreen() {
     if (!summonEl.classList.contains('field')) return;
-    const v = viewportRect();
-    // The pills' list held to the room a keyboard leaves, or let go once they fit again (R6).
-    fitFieldHeight(v, usableViewport());
-    const r = summonEl.getBoundingClientRect();
-    // …or has grown over a card it keeps off — a model's readings landing make it taller (U1c).
-    const over = fieldAvoids().some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top);
-    if (!over && r.bottom <= v.bottom - 2 && r.right <= v.right - 2 && r.top >= v.top - 2 && r.left >= v.left - 2) return;
     placeField();
   }
 
