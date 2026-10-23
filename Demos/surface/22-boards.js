@@ -11,6 +11,7 @@
 //   holds and has left and whether it may clear it (PLAN-IPAD-NOTES I3: loadRoom, roomChanged).
 //   And carrying (RENAME-PLAN N1): *Every board out* and, where this page can carry, *Carry my boards to dyna.ink*,
 //   at the pane's foot, and the old address's notice at its head once N4 turns it on (carryEl, homeNoticeEl).
+//   exampleButtonClick — the panel's start buttons, and the first-run sheet's (27-first.js).
 // Uses: the kept index and pictures (17-find.js: finder, findLoad, findThumbCurrent, findSyncSoon — a board's picture in its row),
 //   carrying (22-carry.js: carryHere, carryOut, everyOut; 17-carry.js: carryWhere),
 //   ui (pane, chip), controls (tiles.boards, togglePanel/closePanel), boards list (boardRows,
@@ -19,7 +20,9 @@
 //   rereadBoards, boardEntryName, exportLogNow, readLogText), input (flash, say), the
 //   inspector's element (the panel's start), boards list (exampleUrl, exampleRows, exampleName, starterOf),
 //   core (params, EMBED, session), folder (boardMode), view (fitAll, fitTo), render (union, viewportWorld),
-//   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1).
+//   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1; consentedHere),
+//   inspector (isProgram), the first hour (27-first.js: motionReduced — under reduced motion the film waits for a play;
+//   restAfterOpen — an example opens fitted, nothing inspected).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -298,7 +301,13 @@
       // is dyna.ink's own, from the site's own origin, so this hand's board of
       // its own may run it without a tap (the consent gate, C1). A deliberate,
       // narrow grant, made only here; a loaded board of someone else's gets none.
-      if (made) grantPlayingPrograms();
+      if (made) {
+        grantPlayingPrograms();
+        // Unless the person asked for less motion (C4): then it waits for their own play, and the line says so.
+        if (motionReduced() && standingPrograms().length) say('the film waits for you — this device asks for less motion; open it and tap “play it here” to play it');
+        // Opened fitted to the free ground, nothing inspected until the hand points or draws (27-first.js; UX-11).
+        restAfterOpen();
+      }
       return made;
     } finally { examples.opening = false; }
   }
@@ -356,7 +365,9 @@
   }
   // The empty board's panel offers the starter in one tap, and more of them (10-inspector.js): its buttons carry no
   // data-act, so the panel's own handler never takes them for a mark's.
-  inspectorEl.addEventListener('click', async (e) => {
+  inspectorEl.addEventListener('click', (e) => exampleButtonClick(e));
+  /** The panel's start buttons, and the first-run sheet's (27-first.js): the same two acts. */
+  async function exampleButtonClick(e) {
     const b = e.target.closest && e.target.closest('button[data-example-start], button[data-example-more]');
     if (!b) return;
     if (b.hasAttribute('data-example-more')) { if (boardsPanel && boardsPanel.hasAttribute('hidden')) tiles.boards.onclick(); return; }
@@ -365,7 +376,12 @@
     if (!id) { say('the examples could not be read — this page keeps them for offline once it has been online'); return; }
     const made = await openExample(id);
     if (made) flash('“' + made.name + '” — a board of your own, made from the example; the board before stays in boards');
-  });
+  }
+  /** The programs the log says are playing that do not run here — what an example opened under reduced motion holds back. */
+  function standingPrograms() {
+    const s = session.getState();
+    return s.live.filter((id) => s.clocks[id] && s.clocks[id].playing && isProgram(s, id) && !consentedHere(id));
+  }
 
   /** The pane's own line: what just happened, or why not — with the ways out as buttons in it. */
   function paneSay(v, retry) {

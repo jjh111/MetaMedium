@@ -404,7 +404,17 @@ input.fileIn { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacit
   scrollbar-width: thin; scrollbar-color: var(--rule) transparent;
 }
 body.panelHidden #inspector { display: none; }
-#inspector .eyebrow { font-family: var(--ui); font-size: 10px; font-weight: 500; letter-spacing: 0.11em; text-transform: uppercase; color: var(--dim); margin-bottom: 8px; }
+/* Over the grid the panel stands aside: it speaks of the canvas's marks (the UX pass, UX-14). */
+body.gridView #inspector { display: none; }
+/* The first run where the panel does not stand (UX-03): the same three steps and one tap, as a small sheet at the foot of
+   the screen, over the status line, until the first stroke (27-first.js). */
+#firstRun {
+  position: absolute; left: 10px; right: 10px; bottom: 34px; margin: 0 auto; max-width: 380px; z-index: 6;
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; padding: 11px 14px 9px;
+  font-family: var(--mono); font-size: 11.5px; line-height: 1.5; box-shadow: var(--shadow); backdrop-filter: blur(8px);
+}
+#firstRun[hidden] { display: none; }
+#inspector .eyebrow, #firstRun .eyebrow { font-family: var(--ui); font-size: 10px; font-weight: 500; letter-spacing: 0.11em; text-transform: uppercase; color: var(--dim); margin-bottom: 8px; }
 #inspector .row { display: flex; gap: 8px; }
 #inspector .k { color: var(--dim); min-width: 44px; flex-shrink: 0; white-space: nowrap; }
 #inspector .v { color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -415,26 +425,26 @@ body.panelHidden #inspector { display: none; }
 #inspector .read .type { color: var(--ink); min-width: 76px; }
 #inspector .read .w { color: var(--dim); min-width: 34px; }
 #inspector .read .by { color: var(--dim); font-size: 10.5px; }
-#inspector .why { color: var(--dim); font-size: 10.5px; padding: 0 4px 0 5px; border-left: 1px solid var(--rule); margin: 1px 4px 5px 6px; line-height: 1.45; }
+#inspector .why, #firstRun .why { color: var(--dim); font-size: 10.5px; padding: 0 4px 0 5px; border-left: 1px solid var(--rule); margin: 1px 4px 5px 6px; line-height: 1.45; }
 #inspector .sep { height: 1px; background: var(--rule); margin: 9px 0; }
 #inspector .ladder .k { color: var(--gold); }
 #inspector .ladder .row + .row { margin-top: 2px; }
-#inspector button.mini {
+#inspector button.mini, #firstRun button.mini {
   pointer-events: auto; cursor: pointer; font: inherit; font-size: 10.5px;
   color: var(--gold); background: none; border: 1px solid rgba(var(--gold-rgb), 0.35);
   border-radius: 4px; padding: 1px 8px; margin: 1px 0 5px 52px;
 }
-#inspector button.mini:hover { border-color: var(--gold); }
-#inspector .acts { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 2px; }
-#inspector .acts button.mini { margin-left: 0; }
+#inspector button.mini:hover, #firstRun button.mini:hover { border-color: var(--gold); }
+#inspector .acts, #firstRun .acts { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 2px; }
+#inspector .acts button.mini, #firstRun .acts button.mini { margin-left: 0; }
 #inspector .empty { color: var(--dim); font-family: var(--ui); font-size: 12px; }
 /* UI-2: the empty board's own row — the loop that already exists, in the
    panel's plain voice. No box, no accent, no call to action: it reads as the
    panel reporting on a board with nothing on it, and the first mark replaces
    it with that mark's reading. */
-#inspector .firstLoop { margin: 2px 0 6px; padding: 0 0 0 16px; color: var(--dim); font-size: 12px; line-height: 1.55; }
-#inspector .firstLoop li { margin: 0 0 3px; }
-#inspector .firstLoop b { color: var(--ink); font-weight: 500; }
+#inspector .firstLoop, #firstRun .firstLoop { margin: 2px 0 6px; padding: 0 0 0 16px; color: var(--dim); font-size: 12px; line-height: 1.55; }
+#inspector .firstLoop li, #firstRun .firstLoop li { margin: 0 0 3px; }
+#inspector .firstLoop b, #firstRun .firstLoop b { color: var(--ink); font-weight: 500; }
 #inspector .srccount { color: var(--dim); font-weight: 400; letter-spacing: 0; }
 #inspector .gap { margin: 6px 0 4px; padding: 5px 7px; font-size: 10.5px; line-height: 1.4; color: var(--gold); border-left: 2px solid var(--gold); background: rgba(var(--gold-rgb), 0.07); }
 #inspector .srchead { display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 2px; padding-bottom: 2px; border-bottom: 1px solid var(--edge); }
@@ -611,7 +621,7 @@ body.embed.summoning #inspector { display: none; }
   #inspector { top: auto; bottom: 34px; right: 10px; left: 10px; width: auto; max-height: 34vh; font-size: 11px; }
   #cc { right: 6px; }
   #cc .ccTiles { grid-template-columns: repeat(3, 96px); }
-  .tile.wide .zoomRow { display: none; } /* pinch zooms */
+  .tile.wide .zoomRow #zoomOut, .tile.wide .zoomRow #zoomIn { display: none; } /* pinch zooms; fit stays (UX-14) */
   .pane { right: 6px; width: min(300px, calc(100vw - 12px)); }
   #summon { width: min(380px, calc(100vw - 12px)); }
   /* The panel lies along the BOTTOM here, so the field's own height is what

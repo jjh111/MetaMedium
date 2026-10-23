@@ -2098,6 +2098,9 @@
 
   function setViewMode(mode) {
     viewMode = mode;
+    // The panel speaks of the canvas's marks; over the grid it hid the first cards and its empty-board steps covered
+    // the grid's own words (the UX pass, UX-14). It stands aside while the grid shows.
+    document.body.classList.toggle('gridView', mode === 'grid');
     if (mode === 'grid') { renderGrid(session.getState()); gridEl.hidden = false; }
     else gridEl.hidden = true;
     document.getElementById('gridBtn').setAttribute('aria-pressed', String(mode === 'grid'));

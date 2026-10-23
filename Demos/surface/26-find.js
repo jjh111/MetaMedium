@@ -9,7 +9,7 @@
 //   matched is let in when the seat scores it near, each such hit said *by meaning 0.72* — and likeNotes (the field's
 //   *Notes like this*, a region's button) lists the notes nearest one thing's words across every board in this same
 //   list, each with its number and reason. With nobody in the seat none of that exists and Find is as it was.
-// Uses: ui (pane, esc), controls (openPane, closePanel, tiles), core (MM.searchBoards, describeHit, boundsOf,
+// Uses: the first hour (27-first.js: motionReduced — the ring holds still under reduced motion), ui (pane, esc), controls (openPane, closePanel, tiles), core (MM.searchBoards, describeHit, boundsOf,
 //   getRep), the session, view (fitTo, view, worldToScreen), the boards adapter (board, boards, onBoardHere,
 //   switchBoard), the kept index (finder, findBoards, findSync, findIdle, findIndexCurrent), the boards pane
 //   (rereadBoards), input (say, flash), the semantic seat (semanticHost, findSemantic, semanticNotesLike).
@@ -335,8 +335,9 @@
     g.clearRect(0, 0, innerWidth, innerHeight);
     if (t >= FIND_FLASH_MS) { ringStop(); return; }
     const a = worldToScreen(ring.box.minX, ring.box.minY), z = worldToScreen(ring.box.maxX, ring.box.maxY);
-    const pad = 10 + 4 * Math.sin(t / 160);
-    const alpha = Math.min(1, (FIND_FLASH_MS - t) / 700);
+    // It pulses and fades — unless the person asked for less motion (C4): then it stands still, and goes.
+    const pad = motionReduced() ? 10 : 10 + 4 * Math.sin(t / 160);
+    const alpha = motionReduced() ? 1 : Math.min(1, (FIND_FLASH_MS - t) / 700);
     g.lineWidth = 2.5;
     g.strokeStyle = 'rgba(' + (C ? C.goldRGB : '201,168,76') + ',' + (0.95 * alpha).toFixed(3) + ')';
     g.beginPath();

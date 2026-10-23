@@ -4784,7 +4784,9 @@
 // Uses: core, view, artifacts, snap, models, palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
 //   packs (packShort — a match chip says its pack; a pack this build lacks is said in the standing line),
 //   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet),
-//   selection (dragPreview, dragFollowers — what follows a drag is drawn where it will stand, V1-PLAN E2).
+//   selection (dragPreview, dragFollowers — what follows a drag is drawn where it will stand, V1-PLAN E2),
+//   the first hour (27-first.js: tapWords, resting, syncFirstRun, motionReduced — the standing line's word for the hand,
+//   an example opened with nothing inspected, the first-run sheet, a working dot that holds still).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -4818,9 +4820,10 @@
     if (s.summon) return 'type in the field, or tap a pill · a tap on the ground lets go';
     // One mark with its own points showing (E1): a ring reshapes its clean form.
     if (s.selection.length) return 'drag inside to move, a corner to scale, the knob to turn' + (markHandles(s).length ? ', a ring to reshape' : '') + ' · Esc lets go';
-    if (s.pendingLassoId) return 'or double-tap inside the loop';
-    if (!strokes && !s.artifacts.length) return 'draw anything · double-click empty ground to type';
-    return 'press and hold a mark to hold it · or circle marks and double-tap inside';
+    // The hand's own word (27-first.js, tapWords): a finger or a pen double-taps, a mouse double-clicks.
+    if (s.pendingLassoId) return 'or ' + tapWords() + ' inside the loop';
+    if (!strokes && !s.artifacts.length) return 'draw anything · ' + tapWords() + ' empty ground to type';
+    return 'press and hold a mark to hold it · or circle marks and ' + tapWords() + ' inside';
   }
 
   /** The last mark on the board whose box, with a little slack, holds the point — found among the few the paint's index says could. */
@@ -5696,7 +5699,8 @@
       chipHits.push({ ids: group.length ? group : [id], x: at.x, y: at.y, w: at.w, h: at.h, text: rc.text });
     }
 
-    const inspectedId = hoverId || lastContentId(s);
+    // A board opened whole inspects nothing until the hand points or draws (27-first.js, resting; UX-11).
+    const inspectedId = hoverId || (resting() ? null : lastContentId(s));
     const pv = dragPreview();
     // The connectors bound to what a drag moves, each drawn as it will stand when the hand lets go (V1-PLAN E2).
     followShown = pv ? dragFollowers() : null;
@@ -5830,6 +5834,7 @@
     syncMarkChip(s);
     renderSummon(s);
     renderInspector(s, inspectedId);
+    syncFirstRun(s);
     renderMinimap(s);
 
     // The status line: what just happened, else the standing state, in a few
@@ -5900,7 +5905,8 @@
       let x, y;
       if (boxes.length) { const b = union(boxes); x = b.minX; y = b.minY - wpx(28); }
       else { const c = screenToWorld(innerWidth / 2, 70); x = c.x; y = c.y; }
-      const r = wpx(4 + 2 * Math.sin(t * 4));
+      // It breathes — unless the person asked for less motion (C4), when it holds still.
+      const r = wpx(motionReduced() ? 5 : 4 + 2 * Math.sin(t * 4));
       ctx.beginPath(); ctx.arc(x + wpx(5), y - wpx(4), r, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(${C.goldRGB},0.85)`; ctx.fill();
       text(w.label, x + wpx(16), y, C.gold);
@@ -6895,7 +6901,8 @@
 //   artifacts (flipped), frames, packs (packShort, packSaid — how a match says its pack),
 //   clocks (definitionOf), handwriting (isWriting, isRead, readLine, readOne), images (svgOf), text
 //   (wordToText, lineToText, foldIntoText, textNear, beginTextEdit), input (say, flash, downType — which
-//   hand opened the field), hand (handOfPointer), controls (escapeStep — the field's Escape is the ladder's).
+//   hand opened the field), hand (handOfPointer), controls (escapeStep — the field's Escape is the ladder's),
+//   the first hour (27-first.js: bringIntoView — Make it Mermaid's card brought into view).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -7208,7 +7215,8 @@
     graph3d: { after: (o, scope, t) => say(!t.made ? 'could not hold that group' : t.detail.ok ? 'in 3D: ' + t.detail.reasoning : 'could not stand it in 3D: ' + t.detail.error) },
     frames: { after: (o, scope, t) => { if (o.data.act !== 'frame' || !t.made) return; const st = session.getState(); flash('framed ' + t.detail.members + ' — ' + MM.describeFrame(MM.frameOfNode(st.nodes.get(t.made)), st.nodes)); } },
     // The drawing said as Mermaid stands beside it: say so, remember which marks it was written from, and keep the field.
-    mermaid: { after: (o, scope, t) => { if (!t.made) { say(t.detail.error); return; } mermaidMadeFrom.set(t.made, scope.marks.slice()); flash('the drawing as Mermaid, beside it — ' + t.detail.reading + '; Draw it puts it back as marks'); refreshPalette(); } },
+    // The card stands beside the drawing — and is brought into view with it when it stood off screen (27-first.js; UX-13).
+    mermaid: { after: (o, scope, t) => { if (!t.made) { say(t.detail.error); return; } mermaidMadeFrom.set(t.made, scope.marks.slice()); bringIntoView(scope.marks.concat([t.made])); flash('the drawing as Mermaid, beside it — ' + t.detail.reading + '; Draw it puts it back as marks'); refreshPalette(); } },
     // A rectangle taken as a region: said, with what it holds (12-regions.js).
     region: { after: (o, scope, t) => { regionMadeSaid(t.detail); } },
     label: { after: (o, scope, t) => { const d = t.detail; if (d.done.length || d.saying.length || d.refused.length) say(labelSentence(String(o.data.word).trim(), d.done, d.saying, d.refused)); } },
@@ -8443,6 +8451,7 @@
 // Provides: the panel: a mark, an artifact, a word, the selection — what it is and what it can become
 //   in plain words first, and the inspector (ids, tiers, relations, measures) behind details, closed by
 //   default and remembered on this device (PLAN-USER-SURFACE U1a: markSummary, inspectDetails).
+// Provides too: firstLoopHtml (the empty board's steps, also the first-run sheet's, 27-first.js).
 // Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models,
 //   palette (contextFor, paletteItems, afforded — what stands beside a selection, and what it put first),
 //   packs (packSaid — a definition from a library pack says its pack).
@@ -8542,6 +8551,23 @@
     inspectorEl.innerHTML = html;
   }
 
+  /**
+   * The empty board's three steps and its one tap, in the panel's plain voice — and, where the panel does not stand,
+   * in the first-run sheet at the foot of the screen (27-first.js; the UX pass, UX-03).
+   */
+  function firstLoopHtml() {
+    return '<div class="eyebrow">nothing drawn yet</div>' +
+      '<ol class="firstLoop">' +
+      '<li><b>draw a few marks</b> — a box, a circle, a line</li>' +
+      '<li><b>press and hold one</b> — it is held with what it sits with</li>' +
+      '<li><b>choose what it becomes</b> — tap a pill, or type in the field</li>' +
+      '</ol>' +
+      // R5: the first run's one tap — a board of your own made from the starter example (22-boards.js takes it).
+      '<div class="acts"><button class="mini" type="button" data-example-start title="a new board of your own with something already drawn — the starter example, yours to draw on">start from an example</button>' +
+      '<button class="mini" type="button" data-example-more title="a flowchart, a class diagram, a molecule and a pattern page — in the boards pane">more examples</button></div>' +
+      '<div class="why">the canvas reads every mark as you draw it; a model is asked only when you ask one</div>';
+  }
+
   function renderInspector(s, id) {
     if (s.summon) return renderSummonScope(s);
     // One region selected alone: what it is and holds, in words (I5; 12-regions.js).
@@ -8557,20 +8583,14 @@
       // It is not a tour and not a mode: it is the empty state of one row, and
       // the first mark drawn replaces it with that mark's reading.
       if (!s.contentIds.length && !s.artifacts.length) {
-        showPanel('<div class="eyebrow">nothing drawn yet</div>' +
-          '<ol class="firstLoop">' +
-          '<li><b>draw a few marks</b> — a box, a circle, a line</li>' +
-          '<li><b>press and hold one</b> — it is held with what it sits with</li>' +
-          '<li><b>choose what it becomes</b> — tap a pill, or type in the field</li>' +
-          '</ol>' +
-          // R5: the first run's one tap — a board of your own made from the starter example (22-boards.js takes it).
-          '<div class="acts"><button class="mini" type="button" data-example-start title="a new board of your own with something already drawn — the starter example, yours to draw on">start from an example</button>' +
-          '<button class="mini" type="button" data-example-more title="a flowchart, a class diagram, a molecule and a pattern page — in the boards pane">more examples</button></div>' +
-          '<div class="why">the canvas reads every mark as you draw it; a model is asked only when you ask one</div>');
+        showPanel(firstLoopHtml());
         return;
       }
-      showPanel('<div class="eyebrow">mark</div>' +
-        '<div class="empty">nothing here yet</div>');
+      // A board opened whole — an example — with nothing pointed at yet (UX-11): what it holds, and how to begin.
+      const marks = s.contentIds.length - s.artifacts.length, made = s.artifacts.length;
+      showPanel('<div class="eyebrow">this board</div>' +
+        '<div class="empty">' + esc([marks ? marks + ' mark' + (marks === 1 ? '' : 's') : '', made ? made + ' thing' + (made === 1 ? '' : 's') + ' made' : ''].filter(Boolean).join(' · ')) + '</div>' +
+        '<div class="why">press and hold a mark to see what it is and what it can become — or point at one</div>');
       return;
     }
 
@@ -9361,7 +9381,8 @@
 //   with the reason), runtimeOffset, runtimeBroken, syncRuntime, the consent gate (trackConsent, consentedHere,
 //   grantPlayingPrograms — this tab runs a program only when this hand played it here, C1), frameCSP (a run or
 //   mermaid frame cannot phone out), WORKER_HARDEN (the js worker keeps only Math/performance/Function/postMessage).
-// Uses: core (session, esc), artifacts (frames, documentFor), render (render).
+// Uses: core (session, esc), artifacts (frames, documentFor), render (render), the first hour (27-first.js: motionReduced —
+//   under reduced motion an example's program is not granted, and waits for the person's own play).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -10119,6 +10140,8 @@
    * made only by the example-open path (22-boards.js), never by a load.
    */
   function grantPlayingPrograms() {
+    // A person who asked for less motion starts it themselves (C4): the program waits for their own play.
+    if (motionReduced()) return false;
     const s = session.getState();
     let any = false;
     for (const id of Object.keys(s.clocks)) {
@@ -15069,6 +15092,9 @@
 
   function setViewMode(mode) {
     viewMode = mode;
+    // The panel speaks of the canvas's marks; over the grid it hid the first cards and its empty-board steps covered
+    // the grid's own words (the UX pass, UX-14). It stands aside while the grid shows.
+    document.body.classList.toggle('gridView', mode === 'grid');
     if (mode === 'grid') { renderGrid(session.getState()); gridEl.hidden = false; }
     else gridEl.hidden = true;
     document.getElementById('gridBtn').setAttribute('aria-pressed', String(mode === 'grid'));
@@ -16166,7 +16192,7 @@
 // Provides: text as an element — typeText (a text artifact at a point), editText (a new version of one),
 //   beginTextEdit/commitTextEdit (the editor on the canvas, opened by a double-click on empty ground or
 //   from the panel), wordToText (a written word becomes a text artifact, on request), strikeOnText/foldIntoText/textNear (text folds back from ink).
-// Uses: core, view, artifacts (frames), render.
+// Uses: core, view, artifacts (frames), render, palette (minimapRect, panelRect — a new text stands clear of them, UX-15).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -16329,6 +16355,28 @@
     editorEl.style.fontSize = Math.max(11, 13 * view.zoom) + 'px';
   }
 
+  /**
+   * A new text's box, moved on screen so it stands clear of the minimap and the panel and inside the window (the UX
+   * pass, UX-15: a double-click at the lower right opened the editor over the minimap, and the text it kept ran under it
+   * and past the window's foot). It moves the least it can — left, or up — and keeps its size.
+   */
+  function clearOfChrome(b) {
+    const M = 8;
+    const a = worldToScreen(b.minX, b.minY), z = worldToScreen(b.maxX, b.maxY);
+    let x = a.x, y = a.y;
+    const w = z.x - a.x, h = z.y - a.y;
+    x = Math.min(x, innerWidth - M - w); y = Math.min(y, innerHeight - M - h);
+    for (const r of [minimapRect(), panelRect()].filter(Boolean)) {
+      if (!(x < r.right + M && x + w > r.left - M && y < r.bottom + M && y + h > r.top - M)) continue;
+      const left = r.left - M - w, up = r.top - M - h;
+      if (a.x - left <= a.y - up && left >= M) x = left; else y = Math.max(M, up);
+    }
+    x = Math.max(M, x); y = Math.max(M, y);
+    if (x === a.x && y === a.y) return b;
+    const p = screenToWorld(x, y);
+    return { minX: p.x, minY: p.y, maxX: p.x + (b.maxX - b.minX), maxY: p.y + (b.maxY - b.minY) };
+  }
+
   /** Open the editor on a text artifact, or on empty ground at a world point. */
   function beginTextEdit(id, at) {
     const s = session.getState();
@@ -16340,7 +16388,7 @@
       if (!rep || (rep.data.kind !== 'text' && rep.data.kind !== 'mermaid')) return false;
       bounds = MM.boundsOf(n); text = rep.data.code;
     } else {
-      bounds = { minX: at.x, minY: at.y, maxX: at.x + TEXT_W, maxY: at.y + TEXT_H };
+      bounds = clearOfChrome({ minX: at.x, minY: at.y, maxX: at.x + TEXT_W, maxY: at.y + TEXT_H });
     }
     editing = { id: id || null, bounds: bounds };
     editorEl.value = text;
@@ -16721,6 +16769,7 @@
 //   holds and has left and whether it may clear it (PLAN-IPAD-NOTES I3: loadRoom, roomChanged).
 //   And carrying (RENAME-PLAN N1): *Every board out* and, where this page can carry, *Carry my boards to dyna.ink*,
 //   at the pane's foot, and the old address's notice at its head once N4 turns it on (carryEl, homeNoticeEl).
+//   exampleButtonClick — the panel's start buttons, and the first-run sheet's (27-first.js).
 // Uses: the kept index and pictures (17-find.js: finder, findLoad, findThumbCurrent, findSyncSoon — a board's picture in its row),
 //   carrying (22-carry.js: carryHere, carryOut, everyOut; 17-carry.js: carryWhere),
 //   ui (pane, chip), controls (tiles.boards, togglePanel/closePanel), boards list (boardRows,
@@ -16729,7 +16778,9 @@
 //   rereadBoards, boardEntryName, exportLogNow, readLogText), input (flash, say), the
 //   inspector's element (the panel's start), boards list (exampleUrl, exampleRows, exampleName, starterOf),
 //   core (params, EMBED, session), folder (boardMode), view (fitAll, fitTo), render (union, viewportWorld),
-//   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1).
+//   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1; consentedHere),
+//   inspector (isProgram), the first hour (27-first.js: motionReduced — under reduced motion the film waits for a play;
+//   restAfterOpen — an example opens fitted, nothing inspected).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -17008,7 +17059,13 @@
       // is dyna.ink's own, from the site's own origin, so this hand's board of
       // its own may run it without a tap (the consent gate, C1). A deliberate,
       // narrow grant, made only here; a loaded board of someone else's gets none.
-      if (made) grantPlayingPrograms();
+      if (made) {
+        grantPlayingPrograms();
+        // Unless the person asked for less motion (C4): then it waits for their own play, and the line says so.
+        if (motionReduced() && standingPrograms().length) say('the film waits for you — this device asks for less motion; open it and tap “play it here” to play it');
+        // Opened fitted to the free ground, nothing inspected until the hand points or draws (27-first.js; UX-11).
+        restAfterOpen();
+      }
       return made;
     } finally { examples.opening = false; }
   }
@@ -17066,7 +17123,9 @@
   }
   // The empty board's panel offers the starter in one tap, and more of them (10-inspector.js): its buttons carry no
   // data-act, so the panel's own handler never takes them for a mark's.
-  inspectorEl.addEventListener('click', async (e) => {
+  inspectorEl.addEventListener('click', (e) => exampleButtonClick(e));
+  /** The panel's start buttons, and the first-run sheet's (27-first.js): the same two acts. */
+  async function exampleButtonClick(e) {
     const b = e.target.closest && e.target.closest('button[data-example-start], button[data-example-more]');
     if (!b) return;
     if (b.hasAttribute('data-example-more')) { if (boardsPanel && boardsPanel.hasAttribute('hidden')) tiles.boards.onclick(); return; }
@@ -17075,7 +17134,12 @@
     if (!id) { say('the examples could not be read — this page keeps them for offline once it has been online'); return; }
     const made = await openExample(id);
     if (made) flash('“' + made.name + '” — a board of your own, made from the example; the board before stays in boards');
-  });
+  }
+  /** The programs the log says are playing that do not run here — what an example opened under reduced motion holds back. */
+  function standingPrograms() {
+    const s = session.getState();
+    return s.live.filter((id) => s.clocks[id] && s.clocks[id].playing && isProgram(s, id) && !consentedHere(id));
+  }
 
   /** The pane's own line: what just happened, or why not — with the ways out as buttons in it. */
   function paneSay(v, retry) {
@@ -18893,7 +18957,7 @@
 //   matched is let in when the seat scores it near, each such hit said *by meaning 0.72* — and likeNotes (the field's
 //   *Notes like this*, a region's button) lists the notes nearest one thing's words across every board in this same
 //   list, each with its number and reason. With nobody in the seat none of that exists and Find is as it was.
-// Uses: ui (pane, esc), controls (openPane, closePanel, tiles), core (MM.searchBoards, describeHit, boundsOf,
+// Uses: the first hour (27-first.js: motionReduced — the ring holds still under reduced motion), ui (pane, esc), controls (openPane, closePanel, tiles), core (MM.searchBoards, describeHit, boundsOf,
 //   getRep), the session, view (fitTo, view, worldToScreen), the boards adapter (board, boards, onBoardHere,
 //   switchBoard), the kept index (finder, findBoards, findSync, findIdle, findIndexCurrent), the boards pane
 //   (rereadBoards), input (say, flash), the semantic seat (semanticHost, findSemantic, semanticNotesLike).
@@ -19219,8 +19283,9 @@
     g.clearRect(0, 0, innerWidth, innerHeight);
     if (t >= FIND_FLASH_MS) { ringStop(); return; }
     const a = worldToScreen(ring.box.minX, ring.box.minY), z = worldToScreen(ring.box.maxX, ring.box.maxY);
-    const pad = 10 + 4 * Math.sin(t / 160);
-    const alpha = Math.min(1, (FIND_FLASH_MS - t) / 700);
+    // It pulses and fades — unless the person asked for less motion (C4): then it stands still, and goes.
+    const pad = motionReduced() ? 10 : 10 + 4 * Math.sin(t / 160);
+    const alpha = motionReduced() ? 1 : Math.min(1, (FIND_FLASH_MS - t) / 700);
     g.lineWidth = 2.5;
     g.strokeStyle = 'rgba(' + (C ? C.goldRGB : '201,168,76') + ',' + (0.95 * alpha).toFixed(3) + ')';
     g.beginPath();
@@ -19231,6 +19296,134 @@
   addEventListener('pointerdown', (e) => { if (ring && ring.box && !(findPanel && findPanel.contains(e.target))) ringStop(); }, { capture: true, passive: true });
   /** For tests: whether the ring is up and the box it rings. */
   function findFlashState() { return { active: !!(ring && ring.box), box: ring && ring.box ? Object.assign({}, ring.box) : null }; }
+
+// ===== the first hour =====
+// Provides: what a first-time hand meets, on a desktop, a phone and an iPad (the UX pass):
+//   - the first run on every screen (UX-03): on an empty board the three steps and *start from an example* whatever
+//     the width — in the panel where it stands, else as a small sheet at the foot of the screen (#firstRun) that
+//     leaves on the first stroke (syncFirstRun, firstRunState);
+//   - the words for the hand in use (tapWords): a finger or a pen double-taps, a mouse double-clicks — read from the
+//     last pointer's own pointerType, else whether the screen's main pointer is coarse; never the user agent;
+//   - a board opened whole from an example inspects nothing until the hand points at a mark or draws (restAfterOpen,
+//     resting; UX-11), and a thing just made is brought into view (bringIntoView; UX-13);
+//   - a said sentence lets go when the hand draws again (UX-16);
+//   - reduced motion (motionReduced; the critic's C4): prefers-reduced-motion, read once and on change — the working
+//     dot and the find ring hold still, and an example's program waits for the person's own play.
+// Uses: core (canvas, session, state, panelOpen, panelToggle, EMBED, prefs), render (render), inspector (firstLoopHtml),
+//   folder (viewMode, boardMode), replay (rp), view (fitTo, usableViewport, worldToScreen, afterViewChange, union),
+//   input (flashText, flashAt, FLASH_MS — the status line's own), boards (exampleButtonClick — the sheet's buttons are
+//   the panel's, 22-boards.js).
+// A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
+// in name order inside `(function () { ... })();`. Shared state is the
+// closure's; no imports, no exports, no build step beyond the concatenation.
+
+  // ===== Reduced motion (C4) ===================================================
+  // The surface's motion is painted on the canvas, not in CSS, so the stylesheet's reduced-motion rule (no
+  // transitions) reached none of it. Read the person's preference once, and again when it changes; what moves by
+  // itself reads motionReduced(). A program the person plays still plays: that motion is theirs.
+  const reducedMotionQuery = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+  let reducedMotion = !!(reducedMotionQuery && reducedMotionQuery.matches);
+  if (reducedMotionQuery) {
+    const heard = (e) => { reducedMotion = !!e.matches; render(session.getState()); };
+    if (reducedMotionQuery.addEventListener) reducedMotionQuery.addEventListener('change', heard);
+    else if (reducedMotionQuery.addListener) reducedMotionQuery.addListener(heard);
+  }
+  /** Whether the person asked for less motion: what moves by itself holds still. */
+  function motionReduced() { return reducedMotion; }
+
+  // ===== The words for the hand in use =========================================
+  // "double-click" means nothing on a phone, and "double-tap" little with a mouse. The hand is told by the pointer it
+  // last used — its own pointerType — and before any, by whether the screen's main pointer is coarse (a finger).
+  let lastPointerType = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 'touch' : 'mouse';
+  addEventListener('pointerdown', (e) => { if (e.pointerType) lastPointerType = e.pointerType; }, { capture: true, passive: true });
+  /** "double-tap" for a finger or a pen, "double-click" for a mouse. */
+  function tapWords() { return lastPointerType === 'touch' || lastPointerType === 'pen' ? 'double-tap' : 'double-click'; }
+
+  // ===== The first run on every screen (UX-03) ==================================
+  // At 820 px and less the panel starts closed, and with it the three steps and *start from an example*: a first-time
+  // hand on a phone met an empty canvas and the word "double-click". Where the panel does not stand — closed, on any
+  // width — the same steps stand as a small sheet at the foot of the screen, until the first stroke. Not in an embed
+  // or a replay (a figure, not a board to start on), not in the grid, and never again once the hand has drawn here.
+  const firstRunEl = document.createElement('div');
+  firstRunEl.id = 'firstRun';
+  firstRunEl.hidden = true;
+  firstRunEl.setAttribute('role', 'region');
+  firstRunEl.setAttribute('aria-label', 'how to begin');
+  document.body.appendChild(firstRunEl);
+  let firstRunGone = false;
+  let firstRunSaid = null;
+  /** Whether the sheet stands now, and why not. */
+  function firstRunState(s) {
+    s = s || session.getState();
+    const empty = !s.contentIds.length && !s.artifacts.length;
+    const panelShows = !document.body.classList.contains('panelHidden');
+    const why = firstRunGone ? 'drawn' : !empty ? 'not empty' : EMBED ? 'embed' : (typeof rp !== 'undefined' && rp.rec) ? 'replay'
+      : viewMode !== 'canvas' ? 'grid' : panelShows ? 'the panel says it' : null;
+    return { shown: !why, why: why };
+  }
+  function syncFirstRun(s) {
+    const st = firstRunState(s);
+    if (st.shown && firstRunSaid === null) { firstRunSaid = firstLoopHtml(); firstRunEl.innerHTML = firstRunSaid; }
+    if (firstRunEl.hidden === st.shown) firstRunEl.hidden = !st.shown;
+  }
+  // The sheet's buttons are the panel's: a board of your own from the starter, or the boards pane's examples.
+  firstRunEl.addEventListener('click', (e) => exampleButtonClick(e));
+  // It leaves on the first stroke: a press on the canvas begins one.
+  canvas.addEventListener('pointerdown', () => { if (!firstRunGone) { firstRunGone = true; firstRunEl.hidden = true; } }, { capture: true, passive: true });
+  panelToggle.addEventListener('click', () => syncFirstRun(session.getState()));
+
+  // ===== A said sentence lets go (UX-16) ========================================
+  // A sentence said for a while (say, seven seconds) held the status line through the next acts — a kept ask stood
+  // beside the lasso's hint after the hand had moved on. Once it has been up for a flash's time, the hand drawing
+  // again is the hand having read it.
+  canvas.addEventListener('pointerdown', () => {
+    if (flashText && Date.now() - flashAt > FLASH_MS) { flashText = null; clearTimeout(flashTimer); }
+  }, { capture: true, passive: true });
+
+  // ===== A board opened whole inspects nothing (UX-11) ===========================
+  // An example opened with its last mark inspected — its note, a text, said as "a text" in the panel — and the panel
+  // over the drawing. Opened, it is fitted to the free ground and nothing is inspected until the hand points at a mark
+  // or the board changes; the panel says what the board holds and how to begin.
+  let restAt = null;
+  function restAfterOpen() {
+    const evs = session.getEvents();
+    restAt = { events: evs, len: evs.length };
+    hoverId = null;
+    fitAll();
+  }
+  /** Whether nothing is to be inspected: the board as it was opened, nothing pointed at. */
+  function resting() {
+    if (!restAt) return false;
+    const evs = session.getEvents();
+    if (evs !== restAt.events || evs.length !== restAt.len) { restAt = null; return false; }
+    return true;
+  }
+
+  // ===== A thing just made, in view (UX-13) ======================================
+  /**
+   * Bring marks into the free ground when any of them is outside it: panned, and zoomed out only as far as it takes —
+   * never zoomed in to show them. Make it Mermaid stood its card right of the drawing, cut off at the window's edge,
+   * and the view did not move. Returns whether the view moved.
+   */
+  function bringIntoView(ids) {
+    const s = session.getState();
+    const boxes = (ids || []).map((id) => s.nodes.get(id)).filter(Boolean).map((n) => MM.boundsOf(n)).filter(Boolean);
+    if (!boxes.length) return false;
+    const b = union(boxes);
+    const free = usableViewport();
+    const a = worldToScreen(b.minX, b.minY), z = worldToScreen(b.maxX, b.maxY);
+    const M = 16;
+    if (a.x >= free.left + M && a.y >= free.top + M && z.x <= free.right - M && z.y <= free.bottom - M) return false;
+    const zoom = view.zoom;
+    fitTo(b);
+    if (view.zoom > zoom) {
+      view.zoom = zoom;
+      view.panX = free.left + (free.width - (b.maxX - b.minX) * zoom) / 2 - b.minX * zoom;
+      view.panY = free.top + (free.height - (b.maxY - b.minY) * zoom) / 2 - b.minY * zoom;
+      afterViewChange();
+    }
+    return true;
+  }
 
 // ===== boot =====
 // Provides: the debug handle (window.__mm, what the e2e drives), subscription (the journal first, the paint,
@@ -19399,6 +19592,13 @@
     },
     carryPrefsAllowed: () => CARRY_PREFS.slice(),
     showHomeNotice: (on) => { carry.noticeForced = !!on; renderBoardsPane(); if (on) homeNoticeOnce(); },
+  });
+
+  // The first hour (the UX pass), for tests: the first-run sheet, the one Escape, the hand's word, reduced motion,
+  // whether nothing is inspected, a thing brought into view, and where the open field stands.
+  Object.assign(window.__mm, {
+    firstRun: () => firstRunState(), escapeStep: (focus) => escapeStep(focus || document.activeElement), tapWords: tapWords,
+    motionReduced: motionReduced, resting: resting, bringIntoView: bringIntoView,
   });
 
   // Mermaid (V1-PLAN D2, D3), for tests: the library a frame loads (a stand-in, or the CDN's again), what a frame said of itself, what Draw it drew.

@@ -6,7 +6,9 @@
 // Uses: core, view, artifacts, snap, models, palette (contextFor), inspector, teach (syncMarkChip), folder (folderStatus, liveSet),
 //   packs (packShort — a match chip says its pack; a pack this build lacks is said in the standing line),
 //   input (live, magnetHold, penHover — the pen's layer draws the stroke in progress and a hovering pencil's magnet),
-//   selection (dragPreview, dragFollowers — what follows a drag is drawn where it will stand, V1-PLAN E2).
+//   selection (dragPreview, dragFollowers — what follows a drag is drawn where it will stand, V1-PLAN E2),
+//   the first hour (27-first.js: tapWords, resting, syncFirstRun, motionReduced — the standing line's word for the hand,
+//   an example opened with nothing inspected, the first-run sheet, a working dot that holds still).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -40,9 +42,10 @@
     if (s.summon) return 'type in the field, or tap a pill · a tap on the ground lets go';
     // One mark with its own points showing (E1): a ring reshapes its clean form.
     if (s.selection.length) return 'drag inside to move, a corner to scale, the knob to turn' + (markHandles(s).length ? ', a ring to reshape' : '') + ' · Esc lets go';
-    if (s.pendingLassoId) return 'or double-tap inside the loop';
-    if (!strokes && !s.artifacts.length) return 'draw anything · double-click empty ground to type';
-    return 'press and hold a mark to hold it · or circle marks and double-tap inside';
+    // The hand's own word (27-first.js, tapWords): a finger or a pen double-taps, a mouse double-clicks.
+    if (s.pendingLassoId) return 'or ' + tapWords() + ' inside the loop';
+    if (!strokes && !s.artifacts.length) return 'draw anything · ' + tapWords() + ' empty ground to type';
+    return 'press and hold a mark to hold it · or circle marks and ' + tapWords() + ' inside';
   }
 
   /** The last mark on the board whose box, with a little slack, holds the point — found among the few the paint's index says could. */
@@ -918,7 +921,8 @@
       chipHits.push({ ids: group.length ? group : [id], x: at.x, y: at.y, w: at.w, h: at.h, text: rc.text });
     }
 
-    const inspectedId = hoverId || lastContentId(s);
+    // A board opened whole inspects nothing until the hand points or draws (27-first.js, resting; UX-11).
+    const inspectedId = hoverId || (resting() ? null : lastContentId(s));
     const pv = dragPreview();
     // The connectors bound to what a drag moves, each drawn as it will stand when the hand lets go (V1-PLAN E2).
     followShown = pv ? dragFollowers() : null;
@@ -1052,6 +1056,7 @@
     syncMarkChip(s);
     renderSummon(s);
     renderInspector(s, inspectedId);
+    syncFirstRun(s);
     renderMinimap(s);
 
     // The status line: what just happened, else the standing state, in a few
@@ -1122,7 +1127,8 @@
       let x, y;
       if (boxes.length) { const b = union(boxes); x = b.minX; y = b.minY - wpx(28); }
       else { const c = screenToWorld(innerWidth / 2, 70); x = c.x; y = c.y; }
-      const r = wpx(4 + 2 * Math.sin(t * 4));
+      // It breathes — unless the person asked for less motion (C4), when it holds still.
+      const r = wpx(motionReduced() ? 5 : 4 + 2 * Math.sin(t * 4));
       ctx.beginPath(); ctx.arc(x + wpx(5), y - wpx(4), r, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(${C.goldRGB},0.85)`; ctx.fill();
       text(w.label, x + wpx(16), y, C.gold);

@@ -4,7 +4,8 @@
 //   with the reason), runtimeOffset, runtimeBroken, syncRuntime, the consent gate (trackConsent, consentedHere,
 //   grantPlayingPrograms — this tab runs a program only when this hand played it here, C1), frameCSP (a run or
 //   mermaid frame cannot phone out), WORKER_HARDEN (the js worker keeps only Math/performance/Function/postMessage).
-// Uses: core (session, esc), artifacts (frames, documentFor), render (render).
+// Uses: core (session, esc), artifacts (frames, documentFor), render (render), the first hour (27-first.js: motionReduced —
+//   under reduced motion an example's program is not granted, and waits for the person's own play).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -762,6 +763,8 @@
    * made only by the example-open path (22-boards.js), never by a load.
    */
   function grantPlayingPrograms() {
+    // A person who asked for less motion starts it themselves (C4): the program waits for their own play.
+    if (motionReduced()) return false;
     const s = session.getState();
     let any = false;
     for (const id of Object.keys(s.clocks)) {

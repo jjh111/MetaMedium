@@ -2,7 +2,7 @@
 // Provides: text as an element — typeText (a text artifact at a point), editText (a new version of one),
 //   beginTextEdit/commitTextEdit (the editor on the canvas, opened by a double-click on empty ground or
 //   from the panel), wordToText (a written word becomes a text artifact, on request), strikeOnText/foldIntoText/textNear (text folds back from ink).
-// Uses: core, view, artifacts (frames), render.
+// Uses: core, view, artifacts (frames), render, palette (minimapRect, panelRect — a new text stands clear of them, UX-15).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
 // closure's; no imports, no exports, no build step beyond the concatenation.
@@ -165,6 +165,28 @@
     editorEl.style.fontSize = Math.max(11, 13 * view.zoom) + 'px';
   }
 
+  /**
+   * A new text's box, moved on screen so it stands clear of the minimap and the panel and inside the window (the UX
+   * pass, UX-15: a double-click at the lower right opened the editor over the minimap, and the text it kept ran under it
+   * and past the window's foot). It moves the least it can — left, or up — and keeps its size.
+   */
+  function clearOfChrome(b) {
+    const M = 8;
+    const a = worldToScreen(b.minX, b.minY), z = worldToScreen(b.maxX, b.maxY);
+    let x = a.x, y = a.y;
+    const w = z.x - a.x, h = z.y - a.y;
+    x = Math.min(x, innerWidth - M - w); y = Math.min(y, innerHeight - M - h);
+    for (const r of [minimapRect(), panelRect()].filter(Boolean)) {
+      if (!(x < r.right + M && x + w > r.left - M && y < r.bottom + M && y + h > r.top - M)) continue;
+      const left = r.left - M - w, up = r.top - M - h;
+      if (a.x - left <= a.y - up && left >= M) x = left; else y = Math.max(M, up);
+    }
+    x = Math.max(M, x); y = Math.max(M, y);
+    if (x === a.x && y === a.y) return b;
+    const p = screenToWorld(x, y);
+    return { minX: p.x, minY: p.y, maxX: p.x + (b.maxX - b.minX), maxY: p.y + (b.maxY - b.minY) };
+  }
+
   /** Open the editor on a text artifact, or on empty ground at a world point. */
   function beginTextEdit(id, at) {
     const s = session.getState();
@@ -176,7 +198,7 @@
       if (!rep || (rep.data.kind !== 'text' && rep.data.kind !== 'mermaid')) return false;
       bounds = MM.boundsOf(n); text = rep.data.code;
     } else {
-      bounds = { minX: at.x, minY: at.y, maxX: at.x + TEXT_W, maxY: at.y + TEXT_H };
+      bounds = clearOfChrome({ minX: at.x, minY: at.y, maxX: at.x + TEXT_W, maxY: at.y + TEXT_H });
     }
     editing = { id: id || null, bounds: bounds };
     editorEl.value = text;

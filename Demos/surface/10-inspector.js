@@ -2,6 +2,7 @@
 // Provides: the panel: a mark, an artifact, a word, the selection — what it is and what it can become
 //   in plain words first, and the inspector (ids, tiers, relations, measures) behind details, closed by
 //   default and remembered on this device (PLAN-USER-SURFACE U1a: markSummary, inspectDetails).
+// Provides too: firstLoopHtml (the empty board's steps, also the first-run sheet's, 27-first.js).
 // Uses: core, render (readRungs, logKey, paintReference), snap, handwriting, models,
 //   palette (contextFor, paletteItems, afforded — what stands beside a selection, and what it put first),
 //   packs (packSaid — a definition from a library pack says its pack).
@@ -101,6 +102,23 @@
     inspectorEl.innerHTML = html;
   }
 
+  /**
+   * The empty board's three steps and its one tap, in the panel's plain voice — and, where the panel does not stand,
+   * in the first-run sheet at the foot of the screen (27-first.js; the UX pass, UX-03).
+   */
+  function firstLoopHtml() {
+    return '<div class="eyebrow">nothing drawn yet</div>' +
+      '<ol class="firstLoop">' +
+      '<li><b>draw a few marks</b> — a box, a circle, a line</li>' +
+      '<li><b>press and hold one</b> — it is held with what it sits with</li>' +
+      '<li><b>choose what it becomes</b> — tap a pill, or type in the field</li>' +
+      '</ol>' +
+      // R5: the first run's one tap — a board of your own made from the starter example (22-boards.js takes it).
+      '<div class="acts"><button class="mini" type="button" data-example-start title="a new board of your own with something already drawn — the starter example, yours to draw on">start from an example</button>' +
+      '<button class="mini" type="button" data-example-more title="a flowchart, a class diagram, a molecule and a pattern page — in the boards pane">more examples</button></div>' +
+      '<div class="why">the canvas reads every mark as you draw it; a model is asked only when you ask one</div>';
+  }
+
   function renderInspector(s, id) {
     if (s.summon) return renderSummonScope(s);
     // One region selected alone: what it is and holds, in words (I5; 12-regions.js).
@@ -116,20 +134,14 @@
       // It is not a tour and not a mode: it is the empty state of one row, and
       // the first mark drawn replaces it with that mark's reading.
       if (!s.contentIds.length && !s.artifacts.length) {
-        showPanel('<div class="eyebrow">nothing drawn yet</div>' +
-          '<ol class="firstLoop">' +
-          '<li><b>draw a few marks</b> — a box, a circle, a line</li>' +
-          '<li><b>press and hold one</b> — it is held with what it sits with</li>' +
-          '<li><b>choose what it becomes</b> — tap a pill, or type in the field</li>' +
-          '</ol>' +
-          // R5: the first run's one tap — a board of your own made from the starter example (22-boards.js takes it).
-          '<div class="acts"><button class="mini" type="button" data-example-start title="a new board of your own with something already drawn — the starter example, yours to draw on">start from an example</button>' +
-          '<button class="mini" type="button" data-example-more title="a flowchart, a class diagram, a molecule and a pattern page — in the boards pane">more examples</button></div>' +
-          '<div class="why">the canvas reads every mark as you draw it; a model is asked only when you ask one</div>');
+        showPanel(firstLoopHtml());
         return;
       }
-      showPanel('<div class="eyebrow">mark</div>' +
-        '<div class="empty">nothing here yet</div>');
+      // A board opened whole — an example — with nothing pointed at yet (UX-11): what it holds, and how to begin.
+      const marks = s.contentIds.length - s.artifacts.length, made = s.artifacts.length;
+      showPanel('<div class="eyebrow">this board</div>' +
+        '<div class="empty">' + esc([marks ? marks + ' mark' + (marks === 1 ? '' : 's') : '', made ? made + ' thing' + (made === 1 ? '' : 's') + ' made' : ''].filter(Boolean).join(' · ')) + '</div>' +
+        '<div class="why">press and hold a mark to see what it is and what it can become — or point at one</div>');
       return;
     }
 
