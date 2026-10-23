@@ -741,9 +741,11 @@
   // Where this field was put when it opened, kept while it is open (the UX pass, UX-06): placed again on every
   // paint from its new height, it jumped 419 px between "make" and "make " as the pills changed under the hand.
   // `edge` is the edge that stands still — its top when it opened below or beside the held marks, its bottom when
-  // it opened above them — so it grows away from what it holds. Let go only when the field would leave the screen
-  // or cover chrome (the panel, the minimap); null while no field is open.
-  let fieldKept = null;      // { x, w, edge: 'top' | 'bottom', y }: y is the edge's place on screen
+  // it opened above them — so it grows away from what it holds. Let go when the field would leave the screen —
+  // grown past the room its standing edge leaves, a keyboard come up under it — or cover chrome (the panel, the
+  // minimap), and when the held marks move on screen (a pan, a zoom, a thing brought into view): the field is then
+  // placed again beside them, from where the hand was as the marks have carried it. Null while no field is open.
+  let fieldKept = null;      // { x, w, edge: 'top' | 'bottom', y, held }: y is the edge's place on screen, held the marks' box
 
   /** Pure: fit `size` at `want` inside `soft` if it fits there, inside `hard` otherwise. */
   function fitSpan(want, size, soft, hard) {
@@ -875,16 +877,41 @@
     return !chrome.some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top);
   }
 
+  /** Pure: whether two boxes on screen stand in the same place, to within a pixel and a half. */
+  function sameScreenBox(a, b) {
+    if (!a || !b) return a === b;
+    return Math.abs(a.left - b.left) < 1.5 && Math.abs(a.top - b.top) < 1.5 && Math.abs(a.right - b.right) < 1.5 && Math.abs(a.bottom - b.bottom) < 1.5;
+  }
+  /** Pure: a point on screen carried as a box moved and scaled from `was` to `now` carries it (a pan, a zoom). */
+  function carriedBy(p, was, now) {
+    if (!p || !was || !now) return p;
+    const sx = was.right - was.left > 1 ? (now.right - now.left) / (was.right - was.left) : 1;
+    const sy = was.bottom - was.top > 1 ? (now.bottom - now.top) / (was.bottom - was.top) : 1;
+    return { x: now.left + (p.x - was.left) * sx, y: now.top + (p.y - was.top) * sy };
+  }
+  /** The field's height with its list unheld: what it would take to show every pill at its width now. */
+  function fieldNaturalHeight() {
+    const list = summonEl.querySelector('.list');
+    return list ? summonEl.offsetHeight - list.offsetHeight + list.scrollHeight : summonEl.offsetHeight;
+  }
+
   /** Place the field where it stands now. Touches left/top/width, and the list's height when it must scroll — NOTHING else. */
   function placeField() {
     const v = viewportRect(), u = usableViewport();
-    // Kept where it opened while that still stands (UX-06): the list scrolls in the room its standing edge leaves
-    // rather than the field moving, and only a field that would leave the screen or cover the chrome is placed again.
+    // Kept where it opened while that still stands (UX-06): typing changes the pills, and the field stays. Placed
+    // again when the held marks moved on screen (from where the hand was, carried with them), when it would leave
+    // the screen — taller than the room its standing edge leaves, which a keyboard coming up takes away — and when
+    // it would cover the chrome.
     if (fieldKept) {
       const k = fieldKept;
+      const s = session.getState();
+      const held = s.summon ? heldBoxOf(s.summon) : null;
       const cap = k.edge === 'top' ? v.bottom - FIELD_M - k.y : k.y - Math.max(v.top + FIELD_M, u.top + FIELD_M);
-      if (k.w <= v.width - FIELD_M * 2 && cap > FIELD_LIST_MIN) {
-        summonEl.style.width = k.w + 'px';
+      const still = sameScreenBox(k.held, held);
+      if (!still) fieldAnchor = carriedBy(fieldAnchor, k.held, held);
+      let fits = still && k.w <= v.width - FIELD_M * 2 && cap > FIELD_LIST_MIN;
+      if (fits) { summonEl.style.width = k.w + 'px'; fits = fieldNaturalHeight() <= cap; }
+      if (fits) {
         fitFieldHeight(v, u, cap);
         const h = summonEl.offsetHeight;
         const box = { x: k.x, y: k.edge === 'top' ? k.y : k.y - h, w: k.w };
@@ -913,7 +940,7 @@
     const s = session.getState();
     const held = s.summon ? heldBoxOf(s.summon) : null;
     const above = !!held && box.y + h <= held.top + 1;
-    fieldKept = { x: box.x, w: box.w, edge: above ? 'bottom' : 'top', y: above ? box.y + h : box.y };
+    fieldKept = { x: box.x, w: box.w, edge: above ? 'bottom' : 'top', y: above ? box.y + h : box.y, held: held };
     return box;
   }
 

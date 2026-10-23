@@ -21,6 +21,8 @@
 //        labels and the file's name in each tooltip (UX-12); over the grid the panel stands aside, the View group's
 //        tile is "layout", and at 390 px the zoom tile keeps *fit* (UX-14); a new text and its editor stand clear of
 //        the minimap (UX-15); a sentence said for a while lets go when the hand draws again (UX-16)
+//   X7   the field stays where it opened while words are typed, and goes with the marks it holds when the view zooms or
+//        pans — never left over them (UX-06)
 //
 // It opens its own contexts (a desktop, a phone with touch, and one that asks for reduced motion), each with the
 // gate's guards, so it runs like keep and boards.
@@ -83,6 +85,23 @@ const paneNow = (page, id) => page.evaluate((id) => {
     vh: innerHeight, vw: innerWidth, overflowY: getComputedStyle(el).overflowY,
   };
 }, id);
+/** The open field and the held marks' box, on screen, and whether one lies over the other. */
+const fieldOverHeld = (page) => page.evaluate(() => {
+  const mm = window.__mm, s = mm.session.getState(), f = document.getElementById('summon');
+  if (!s.summon || !f || f.style.display === 'none') return { open: false };
+  const fr = f.getBoundingClientRect();
+  let h = null;
+  for (const id of s.summon.enclosedIds) {
+    const n = s.nodes.get(id), b = n && mm.MM.boundsOf(n);
+    if (!b) continue;
+    const a = mm.worldToScreen(b.minX, b.minY), z = mm.worldToScreen(b.maxX, b.maxY);
+    h = h ? { left: Math.min(h.left, a.x), top: Math.min(h.top, a.y), right: Math.max(h.right, z.x), bottom: Math.max(h.bottom, z.y) } : { left: a.x, top: a.y, right: z.x, bottom: z.y };
+  }
+  const r = (b) => b && { left: Math.round(b.left), top: Math.round(b.top), right: Math.round(b.right), bottom: Math.round(b.bottom) };
+  const over = !!h && fr.left < h.right - 1 && fr.right > h.left + 1 && fr.top < h.bottom - 1 && fr.bottom > h.top + 1;
+  return { open: true, field: r(fr), held: r(h), over };
+});
+
 /** A box inside another (and inside the window), give or take a pixel. */
 const inside = (a, b) => !!a && !!b && a.top >= b.top - 1 && a.bottom <= b.bottom + 1 && a.left >= b.left - 1 && a.right <= b.right + 1;
 
@@ -374,6 +393,10 @@ export async function runUx(browser, servers, { freshContext }) {
     });
     check(`X6. Make it Mermaid's card, standing right of a drawing at the window's edge, is brought into view (${card ? Math.round(card.left) + '–' + Math.round(card.right) + ' of ' + card.vw : 'no card'})`,
       !!card && card.left >= 0 && card.right <= card.vw && card.top >= 0 && card.bottom <= card.vh, card);
+    // The view moved to bring it in, and the field still open goes with the marks it holds — never left over them.
+    const moved = await fieldOverHeld(page);
+    check(`X6a. the field still open after the view moved stands beside the marks it holds, not over them (field ${moved.field ? moved.field.top + '–' + moved.field.bottom : '—'}, marks ${moved.held ? moved.held.top + '–' + moved.held.bottom : '—'})`,
+      moved.open && !moved.over, moved);
     await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await page.waitForTimeout(150);
 
     // The export pane: every button inside it, plain labels, the file's name in the tooltip.
@@ -438,6 +461,36 @@ export async function runUx(browser, servers, { freshContext }) {
     const after = await page.evaluate(() => document.getElementById('status').textContent);
     check(`X6e. a sentence said for a while (“${said.slice(0, 50)}”) lets go once the hand draws again (now: ${after.slice(0, 70)})`,
       /using the Basics pack/.test(said) && !/using the Basics pack/.test(after), { said, after });
+    await guards.context.close();
+  });
+
+  // ---- X7. the field keeps its place while typed in, and goes with its marks when the view moves (UX-06) ------------
+  await record('X7', async () => {
+    const { page, guards } = await open(DESKTOP, APP, 'ux-field');
+    await draw(page, box(500, 300, 140, 90));
+    await draw(page, box(700, 300, 140, 90));
+    await hold(page, 500, 345);
+    const opened = await fieldOverHeld(page);
+    for (const w of 'make a page'.split('')) await page.keyboard.type(w);
+    await page.waitForTimeout(200);
+    const typed = await fieldOverHeld(page);
+    await page.keyboard.press('Control+a'); await page.keyboard.press('Backspace'); await page.waitForTimeout(150);
+    // Zoomed in over the marks with ctrl and the wheel: they grow under where the field stood.
+    await page.mouse.move(670, 345);
+    await page.keyboard.down('Control');
+    for (let i = 0; i < 4; i++) { await page.mouse.wheel(0, -100); await page.waitForTimeout(60); }
+    await page.keyboard.up('Control');
+    await page.waitForTimeout(400);
+    const zoomed = await fieldOverHeld(page);
+    // And panned: the field goes with them.
+    await page.mouse.move(1150, 150);
+    for (let i = 0; i < 3; i++) { await page.mouse.wheel(60, 80); await page.waitForTimeout(60); }
+    await page.waitForTimeout(400);
+    const panned = await fieldOverHeld(page);
+    const still = opened.field && typed.field && Math.abs(opened.field.left - typed.field.left) <= 3 && Math.abs(opened.field.top - typed.field.top) <= 3;
+    check(`X7. the field stays where it opened while words are typed (${opened.field ? opened.field.left + ',' + opened.field.top : '—'} → ${typed.field ? typed.field.left + ',' + typed.field.top : '—'}), and when the view zooms or pans it goes with the marks it holds, never over them (zoomed: ${zoomed.over ? 'over' : 'beside'}, panned: ${panned.over ? 'over' : 'beside'})`,
+      opened.open && typed.open && still && zoomed.open && !zoomed.over && panned.open && !panned.over &&
+      (zoomed.held.top !== opened.held.top || zoomed.held.right !== opened.held.right) && (panned.held.top !== zoomed.held.top || panned.held.left !== zoomed.held.left), { opened, typed, zoomed, panned });
     await guards.context.close();
   });
 

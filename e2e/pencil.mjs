@@ -32,6 +32,7 @@
 //   P5   the pen holds a mark, the field opens, and a pill the pen taps is taken — a clean
 //   P6   the pen taps undo, and the clean form goes
 //   P7   the keyboard up: the field stays in the visible viewport, every pill in reach, one taken
+//   P7b  the keyboard up under a field opened mid-screen: it moves up whole rather than squeezing its pills
 //   P8   the hand tile gives a finger its ink back — a palm still draws nothing, a field a
 //        finger opened does not take the focus — and four taps come round to the pen
 //   P9   the mouse is untouched: it draws, its points carry no pressure, its hover no ghost
@@ -485,6 +486,35 @@ export async function runPencil(browser, servers, { freshContext, screenshot }) 
         opened && focused && at360.inView && at360.inputInView && !at360.held && at260.inView && at260.inputInView && at260.held
           && allReach && away.open && away.inView && !away.held && typed.open && typed.inView && !typed.held && took && took.inView && labelled,
         { opened, focused, at360, at260, reach, away, typed, took, labelled });
+    });
+
+    // ---- P7b. The keyboard up under a field opened mid-screen: the field moves up whole, its pills not squeezed ----
+    await record('P7b', async () => {
+      await penTapGround();
+      // On empty ground, away from what the records before drew: the view is put back after.
+      const was = await page.evaluate(() => { const v = window.__mm.view; const w = { zoom: v.zoom, panX: v.panX, panY: v.panY }; window.__mm.setView(1, 0, -6000); return w; });
+      await sleep(40);
+      // A row near the top: the field opens under it, its top a quarter of the way down — where it stood when it opened
+      // it would run off the 360 px the keyboard leaves, so it is placed again, whole (the UX pass, UX-06: a kept field
+      // held its place and squeezed its list into a strip instead).
+      const row = [{ x: 700, y: 140, w: 70, h: 60 }, { x: 800, y: 144, w: 70, h: 60 }, { x: 900, y: 138, w: 70, h: 60 }];
+      for (const b of row) await page.evaluate(({ pts, ps }) => window.__hand.penStroke(pts, ps), { pts: boxPath(b, 8), ps: pressures(33) });
+      await sleep(40);
+      const opened = await holdWithPen(835, 144);
+      const before = await page.evaluate(fieldGeometry);
+      const focused = await page.evaluate(() => { const f = document.querySelector('#summon input.filter'); if (!f) return false; f.focus(); return document.activeElement === f; });
+      await page.evaluate(() => window.__keyboard(460));
+      await frames(page);
+      const up = await page.evaluate(fieldGeometry);
+      await page.evaluate(() => window.__keyboard(0));
+      await frames(page);
+      await penTapGround();
+      await page.evaluate((w) => window.__mm.setView(w.zoom, w.panX, w.panY), was);
+      await frames(page);
+      const tall = up.field.bottom - up.field.top;
+      check(`P7b. the keyboard up under a field opened at ${Math.round(before.field.top)} px: ${Math.round(tall)} px tall, it fits the 360 left, so it moves up whole (${Math.round(up.field.top)}–${Math.round(up.field.bottom)}) — its list ${up.held ? 'HELD to ' + up.listH + ' of ' + up.listScroll + ' px' : 'whole, ' + up.listH + ' px'}, the input in view`,
+        opened && focused && before.open && before.field.bottom > up.v.bottom && up.open && up.inView && up.inputInView && !up.held && up.listH >= up.listScroll - 1 && up.pills >= 4,
+        { opened, focused, before, up });
     });
 
     // ---- P8. The hand tile gives a finger its ink back; four taps come round ----
