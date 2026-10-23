@@ -357,7 +357,7 @@
     lastTap = null;
     session.summonMarks(group, Date.now());
     render(session.getState());
-    if (group.length > 1) flash('held with ' + (group.length - 1) + ' it hangs together with');
+    if (group.length > 1) flash('held, with the ' + (group.length - 1) + ' beside it that belong with it');
   }
 
   /** Is a world point inside the loop that waits to be taken up? */

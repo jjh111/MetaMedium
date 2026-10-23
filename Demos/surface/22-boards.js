@@ -176,7 +176,7 @@
     if (here.notice) frag.appendChild(homeNoticeEl(here));
     const head = bdJoin(bdEl('div', 'bdHead'), [
       bdButton('New board', 'bdNew', { boardNew: '' }, 'a new, empty board — the one on screen stays as it is'),
-      bdButton('from a file…', 'bdFrom', { boardFile: '' }, 'a board from a .zip made by export with its pictures, or from a log file — one event per line'),
+      bdButton('from a file…', 'bdFrom', { boardFile: '' }, 'a board from a file: a .zip that export made with its pictures, or a board file it made'),
     ]);
     if (!many) head.querySelectorAll('button').forEach((b) => { b.disabled = true; });
     frag.appendChild(head);
@@ -291,7 +291,7 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         read = readLogText(await res.text(), row.name);
       } catch (err) { report('could not read the “' + row.name + '” example (' + ((err && err.message) || err) + ') — it opens once this page has been online'); return false; }
-      if (!read.events) { report(read.refused || 'the “' + row.name + '” example is not a board’s log'); return false; }
+      if (!read.events) { report(read.refused || 'the “' + row.name + '” example cannot be read as a board'); return false; }
       const events = read.events;
       const made = await newBoard({ name: exampleName([...boards.entries.values()], row), events: events, force: !!o.force, said: o.said || ((v) => say(v.words)) });
       // A shipped example IS the program shown — the launch film — and its code
@@ -322,7 +322,7 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         read = readLogText(await res.text(), row.name);
       } catch (err) { say('could not read the “' + row.name + '” example (' + ((err && err.message) || err) + ')'); return; }
-      if (!read.events) { say(read.refused || 'the “' + row.name + '” example is not a board’s log'); return; }
+      if (!read.events) { say(read.refused || 'the “' + row.name + '” example cannot be read as a board'); return; }
       // Unless the reader has drawn on the figure before the log arrived: theirs stands.
       if (session.getEvents().length) return;
       session.load(read.events);
@@ -379,7 +379,7 @@
     if (!bd.said) return;
     const parts = [document.createTextNode(bd.said.words)];
     for (const w of bd.said.ways) {
-      if (w === 'export') parts.push(bdButton('export the log', 'bdWay', { leaveWay: 'export' }, 'the whole board on screen, as a file to keep'));
+      if (w === 'export') parts.push(bdButton('save it as a file', 'bdWay', { leaveWay: 'export' }, 'the whole board on screen, as a file to keep'));
       else if (w === 'leave' && bd.said.retry) parts.push(bdButton('leave it anyway', 'bdWay', { leaveWay: 'leave' }, 'what was not saved is lost'));
     }
     bdJoin(bdStatus, parts);

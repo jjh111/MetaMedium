@@ -214,7 +214,7 @@ input.fileIn { position: fixed; left: 0; top: 0; width: 1px; height: 1px; opacit
 
 /* The export pane: three files; the import pane: photos, camera, other files. */
 #exportPanel .exRow, #importPanel .exRow { display: flex; gap: 7px; }
-#exportPanel .exRow button, #importPanel .exRow button { flex: 1; font-family: var(--mono); font-size: 11px; }
+#exportPanel .exRow button, #importPanel .exRow button { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; font-family: var(--mono); font-size: 11px; }
 #exportPanel .exRow + .exRow { margin-top: 7px; }
 #exportPanel .exRow button:disabled { opacity: 0.45; cursor: default; }
 /* The live pane: share this board, or — in a room — who is here, the invite, a copy, leave; other ways in under "more". */

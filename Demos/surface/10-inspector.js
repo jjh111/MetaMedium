@@ -76,6 +76,15 @@
     return k === 'js' || k === 'run';
   }
 
+  /**
+   * What a thing made is, said over the panel in the person's words (the UX pass, UX-08: "LIVING PAGE",
+   * "LIVING TEXT"): a page, a program, a text — never the engine's kind, and never "living".
+   */
+  function kindEyebrow(kind) {
+    const WORDS = { html: 'a page', run: 'a program', js: 'a behaviour', text: 'a text', svg: 'a figure', mermaid: 'a diagram in words', json: 'data', md: 'notes', control: 'a control' };
+    return WORDS[kind] || (MM.isPictureKind(kind) ? 'a picture' : 'a ' + kind + ' file');
+  }
+
   /** The kind of an artifact's newest code rep, html by default. */
   function codeKindOf(node) { const r = node && codeRepOf(node); return (r && r.data.kind) || 'html'; }
 
@@ -130,8 +139,7 @@
     // Who made it: a mark's drawer, an artifact's blesser — never who drew its marks (V1-PLAN L2f).
     const author = authorOf(node);
     const authorName = nameOfParticipant(author);
-    const eyebrow = '<div class="eyebrow">' +
-      (isLive ? (codeKindOf(node) === 'html' ? 'living page' : codeKindOf(node) === 'mermaid' ? 'a diagram in words' : 'living ' + codeKindOf(node)) : isArtifact ? 'artifact' : isWordNode ? 'word' : 'mark') + '</div>';
+    const eyebrow = '<div class="eyebrow">' + (isLive ? kindEyebrow(codeKindOf(node)) : isArtifact ? 'a thing made' : isWordNode ? 'a word' : 'a mark') + '</div>';
     // What the person reads first (U1a): what it is and what it can become, in a few plain
     // lines. Everything the engine holds about it — ids, tiers, relations, measures — is
     // below, behind details.
@@ -283,7 +291,7 @@
         const m = mine && String(ownCode.data.code).match(new RegExp('<([a-z]+)[^>]*data-region="' + mine.id + '"'));
         rows.push(['code', isLive
           ? (codeKindOf(node) !== 'html' ? 'a running ' + codeKindOf(node) + (codeKindOf(node) === 'js' ? ' — code that runs when played' : '') : rung.genre && (rung.genre.genre === 'graph' || rung.genre.genre === 'mixed') ? 'a running diagram' : 'a running page')
-          : (m ? '<' + m[1] + ' data-region="' + mine.id + '">' : 'part of ' + (MM.wordOf(owner) || 'an artifact')),
+          : (m ? '<' + m[1] + ' data-region="' + mine.id + '">' : 'part of ' + (MM.wordOf(owner) || 'a thing made')),
           isLive && rung.genre ? rung.genre.reasoning : '']);
       }
       if (rows.length) {
@@ -470,12 +478,12 @@
       if (rep) {
         const kind = rep.data.kind || 'html';
         const what = kind === 'run' ? (rep.data.code && rep.data.code.startsWith(MM.GRAPH3D_MARK) ? 'a 3D thing' : 'a program') : kind === 'html' ? 'a page' : kind === 'text' ? 'text' : kind === 'mermaid' ? 'a diagram written in Mermaid' : MM.isPictureKind(kind) ? 'a picture' : 'a ' + kind + ' file';
-        return { here: 'an artifact, ' + what, next: kind === 'mermaid' ? (paletteItems.some((i) => i.key === 'mermaid-draw') ? 'Draw it puts it on the board as marks · ' : '') + 'edit the text for a new version · ink over a node addresses its marks' : 'ink over it addresses its parts · a brief is a new version · wire it in a frame' };
+        return { here: what + ', made', next: kind === 'mermaid' ? (paletteItems.some((i) => i.key === 'mermaid-draw') ? 'Draw it puts it on the board as marks · ' : '') + 'edit the words and it is drawn again · ink over a box in it reaches the marks it was written from' : 'ink over it reaches its parts · type a change and it is made again · wire it into a frame' };
       }
-      return { here: 'a definition' + (MM.wordOf(a) ? ' “' + MM.wordOf(a) + '”' : ''), next: 'another like it is matched · a brief builds on it · its tank plays' };
+      return { here: 'a definition' + (MM.wordOf(a) ? ' “' + MM.wordOf(a) + '”' : ''), next: 'another like it is recognised · type what to make from it · it can be played' };
     }
     const match = sum.suggestions.find((x) => x.kind === 'match');
-    if (match) return { here: 'a definition, ' + match.label + ' ' + (match.score || 1).toFixed(2) + (match.pack ? ', from ' + packSaid(match.pack) : ''), next: (libraryEntries(s).some((e) => e.id === match.artifactId) ? 'its program on this drawing' : 'take the name') + ' · a brief builds from it' };
+    if (match) return { here: 'a definition, ' + match.label + ' ' + (match.score || 1).toFixed(2) + (match.pack ? ', from ' + packSaid(match.pack) : ''), next: (libraryEntries(s).some((e) => e.id === match.artifactId) ? 'its program on this drawing' : 'take the name') + ' · type what to make from it' };
     const genre = reading.genre && reading.genre.genre;
     const concept = reading.concepts[0];
     // Writing becomes what Enter does with it: read, then text, a name or a label (W2, U2's walk).
@@ -501,7 +509,7 @@
     if (concept) return { here: 'a concept, ' + concept.concept + ' ' + concept.confidence.toFixed(2), next: concept.conversions.filter((c) => c.effect.kind !== 'name' && c.effect.kind !== 'prompt').map((c) => c.label).concat(['a name']).join(' · ') };
     const shapes = ids.map((id) => MM.topInterpretation(s.nodes.get(id))).filter(Boolean);
     if (shapes.length && shapes.every((x) => x === 'text')) return { here: 'writing', next: 'Read the writing · a name · text' };
-    return { here: 'shapes' + (shapes.length ? ', ' + [...new Set(shapes)].join(', ') : ''), next: 'draw them clean · a name · a brief is a program' };
+    return { here: 'shapes' + (shapes.length ? ', ' + [...new Set(shapes)].join(', ') : ''), next: 'draw them clean · a name · say what to make in a sentence' };
   }
 
   // What the selection reads as, kept while the log stands (R4c): a pan with

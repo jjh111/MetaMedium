@@ -91,7 +91,7 @@
         wrap.className = 'artifactFrame parked';
         const card = document.createElement('div');
         card.className = 'park';
-        card.innerHTML = '<b>' + esc(MM.wordOf(node) || id) + '</b>' + esc((rep.data.kind || 'html') + (rep.data.path ? ' · ' + rep.data.path : '')) + '<br>parked — past the live budget; pan closer to run it';
+        card.innerHTML = '<b>' + esc(MM.wordOf(node) || id) + '</b>' + esc((rep.data.kind || 'html') + (rep.data.path ? ' · ' + rep.data.path : '')) + '<br>waiting — only the nearest few run at once; pan closer to run it';
         wrap.appendChild(card);
         stage.appendChild(wrap);
         f = { wrap: wrap, iframe: null, codeAt: 'parked', parked: true };

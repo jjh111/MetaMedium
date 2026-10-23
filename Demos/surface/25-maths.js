@@ -231,11 +231,11 @@
   // ===== The export pane's row: the figure at its real size =================
   const mathsRow = document.createElement('div');
   mathsRow.className = 'exRow exMaths';
-  mathsRow.innerHTML = '<button data-mathsout="svg">true-size.svg</button><button data-mathsout="print">print.html</button>';
+  mathsRow.innerHTML = '<button data-mathsout="svg">true size · SVG</button><button data-mathsout="print">print at true size</button>';
   exportPanel.appendChild(mathsRow);
   const MATHS_WAITS = 'the figures at their real size — label a side, in inches or centimetres, and this draws it';
-  const MATHS_SVG_TITLE = 'Every labelled figure drawn from its numbers at its real size: the root in paper inches or centimetres';
-  const MATHS_PRINT_TITLE = 'The same tiled onto pages at 100%, a test square on each — a printer scales without saying so';
+  const MATHS_SVG_TITLE = 'true-size.svg — every labelled figure drawn from its numbers at its real size, in paper inches or centimetres';
+  const MATHS_PRINT_TITLE = 'print-true-size.html — the same tiled onto pages at 100%, a test square on each: a printer scales without saying so';
   let mathsRowState = null;
   /** The row is always there; it waits, and says why, until a figure has numbers and a unit. */
   function syncMathsRow(board) {

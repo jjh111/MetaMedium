@@ -454,7 +454,7 @@ export async function boardsTest(browser, servers, ctx) {
     await until(page, () => !/not saved/.test(document.getElementById('status').textContent) && !window.__mm.board().inFlight, null, 10000);
     await switchTo(page, 'default');
     const kept16 = strokesIn((await storeOf(page, here16)).log);
-    check('N16. a board that is not saved is never left without a word: the switch is refused in the pane — the board stays on screen with its stroke, the ways out offered (export the log, leave it anyway), nothing the store held lost while writes fail — and once a save lands the switch goes, every stroke in the store',
+    check('N16. a board that is not saved is never left without a word: the switch is refused in the pane — the board stays on screen with its stroke, the ways out offered (save it as a file, leave it anyway), nothing the store held lost while writes fail — and once a save lands the switch goes, every stroke in the store',
       /is not saved/.test(refused16.said) && refused16.ways.includes('export') && refused16.ways.includes('leave') && refused16.current === here16 &&
         onScreen16.some((x) => sameSig(x, drawn16)) && during16 === before16 && kept16 === before16 + 2,
       { refused: refused16, onScreen: onScreen16.length, stored: { before: before16, whileFailing: during16, after: kept16 }, second: !!drawn16b });
@@ -626,7 +626,7 @@ export async function logFormatTest(browser, servers, ctx) {
     const said = await statusText(page);
     check('N19. the log the export pane writes is version 1: a header line naming the format, the version and the app that wrote it, then every event; and the status line says the version and that an older dyna.ink opens it too',
       head.format === 'metamedium-log' && head.version === 1 && head.app === version && JSON.stringify(lines.slice(1).map((l) => JSON.parse(l))) === want &&
-        /log version 1/.test(said) && /older dyna\.ink opens it too/.test(said),
+        /board file, version 1/.test(said) && /older dyna\.ink opens it too/.test(said),
       { head, events: lines.length - 1, app: version, said });
 
     // ---- N19b. version 1 back, and version 0 too --------------------------------------

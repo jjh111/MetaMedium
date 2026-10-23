@@ -646,7 +646,7 @@
         wrap.className = 'artifactFrame parked';
         const card = document.createElement('div');
         card.className = 'park';
-        card.innerHTML = '<b>' + esc(MM.wordOf(node) || id) + '</b>' + esc((rep.data.kind || 'html') + (rep.data.path ? ' · ' + rep.data.path : '')) + '<br>parked — past the live budget; pan closer to run it';
+        card.innerHTML = '<b>' + esc(MM.wordOf(node) || id) + '</b>' + esc((rep.data.kind || 'html') + (rep.data.path ? ' · ' + rep.data.path : '')) + '<br>waiting — only the nearest few run at once; pan closer to run it';
         wrap.appendChild(card);
         stage.appendChild(wrap);
         f = { wrap: wrap, iframe: null, codeAt: 'parked', parked: true };
@@ -4374,7 +4374,7 @@
     lastTap = null;
     session.summonMarks(group, Date.now());
     render(session.getState());
-    if (group.length > 1) flash('held with ' + (group.length - 1) + ' it hangs together with');
+    if (group.length > 1) flash('held, with the ' + (group.length - 1) + ' beside it that belong with it');
   }
 
   /** Is a world point inside the loop that waits to be taken up? */
@@ -5775,22 +5775,25 @@
         // rule the reading under a mark already follows: shown for the one the
         // hand is on, not for every mark on the board.
         if (chromeShown(s, id, inspectedId)) {
-          const name = (MM.wordOf(node) || '') + (isLive ? '  ·  live' : '');
+          const name = MM.wordOf(node) || '';
           if (paintOps) recordOp({ kind: 'chrome', id: id, text: name, box: boxOfRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY), moved: !!pl });
           brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
           text(name, b.minX, b.minY - wpx(10), C.gold);
         }
       } else if (b && !pending && id === inspectedId && !s.selection.length) {
         // The reading of the mark the hand just made (or is over), and only
-        // that one: what it is, and what it plays. Under every mark it was a
-        // board of fragments; the panel has the rest.
+        // that one: what it is. Under every mark it was a board of fragments;
+        // the panel has the rest. What it plays — node, edge, annotation — is
+        // the engine's word, so it is said in the panel's details and kept for
+        // the tests (`role`), never drawn under the mark (the UX pass, UX-08:
+        // "text · annotation" under a squiggle).
         const top = readingUnder(s, node, id);
         const role = readRungs(s).roles.get(id);
-        const played = role && role.role !== 'unclassified' && role.role !== top ? ' · ' + role.role : '';
+        const played = role && role.role !== 'unclassified' && role.role !== top ? role.role : null;
         if (top) {
-          readingDrawn = { id: id, text: top + played };
-          if (paintOps) recordOp({ kind: 'reading', id: id, text: top + played, box: boxOfRect(b.minX, b.maxY, 0, wpx(15)), moved: !!pl });
-          text(top + played, b.minX, b.maxY + wpx(15), `rgba(${C.labelRGB},0.85)`);
+          readingDrawn = { id: id, text: top, role: played };
+          if (paintOps) recordOp({ kind: 'reading', id: id, text: top, role: played, box: boxOfRect(b.minX, b.maxY, 0, wpx(15)), moved: !!pl });
+          text(top, b.minX, b.maxY + wpx(15), `rgba(${C.labelRGB},0.85)`);
         }
       }
     }
@@ -5839,7 +5842,7 @@
     const parts = strokes ? [strokes + ' mark' + (strokes === 1 ? '' : 's')] : []; // an empty board: the next move says it
     if (s.artifacts.length) {
       const running = liveSet(s).size;
-      parts.push(s.artifacts.length + ' thing' + (s.artifacts.length === 1 ? '' : 's') + ' made' + (s.live.length ? ' (' + (running < s.live.length ? running + ' of ' + s.live.length + ' live, the rest parked' : s.live.length + ' live') + ')' : ''));
+      parts.push(s.artifacts.length + ' thing' + (s.artifacts.length === 1 ? '' : 's') + ' made' + (running < s.live.length ? ' (' + running + ' of ' + s.live.length + ' shown — pan closer to the rest)' : ''));
     }
     if (s.regions.length) parts.push(s.regions.length + ' region' + (s.regions.length === 1 ? '' : 's'));
     const fs = folderStatus();
@@ -5881,7 +5884,7 @@
     if (key === statusSaid) return;
     statusSaid = key;
     if (!warn) { statusEl.textContent = text; return; }
-    const label = { export: 'export the log', folder: 'open a folder' };
+    const label = { export: 'save it as a file', folder: 'open a folder' };
     statusEl.innerHTML = '<span class="lead">' + esc(warn.lead) + '</span>' +
       (ways.length ? ': ' + ways.map((w) => '<button type="button" data-way="' + w + '">' + label[w] + '</button>').join(', or ') : '') +
       (text ? '<span class="rest">  ·  ' + esc(text) + '</span>' : '');
@@ -7312,7 +7315,7 @@
         run: () => copyMarks(marks) },
       { key: 'paste', core: true, label: 'Paste', verbs: ['paste'], why: clip ? 'Paste — the copied ink, beside these' : 'Paste — nothing copied yet', disabled: !clip, tier: 1,
         run: () => { if (!clip) return; const b = selectionBounds(s) || (marks.length ? union(marks.map((id) => MM.boundsOf(s.nodes.get(id))).filter(Boolean)) : null); pasteClip(b ? { x: b.maxX + wpx(40), y: b.minY } : screenToWorld(innerWidth / 2, innerHeight / 2)); refreshPalette(); } },
-      { key: 'erase', core: true, label: 'Erase', verbs: ['erase', 'delete', 'del', 'remove', 'rm'], why: 'Erase — the ink stays in the log; undo brings it back', disabled: !marks.length, tier: 1,
+      { key: 'erase', core: true, label: 'Erase', verbs: ['erase', 'delete', 'del', 'remove', 'rm'], why: 'Erase — undo brings it back', disabled: !marks.length, tier: 1,
         run: () => { const at = Date.now(); if (sum) session.dismiss(sum.id, at); marks.forEach((id) => session.erase(id, at)); flash('erased ' + marks.length + ' mark' + (marks.length === 1 ? '' : 's')); } },
     ];
   }
@@ -8514,6 +8517,15 @@
     return k === 'js' || k === 'run';
   }
 
+  /**
+   * What a thing made is, said over the panel in the person's words (the UX pass, UX-08: "LIVING PAGE",
+   * "LIVING TEXT"): a page, a program, a text — never the engine's kind, and never "living".
+   */
+  function kindEyebrow(kind) {
+    const WORDS = { html: 'a page', run: 'a program', js: 'a behaviour', text: 'a text', svg: 'a figure', mermaid: 'a diagram in words', json: 'data', md: 'notes', control: 'a control' };
+    return WORDS[kind] || (MM.isPictureKind(kind) ? 'a picture' : 'a ' + kind + ' file');
+  }
+
   /** The kind of an artifact's newest code rep, html by default. */
   function codeKindOf(node) { const r = node && codeRepOf(node); return (r && r.data.kind) || 'html'; }
 
@@ -8568,8 +8580,7 @@
     // Who made it: a mark's drawer, an artifact's blesser — never who drew its marks (V1-PLAN L2f).
     const author = authorOf(node);
     const authorName = nameOfParticipant(author);
-    const eyebrow = '<div class="eyebrow">' +
-      (isLive ? (codeKindOf(node) === 'html' ? 'living page' : codeKindOf(node) === 'mermaid' ? 'a diagram in words' : 'living ' + codeKindOf(node)) : isArtifact ? 'artifact' : isWordNode ? 'word' : 'mark') + '</div>';
+    const eyebrow = '<div class="eyebrow">' + (isLive ? kindEyebrow(codeKindOf(node)) : isArtifact ? 'a thing made' : isWordNode ? 'a word' : 'a mark') + '</div>';
     // What the person reads first (U1a): what it is and what it can become, in a few plain
     // lines. Everything the engine holds about it — ids, tiers, relations, measures — is
     // below, behind details.
@@ -8721,7 +8732,7 @@
         const m = mine && String(ownCode.data.code).match(new RegExp('<([a-z]+)[^>]*data-region="' + mine.id + '"'));
         rows.push(['code', isLive
           ? (codeKindOf(node) !== 'html' ? 'a running ' + codeKindOf(node) + (codeKindOf(node) === 'js' ? ' — code that runs when played' : '') : rung.genre && (rung.genre.genre === 'graph' || rung.genre.genre === 'mixed') ? 'a running diagram' : 'a running page')
-          : (m ? '<' + m[1] + ' data-region="' + mine.id + '">' : 'part of ' + (MM.wordOf(owner) || 'an artifact')),
+          : (m ? '<' + m[1] + ' data-region="' + mine.id + '">' : 'part of ' + (MM.wordOf(owner) || 'a thing made')),
           isLive && rung.genre ? rung.genre.reasoning : '']);
       }
       if (rows.length) {
@@ -8908,12 +8919,12 @@
       if (rep) {
         const kind = rep.data.kind || 'html';
         const what = kind === 'run' ? (rep.data.code && rep.data.code.startsWith(MM.GRAPH3D_MARK) ? 'a 3D thing' : 'a program') : kind === 'html' ? 'a page' : kind === 'text' ? 'text' : kind === 'mermaid' ? 'a diagram written in Mermaid' : MM.isPictureKind(kind) ? 'a picture' : 'a ' + kind + ' file';
-        return { here: 'an artifact, ' + what, next: kind === 'mermaid' ? (paletteItems.some((i) => i.key === 'mermaid-draw') ? 'Draw it puts it on the board as marks · ' : '') + 'edit the text for a new version · ink over a node addresses its marks' : 'ink over it addresses its parts · a brief is a new version · wire it in a frame' };
+        return { here: what + ', made', next: kind === 'mermaid' ? (paletteItems.some((i) => i.key === 'mermaid-draw') ? 'Draw it puts it on the board as marks · ' : '') + 'edit the words and it is drawn again · ink over a box in it reaches the marks it was written from' : 'ink over it reaches its parts · type a change and it is made again · wire it into a frame' };
       }
-      return { here: 'a definition' + (MM.wordOf(a) ? ' “' + MM.wordOf(a) + '”' : ''), next: 'another like it is matched · a brief builds on it · its tank plays' };
+      return { here: 'a definition' + (MM.wordOf(a) ? ' “' + MM.wordOf(a) + '”' : ''), next: 'another like it is recognised · type what to make from it · it can be played' };
     }
     const match = sum.suggestions.find((x) => x.kind === 'match');
-    if (match) return { here: 'a definition, ' + match.label + ' ' + (match.score || 1).toFixed(2) + (match.pack ? ', from ' + packSaid(match.pack) : ''), next: (libraryEntries(s).some((e) => e.id === match.artifactId) ? 'its program on this drawing' : 'take the name') + ' · a brief builds from it' };
+    if (match) return { here: 'a definition, ' + match.label + ' ' + (match.score || 1).toFixed(2) + (match.pack ? ', from ' + packSaid(match.pack) : ''), next: (libraryEntries(s).some((e) => e.id === match.artifactId) ? 'its program on this drawing' : 'take the name') + ' · type what to make from it' };
     const genre = reading.genre && reading.genre.genre;
     const concept = reading.concepts[0];
     // Writing becomes what Enter does with it: read, then text, a name or a label (W2, U2's walk).
@@ -8939,7 +8950,7 @@
     if (concept) return { here: 'a concept, ' + concept.concept + ' ' + concept.confidence.toFixed(2), next: concept.conversions.filter((c) => c.effect.kind !== 'name' && c.effect.kind !== 'prompt').map((c) => c.label).concat(['a name']).join(' · ') };
     const shapes = ids.map((id) => MM.topInterpretation(s.nodes.get(id))).filter(Boolean);
     if (shapes.length && shapes.every((x) => x === 'text')) return { here: 'writing', next: 'Read the writing · a name · text' };
-    return { here: 'shapes' + (shapes.length ? ', ' + [...new Set(shapes)].join(', ') : ''), next: 'draw them clean · a name · a brief is a program' };
+    return { here: 'shapes' + (shapes.length ? ', ' + [...new Set(shapes)].join(', ') : ''), next: 'draw them clean · a name · say what to make in a sentence' };
   }
 
   // What the selection reads as, kept while the log stands (R4c): a pan with
@@ -11616,8 +11627,8 @@
     if (s.state === 'readonly' || (s.state === 'armed' && s.trouble)) {
       if (s.state === 'readonly' && !s.dirty) return null; // nothing drawn here, nothing to keep
       const tab = s.trouble && (s.trouble.kind === 'tab' || s.trouble.kind === 'elsewhere');
-      if (tab) return { kind: 'not-kept', words: name + ' is open in another tab, and what was drawn on it here was not kept — export the log to keep it, or leave it as that tab has it', ways };
-      return { kind: 'unsaved', words: name + ' is not saved' + (s.trouble && s.trouble.kind === 'full' ? ' (the browser\'s storage is full)' : '') + ' — export the log to keep it, or leave it and lose what was not saved', ways };
+      if (tab) return { kind: 'not-kept', words: name + ' is open in another tab, and what was drawn on it here was not kept — save it as a file to keep it, or leave it as that tab has it', ways };
+      return { kind: 'unsaved', words: name + ' is not saved' + (s.trouble && s.trouble.kind === 'full' ? ' (the browser\'s storage is full)' : '') + ' — save it as a file to keep it, or leave it and lose what was not saved', ways };
     }
     if (s.state === 'armed') return s.inFlight || s.dirty || s.needWhole ? { kind: 'busy' } : null;
     return { kind: 'busy' }; // 'waiting': the store is still being opened
@@ -13634,7 +13645,7 @@
     try { logs = await store.readLogs(); }
     catch (err) {
       if (err && err.name === 'LogFormatError') { say(err.message); return null; }
-      readFailed = 'could not read the logs: ' + (err.message || err);
+      readFailed = 'could not read what the folder keeps of its boards: ' + (err.message || err);
     }
     // From here this page's log is the folder's or the room's: the board this
     // browser keeps stays as it was (where the hand left it too), and is not written again from this page.
@@ -13688,7 +13699,7 @@
     if (folder.how === 'folder' || folder.how === 'git' || folder.how === 'static') rememberPlace(folder.how, folder.name || folder.how, folder.name, opts.handle || null);
     syncBoardFaces();
     const misnumbered = [...folder.misnumbered.values()];
-    flash((carry ? 'the board is kept in ' + (folder.name || 'the folder') + ' now — ' + carry.length + ' event' + (carry.length === 1 ? '' : 's') + ' carried in, '
+    flash((carry ? 'the board is kept in ' + (folder.name || 'the folder') + ' now — ' + carry.length + ' change' + (carry.length === 1 ? '' : 's') + ' carried in, '
       : 'opened ' + (folder.name || 'a folder') + ': ') + entries.length + ' file' + (entries.length === 1 ? '' : 's') + (folder.truncated ? ' shown — the folder holds more' : '') +
       (misnumbered.length ? ' · ' + misnumbered.join(' · ') : ''));
     return folder;
@@ -14675,7 +14686,7 @@
     return { events };
   }
   /** What a log written by this page says of itself in the status line: the version, and that an older app opens it. */
-  function logFileNote() { return ' · log version ' + MM.LOG_VERSION + ' — an older dyna.ink opens it too'; }
+  function logFileNote() { return ' · a board file, version ' + MM.LOG_VERSION + ' — an older dyna.ink opens it too'; }
   /**
    * The version this page is: its <meta name="dynaink-version">, or — on a page an older worker kept — the name that
    * tag had before (17-boards.js's pageVersionOf, RENAME-PLAN N3b). '' for none.
@@ -14720,13 +14731,13 @@
       else if (b.notCarried.length) notes.push(plural(b.notCarried.length, 'picture') + ' named in this board ' + (b.notCarried.length === 1 ? 'is' : 'are') + ' not in the file — ' + (b.notCarried.length === 1 ? 'it stands' : 'they stand') + ' as ' + (b.notCarried.length === 1 ? 'its name' : 'their names'));
     } else {
       const r = readLogText(await file.text(), file.name);
-      if (!r.events) return refuse(r.refused || '“' + file.name + '” is not a board’s log — one event per line, as export writes it');
+      if (!r.events) return refuse(r.refused || '“' + file.name + '” is not a board — a board file is what “export” writes, one change a line');
       events = r.events;
       // A bare log names pictures it does not carry: the ones this device holds draw, the rest stand as their names.
       const named = [...assetsOfEvents(events)];
       const lacking = [];
       for (const ref of named) if (!(await assetGet(ref))) lacking.push(ref);
-      if (lacking.length) { notes = [plural(lacking.length, 'picture') + (lacking.length === 1 ? ' is' : ' are') + ' named in this log but ' + (lacking.length === 1 ? 'is' : 'are') + ' not in it — ' + (lacking.length === 1 ? 'it stands' : 'they stand') + ' as ' + (lacking.length === 1 ? 'its name' : 'their names') + '; export “board + pictures”, a .zip, to carry them']; }
+      if (lacking.length) { notes = [plural(lacking.length, 'picture') + (lacking.length === 1 ? ' is' : ' are') + ' named on this board but ' + (lacking.length === 1 ? 'is' : 'are') + ' not in it — ' + (lacking.length === 1 ? 'it stands' : 'they stand') + ' as ' + (lacking.length === 1 ? 'its name' : 'their names') + '; export “board + pictures”, a .zip, to carry them']; }
     }
     try {
       const made = await newBoard(Object.assign({}, o, { name: name, events: events }));
@@ -14802,7 +14813,7 @@
       if (!br.ok) { failed.push({ name: b.name, why: br.words }); continue; }
       let read;
       try { read = readLogText(br.text, b.name); } catch (err) { read = { notLog: true }; }
-      if (!read.events) { failed.push({ name: b.name, why: read.refused || 'its board.jsonl is not a board’s log' }); continue; }
+      if (!read.events) { failed.push({ name: b.name, why: read.refused || 'the board in it cannot be read' }); continue; }
       incoming.push({ key: key, name: b.name, view: b.view, events: read.events, assets: br.assets, damaged: br.damaged.length, hash: await logHash(read.events) });
     }
     const held = await carryHeld();
@@ -14858,7 +14869,7 @@
    */
   async function resetBoard() {
     if (boards.how !== 'indexeddb') {
-      if (Date.now() - board.resetArmed > 5000) { board.resetArmed = Date.now(); say('this browser keeps one board here and has no trash — export the log to keep it; Reset again within 5 s empties it'); return false; }
+      if (Date.now() - board.resetArmed > 5000) { board.resetArmed = Date.now(); say('this browser keeps one board here and has no trash — save it as a file to keep it; Reset again within 5 s empties it'); return false; }
       board.resetArmed = 0;
       await forgetLocalLog();
       location.reload();
@@ -14949,7 +14960,7 @@
   function exportLogNow() {
     const evs = session.getEvents();
     downloadText('canvas.jsonl', MM.encodeLog(evs, logWrite()), 'application/json');
-    flash('canvas.jsonl — the whole board, ' + evs.length + ' events, to keep' + logFileNote());
+    flash('canvas.jsonl — the whole board as a file, ' + evs.length + ' change' + (evs.length === 1 ? '' : 's') + ', to keep' + logFileNote());
   }
   statusEl.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('button[data-way]');
@@ -15076,7 +15087,7 @@
     viewBarEl.hidden = false;
     const order = gridOrder(s);
     if (viewMode === 'grid') {
-      viewBarEl.innerHTML = '<b>' + order.length + '</b> artifact' + (order.length === 1 ? '' : 's') + ' · sort ' +
+      viewBarEl.innerHTML = '<b>' + order.length + '</b> thing' + (order.length === 1 ? '' : 's') + ' made · sort ' +
         ['name', 'kind', 'recency', 'folder'].map((k) => '<button data-sort="' + k + '"' + (gridSort === k ? ' class="on"' : '') + '>' + k + '</button>').join('') +
         '<button data-view="canvas" title="Esc">canvas</button>';
     } else {
@@ -15096,7 +15107,7 @@
 
   function renderGrid(s) {
     const order = gridOrder(s);
-    let html = order.length ? '<div class="cards">' : '<div class="empty">no artifacts yet — name something, or open a folder</div><div class="cards">';
+    let html = order.length ? '<div class="cards">' : '<div class="empty">nothing made yet — name something you drew, or open a folder</div><div class="cards">';
     for (const id of order) {
       const n = s.nodes.get(id);
       const r = codeRepOf(n);
@@ -15889,7 +15900,7 @@
     if (t.figures) parts.push(plural(t.figures, 'figure'));
     if (t.writing) parts.push(t.writing === 1 ? 'writing' : t.writing + ' lines of writing');
     if (t.strokes) parts.push(plural(t.strokes, 'stroke'));
-    const left = t.left ? ' · ' + plural(t.left, 'page or program', 'pages and programs') + ' not drawn — only their text stands in the log' : '';
+    const left = t.left ? ' · ' + plural(t.left, 'page or program', 'pages and programs') + ' not drawn — the board file keeps them' : '';
     return name + ' — ' + of + (parts.length ? ': ' + parts.join(', ') : '') + (extra ? ' · ' + extra : '') + left;
   }
 
@@ -16096,7 +16107,7 @@
     const r = await bundleRead(bytes, { inflate: inflateRaw, digest: digestHex });
     if (!r.ok) return r;
     const read = readLogText(r.text, file.name);
-    if (!read.events) return { ok: false, words: read.refused || 'the board.jsonl in this zip is not a board’s log — nothing was opened' };
+    if (!read.events) return { ok: false, words: read.refused || 'the board.jsonl in this zip cannot be read as a board — nothing was opened' };
     const info = new Map();
     for (const ev of read.events) if (ev && ev.type === 'import' && isAssetRef(ev.asset)) info.set(ev.asset, { mime: ev.mime, w: ev.w, h: ev.h });
     let stored = 0;
@@ -16116,7 +16127,7 @@
     const z = await zipRead(bytes, { inflate: inflateRaw });
     if (!z.ok) return { ok: false, words: z.words };
     const log = z.entries.find((e) => e.name === BUNDLE_LOG);
-    if (!log) return { ok: false, words: 'no log' };
+    if (!log) return { ok: false, words: 'no board in it' };
     const text = new TextDecoder().decode(log.data);
     return {
       ok: true, names: z.entries.map((e) => e.name), entries: z.entries.map((e) => ({ name: e.name, dataAt: e.data.byteOffset - bytes.byteOffset, bad: e.bad || null })),
@@ -16146,7 +16157,7 @@
     else if (which === 'log') {
       const evs = session.getEvents(), pics = assetsOfEvents(evs).size;
       downloadText('canvas.jsonl', MM.encodeLog(evs, logWrite()), 'application/json');
-      flash('canvas.jsonl — ' + evs.length + ' events' + logFileNote() + (pics ? ' · its ' + plural(pics, 'picture') + (pics === 1 ? ' is' : ' are') + ' not in it — export “board + pictures”, a .zip, to carry them' : ''));
+      flash('canvas.jsonl — the board as a file, ' + evs.length + ' change' + (evs.length === 1 ? '' : 's') + logFileNote() + (pics ? ' · its ' + plural(pics, 'picture') + (pics === 1 ? ' is' : ' are') + ' not in it — export “board + pictures”, a .zip, to carry them' : ''));
     }
     closePanel(exportPanel, exportBtn);
   });
@@ -16355,7 +16366,7 @@
     }
     if (!text.trim()) return null;
     const id = typeText({ x: e.bounds.minX, y: e.bounds.minY }, text);
-    flash('text: a file of words — circle it with a page to wire it into a slot');
+    flash('a text on the board — double-click it to change the words; undo takes it away');
     return id;
   }
   function cancelTextEdit() {
@@ -16436,26 +16447,26 @@
     ui.tile(tiles.snap, 'snap', snapMode, { on: snapMode !== 'off', why: 'offer: a dashed ghost under a confident shape · auto: drawn clean as you draw · off' });
     const n = heldCandidates.length || snapOffers.size;
     if (tiles.snapNow) { tiles.snapNow.hidden = n === 0; ui.tile(tiles.snapNow, heldCandidates.length ? 'snap circled' : 'snap now', n ? String(n) : '', { why: 'redraw every confidently read shape clean; the ink stays underneath' }); }
-    ui.tile(tiles.view, 'view', viewMode === 'canvas' ? 'canvas' : viewMode, { on: viewMode !== 'canvas', why: 'canvas, or every artifact as a card' });
-    ui.tile(tiles.theme, 'theme', themeMode, { why: 'system follows the OS; light and dark are the same tokens inverted' });
+    ui.tile(tiles.view, 'layout', viewMode === 'grid' ? 'cards' : viewMode, { on: viewMode !== 'canvas', why: 'the board as one canvas, or every thing made on it as a card — Esc comes back' });
+    ui.tile(tiles.theme, 'theme', themeMode, { why: 'light, dark, or system — which follows your device' });
     // The hand: which side of the pen tip the field opens on — and, once a pen has been seen here, what draws (V1-PLAN R6).
     ui.tile(tiles.hand, 'hand', handFace(hand, draws), draws
       ? { on: draws === 'pen', why: 'which side of the pen tip the field opens on, and what draws: the pen — a finger pans and pinches, and a palm on the glass is ignored — or a finger too. A tap changes one word' }
       : { why: 'which side of the pen tip the field opens on' });
     ui.tile(tiles.autoRead, 'auto-read', autoRead ? 'on' : 'off', { on: autoRead, why: 'read handwriting with a model as it is written; off asks only when you say read' });
-    ui.tile(tiles.folder, folder.store ? (folder.how === 'git' ? 'repo' : folder.how === 'static' ? 'site' : 'folder') : 'folder', folder.store ? (folder.name || 'open') : 'open…', { on: !!folder.store, why: 'a folder is the canvas: its files are artifacts, your ink is saved beside them' });
+    ui.tile(tiles.folder, folder.store ? (folder.how === 'git' ? 'repo' : folder.how === 'static' ? 'site' : 'folder') : 'folder', folder.store ? (folder.name || 'open') : 'open…', { on: !!folder.store, why: 'a folder on this computer as the board: each file in it a thing on the board, your ink kept beside them' });
     ui.tile(tiles.imp, 'import', '…', { why: 'photos from your library, a picture from the camera, or a file of a known kind — pictures are kept with the board and drawn on it, under your ink. Drop or paste works too' });
-    ui.tile(tiles.exp, 'export', '…', { why: 'the board as SVG or PNG, or the session as its log' });
+    ui.tile(tiles.exp, 'export', '…', { why: 'the board as a file to keep or send: with its pictures, as a picture or a page, or as a board file to open again' });
     const seated = agents.map((a) => modelWords(a)).concat(deciderHost() ? [deciderHost().name + ' (decider)'] : []);
     ui.tile(tiles.models, 'models', seated.length ? seated.join(', ') : 'none', { on: seated.length > 0, why: 'a model joins as a participant, in a seat if you give it one; it is asked only when you ask' });
     ui.tile(tiles.teach, 'mark', s.commandMark ? s.commandMark.name : 'check ✓', { on: !!s.commandMark, why: 'the mark that turns a circled group into a selection; teach your own' });
     ui.tile(tiles.reset, 'reset', 'fresh board', { why: 'a fresh board under the same name — what this one holds goes to the trash, from which it comes back whole' });
     ui.tile(tiles.help, 'help', '?', { why: 'how to use the canvas, on one page: draw, hold, choose — and models, boards, rooms, your mark, the shortcuts' });
-    ui.tile(tiles.live, 'live', folder.how === 'live' ? roomShort(folder.name) : 'share…', { on: folder.how === 'live', why: 'share this board: anyone you send the link to draws on it with you, live — or join a room' });
+    ui.tile(tiles.live, 'share', folder.how === 'live' ? roomShort(folder.name) : '…', { on: folder.how === 'live', why: 'share this board: anyone you send the link to draws on it with you, as you draw — or join a room' });
     // Its face is the name of what is on screen (V1-PLAN R1); the pane is 22-boards.js.
     ui.tile(tiles.boards, 'boards', boardOnScreenName() || '…', { why: 'the boards this browser keeps — new, open, rename, duplicate, delete, and the trash — and the folders, repositories and sites opened lately' });
     // The library packs this board uses (V1-PLAN §2.3, B3), last in the grid; the pane is 23-packs.js.
-    ui.tile(tiles.packs, 'packs', packsFace(s), { on: s.packs.length > 0, why: 'the library packs this board uses — premade definitions and notations, matched as if you had taught them; using one is an event in the board’s log, and undo takes it back' });
+    ui.tile(tiles.packs, 'packs', packsFace(s), { on: s.packs.length > 0, why: 'the library packs this board uses — things already drawn and named for you, recognised as if you had taught them; undo takes a pack back' });
     // While in a room, the chip in the bar: the room and who is here (24-room.js).
     syncRoomChip();
   }
@@ -16470,7 +16481,7 @@
   // A live room: Share this board — or, in a room, who is here, the invite, a copy, Leave (24-room.js) — and under
   // "more", a room by its name or an invite link pasted, and "with Claude".
   const livePanel = document.getElementById('livePanel');
-  ui.pane(livePanel, 'live', () => { closePanel(livePanel, tiles.live); const l = document.getElementById('liveLink'); if (l) { l.hidden = true; l.value = ''; } });
+  ui.pane(livePanel, 'share', () => { closePanel(livePanel, tiles.live); const l = document.getElementById('liveLink'); if (l) { l.hidden = true; l.value = ''; } });
   tiles.live.onclick = () => {
     togglePanel(livePanel, tiles.live);
     if (livePanel.hasAttribute('hidden')) return;
@@ -16875,7 +16886,7 @@
     if (here.notice) frag.appendChild(homeNoticeEl(here));
     const head = bdJoin(bdEl('div', 'bdHead'), [
       bdButton('New board', 'bdNew', { boardNew: '' }, 'a new, empty board — the one on screen stays as it is'),
-      bdButton('from a file…', 'bdFrom', { boardFile: '' }, 'a board from a .zip made by export with its pictures, or from a log file — one event per line'),
+      bdButton('from a file…', 'bdFrom', { boardFile: '' }, 'a board from a file: a .zip that export made with its pictures, or a board file it made'),
     ]);
     if (!many) head.querySelectorAll('button').forEach((b) => { b.disabled = true; });
     frag.appendChild(head);
@@ -16990,7 +17001,7 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         read = readLogText(await res.text(), row.name);
       } catch (err) { report('could not read the “' + row.name + '” example (' + ((err && err.message) || err) + ') — it opens once this page has been online'); return false; }
-      if (!read.events) { report(read.refused || 'the “' + row.name + '” example is not a board’s log'); return false; }
+      if (!read.events) { report(read.refused || 'the “' + row.name + '” example cannot be read as a board'); return false; }
       const events = read.events;
       const made = await newBoard({ name: exampleName([...boards.entries.values()], row), events: events, force: !!o.force, said: o.said || ((v) => say(v.words)) });
       // A shipped example IS the program shown — the launch film — and its code
@@ -17021,7 +17032,7 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         read = readLogText(await res.text(), row.name);
       } catch (err) { say('could not read the “' + row.name + '” example (' + ((err && err.message) || err) + ')'); return; }
-      if (!read.events) { say(read.refused || 'the “' + row.name + '” example is not a board’s log'); return; }
+      if (!read.events) { say(read.refused || 'the “' + row.name + '” example cannot be read as a board'); return; }
       // Unless the reader has drawn on the figure before the log arrived: theirs stands.
       if (session.getEvents().length) return;
       session.load(read.events);
@@ -17078,7 +17089,7 @@
     if (!bd.said) return;
     const parts = [document.createTextNode(bd.said.words)];
     for (const w of bd.said.ways) {
-      if (w === 'export') parts.push(bdButton('export the log', 'bdWay', { leaveWay: 'export' }, 'the whole board on screen, as a file to keep'));
+      if (w === 'export') parts.push(bdButton('save it as a file', 'bdWay', { leaveWay: 'export' }, 'the whole board on screen, as a file to keep'));
       else if (w === 'leave' && bd.said.retry) parts.push(bdButton('leave it anyway', 'bdWay', { leaveWay: 'leave' }, 'what was not saved is lost'));
     }
     bdJoin(bdStatus, parts);
@@ -17423,10 +17434,20 @@
 
   /** A pack as a match says it, short: `basics@1` → `basics`. */
   function packShort(ref) { return String(ref || '').split('@')[0]; }
-  /** A pack as a tooltip says it: `the Basics pack (basics@1)`. */
+  /** A pack as a tooltip says it: `the Basics pack` — its name, never its id (`basics@1`, the UX pass, UX-08). */
   function packSaid(ref) {
     const p = MM.shippedPack(ref);
-    return 'the ' + (p ? p.name : packShort(ref)) + ' pack (' + ref + ')';
+    return 'the ' + (p ? p.name : packShort(ref)) + ' pack';
+  }
+  /** A pack's name, as the pane and the status line say it. */
+  function packName(ref) { const p = MM.shippedPack(ref); return p ? p.name : packShort(ref); }
+  /** The plural of a symbol or a connector's name: branch → branches, self → self-calls (a word, never name + 's'). */
+  const PLURALS = { self: 'self-calls' };
+  function pluralWord(w) {
+    if (PLURALS[w]) return PLURALS[w];
+    if (/(?:s|x|z|ch|sh)$/.test(w)) return w + 'es';
+    if (/[^aeiou]y$/.test(w)) return w.slice(0, -1) + 'ies';
+    return w + 's';
   }
   /** The tile's face: the packs this board uses, short — or none; a name this build lacks shows as a question. */
   function packsFace(s) {
@@ -17440,7 +17461,10 @@
     if (p.definitions.length) parts.push(p.definitions.map((d) => d.name).join(', '));
     if (p.notation) {
       const n = MM.notationById(p.notation);
-      parts.push('the ' + (n ? n.name.toLowerCase() : p.notation) + ' notation' + (n ? ': ' + n.symbols.map((x) => x.name).concat(n.connectors.map((x) => x.name + 's')).join(', ') : ''));
+      // "Flowchart" → "a flowchart", "ER diagram" → "an ER diagram": a name in capitals keeps them.
+      const what = n ? (/^[A-Z]{2}/.test(n.name) ? n.name : n.name[0].toLowerCase() + n.name.slice(1)) : p.notation;
+      const joins = n && n.connectors.length ? ' — joined by ' + n.connectors.map((x) => pluralWord(x.name)).join(', ') : '';
+      parts.push('reads ' + (/^(?:[aeio]|ER\b)/i.test(what) ? 'an ' : 'a ') + what + (n ? ': ' + n.symbols.map((x) => x.name).join(', ') + joins : ''));
     }
     if (p.connectors && p.connectors.length) parts.push(p.connectors.map((c) => c.name).join(', '));
     return parts.join(' · ');
@@ -17474,16 +17498,16 @@
       const top = row.appendChild(pkEl('div', 'pkTop'));
       top.appendChild(pkEl('span', 'pkName', p.name));
       top.appendChild(document.createTextNode(' '));
-      top.appendChild(ui.chip(ref, { cls: 'pkRef', why: 'its name and version — content under one name never changes' }));
-      if (used) { top.appendChild(document.createTextNode(' ')); top.appendChild(ui.chip('in use', { cls: 'pkUsed', why: 'this board uses it: its log says so' })); }
+      top.appendChild(ui.chip('version ' + p.version, { cls: 'pkRef', why: 'what a pack holds under one version never changes' }));
+      if (used) { top.appendChild(document.createTextNode(' ')); top.appendChild(ui.chip('in use', { cls: 'pkUsed', why: 'this board uses it' })); }
       row.appendChild(pkEl('div', 'pkWhat', p.describes));
       const holds = packHolds(p);
       if (holds) row.appendChild(pkEl('div', 'pkHolds', holds));
       const b = row.appendChild(pkEl('button', '', used ? 'stop using' : 'use'));
       b.type = 'button';
       b.dataset[used ? 'unuse' : 'use'] = ref;
-      b.title = used ? 'its definitions leave this board’s matching — an event in its log; undo brings them back'
-        : 'this board uses it from now on — an event in its log: what it ships is matched here, attributed to it';
+      b.title = used ? 'what it holds is no longer recognised on this board — undo brings it back'
+        : 'this board uses it from now on: what it holds is recognised here, and says it came from the pack — undo takes it back';
     }
     // What this board names that this build does not ship: said, never hidden, and it can be let go.
     for (const n of s.packNotices || []) {
@@ -17497,7 +17521,7 @@
       const b = row.appendChild(pkEl('button', '', 'stop using'));
       b.type = 'button';
       b.dataset.unuse = n.pack;
-      b.title = 'the board stops naming it — an event in its log';
+      b.title = 'the board stops asking for it — undo brings it back';
     }
     pkList.replaceChildren(frag);
   }
@@ -17514,13 +17538,13 @@
         const refused = session.use(d.use, Date.now());
         if (refused) { pkSay(refused.detail); return; }
         const p = MM.shippedPack(d.use);
-        const what = p && p.definitions.length ? p.definitions.map((x) => x.name).join(', ') + ' matched here' : p && p.notation ? 'its notation’s ports on the pen' : 'in use';
-        pkSay('this board uses ' + d.use + ' — ' + what + '; undo takes it back');
+        const what = p && p.definitions.length ? p.definitions.map((x) => x.name).join(', ') + ' recognised here' : p && p.notation ? 'the pen ties lines to its symbols' : 'in use';
+        pkSay('this board uses ' + packSaid(d.use) + ' — ' + what + '; undo takes it back');
         say('using ' + packSaid(d.use) + ' — ' + what);
       } else if (d.unuse !== undefined) {
         session.unuse(d.unuse, Date.now());
-        pkSay('this board no longer uses ' + d.unuse + '; undo brings it back');
-        say('stopped using ' + d.unuse);
+        pkSay('this board no longer uses ' + packSaid(d.unuse) + '; undo brings it back');
+        say('stopped using ' + packSaid(d.unuse));
       }
       syncTiles();
       renderPacksPane();
@@ -18219,10 +18243,10 @@
   /** Why the seat cannot take a question on this page now, in one sentence — or null. */
   function whyNoSeat() {
     if (folder.how !== 'live' || !folder.store) {
-      return 'Claude answers here once this page is in its room — tap “with Claude” in the live tile, or open this page with ?live=' + CLAUDE_ROOM + '&relay=' + CLAUDE_RELAY + (ownRelay(CLAUDE_RELAY) ? '#key=… (the room’s key)' : '') + '.';
+      return 'Claude answers here once this page is in Claude’s room — tap share, then “with Claude” under more ways in.';
     }
-    if (!folder.relay) return 'This room is between tabs on this machine, and Claude’s hand reaches a room only through a relay — tap “with Claude” in the live tile.';
-    if (MM.providerLocality({ baseUrl: folder.relay }) !== 'local' && !ownRelay(folder.relay)) return 'This room’s relay is on another machine, and the seat asks only through a relay on this one or the dyna.ink relay — tap “with Claude” in the live tile.';
+    if (!folder.relay) return 'This room is between tabs on this machine, and Claude reaches a room only through a relay — tap share, then “with Claude” under more ways in.';
+    if (MM.providerLocality({ baseUrl: folder.relay }) !== 'local' && !ownRelay(folder.relay)) return 'This room’s relay is on another machine, and Claude is asked only through a relay on this one or dyna.ink’s own — tap share, then “with Claude” under more ways in.';
     return null;
   }
 
@@ -18347,8 +18371,8 @@
       html += '<div class="note">' + esc(here + ' is here, and sees: seated, What is this?, Read the writing and ask: go to it') + '</div>';
     } else {
       html += '<div class="note">' + esc(folder.name === CLAUDE_ROOM
-        ? 'Claude isn’t in this room yet — it joins whenever Claude Code is open in this project (its hand is node Demos/mcp.mjs), and is offered here the moment it is heard.'
-        : 'Claude isn’t in room “' + folder.name + '” — its hand joins room “' + CLAUDE_ROOM + '”: tap “with Claude” in the live tile.') + '</div>';
+        ? 'Claude isn’t in this room yet — it joins whenever Claude Code is open in this project, and is offered here the moment it is heard.'
+        : 'Claude isn’t in room “' + folder.name + '” — it joins room “' + CLAUDE_ROOM + '”: tap share, then “with Claude” under more ways in.') + '</div>';
     }
     seatSection.innerHTML = html;
     const join1 = seatSection.querySelector('#mpSeatJoin');
@@ -18643,11 +18667,11 @@
   // ===== The export pane's row: the figure at its real size =================
   const mathsRow = document.createElement('div');
   mathsRow.className = 'exRow exMaths';
-  mathsRow.innerHTML = '<button data-mathsout="svg">true-size.svg</button><button data-mathsout="print">print.html</button>';
+  mathsRow.innerHTML = '<button data-mathsout="svg">true size · SVG</button><button data-mathsout="print">print at true size</button>';
   exportPanel.appendChild(mathsRow);
   const MATHS_WAITS = 'the figures at their real size — label a side, in inches or centimetres, and this draws it';
-  const MATHS_SVG_TITLE = 'Every labelled figure drawn from its numbers at its real size: the root in paper inches or centimetres';
-  const MATHS_PRINT_TITLE = 'The same tiled onto pages at 100%, a test square on each — a printer scales without saying so';
+  const MATHS_SVG_TITLE = 'true-size.svg — every labelled figure drawn from its numbers at its real size, in paper inches or centimetres';
+  const MATHS_PRINT_TITLE = 'print-true-size.html — the same tiled onto pages at 100%, a test square on each: a printer scales without saying so';
   let mathsRowState = null;
   /** The row is always there; it waits, and says why, until a figure has numbers and a unit. */
   function syncMathsRow(board) {
@@ -18737,6 +18761,8 @@
 
   // ===== Draw it: a text drawn as ink ========================================
   const MERMAID_THINGS = { sequence: ['participant', 'participants'], 'uml-class': ['class', 'classes'] };
+  // What Mermaid calls a node, in the person's word (the UX pass, UX-08).
+  const MERMAID_THING = ['shape', 'shapes'];
   const MERMAID_LINKS = { sequence: ['message', 'messages'] };
   const mermaidCount = (n, [one, many]) => n + ' ' + (n === 1 ? one : many);
   let mermaidDrawn = null;
@@ -18756,7 +18782,7 @@
     const article = /^[A-Z]{2,}\b/.test(called) ? 'a ' + called : (/^[aeio]/i.test(called) ? 'an ' : 'a ') + called.toLowerCase();
     const nodes = Object.keys(drawn.ids).length;
     let out = drawn.bounds
-      ? 'drew ' + article + ' from ' + name + ': ' + mermaidCount(nodes, MERMAID_THINGS[drawn.notation] || ['node', 'nodes']) + ' and ' + mermaidCount(drawn.links.length, MERMAID_LINKS[drawn.notation] || ['link', 'links'])
+      ? 'drew ' + article + ' from ' + name + ': ' + mermaidCount(nodes, MERMAID_THINGS[drawn.notation] || MERMAID_THING) + ' and ' + mermaidCount(drawn.links.length, MERMAID_LINKS[drawn.notation] || ['link', 'links'])
       : 'nothing was drawn from ' + name;
     const parts = [];
     if (drawn.refused.length) {
@@ -18809,7 +18835,7 @@
     const read = MM.readMermaid(rep.data.code);
     if (read.notation) {
       session.summonMarks([artifactId], Date.now());
-      say(name + ': ' + mermaidCount(read.nodes.length, MERMAID_THINGS[read.notation] || ['node', 'nodes']) + ' of Mermaid — Draw it puts it on the board as marks');
+      say(name + ': ' + mermaidCount(read.nodes.length, MERMAID_THINGS[read.notation] || MERMAID_THING) + ' of Mermaid — Draw it puts it on the board as marks');
     } else {
       const why = read.refused.length ? read.refused[0].reason : 'it is not a diagram the canvas reads';
       say(name + ' stands as text: the canvas cannot draw it yet — ' + why);
@@ -18842,8 +18868,8 @@
     exMermaid.hidden = !got;
     if (!got) return;
     const b = exMermaid.querySelector('button');
-    b.textContent = got.said.reading.notation + '.mmd';
-    b.title = (got.scope === 'held' ? 'The marks held' : 'The board') + ' as Mermaid text — ' + MM.describeNotation(got.said.reading);
+    b.textContent = 'Mermaid text';
+    b.title = got.said.reading.notation + '.mmd — ' + (got.scope === 'held' ? 'the marks held' : 'the board') + ' as Mermaid text: ' + MM.describeNotation(got.said.reading);
   }
   exportBtn.addEventListener('click', refreshMermaidRow);
   exportPanel.addEventListener('click', (e) => {

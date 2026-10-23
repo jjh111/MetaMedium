@@ -997,22 +997,25 @@
         // rule the reading under a mark already follows: shown for the one the
         // hand is on, not for every mark on the board.
         if (chromeShown(s, id, inspectedId)) {
-          const name = (MM.wordOf(node) || '') + (isLive ? '  ·  live' : '');
+          const name = MM.wordOf(node) || '';
           if (paintOps) recordOp({ kind: 'chrome', id: id, text: name, box: boxOfRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY), moved: !!pl });
           brackets(b, isLive ? C.gold : `rgba(${C.goldRGB},0.7)`);
           text(name, b.minX, b.minY - wpx(10), C.gold);
         }
       } else if (b && !pending && id === inspectedId && !s.selection.length) {
         // The reading of the mark the hand just made (or is over), and only
-        // that one: what it is, and what it plays. Under every mark it was a
-        // board of fragments; the panel has the rest.
+        // that one: what it is. Under every mark it was a board of fragments;
+        // the panel has the rest. What it plays — node, edge, annotation — is
+        // the engine's word, so it is said in the panel's details and kept for
+        // the tests (`role`), never drawn under the mark (the UX pass, UX-08:
+        // "text · annotation" under a squiggle).
         const top = readingUnder(s, node, id);
         const role = readRungs(s).roles.get(id);
-        const played = role && role.role !== 'unclassified' && role.role !== top ? ' · ' + role.role : '';
+        const played = role && role.role !== 'unclassified' && role.role !== top ? role.role : null;
         if (top) {
-          readingDrawn = { id: id, text: top + played };
-          if (paintOps) recordOp({ kind: 'reading', id: id, text: top + played, box: boxOfRect(b.minX, b.maxY, 0, wpx(15)), moved: !!pl });
-          text(top + played, b.minX, b.maxY + wpx(15), `rgba(${C.labelRGB},0.85)`);
+          readingDrawn = { id: id, text: top, role: played };
+          if (paintOps) recordOp({ kind: 'reading', id: id, text: top, role: played, box: boxOfRect(b.minX, b.maxY, 0, wpx(15)), moved: !!pl });
+          text(top, b.minX, b.maxY + wpx(15), `rgba(${C.labelRGB},0.85)`);
         }
       }
     }
@@ -1061,7 +1064,7 @@
     const parts = strokes ? [strokes + ' mark' + (strokes === 1 ? '' : 's')] : []; // an empty board: the next move says it
     if (s.artifacts.length) {
       const running = liveSet(s).size;
-      parts.push(s.artifacts.length + ' thing' + (s.artifacts.length === 1 ? '' : 's') + ' made' + (s.live.length ? ' (' + (running < s.live.length ? running + ' of ' + s.live.length + ' live, the rest parked' : s.live.length + ' live') + ')' : ''));
+      parts.push(s.artifacts.length + ' thing' + (s.artifacts.length === 1 ? '' : 's') + ' made' + (running < s.live.length ? ' (' + running + ' of ' + s.live.length + ' shown — pan closer to the rest)' : ''));
     }
     if (s.regions.length) parts.push(s.regions.length + ' region' + (s.regions.length === 1 ? '' : 's'));
     const fs = folderStatus();
@@ -1103,7 +1106,7 @@
     if (key === statusSaid) return;
     statusSaid = key;
     if (!warn) { statusEl.textContent = text; return; }
-    const label = { export: 'export the log', folder: 'open a folder' };
+    const label = { export: 'save it as a file', folder: 'open a folder' };
     statusEl.innerHTML = '<span class="lead">' + esc(warn.lead) + '</span>' +
       (ways.length ? ': ' + ways.map((w) => '<button type="button" data-way="' + w + '">' + label[w] + '</button>').join(', or ') : '') +
       (text ? '<span class="rest">  ·  ' + esc(text) + '</span>' : '');

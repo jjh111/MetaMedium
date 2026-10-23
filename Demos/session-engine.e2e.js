@@ -2223,7 +2223,7 @@ window.__scenario = async function(){
     await wait(60);
     const iframes = document.querySelectorAll('#stage .artifactFrame iframe').length;
     const parked = document.querySelectorAll('#stage .artifactFrame.parked').length;
-    step('23c. past the live budget, artifacts are parked cards, and the status says so', iframes === 12 && parked === 4 && /12 of 16 live/.test(document.getElementById('status').dataset.standing), { iframes, parked, standing: document.getElementById('status').dataset.standing });
+    step('23c. past the live budget, artifacts are parked cards, and the status says so in the person’s words', iframes === 12 && parked === 4 && /12 of 16 shown/.test(document.getElementById('status').dataset.standing), { iframes, parked, standing: document.getElementById('status').dataset.standing });
     // Views: the grid lists every artifact; a card focuses it; Esc is the canvas again.
     mm.setViewMode('grid');
     const cards = document.querySelectorAll('#grid .card').length;
@@ -3652,7 +3652,8 @@ window.__scenario = async function(){
     mm.session.load([]); mm.setView(1, 0, 0); await wait(30);
     const until48 = async (pred) => { for (let i = 0; i < 40 && !pred(); i++) await wait(50); };
     const lastId = () => { const st = mm.session.getState(); return st.contentIds[st.contentIds.length - 1]; };
-    const readingNow = () => { const r = mm.readingDrawn(); return r ? r.id + ' ' + r.text : null; };
+    // What is drawn under the mark, and what it plays — kept beside it, never drawn (UX-08).
+    const readingNow = () => { const r = mm.readingDrawn(); return r ? r.id + ' ' + r.text + (r.role ? ' · ' + r.role : '') : null; };
     const panel = () => document.getElementById('inspector').textContent;
     const hoverAt = (x, y) => document.getElementById('canvas').dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, isPrimary: true, bubbles: true, clientX: x, clientY: y, button: 0, buttons: 0 }));
     const leave = () => document.getElementById('canvas').dispatchEvent(new PointerEvent('pointerleave', { pointerId: 1, bubbles: true }));
@@ -3982,7 +3983,7 @@ window.__scenario = async function(){
     const topText51 = top51 ? top51.querySelector('span').textContent : '';
     const ranked51 = (mm.fieldItems('') || { ranked: [] }).ranked;
     step('51a. the canonical molecule drawn with nothing taught is named — the chip beside it and the field’s first reading say “molecule … · basics”, the tooltip the pack it came from — and nothing is made, no model asked',
-      !!chip51 && /^molecule \d\.\d\d · basics$/.test(chip51.text) && /^molecule \d\.\d\d · basics$/.test(topText51) && !!top51 && /from the Basics pack \(basics@1\)/.test(top51.title) &&
+      !!chip51 && /^molecule \d\.\d\d · basics$/.test(chip51.text) && /^molecule \d\.\d\d · basics$/.test(topText51) && !!top51 && /from the Basics pack\b/.test(top51.title) && !/@\d/.test(top51.title) &&
         ranked51.length > 0 && ranked51[0].key.startsWith('sug:') && mm.session.getState().artifacts.length === 0,
       { chip: chip51 && chip51.text, top: topText51, title: top51 && top51.title, first: ranked51[0] && ranked51[0].key, artifacts: mm.session.getState().artifacts.length });
     await letGo51();

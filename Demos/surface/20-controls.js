@@ -53,26 +53,26 @@
     ui.tile(tiles.snap, 'snap', snapMode, { on: snapMode !== 'off', why: 'offer: a dashed ghost under a confident shape · auto: drawn clean as you draw · off' });
     const n = heldCandidates.length || snapOffers.size;
     if (tiles.snapNow) { tiles.snapNow.hidden = n === 0; ui.tile(tiles.snapNow, heldCandidates.length ? 'snap circled' : 'snap now', n ? String(n) : '', { why: 'redraw every confidently read shape clean; the ink stays underneath' }); }
-    ui.tile(tiles.view, 'view', viewMode === 'canvas' ? 'canvas' : viewMode, { on: viewMode !== 'canvas', why: 'canvas, or every artifact as a card' });
-    ui.tile(tiles.theme, 'theme', themeMode, { why: 'system follows the OS; light and dark are the same tokens inverted' });
+    ui.tile(tiles.view, 'layout', viewMode === 'grid' ? 'cards' : viewMode, { on: viewMode !== 'canvas', why: 'the board as one canvas, or every thing made on it as a card — Esc comes back' });
+    ui.tile(tiles.theme, 'theme', themeMode, { why: 'light, dark, or system — which follows your device' });
     // The hand: which side of the pen tip the field opens on — and, once a pen has been seen here, what draws (V1-PLAN R6).
     ui.tile(tiles.hand, 'hand', handFace(hand, draws), draws
       ? { on: draws === 'pen', why: 'which side of the pen tip the field opens on, and what draws: the pen — a finger pans and pinches, and a palm on the glass is ignored — or a finger too. A tap changes one word' }
       : { why: 'which side of the pen tip the field opens on' });
     ui.tile(tiles.autoRead, 'auto-read', autoRead ? 'on' : 'off', { on: autoRead, why: 'read handwriting with a model as it is written; off asks only when you say read' });
-    ui.tile(tiles.folder, folder.store ? (folder.how === 'git' ? 'repo' : folder.how === 'static' ? 'site' : 'folder') : 'folder', folder.store ? (folder.name || 'open') : 'open…', { on: !!folder.store, why: 'a folder is the canvas: its files are artifacts, your ink is saved beside them' });
+    ui.tile(tiles.folder, folder.store ? (folder.how === 'git' ? 'repo' : folder.how === 'static' ? 'site' : 'folder') : 'folder', folder.store ? (folder.name || 'open') : 'open…', { on: !!folder.store, why: 'a folder on this computer as the board: each file in it a thing on the board, your ink kept beside them' });
     ui.tile(tiles.imp, 'import', '…', { why: 'photos from your library, a picture from the camera, or a file of a known kind — pictures are kept with the board and drawn on it, under your ink. Drop or paste works too' });
-    ui.tile(tiles.exp, 'export', '…', { why: 'the board as SVG or PNG, or the session as its log' });
+    ui.tile(tiles.exp, 'export', '…', { why: 'the board as a file to keep or send: with its pictures, as a picture or a page, or as a board file to open again' });
     const seated = agents.map((a) => modelWords(a)).concat(deciderHost() ? [deciderHost().name + ' (decider)'] : []);
     ui.tile(tiles.models, 'models', seated.length ? seated.join(', ') : 'none', { on: seated.length > 0, why: 'a model joins as a participant, in a seat if you give it one; it is asked only when you ask' });
     ui.tile(tiles.teach, 'mark', s.commandMark ? s.commandMark.name : 'check ✓', { on: !!s.commandMark, why: 'the mark that turns a circled group into a selection; teach your own' });
     ui.tile(tiles.reset, 'reset', 'fresh board', { why: 'a fresh board under the same name — what this one holds goes to the trash, from which it comes back whole' });
     ui.tile(tiles.help, 'help', '?', { why: 'how to use the canvas, on one page: draw, hold, choose — and models, boards, rooms, your mark, the shortcuts' });
-    ui.tile(tiles.live, 'live', folder.how === 'live' ? roomShort(folder.name) : 'share…', { on: folder.how === 'live', why: 'share this board: anyone you send the link to draws on it with you, live — or join a room' });
+    ui.tile(tiles.live, 'share', folder.how === 'live' ? roomShort(folder.name) : '…', { on: folder.how === 'live', why: 'share this board: anyone you send the link to draws on it with you, as you draw — or join a room' });
     // Its face is the name of what is on screen (V1-PLAN R1); the pane is 22-boards.js.
     ui.tile(tiles.boards, 'boards', boardOnScreenName() || '…', { why: 'the boards this browser keeps — new, open, rename, duplicate, delete, and the trash — and the folders, repositories and sites opened lately' });
     // The library packs this board uses (V1-PLAN §2.3, B3), last in the grid; the pane is 23-packs.js.
-    ui.tile(tiles.packs, 'packs', packsFace(s), { on: s.packs.length > 0, why: 'the library packs this board uses — premade definitions and notations, matched as if you had taught them; using one is an event in the board’s log, and undo takes it back' });
+    ui.tile(tiles.packs, 'packs', packsFace(s), { on: s.packs.length > 0, why: 'the library packs this board uses — things already drawn and named for you, recognised as if you had taught them; undo takes a pack back' });
     // While in a room, the chip in the bar: the room and who is here (24-room.js).
     syncRoomChip();
   }
@@ -87,7 +87,7 @@
   // A live room: Share this board — or, in a room, who is here, the invite, a copy, Leave (24-room.js) — and under
   // "more", a room by its name or an invite link pasted, and "with Claude".
   const livePanel = document.getElementById('livePanel');
-  ui.pane(livePanel, 'live', () => { closePanel(livePanel, tiles.live); const l = document.getElementById('liveLink'); if (l) { l.hidden = true; l.value = ''; } });
+  ui.pane(livePanel, 'share', () => { closePanel(livePanel, tiles.live); const l = document.getElementById('liveLink'); if (l) { l.hidden = true; l.value = ''; } });
   tiles.live.onclick = () => {
     togglePanel(livePanel, tiles.live);
     if (livePanel.hasAttribute('hidden')) return;

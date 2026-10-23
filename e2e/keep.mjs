@@ -19,7 +19,7 @@
 //   (`E2E_KEEP_SEED`).
 //
 //   NEVER SILENT. A save that fails is said at once in the status line, in
-//   plain words, with the way out offered — export the log, open a folder —
+//   plain words, with the way out offered — save it as a file, open a folder —
 //   and keeps being said until a save succeeds. Forced two ways: the
 //   browser's storage made full for real (browser storage filled to its
 //   limit, and the quota of the page's origin taken down to nothing through
@@ -342,8 +342,8 @@ export async function quotaTest(browser, servers, ctx) {
     await draw();
     const said = await waitSaid(/not saved/, true);
     const full = /not saved — the browser's storage for this page is full/;
-    check('Q1. storage full: said at once in the status line, in plain words, with the way out — export the log, open a folder',
-      full.test(atOpen) && full.test(said) && /export the log/.test(said) && /open a folder/.test(said) === canFolder,
+    check('Q1. storage full: said at once in the status line, in plain words, with the way out — save it as a file, open a folder',
+      full.test(atOpen) && full.test(said) && /save it as a file/.test(said) && /open a folder/.test(said) === canFolder,
       { atOpen, status: said, filledChars: filled, canFolder });
 
     // Another stroke, and a scratch that erases a box (a message of its own in the line): still said.
@@ -413,7 +413,7 @@ export async function blockedTest(browser, servers, ctx) {
     for (let i = 0; i < 60 && !/not saved/.test(said); i++) { await sleep(50); said = await statusText(page); }
     // "open a folder" is offered where the browser can open one (Chromium) and nowhere else.
     check('B1. a store the browser will not let the page use (a private window, blocked site data): said at once, with the way out',
-      /not saved — this browser will not let the page keep anything/.test(said) && /export the log/.test(said) && /open a folder/.test(said) === canFolder,
+      /not saved — this browser will not let the page keep anything/.test(said) && /save it as a file/.test(said) && /open a folder/.test(said) === canFolder,
       { status: said, canFolder });
 
     // The way out, taken: the whole log as a file.
@@ -424,7 +424,7 @@ export async function blockedTest(browser, servers, ctx) {
     const lines = file.split('\n').filter(Boolean);
     // Since R2 the file is version 1: its first line is the header, and every line after it is an event.
     const isHeader = (l) => { try { const h = JSON.parse(l); return h.format === 'metamedium-log' && h.version === 1; } catch (e) { return false; } };
-    check(`B2. "export the log" in the line hands over the whole board as a file (${lines.length - 1} of ${events} events after its version 1 header, ${download.suggestedFilename()})`,
+    check(`B2. "save it as a file" in the line hands over the whole board as a file (${lines.length - 1} of ${events} events after its version 1 header, ${download.suggestedFilename()})`,
       download.suggestedFilename() === 'canvas.jsonl' && isHeader(lines[0]) && lines.length === events + 1 && lines.slice(1).every((l) => { try { return !!JSON.parse(l).type; } catch (e) { return false; } }),
       { lines: lines.length, events });
 
@@ -648,7 +648,7 @@ export async function tabsTest(browser, servers, ctx) {
     await sleep(300);
     check('T1. a second tab shows the board, writes nothing, and says so — with the way out',
       bState.state === 'readonly' && bState.lock === 'taken' && (await strokes(b)) === 2 && (await stored(a)) === 1 &&
-        /not saved here — this board is open in another tab/.test(bSaid) && /export the log/.test(bSaid),
+        /not saved here — this board is open in another tab/.test(bSaid) && /save it as a file/.test(bSaid),
       { state: bState.state, lock: bState.lock, status: bSaid });
     // The first tab lets go having written nothing more: the second takes over and writes what it drew.
     await a.close();

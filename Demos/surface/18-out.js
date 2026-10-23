@@ -143,7 +143,7 @@
     if (t.figures) parts.push(plural(t.figures, 'figure'));
     if (t.writing) parts.push(t.writing === 1 ? 'writing' : t.writing + ' lines of writing');
     if (t.strokes) parts.push(plural(t.strokes, 'stroke'));
-    const left = t.left ? ' · ' + plural(t.left, 'page or program', 'pages and programs') + ' not drawn — only their text stands in the log' : '';
+    const left = t.left ? ' · ' + plural(t.left, 'page or program', 'pages and programs') + ' not drawn — the board file keeps them' : '';
     return name + ' — ' + of + (parts.length ? ': ' + parts.join(', ') : '') + (extra ? ' · ' + extra : '') + left;
   }
 
@@ -350,7 +350,7 @@
     const r = await bundleRead(bytes, { inflate: inflateRaw, digest: digestHex });
     if (!r.ok) return r;
     const read = readLogText(r.text, file.name);
-    if (!read.events) return { ok: false, words: read.refused || 'the board.jsonl in this zip is not a board’s log — nothing was opened' };
+    if (!read.events) return { ok: false, words: read.refused || 'the board.jsonl in this zip cannot be read as a board — nothing was opened' };
     const info = new Map();
     for (const ev of read.events) if (ev && ev.type === 'import' && isAssetRef(ev.asset)) info.set(ev.asset, { mime: ev.mime, w: ev.w, h: ev.h });
     let stored = 0;
@@ -370,7 +370,7 @@
     const z = await zipRead(bytes, { inflate: inflateRaw });
     if (!z.ok) return { ok: false, words: z.words };
     const log = z.entries.find((e) => e.name === BUNDLE_LOG);
-    if (!log) return { ok: false, words: 'no log' };
+    if (!log) return { ok: false, words: 'no board in it' };
     const text = new TextDecoder().decode(log.data);
     return {
       ok: true, names: z.entries.map((e) => e.name), entries: z.entries.map((e) => ({ name: e.name, dataAt: e.data.byteOffset - bytes.byteOffset, bad: e.bad || null })),
@@ -400,7 +400,7 @@
     else if (which === 'log') {
       const evs = session.getEvents(), pics = assetsOfEvents(evs).size;
       downloadText('canvas.jsonl', MM.encodeLog(evs, logWrite()), 'application/json');
-      flash('canvas.jsonl — ' + evs.length + ' events' + logFileNote() + (pics ? ' · its ' + plural(pics, 'picture') + (pics === 1 ? ' is' : ' are') + ' not in it — export “board + pictures”, a .zip, to carry them' : ''));
+      flash('canvas.jsonl — the board as a file, ' + evs.length + ' change' + (evs.length === 1 ? '' : 's') + logFileNote() + (pics ? ' · its ' + plural(pics, 'picture') + (pics === 1 ? ' is' : ' are') + ' not in it — export “board + pictures”, a .zip, to carry them' : ''));
     }
     closePanel(exportPanel, exportBtn);
   });

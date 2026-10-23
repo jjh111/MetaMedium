@@ -202,7 +202,7 @@
     }
     if (!text.trim()) return null;
     const id = typeText({ x: e.bounds.minX, y: e.bounds.minY }, text);
-    flash('text: a file of words — circle it with a page to wire it into a slot');
+    flash('a text on the board — double-click it to change the words; undo takes it away');
     return id;
   }
   function cancelTextEdit() {

@@ -53,6 +53,8 @@
 
   // ===== Draw it: a text drawn as ink ========================================
   const MERMAID_THINGS = { sequence: ['participant', 'participants'], 'uml-class': ['class', 'classes'] };
+  // What Mermaid calls a node, in the person's word (the UX pass, UX-08).
+  const MERMAID_THING = ['shape', 'shapes'];
   const MERMAID_LINKS = { sequence: ['message', 'messages'] };
   const mermaidCount = (n, [one, many]) => n + ' ' + (n === 1 ? one : many);
   let mermaidDrawn = null;
@@ -72,7 +74,7 @@
     const article = /^[A-Z]{2,}\b/.test(called) ? 'a ' + called : (/^[aeio]/i.test(called) ? 'an ' : 'a ') + called.toLowerCase();
     const nodes = Object.keys(drawn.ids).length;
     let out = drawn.bounds
-      ? 'drew ' + article + ' from ' + name + ': ' + mermaidCount(nodes, MERMAID_THINGS[drawn.notation] || ['node', 'nodes']) + ' and ' + mermaidCount(drawn.links.length, MERMAID_LINKS[drawn.notation] || ['link', 'links'])
+      ? 'drew ' + article + ' from ' + name + ': ' + mermaidCount(nodes, MERMAID_THINGS[drawn.notation] || MERMAID_THING) + ' and ' + mermaidCount(drawn.links.length, MERMAID_LINKS[drawn.notation] || ['link', 'links'])
       : 'nothing was drawn from ' + name;
     const parts = [];
     if (drawn.refused.length) {
@@ -125,7 +127,7 @@
     const read = MM.readMermaid(rep.data.code);
     if (read.notation) {
       session.summonMarks([artifactId], Date.now());
-      say(name + ': ' + mermaidCount(read.nodes.length, MERMAID_THINGS[read.notation] || ['node', 'nodes']) + ' of Mermaid — Draw it puts it on the board as marks');
+      say(name + ': ' + mermaidCount(read.nodes.length, MERMAID_THINGS[read.notation] || MERMAID_THING) + ' of Mermaid — Draw it puts it on the board as marks');
     } else {
       const why = read.refused.length ? read.refused[0].reason : 'it is not a diagram the canvas reads';
       say(name + ' stands as text: the canvas cannot draw it yet — ' + why);
@@ -158,8 +160,8 @@
     exMermaid.hidden = !got;
     if (!got) return;
     const b = exMermaid.querySelector('button');
-    b.textContent = got.said.reading.notation + '.mmd';
-    b.title = (got.scope === 'held' ? 'The marks held' : 'The board') + ' as Mermaid text — ' + MM.describeNotation(got.said.reading);
+    b.textContent = 'Mermaid text';
+    b.title = got.said.reading.notation + '.mmd — ' + (got.scope === 'held' ? 'the marks held' : 'the board') + ' as Mermaid text: ' + MM.describeNotation(got.said.reading);
   }
   exportBtn.addEventListener('click', refreshMermaidRow);
   exportPanel.addEventListener('click', (e) => {
