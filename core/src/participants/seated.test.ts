@@ -114,6 +114,26 @@ describe('a model joined on one board is asked on the next', () => {
     expect(joins(s)).toHaveLength(1);
   });
 
+  it('made lazily (a model the page seats on its own, unasked), it writes nothing until its first ask — and joins once', async () => {
+    const { s, mark } = boardWithMark();
+    const before = s.getEvents().length;
+    const agent = createAgentParticipant(s, local, 1100, { transport: says('a circle'), lazy: true, name: 'dyna.ink writer' });
+    expect(s.getEvents()).toHaveLength(before); // made, and the board only looked at: nothing written
+    expect(agent.id).toBe('');
+    const res = await agent.ask('what is it?', [mark], 1200);
+    expect(res.ok).toBe(true);
+    expect(joins(s)).toHaveLength(1);
+    expect(agent.id).not.toBe('');
+    expect(wordOf(s.getState().nodes.get(agent.id)!)).toBe('dyna.ink writer');
+    expect((await agent.ask('and now?', [mark], 1300)).ok).toBe(true);
+    expect(joins(s)).toHaveLength(1);
+    // Made lazily on a board that already holds its join: it is that participant, and writes nothing.
+    const kept = s.getEvents().slice();
+    const again = createAgentParticipant(s, local, 1400, { transport: says('x'), lazy: true, name: 'dyna.ink writer' });
+    expect(again.id).toBe(agent.id);
+    expect(s.getEvents()).toHaveLength(kept.length);
+  });
+
   it('a bridge, which wraps an agent, keeps up with it', async () => {
     const { s } = boardWithMark();
     const bridge = createBridgeParticipant(s, 1100, { name: 'hand' });

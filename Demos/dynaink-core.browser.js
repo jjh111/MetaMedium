@@ -31811,8 +31811,8 @@ Reply with ONLY a JSON array, no prose, no code fences.`;
     const send = options.transport ?? ((c, m, o) => complete(c, m, o));
     const name = options.name ?? providerLabel(config);
     const seating = { kind: "agent", name, capability: options.tier ?? providerTier(config), locality: options.locality ?? providerLocality(config) };
-    let id = session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
-    const seat = (now = at) => id = seatOn(session, seating, id, now);
+    let id = options.lazy ? heldParticipant(session.getState(), seating) ?? "" : session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
+    const seat = (now = at) => id = seatOn(session, seating, id || void 0, now);
     const staleWhy = (fallback) => session.getState().staleResult?.detail ?? fallback;
     async function interpret(nodeIds, now, signal) {
       seat(now);

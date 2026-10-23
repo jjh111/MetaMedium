@@ -18,7 +18,7 @@ import { describeSession, describeSignature, describeReading } from './serialize
 import { frameOf, regionsOf } from '../session/regions';
 import { planFor } from '../parse/plan';
 import { getRep } from '../session/nodes';
-import { seatOn, type Seating } from './seated';
+import { heldParticipant, seatOn, type Seating } from './seated';
 import { validateRegions, type RegionContent, type Theme } from '../parse/scaffold';
 import { type DrawnShape, parseShapes, strokeFor, MAX_DRAWN } from '../session/synthesize';
 import type { Behaviour, Term, Verb } from '../behave/verbs';
@@ -812,6 +812,13 @@ export interface AgentOptions {
   name?: string;
   tier?: Capability;
   locality?: Locality;
+  /**
+   * Join lazily: write no `join` when made — the board's own join for it if it holds one, else nothing until the
+   * first ask seats it (`seat()`). For a model a page seats on its own, unasked — dyna.ink's own writer and reader,
+   * seated silently where the page may use them — so seating it writes nothing to a board the hand only looked at,
+   * as the decision seat is made. Its `id` is '' until then.
+   */
+  lazy?: boolean;
 }
 
 export function createAgentParticipant(
@@ -825,10 +832,12 @@ export function createAgentParticipant(
   // Join at the provider's tier (2: a model) with its locality, so surfaces
   // can group readings by voice and the router can ask the cheaper first.
   const seating: Seating = { kind: 'agent', name, capability: options.tier ?? providerTier(config), locality: options.locality ?? providerLocality(config) };
-  let id = session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
+  let id = options.lazy
+    ? heldParticipant(session.getState(), seating) ?? ''
+    : session.join(seating.kind, seating.name, at, seating.capability, seating.locality);
   // A board loaded in place takes this join with it (`participants/seated.ts`): every ask seats the agent
   // on the board it is asked on first — found there if the board holds its join, joined once if not.
-  const seat = (now: number = at): string => (id = seatOn(session, seating, id, now));
+  const seat = (now: number = at): string => (id = seatOn(session, seating, id || undefined, now));
 
   // A model thinks for a long time — a cold local one for minutes — and the
   // human keeps drawing. Every result therefore says which board it was asked
