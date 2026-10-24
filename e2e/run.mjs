@@ -361,7 +361,8 @@ async function runSmoke(browser, servers) {
  * `hand.mjs`): a relay, the MCP hand and a counting model of its own. And
  * security (C1, C6; `security.mjs`): another hand's program merged as a room
  * merges does not run; played here it still cannot reach the person's boards;
- * injected markup never executes; a run frame cannot phone out.
+ * injected markup never executes; a run frame cannot fetch, open a socket or
+ * beacon, and its navigation carries nothing of the page's fragment and is stopped.
  */
 const OWN_PAGES = { keep: runKeep, big: runBig, boards: runBoards, carry: runCarry, app: runApp, prod: runProd, pencil: runPencil, models: runModels, seat: runSeat, hand: runHand, walk: runWalk, security: runSecurity, room: runRoom, ux: runUx };
 const OWN_URL = { carry: 'app/?nosw=1&carryTo=…', walk: 'app/?fresh=1&nosw=1', app: 'app/', prod: 'app/ (the built site, served as Pages serves it)', models: 'app/', seat: 'Demos/session-engine.html?live=claude&relay=…', hand: 'Demos/session-engine.html?live=mcp-test&relay=…', security: 'Demos/session-engine.html?fresh=1&nosw=1', room: 'app/?live=r-…#key=…', ux: 'app/?fresh=1&nosw=1 (1280×800 and 390×844)' };

@@ -203,12 +203,16 @@ leads with them: *Using dyna.ink’s own models — no key needed*.
   to write it; `page:`, `run:` or `new:` say it for you. The page's boxes stand
   at once either way, and a sure answer replaces them only if you have not
   drawn since.
-- **What is sent, and where.** Only what you ask about, only when you ask: what
-  the canvas reads of the marks — what they are, how they sit and the words on
-  them — and the brief you typed, or, to read, a picture of the ink (or of the
-  page) you ask it to read. It goes to dyna.ink's relay, which asks Cloudflare's
-  models. The relay passes it on and keeps none of it: it notes only that a
-  call was made, which model, how long it took and how big it was. What
+- **What is sent, and where.** Only what you ask about, only when you ask. To
+  the writer: the brief you typed, what the canvas reads of the marks you ask
+  about — what they are, how they sit among themselves and the words on them —
+  and the names you gave your own things. Not the other people in a room, nor
+  their things elsewhere on the board (though marks someone else drew, when you
+  ask about them, still carry the name they draw under). To the reader: a
+  picture of the ink (or of the page) you ask it to read. It goes to dyna.ink's
+  relay, which asks Cloudflare's models. The relay passes it on and keeps none
+  of it: it notes only that a call was made, which model, how long it took and
+  how big it was. What
   Cloudflare does with it is set by Cloudflare's terms, not by dyna.ink.
 - **A share a day.** dyna.ink's own are held to a daily share for each internet
   address, within a budget for everyone. When the share is spent, or the relay
@@ -216,10 +220,12 @@ leads with them: *Using dyna.ink’s own models — no key needed*.
   model of yours joins, and asking again later works. For the decider, what the
   canvas ranked stands.
 - **none**, on a seat's row, stops dyna.ink's own in that seat, and is
-  remembered on this device; **dyna.ink’s own** brings it back. **none** on the
-  reader means no picture of your ink goes to dyna.ink at all — its writer is
-  not asked to read either. **auto-read** never uses dyna.ink's own: it reads
-  only with a model of yours.
+  remembered on this device. It stays chosen when a model of your own joins that
+  seat and when it leaves, and after a reload; only **dyna.ink’s own** brings it
+  back. When a model of yours leaves a seat and dyna.ink's own takes its place,
+  the pane says so. **none** on the reader means no picture of your ink goes to
+  dyna.ink at all — its writer is not asked to read either. **auto-read** never
+  uses dyna.ink's own: it reads only with a model of yours.
 - If dyna.ink's relay does not answer, none of them is seated and the canvas
   works as it does with no model. A copy of the app served from anywhere else
   has none of them.
@@ -337,8 +343,9 @@ its own colour.
 
 - **The key stays out of the address servers see.** The link carries the room's
   key after the `#`, and a browser never sends what comes after `#` to the site
-  it opens; the page hands the key only to the relay, to open the room. Anyone
-  who has the link can join, so send it only to the people you want there.
+  it opens; the page hands the key only to the relay, to open the room, and no
+  program on the board can read it. Anyone who has the link can join, so send
+  it only to the people you want there.
 - **A guest is asked a name** before joining, so everyone can tell whose marks
   are whose. You are asked one too when you share, if you have not given one.
 - **Who is here.** In a room the bar shows it: its name, and a dot for each
@@ -367,6 +374,12 @@ its own colour.
   one. A room with nothing in it says so, and that it may have been forgotten.
 - A board too big to carry in is said before anything is sent, with **Share an
   empty board instead**.
+- **A relay keeps only so much.** dyna.ink's relay holds each internet address
+  to so much a day across every room, and all the rooms people open to so much
+  at once and so much a day. Past it, what you draw is held on this page and
+  sent again when the relay takes it — the status line says so, and leaving or
+  closing the page before then loses it — and while the relay holds all it may,
+  **Share this board** says so, in the relay's words.
 - **undo** takes back only your own last act; the others' work stays. A word
   goes only on your own ink.
 
@@ -381,8 +394,16 @@ field **Play … here**. That play is yours, and **undo** takes it back. A
 program you played yourself waits the same way after a reload. The examples
 dyna.ink ships play as they open.
 
+- **A new version waits too.** When someone else writes a new version of a
+  program you play, that version does not run in your tab: the program waits,
+  dashed, for **play it here** again, and the status line says who wrote it.
+- **It keeps running while your play stands.** Someone else playing it too, or
+  an undo of something else, leaves it running; **undo** of your own play stops
+  it here.
+
 Played here, it runs walled off from the page: it cannot open your boards or
-reach your keys.
+reach your keys, and it is given no room's key to read. One that tries to load
+another page in its place is stopped, and the status line says so.
 
 ## Your mark
 
