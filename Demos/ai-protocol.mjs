@@ -60,7 +60,7 @@ export const AI_CHAT_WAIT_MS = 60_000;
 export const AI_CHAT_PER_MINUTE = { caller: 10, room: 30 };
 /** Chat calls a day across every caller, when the relay's `MM_AI_CHAT_DAILY` says nothing — a budget of its own, apart from the decisions'. */
 export const DEFAULT_AI_CHAT_DAILY = 2000;
-/** One address's share of the day's chat, from the relay's environment: a DAY_SHARE-th of the budget (decide-protocol.mjs), a /56 four times that — 62 calls, and 250, at the defaults. */
+/** One address's share of the day's chat, from the relay's environment: a DAY_SHARE-th of the budget (decide-protocol.mjs), a /56 four times that — 62 calls, and 248, at the defaults. */
 export function aiChatShareFrom(env = {}) { return Math.max(1, Math.floor(aiChatDailyFrom(env) / DAY_SHARE)); }
 /** The share at the default budget. */
 export const AI_CHAT_PER_DAY = { caller: Math.floor(DEFAULT_AI_CHAT_DAILY / DAY_SHARE) };
