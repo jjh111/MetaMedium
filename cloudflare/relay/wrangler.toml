@@ -41,8 +41,8 @@ binding = "AI"
 # address and localhost are built in):
 # MM_RELAY_ORIGINS = "https://preview.dyna.ink"
 # MM_RELAY_MAX_LINES = "5000"
-# MM_RELAY_MAX_BYTES = "32000000"
-# MM_RELAY_ASSET_BYTES = "67108864"   # bytes of pictures a room keeps (A1); past it a put is refused
+# MM_RELAY_MAX_BYTES = "32000000"     # UTF-8 bytes of lines a room keeps
+# MM_RELAY_ASSET_BYTES = "67108864"   # bytes of pictures a room keeps (A1), and at most 1,000 of them; past either a put is refused
 # The model routes (src/ai.mjs, Demos/decide-protocol.mjs): who may ask — off | keyed (a room's key only) |
 # limited (the app's own pages, per address, and keyed hands; the default) — and how many calls a day across
 # everyone, past which a decision is refused with 429 and the engine's ranking stands:
@@ -58,10 +58,11 @@ binding = "AI"
 # MM_AI_CHAT_DAILY = "2000"
 # Rooms anyone opens from the app (POST /rooms, src/mint.mjs):
 # MM_RELAY_MINT = "0"                  # open no new rooms (503, in words)
-# MM_RELAY_MINT_PER_HOUR = "10"        # rooms one address may open an hour
-# MM_RELAY_MINT_PER_DAY = "500"        # rooms the relay opens a day, in all
+# MM_RELAY_MINT_PER_HOUR = "10"        # rooms one address may open an hour (its IPv6 /56 four times as many)
+# MM_RELAY_MINT_PER_DAY = "500"        # rooms the relay opens a day, in all; one address a twentieth of them (a /56 four times that)
 # MM_RELAY_ROOM_IDLE_DAYS = "30"       # a room it opened is forgotten this long after it was last used
-# What the relay keeps, counted across rooms (src/store.mjs) — an operating ceiling under what the plan allows:
-# MM_RELAY_STORE_PER_DAY = "268435456" # characters and bytes one address may keep a day in every room (a line counts 4 KiB more, for its rows)
-# MM_RELAY_MINTED_HELD = "2147483648"  # bytes every room it opened may hold at once; past it they keep nothing more and none is opened
-# MM_RELAY_MINTED_PER_DAY = "2147483648" # characters and bytes every room it opened may keep a day, in all (a line 4 KiB more)
+# What the relay keeps, counted across rooms (src/store.mjs) — an operating ceiling under what the plan allows. An item
+# counts its UTF-8 bytes and 4 KiB for each storage row it is kept in (ROW_COST); held, 256 bytes a row (ROW_HELD):
+# MM_RELAY_STORE_PER_DAY = "67108864"  # what one address may keep a day in every room (default: MINTED_PER_DAY / 32; a /56 four times as much)
+# MM_RELAY_MINTED_HELD = "2147483648"  # what every room it opened may hold at once; past it they keep nothing more and none is opened
+# MM_RELAY_MINTED_PER_DAY = "2147483648" # what every room it opened may keep a day, in all — at most this / 4 KiB rows a day
