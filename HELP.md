@@ -8,7 +8,8 @@ The canvas reads every mark as you draw it. Nothing asks a model until you do.
    just made, the canvas says what it reads it as.
 2. **Press and hold** a mark. It is held together with what it sits with, and
    **the field** opens beside your hand. (Or circle some marks and double-tap
-   inside the circle, or draw your mark across them — see *Your mark*.)
+   inside the circle — double-click, with a mouse — or draw your mark across
+   them: see *Your mark*.)
 3. **Choose** what it becomes: tap a pill, or type in the field. The line
    under the field always says what **Enter** will do — with nothing typed,
    the likely act (*Draw them clean*, *Line up across*, *read it* for
@@ -16,10 +17,14 @@ The canvas reads every mark as you draw it. Nothing asks a model until you do.
 
 A tap on empty ground lets go of whatever is held.
 
-New here? On an empty board the panel offers **start from an example**: a
-board of your own opens with a molecule already drawn — hold it and see what
-the canvas reads it as. **More examples** opens the boards pane, where a
-flowchart, a class diagram and a pattern page wait too.
+New here? On an empty board the panel shows these three steps and offers
+**start from an example**: a board of your own opens with a molecule already
+drawn — hold it and see what the canvas reads it as. Where the panel is closed,
+as on a phone, the same steps stand in a card at the foot of the screen until
+your first stroke. **More examples** opens the boards pane, where a flowchart,
+a class diagram and a pattern page wait too. An example bigger than the screen
+opens on what plays in it, or on its first part; pinch, or tap the map in the
+corner, to see the rest.
 
 ## The field
 
@@ -54,9 +59,12 @@ flowchart, a class diagram and a pattern page wait too.
   Mermaid*, *Tidy the diagram* and *Route the connectors* are offered. Draw each
   line or arrow from one box onto the other so it ties — an arrow ties where its
   head points. Circles joined by lines are a molecule, not a diagram.
-- With **the semantic seat** loaded (models → seats), words no list holds are
+- With **the semantic seat** loaded (see *Models*), words no list holds are
   matched by meaning on this device once you stop typing (*schematic* finds
   *Make it Mermaid*), and the line says *by meaning*.
+- **The field stays where it opened** while you type. When you pan or zoom it
+  goes with the marks it holds, and it moves only to stay on the screen, clear
+  of the panel and the map.
 
 ## Handling marks
 
@@ -84,9 +92,10 @@ flowchart, a class diagram and a pattern page wait too.
   every line is drawn cleanly from your own strokes onto one numbered sheet and
   sent to your reader in one go, a sheet of up to eight lines at a time. The
   status line says how far it is (*reading lines 1–8 of 12*), the marks show a
-  dot where the reader is working, and **Esc stops the rest**. Each line's words
-  land beside your ink, never over it, and the panel says what each line said —
-  or why one was not read. Lines already read are left alone; type **read these
+  dot where the reader is working, and **Esc**, with nothing held, stops the
+  rest. Each line's words land beside your ink, never over it, and the panel
+  says what each line said — or why one was not read. Lines already read are
+  left alone; type **read these
   again** to read them again, or **read the board** (with anything held) to read
   every line on the board. Hold a **picture** of a page and choose **Read the
   picture**: its text stands beside it as a text of its own, which you can edit.
@@ -173,28 +182,74 @@ and have it read) and it is that side's length.
 
 A model adds reading handwriting, saying what a drawing is (*What is this?*),
 answering a question, and writing a page or a program from a brief. It is
-asked only when you ask — never while you draw.
+asked only when you ask — never while you draw, hold a mark or open the field.
 
-- **controls › Helpers › models** lists who can read for you: **Claude Code —
-  in this room** first when Claude is here, a model on this machine (Ollama or
-  LM Studio, found by itself, one suggested per job), or a hosted one by its
-  key. A key stays on this device, and only if you tick *remember*.
-- **Claude**: *controls › Helpers › live › with Claude* joins the room Claude Code is in
-  and makes Claude the one who reads for you. On dyna.ink it joins through the hosted
-  relay (the room's key goes on the page's address as `&key=`); anywhere else, through
-  the relay on this machine, or the one you type there.
+**dyna.ink's own models, with no key.** On dyna.ink, and at this app's old
+address, dyna.ink brings models of its own, and **controls › Helpers › models**
+leads with them: *Using dyna.ink’s own models — no key needed*.
+
+- **The writer** says what a group is (*What is this?*), writes a page or a
+  program from a brief, answers `ask:` and draws for `draw:`. **The reader**
+  reads your handwriting (*Read the writing*, *Read these*) and a picture of a
+  page (*Read the picture*). Both are models Cloudflare runs.
+- **The decider** is Cloudflare's Clef-flash, a decision model: it picks
+  between answers the canvas already holds. It is asked only when you tap
+  **Which is it?** (two things you named match a group about equally) or
+  **Which diagram is this?** (a drawing that could be more than one kind of
+  diagram, or that the canvas cannot place), and its answer joins the readings
+  only when it is 99% sure — otherwise what the canvas ranked stands. **choose
+  it**, on the decider's row, also lets it say on a brief's Enter what the brief
+  should make — a page, a program, Mermaid or an answer — when a model is here
+  to write it; `page:`, `run:` or `new:` say it for you. The page's boxes stand
+  at once either way, and a sure answer replaces them only if you have not
+  drawn since.
+- **What is sent, and where.** Only what you ask about, only when you ask: what
+  the canvas reads of the marks — what they are, how they sit and the words on
+  them — and the brief you typed, or, to read, a picture of the ink (or of the
+  page) you ask it to read. It goes to dyna.ink's relay, which asks Cloudflare's
+  models. The relay passes it on and keeps none of it: it notes only that a
+  call was made, which model, how long it took and how big it was. What
+  Cloudflare does with it is set by Cloudflare's terms, not by dyna.ink.
+- **A share a day.** dyna.ink's own are held to a daily share for each internet
+  address, within a budget for everyone. When the share is spent, or the relay
+  is busy, the field says so in plain words and the ask is kept: it runs when a
+  model of yours joins, and asking again later works. For the decider, what the
+  canvas ranked stands.
+- **none**, on a seat's row, stops dyna.ink's own in that seat, and is
+  remembered on this device; **dyna.ink’s own** brings it back. **none** on the
+  reader means no picture of your ink goes to dyna.ink at all — its writer is
+  not asked to read either. **auto-read** never uses dyna.ink's own: it reads
+  only with a model of yours.
+- If dyna.ink's relay does not answer, none of them is seated and the canvas
+  works as it does with no model. A copy of the app served from anywhere else
+  has none of them.
+
+**Your own models.** **more — bring your own model**, under the lead, opens the
+rest of the pane (where dyna.ink's own are not here, the pane opens on it). A
+model of yours, or Claude Code seated, is always asked before dyna.ink's own.
+
+- **Claude Code — in this room** comes first when Claude is here. Then a model
+  on this machine — Ollama or LM Studio, one suggested per job; on a public
+  address they are looked for only when you tap **Find models on this
+  machine** — or a hosted one by its key. A key stays on this device, and only
+  if you tick *remember*.
+- **Claude**: *controls › Helpers › share › more ways in › with Claude* joins the
+  room Claude Code is in and makes Claude the one who reads for you. It takes the
+  board on screen with you, for Claude to read. On dyna.ink it joins through
+  dyna.ink's relay (where the room needs a key, it goes after `#key=` in the
+  page's address); anywhere else, through the relay on this machine, or the one
+  you type there.
 - **Claude and your notes.** Claude's hand can find a word on the board, put a region round
   your notes — a region holds what stands in it — and move marks into place, yours too. When
   it moves your marks the status line says so — *claude moved 2 of your marks* — and your
   **undo does not reach it**: undo takes back your own last act, never another hand's. To get
   them back, move them yourself, or ask Claude to move them back. Claude labels only its own
   ink and renames only a region it made.
-- **Seats.** The pane is four seats, one job each. **Reader** reads handwriting
-  into text — a model that can see, the quickest you have. **Writer** writes
-  briefs, pages and programs and says what a group is. **Decider** is a
-  decision model (Jev): when two things you have named match a group about
-  equally, *Which is it?* asks it, and its answer joins the readings — taken
-  only when it is 0.99 sure, otherwise what the canvas ranked stands.
+- **Seats.** The pane holds four seats, one job each. **Reader** reads
+  handwriting into text — a model that can see, the quickest you have.
+  **Writer** writes briefs, pages and programs and says what a group is.
+  **Decider** chooses between what the canvas already holds: dyna.ink's own
+  (above), a decision model of yours with its key (**another…**), or **none**.
   **Semantic** is a small model that runs on this device — no key, nothing sent
   anywhere: tap **load it here** once (about 30 MB, fetched once and kept in the
   browser; nothing loads until you tap) and **find** also looks by meaning, and
@@ -210,7 +265,7 @@ asked only when you ask — never while you draw.
 - Ask with no model here and the ask is **kept**: the field says what it needs,
   and it runs when one joins.
 - A model at work shows a dot over the marks it is working on. **Esc**, with
-  nothing held, stops it.
+  nothing open and nothing held, stops it (see *Escape*).
 
 ## Boards
 
@@ -220,12 +275,17 @@ whole. **reset** is a fresh board — the old one goes to the trash. Under
 *examples*, a flowchart (with its Mermaid beside it), a class diagram, a
 molecule and a pattern page: opening one makes a new board of your own from
 it — the example itself never changes, so draw on it freely. Every
-board is kept in this browser as you draw — its pictures too; **export** writes it out —
-**board + pictures** as one `.dyna.zip` that **boards › from a file…** opens whole, pictures
-and all; **board.svg**, **board.png** and **board.pdf** (one page of Letter or A4) of what you
-hold, or of the whole board, with its pictures and figures in them; or its log
-(`canvas.jsonl`, which names its pictures but does not carry them) — and, when what you hold or the
-board reads as a diagram, as Mermaid text — and **folder** makes a folder on your computer the canvas.
+board is kept in this browser as you draw, its pictures too, and **folder** makes a
+folder on your computer the canvas.
+
+**controls › Board › export** writes the board out. **board + pictures** is one
+`.dyna.zip` that **boards › from a file…** opens whole, pictures and all. **drawing ·
+SVG**, **picture · PNG** and **page · PDF** (one page of Letter or A4) are of what you
+hold, or of the whole board, with its pictures and figures in them. **board file**
+(`canvas.jsonl`) is the board as a file of its own, to open again under **boards ›
+from a file…** — it names its pictures but does not carry them. **Mermaid text** is
+there when what you hold, or the board, reads as a diagram. Point at a button and it
+names its file.
 
 **Every board out**, at the foot of the boards pane, writes every board kept here — each with
 its pictures, its name, your mark and your settings, never a model's key — as one `.zip`.
@@ -266,11 +326,63 @@ the diagrams and pattern pieces the canvas reads and make what goes with them
 likelier first. A board keeps the packs it uses; *stop using* puts one back, and
 **undo** takes either back.
 
-## Live rooms
+## Sharing a board
 
-**controls › Helpers › live**: a room name, and other tabs on this machine can
-join it; with a relay, other machines too. Each hand draws in its own colour,
-and a word goes only on your own ink.
+**controls › Helpers › share › Share this board** puts the board on screen into
+a new room on dyna.ink's relay — every mark on it, the ones others made still
+theirs. Then **Copy invite link** (on a phone or an iPad, the share sheet) and
+send the link to whoever you want drawing with you. Anyone with the link can
+open it in any browser, give a name, and draw with you as you draw, each hand in
+its own colour.
+
+- **The key stays out of the address servers see.** The link carries the room's
+  key after the `#`, and a browser never sends what comes after `#` to the site
+  it opens; the page hands the key only to the relay, to open the room. Anyone
+  who has the link can join, so send it only to the people you want there.
+- **A guest is asked a name** before joining, so everyone can tell whose marks
+  are whose. You are asked one too when you share, if you have not given one.
+- **Who is here.** In a room the bar shows it: its name, and a dot for each
+  person heard in the last minute, in their colour. The status line says *in
+  room … · you are … · with …*. Tap the chip in the bar for the share pane: who
+  is here, **Copy invite link** again, **Save a copy to my boards**, and
+  **Leave**.
+- **Save a copy to my boards** keeps the room's board as it stands, as a board
+  of your own in this browser — the others' marks still theirs. The room goes
+  on as it was.
+- **Leave** takes you back to the board you had open before, as it was then:
+  what is drawn in the room stays in the room.
+- **How long a room is kept.** What is drawn in a room the relay opened — its
+  marks and the pictures put in it — is kept on the relay while the room is in
+  use, and the room is forgotten 30 days after it was last used; then it is gone
+  for everyone. The share pane says how long. *Save a copy to my boards* keeps
+  it.
+- **Joining** never brings your board in. Under **more ways in**, type a room's
+  name or paste an invite link, and tap **Join**; with no relay typed, a room is
+  between the tabs of this browser. (*with Claude* is the one way in that brings
+  the board on screen, for Claude to read — see *Models*.)
+- **Offline**, what you draw is held on this page and sent when you are back.
+  Leaving the room or closing the page before then loses it — **Leave** says so,
+  and offers **Leave anyway** before it goes.
+- A link that does not open the room says so: ask whoever sent it for a new
+  one. A room with nothing in it says so, and that it may have been forgotten.
+- A board too big to carry in is said before anything is sent, with **Share an
+  empty board instead**.
+- **undo** takes back only your own last act; the others' work stays. A word
+  goes only on your own ink.
+
+## Play it here
+
+A program — or a script that moves something on the board — runs code. One
+that someone else set playing, in a shared room or on a board that came from a
+file, a folder or another browser, does not run in your tab until you say so:
+it waits with a dashed edge, and the status line says so, and who set it
+playing. Point at it or hold it: the panel offers **play it here**, and the
+field **Play … here**. That play is yours, and **undo** takes it back. A
+program you played yourself waits the same way after a reload. The examples
+dyna.ink ships play as they open.
+
+Played here, it runs walled off from the page: it cannot open your boards or
+reach your keys.
 
 ## Your mark
 
@@ -282,8 +394,24 @@ the check.
 ## Undo
 
 **undo** in the bar, or ⌘Z / Ctrl+Z, takes back your own last act — one
-stroke, or everything one choice in the field did. Another hand's work in a
-live room stays.
+stroke, or everything one choice in the field did. On a shared board, the
+others' work stays.
+
+## Escape
+
+**Esc** takes back one thing a press, the top one first: the controls, then the
+field, then an open pane, then the cards (**layout**), then what is held. With
+nothing open and nothing held, it stops every model at work. A box you are
+typing in takes Esc first: the text you are typing is dropped, find closes, a
+board's new name is put back.
+
+## Less motion
+
+If your device asks for less motion, nothing on the board moves by itself: the
+dot over a model at work holds still, a found word's ring does not pulse, an
+example's film waits for you, and a drawing set moving before this page opened,
+or by someone else, holds still. Start one with **play it here** in the panel,
+or hold it and choose **Play … here**. What you play yourself plays.
 
 ## On an iPad
 
@@ -307,9 +435,9 @@ is ignored.** The canvas keeps how hard you pressed and when, at every point the
 pencil reports, so a quick stroke stays as smooth as you drew it. The *hand*
 tile gives a finger its ink back, and says left or right for your hand.
 
-**Pictures come in two ways**: **Import a photo** (from your photo library or
-Files, several at a time) and **Take a photo** (the camera). Each lands on the
-board and is kept with it.
+**Pictures come in two ways**, under **controls › Board › import**: **photos**
+(from your photo library or Files, several at a time) and **camera** (one shot).
+Each lands on the board and is kept with it.
 
 ## Shortcuts
 
@@ -317,12 +445,13 @@ board and is kept with it.
 - **⌘C / Ctrl+C** — copy the held marks
 - **⌘V / Ctrl+V** — paste — copied ink, a picture, or a file
 - **Delete / Backspace** — erase the held marks
-- **Esc** — close the field, let go, or stop the models at work
+- **Esc** — one thing a press: the controls, the field, a pane, the cards, what
+  is held; with nothing up, stop the models at work (see *Escape*)
 - **Enter** — do what the line under the field says
 - **↑ ↓ ← →** — choose a pill in the field
 - **+ / −** — zoom in / out
 - **⌘0 / Ctrl+0** — fit everything on screen
-- **/ , ⌘K / Ctrl+K** — find a word on any board
+- **/ , ⌘K / Ctrl+K** (or ⌘F / Ctrl+F) — find a word on any board
 - **Space + drag, or scroll** — pan
 - **pinch, or ⌘ / Ctrl + scroll** — zoom
 
@@ -333,6 +462,3 @@ is ignored. The *hand* tile gives the finger its ink back.
 
 dyna.ink is open source under the GNU AGPL-3.0: **Source code**, at the top
 of this pane, opens its source, and **AGPL-3.0** beside it the license.
-
-*The manual test plan the builders walk is `QA-v8.md`, beside this file in
-the repository.*
