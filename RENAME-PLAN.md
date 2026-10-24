@@ -52,6 +52,23 @@ license itself, pricing and vendor terms stay out of this repository.*
 - **No release has been cut.** `VERSION` is `0.0.0`. `origin`'s push URL is a
   lock; pushes go to the fetch URL on John's word.
 
+*Status, 23 Oct 2026* (the multiuser milestone: the branch
+`claude/loving-maxwell-zagdqy`, from `master` at `6f541ef`, checked at
+`ca89381`; the list above is as it stood on 2 Oct). N0, N1, N2 and N3a–N3e are
+on `master`, and `0.1.0` is released. **N4 is prepared and not applied**:
+`scripts/n4.mjs` lists its eleven edits and makes them only with `--apply`, in
+the old repository at the cutover (§5 N4). **N5 now comes before N4**: `0.2.0`
+is the milestone the new repository starts from (§5 N5). **H1 is superseded**
+by `NEW-REPO-PLAN.md`: the new repository is born in the organisation, and this
+one is never transferred or renamed (§5 H1). The deploy no longer runs on every
+push to `master`: it runs after CI passes, only for `master`'s tip, and only from
+the repository that holds the Cloudflare secrets — which `NEW-REPO-PLAN.md` makes
+the new one (`cloudflare/README.md`, *When it deploys*). Nothing has been deployed;
+John's Cloudflare steps are still to do. The numbers at `ca89381`: every step of
+CI's core and shard jobs passes, and the gate on Chromium gives 1,010 passed, 0
+failed, 12 skipped by name, in 18 scenarios (WebKit does not run where it was
+built; CI runs it).
+
 ## 1. The names, one home
 
 This table is the only place the spellings are defined. Everything else
@@ -525,10 +542,47 @@ for the spellings and does not restate them.
 the site are relative, and the address search in the app scenario is how to
 know.
 
+**N4 status, 23 Oct 2026: prepared, not applied.** `scripts/n4.mjs` (the deploy
+lane of the multiuser milestone) is N4's code changes as a list: `node
+scripts/n4.mjs` prints each edit with where it stands and what it becomes, and
+writes nothing; `--apply` makes them, refuses by name a file that has drifted
+from what an edit expects (an edit already made is said and left), and then
+prints what to run and what is left by hand. The eleven: `index.html`'s social
+card and canonical address, absolute on dyna.ink; its *Open it →* and its
+reference surface, the app on the same site (`app/?example=story`, `app/`); every
+other link into the site, relative; `404.html`'s card and its two ways back,
+absolute on dyna.ink (a 404 is served at any depth); `OPENROUTER_APP.url` in
+`core/src/llm/provider.ts`; the address `scripts/release.mjs` prints;
+`NEW_HOME_NOTICE` in `Demos/surface/17-carry.js` turned on, and the two lines of
+its test that say so. `scripts/n4.test.mjs`, in CI's core job, holds the list to
+the repository as it stands. Done ahead of it: the address search reads dyna.ink
+links as well as the old address's (`SITE_URLS` in `e2e/links.mjs`, the one home
+the `app` and `prod` scenarios and the site test read), so the `SITE_URL` step
+above is no longer one. Left by hand, as the script says: the README's links,
+`CHANGELOG.md`'s header line and `CLAUDE.md`'s *published at*; the launch film's
+end card (render again with `url=dyna.ink/app`); and the iPad checks above.
+**Where and when:** in the old repository, as one commit at the cutover
+(`NEW-REPO-PLAN.md` §8, step 4), once dyna.ink answers — applied earlier, the
+social card, the canonical address and the 404's buttons would name a site that
+is not there. Unverified: `--apply` has run only on scratch copies, and the
+commands it prints have not been run on the result.
+
 ### N5: release 0.2.0
 
 `node scripts/release.mjs 0.2.0` cuts the first dyna.ink release, titled
 "dyna.ink 0.2.0", with `dist/release/dynaink-0.2.0.html`.
+
+**N5 status, 23 Oct 2026: not cut — on John's word, and now before N4.** §4 puts
+N5 after N4; `NEW-REPO-PLAN.md` (§2, decision 7) makes `v0.2.0` the milestone the
+new repository is seeded from, so it is cut once the milestone's branch is on
+`master`, and N4 follows at the cutover. **From a full clone with its tags**:
+since this cycle `release.mjs` refuses a clone that cannot see the last release
+(`unseenRelease`: `VERSION` is above `0.0.0` and no `v<VERSION>` tag is reachable
+from `HEAD`) and says what to run — `git fetch --tags --unshallow` in a shallow
+clone, `git fetch --tags` in a full one — so a release cut in a container's
+shallow checkout never writes its section from the whole history as though
+`v0.1.0` were not there. Its section, from `v0.1.0`, takes in N1, N2, N3a–N3e,
+the storyboard and the film, and the milestone's lanes.
 
 ### H1: the organisation (before a hard launch)
 
@@ -546,6 +600,29 @@ Create the organisation and transfer the repository into it (for example
   links.
 - The private repository for the paid layer lives beside it. Reserving the
   organisation's name costs nothing and is in the admin list now.
+
+**H1 status, 23 Oct 2026: superseded by `NEW-REPO-PLAN.md`.** Nothing is
+transferred. The organisation is still to be made (its name is John's decision,
+`NEW-REPO-PLAN.md` §2, decision 1), and the product's repository is **born in
+it**: a new repository seeded from `v0.2.0` with the full history of `master` and
+one commit that leaves the experiments behind (`NEW-REPO-PLAN.md` §3–§5). **This
+repository is never transferred or renamed**, because a transfer would move its
+GitHub Pages address, `jjh111.github.io/MetaMedium/`, and that address is:
+- **the carry's sender**, by name: dyna.ink takes boards from
+  `https://jjh111.github.io` alone (`CARRY_OLD_ORIGIN` in
+  `Demos/surface/17-carry.js`), so a person whose boards are kept at the old
+  address could no longer carry them across;
+- **every installed app's**: an app added to a Home Screen from the old address
+  keeps its boards in that address's storage, and is tied to it;
+- and every old link's.
+
+So `jjh111/MetaMedium` stays where it is, keeps serving the old address, takes N4
+as one commit at the cutover, and holds no Cloudflare secrets. What this unit
+listed as moving with the repository — the deploy's secrets, the fetch URL, the
+address `release.mjs` prints, `CLAUDE.md`'s push instruction, the README's links
+— and the source address the app offers (`SOURCE_URL`, AGPL-3.0 §13) are set in
+the new repository instead (`NEW-REPO-PLAN.md` §5, §7, §8). §2's *the repository
+`jjh111/MetaMedium`, until H1* now reads: for good.
 
 ## 6. How the agents run
 

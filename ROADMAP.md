@@ -1,7 +1,70 @@
 # dyna.ink Roadmap — Mid-2026 Refresh
 
-**Date:** June 2026 · last revised August 2026
-**Status:** Active plan
+## Status, 23 October 2026
+
+This section is the status. Everything under it is the roadmap as it stood from
+June to September 2026 and the August 2026 accounting, **kept as history**: its
+counts, its *not started* and its *next* are of their day. What is built is in
+`CLAUDE.md`; what is built next is `V1-SPEC.md` (its units in §6, its ladder in
+§7); the rename's units are `RENAME-PLAN.md`; the new repository is
+`NEW-REPO-PLAN.md`.
+
+- **0.1.0, the last MetaMedium** (`v0.1.0`, cut 2 Oct 2026; `CHANGELOG.md`
+  lists its 801 commits by unit). It held `V1-PLAN.md`'s phases 0 to 2 and
+  phase 3's cores: ids that hold and gestures per hand; a board that holds 2,000
+  marks; tools, context and library packs; handles and bindings that follow; the
+  flowchart, class, sequence, state, ER and mind-map notations with Mermaid out
+  and in, and routing; maths on a page and the garment pattern piece; the pencil;
+  one app address, versioned; Claude Code as the canvas's seat. Beside them: the iPad units of
+  `PLAN-IPAD-NOTES.md` (pictures kept and drawn, a board out and back whole,
+  regions, Find, a model per job, notes read in batches, the semantic seat, the
+  agent's hand on pictures and notes), the field's push (`PLAN-FIELD-PAR.md`),
+  and dyna.ink's Cloudflare home, built and not deployed (CF1). After it, on
+  `master`: the rename (`RENAME-PLAN.md` N1, N2, N3a–N3e), the storyboard and
+  the launch film as an example, the whitepaper's film and stories.
+- **This milestone: the demo as a multiuser web app** (the branch
+  `claude/loving-maxwell-zagdqy`, from `master` at `6f541ef`;
+  `NEW-REPO-PLAN.md` §1 says what each part is and where it lives):
+  - **rooms anyone opens**: *Share this board*, *Copy invite link* with the
+    room's key after `#`, a guest's name, who is here in the bar, *Save a copy to
+    my boards*; a name claimed by the hand that writes under it, a room's
+    floodgate, lines sent again until the relay takes them, a big board in
+    pieces; a room the relay opened forgotten 30 days after its last use;
+  - **dyna.ink's own models, with no key in a browser**: Cloudflare's Clef-flash
+    as the decider (*Which is it?*, *Which diagram is this?*, *what should this
+    brief make?*), and a writer and a reader, through the relay's Workers AI
+    binding — seated only once the relay answers, asked after a person's own
+    model and Claude Code, each within a budget a day;
+  - **another hand's code runs only after *Play it here***, a behaviour in a
+    sealed, opaque-origin frame, and no program or Mermaid frame able to open a
+    connection out;
+  - **a deploy that can be trusted**: only after CI passes on `master`'s tip, the
+    app under its own policy, the site without what cannot run, a gate scenario
+    that serves it as production does, and `scripts/n4.mjs` ready for N4;
+  - **a first hour that holds** on a desktop, a phone and an iPad: panes that
+    fit, one Escape, a first run on every screen, a field that stays put, and a
+    test of the words a person reads.
+
+  Checked at `ca89381`: every step of CI's core and shard jobs passes, and the
+  gate on Chromium gives 1,010 passed, 0 failed, 12 skipped by name, in 18
+  scenarios. Not run: WebKit (CI runs it), and anything on Cloudflare — nothing
+  is deployed and no real model reply has been seen (`cloudflare/README.md`).
+- **What 0.2.0 and the new repository need**, in order: the milestone's branch
+  on `master`; **0.2.0**, cut on John's word from a full clone with its tags
+  (`RENAME-PLAN.md` N5); the **new repository**, seeded from `v0.2.0`, after
+  John's decisions — the organisation's name first (`NEW-REPO-PLAN.md` §2, §5);
+  **John's Cloudflare steps**, in the new repository only
+  (`cloudflare/README.md`); the **cutover**, with N4 as one commit in the old
+  repository (`NEW-REPO-PLAN.md` §8). Then the first units in the new repository
+  (`NEW-REPO-PLAN.md` §9) and `V1-SPEC.md` §7: the rest of its phase 0 (A10 and
+  A11 by hand on an iPad), then phase 1, *Bring it in*.
+
+---
+
+*Below: the roadmap as it stood, kept as history.*
+
+**Date:** June 2026 · last revised August 2026 (dated entries to 27 September 2026)
+**Status:** history since 23 October 2026 — the status is the section above
 **Supersedes:** the day-by-day roadmap in the old CLAUDE.md; sequences (does not replace) `archive/PRD-v4-LLM-Grounded.md` and `ARCHITECTURE-v5-UNIFIED-ENGINE.md`
 
 ---
