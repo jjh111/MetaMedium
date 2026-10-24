@@ -31308,7 +31308,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
       for (const t of said3) lines.push(`    - "${t.text}" ${t.confidence.toFixed(2)} by ${t.source ?? "unknown"}`);
     }
     const rels = node.edges.filter(
-      (e) => e.rel !== "resembles" && e.rel !== "blessed-by" && e.rel !== "made-by"
+      (e) => e.rel !== "resembles" && e.rel !== "blessed-by" && e.rel !== "made-by" && (!opts.within || opts.within.has(e.to))
     );
     if (rels.length > 0) {
       const shown2 = rels.map((e) => `${e.rel} ${e.to}`).join(", ");
@@ -31323,15 +31323,16 @@ Reply with ONLY a JSON object, no prose, no code fences:
     const nodes = ids.map((id) => state.nodes.get(id)).filter((x) => !!x && !isParticipant(x) && !isGesture(x));
     if (nodes.length === 0) return "(nothing on the canvas)";
     const parts = [];
-    const named2 = state.artifacts.map((id) => state.nodes.get(id)).filter((x) => !!x).map((a) => wordOf(a)).filter((w2) => !!w2);
+    const scoped = options.nodeIds !== void 0;
+    const asked = new Set(nodes.map((x) => x.id));
+    const bears = (a) => !scoped || authorOf(a) === LOCAL_PARTICIPANT || asked.has(a.id) || a.edges.some((e) => e.rel === "has-part" && asked.has(e.to));
+    const named2 = state.artifacts.map((id) => state.nodes.get(id)).filter((x) => !!x && bears(x)).map((a) => wordOf(a)).filter((w2) => !!w2);
     if (named2.length > 0) {
-      parts.push(`Known names in this session: ${named2.join(", ")}`);
+      parts.push(`Known names in this session: ${[...new Set(named2)].join(", ")}`);
     }
-    const others = state.participants.map((id) => state.nodes.get(id)).filter((x) => !!x).map((p) => wordOf(p)).filter((w2) => !!w2);
-    if (others.length > 0) parts.push(`Participants: ${others.join(", ")}`);
     parts.push(`Marks (${nodes.length}):`);
     for (const node of nodes) {
-      parts.push(describeNode(node, state, { includeInterpretations, round }));
+      parts.push(describeNode(node, state, { includeInterpretations, round, within: scoped ? asked : void 0 }));
     }
     return parts.join("\n");
   }

@@ -296,7 +296,10 @@
 
   /** What a house model is sent and where, in one line — "keeps none" said of dyna.ink only: nobody here can say what Cloudflare keeps. */
   function houseSends(seat) {
-    const what = seat === 'reader' ? 'a picture of the ink you ask it to read' : 'the brief you typed and the words of the marks you ask about';
+    // What a writer is sent is the marks asked about — their shapes and words, how they sit among themselves — and the
+    // names this hand gave its own things (core's `describeSession`, scoped): never another hand's thing elsewhere on a
+    // shared board, nor who is in the room.
+    const what = seat === 'reader' ? 'a picture of the ink you ask it to read' : 'the brief you typed and the words of the marks you ask about, with the names you gave your own things';
     return 'asked only when you ask — it is sent ' + what + ', to dyna.ink’s relay, which asks Cloudflare’s models; dyna.ink keeps none of it';
   }
 

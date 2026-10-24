@@ -322,7 +322,7 @@ test('once the house answers, its writer and reader are seated where the person 
 test('their rows and the pane’s lead say what they are and what is sent where, in the person’s words — no key, and never what Cloudflare keeps', () => {
   assert.equal(S.houseWords('writer'), 'dyna.ink’s writer — no key needed');
   assert.equal(S.houseWords('reader'), 'dyna.ink’s reader — no key needed');
-  assert.match(S.houseSends('writer'), /the brief you typed and the words of the marks you ask about, to dyna\.ink’s relay, which asks Cloudflare’s models; dyna\.ink keeps none of it$/);
+  assert.match(S.houseSends('writer'), /the brief you typed and the words of the marks you ask about, with the names you gave your own things, to dyna\.ink’s relay, which asks Cloudflare’s models; dyna\.ink keeps none of it$/);
   assert.match(S.houseSends('reader'), /a picture of the ink you ask it to read/);
   const lead = S.houseLead();
   assert.equal(lead.head, 'Using dyna.ink’s own models — no key needed');

@@ -12,7 +12,7 @@
 
 import type { MMNode } from '../session/nodes';
 import type { SessionState } from '../session/session';
-import { fingerprintOf, wordOf, labelOf, boundsOf, isParticipant, isGesture, transcriptsOf } from '../session/nodes';
+import { fingerprintOf, wordOf, labelOf, boundsOf, isParticipant, isGesture, transcriptsOf, authorOf, LOCAL_PARTICIPANT } from '../session/nodes';
 import { interpretationsOf } from '../session/interpretations';
 import type { Rect, Region } from '../session/regions';
 import type { Relation } from '../relate/relations';
@@ -35,7 +35,7 @@ function n(v: number, round: boolean): string {
 function describeNode(
   node: MMNode,
   state: SessionState,
-  opts: Required<Pick<SerializeOptions, 'includeInterpretations' | 'round'>>
+  opts: Required<Pick<SerializeOptions, 'includeInterpretations' | 'round'>> & { within?: ReadonlySet<string> }
 ): string {
   const lines: string[] = [];
   const name = wordOf(node);
@@ -86,7 +86,7 @@ function describeNode(
 
   // Spatial relations are the part a screenshot cannot hand a model directly.
   const rels = node.edges.filter(
-    (e) => e.rel !== 'resembles' && e.rel !== 'blessed-by' && e.rel !== 'made-by'
+    (e) => e.rel !== 'resembles' && e.rel !== 'blessed-by' && e.rel !== 'made-by' && (!opts.within || opts.within.has(e.to))
   );
   if (rels.length > 0) {
     const shown = rels.map((e) => `${e.rel} ${e.to}`).join(', ');
@@ -101,7 +101,11 @@ function describeNode(
  *
  * Participants and gesture strokes are excluded: an agent reasons about
  * content, and the lasso that selected the content is not part of what was
- * drawn.
+ * drawn. And a slice says only what bears on it: in a room the board holds
+ * other people's things, and what is sent to a model — the person's own, or
+ * dyna.ink's — is the marks asked about. So the names it lists are this hand's
+ * own and those of the things the marks asked about are part of; a relation is
+ * said only between marks asked about; and who is in the room is never said.
  */
 export function describeSession(state: SessionState, options: SerializeOptions = {}): string {
   const includeInterpretations = options.includeInterpretations ?? true;
@@ -116,25 +120,24 @@ export function describeSession(state: SessionState, options: SerializeOptions =
 
   const parts: string[] = [];
 
+  // A slice (`nodeIds`) names what bears on it: this hand's own things — its vocabulary — and the things the marks
+  // asked about are, or are part of. Another hand's things elsewhere on the board are theirs, not the question's.
+  const scoped = options.nodeIds !== undefined;
+  const asked = new Set(nodes.map((x) => x.id));
+  const bears = (a: MMNode): boolean =>
+    !scoped || authorOf(a) === LOCAL_PARTICIPANT || asked.has(a.id) || a.edges.some((e) => e.rel === 'has-part' && asked.has(e.to));
   const named = state.artifacts
     .map((id) => state.nodes.get(id))
-    .filter((x): x is MMNode => !!x)
+    .filter((x): x is MMNode => !!x && bears(x))
     .map((a) => wordOf(a))
     .filter((w): w is string => !!w);
   if (named.length > 0) {
-    parts.push(`Known names in this session: ${named.join(', ')}`);
+    parts.push(`Known names in this session: ${[...new Set(named)].join(', ')}`);
   }
-
-  const others = state.participants
-    .map((id) => state.nodes.get(id))
-    .filter((x): x is MMNode => !!x)
-    .map((p) => wordOf(p))
-    .filter((w): w is string => !!w);
-  if (others.length > 0) parts.push(`Participants: ${others.join(', ')}`);
 
   parts.push(`Marks (${nodes.length}):`);
   for (const node of nodes) {
-    parts.push(describeNode(node, state, { includeInterpretations, round }));
+    parts.push(describeNode(node, state, { includeInterpretations, round, within: scoped ? asked : undefined }));
   }
 
   return parts.join('\n');
