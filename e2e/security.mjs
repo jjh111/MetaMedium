@@ -322,6 +322,63 @@ export async function runSecurity(browser, servers, { freshContext, screenshot }
         st.both.here && st.both.author === 'bob' && st.undone.here && st.undone.playing && st.cut.here, st);
     });
 
+    // ---- C1.6. A frame another hand made that wires a program this hand plays is a version of its own: what the
+    // worker would run is theirs to set, so it stands by for Play it here — and a frame this hand made retunes nothing
+    // it did not consent to ----
+    await record('C1.6', async () => {
+      const st = await page.evaluate(async () => {
+        const mm = window.__mm, s = mm.session;
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        const X = 4000, Y = 1200;   // clear of every mark the records before drew
+        const line = (x, y, x2, y2) => { const p = []; for (let i = 0; i <= 20; i++) p.push({ x: X + x + (x2 - x) * i / 20, y: Y + y + (y2 - y) * i / 20 }); return p; };
+        const dot = (x, y) => { const p = []; for (let i = 0; i < 10; i++) { const a = i / 10 * 2 * Math.PI; p.push({ x: X + x + 2 * Math.cos(a), y: Y + y + 2 * Math.sin(a) }); } return p; };
+        const circ = (cx, cy, r) => { const p = []; for (let i = 0; i <= 32; i++) { const a = i / 32 * 2 * Math.PI; p.push({ x: X + cx + r * Math.cos(a), y: Y + cy + r * Math.sin(a) }); } return p; };
+        const chk = (x, y) => { const p = []; for (let i = 0; i <= 10; i++) p.push({ x: X + x + 8 * i / 10, y: Y + y + 10 * i / 10 }); for (let i = 1; i <= 16; i++) p.push({ x: X + x + 8 + 16 * i / 16, y: Y + y + 10 - 28 * i / 16 }); return p; };
+        const steps = async (id, n) => { for (let i = 0; i < n; i++) { try { await mm.runtime().stepOnce(id); } catch (e) {} } const b = mm.runtime().bodies.get(id); return b ? b.vx : 0; };
+        const mover = (name, x) => s.import({ kind: 'js', path: name + '.js', name, bounds: { minX: X + x, minY: Y - 400, maxX: X + x + 100, maxY: Y - 340 }, code: 'const SPEED = 5;\nfunction step(w){ return { fx: SPEED, fy: 0 }; }\nreturn step(world);', at: at++ });
+        let at = Date.now();
+        // This hand's own behaviour, played here, at its own speed.
+        const jsId = mover('mover', 600);
+        s.clock({ nodeId: jsId, op: 'play', at: at++ });
+        await sleep(600);
+        // A control of this hand's own: a drawn slider, circled and checked, its value read from where the knob sits.
+        s.addStroke(line(100, 500, 400, 500), at++); s.addStroke(dot(340, 501), at++); s.addStroke(circ(250, 500, 210), at++); s.addStroke(chk(430, 540), at++);
+        const sum = s.getState().summon;
+        const ctrlId = sum && s.bless({ summonId: sum.id, name: 'amount', at: at++ });
+        s.attachCode({ participantId: 'participant:local', nodeId: ctrlId, kind: 'control', code: '{"min":0,"max":1000}', at: at++ });
+        const before = { here: mm.playedHere(jsId), vx: await steps(jsId, 6), control: !!ctrlId };
+        // eve's frame, a line the room appends: the control's value into SPEED of this hand's program.
+        s.rebase(s.getEvents().length, [{ type: 'frame', ids: [ctrlId, jsId], name: 'wire', connections: [{ from: { id: ctrlId, port: 'value' }, to: { id: jsId, port: 'param:SPEED' } }], at: at++, origin: 'eve~e1', seq: 1, by: 'eve~e1' }]);
+        await sleep(600);
+        const vx = await steps(jsId, 6);
+        const f = mm.frames && mm.frames.get(jsId);
+        mm.inspect(jsId);
+        await sleep(100);
+        const after = { here: mm.playedHere(jsId), vx, standing: !!(f && f.wrap.classList.contains('playing-elsewhere')),
+          panel: (document.getElementById('inspector').textContent || '').replace(/\s+/g, ' ') };
+        mm.inspect(null);
+        // Play it here: the person's own play of the version that stands — the wired one — which then runs.
+        mm.playHere(jsId);
+        await sleep(600);
+        const again = { here: mm.playedHere(jsId), vx: await steps(jsId, 6) };
+        // A frame this hand makes is its own act: its own program, wired by its own frame, keeps running, retuned.
+        const mine = mover('mine', 900);
+        s.clock({ nodeId: mine, op: 'play', at: at++ });
+        await sleep(400);
+        const mineBefore = await steps(mine, 4);
+        s.frame({ ids: [ctrlId, mine], name: 'wire mine', connections: [{ from: { id: ctrlId, port: 'value' }, to: { id: mine, port: 'param:SPEED' } }], at: at++ });
+        await sleep(600);
+        const own = { here: mm.playedHere(mine), before: mineBefore, vx: await steps(mine, 6) };
+        return { before, after, again, own };
+      });
+      check('C1.6. this hand’s own behaviour and control: the behaviour, played here, runs at its own speed', st.before.control && st.before.here && st.before.vx > 0 && st.before.vx < 20, st.before);
+      check('C1.6. another hand’s frame wiring it into a program this hand plays does not retune it here — it stands by, dashed, for Play it here, its body never driven by the wired value',
+        !st.after.here && st.after.standing && st.after.vx <= st.before.vx + 1e-9, st.after);
+      check('C1.6. and the panel says whose frame it is, in the person’s words', /wired to a frame by eve — not running here until you play it/.test(st.after.panel), { panel: st.after.panel.slice(0, 400) });
+      check('C1.6. Play it here runs the wired version, by the person’s own act', st.again.here && st.again.vx > st.before.vx * 5, st.again);
+      check('C1.6. a frame this hand makes is its own act: its program keeps running here, retuned by its own wiring', st.own.here && st.own.vx > st.own.before * 5, st.own);
+    });
+
     // ---- XSS. Injected names, labels, svg/mermaid/page never execute ----
     await record('XSS', async () => {
       await page.goto(`${origin}/${APP}`, { waitUntil: 'load', timeout: 60000 });

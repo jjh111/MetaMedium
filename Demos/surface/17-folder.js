@@ -578,11 +578,14 @@
       const who = session.clockAuthor(id);
       // A program this hand plays that another hand gave a new version: that version waits for the person's own play.
       const by = !who && ownPlayStands(id) ? newVersionBy(s, id) : null;
-      if (!who && !by) continue;
+      // Or wired it to a frame of theirs: what it would run is theirs to set, so that too waits for the person's own play.
+      const wired = !who && !by && ownPlayStands(id) ? wiredBy(s, id) : null;
+      if (!who && !by && !wired) continue;
       folder.playsSaid.add(id);
       const name = '“' + (MM.wordOf(s.nodes.get(id)) || 'a program') + '”';
       if (who) say(who + ' set ' + name + ' playing — it does not run here until you play it; open it and tap “play it here”');
-      else say(by + ' wrote a new version of ' + name + ' — it does not run here until you play it; open it and tap “play it here”');
+      else if (by) say(by + ' wrote a new version of ' + name + ' — it does not run here until you play it; open it and tap “play it here”');
+      else say(wired + ' wired ' + name + ' to a frame of theirs — it does not run here until you play it; open it and tap “play it here”');
     }
   }
 

@@ -1,5 +1,5 @@
 // ===== frames =====
-// Provides: frames on the surface — wiredCodeOf/wiredBehaviourOf (the harness applied where members render
+// Provides: frames on the surface — wiringOf/wiredCodeOf/wiredBehaviourOf (the harness applied where members render
 //   and run), frame and control rendering, the knob drag, exportFrameFiles. (Making a frame or a slider,
 //   and finding a frame again, are core's `frames` and `control` tools, offered in the field.)
 // Uses: core, artifacts (frames map), render, kinds, clocks.
@@ -17,14 +17,24 @@
       .filter((n) => n && MM.isFrame(n) && !n.reps.some((r) => r.modality === 'erased') && MM.frameOfNode(n).members.includes(id));
   }
 
-  /** The member's code with its connections applied, or null when nothing feeds it. */
-  function wiredCodeOf(s, id) {
+  /**
+   * The frame that wires a member's code, and the code it makes of it: the newest frame holding it that feeds it —
+   * `{ frame, code }`, the frame's node and the member's code with the connections applied — or null when nothing does.
+   * What a playing `js` runs is that code, so the consent gate asks it whose frame it is (13-kinds.js, `codeVersionOf`).
+   */
+  function wiringOf(s, id) {
     const holders = framesHolding(s, id);
     for (let i = holders.length - 1; i >= 0; i--) {
       const r = MM.resolveFrame(MM.frameOfNode(holders[i]), s.nodes);
-      if (r.code[id] !== undefined) return r.code[id];
+      if (r.code[id] !== undefined) return { frame: holders[i], code: r.code[id] };
     }
     return null;
+  }
+
+  /** The member's code with its connections applied, or null when nothing feeds it. */
+  function wiredCodeOf(s, id) {
+    const w = wiringOf(s, id);
+    return w ? w.code : null;
   }
 
   /** A definition's behaviour with its wired speed and weights, or the behaviour itself. */

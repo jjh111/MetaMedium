@@ -2,9 +2,11 @@
 // Provides: documentForKind (the renderers: every kind as a document ink can address), the mermaid harness (mermaidFrom, mermaidStates), postPointer (a hand forwarded into a playing frame), the worker runtime
 //   (a blessed `js` artifact's code runs in a worker with a budget; a throw or a hang pauses its clock
 //   with the reason), runtimeOffset, runtimeBroken, syncRuntime, the consent gate (trackConsent, consentedHere,
-//   grantPlayingPrograms, ownPlayStands — this tab runs a program only when this hand played that very code here, C1), frameCSP (a run or
+//   grantPlayingPrograms, ownPlayStands, newVersionBy, wiredBy — this tab runs a program only when this hand played that very code here,
+//   as a frame of another hand's would wire it, C1), frameCSP (a run or
 //   mermaid frame cannot fetch, open a socket or beacon), frameLoaded (one that navigates itself is stopped), WORKER_HARDEN (the js worker keeps only Math/performance/Function/postMessage).
-// Uses: core (session, esc), artifacts (frames, documentFor), render (render), the first hour (27-first.js: motionReduced —
+// Uses: core (session, esc), artifacts (frames, documentFor), render (render, nameOfParticipant), frames (16-frames.js: wiringOf —
+//   whose frame wires what a `js` runs), the first hour (27-first.js: motionReduced —
 //   under reduced motion an example's program is not granted, and waits for the person's own play).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
@@ -755,13 +757,32 @@
   // after *Play it here* again. So a grant holds the versions of the artifact's code this hand played, or wrote
   // itself while playing it (its own model's revision is its own); a newer version from anyone else is not among
   // them, and the program stands by — dashed, offering *Play it here* — until the person plays it.
+  // And what the worker runs of a `js` behaviour is its code as a frame wires it (16-frames.js, `wiringOf`): a number,
+  // a value or a slot of it set from another member's port. A frame another hand made that wires a program this hand
+  // plays is a version of its own, then — it retunes what runs here with no play and no new code of this hand's — so it
+  // stands by for *Play it here* as another hand's new version does. A frame this hand made is its own act and makes no
+  // new version: the values its wiring carries (a knob it drags, a member it wired in) retune what it plays, which is
+  // what wiring is for.
   const grantedHere = new Map(); // artifactId -> Set of code versions (`codeVersionOf`) this hand may run here
   let consentArr = null, consentLen = 0;
-  /** The version of an artifact's code: its newest code rep, by when it was written and what it says. */
+  /**
+   * The version of an artifact's code as it would run here: its newest code rep, by when it was written and what it
+   * says — and, when a frame another hand made wires it, which frame.
+   */
   function codeVersionOf(s, id) {
     const node = s && s.nodes.get(id);
     const rep = node && codeRepOf(node);
-    return rep ? rep.data.at + ':' + hashOf(rep.data.code || '') : '';
+    if (!rep) return '';
+    const base = rep.data.at + ':' + hashOf(rep.data.code || '');
+    const by = wiredByOther(s, id);
+    return by ? base + ':wired:' + by.frame.id : base;
+  }
+  /** The frame another hand made that wires this program's code, with whose it is — else null (16-frames.js, `wiringOf`). */
+  function wiredByOther(s, id) {
+    const w = wiringOf(s, id);
+    if (!w) return null;
+    const maker = MM.authorOf(w.frame);
+    return maker === MM.LOCAL_PARTICIPANT ? null : { frame: w.frame, maker: maker };
   }
   function grantCode(s, id) {
     let versions = grantedHere.get(id);
@@ -824,6 +845,11 @@
     const rep = node && codeRepOf(node);
     if (!rep || !rep.source || rep.source === MM.LOCAL_PARTICIPANT) return null;
     return nameOfParticipant(rep.source);
+  }
+  /** The name of the hand whose frame wires a program this hand plays — which waits for *Play it here* — else null. */
+  function wiredBy(s, id) {
+    const by = wiredByOther(s, id);
+    return by ? nameOfParticipant(by.maker) : null;
   }
   /** Whether this tab may run this artifact's code as it stands now: this hand played this very version here. */
   function consentedHere(id, s) {
