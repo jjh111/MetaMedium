@@ -227,6 +227,7 @@
   }
   /** dyna.ink's own, taken by the hand: kept as its pick, and said — when it is asked and what it is sent. */
   function keepHouseChoice(m) {
+    seatPicks = withHouse(seatPicks, 'decider', true);
     seatPicks.decider = { provider: 'dyna', model: m };
     saveSeats();
     mpStatus.textContent = deciderWords(m, MM.DECIDER_TAKE_AT) + ' — it is the decider.';
@@ -238,12 +239,13 @@
   /** At boot, after the seats kept have rejoined: dyna.ink's own decider, silently, unless the hand chose one or chose none (03-seats.js, deciderAtBoot). */
   function seatHouseDecider() {
     if (decider) return;
-    const plan = deciderAtBoot(seatPicks.decider, HOUSE);
+    const plan = deciderAtBoot(seatPicks.decider, HOUSE, houseLetGo(seatPicks, 'decider'));
     if (plan.seat === 'house') joinHouseDecider(plan.model, true, plan.chosen);
   }
   /** The hand lets the decider seat go: none, kept, so a reload does not seat dyna.ink's own again. */
   function noDecider() {
     leaveDecider(true);
+    seatPicks = withHouse(seatPicks, 'decider', false);
     seatPicks.decider = { none: true };
     saveSeats();
     mpStatus.textContent = 'No decider — ' + fallbackWords('decider', { house: !!HOUSE && houseUp.decide }) + '.';
@@ -293,8 +295,9 @@
     saveSeats();
     if (!d.house) forgetKeyIfUnused(d.config.baseUrl);
     if (quiet) return;
-    // A decider the hand joined, let go where dyna.ink's own may be used: dyna.ink's own is the decider again.
-    if (!d.house && HOUSE && joinHouseDecider(HOUSE_DECIDER_MODEL, true)) { mpStatus.textContent = d.name + ' left the decider seat — ' + deciderWords(HOUSE_DECIDER_MODEL, MM.DECIDER_TAKE_AT) + ' is the decider again.'; return; }
+    // A decider the hand joined, let go where dyna.ink's own may be used: dyna.ink's own is the decider again — unless
+    // the hand let dyna.ink's own go, which a model of its own coming and going never undoes.
+    if (!d.house && HOUSE && !houseLetGo(seatPicks, 'decider') && joinHouseDecider(HOUSE_DECIDER_MODEL, true)) { mpStatus.textContent = d.name + ' left the decider seat — ' + deciderWords(HOUSE_DECIDER_MODEL, MM.DECIDER_TAKE_AT) + ' is the decider again.'; return; }
     mpStatus.textContent = d.name + ' left the decider seat.'; renderSeats(); syncTiles(); refreshPalette();
   }
 
@@ -514,6 +517,7 @@
   /** The hand lets dyna.ink's own writer or reader go: none, kept on this device, so a reload does not seat it again. */
   function noHouse(seat) {
     leaveHouse(seat);
+    seatPicks = withHouse(seatPicks, seat, false);
     seatPicks[seat] = { none: true };
     saveSeats();
     mpStatus.textContent = 'No ' + HOUSE_SEATS[seat].name + ' — ' + fallbackWords(seat, { letGo: true }) + '.';
@@ -522,7 +526,9 @@
 
   /** The hand takes dyna.ink's own writer or reader back after letting it go. */
   function houseBack(seat) {
-    if (seatPicks[seat] && seatPicks[seat].none) { delete seatPicks[seat]; saveSeats(); }
+    seatPicks = withHouse(seatPicks, seat, true);
+    if (seatPicks[seat] && seatPicks[seat].none) delete seatPicks[seat];
+    saveSeats();
     seatHouse();
     mpStatus.textContent = houseAgents[seat] ? houseWords(seat) + ' — ' + houseSends(seat) + '.' : 'dyna.ink’s own ' + seat + ' is not here just now.';
     renderSeats();
@@ -676,11 +682,11 @@
           '<button class="ghost" data-seat-set="' + seat + '" title="join a model for this seat — the key already entered is used">another…</button>' +
           (held || houseAsked ? '<button class="ghost" data-seat-try="' + seat + '">try it</button>' : '') +
           (house && !held ? '<button class="ghost" data-seat-none="' + seat + '" title="no ' + esc(HOUSE_SEATS[seat].name) + ': nothing is sent there — remembered on this device">none</button>' : '') +
-          (!house && houseUp.ai && seatPicks[seat] && seatPicks[seat].none ? '<button class="ghost" data-seat-house="' + seat + '" title="' + esc(houseWords(seat)) + '">dyna.ink’s own</button>' : '');
+          (!house && houseUp.ai && ((seatPicks[seat] && seatPicks[seat].none) || houseLetGo(seatPicks, seat)) ? '<button class="ghost" data-seat-house="' + seat + '" title="' + esc(houseWords(seat)) + '">dyna.ink’s own</button>' : '');
         if (held) { who = agentWords(held); call = callOf(agentKey(held)); }
         else if (houseAsked) { who = houseWords(seat); note = houseSends(seat); call = callOf(agentKey(house)); }
         else if (house) { who = 'nothing chosen'; note = (names(now) ? 'now: ' + names(now) + ' — ' : '') + houseWaits(seat); }
-        else { who = 'nothing chosen'; note = fallbackWords(seat, { letGo: !!(seatPicks[seat] && seatPicks[seat].none) }) + (names(now) ? ' — now: ' + names(now) : ''); }
+        else { who = 'nothing chosen'; note = fallbackWords(seat, { letGo: !!(seatPicks[seat] && seatPicks[seat].none) || houseLetGo(seatPicks, seat) }) + (names(now) ? ' — now: ' + names(now) : ''); }
       }
       html += '<div class="seatRow" data-seat="' + seat + '"><div class="seatHead"><b>' + seat + '</b><span class="seatJob">' + esc(w.job) + '</span></div>' +
         (body ? '<div class="seatBody">' + body + '</div>' : '') +

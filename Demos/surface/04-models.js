@@ -514,8 +514,11 @@
     // on its provider still uses is forgotten, as it was — and dyna.ink's own takes a seat left empty again, where the house
     // answered and the hand did not let it go (04-seatpane.js).
     forgetSeats(agent);
+    const had = { writer: houseAgents.writer, reader: houseAgents.reader };
     seatHouse();
-    mpStatus.textContent = modelWords(agent) + ' left.';
+    // dyna.ink's own taking a seat this model left is said: it is where a brief or a picture of the ink goes next.
+    const took = ['writer', 'reader'].filter((seat) => !had[seat] && houseAgents[seat]).map((seat) => HOUSE_SEATS[seat].name);
+    mpStatus.textContent = modelWords(agent) + ' left.' + (took.length ? ' ' + took.join(' and ') + (took.length > 1 ? ' take its place' : ' takes its place') + ' — let it go in its row to keep everything on your own models.' : '');
     renderAgents();
     renderLocal();
     syncTiles();

@@ -2014,6 +2014,53 @@ export async function runModels(browser, servers, { freshContext, screenshot }) 
         back.length === 1 && back[0].model === 'reader' && back[0].images === 1 && word === 'hello', { back: back.map((c) => ({ job: c.job, model: c.model, images: c.images })), word });
     });
 
+    await record('M55c', async () => {
+      // "none" outlives a model of the person's own: let go, joined for the seat and gone again, dyna.ink's reader is not
+      // seated by itself — nothing of the ink goes to dyna.ink — and a reload keeps it so. Only "dyna.ink’s own" takes it back.
+      const more = async () => { if (!(await p8.evaluate(() => document.getElementById('modelPanel').classList.contains('moreOpen')))) await p8.click('#mpHouse .mpMore').catch(() => {}); };
+      await openModels(p8); await more();
+      await p8.locator('.seatRow[data-seat="reader"] [data-seat-none="reader"]').click({ timeout: 5000 });
+      await sleep(150);
+      const joined = await joinCustom(p8, stub.baseUrl, 'z-ai/glm-5.3-flash', STUB_KEY, false, 'reader');
+      await sleep(200);
+      const mid = await seatsOf(p8);
+      await openModels(p8);
+      await p8.locator('#mpList [data-leave]').first().click({ timeout: 5000 });
+      await sleep(400);
+      const left = await seatsOf(p8);
+      const status = await p8.evaluate(() => document.getElementById('mpStatus').textContent || '');
+      const kept = await p8.evaluate(() => JSON.parse(localStorage.getItem('mm-seats') || 'null'));
+      await closeModels(p8);
+      await p8.evaluate(() => { const mm = window.__mm; mm.session.load([]); mm.setView(1, 0, 0); });
+      await sleep(150);
+      const board = await p8.evaluate(drawBoard, MOLECULE_AT);
+      await sleep(200);
+      const since = stub.house().length;
+      const wordAt = await p8.evaluate((id) => { const b = window.__mm.MM.boundsOf(window.__mm.session.getState().nodes.get(id)); return window.__mm.worldToScreen((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2); }, board.word);
+      const held = await holdAt(p8, wordAt.x, wordAt.y);
+      const took = held && (await takePill(p8, /^writing( \d\.\d\d)?$/) || await takePill(p8, 'Read the writing') || await takePill(p8, 'Read as writing'));
+      await sleep(600);
+      await letGo(p8);
+      const sent = houseChats(since);
+      check(`M55c. "none" on the reader, then a reader of the person's own joined (${JSON.stringify(mid.readers)}) and gone ("${status.slice(0, 60)}"): dyna.ink's reader is not seated again (${JSON.stringify(left.house.reader)}), the choice kept (${JSON.stringify(kept && kept.off)}), and Read the writing sends nothing to dyna.ink (${sent.length})`,
+        /joined|reader/.test(joined) && mid.readers.length === 1 && mid.readers[0] !== 'reader' && !left.house.reader && JSON.stringify(left.readers) === '[]' && !!kept && !!kept.off && kept.off.reader === true && held && took && sent.length === 0,
+        { joined, mid: mid.readers, left: left.house, kept, sent: sent.map((c) => c.model) });
+      // A reload keeps it so: the writer is seated once the relay answers, the reader is not.
+      await p8.reload({ waitUntil: 'load' });
+      await waitReady(p8);
+      await until(p8, () => { const h = window.__mm.seats().house; return h && h.writer ? true : null; }, null, 8000);
+      await sleep(300);
+      const after = await seatsOf(p8);
+      check(`M55c2. after a reload dyna.ink's reader is still let go (${JSON.stringify(after.house.reader)}) while its writer is seated (${after.house.writer && after.house.writer.name})`,
+        !!after.house.writer && !after.house.reader, { house: after.house });
+      await openModels(p8); await more();
+      await p8.locator('.seatRow[data-seat="reader"] [data-seat-house="reader"]').click({ timeout: 5000 });
+      await sleep(200);
+      const back = await seatsOf(p8);
+      await closeModels(p8);
+      check(`M55c3. "dyna.ink’s own" takes it back (${back.house.reader && back.house.reader.name})`, !!back.house.reader, { house: back.house });
+    });
+
     // The house not answering — its list refused, as a relay with no Workers AI binding refuses it — in a device of its own.
     const guards9 = await freshContext(browser, { origins: [servers.staticOrigin, stub.origin], label: 'models-house-down' });
     guardsAll.push(guards9);

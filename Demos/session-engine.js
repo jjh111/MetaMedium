@@ -851,7 +851,7 @@
 //   deciderWords (what its row says), deciderAsks (when a decider is asked and what it is sent, in words); and dyna.ink's
 //   own writer and reader (the audit's UX-04): HOUSE_AI, HOUSE_SEATS and HOUSE_WAIT_MS (where they are asked and how long
 //   for), houseAiFor (whether a page may use them, and where), houseAtBoot (whether one is seated once the house answers),
-//   houseWords, houseSends, houseWaits and houseLead (what their rows and the pane's lead say, in words), houseCannotWords (what
+//   houseLetGo and withHouse (dyna.ink's own let go for a seat, kept apart from the seat's pick), houseWords, houseSends, houseWaits and houseLead (what their rows and the pane's lead say, in words), houseCannotWords (what
 //   it could not do just now, in the relay's own words), and probesOnOpen (whether the
 //   pane looks for models on this machine as it opens, or waits for the person to ask — UX-DEP-1).
 // Uses: NOTHING. Like 07-hand.js and 09-field.js, this fragment names no closure variable, touches no DOM and asks
@@ -1059,9 +1059,12 @@
    * `chosen` when the hand kept it as its pick, else seated silently — `{ seat: 'pick' }` (a decision model the hand
    * joined, rejoined as before), or `{ seat: null }` — the hand chose none, or there is none here.
    */
-  function deciderAtBoot(kept, house) {
+  function deciderAtBoot(kept, house, letGo) {
     if (kept && kept.none) return { seat: null, why: 'none' };
     if (kept && kept.baseUrl && kept.model) return { seat: 'pick' };
+    // dyna.ink's own let go (`houseLetGo`): kept apart from the seat's pick, so a model of the person's that came and
+    // went since never brings it back.
+    if (letGo) return { seat: null, why: 'none' };
     if (!house) return { seat: null, why: 'no house decider here' };
     const chosen = !!(kept && kept.provider === 'dyna');
     const model = chosen && HOUSE_MODELS[kept.model] ? kept.model : HOUSE_DECIDER_MODEL;
@@ -1126,9 +1129,24 @@
     if (!house) return { seat: false, why: 'no house here' };
     const k = kept || {};
     const mine = (p) => !!p && !!p.baseUrl && !!p.model;
-    if (k[seat] && k[seat].none) return { seat: false, why: 'none' };
+    if ((k[seat] && k[seat].none) || houseLetGo(k, seat)) return { seat: false, why: 'none' };
     if (mine(k[seat]) || (seat === 'writer' && mine(k.any))) return { seat: false, why: 'pick' };
     return { seat: true, why: 'nothing of yours chosen' };
+  }
+
+  /**
+   * Whether the person let dyna.ink's own go for `seat` ('writer' | 'reader' | 'decider'): kept in `mm-seats` under
+   * `off`, apart from the seat's pick, so joining a model of one's own for that seat — which writes its pick there —
+   * and its leaving, which lets the pick go, never undo the choice. Only *dyna.ink's own* takes it back (`withHouse`).
+   */
+  function houseLetGo(kept, seat) { return !!(kept && kept.off && kept.off[seat] === true); }
+  /** What is kept when the person lets dyna.ink's own go for `seat` (`on` false) or takes it back (`on` true). */
+  function withHouse(kept, seat, on) {
+    const next = Object.assign({}, kept || {});
+    const off = Object.assign({}, next.off || {});
+    if (on) delete off[seat]; else off[seat] = true;
+    if (Object.keys(off).length) next.off = off; else delete next.off;
+    return next;
   }
 
   /** What a house seat's row says it is: whose, and that it needs no key. */
@@ -1208,6 +1226,7 @@
     // A seat let go (`{ none: true }` — dyna.ink's own decider, writer or reader) stays let go, unless the old pick takes it.
     const next = {};
     for (const k of ['decider', 'reader', 'writer']) if (seats && seats[k] && seats[k].none) next[k] = { none: true };
+    if (seats && seats.off && typeof seats.off === 'object') next.off = Object.assign({}, seats.off);
     next.writer = pick;
     if (pick.vision) next.reader = pick;
     const kept = Object.assign({}, keys);
@@ -2254,8 +2273,11 @@
     // on its provider still uses is forgotten, as it was — and dyna.ink's own takes a seat left empty again, where the house
     // answered and the hand did not let it go (04-seatpane.js).
     forgetSeats(agent);
+    const had = { writer: houseAgents.writer, reader: houseAgents.reader };
     seatHouse();
-    mpStatus.textContent = modelWords(agent) + ' left.';
+    // dyna.ink's own taking a seat this model left is said: it is where a brief or a picture of the ink goes next.
+    const took = ['writer', 'reader'].filter((seat) => !had[seat] && houseAgents[seat]).map((seat) => HOUSE_SEATS[seat].name);
+    mpStatus.textContent = modelWords(agent) + ' left.' + (took.length ? ' ' + took.join(' and ') + (took.length > 1 ? ' take its place' : ' takes its place') + ' — let it go in its row to keep everything on your own models.' : '');
     renderAgents();
     renderLocal();
     syncTiles();
@@ -2872,6 +2894,7 @@
   }
   /** dyna.ink's own, taken by the hand: kept as its pick, and said — when it is asked and what it is sent. */
   function keepHouseChoice(m) {
+    seatPicks = withHouse(seatPicks, 'decider', true);
     seatPicks.decider = { provider: 'dyna', model: m };
     saveSeats();
     mpStatus.textContent = deciderWords(m, MM.DECIDER_TAKE_AT) + ' — it is the decider.';
@@ -2883,12 +2906,13 @@
   /** At boot, after the seats kept have rejoined: dyna.ink's own decider, silently, unless the hand chose one or chose none (03-seats.js, deciderAtBoot). */
   function seatHouseDecider() {
     if (decider) return;
-    const plan = deciderAtBoot(seatPicks.decider, HOUSE);
+    const plan = deciderAtBoot(seatPicks.decider, HOUSE, houseLetGo(seatPicks, 'decider'));
     if (plan.seat === 'house') joinHouseDecider(plan.model, true, plan.chosen);
   }
   /** The hand lets the decider seat go: none, kept, so a reload does not seat dyna.ink's own again. */
   function noDecider() {
     leaveDecider(true);
+    seatPicks = withHouse(seatPicks, 'decider', false);
     seatPicks.decider = { none: true };
     saveSeats();
     mpStatus.textContent = 'No decider — ' + fallbackWords('decider', { house: !!HOUSE && houseUp.decide }) + '.';
@@ -2938,8 +2962,9 @@
     saveSeats();
     if (!d.house) forgetKeyIfUnused(d.config.baseUrl);
     if (quiet) return;
-    // A decider the hand joined, let go where dyna.ink's own may be used: dyna.ink's own is the decider again.
-    if (!d.house && HOUSE && joinHouseDecider(HOUSE_DECIDER_MODEL, true)) { mpStatus.textContent = d.name + ' left the decider seat — ' + deciderWords(HOUSE_DECIDER_MODEL, MM.DECIDER_TAKE_AT) + ' is the decider again.'; return; }
+    // A decider the hand joined, let go where dyna.ink's own may be used: dyna.ink's own is the decider again — unless
+    // the hand let dyna.ink's own go, which a model of its own coming and going never undoes.
+    if (!d.house && HOUSE && !houseLetGo(seatPicks, 'decider') && joinHouseDecider(HOUSE_DECIDER_MODEL, true)) { mpStatus.textContent = d.name + ' left the decider seat — ' + deciderWords(HOUSE_DECIDER_MODEL, MM.DECIDER_TAKE_AT) + ' is the decider again.'; return; }
     mpStatus.textContent = d.name + ' left the decider seat.'; renderSeats(); syncTiles(); refreshPalette();
   }
 
@@ -3159,6 +3184,7 @@
   /** The hand lets dyna.ink's own writer or reader go: none, kept on this device, so a reload does not seat it again. */
   function noHouse(seat) {
     leaveHouse(seat);
+    seatPicks = withHouse(seatPicks, seat, false);
     seatPicks[seat] = { none: true };
     saveSeats();
     mpStatus.textContent = 'No ' + HOUSE_SEATS[seat].name + ' — ' + fallbackWords(seat, { letGo: true }) + '.';
@@ -3167,7 +3193,9 @@
 
   /** The hand takes dyna.ink's own writer or reader back after letting it go. */
   function houseBack(seat) {
-    if (seatPicks[seat] && seatPicks[seat].none) { delete seatPicks[seat]; saveSeats(); }
+    seatPicks = withHouse(seatPicks, seat, true);
+    if (seatPicks[seat] && seatPicks[seat].none) delete seatPicks[seat];
+    saveSeats();
     seatHouse();
     mpStatus.textContent = houseAgents[seat] ? houseWords(seat) + ' — ' + houseSends(seat) + '.' : 'dyna.ink’s own ' + seat + ' is not here just now.';
     renderSeats();
@@ -3321,11 +3349,11 @@
           '<button class="ghost" data-seat-set="' + seat + '" title="join a model for this seat — the key already entered is used">another…</button>' +
           (held || houseAsked ? '<button class="ghost" data-seat-try="' + seat + '">try it</button>' : '') +
           (house && !held ? '<button class="ghost" data-seat-none="' + seat + '" title="no ' + esc(HOUSE_SEATS[seat].name) + ': nothing is sent there — remembered on this device">none</button>' : '') +
-          (!house && houseUp.ai && seatPicks[seat] && seatPicks[seat].none ? '<button class="ghost" data-seat-house="' + seat + '" title="' + esc(houseWords(seat)) + '">dyna.ink’s own</button>' : '');
+          (!house && houseUp.ai && ((seatPicks[seat] && seatPicks[seat].none) || houseLetGo(seatPicks, seat)) ? '<button class="ghost" data-seat-house="' + seat + '" title="' + esc(houseWords(seat)) + '">dyna.ink’s own</button>' : '');
         if (held) { who = agentWords(held); call = callOf(agentKey(held)); }
         else if (houseAsked) { who = houseWords(seat); note = houseSends(seat); call = callOf(agentKey(house)); }
         else if (house) { who = 'nothing chosen'; note = (names(now) ? 'now: ' + names(now) + ' — ' : '') + houseWaits(seat); }
-        else { who = 'nothing chosen'; note = fallbackWords(seat, { letGo: !!(seatPicks[seat] && seatPicks[seat].none) }) + (names(now) ? ' — now: ' + names(now) : ''); }
+        else { who = 'nothing chosen'; note = fallbackWords(seat, { letGo: !!(seatPicks[seat] && seatPicks[seat].none) || houseLetGo(seatPicks, seat) }) + (names(now) ? ' — now: ' + names(now) : ''); }
       }
       html += '<div class="seatRow" data-seat="' + seat + '"><div class="seatHead"><b>' + seat + '</b><span class="seatJob">' + esc(w.job) + '</span></div>' +
         (body ? '<div class="seatBody">' + body + '</div>' : '') +
