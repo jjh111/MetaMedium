@@ -368,6 +368,49 @@ describe('live logs', () => {
       expect(store.notices()).toEqual(['the room is older than the relay remembers — 12 earlier lines are gone']);
     });
 
+    it('a beat that passes a slow whole of its writer never makes a peer drop that whole — one line or in pieces', async () => {
+      const ann = named('ann~a1');
+      ann.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      ann.addStroke(rectStroke(400, 100, 200, 120), 1100);
+      ann.addStroke(rectStroke(700, 100, 200, 120), 1200);
+      const three = mine(ann);
+      const w = wire();
+      const bob = new LiveStore(w.transport as any, 'bob~b1');
+      w.deliver({ participant: 'ann~a1', events: three, at: 1000, sid: 'a' });
+      // ann undoes two: her whole log of one leaves at 2000 and takes its time; her beat at 3000 lands first.
+      w.deliver({ participant: 'ann~a1', events: [], at: 3000, sid: 'a' });
+      w.deliver({ participant: 'ann~a1', events: three.slice(0, 1), at: 2000, full: true, sid: 'a' });
+      expect((await bob.readLogs())['ann~a1']).toEqual(three.slice(0, 1));
+      // The same with a whole that goes in pieces: its first piece is judged against no beat either.
+      const w2 = wire();
+      const dan = new LiveStore(w2.transport as any, 'dan~d1');
+      w2.deliver({ participant: 'ann~a1', events: three.slice(0, 1), at: 1000, sid: 'a' });
+      w2.deliver({ participant: 'ann~a1', events: [], at: 3000, sid: 'a' });
+      w2.deliver({ participant: 'ann~a1', events: three.slice(0, 2), at: 2000, full: true, set: 2000, more: true, sid: 'a' });
+      w2.deliver({ participant: 'ann~a1', events: three.slice(2), at: 2100, set: 2000, sid: 'a' });
+      expect((await dan.readLogs())['ann~a1']).toEqual(three);
+      // A beat still says the hand is here.
+      expect(dan.presence().map((p) => p.participant)).toContain('ann~a1');
+    });
+
+    it('the relay’s word that it forgot the room sends this hand’s log again whole and asks every hand for theirs', async () => {
+      const ada = named('ada~1');
+      ada.addStroke(rectStroke(100, 100, 200, 120), 1000);
+      ada.addStroke(rectStroke(400, 100, 200, 120), 1100);
+      const w = wire();
+      const store = new LiveStore(w.transport as any, 'ada~1');
+      await publish(store, mine(ada));
+      await tick();
+      expect(store.unsent()).toBe(0);
+      w.sent.length = 0;
+      w.deliver({ relay: 'forgotten', room: 'r-abc' });
+      await tick();
+      const whole = w.sent.find((l) => l.participant === 'ada~1' && l.full);
+      expect(whole?.events).toEqual(mine(ada));
+      expect(w.sent.some((l) => l.participant === 'ada~1' && l.hello)).toBe(true);
+      expect(store.notices()).toEqual([]);
+    });
+
     it('a relay that refused the hand’s key is a notice, in words and never with the key', async () => {
       const w = wire();
       const store = new LiveStore(w.transport as any, 'me~1');

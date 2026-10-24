@@ -20483,6 +20483,11 @@ var LiveStore = class {
       this.notify("", []);
       return;
     }
+    if (raw.relay === "forgotten") {
+      this.answer(this.me);
+      this.hello();
+      return;
+    }
     if (raw.relay === "truncated") {
       const n2 = raw;
       this.truncated = { relay: "truncated", room: n2.room, dropped: Math.max(0, Number(n2.dropped) || 0), kept: n2.kept };
@@ -20625,8 +20630,10 @@ var LiveStore = class {
       }
       if (added) this.rev++;
     }
-    this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, lineAt));
-    if (!line.via) this.ownAt.set(line.participant, Math.max(this.ownAt.get(line.participant) ?? 0, lineAt));
+    if (full || events.length) {
+      this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, lineAt));
+      if (!line.via) this.ownAt.set(line.participant, Math.max(this.ownAt.get(line.participant) ?? 0, lineAt));
+    }
     this.notify(line.participant, events);
   }
   /**

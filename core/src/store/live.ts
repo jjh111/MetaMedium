@@ -132,6 +132,17 @@ export interface RelayNotice {
 }
 
 /**
+ * The relay's word that it forgot this room (Demos/relay-protocol.mjs, `forgottenNotice`): a hand that reconnects with
+ * a last id the room no longer reaches read a room since emptied — a room the relay opened, unused for its idle days,
+ * or a relay that restarted — whose ids began again at 1. The relay replays the room from its beginning, and the store
+ * sends its own log again whole and asks every hand for theirs, as a newcomer would: the room holds none of them now.
+ */
+export interface RelayForgotten {
+  relay: 'forgotten';
+  room?: string;
+}
+
+/**
  * A relay that asks for a key (cloudflare/relay) refused this hand: it is not
  * the relay's word on the stream — a refused stream has none — but the
  * transport's, made of the status it was answered with, so a wrong or missing
@@ -166,7 +177,7 @@ export interface LiveTransport {
    * promise may resolve to a `SendResult`; anything else is a line that went.
    */
   send(line: LiveLine): void | SendResult | Promise<unknown>;
-  onMessage(cb: (line: LiveLine | RelayNotice | RelayRefusal | RelayReplay) => void): () => void;
+  onMessage(cb: (line: LiveLine | RelayNotice | RelayRefusal | RelayReplay | RelayForgotten) => void): () => void;
   close?(): void;
 }
 
@@ -951,7 +962,7 @@ export class LiveStore implements Store {
     this.notify(name, []);
   }
 
-  private receive(raw: LiveLine | RelayNotice | RelayRefusal | RelayReplay | null | undefined): void {
+  private receive(raw: LiveLine | RelayNotice | RelayRefusal | RelayReplay | RelayForgotten | null | undefined): void {
     if (this.closed || !raw || typeof raw !== 'object') return;
     // Where the relay's replay to a stream just opened begins and ends: nobody is here by a line written before.
     if ((raw as RelayReplay).relay === 'replay') { this.replaying = true; return; }
@@ -960,6 +971,13 @@ export class LiveStore implements Store {
       const r = raw as RelayRefusal;
       this.refused = { relay: 'refused', room: r.room, status: Number(r.status) || 0, ...(r.reason === 'origin' ? { reason: 'origin' as const } : {}) };
       this.notify('', []);
+      return;
+    }
+    if ((raw as RelayForgotten).relay === 'forgotten') {
+      // The room holds nothing it held before: my log goes again whole — with a copy of any hand's I hold that has
+      // gone, as a hello would be answered — and every hand is asked again for its own.
+      this.answer(this.me);
+      this.hello();
       return;
     }
     if ((raw as RelayNotice).relay === 'truncated') {
@@ -1144,8 +1162,13 @@ export class LiveStore implements Store {
       }
       if (added) this.rev++;
     }
-    this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, lineAt));
-    if (!line.via) this.ownAt.set(line.participant, Math.max(this.ownAt.get(line.participant) ?? 0, lineAt));
+    // Only a line that carries a log moves the clocks a whole is judged by: a beat — a line of nothing, which may pass a
+    // slow whole of its writer's on the way (`sendMine`) — stamped after that whole would make every peer drop it as
+    // older, for good, while its writer was told it was taken.
+    if (full || events.length) {
+      this.applied.set(line.participant, Math.max(this.applied.get(line.participant) ?? 0, lineAt));
+      if (!line.via) this.ownAt.set(line.participant, Math.max(this.ownAt.get(line.participant) ?? 0, lineAt));
+    }
     this.notify(line.participant, events);
   }
 
