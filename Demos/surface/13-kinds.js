@@ -3,7 +3,7 @@
 //   (a blessed `js` artifact's code runs in a worker with a budget; a throw or a hang pauses its clock
 //   with the reason), runtimeOffset, runtimeBroken, syncRuntime, the consent gate (trackConsent, consentedHere,
 //   grantPlayingPrograms, ownPlayStands — this tab runs a program only when this hand played that very code here, C1), frameCSP (a run or
-//   mermaid frame cannot phone out), WORKER_HARDEN (the js worker keeps only Math/performance/Function/postMessage).
+//   mermaid frame cannot fetch, open a socket or beacon), frameLoaded (one that navigates itself is stopped), WORKER_HARDEN (the js worker keeps only Math/performance/Function/postMessage).
 // Uses: core (session, esc), artifacts (frames, documentFor), render (render), the first hour (27-first.js: motionReduced —
 //   under reduced motion an example's program is not granted, and waits for the person's own play).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -125,7 +125,7 @@
   // canvas reads them back through postMessage.
   const THREE_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
 
-  // ===== A program's frame cannot phone out (C6) ===========================
+  // ===== A program's frame cannot connect out, and reads no key (C6) =======
   // run and mermaid frames are opaque-origin sandboxes: they cannot reach the
   // page, its storage or its keys. But they can still `fetch` — under the
   // app's own CSP that reaches the allowlisted hosts — so a program drawn by
