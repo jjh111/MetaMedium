@@ -35,10 +35,16 @@ What this cycle added on top of `master` 6f541ef (the branch `claude/loving-maxw
 
 Each of these was built in a lane of its own, read by three adversarial reviewers (correctness,
 the repository's invariants, whether its tests prove what they say), fixed, merged, and then the
-whole change read again by area.
+whole change read again by area (17 findings, all fixed). The three blocker fixes were then given
+to skeptics to break: the consent fix held but for one gap, fixed; the frame fix is covered by the
+gate's own record C6b (its skeptic would not write key-extraction probes, so it proved nothing
+either way); the storage fix broke, was reworked to count what is kept in bytes and rows with
+small, paid-for reservations, and the next skeptic found only a minor, also fixed. A flaky gate
+record under load turned out to be a real fault — a busy page taken for a hung program — fixed and
+proven under load.
 
 What it was checked with: every step of CI's core and shard jobs passes, and the browser gate on
-Chromium gives **1010 passed, 0 failed, 12 skipped by name across 18 scenarios** at `ca89381`
+Chromium gives **1024 passed, 0 failed, 13 skipped by name across 18 scenarios** at `8759eea`
 (`node e2e/run.mjs`). WebKit does not run in the container this was built in; CI runs it.
 **Nothing that talks to Cloudflare has run against Cloudflare**: dyna.ink, `relay.dyna.ink` and
 Workers AI were unreachable from here, so the relay ran as its own logic in Node and under
