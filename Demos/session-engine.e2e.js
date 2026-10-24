@@ -4597,9 +4597,9 @@ window.__scenario = async function(){
     for (let i = 0; i < 40 && (!body61() || body61() === 'loading…'); i++) await wait(50);
     const help61 = body61();
     const has61 = (re) => re.test(help61);
-    step('61. help is one page for a person: draw, hold, choose; the four round buttons; what a model adds and how to ask one, Claude too; boards; live rooms; your mark; undo; the shortcuts — and no developer test plan',
-      has61(/press and hold/i) && has61(/Name/) && has61(/Copy/) && has61(/Paste/) && has61(/Erase/) && has61(/model/i) && has61(/Claude/) && has61(/board/i) && has61(/live/i) && has61(/your mark/i) && has61(/undo/i) && has61(/shortcut/i)
-        && !has61(/QA for v8|Branch:|http\.server|next-phases/),
+    step('61. help is one page for a person: draw, hold, choose; the four round buttons; what a model adds and how to ask one, Claude too; boards; sharing a board in a room; your mark; undo; the shortcuts — and no developer test plan',
+      has61(/press and hold/i) && has61(/Name/) && has61(/Copy/) && has61(/Paste/) && has61(/Erase/) && has61(/model/i) && has61(/Claude/) && has61(/board/i) && has61(/share/i) && has61(/room/i) && has61(/your mark/i) && has61(/undo/i) && has61(/shortcut/i)
+        && !has61(/QA for v8|QA-v8|Branch:|http\.server|next-phases/),
       help61.slice(0, 240));
     if (!helpPanel61.hasAttribute('hidden')) document.getElementById('helpBtn').click();
     // Your mark: the pane and the chip say what a mark does, before asking for five.
