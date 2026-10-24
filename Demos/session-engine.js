@@ -9009,12 +9009,13 @@
     // Under reduced motion a tank this hand did not start here holds still (C4, 14-clocks.js): its play is the person's.
     const still = !elsewhere && c && c.playing && !isProgram(s, id) && tankHeldStill(s, id);
     const who = elsewhere ? session.clockAuthor(id) : null;
-    // Played here, then given a new version by another hand: that version waits for the person's own play.
+    // Played here, then given a new version by another hand — or wired to a frame of theirs: that waits for the person's own play.
     const by = elsewhere && !who && ownPlayStands(id) ? newVersionBy(s, id) : null;
+    const wired = elsewhere && !who && !by && ownPlayStands(id) ? wiredBy(s, id) : null;
     // A program's time is its own (a run program keeps none the tank could say); a tank's is said.
     const t = isProgram(s, id) && codeKindOf(s.nodes.get(id)) === 'run' ? '' : ' · t = ' + tankTime(id).toFixed(1) + 's';
     const stateText = !c ? 'not played'
-      : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : by ? 'a new version by ' + by + ' — not running here until you play it' : motionReduced() ? 'waiting for you to play it — this device asks for less motion' : 'played — not running in this tab yet')
+      : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : by ? 'a new version by ' + by + ' — not running here until you play it' : wired ? 'wired to a frame by ' + wired + ' — not running here until you play it' : motionReduced() ? 'waiting for you to play it — this device asks for less motion' : 'played — not running in this tab yet')
       : still ? 'playing — held still here, since this device asks for less motion'
       : c.playing ? 'playing' + t : 'paused' + (c.reason ? ' — ' + c.reason : '') + t;
     return '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>' +
@@ -9888,9 +9889,11 @@
 // Provides: documentForKind (the renderers: every kind as a document ink can address), the mermaid harness (mermaidFrom, mermaidStates), postPointer (a hand forwarded into a playing frame), the worker runtime
 //   (a blessed `js` artifact's code runs in a worker with a budget; a throw or a hang pauses its clock
 //   with the reason), runtimeOffset, runtimeBroken, syncRuntime, the consent gate (trackConsent, consentedHere,
-//   grantPlayingPrograms, ownPlayStands — this tab runs a program only when this hand played that very code here, C1), frameCSP (a run or
+//   grantPlayingPrograms, ownPlayStands, newVersionBy, wiredBy — this tab runs a program only when this hand played that very code here,
+//   as a frame of another hand's would wire it, C1), frameCSP (a run or
 //   mermaid frame cannot fetch, open a socket or beacon), frameLoaded (one that navigates itself is stopped), WORKER_HARDEN (the js worker keeps only Math/performance/Function/postMessage).
-// Uses: core (session, esc), artifacts (frames, documentFor), render (render), the first hour (27-first.js: motionReduced —
+// Uses: core (session, esc), artifacts (frames, documentFor), render (render, nameOfParticipant), frames (16-frames.js: wiringOf —
+//   whose frame wires what a `js` runs), the first hour (27-first.js: motionReduced —
 //   under reduced motion an example's program is not granted, and waits for the person's own play).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () { ... })();`. Shared state is the
@@ -10641,13 +10644,32 @@
   // after *Play it here* again. So a grant holds the versions of the artifact's code this hand played, or wrote
   // itself while playing it (its own model's revision is its own); a newer version from anyone else is not among
   // them, and the program stands by — dashed, offering *Play it here* — until the person plays it.
+  // And what the worker runs of a `js` behaviour is its code as a frame wires it (16-frames.js, `wiringOf`): a number,
+  // a value or a slot of it set from another member's port. A frame another hand made that wires a program this hand
+  // plays is a version of its own, then — it retunes what runs here with no play and no new code of this hand's — so it
+  // stands by for *Play it here* as another hand's new version does. A frame this hand made is its own act and makes no
+  // new version: the values its wiring carries (a knob it drags, a member it wired in) retune what it plays, which is
+  // what wiring is for.
   const grantedHere = new Map(); // artifactId -> Set of code versions (`codeVersionOf`) this hand may run here
   let consentArr = null, consentLen = 0;
-  /** The version of an artifact's code: its newest code rep, by when it was written and what it says. */
+  /**
+   * The version of an artifact's code as it would run here: its newest code rep, by when it was written and what it
+   * says — and, when a frame another hand made wires it, which frame.
+   */
   function codeVersionOf(s, id) {
     const node = s && s.nodes.get(id);
     const rep = node && codeRepOf(node);
-    return rep ? rep.data.at + ':' + hashOf(rep.data.code || '') : '';
+    if (!rep) return '';
+    const base = rep.data.at + ':' + hashOf(rep.data.code || '');
+    const by = wiredByOther(s, id);
+    return by ? base + ':wired:' + by.frame.id : base;
+  }
+  /** The frame another hand made that wires this program's code, with whose it is — else null (16-frames.js, `wiringOf`). */
+  function wiredByOther(s, id) {
+    const w = wiringOf(s, id);
+    if (!w) return null;
+    const maker = MM.authorOf(w.frame);
+    return maker === MM.LOCAL_PARTICIPANT ? null : { frame: w.frame, maker: maker };
   }
   function grantCode(s, id) {
     let versions = grantedHere.get(id);
@@ -10710,6 +10732,11 @@
     const rep = node && codeRepOf(node);
     if (!rep || !rep.source || rep.source === MM.LOCAL_PARTICIPANT) return null;
     return nameOfParticipant(rep.source);
+  }
+  /** The name of the hand whose frame wires a program this hand plays — which waits for *Play it here* — else null. */
+  function wiredBy(s, id) {
+    const by = wiredByOther(s, id);
+    return by ? nameOfParticipant(by.maker) : null;
   }
   /** Whether this tab may run this artifact's code as it stands now: this hand played this very version here. */
   function consentedHere(id, s) {
@@ -11203,7 +11230,7 @@
   }
 
 // ===== frames =====
-// Provides: frames on the surface — wiredCodeOf/wiredBehaviourOf (the harness applied where members render
+// Provides: frames on the surface — wiringOf/wiredCodeOf/wiredBehaviourOf (the harness applied where members render
 //   and run), frame and control rendering, the knob drag, exportFrameFiles. (Making a frame or a slider,
 //   and finding a frame again, are core's `frames` and `control` tools, offered in the field.)
 // Uses: core, artifacts (frames map), render, kinds, clocks.
@@ -11221,14 +11248,24 @@
       .filter((n) => n && MM.isFrame(n) && !n.reps.some((r) => r.modality === 'erased') && MM.frameOfNode(n).members.includes(id));
   }
 
-  /** The member's code with its connections applied, or null when nothing feeds it. */
-  function wiredCodeOf(s, id) {
+  /**
+   * The frame that wires a member's code, and the code it makes of it: the newest frame holding it that feeds it —
+   * `{ frame, code }`, the frame's node and the member's code with the connections applied — or null when nothing does.
+   * What a playing `js` runs is that code, so the consent gate asks it whose frame it is (13-kinds.js, `codeVersionOf`).
+   */
+  function wiringOf(s, id) {
     const holders = framesHolding(s, id);
     for (let i = holders.length - 1; i >= 0; i--) {
       const r = MM.resolveFrame(MM.frameOfNode(holders[i]), s.nodes);
-      if (r.code[id] !== undefined) return r.code[id];
+      if (r.code[id] !== undefined) return { frame: holders[i], code: r.code[id] };
     }
     return null;
+  }
+
+  /** The member's code with its connections applied, or null when nothing feeds it. */
+  function wiredCodeOf(s, id) {
+    const w = wiringOf(s, id);
+    return w ? w.code : null;
   }
 
   /** A definition's behaviour with its wired speed and weights, or the behaviour itself. */
@@ -14194,11 +14231,14 @@
       const who = session.clockAuthor(id);
       // A program this hand plays that another hand gave a new version: that version waits for the person's own play.
       const by = !who && ownPlayStands(id) ? newVersionBy(s, id) : null;
-      if (!who && !by) continue;
+      // Or wired it to a frame of theirs: what it would run is theirs to set, so that too waits for the person's own play.
+      const wired = !who && !by && ownPlayStands(id) ? wiredBy(s, id) : null;
+      if (!who && !by && !wired) continue;
       folder.playsSaid.add(id);
       const name = '“' + (MM.wordOf(s.nodes.get(id)) || 'a program') + '”';
       if (who) say(who + ' set ' + name + ' playing — it does not run here until you play it; open it and tap “play it here”');
-      else say(by + ' wrote a new version of ' + name + ' — it does not run here until you play it; open it and tap “play it here”');
+      else if (by) say(by + ' wrote a new version of ' + name + ' — it does not run here until you play it; open it and tap “play it here”');
+      else say(wired + ' wired ' + name + ' to a frame of theirs — it does not run here until you play it; open it and tap “play it here”');
     }
   }
 

@@ -362,6 +362,11 @@ export const CLAIMS_FULL = { status: 429, retryAfter: 600, words: 'this room hol
 export const MAX_ASSET_BYTES = 12 * 1024 * 1024;
 /** What a room keeps in pictures when nothing says otherwise: a refused put, never an evicted picture (an event may still name it). */
 export const DEFAULT_ASSET_ROOM_BYTES = 64 * 1024 * 1024;
+/**
+ * How many pictures a room keeps, whatever their size: a picture is a few rows wherever it is kept and a record a room
+ * holds in memory, so a room of 24-byte pictures under its bytes would be millions of them. A board has a few dozen.
+ */
+export const MAX_ROOM_ASSETS = 1000;
 /** What a picture's answer says about caching: its address is its content, so it never changes. `private`: a room's key opened it. */
 export const ASSET_CACHE_CONTROL = 'private, max-age=31536000, immutable';
 
@@ -456,7 +461,8 @@ export async function sha256Of(bytes) {
 /**
  * What a put of `bytes` under `hash` is told: null when the room takes it, else `{ status, words }`. In the
  * order the questions can be answered — nothing, too large, not a picture, not the bytes the address names, and
- * last the room's own cap (`held` bytes of `cap`, unless the picture is already `have`n, which costs nothing).
+ * last the room's own caps (`held` bytes of `cap`, and `count` pictures of MAX_ROOM_ASSETS, unless the picture is
+ * already `have`n, which costs nothing).
  */
 export async function assetCheck(bytes, hash, o = {}) {
   if (!bytes || !bytes.length) return { status: 400, words: 'nothing was sent — a picture is its bytes' };
@@ -465,14 +471,16 @@ export async function assetCheck(bytes, hash, o = {}) {
   if (!sniffImage(bytes)) return { status: 415, words: 'a picture here is a PNG, JPEG, WebP or GIF — those bytes are none of them' };
   const actual = await sha256Of(bytes);
   if (actual !== hash) return { status: 422, words: 'those are not the bytes this address names — they hash to ' + actual.slice(0, 12) + '…' };
-  return o.have ? null : assetFull(o.held || 0, bytes.length, o.cap || DEFAULT_ASSET_ROOM_BYTES);
+  return o.have ? null : assetFull(o.held || 0, bytes.length, o.cap || DEFAULT_ASSET_ROOM_BYTES, o.count || 0);
 }
 
 /**
- * The room's own cap: null while `n` more bytes fit beside the `held` ones, else the refusal. Asked again by a
- * server at the moment it keeps a picture, with nothing awaited between, so two puts at once cannot both fit.
+ * The room's own caps: null while `n` more bytes fit beside the `held` ones and one more picture beside the `count`
+ * it holds, else the refusal. Asked again by a server at the moment it keeps a picture, with nothing awaited between,
+ * so two puts at once cannot both fit.
  */
-export function assetFull(held, n, cap) {
+export function assetFull(held, n, cap, count = 0) {
+  if (count >= MAX_ROOM_ASSETS) return { status: 507, words: 'this room holds as many pictures as it keeps (' + MAX_ROOM_ASSETS.toLocaleString('en') + ') — nothing was added, and what it holds stays' };
   if (held + n <= cap) return null;
   return { status: 507, words: 'this room holds all the pictures it keeps (' + mb(cap) + ') — nothing was added, and what it holds stays' };
 }

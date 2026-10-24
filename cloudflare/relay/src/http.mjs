@@ -52,8 +52,33 @@ export function callerKey(ip) {
 }
 
 /**
- * Who a request came from, for every limit the relay keeps — the rooms it opens, a room's floodgates and new names,
- * what a caller stores, the models: Cloudflare's header (else, in Node, nothing better than one bucket), as `callerKey`
- * counts it. One home, so no route counts a /64 as many callers while another counts it as one.
+ * How many times one address's allowance the /56 that holds it may have in all, wherever a caller is counted. A home
+ * connection is commonly given a /56 — 256 /64s — so each /64 alone would make one home 256 callers.
  */
-export const callerOf = (request) => callerKey(request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'local');
+export const NET56_TIMES = 4;
+
+/**
+ * Every bucket a caller is counted in, each with how many times an address's allowance it may have: an IPv4 address
+ * alone (`[{ key, times: 1 }]`); an IPv6 address by its /64 — `callerKey`'s, always first — and by the /56 that holds
+ * it, allowed NET56_TIMES as much. So one machine is one caller, and the /64s of one home are a few callers' worth,
+ * not 256. Anything that does not read as an address is one bucket, as it came. (A wider allocation — a tunnel
+ * broker's /48, many /56s — is many callers: that is the residual store.mjs states.)
+ */
+export function callerBuckets(ip) {
+  const key = callerKey(ip);
+  const m = /^([0-9a-f]{1,4}):([0-9a-f]{1,4}):([0-9a-f]{1,4}):([0-9a-f]{1,4})::\/64$/.exec(key);
+  if (!m) return [{ key, times: 1 }];
+  const net56 = m[1] + ':' + m[2] + ':' + m[3] + ':' + (parseInt(m[4], 16) & 0xff00).toString(16) + '::/56';
+  return [{ key, times: 1 }, { key: net56, times: NET56_TIMES }];
+}
+
+/** The address a request came from: Cloudflare's header (else, in Node, nothing better than one bucket). */
+const addressOf = (request) => request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'local';
+
+/**
+ * Who a request came from, for every limit the relay keeps — the rooms it opens, a room's floodgates and new names,
+ * what a caller stores, the models: `callerKey` of its address. One home, so no route counts a /64 as many callers
+ * while another counts it as one. `callerBucketsOf` is every bucket it is counted in (its /56 too).
+ */
+export const callerOf = (request) => callerKey(addressOf(request));
+export const callerBucketsOf = (request) => callerBuckets(addressOf(request));

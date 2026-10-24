@@ -90,6 +90,7 @@ function assetStore(dir) {
   };
   return {
     bytesIn: (room) => of(room).bytes,
+    countIn: (room) => of(room).held.size,
     has: (room, hash) => of(room).held.has(hash),
     get(room, hash) {
       const e = of(room).held.get(hash);
@@ -139,7 +140,7 @@ export function startRelay(port = Number(process.env.PORT || 8020), opts = {}) {
       if (big) { plain(res, big.status, big.words); return; }
       const bytes = Buffer.concat(chunks);
       const have = assets.has(a.room, a.hash);
-      const no = await assetCheck(bytes, a.hash, { held: assets.bytesIn(a.room), cap: assetCap, have });
+      const no = await assetCheck(bytes, a.hash, { held: assets.bytesIn(a.room), cap: assetCap, count: assets.countIn(a.room), have });
       if (no) { plain(res, no.status, no.words); return; }
       assets.put(a.room, a.hash, bytes);
       res.writeHead(204); res.end();
