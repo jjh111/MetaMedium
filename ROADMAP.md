@@ -29,15 +29,17 @@ counts, its *not started* and its *next* are of their day. What is built is in
     room's key after `#`, a guest's name, who is here in the bar, *Save a copy to
     my boards*; a name claimed by the hand that writes under it, a room's
     floodgate, lines sent again until the relay takes them, a big board in
-    pieces; a room the relay opened forgotten 30 days after its last use;
+    pieces; what the rooms keep counted across rooms, an IPv6 address by its
+    /64; a room the relay opened forgotten 30 days after its last use;
   - **dyna.ink's own models, with no key in a browser**: Cloudflare's Clef-flash
     as the decider (*Which is it?*, *Which diagram is this?*, *what should this
     brief make?*), and a writer and a reader, through the relay's Workers AI
     binding — seated only once the relay answers, asked after a person's own
     model and Claude Code, each within a budget a day;
-  - **another hand's code runs only after *Play it here***, a behaviour in a
-    sealed, opaque-origin frame, and no program or Mermaid frame able to open a
-    connection out;
+  - **another hand's code runs only after *Play it here***, each new version of
+    it too, a behaviour in a sealed, opaque-origin frame, and no program or
+    Mermaid frame able to open a connection out or read a room's key — one that
+    loads another page in its frame is stopped;
   - **a deploy that can be trusted**: only after CI passes on `master`'s tip, the
     app under its own policy, the site without what cannot run, a gate scenario
     that serves it as production does, and `scripts/n4.mjs` ready for N4;
@@ -47,8 +49,12 @@ counts, its *not started* and its *next* are of their day. What is built is in
 
   Checked at `ca89381`: every step of CI's core and shard jobs passes, and the
   gate on Chromium gives 1,010 passed, 0 failed, 12 skipped by name, in 18
-  scenarios. Not run: WebKit (CI runs it), and anything on Cloudflare — nothing
-  is deployed and no real model reply has been seen (`cloudflare/README.md`).
+  scenarios. Then a review of the whole change found seventeen defects, three
+  of them blockers, and a fix pass settled all of them (merged at `834c09a`): at
+  `1f8b1ff` the gate on Chromium gives 1,019 passed, 0 failed, 13 skipped by
+  name, in 18 scenarios. Not run: WebKit (CI runs it), and anything on
+  Cloudflare — nothing is deployed and no real model reply has been seen
+  (`cloudflare/README.md`).
 - **What 0.2.0 and the new repository need**, in order: the milestone's branch
   on `master`; **0.2.0**, cut on John's word from a full clone with its tags
   (`RENAME-PLAN.md` N5); the **new repository**, seeded from `v0.2.0`, after

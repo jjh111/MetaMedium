@@ -49,6 +49,11 @@ and the gate's `prod` scenario runs the app as production serves it (*One app ad
 fit, one Escape ladder, a first run on every screen (`Demos/surface/27-first.js`), the person's words held by
 `scripts/words.test.mjs`. CI's core and shard jobs and the browser gate on Chromium pass at ca89381; nothing has
 reached Cloudflare, dyna.ink or relay.dyna.ink, and WebKit has not run it — each paragraph says what is unverified.
+**24 Oct 2026: a review of the whole change found seventeen defects, three of them blockers, and a fix pass settled
+all seventeen** (merged at 834c09a; the browser gate's default run passing at 1f8b1ff, and its `canvas`, `room`, `ux`,
+`security` and `models` scenarios again at 774e228): what the relay keeps is
+counted across rooms, a program's frame reads no room's key and is stopped when it loads another page, and another
+hand's new version of a program played here waits for *Play it here* — each under the paragraph it changed.
 What comes next is `NEW-REPO-PLAN.md`: a new repository, `dyna.ink`, seeded from this milestone.
 
 **28 Sep 2026: phases 1 and 2 of `V1-PLAN.md` are done and phase 3's cores
@@ -401,7 +406,7 @@ any structural change.
 | `metadoodle1.html` | Fork of flagship + tiered LLM recognition (WebLLM in-browser, LM Studio local API) + voice. Single-file (~600KB) |
 | `Web App Skeleton/` | React + Vite + TypeScript + Zustand rebuild; Claude API interpreter skeleton in `src/llm/`; recognition/spatial/matching in `src/core/` |
 | `Demos/surface/` | **The reference surface's source**: `surface.css` and its script fragments (incl. `24-room`, the rooms, under *Rooms anyone can open*, `27-first`, the first hour, under *The surface's chrome*, `17-find` and `26-find`, I6, under *Several boards*: Find, `17-carry` and `22-carry`, RENAME-PLAN N1, under *Several boards*: carried to the new home, `24-relay`, A2, under *The hand organises notes*, and `03-semantic`, I9, the semantic seat's adapter) (`00-core`, `00-ui` … `12-regions` (regions: the frame, the title as a handle, the outline; I5), … `17-assets`, `17-bundle`, … `20-controls`, `21-minimap`, `22-boards`, `23-packs`, `24-relay`, `24-room`, `24-seat`, `25-maths`, `25-mermaid`, `26-find`, `27-first`, then `90-boot`, which must stay last), one concern each, concatenated in name order into one closure by `Demos/build-surface.mjs` → the committed `Demos/session-engine.js` (CI checks it has not drifted). Because they are one closure, the build and its `--check` refuse a name declared at the top of two fragments — the last would silently replace the first everywhere, which broke rendering once — reading the fragments as one strict block, so they must also compile as strict code (`Demos/build-surface.test.mjs`, in CI's `core` job). Fragments share the closure's variables — no imports; each fragment's header says what it provides and uses. Edit a fragment, run the build, commit both. **`09-field.js` is the exception that proves the rule** (SEAM-1): it names nothing outside itself, so the field's query is a pure function of a record and is unit-tested in Node with no browser — `node --test Demos/surface/09-field.test.mjs`, in CI's `core` job. **`17-board.js` is the second** (V1-PLAN R3): the journal the board this browser keeps is written through, driven in Node by a store held in memory — `node --test Demos/surface/17-board.test.mjs`, in CI's `core` job too. **`17-boards.js` is the third** (R1): the list of boards — names, the trash, which board a page opens, whether the one on screen may be left — `node --test Demos/surface/17-boards.test.mjs`, also in CI. **`07-hand.js` is the fourth** (R6): the hand's rules — what a pen, a finger and a palm do, and the hand tile's face and cycle — `node --test Demos/surface/07-hand.test.mjs`, also in CI; `07-input.js` is its adapter. **`17-assets.js` is the sixth** (I1): what a picture is kept as, its name, where a pick stands, which assets nothing uses and what the decoded pictures cost — `node --test Demos/surface/17-assets.test.mjs`, also in CI (`18-images.js` is its adapter: IndexedDB, workers, canvas). **`17-bundle.js` is the seventh** (I4): the zip written and read by hand, the board bundle, the board as one SVG, the PNG's size and the PDF writer — `node --test Demos/surface/17-bundle.test.mjs`, also in CI (`18-out.js` is its adapter: the export pane, the offscreen canvas, the file opened). **`17-carry.js` is the eighth** (RENAME-PLAN N1): who may send boards and who may take them (two fixed origins, and an address read only on a page on this machine), the preferences carried by name and never a key, what a carry brings in, and every board out in one file — `node --test Demos/surface/17-carry.test.mjs`, also in CI, loaded with `17-boards.js` and `17-bundle.js`, whose `boardName` and zip it calls (`22-carry.js` is its adapter: the window, the messages, the pane's acts).
-**`03-seats.js` is the fifth** (I7): the seats' rules — who reads, who writes, whose key is whose, what an older device's pick becomes, and where dyna.ink's own models are asked and when they are seated (`houseDeciderFor`, `houseAiFor`, `deciderAtBoot`, `houseAtBoot`, `deciderAsks`) — `node --test Demos/surface/03-seats.test.mjs`, also in CI; `04-models.js` and `04-seatpane.js` are its adapters. **`24-relay.js` is the eighth** (A2, and the rooms): which relay a page shares a board through (`roomRelayFor`) and *with Claude* defaults to (`claudeRelayFor`), the one hosted relay the seat accepts, an invite's link written and read (`inviteLink`, `inviteOf`: the key after `#`), what a page in a room keeps in its address, and how much of a board *Share* carries (`carryVerdict`) — `node --test Demos/surface/24-relay.test.mjs`, also in CI (`24-seat.js` and `24-room.js` are its adapters). A fragment's `.test.mjs` is not concatenated into the build. `09-palette.js` is the adapter over core's tools (B1): it reads the readings, maps `MM.offersFor` to pills and performs what only the surface can, and builds no affordance by hand |
+**`03-seats.js` is the fifth** (I7): the seats' rules — who reads, who writes, whose key is whose, what an older device's pick becomes, and where dyna.ink's own models are asked and when they are seated (`houseDeciderFor`, `houseAiFor`, `deciderAtBoot`, `houseAtBoot`, `deciderAsks`, and `houseLetGo` / `withHouse`, a *none* on dyna.ink's own kept apart from the seat's pick) — `node --test Demos/surface/03-seats.test.mjs`, also in CI; `04-models.js` and `04-seatpane.js` are its adapters. **`24-relay.js` is the eighth** (A2, and the rooms): which relay a page shares a board through (`roomRelayFor`) and *with Claude* defaults to (`claudeRelayFor`), the one hosted relay the seat accepts, an invite's link written and read (`inviteLink`, `inviteOf`: the key after `#`), what a page in a room keeps in its address, and how much of a board *Share* carries (`carryVerdict`) — `node --test Demos/surface/24-relay.test.mjs`, also in CI (`24-seat.js` and `24-room.js` are its adapters). A fragment's `.test.mjs` is not concatenated into the build. `09-palette.js` is the adapter over core's tools (B1): it reads the readings, maps `MM.offersFor` to pills and performs what only the surface can, and builds no affordance by hand |
 | `Demos/` | **`session-engine.html` is the MVP surface** (it links `surface/surface.css` and loads `session-engine.js`) — infinite canvas, the taught command mark, living artifacts in a DOM overlay, ink-over-artifact addressing, "why" inspector, model participants, canvas answers. Uses the committed `dynaink-core.browser.js` bundle, whose global is `DynaInkCore` — with `MetaMediumCore` assigned the same object for one release, for anything outside the repository that reads the old one (RENAME-PLAN N3c; `core-bundle.test.mjs` runs the bundle as a page does and asks that both are one, in CI's `core` job). **`session-engine.e2e.js`** drives the whole loop through the real UI with a stubbed model (browser console; not part of `npm test`). `build-standalone.mjs` inlines the bundle into a single shareable file (and exports the same build as `standalone(dir)`, which the release script attaches to a release). **`sw.js` is the service worker for both addresses** — this one and `/app/` — copied to `app/sw.js` by `scripts/build-app.mjs`, which stamps `VERSION` into it and into the page's `<meta name="dynaink-version">` (*One app address*, below). **`mcp.mjs`** is the MCP hand (Claude Code's way onto the board; `.mcp.json` at the root registers it), over `relay.mjs` and `live-node.mjs`, with `ink-png.mjs` for the ink as a picture (and, since A1, the PNG reader and the pictures under it) and `mcp-smoke.mjs` as its stdio test; it is also the canvas's seat's answerer, and **`seat-watch.mjs`** is the silent reader that prints one line per brief parked there — what wakes a Claude Code session (*The canvas's seat*, below); `dynaink-core.node.mjs` is the committed Node bundle it runs (`npm run build:node`, drift-checked in CI like the browser bundle). **`relay-protocol.mjs`** is the relay's protocol with no server in it (what a client is replayed, the truncation word, the cap — since A1, a room's pictures: the asset address, `sniffImage`, the verdicts and their sentences — and since the rooms, a room's name the relay mints, a name claimed by its hand, the floodgate and `compact`), read by `relay.mjs` and by the Cloudflare Worker (`cloudflare/relay`); **`decide-protocol.mjs`** and **`ai-protocol.mjs`** are the model routes' (*dyna.ink's own models*: what `/decide`, `/extract` and `/ai/v1/…` take, refuse and answer), read by the Worker and by `relay.mjs`, which answers each with 501, in words (and `ai-protocol.mjs` by the gate's stub too); `relay-assets.conformance.mjs` is the one definition of the asset cases, run against both servers; `ink-png.test.mjs` is the PNG reader's. **`relay.test.mjs`** is the relay's own test (`node --test Demos/relay.test.mjs`, in CI's `core` job): the catch-up as a pure function, and, over a real relay on a free port, the truncation line and three hands with one departed. `Demos/programs/` holds `run` programs written for the canvas (`dynaink-explained.run.js`: the loop told as a program, ending on a real measurement of the viewer's own stroke). Plus fish, composition diagrams, no-modes graph, etc. |
 | `app/` | **The app — v1's one address, `https://jjh111.github.io/MetaMedium/app/`** (V1-PLAN R7). Made, never edited: `index.html` is `Demos/session-engine.html` with each file it asks for asked for from `/app/` (`../Demos/…`), `sw.js` is `Demos/sw.js` byte for byte, `manifest.webmanifest` is the old address's starting and scoped at `./` — all three written by `node scripts/build-app.mjs` and drift-checked in CI (`--check`). Installable there, and it opens with no network after one visit. `Demos/session-engine.html` stays where it was and works as it always has |
 | `HELP.md` | **The help pane's page**, for a person using the canvas (PLAN-USER-SURFACE U1g): the loop, the field, handling marks, models and Claude, boards, rooms, your mark, undo, *On an iPad* (the Home Screen and why, the pencil, pictures), the shortcuts. The help tile reads it (`20-controls.js`), both service workers keep it for offline, and the gate's `app` scenario asks for it. Keep it true to the surface — it names controls and keys |
@@ -412,9 +417,9 @@ any structural change.
 | `skills/` | Claude Code skills: `dynaink-code` (code patterns), `dynaink-design` (design principles) |
 | `Assets/` | Figures and design rationale (recognition strategy, point-primitive proposal), and the social card. `Assets/ux-audit-2026-09-28/` holds the screenshots of the audit walked again (U2), which `UX-AUDIT-2026-09-28.md` cites. `make-card.mjs` regenerates that card from index.html's own hero — synthetic pointer input, so the picture shows the engine really reading a mark; `node Assets/make-card.mjs`. Change the picture and you must change the FILENAME and the four og:/twitter: tags in `index.html` and `404.html`, because scrapers cache by URL. **`Assets/whitepaper-figures/`** is the whitepaper's seven graphic plates: `build.py` holds their content and geometry and emits the static blocks `index.html` carries between `whitepaper-plate:KEY` markers (`--check` says they are in sync), `figures.css` and `figures.js` style and enhance them with no build, and `e2e/whitepaper-figures.mjs` audits the real page; its README is the workflow |
 | `archive/` | Retired versions and superseded plans, incl. whitepaper v4 (root `MetaMedium_Whitepaper_v4.html` is a redirect stub — keep it) and PRDs v3.2/v4 |
-| `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `dynaink-3d`), opens a **fresh browser context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `dynaink-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — or runs a scenario's own file (`OWN_PAGES` in `run.mjs`; each file's header says what it walks), and awaits the result each returns; it does not reimplement them. **It prints its own numbers** — records passed, failed and skipped, per scenario and in all — so this map keeps none: they drift. Pass, fail and **skip** are counted apart (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. A scenario that needs a relay starts one of its own on a free port — never `:8020`, where a room of John's may be; a request there is refused and counted. **The default run, on Chromium** (`byDefault` in `run.mjs`): `canvas` (the loop, e2e 1–71); `keep` (V1-PLAN R3, no harness: the kill test — the page crashed or closed at random points, across board switches, every completed stroke there — a save forced to fail, the old board imported once, two tabs, the pages that must not write); `boards` (R1: the boards pane by the real pointer, with the storage ask, I3, and the semantic seat, I9, `e2e/semantic.mjs`, against a model the gate builds and serves); `carry` (N1: three origins play the old address, dyna.ink and a stranger); `app` (R7: `/app/` installable, controlled by its worker and open offline, the help saying `VERSION`, every address the whitepaper, `404.html` and the README link answering, a release renaming the cache); `prod` (*One app address*: the site built and served as Pages serves it — `e2e/pages.mjs`, checked against `wrangler pages dev` — and the app run under its headers with every frame's policy violations heard, a violation made on purpose, a build without `'unsafe-eval'` and a room on a relay the policy does not name each caught; `e2e/links.mjs` is the one home of the linked addresses `app`, `prod`, the site test and `scripts/n4.test.mjs` read); `pencil` (R6: a pen and fingers synthesised as iPadOS delivers them, and the on-screen keyboard; `QA-v1.md` §A10 is what only an iPad can say); `models` (J5, I7 and *dyna.ink's own models*, against `startModelStub` in `e2e/servers.mjs` — OpenRouter's recorded shapes, and the relay's `/decide` and `/ai/v1/…`, the latter with the relay's own checks (`ai-protocol.mjs`); the stub's decision and System One shapes are written by hand); `seat` (J4, *The canvas's seat*); `hand` (H1 and A1–A2b, *The MCP hand*: *Tier 1 before a model*, the rows that need John's handwriting skipped by name); `room` (*Rooms anyone can open*: two people who are not John through the Worker's own logic — sharing, an invite, a guest's name, undo per hand, offline and back, a forged log refused, a wrong key, a copy saved and shared again, the key in nothing kept); `walk` (`e2e/walk.mjs`, PLAN-FIELD-PAR FP9 and the UX pass: the field push with the pointer's own strokes; run directly, it is a map, never a verdict); `ux` (the UX pass at 1280×800, at 390×844 with touch and under reduced motion); `security` (*Living artifacts*' last rule: a hostile hand's log merged as a room merges it — its code never runs here unasked and is sealed when played, its injected markup inert); `budgets` (R4c, I2, P1: the paint held to the whole-board read on the bench's 500-mark board, PERF.md's budgets on the 2,000 and on traced pictures — timing records skipped by name on a machine too loaded or too slow to measure, or whose page draws in software — and the ink raster's structural records, which never skip); `shard`, `demo` and `demo2` (DynaInk3D's). Opt-in: **`smoke`** (`--browser webkit smoke`: a board drawn, read, held and a pill taken — a WebKit smoke, not an iPhone test) and **`big`** (minutes: a 2,000-mark board saved and reopened). CI's `webkit` job runs `smoke pencil keep carry` (`npm run webkit` in `e2e/`; what WebKit cannot force skips by name). Beside the gate, on its static server and never run by it or by CI: `e2e/perf.mjs` (the surface's half of `PERF.md`, measured with the gate's own `budgets.mjs`), `e2e/pictures.mjs` (P1: traced pictures panned with the ink's raster and without) and `e2e/whitepaper-figures.mjs` (the plates' audit). `e2e/README.md` has the rest |
+| `e2e/` | **The browser gate** (`DIRECTOR-REVIEW-2026-09-15.md`, QA-1): `node e2e/run.mjs` starts its own servers on free ports (a static one over the repo root, vite over `dynaink-3d`), opens a **fresh browser context per scenario**, loads the harnesses that already exist — `Demos/session-engine.e2e.js` (`__setup` + `__scenario`) and `dynaink-3d/e2e.js` (`__scenario`, `__demo`, `__demo2`) — or runs a scenario's own file (`OWN_PAGES` in `run.mjs`; each file's header says what it walks), and awaits the result each returns; it does not reimplement them. **It prints its own numbers** — records passed, failed and skipped, per scenario and in all — so this map keeps none: they drift. Pass, fail and **skip** are counted apart (a record whose name says it skipped is a skip); a failed assertion, a harness exception, an attempted request to a real model, or a page error not on the named allowlist in `guards.mjs` each exit nonzero, with structured JSON and a screenshot in `e2e/results/`. A scenario that needs a relay starts one of its own on a free port — never `:8020`, where a room of John's may be; a request there is refused and counted. **The default run, on Chromium** (`byDefault` in `run.mjs`): `canvas` (the loop, e2e 1–71); `keep` (V1-PLAN R3, no harness: the kill test — the page crashed or closed at random points, across board switches, every completed stroke there — a save forced to fail, the old board imported once, two tabs, the pages that must not write); `boards` (R1: the boards pane by the real pointer, with the storage ask, I3, and the semantic seat, I9, `e2e/semantic.mjs`, against a model the gate builds and serves); `carry` (N1: three origins play the old address, dyna.ink and a stranger); `app` (R7: `/app/` installable, controlled by its worker and open offline, the help saying `VERSION`, every address the whitepaper, `404.html` and the README link answering, a release renaming the cache); `prod` (*One app address*: the site built and served as Pages serves it — `e2e/pages.mjs`, checked against `wrangler pages dev` — and the app run under its headers with every frame's policy violations heard, a violation made on purpose, a build without `'unsafe-eval'` and a room on a relay the policy does not name each caught; `e2e/links.mjs` is the one home of the linked addresses `app`, `prod`, the site test and `scripts/n4.test.mjs` read); `pencil` (R6: a pen and fingers synthesised as iPadOS delivers them, and the on-screen keyboard; `QA-v1.md` §A10 is what only an iPad can say); `models` (J5, I7 and *dyna.ink's own models*, against `startModelStub` in `e2e/servers.mjs` — OpenRouter's recorded shapes, and the relay's `/decide` and `/ai/v1/…`, the latter with the relay's own checks (`ai-protocol.mjs`); the stub's decision and System One shapes are written by hand; *none* on dyna.ink's own kept through a model of the person's joining and leaving and a reload); `seat` (J4, *The canvas's seat*); `hand` (H1 and A1–A2b, *The MCP hand*: *Tier 1 before a model*, the rows that need John's handwriting skipped by name); `room` (*Rooms anyone can open*: two people who are not John through the Worker's own logic — sharing, an invite, a guest's name, undo per hand, offline and back, a forged log refused, a wrong key, a copy saved and shared again, an example opened from a room that runs nobody's program but its own, the key in nothing kept); `walk` (`e2e/walk.mjs`, PLAN-FIELD-PAR FP9 and the UX pass: the field push with the pointer's own strokes; run directly, it is a map, never a verdict); `ux` (the UX pass at 1280×800, at 390×844 with touch and under reduced motion); `security` (*Living artifacts*' last rule: a hostile hand's log merged as a room merges it — its code never runs here unasked and is sealed when played, its new version of a program played here waits for *Play it here*, a grant holds while this hand's own play stands, a run frame's navigation carries nothing of the page's fragment and is stopped, its injected markup inert); `budgets` (R4c, I2, P1: the paint held to the whole-board read on the bench's 500-mark board, PERF.md's budgets on the 2,000 and on traced pictures — timing records skipped by name on a machine too loaded or too slow to measure, or whose page draws in software — and the ink raster's structural records, which never skip); `shard`, `demo` and `demo2` (DynaInk3D's). Opt-in: **`smoke`** (`--browser webkit smoke`: a board drawn, read, held and a pill taken — a WebKit smoke, not an iPhone test) and **`big`** (minutes: a 2,000-mark board saved and reopened). CI's `webkit` job runs `smoke pencil keep carry` (`npm run webkit` in `e2e/`; what WebKit cannot force skips by name). Beside the gate, on its static server and never run by it or by CI: `e2e/perf.mjs` (the surface's half of `PERF.md`, measured with the gate's own `budgets.mjs`), `e2e/pictures.mjs` (P1: traced pictures panned with the ink's raster and without) and `e2e/whitepaper-figures.mjs` (the plates' audit). `e2e/README.md` has the rest |
 | `PERF.md`, `core/bench/`, `e2e/perf.mjs` | **The performance baseline** (V1-PLAN §9 R4a, 27 Sep 2026): `bench/board.mjs` draws deterministic boards of 500, 2,000 and 5,000 marks from a seed (the generator is kept, never the boards); `bench/engine.mjs` times replay, memory, relations, the whole-board read, one more stroke, a live room's incoming line and a newcomer's hello; `e2e/perf.mjs`, beside the gate and on its servers and model guard, times the surface — open, pan, draw, release → reading drawn — in Chromium and WebKit; `bench/profile.mjs` reads a CPU profile back to `src/…:line` and the surface's fragments; `bench/report.mjs` prints `PERF.md`'s tables from the results. `PERF.md` has the answer (500 marks usable, 2,000 not, 5,000 does not open), every number with its command, the hotspots ranked with file:line, and budgets for R4b — and, after R4b, the engine's numbers beside them. **R4b added** `bench/budgets.test.mjs` (`node --test`: the engine's budgets on the generated 2,000-mark board — replay ≤ 0.5 s, a stroke ≤ 4 / 16 ms, ≤ 150 MB — and the 5,000 board replays; each size in a process of its own, every run's numbers recorded in `dist/bench`) and `bench/equivalence.mjs` (every held log, a scripted log of the rarer acts and the 500-mark board replayed by the old engine — a committed bundle at `--ref` — and by `src/`, every reading and id compared, and what differs said). Not in `npm test` (`vitest.config.mjs` keeps `bench/` out) or the gate. **R4c added** the surface's column, and its budgets to the gate: `e2e/budgets.mjs` (what `perf.mjs` and the gate's `budgets` scenario both measure with) **I2 added** (V1-PLAN I2, 1 Oct 2026) pictures traced into ink beside artifacts: `bench/board.mjs`'s `tracedStrokes` and `importedBoard` (what `trace` leaves of a photograph, and a board of SVG figures and pictures as the surface brings them in — the traced ink, then the picture beside it), `bench/imports.mjs` (apply per import, cold and warm replay, a stroke drawn on a picture's ink; `--bundle=` for an older engine) and two tests in `bench/budgets.test.mjs` (an import of 2,000 traced strokes beside an SVG applies in ≤ 4 ms a stroke on average and replays in ≤ 0.25 ms a mark, a stroke on its ink ≤ 4 / 16 ms; 5 pictures beside 5 SVGs the same, replay ≤ 1.25 s) — a minute and a half to apply and replay before, under a second after. **R4d added** `bench/room.test.mjs` (`node --test`: a live room's budgets on the 2,000-mark board — a line ≤ 16 ms at p95 with no full replay, one crossing a mark just drawn too, a line that lands earlier from a checkpoint, a line with no events no work, a newcomer's hello one copy of each log in rooms of three and six with a hand gone — measured by `bench/room.mjs`, whose `--path=before` is the surface before R4d). |
-| `cloudflare/` | **dyna.ink on Cloudflare** (CF1, 1 Oct 2026; `cloudflare/README.md` is what John does, once): **the site** — `build-site.mjs` makes what Pages publishes from the files git tracks, less what a browser on the product's site never asks for, each file left out with its reason (`whyLeftOut`: the tests, the gate and the scripts, the plans at the root but `ROOT_DOCS`, the engine's source, the pages that load TypeScript through a dev server, dot-files), plus `_headers` (`pages/headers.template`: a floor policy, `object-src 'none'; base-uri 'self'; frame-ancestors 'self'`, and HSTS on every path; `pages/csp.txt`, the app's CSP held to what its source loads — `'unsafe-eval'` stays because a program's frame inherits it and runs `new Function`; no COOP/COEP, the reason written), `_redirects` (`/app` → `/app/`) and `robots.txt`. The app's two pages (`STAMPED`) also carry its policy in themselves (`withPolicy`, a meta), because Pages matches `_headers` against the path as asked and answers addresses such as `/ap%70/` with the app under the floor alone; `--commit <sha>` names the deployed commit in them. `site.test.mjs` holds it, and the gate's `prod` scenario serves that build as Pages does. GitHub Pages still publishes the whole repository at the old address. **The room relay** — `relay/`: `Demos/relay.mjs`'s protocol as a Worker + one Durable Object per room (`src/worker.mjs`; lines kept in SQLite-backed storage in pieces, bounded in lines and characters), **a key per room** (`src/auth.mjs`: HMAC-SHA256 of the room's name under a secret; `room-key.mjs` makes one; `*` opens every room), CORS for the app's origins (`src/http.mjs`, the one home of the origins and where a key is read), fail closed with no secret. Since A1 it also keeps a room's pictures by their hash, in the Durable Object's storage (`PUT|GET|HEAD /rooms/<room>/assets/<sha256>`; *A picture in a room*, under *The MCP hand*). Since the multiuser milestone (23 Oct 2026) it opens rooms (`src/mint.mjs`, `POST /rooms`; *Rooms anyone can open*), counts what it limits in a Durable Object of its own (`src/limits.mjs`, `Limits`: fixed windows, one object a scope, so a limit is one count wherever a request lands; a limited route with no `LIMITS` binding fails closed), and asks Cloudflare's models through the Workers AI binding `AI` (`src/ai.mjs`: `/decide`, `/extract`, `/ai/v1/chat/completions`, `GET /ai/v1/models`; *dyna.ink's own models*). `dev-server.mjs` runs the Worker's logic in Node (`MM_DECIDE_FAKE=1`, `MM_AI_FAKE=1` for stand-in models); `cd cloudflare/relay && npm test` runs its tests — the protocol over a fake storage, parity with the Node relay, the hands over a socket with a key, the limits, the model routes, and the real runtime via `wrangler dev --local` (skipped by name without `npm ci`). **The deploy** (`.github/workflows/deploy-cloudflare.yml`) runs only after CI passes on a push to `master`, and only while that commit is still `master`'s tip, or by hand from `master` (*One app address*); it skips cleanly without `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`, deploys both with the relay lockfile's wrangler, makes the Pages project `dyna-ink` the first time and puts the relay's secret from a GitHub secret `MM_RELAY_SECRET` when one is set (from stdin, never logged), so the README's setup can be done from a browser alone. `relay.dyna.ink` is still commented out in `wrangler.toml`: until it is bound, what the public pages ask of it — sharing a board, dyna.ink's own models — has no relay to reach |
+| `cloudflare/` | **dyna.ink on Cloudflare** (CF1, 1 Oct 2026; `cloudflare/README.md` is what John does, once): **the site** — `build-site.mjs` makes what Pages publishes from the files git tracks, less what a browser on the product's site never asks for, each file left out with its reason (`whyLeftOut`: the tests, the gate and the scripts, the plans at the root but `ROOT_DOCS`, the engine's source, the pages that load TypeScript through a dev server, dot-files), plus `_headers` (`pages/headers.template`: a floor policy, `object-src 'none'; base-uri 'self'; frame-ancestors 'self'`, and HSTS on every path; `pages/csp.txt`, the app's CSP held to what its source loads — `'unsafe-eval'` stays because a program's frame inherits it and runs `new Function`; no COOP/COEP, the reason written), `_redirects` (`/app` → `/app/`) and `robots.txt`. The app's two pages (`STAMPED`) also carry its policy in themselves (`withPolicy`, a meta), because Pages matches `_headers` against the path as asked and answers addresses such as `/ap%70/` with the app under the floor alone; `--commit <sha>` names the deployed commit in them. `site.test.mjs` holds it, and the gate's `prod` scenario serves that build as Pages does. GitHub Pages still publishes the whole repository at the old address. **The room relay** — `relay/`: `Demos/relay.mjs`'s protocol as a Worker + one Durable Object per room (`src/worker.mjs`; lines kept in SQLite-backed storage in pieces, bounded in lines and characters), **a key per room** (`src/auth.mjs`: HMAC-SHA256 of the room's name under a secret; `room-key.mjs` makes one; `*` opens every room), CORS for the app's origins (`src/http.mjs`, the one home of the origins and where a key is read), fail closed with no secret. Since A1 it also keeps a room's pictures by their hash, in the Durable Object's storage (`PUT|GET|HEAD /rooms/<room>/assets/<sha256>`; *A picture in a room*, under *The MCP hand*). Since the multiuser milestone (23 Oct 2026) it opens rooms (`src/mint.mjs`, `POST /rooms`; *Rooms anyone can open*), counts what it limits in a Durable Object of its own (`src/limits.mjs`, `Limits`: fixed windows, one object a scope, so a limit is one count wherever a request lands, and a gauge no window empties; a limited route with no `LIMITS` binding fails closed), counts what its rooms keep across rooms (`src/store.mjs`: an address's day, and what the rooms it opened hold and keep a day), counts every caller by its address and an IPv6 one by its /64 (`callerOf` in `src/http.mjs`), and asks Cloudflare's models through the Workers AI binding `AI` (`src/ai.mjs`: `/decide`, `/extract`, `/ai/v1/chat/completions`, `GET /ai/v1/models`; *dyna.ink's own models*). `dev-server.mjs` runs the Worker's logic in Node (`MM_DECIDE_FAKE=1`, `MM_AI_FAKE=1` for stand-in models); `cd cloudflare/relay && npm test` runs its tests — the protocol over a fake storage, parity with the Node relay, the hands over a socket with a key, the limits, the model routes, and the real runtime via `wrangler dev --local` (skipped by name without `npm ci`). **The deploy** (`.github/workflows/deploy-cloudflare.yml`) runs only after CI passes on a push to `master`, and only while that commit is still `master`'s tip, or by hand from `master`, held to its tip too (*One app address*); it skips cleanly without `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID`, deploys both with the relay lockfile's wrangler, makes the Pages project `dyna-ink` the first time and puts the relay's secret from a GitHub secret `MM_RELAY_SECRET` when one is set (from stdin, never logged), so the README's setup can be done from a browser alone. `relay.dyna.ink` is still commented out in `wrangler.toml`: until it is bound, what the public pages ask of it — sharing a board, dyna.ink's own models — has no relay to reach |
 | `.github/workflows/ci.yml` | CI, on every push/PR, every job on `ubuntu-24.04` with a timeout of its own: typecheck + test + build for `core` — with the drift check for both committed bundles and the test of the browser bundle's two globals (`Demos/core-bundle.test.mjs`), the MCP hand's smoke and the MCP door's, the Cloudflare relay's and the site's tests (no install: the workerd test runs in the deploy), the surface's drift check and its build's test, each pure fragment's Node test (the field reader, the hand's rules, the board journal, the board list, the asset store, the bundle, the carry, the relay defaults, the seats), the relay's and the PNG reader's, the app's drift check (`scripts/build-app.mjs --check`), the app build's and release script's tests, N4's list (`scripts/n4.test.mjs`), the name test (`scripts/name.test.mjs`, RENAME-PLAN N3a), the words test (`scripts/words.test.mjs`), the rights, the stories, and the example boards' drift check and test (`scripts/examples.mjs --check`, `examples.test.mjs`) — `dynaink-3d` (with its MCP hand's smoke) and `Web App Skeleton` (with lint); the **browser gate** (`e2e/run.mjs` on Chromium, the default list); and **WebKit** — the smoke, `pencil`, `keep` and `carry` (`--browser webkit smoke pencil keep carry`) — in a job of its own. Both browser jobs upload `e2e/results` when they fail. The deploy to Cloudflare follows only a CI that passed on `master` |
 
 ### Experiments (subordinate tier — see `EXPERIMENTS.md`)
@@ -1686,22 +1691,44 @@ makes it render as real DOM in the canvas. The rules:
   ink from anywhere (nothing in them to press); a loop that waits is the
   hand's wherever it lies, so the tap or mark that takes it up lands in
   the loop, not the frame. The cursor changes over a playing frame.
-- **Code from another hand plays only after *Play it here*** (the multiuser milestone, 23 Oct 2026;
-  `grantedHere`, `trackConsent`, `playHere` and `WORKER_HOST_CSP` in `13-kinds.js`, `session.clockAuthor`;
-  e2e `security`). A `js` behaviour and a `run` program run arbitrary code, so they run in a tab only when
-  THIS hand played them here, live. A play that arrives in a log brought in any other way — a room's line, a
-  file, a folder, a carry, a reload — is said once, in the person's words (`noteStandingPrograms`,
-  `tellPlayingPrograms` in `17-folder.js`; a dashed edge on the frame), and waits for the person's tap, which
-  writes this hand's own `clock` play and undoes per hand. The consent is runtime, like paint, so
-  `SessionState.clocks` stays a pure function of the log; a shipped example's program is granted as it opens
-  (`grantPlayingPrograms`, its code being the site's own), except under reduced motion. **Played here, a
-  behaviour is still sealed**: its worker is made inside an opaque-origin sandboxed iframe whose CSP has
-  `connect-src 'none'` and a `script-src` naming no host — no fetch, XHR, socket or beacon, no `import()` of any
-  address — and whose null origin makes `indexedDB` throw, so the person's boards are out of reach; inside,
-  `WORKER_HARDEN` also takes the network, storage, channel and nested-worker globals away. A `run` or `mermaid`
-  frame carries a CSP of its own (`frameCSP`): `connect-src 'none'`, scripts only from the pinned library's
-  host, pictures and media only from the page's origin, `data:` and `blob:`. A kind another hand names is
-  escaped wherever the panel says it. Unverified on WebKit: reasoned, not run.
+- **Code from another hand plays only after *Play it here*** (the multiuser milestone, 23 Oct 2026; `grantedHere`,
+  `trackConsent`, `codeVersionOf`, `ownPlayStands`, `playHere`, `frameLoaded` and `WORKER_HOST_CSP` in
+  `13-kinds.js`, `pinBase` in `00-core.js`, `session.clockAuthor`; e2e `security`). A `js` behaviour and a `run`
+  program run arbitrary code, so they run in a tab only when THIS hand played them here, live. A play that arrives
+  in a log brought in any other way — a room's line, a file, a folder, a carry, a reload — is said once, in the
+  person's words (`noteStandingPrograms`, `tellPlayingPrograms` in `17-folder.js`; a dashed edge on the frame), and
+  waits for the person's tap, which writes this hand's own `clock` play and undoes per hand. **A grant is for the
+  code it was given to** (`codeVersionOf`: the newest code rep's time and a hash of its code): it holds the
+  versions this hand played, or wrote itself while playing (its own model's revision is its own), so another hand's
+  new version of a program played here — a revision of theirs, the MCP hand's `canvas_write` — stands by, dashed,
+  offering *Play it here*, and the status line says who wrote it (*bob wrote a new version of …*). **A grant holds while this
+  hand's own play stands** (`ownPlayStands`: the last of this hand's own clock events for it, the ones no merge
+  stamped `by`, is a play) — never "while the last clock event is mine" — so another hand pressing *Play it here*
+  too, an undo of an unrelated stroke and a late line that cuts the board leave it running, while this hand's own
+  pause, reset or undo of its play lets the grant go (another hand's pause stops the clock in the log itself); a
+  tank held still under reduced motion follows the same rule (`tankStartedHere`, `14-clocks.js`). The consent is
+  runtime, like paint, so `SessionState.clocks` stays a pure function of the log; a shipped example's program is
+  granted as it opens (`grantPlayingPrograms`, its code being the site's own), except under reduced motion — and
+  only on the board the example made: opened from a room (or a folder), which leaves for a page of its own, the new
+  board's id goes ahead in `sessionStorage` (`mm-example-grant`) and the page that opens grants that board alone as
+  it opens (`exampleGrantAtOpen` in `22-boards.js`), so nothing playing on the room's board runs as the page leaves
+  (e2e `room` R13). **Played here, a behaviour is still sealed**: its worker is made inside an opaque-origin
+  sandboxed iframe whose CSP has `connect-src 'none'` and a `script-src` naming no host — no fetch, XHR, socket or
+  beacon, no `import()` of any address — and whose null origin makes `indexedDB` throw, so the person's boards are
+  out of reach; inside, `WORKER_HARDEN` also takes the network, storage, channel and nested-worker globals away. A
+  `run` or `mermaid` frame carries a CSP of its own (`frameCSP`): `connect-src 'none'`, scripts only from the
+  pinned library's host, pictures and media only from the page's origin, `data:` and `blob:` — so it cannot fetch,
+  open a socket or beacon. **It can still navigate its own frame**, which no CSP governs (a navigation is not a
+  connection), and a GET leaves with whatever the program puts in the address, so **what a frame can read holds
+  nothing of the page**: its origin is opaque, and its base URL is the page's `<base>`, the page's address less the
+  fragment and less an old link's `?key=` (`pinBase` in `00-core.js`, first in the head before any frame is made
+  and kept in step after every `replaceState`), so no frame's base holds a room's key, even after the program takes
+  its own `<base>` away. And a frame that loads another page is stopped: its document is set before the frame is
+  inserted and says it is here as it begins (`frameHello`), so a later load that no such word came before is the
+  frame navigating, and the program is marked broken with the reason (*tried to load another page in its frame*,
+  `frameLoaded`); a mermaid frame is put back. A destination that answers 204 leaves the frame where it was and is
+  not detected. A kind another hand names is escaped wherever the panel says it. Unverified on WebKit: reasoned,
+  not run (the navigation check was made so that an engine loading an empty page first is not counted).
 
 ### Relations and concepts (Tier 1)
 
@@ -2361,11 +2388,18 @@ relative to the target's own size. Legacy copies still exist for reference in
   transport in the seat and a job on the surface**: `llm/decide-openrouter.ts`
   (`createChatDecideTransport`) is a `DecideTransport` over `provider.ts`'s
   `complete` — the questions as one JSON user message of options (*none of
-  these* always among them, never a node id), the answer asked for as typed
-  JSON and read as a distribution over **exactly the options offered**: an
-  option nobody offered, a negative or non-finite probability or nothing that
-  sums to anything leaves that question unanswered, never guessed, and the pick
-  is read back off the distribution. How Jev answers on OpenRouter
+  these* always among them, never a node id), each named `q1…qn` on the wire
+  and read back by that name (`wireName`), never by its own id, which names a
+  mark and the hand that drew it — the answer asked for as typed JSON and read
+  as a distribution over **exactly the options offered**: an option nobody
+  offered, a negative or non-finite probability, nothing that sums to anything,
+  or **a part of a distribution** — a sum more than `SUM_SLACK` (0.02) under 1,
+  the pick's probability alone or the top few, which divided by its sum would
+  be held as a certainty — leaves that question unanswered, never guessed
+  (`partialSum` in `participants/decide.ts`, the one rule both decision
+  transports read; a sum short of 1 by no more than the slack is the whole,
+  rounded, and beyond it only a sum over 1 is normalised), and the pick is read
+  back off the distribution. How Jev answers on OpenRouter
   (`typesafe/jev-1.13`, as John was told, `DEFAULT_DECIDER_MODEL`) is
   **unverified**, so everything a vendor's shape decides is a `DecideWire`
   (`build` the messages, `parse` the reply), the seam where the native
@@ -2852,7 +2886,8 @@ its join gets no second. A participant's id therefore moves, and the surface key
 map by `agentKey` (04-models.js), never by `agent.id`. **What is
 kept, `mm-seats`, is a pick a seat** (`{ reader, writer, decider, any }`: where, which,
 what the provider said — `pickOf`, never a key); `any` is the one model last joined
-with no seat, as the single pick always was. An older device's `mm-model-pick` and
+with no seat, as the single pick always was; and `off`, the seats where the person let
+dyna.ink's own go, kept apart from the picks (*dyna.ink's own models*, below). An older device's `mm-model-pick` and
 `mm-model-key` become the writer seat (and the reader, for a model that sees) and the
 provider's key, once, the old entries let go only after the new are read back
 (`migrateStored`; e2e M19). A reload rejoins every seat the way it joined (the
@@ -2865,41 +2900,56 @@ what act, is §6.3's, unchanged.
 `cloudflare/relay/src/ai.mjs` over the Workers AI binding `AI`, its protocols `Demos/decide-protocol.mjs` and
 `Demos/ai-protocol.mjs`; core's `llm/decide-systemone.ts` and `participants/decide-state.ts`; the surface's
 `03-seats.js`, `04-seatpane.js` and `04-models.js`; e2e `models`, M37 onward). On dyna.ink, its subdomains and the
-old address (`houseDeciderFor`, `houseAiFor`), three seats need no key: dyna.ink's relay asks a Cloudflare model through its own
-binding, so the page sends none and holds none. **The decider** is Cloudflare's Clef-flash (`HOUSE_DECIDER_MODEL`), a
-System One decision model, asked at `/decide` by `createSystemOneDecideTransport` — a transport beside the chat one,
-not a `DecideWire`: questions named `q1…qn` go in with typed criteria (a choice's options keyed in lower snake case,
-`none_of_these` last; a score's levels as a list; a statement for a yes) and typed answers come back, read against
-exactly the options sent. What it is told is `decisionStateOf`'s words and never an id (`withoutIds` strips every id
-the board holds, Mermaid's spelling too): what the marks are and read as, what a person wrote on and beside them
-(`WRITTEN` — never Mermaid text, a page a model wrote or a file's name), each candidate's provenance, cut to the
-relay's limits. Its jobs, each asked only by its deliberate act and taken only at `DECIDER_TAKE_AT`: *Which is it?*;
-**Which diagram is this?** (`tools/which-notation.ts`, registered last: offered when the likeliest notation reads
-between `NOTATION_OFFER_FROM` and the floor on a graph that is not a molecule, or two tie above the floor; held as a
+old address (`houseDeciderFor`, `houseAiFor`), three seats need no key: dyna.ink's relay asks a Cloudflare model
+through its own binding, so the page sends none and holds none. **The decider** is Cloudflare's Clef-flash
+(`HOUSE_DECIDER_MODEL`), a System One decision model, asked at `/decide` by `createSystemOneDecideTransport` — a
+transport beside the chat one, not a `DecideWire`: questions named `q1…qn` go in with typed criteria (a choice's
+options keyed in lower snake case, `none_of_these` last; a score's levels as a list; a statement for a yes) and typed
+answers come back, read against exactly the options sent — a part of a distribution no answer here either
+(`partialSum`). What it is told is `decisionStateOf`'s words and never an id (`withoutIds` strips every id the board
+holds, Mermaid's spelling too): what the marks are and read as, what a person wrote on and beside them (`WRITTEN` —
+never Mermaid text, a page a model wrote or a file's name), each candidate's provenance, cut to the relay's limits.
+Its jobs, each asked only by its deliberate act and taken only at `DECIDER_TAKE_AT`: *Which is it?*; **Which diagram
+is this?** (`tools/which-notation.ts`, registered last: offered when the likeliest notation reads between
+`NOTATION_OFFER_FROM` and the floor on a graph that is not a molecule, or two tie above the floor; held as a
 decision, never a reading, and read by `mermaidFor` and the route tool); and **what should this brief make?**
-(`participants/brief-kind.ts`), asked on a brief's Enter only of a decider the hand chose (*choose it* in its row,
-or one joined), with a writer here, no prefix, no revision and nothing the library answers — the drawing's guess
-stands at once, and a sure *something else* takes it back only while it is still this hand's last act. **The writer
-and the reader** are a Workers AI model each (`MM_AI_WRITER`, `MM_AI_READER`, default `DEFAULT_AI_MODEL`,
+(`participants/brief-kind.ts`), asked on a brief's Enter only of a decider the hand chose (*choose it* in its row, or
+one joined), with a writer here, no prefix, no revision and nothing the library answers — the drawing's guess stands
+at once, and a sure *something else* takes it back only while it is still this hand's last act. **The writer and the
+reader** are a Workers AI model each (`MM_AI_WRITER`, `MM_AI_READER`, default `DEFAULT_AI_MODEL`,
 `@cf/qwen/qwen3.8-27b`), asked by the short names `writer` and `reader` at `/ai/v1/chat/completions` in OpenAI's
-shape, so core's transport speaks to them unchanged; the page never names an `@cf` id. **Seated only once the relay
-answers**: at boot the page looks once at `GET /decide` and `GET /ai/v1/models` (`probeHouse`; neither calls a model)
-and seats nothing whose list does not answer within `HOUSE_PROBE_MS`, nor in an embed; seated, a house model joins a
-board lazily under its own name (*dyna.ink writer*, *dyna.ink reader*) by a join marked `seated`, which undo passes
-over, and is kept nowhere. **Asked last**: a model of the person's, or Claude Code seated, is asked instead
-(`resolveWriters`, `resolveReaders`); only the house *reader* reads — *none* on it sends no picture of the ink to
-dyna.ink — and auto-read never asks it. *none* on a house row is remembered in `mm-seats`. An ask the house cannot
-answer just now (a 429, a 5xx, unreachable, timed out) is said in the relay's own words (`houseCannotWords`) and
-kept for a model of the person's (`keepFromHouse`). The models pane leads with *Using dyna.ink’s own models — no key
-needed* and what is sent where; on a public origin Ollama and LM Studio are looked for only when *Find models on
-this machine* is tapped (`probesOnOpen`). **Switches and budgets** (Worker variables, commented in `wrangler.toml`):
-who may ask — `MM_DECIDE`, and `MM_AI_CHAT`, which follows it when unset: *off*, *keyed* (a room's key only) or
-*limited* (the app's origins and keyed hands; the default) — with no Origin and no key refused; so many calls a
-minute per address (an IPv6 address by its /64) and per room key (`DECIDE_PER_MINUTE`, `AI_CHAT_PER_MINUTE`), a share
-a day per address whatever key it holds (`DECIDE_PER_DAY`, `AI_CHAT_PER_DAY`), and a budget a day across everyone for
-each route (`MM_AI_DAILY`, `MM_AI_CHAT_DAILY`). The relay logs a call's route, model, status, time and size and
-nothing it was asked, caches nothing and uses no AI Gateway. `/extract` (Clairic) is a route with no job yet; the Node
-relay answers every model route with 501. **Unverified**: every System One field name (no real reply has been seen;
+shape, so core's transport speaks to them unchanged; the page never names an `@cf` id. **What the writer is sent** is
+the prompt every model is given, scoped to the marks asked about: `describeSession` given `nodeIds`
+(`participants/serialize.ts`, `serialize.test.ts`) names only this hand's own things and the things the asked marks
+belong to, gives relations only among the asked marks and has no Participants line, so in a room another person's
+name and the names of their things elsewhere on the board go nowhere by someone else's tap; `houseSends`
+(`03-seats.js`) says it in the row. Residual: the marks' ids still carry the drawing hand's log name, so asking about
+another hand's marks sends that name. **Seated only once the relay answers**: at boot the page looks once at `GET
+/decide` and `GET /ai/v1/models` (`probeHouse`; neither calls a model) and seats nothing whose list does not answer
+within `HOUSE_PROBE_MS`, nor in an embed; seated, a house model joins a board lazily under its own name (*dyna.ink
+writer*, *dyna.ink reader*) by a join marked `seated`, which undo passes over, and is kept nowhere. **Asked last**: a
+model of the person's, or Claude Code seated, is asked instead (`resolveWriters`, `resolveReaders`); only the house
+*reader* reads — *none* on it sends no picture of the ink to dyna.ink — and auto-read never asks it. *none* on a
+house row — the reader, the writer or the decider — is kept in `mm-seats` under `off` (each seat let go as `true`;
+`houseLetGo`, `withHouse` in `03-seats.js`), apart from the seat's pick, so a model of the person's joined for that
+seat (which writes the pick) and its leaving (which lets the pick go) never undo it, nor does a reload:
+`houseAtBoot`, `deciderAtBoot`, `seatHouseDecider` and `leaveDecider` honour it, and only *dyna.ink's own* clears it
+(e2e M55c–M55c3). A model leaving says when dyna.ink's own takes its seat (*… takes its place — let it go in its row
+to keep everything on your own models*). An ask the house cannot answer just now (a 429, a 5xx, unreachable, timed
+out) is said in the relay's own words (`houseCannotWords`) and kept for a model of the person's (`keepFromHouse`).
+The models pane leads with *Using dyna.ink’s own models — no key needed* and what is sent where; on a public origin
+Ollama and LM Studio are looked for only when *Find models on this machine* is tapped (`probesOnOpen`). **Switches
+and budgets** (Worker variables, commented in `wrangler.toml`): who may ask — `MM_DECIDE`, and `MM_AI_CHAT`, which
+follows it when unset: *off*, *keyed* (only the key of a room named by hand) or *limited* (the app's origins and
+keyed hands; the default) — with no Origin and no key refused. **A minted room's key is no key on `/decide` and
+`/ai/…`** (`askerOf` in `cloudflare/relay/src/ai.mjs`): `POST /rooms` hands one to anyone, so it is never *keyed*, is
+held to its address's minute and with no Origin is refused, and `MM_DECIDE=keyed` admits only the keys of rooms named
+by hand. Each route allows so many calls a minute per address (an IPv6 address by its /64, as every limit the relay
+keeps counts one) and per key of a room named by hand (`DECIDE_PER_MINUTE`, `AI_CHAT_PER_MINUTE`), a share a day per
+address whatever key it holds (`DECIDE_PER_DAY`, `AI_CHAT_PER_DAY`), and a budget a day across everyone
+(`MM_AI_DAILY`, `MM_AI_CHAT_DAILY`). The relay logs a call's route, model, status, time and size and nothing it was
+asked, caches nothing and uses no AI Gateway. `/extract` (Clairic) is a route with no job yet; the Node relay answers
+every model route with 501. **Unverified**: every System One field name (no real reply has been seen;
 `scripts/record-systemone.mjs` records them, and the reader takes every spelling written about), the binding's call
 and reply shapes for both routes, whether `@cf/qwen/qwen3.8-27b` exists under that id and what it sees, whether
 Workers AI keeps prompts, what the budgets cost, and whether Clef ever reaches 0.99 on a real tie. `relay.dyna.ink`
@@ -3522,7 +3572,10 @@ and writes nothing, exiting 1 where the real run would refuse.
 and `e2e/pages.mjs`). **The deploy waits for CI**: it runs after CI passes on a push to `master` (`workflow_run`),
 deploys the very commit CI passed, and only while that commit is still `master`'s tip — CI runs finish in any order,
 and an older commit's finishing last would otherwise put dyna.ink back on it; the run says so and stays green. A
-pull request, a failed CI and a fork's branch called `master` deploy nothing; by hand, only from `master`. **The
+pull request, a failed CI and a fork's branch called `master` deploy nothing; by hand, only from `master`, and held to
+its tip too — GitHub re-runs a run with the commit it was first dispatched at, so a run dispatched at a commit
+`master` has moved past deploys nothing and fails, saying to run the workflow again (`site.test.mjs` holds the step,
+and the step was run against a stub `gh` for both events). **The
 site** is the repository less what cannot run or is never asked for, each with its reason (`whyLeftOut`); every page
 gets a floor policy and HSTS (six months, no subdomains, no preload), and the app's pages their own policy,
 `csp.txt`, as a header and again in the page itself. **The `prod` scenario** serves that very build as Pages does and
@@ -3597,7 +3650,7 @@ log arriving live instead of after a pull. `LiveStore` is a `Store` with
 events — between hands: a `BroadcastChannel` between tabs on one machine
 (`?live=<room>`, or the *share* tile), or a relay between machines
 (`?live=<room>&relay=http://host:8020`; `node Demos/relay.mjs` is a page
-of Server-Sent Events in and POST out, with no truth of its own). **Across the internet the relay is a Worker** (CF1, `cloudflare/relay`; `cloudflare/README.md`): the same protocol over https (`Demos/relay-protocol.mjs` is the one definition of it), a Durable Object a room, and **a key per room** — the HMAC of the room's name under a secret only the relay holds, sent by a Node hand as `Authorization: Bearer` (`MM_RELAY_KEY`, or `--key`, on `Demos/mcp.mjs` and `seat-watch.mjs`; `live-node.mjs`' `relayTransport(url, room, { key })`) and by a tab the same way, its stream read with `fetch` (an `EventSource`, with `?key=` in its address, only where `fetch` cannot stream; the page's own address holds the key after `#` — `17-folder.js`, *Rooms anyone can open*), never in the log, the board, an export, a cache (`sw.js` keeps no request with a key in its address) or another board's address (`boardSearch`). A relay that refuses a hand says so once as `{ relay: 'refused', status }`, which `LiveStore.refusal()` turns into a sentence in every hand's `notices()` — *the relay does not take this key for this room* — and the hand stops asking; `mcp.mjs` and `seat-watch.mjs` ask the relay once at start (`checkRelay`) and exit 1 with the reason. **A room also keeps the bytes of its pictures** (A1: `PUT|GET|HEAD /rooms/<room>/assets/<sha256>` under the same key, kept per room by their hash; *A picture in a room*, under *The MCP hand*) — the lines stay the only log, and an `import` still names a picture and carries none. A
+of Server-Sent Events in and POST out, with no truth of its own). **Across the internet the relay is a Worker** (CF1, `cloudflare/relay`; `cloudflare/README.md`): the same protocol over https (`Demos/relay-protocol.mjs` is the one definition of it), a Durable Object a room, and **a key per room** — the HMAC of the room's name under a secret only the relay holds, sent by a Node hand as `Authorization: Bearer` (`MM_RELAY_KEY`, or `--key`, on `Demos/mcp.mjs` and `seat-watch.mjs`; `live-node.mjs`' `relayTransport(url, room, { key })`) and by a tab the same way, its stream read with `fetch` (an `EventSource`, with `?key=` in its address, only where `fetch` cannot stream; the page's own address holds the key after `#` — `17-folder.js`, *Rooms anyone can open*), never in the log, the board, an export, a cache (`sw.js` keeps no request with a key in its address), another board's address (`boardSearch`) or the base a program's frame reads (`pinBase`, *Living artifacts*). A relay that refuses a hand says so once as `{ relay: 'refused', status }`, which `LiveStore.refusal()` turns into a sentence in every hand's `notices()` — *the relay does not take this key for this room* — and the hand stops asking; `mcp.mjs` and `seat-watch.mjs` ask the relay once at start (`checkRelay`) and exit 1 with the reason. **A room also keeps the bytes of its pictures** (A1: `PUT|GET|HEAD /rooms/<room>/assets/<sha256>` under the same key, kept per room by their hash; *A picture in a room*, under *The MCP hand*) — the lines stay the only log, and an `import` still names a picture and carries none. A
 newcomer says hello and is answered **once per log** (V1-PLAN R4d): every
 hand answers for its own log, at once; a copy of another hand's — marked
 `via` the hand that holds it — goes only when its writer cannot answer:
@@ -3752,7 +3805,15 @@ that diverges from what is held. **A room older than the relay remembers
 says so:** the relay keeps `maxLines` lines a room (`startRelay(port, {
 maxLines })`, else `MM_RELAY_MAX_LINES`, else 5000) and tells a client
 that connects after it forgot some, and the store makes that a sentence.
-Both land in `LiveStore.notices()`, which all three hands say: the
+**A room the relay forgot whole is filled again**: a hand reconnecting with a
+`Last-Event-ID` past every id a room holds — a room the Worker forgot after its
+idle days, a relay that restarted, ids begun again at 1 — is sent
+`{ relay: 'forgotten' }` (`forgottenNotice` in `relay-protocol.mjs`, both
+relays) and the room from its beginning, and `LiveStore` answers that word by
+sending its own log whole (with a copy of any departed hand's it holds) and
+saying hello, as a newcomer would. Residual: a hand whose old id is below the
+new room's last id is not told. The truncation and the collision
+land in `LiveStore.notices()`, which all three hands say: the
 canvas's status line (`folderStatus`), the MCP hand's `canvas_look`, and
 the shard's status line (`Room.notices`) and `space_look`.
 
@@ -3844,29 +3905,45 @@ on screen in — the marks other hands made on it go in as copies this hand hold
 still theirs; a board over `CARRY_MAX_CHARS` is said before anything is sent. *Copy invite link* hands on
 `?live=<room>` with **the key after `#key=`** (`inviteLink`), which no browser sends to a server; a guest who came by
 an invite with no name kept is asked one; joining by a link, a room's name or a pasted invite never carries the
-guest's board in (*with Claude* still does, since the seat is there to read it). The bar shows the room and a dot
-per hand heard in the last minute — each hand says it is here every `ROOM_BEAT_MS` on a line the relays pass on and
-never store, and presence is never read from a replay, which the relays mark — and *Save a copy to my boards* keeps
-the room's board as one of this browser's. **Who opens, and who writes**: anyone on the app's origins may open a room,
-an address so many an hour and the relay so many a day (`MM_RELAY_MINT_PER_HOUR`, 10; `MM_RELAY_MINT_PER_DAY`, 500;
-counted in `src/limits.mjs`; `MM_RELAY_MINT=0` opens none). In every room **a name is claimed by the hand that first
-writes under it** (`x-dyna-hand`, a secret of its sitting, kept as a hash; `live-node.mjs` sends one for a Node
-hand), and a line under a name another hand claimed is refused (409, said); what a copy may change is the store's to
-judge — **a copy handed on may only add** to what is held (`accountsFor`). The Worker's **floodgate** holds a hand, an address
-and the room to so many lines and characters (`FLOOD`, `FLOOD_ADDRESS`, `FLOOD_ROOM`; 429), a room keeps at most
-`MAX_CLAIMS` names, and before it lets go of history to stay under its caps it lets go of what replay would never
-send (`compact`: a hand's newest whole log stands for its own lines before it). **Nothing sent is lost in silence**:
-a transport says what became of a line (`SendResult`); a hand's own lines go one at a time and one unanswered for
-`OWN_WAIT_MS` is sent again; a failed send is tried again from `RETRY_FIRST_MS`, backing off to `RETRY_MAX_MS`, after
-a `retry-after` and at once on the browser's `online`; a whole log over `LINE_CHARS` goes as pieces of one set that a
-receiver takes only whole; and *Leave* refuses, in words, while what this hand drew has not reached the room (*Leave
-anyway* beside it). **Expiry and retention**: a room the Worker opened is forgotten `MM_RELAY_ROOM_IDLE_DAYS` (30) days
-after it was last used — a line, a stream opened or a picture put — when an alarm deletes everything it holds (lines,
-pictures, the claims' hashes) and closes its streams; a room named by hand (`claude`, a table) never expires and is
-bounded by its caps alone. **Unverified**: only the Worker's logic in Node and under `wrangler dev --local` has run,
-never the hosted relay; Chromium only (WebKit's fetch stream, a keepalive goodbye with a preflight and an iPad's share
-sheet are untried); and an event forged inside a copy that only adds is still taken — proving who wrote an event
-needs signatures, left to the new repository.
+guest's board in (*with Claude* still does, since the seat is there to read it). The bar shows the room and a dot per
+hand heard in the last minute — each hand says it is here every `ROOM_BEAT_MS` on a line the relays pass on and never
+store, and presence is never read from a replay, which the relays mark; **a beat moves no clock** (`applied`, `ownAt`
+in `live.ts` move only for a line that carries events or a whole log), because a beat that passed a slow whole of its
+writer's on the way, stamped after it, made every peer drop that whole as older, for good — and *Save a copy to my
+boards* keeps the room's board as one of this browser's. **Who opens, and who writes**: anyone on the app's origins
+may open a room, an address so many an hour and the relay so many a day (`MM_RELAY_MINT_PER_HOUR`, 10;
+`MM_RELAY_MINT_PER_DAY`, 500; counted in `src/limits.mjs`; `MM_RELAY_MINT=0` opens none). In every room **a name is
+claimed by the hand that first writes under it** (`x-dyna-hand`, a secret of its sitting, kept as a hash;
+`live-node.mjs` sends one for a Node hand), and a line under a name another hand claimed is refused (409, said); what
+a copy may change is the store's to judge — **a copy handed on may only add** to what is held (`accountsFor`). The
+Worker's **floodgate** holds a hand, an address and the room to so many lines and characters (`FLOOD`,
+`FLOOD_ADDRESS`, `FLOOD_ROOM`; 429), a room keeps at most `MAX_CLAIMS` names, and before it lets go of history to
+stay under its caps it lets go of what replay would never send (`compact`: a hand's newest whole log stands for its
+own lines before it). **What is kept is counted across rooms** (`cloudflare/relay/src/store.mjs`), because a bound
+per room is none when anyone may open rooms: what one address keeps a day in every room — each kept line's characters
+and `LINE_COST` (4 KiB) more for its rows, and each picture's bytes — `MM_RELAY_STORE_PER_DAY` (256 MiB; 429 with
+`retry-after`); what every room the relay opened holds at once, a gauge in the `Limits` object's `minted` scope that
+its alarm never clears, reserved `MINTED_RESERVE` at a time and given back when the room is forgotten
+(`MM_RELAY_MINTED_HELD`, 2 GiB: past it such a room keeps nothing more, 507, and `POST /rooms` answers 503, *opens no
+new room until older ones are let go of*); and what they keep in a day together (`MM_RELAY_MINTED_PER_DAY`, 2 GiB;
+429), since a room at its caps keeps writing as it lets its oldest lines go. A picture goes through the address's and
+the room's floodgates as a line does, a beat is kept nowhere and costs nothing, and a room named by hand is outside
+both minted counts; with no `LIMITS` binding nothing is kept (503). These are an operating ceiling set below a plan's
+limits, not a bill (`cloudflare/README.md`, *Costs*). **Every limit counts an IPv6 caller by its /64** (`callerKey`,
+`callerOf` in `src/http.mjs`, one home): minting, a room's floodgates and new names, the store count and the model
+routes. **Nothing sent is lost in silence**: a transport says what became of a line (`SendResult`); a hand's own
+lines go one at a time and one unanswered for `OWN_WAIT_MS` is sent again; a failed send is tried again from
+`RETRY_FIRST_MS`, backing off to `RETRY_MAX_MS`, after a `retry-after` and at once on the browser's `online`; a whole
+log over `LINE_CHARS` goes as pieces of one set that a receiver takes only whole; and *Leave* refuses, in words,
+while what this hand drew has not reached the room (*Leave anyway* beside it). **Expiry and retention**: a room the
+Worker opened is forgotten `MM_RELAY_ROOM_IDLE_DAYS` (30) days after it was last used — a line, a stream opened or a
+picture put — when an alarm deletes everything it holds (lines, pictures, the claims' hashes) and closes its streams;
+a room named by hand (`claude`, a table) never expires and is bounded by its caps and by what its writers' addresses
+may keep a day. **Unverified**: only the Worker's logic in Node and under `wrangler dev --local` has run, never the
+hosted relay, so the plan's own storage and rows written a day stand unchecked against the store's ceilings; Chromium
+only (WebKit's fetch stream, a keepalive goodbye with a preflight and an iPad's share sheet are untried); and an
+event forged inside a copy that only adds is still taken — proving who wrote an event needs signatures, left to the
+new repository.
 
 ### The MCP hand: Claude Code on the board (v10 T2)
 
@@ -4548,7 +4625,10 @@ sandboxes, never both. An html, svg, text or picture frame is `allow-same-origin
 `allow-scripts` — same-origin is what lets ink hit-test into the artifact's DOM, granting both is the known
 escape, and markup injected there is inert. A `run` or `mermaid` frame is `allow-scripts` without
 `allow-same-origin` — an opaque origin that cannot reach the page, its storage or its keys — with a CSP of its
-own whose `connect-src` is `'none'` (`frameCSP`). A `js` behaviour's worker runs inside an opaque-origin frame
+own whose `connect-src` is `'none'` (`frameCSP`): no fetch, socket or beacon. That does not stop the frame
+navigating itself, so the page's `<base>` is its address less the fragment (`pinBase`), and no frame's base carries
+a room's key, and a frame that loads another page is stopped (`frameHello`, `frameLoaded`; a destination that answers
+204 is not caught). A `js` behaviour's worker runs inside an opaque-origin frame
 of the same kind under `WORKER_HOST_CSP`, its network, storage and channel globals taken away besides
 (`WORKER_HARDEN`). Another hand's `js` or `run` runs only after *Play it here* (*Living artifacts*). On dyna.ink
 the app's pages carry `cloudflare/pages/csp.txt` as a header, and as a meta in the built pages.
@@ -4619,8 +4699,8 @@ which only works because every diagram is authored 1000 units wide.
   scenario asks every address the whitepaper, `404.html` and the README link into the site)
 - The whitepaper's claim-to-demo honesty: only link demos that actually show what the text claims
 - A room's key travels in an invite's fragment and an `Authorization` header — never in a log, a board, an
-  export or a cache (the `room` scenario looks) — and another hand's code runs here only after *Play it here*
-  (the `security` scenario)
+  export, a cache (the `room` scenario looks) or a frame's base (`pinBase`) — and another hand's code, each new
+  version of it too, runs here only after *Play it here* (the `security` scenario)
 
 ## Common Pitfalls
 
