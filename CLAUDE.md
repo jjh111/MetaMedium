@@ -4032,7 +4032,8 @@ are **one file's** (`relay-protocol.mjs`, read by both servers; their cases are 
 arrival** (the bytes are the ones the address names, or nothing is kept — 422), the bytes must be **a
 picture by their own header** (`sniffImage`: PNG, JPEG, WebP or GIF, the size read by hand, no image
 library; the type served is the bytes', never the sender's — 415), **up to 12 MB** (`MAX_ASSET_BYTES`,
-413 before the body is read where the length is declared) and a room's pictures are **capped**
+413 — what is over it is read, up to four times the cap, and kept nowhere, so a sender still sending hears the
+sentence) and a room's pictures are **capped**
 (`MM_RELAY_ASSET_BYTES`, 64 MiB by default, and at most `MAX_ROOM_ASSETS` pictures whatever their size; past
 either a put is refused in a sentence — 507 — and no picture is ever dropped, because an event may still name it).
 Every refusal is a status and a sentence (`assetCheck`); a get is `private, max-age=31536000, immutable` with
@@ -4108,7 +4109,8 @@ canvas_transcribe each*, a line partly read said *(2 of 3 marks read)*. Derived 
 **"With Claude" on dyna.ink** (`24-relay.js`, pure, `node --test Demos/surface/24-relay.test.mjs`): the share pane's
 *with Claude* defaults to `https://relay.dyna.ink` when the page's hostname is `dyna.ink` or ends `.dyna.ink`
 (`claudeRelayFor`; `notdyna.ink` and `dyna.ink.evil.com` are not), and to `http://127.0.0.1:8020` everywhere else; a
-relay typed in the pane wins. The room's key stays the page address's `?key=` (`openLive`, unchanged) and is never
+relay typed in the pane wins. The room's key is the one the page was opened with — after `#key=` in its address, an old `?key=` moved
+there (`roomKeyFor` in `24-room.js`) — and is never
 held, read or said by the fragment. **A hosted relay would have refused the seat** — `whyNoSeat` accepted only a relay
 on this machine — so the product's own relay, exactly `https://relay.dyna.ink` and nothing a key or a login is in,
 is accepted too (`ownRelay`); the seat's locality is then `hosted`, as `providerLocality` says, and any other relay

@@ -102,7 +102,8 @@ final address:
   machine's relay (`http://127.0.0.1:8020`) everywhere else, `*.pages.dev` included (`roomRelayFor` in
   `Demos/surface/24-relay.js`); it seats dyna.ink's own decider, writer and reader only on dyna.ink and the
   old address (`houseFor` in `Demos/surface/03-seats.js`);
-- the app's policy lets it reach `relay.dyna.ink` and no other relay (`pages/csp.txt`, `connect-src`);
+- the app's policy lets it reach `relay.dyna.ink` and no other relay off this machine (`pages/csp.txt`,
+  `connect-src`: beside it only `http://localhost:*` and `http://127.0.0.1:*`);
 - the relay takes browsers from its built-in origins only (`ORIGINS` in `relay/src/http.mjs`), and
   `*.pages.dev` is not one.
 
@@ -180,8 +181,8 @@ Every one is optional; each is read where the table says. Set them in `relay/wra
 | Variable | Default | What it does | Read in |
 |---|---|---|---|
 | `MM_RELAY_SECRET` (a **secret**) | none: every room, and opening one, is refused (503) | Room keys are the HMAC-SHA256 of a room's name under it. Comma-separated `new,old` while hands move to new keys; a room the app opens gets its key under the first | `relay/src/auth.mjs`, `worker.mjs`, `mint.mjs`, `ai.mjs` |
-| `MM_RELAY_OPEN` | unset | `1`: no key is asked anywhere, and `POST /rooms` answers `key: null` — an open relay, on purpose, for a trial; never the address you keep | `worker.mjs`, `mint.mjs` |
-| `MM_RELAY_ORIGINS` | unset | More origins a browser may call from, comma-separated, beside the built-in `https://dyna.ink`, `www.`, `app.`, `https://jjh111.github.io` and `localhost` / `127.0.0.1` / `[::1]` on any port | `relay/src/http.mjs` (`ORIGINS`) |
+| `MM_RELAY_OPEN` | unset | `1`: no room asks a key — not for its lines, its stream or its pictures — and `POST /rooms` answers `key: null` — an open relay, on purpose, for a trial; never the address you keep. The model routes keep their own rule: under `keyed` they still want a room's key, and with no secret none opens | `worker.mjs`, `mint.mjs` |
+| `MM_RELAY_ORIGINS` | unset | More origins a browser may call from, comma-separated, beside the built-in `https://dyna.ink`, `www.`, `app.`, `https://jjh111.github.io` and `http://` `localhost` / `127.0.0.1` / `[::1]` with a port, any port (an origin that names none is not one) | `relay/src/http.mjs` (`ORIGINS`) |
 | `MM_RELAY_MAX_LINES` | 5,000 | Lines a room keeps. Past it, what replay would never send goes first (a hand's own whole logs a newer one stands after), then the oldest; a hand that joins later is told the room is older than the relay remembers | `Demos/relay-protocol.mjs` (`DEFAULT_MAX_LINES`) |
 | `MM_RELAY_MAX_BYTES` | 32,000,000 | UTF-8 bytes of lines a room keeps (never UTF-16 characters: a line of CJK is three bytes a character), by the same rule | `worker.mjs` (`DEFAULT_MAX_BYTES`) |
 | `MM_RELAY_ASSET_BYTES` | 67,108,864 (64 MiB) | Bytes of pictures a room keeps — and at most 1,000 pictures a room, whatever their size (`MAX_ROOM_ASSETS`). Past either a put is refused (507, in words) and no picture is ever let go — an event may still name it | `relay-protocol.mjs` (`DEFAULT_ASSET_ROOM_BYTES`, `MAX_ROOM_ASSETS`) |
@@ -447,7 +448,7 @@ encryption: whoever runs the Worker (you) and Cloudflare could read a room.
   `MM_RELAY_ROOM_IDLE_DAYS` (30). A use is a line sent (a beat included), the stream opened or a picture put; a
   picture fetched is not one. Its alarm moves at most once a day (once a tenth of the idle time, when that is
   shorter), so at the default a room goes between 29 and 30 days after its last use. Then the room is let go of:
-  from then on it answers 503, in words (*this room is being let go of just now*), and takes nothing; it waits for
+  until that is done it answers 503, in words (*this room is being let go of just now*), and takes nothing; it waits for
   what is being kept, closes its streams, writes down what it owes the rooms' gauge (`MM_RELAY_MINTED_HELD`), deletes
   everything it holds (`storage.deleteAll()`), and only then gives back what it owed, once — an alarm that runs
   twice, or fails half way, gives back no more — and lets go of its memory; nothing of it is kept anywhere else. A
@@ -461,9 +462,10 @@ encryption: whoever runs the Worker (you) and Cloudflare could read a room.
   (`cf-connecting-ip`; an IPv6 address by its /64, and by the /56 that holds it) — for rooms opened an hour and a
   day, for what it kept a day in every room, and for model calls a minute and a day — and deletes each window once it
   has ended, so there an address is kept at most a day. Counts asked together are taken all or none, so a room
-  opening or a model call refused writes none of them. Beside them it keeps two counts under no address: what all
-  the rooms the relay opened keep in a day (a window like the others) and what they hold at once (a gauge, which no
-  alarm clears — it falls as each room is forgotten). A room's floodgate keeps its buckets in memory only, and a
+  opening or a model call refused writes none of them. Beside them it keeps counts under no address: the rooms the
+  relay opens in a day, each model route's budget for the day, the minute of a hand with the key of a room named by
+  hand (under that room's name), and what all the rooms the relay opened keep in a day — windows like the others —
+  and what they hold at once (a gauge, which no alarm clears — it falls as each room is forgotten). A room's floodgate keeps its buckets in memory only, and a
   model route's first count (a minute's, per isolate) is in memory too.
 - **Nothing of a model call** — no state, question, message or picture; nothing is cached, and AI Gateway is not
   used (its logs would keep a board's words).
