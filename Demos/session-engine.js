@@ -10132,11 +10132,21 @@
     '})();',
   ].join('\n');
 
+  /**
+   * The first thing a program's or a diagram's document does, in its head: say it is here (`doc`). A frame element
+   * loads its own document once, so a load that no such word came before is the frame navigating itself
+   * (`frameLoaded`) — and a load before the document's first word (an engine's empty page as the element goes in) is
+   * not counted at all.
+   */
+  function frameHello(id) {
+    return '<script>parent.postMessage({ mm: true, id: ' + JSON.stringify(String(id)).replace(/<\//g, '<\\/') + ', type: "doc" }, "*");<\/script>';
+  }
+
   /** The program in its harness: a clear frame that runs the code and reports its parts. */
   function runDocument(id, code, w, h) {
     const safe = (s) => JSON.stringify(String(s)).replace(/<\//g, '<\\/');
     const script = RUN_HARNESS.replace('__W__', Math.round(w)).replace('__H__', Math.round(h)).replace('__ID__', safe(id)).replace('__CODE__', safe(code)).replace('__THREE__', JSON.stringify(THREE_CDN));
-    return '<!doctype html><html><head><meta charset="utf-8">' + frameCSP([THREE_CDN]) + '<style>html,body{margin:0;background:transparent;overflow:hidden;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px}</style>' +
+    return '<!doctype html><html><head><meta charset="utf-8">' + frameCSP([THREE_CDN]) + frameHello(id) + '<style>html,body{margin:0;background:transparent;overflow:hidden;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px}</style>' +
       '</head><body><script>' + script + '<\/script></body></html>';
   }
 
@@ -10249,7 +10259,7 @@
       '#out .flowchart-link,#out .edgePath path,#out path.relation,#out .messageLine0,#out .messageLine1,#out .actor-line,#out .divider path{stroke:' + ink + ' !important;}' +
       '#out marker path,#out marker circle,#out .arrowMarkerPath,#out #arrowhead path{fill:' + ink + ' !important;stroke:' + ink + ' !important;}' +
       '#out .edgeLabel,#out .edgeLabel rect,#out .labelBkg,#out .cluster rect{fill:transparent !important;background:transparent !important;}';
-    return '<!doctype html><html><head><meta charset="utf-8">' + frameCSP(mermaidSourcesNow()) + '<style>' + css + '</style></head><body>' +
+    return '<!doctype html><html><head><meta charset="utf-8">' + frameCSP(mermaidSourcesNow()) + frameHello(id) + '<style>' + css + '</style></head><body>' +
       '<div id="mmroot"><pre id="src">' + esc(text) + '</pre><p id="note" hidden></p><div id="out" hidden></div></div>' +
       '<script>' + script + '<\/script></body></html>';
   }
@@ -10260,6 +10270,7 @@
     if (!m || m.mm !== true || typeof m.id !== 'string') return;
     const f = frames.get(m.id);
     if (!f || !f.iframe || f.iframe.contentWindow !== e.source) return; // only the frame that owns the id
+    if (m.type === 'doc') { f.iframe.__mmSaidHere = true; return; } // its own document, beginning (`frameHello`)
     if (m.type === 'regions' && Array.isArray(m.regions)) { reported.set(m.id, m.regions); return; }
     // A diagram that was not drawn is not a broken program: the text stands and the frame says why (D2).
     if (m.type === 'mermaid') {
@@ -10526,17 +10537,22 @@
   }
 
   /**
-   * A frame's document is there: sized for the screen — and, for a program's or a diagram's frame, counted. Each frame
-   * element loads its own document once (a document that changes gets a new element, `syncStage`), so a second load is
-   * the frame navigating itself: the one way out a frame's CSP cannot shut (a navigation is not a connection). It
+   * A frame's document is there: sized for the screen — and, for a program's or a diagram's frame, judged. Each frame
+   * element loads its own document once (a document that changes gets a new element, `syncStage`), and that document
+   * says so as it begins (`frameHello`), so a load after it that no such word came before is the frame navigating
+   * itself: the one way out a frame's CSP cannot shut (a navigation is not a connection). It
    * carried nothing of the page — the page's <base> holds no fragment (`pinBase`) and a frame's origin is opaque — but
    * a frame that leaves for another page is stopped where it stands, given its own document back, and said.
    */
   function frameLoaded(id, iframe) {
     sizeFramesToScreen();
-    iframe.__mmLoads = (iframe.__mmLoads || 0) + 1;
     const f = frames.get(id);
-    if (iframe.__mmLoads < 2 || !f || f.iframe !== iframe || (f.kind !== 'run' && f.kind !== 'mermaid')) return;
+    if (!f || f.iframe !== iframe || (f.kind !== 'run' && f.kind !== 'mermaid')) return;
+    // Its own document said it was here before this load: this is that document's load.
+    if (iframe.__mmSaidHere) { iframe.__mmSaidHere = false; iframe.__mmOwnLoaded = true; return; }
+    // A load before its own document said a word — an engine's empty page as the element went in, or a still card
+    // that runs nothing — is not a navigation.
+    if (!iframe.__mmOwnLoaded) return;
     f.codeAt = 'left'; // the next paint gives it a fresh element and its own document
     const node = state.nodes.get(id);
     const name = (node && MM.wordOf(node)) || (f.kind === 'mermaid' ? 'the diagram' : 'the program');
