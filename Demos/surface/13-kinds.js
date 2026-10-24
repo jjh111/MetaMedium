@@ -557,6 +557,7 @@
     nonce: '',           // tags messages to/from that host, so no other frame is heard
     ready: false,        // the host said its worker is up
     outbox: [],          // messages posted before the host was ready, flushed on ready
+    readyWaiters: [],    // resolvers waiting for the host to say it is up (stepOnce)
     loaded: new Map(),   // artifactId -> code rep `at` the worker holds
     pending: new Map(),  // artifactId -> watchdog timer for the step in flight
     bodies: new Map(),   // artifactId -> { x, y, vx, vy, heading, age, tick } — offsets from the frame, runtime only
@@ -612,7 +613,12 @@
     if (!host || !host.contentWindow || e.source !== host.contentWindow) return;
     const d = e.data;
     if (!d || d.__mmw !== runtime.nonce) return;
-    if (d.ready) { runtime.ready = true; const q = runtime.outbox; runtime.outbox = []; for (const m of q) workerPost(m); return; }
+    if (d.ready) {
+      runtime.ready = true;
+      const q = runtime.outbox; runtime.outbox = []; for (const m of q) workerPost(m);
+      const ws = runtime.readyWaiters; runtime.readyWaiters = []; for (const w of ws) w();
+      return;
+    }
     if (d.err) { flash('runtime: ' + (d.err || 'error')); return; }
     if (d.m) onWorkerMessage(d.m);
   });
@@ -638,6 +644,13 @@
     runtime.worker = host;
     runtime.loaded.clear();
     return host;
+  }
+
+  /** Resolves once the behaviour worker's host is up, making it if there is none. */
+  function hostReady() {
+    ensureWorker();
+    if (runtime.ready) return Promise.resolve();
+    return new Promise((resolve) => { runtime.readyWaiters.push(resolve); });
   }
 
   /** Drop the host iframe and forget: after a hang, nothing it held can be trusted. */
@@ -945,6 +958,10 @@
   function sendStep(s, r, bodies) {
     if (runtime.pending.has(r.id)) return false; // one step in flight per artifact
     ensureWorker();
+    // Making the host frame and its worker is not a step: no step is sent, and no budget armed, until the host says it
+    // is up — or a slow machine's first play is taken for a hang and paused ("took longer than its budget"). The loop
+    // asks again on the next frame.
+    if (!runtime.ready) return false;
     if (runtime.loaded.get(r.id) !== r.key) {
       runtime.loaded.set(r.id, r.key);
       workerPost({ type: 'load', id: r.id, code: r.code, at: r.key });
@@ -962,11 +979,19 @@
       type: 'step', id: r.id, tick: runtime.tick, seed: clock ? clock.seed : 1,
       world: { t: body.age, dt: RUN_DT, me: me, others: others, walls: [] },
     });
-    runtime.pending.set(r.id, setTimeout(() => {
-      // Past its budget: the worker is gone, and so is everything it held.
+    // The watchdog. A step past its budget is a hang: the worker is gone, and so is everything it held. But the watchdog
+    // runs on the page's thread, and so does the step's answer: when the page itself was held up past the budget — a big
+    // merge, a repaint, a slow machine — the timer fires late with the answer still queued behind it, and a busy page
+    // would be taken for a hung program. So a watchdog that fires late waits one budget more, once; a real hang is still
+    // stopped, within about two budgets.
+    const sentAt = performance.now();
+    const watch = (more) => setTimeout(() => {
+      const late = performance.now() - sentAt - RUN_BUDGET_MS * (more ? 2 : 1);
+      if (!more && late > RUN_BUDGET_MS / 2) { runtime.pending.set(r.id, watch(true)); return; }
       dropWorker();
       markBroken(r.id, 'took longer than its ' + RUN_BUDGET_MS + 'ms budget for one step');
-    }, RUN_BUDGET_MS));
+    }, RUN_BUDGET_MS);
+    runtime.pending.set(r.id, watch(false));
     return true;
   }
 
@@ -994,6 +1019,7 @@
    * waited out first, so the answer is this step's and not an earlier one's.
    */
   async function stepOnce(id) {
+    await hostReady();
     if (runtime.pending.has(id)) await settled(id);
     const s = session.getState();
     const r = runnable(s).find((x) => x.id === id);
