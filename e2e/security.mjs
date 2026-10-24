@@ -18,6 +18,10 @@
 //     none of is gone, so nothing is exfiltrated (the hardening, C1);
 //   - another hand's `run` program does not auto-play, and a run program's
 //     own fetch is refused by the frame's CSP (`connect-src 'none'`, C6);
+//   - a run program that navigates its own frame — which no CSP governs —
+//     carries nothing of the page's fragment (a room's key), even with its
+//     own <base> taken away, and a frame that loads another page is stopped
+//     where it stands (C6b);
 //   - injected names, labels, a region name, an svg script, a mermaid label
 //     and a page's code never execute (the srcdoc frames are script-less or
 //     opaque-origin; xss.mjs);
@@ -113,7 +117,8 @@ export async function runSecurity(browser, servers, { freshContext, screenshot }
   // Every would-be beacon is caught here, and answered, so a call that leaves
   // is seen — and one the CSP or the hardening refused never arrives.
   const seen = [];
-  await guards.context.route('**/exfil**', (route) => { seen.push(route.request().url()); route.fulfill({ status: 204, body: '' }); });
+  // A navigation is answered with a page (C6b: a frame that leaves for one is stopped); anything else with nothing.
+  await guards.context.route('**/exfil**', (route) => { const u = route.request().url(); seen.push(u); route.fulfill(/[?&]nav=/.test(u) ? { status: 200, contentType: 'text/html', body: '<p>elsewhere</p>' } : { status: 204, body: '' }); });
   const page = await guards.context.newPage();
   const pwn = [];
   page.on('dialog', (d) => { pwn.push('DIALOG ' + d.message()); d.dismiss(); });
@@ -228,6 +233,31 @@ export async function runSecurity(browser, servers, { freshContext, screenshot }
       check('C6. a local run program runs under the frame’s CSP (it reports its part)', reported >= 1, { reported });
       check('C6. its fetch is refused by connect-src ‘none’ — nothing leaves the opaque-origin frame', seen.filter((u) => /run=local/.test(u)).length === 0, { seen });
       check('C6. a run frame carries a CSP with connect-src ‘none’', !!csp && /connect-src 'none'/.test(csp), { csp });
+    });
+
+    // ---- C6b. A run program that navigates its own frame — the one way out a CSP does not govern — carries nothing of
+    // the page's address (the room's key lives in its fragment, and the page's <base> holds none), and is stopped ----
+    await record('C6b', async () => {
+      seen.length = 0;
+      await page.evaluate(() => history.replaceState(history.state, '', location.pathname + location.search + '#key=GATEROOMKEY0123456789'));
+      const rid = await page.evaluate(() => {
+        const s = window.__mm.session;
+        // It even takes its own <base> away first, so the frame falls back to whatever base it was made with.
+        const code = "mm.report('nav', 0, 0, 40, 40); setInterval(function(){ try { var b = document.querySelectorAll('base'); for (var i = 0; i < b.length; i++) b[i].remove(); location.href = '/exfil?nav=' + encodeURIComponent(document.baseURI + ' ' + document.referrer); } catch (e) {} }, 250);";
+        const id = s.import({ kind: 'run', path: 'leave.run.js', name: 'leave', bounds: { minX: 2400, minY: 100, maxX: 2600, maxY: 240 }, code: code, at: Date.now() });
+        s.clock({ nodeId: id, op: 'play', at: Date.now() });
+        return id;
+      });
+      await wait(2000);
+      const st = await page.evaluate((id) => { const c = window.__mm.session.getState().clocks[id]; return { playing: !!(c && c.playing), reason: c && c.reason, base: document.baseURI }; }, rid);
+      const navs = seen.filter((u) => /nav=/.test(u));
+      await page.evaluate(() => history.replaceState(history.state, '', location.pathname + location.search));
+      check('C6b. a run program’s navigation of its own frame carries nothing of the page’s fragment — not the room’s key, even with its <base> taken away — and the page’s own base holds none',
+        navs.length >= 1 && navs.every((u) => !/GATEROOMKEY/.test(decodeURIComponent(u))) && !/GATEROOMKEY/.test(st.base), { navs, base: st.base });
+      // A page that answers 204 keeps the frame where it was — nothing loads, so nothing is seen to leave; that a
+      // program can still say what it knows by asking for an address is what the <base> answers, above.
+      check('C6b. a frame that loads another page is stopped where it stands, and says so — once it has left, it leaves no more',
+        !st.playing && /tried to load another page in its frame/.test(st.reason || '') && navs.length === 1, { st, navs: navs.length });
     });
 
     // ---- XSS. Injected names, labels, svg/mermaid/page never execute ----

@@ -137,6 +137,12 @@
   // stand-in library (served from the gate's own origin) still loads and the
   // CDNs stay in one home. img/media are held to the page's own origin and
   // data:/blob:, so no <img> or <video> GET can beacon to a stranger either.
+  // What no CSP here governs is a navigation: a program may set its own
+  // frame's location, and a GET leaves with whatever it puts in the address.
+  // So the frame can read nothing of the page worth carrying — its origin is
+  // opaque, and its base URL is the page's <base>, the address less the
+  // fragment where a room's key lives (00-core.js, `pinBase`) — and a frame
+  // that loads another page is stopped where it stands (`frameLoaded`).
   function originOf(u) { try { return new URL(u, location.href).origin; } catch (e) { return null; } }
   function frameCSP(scriptUrls) {
     const self = location.origin && location.origin !== 'null' ? location.origin : '';
@@ -631,6 +637,26 @@
     runtime.loaded.clear();
     for (const t of runtime.pending.values()) clearTimeout(t);
     runtime.pending.clear();
+  }
+
+  /**
+   * A frame's document is there: sized for the screen — and, for a program's or a diagram's frame, counted. Each frame
+   * element loads its own document once (a document that changes gets a new element, `syncStage`), so a second load is
+   * the frame navigating itself: the one way out a frame's CSP cannot shut (a navigation is not a connection). It
+   * carried nothing of the page — the page's <base> holds no fragment (`pinBase`) and a frame's origin is opaque — but
+   * a frame that leaves for another page is stopped where it stands, given its own document back, and said.
+   */
+  function frameLoaded(id, iframe) {
+    sizeFramesToScreen();
+    iframe.__mmLoads = (iframe.__mmLoads || 0) + 1;
+    const f = frames.get(id);
+    if (iframe.__mmLoads < 2 || !f || f.iframe !== iframe || (f.kind !== 'run' && f.kind !== 'mermaid')) return;
+    f.codeAt = 'left'; // the next paint gives it a fresh element and its own document
+    const node = state.nodes.get(id);
+    const name = (node && MM.wordOf(node)) || (f.kind === 'mermaid' ? 'the diagram' : 'the program');
+    if (f.kind === 'mermaid') { flash(name + ' tried to load another page in its frame — it was put back'); render(session.getState()); return; }
+    markBroken(id, 'tried to load another page in its frame — a program may not, so it was stopped');
+    flash(name + ' tried to load another page in its frame — it was stopped');
   }
 
   function markBroken(id, error) {

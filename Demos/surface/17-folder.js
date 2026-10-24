@@ -516,6 +516,7 @@
     // only the key in the fragment, and its relay only where it is not this page's own.
     try { history.replaceState(history.state, '', location.pathname + roomSearch(location.search, room, relay, key ? roomRelayFor(location.hostname) : null) + roomHash(key)); }
     catch (err) { /* an address this page may not change: the room still holds, and a reload goes back to the board */ }
+    pinBase();
   }
   /** A name for this hand in a room: the person's name (a preference), and this page load's suffix. */
   function handName() {
@@ -1503,6 +1504,7 @@
     if (board.mode !== 'fresh' && (!o.boot || untouched)) restoreBoardView(id);
     if (o.address && !EMBED) {
       try { history.replaceState(history.state, '', location.pathname + boardSearch(location.search, id) + withoutKey(location.hash)); } catch (err) { /* an address this page may not change */ }
+      pinBase();
     }
     if (!o.boot) markAfterOpen();
     syncBoardFaces();

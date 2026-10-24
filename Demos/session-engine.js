@@ -3,7 +3,8 @@
 // ===== core =====
 // Provides: the engine handle, URL params, the theme (light · dark · system) and the colours the canvas
 //   draws with (read from the stylesheet, so ink and chrome agree), device preferences (prefs), the
-//   session, DOM handles, the panel toggle, shared state (state, live, hoverId, lastPen), esc().
+//   session, DOM handles, the panel toggle, shared state (state, live, hoverId, lastPen), esc(), pinBase (the
+//   page's <base>: its address less the fragment, so no frame reads a room's key).
 // Uses: nothing — every other fragment reads from here.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -16,6 +17,32 @@
   const params = new URLSearchParams(location.search);
   const EMBED = params.has('embed');
   if (EMBED) document.body.classList.add('embed');
+
+  // ===== A frame never reads the page's fragment: the base is pinned =======
+  // A srcdoc frame — a program's, a Mermaid diagram's, a page's — takes its base URL from the page that made it, and
+  // with no <base> that is the page's whole address, fragment and all. A room's key lives in the fragment (24-relay.js),
+  // so a program could read it off `document.baseURI` and leave with it by navigating its own frame, which a frame's
+  // `connect-src 'none'` does not govern. So the page carries a <base> of its own address less the fragment (and less an
+  // old link's `?key=`), put first in the head before any frame is made and kept in step whenever the page changes its
+  // address (`pinBase`, after every replaceState): every relative URL resolves exactly as before — the same path and
+  // query — and every frame's base is an address with no key in it; a program that takes its own <base> away falls
+  // back to this one, never to the address.
+  function pinBase() {
+    try {
+      if (!/^https?:$/.test(location.protocol)) return;
+      const q = location.search.replace(/^\?/, '').split('&').filter((p) => p && !/^key(=|$)/i.test(p));
+      const href = location.origin + location.pathname + (q.length ? '?' + q.join('&') : '');
+      const root = document.head || document.documentElement;
+      let base = document.getElementById('mmBase');
+      if (!base) {
+        base = document.createElement('base');
+        base.id = 'mmBase';
+        root.insertBefore(base, root.firstChild);
+      }
+      if (base.getAttribute('href') !== href) base.setAttribute('href', href);
+    } catch (err) { /* an address this page cannot read: nothing in it is a room's */ }
+  }
+  pinBase();
 
   // ===== Device preferences: small, named, held on this device ==============
   const prefs = {
@@ -577,7 +604,11 @@
   //  - run/mermaid frames: `allow-scripts` WITHOUT `allow-same-origin`, so they
   //    run script at an OPAQUE origin that cannot reach the page, its storage or
   //    its keys — and, since C6, each srcdoc carries a CSP (`connect-src 'none'`,
-  //    13-kinds.js `frameCSP`) so a playing program cannot phone out.
+  //    13-kinds.js `frameCSP`) so a playing program cannot fetch, open a socket or
+  //    beacon. It can still navigate its own frame (no CSP governs a navigation),
+  //    so what it can read holds nothing of the page: the page's <base> is its
+  //    address less the fragment, where a room's key lives (00-core.js `pinBase`),
+  //    and a frame that loads another page is stopped (13-kinds.js `frameLoaded`).
   //  - the `js` worker (13-kinds.js) runs arbitrary behaviour code, and is
   //    defended three ways, any one of which alone contains it: nothing runs
   //    there until this hand played it HERE (the consent gate, C1); the worker
@@ -669,8 +700,9 @@
         iframe.setAttribute('sandbox', kind === 'run' || kind === 'mermaid' ? 'allow-scripts' : 'allow-same-origin');
         iframe.setAttribute('scrolling', 'no');
         iframe.title = MM.wordOf(node) || id;
-        iframe.onload = sizeFramesToScreen; // the type is set for the screen as soon as the document is there
-        wrap.appendChild(iframe);
+        iframe.onload = () => frameLoaded(id, iframe); // the type is set for the screen as soon as the document is there
+        // Put in the wrap only once its document is set (below): a frame inserted with none loads an empty page first,
+        // and a frame's every load after its own document's is the frame navigating itself (`frameLoaded`).
         stage.appendChild(wrap);
         f = { wrap: wrap, iframe: iframe, codeAt: null, parked: false, kind: kind };
         frames.set(id, f);
@@ -718,16 +750,21 @@
         // the second navigation on a board with a dozen frames loading: the
         // program never started and nothing said so. A fresh iframe always
         // navigates; the message listener ignores the old window by identity.
-        if (f.codeAt !== null) {
+        // Its document is set before it is put in the page, so the one load a frame makes is its own document's.
+        const doc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h, { id: id, playing: playing });
+        if (f.codeAt !== null && f.iframe.isConnected) {
           const next = document.createElement('iframe');
           for (const attr of ['sandbox', 'scrolling', 'title']) { const v = f.iframe.getAttribute(attr); if (v !== null) next.setAttribute(attr, v); }
-          next.onload = sizeFramesToScreen;
+          next.onload = () => frameLoaded(id, next);
+          next.srcdoc = doc;
           f.iframe.replaceWith(next);
           f.iframe = next;
+        } else {
+          f.iframe.srcdoc = doc;
+          if (!f.iframe.isConnected) f.wrap.insertBefore(f.iframe, f.wrap.firstChild);
         }
         f.codeAt = stamp;
         if (kind === 'run' || kind === 'mermaid') { reported.delete(id); mermaidStates.delete(id); }
-        f.iframe.srcdoc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h, { id: id, playing: playing });
       }
     }
     syncRuntime(s);
@@ -9953,6 +9990,12 @@
   // stand-in library (served from the gate's own origin) still loads and the
   // CDNs stay in one home. img/media are held to the page's own origin and
   // data:/blob:, so no <img> or <video> GET can beacon to a stranger either.
+  // What no CSP here governs is a navigation: a program may set its own
+  // frame's location, and a GET leaves with whatever it puts in the address.
+  // So the frame can read nothing of the page worth carrying — its origin is
+  // opaque, and its base URL is the page's <base>, the address less the
+  // fragment where a room's key lives (00-core.js, `pinBase`) — and a frame
+  // that loads another page is stopped where it stands (`frameLoaded`).
   function originOf(u) { try { return new URL(u, location.href).origin; } catch (e) { return null; } }
   function frameCSP(scriptUrls) {
     const self = location.origin && location.origin !== 'null' ? location.origin : '';
@@ -10447,6 +10490,26 @@
     runtime.loaded.clear();
     for (const t of runtime.pending.values()) clearTimeout(t);
     runtime.pending.clear();
+  }
+
+  /**
+   * A frame's document is there: sized for the screen — and, for a program's or a diagram's frame, counted. Each frame
+   * element loads its own document once (a document that changes gets a new element, `syncStage`), so a second load is
+   * the frame navigating itself: the one way out a frame's CSP cannot shut (a navigation is not a connection). It
+   * carried nothing of the page — the page's <base> holds no fragment (`pinBase`) and a frame's origin is opaque — but
+   * a frame that leaves for another page is stopped where it stands, given its own document back, and said.
+   */
+  function frameLoaded(id, iframe) {
+    sizeFramesToScreen();
+    iframe.__mmLoads = (iframe.__mmLoads || 0) + 1;
+    const f = frames.get(id);
+    if (iframe.__mmLoads < 2 || !f || f.iframe !== iframe || (f.kind !== 'run' && f.kind !== 'mermaid')) return;
+    f.codeAt = 'left'; // the next paint gives it a fresh element and its own document
+    const node = state.nodes.get(id);
+    const name = (node && MM.wordOf(node)) || (f.kind === 'mermaid' ? 'the diagram' : 'the program');
+    if (f.kind === 'mermaid') { flash(name + ' tried to load another page in its frame — it was put back'); render(session.getState()); return; }
+    markBroken(id, 'tried to load another page in its frame — a program may not, so it was stopped');
+    flash(name + ' tried to load another page in its frame — it was stopped');
   }
 
   function markBroken(id, error) {
@@ -13973,6 +14036,7 @@
     // only the key in the fragment, and its relay only where it is not this page's own.
     try { history.replaceState(history.state, '', location.pathname + roomSearch(location.search, room, relay, key ? roomRelayFor(location.hostname) : null) + roomHash(key)); }
     catch (err) { /* an address this page may not change: the room still holds, and a reload goes back to the board */ }
+    pinBase();
   }
   /** A name for this hand in a room: the person's name (a preference), and this page load's suffix. */
   function handName() {
@@ -14960,6 +15024,7 @@
     if (board.mode !== 'fresh' && (!o.boot || untouched)) restoreBoardView(id);
     if (o.address && !EMBED) {
       try { history.replaceState(history.state, '', location.pathname + boardSearch(location.search, id) + withoutKey(location.hash)); } catch (err) { /* an address this page may not change */ }
+      pinBase();
     }
     if (!o.boot) markAfterOpen();
     syncBoardFaces();
@@ -17580,6 +17645,7 @@
       url.searchParams.delete('example');
       history.replaceState(history.state, '', url.pathname + url.search + url.hash);
     } catch (err) { /* an address that cannot be rewritten still opens the example once */ }
+    pinBase();
     const made = await openExample(id);
     if (made) exampleOpened('“' + made.name + '” — a board of your own, made from the example; the example is as it was');
   }

@@ -355,6 +355,7 @@
       url.searchParams.delete('example');
       history.replaceState(history.state, '', url.pathname + url.search + url.hash);
     } catch (err) { /* an address that cannot be rewritten still opens the example once */ }
+    pinBase();
     const made = await openExample(id);
     if (made) exampleOpened('“' + made.name + '” — a board of your own, made from the example; the example is as it was');
   }
