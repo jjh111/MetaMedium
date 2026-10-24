@@ -183,19 +183,19 @@ Every one is optional; each is read where the table says. Set them in `relay/wra
 | `MM_RELAY_OPEN` | unset | `1`: no key is asked anywhere, and `POST /rooms` answers `key: null` — an open relay, on purpose, for a trial; never the address you keep | `worker.mjs`, `mint.mjs` |
 | `MM_RELAY_ORIGINS` | unset | More origins a browser may call from, comma-separated, beside the built-in `https://dyna.ink`, `www.`, `app.`, `https://jjh111.github.io` and `localhost` / `127.0.0.1` / `[::1]` on any port | `relay/src/http.mjs` (`ORIGINS`) |
 | `MM_RELAY_MAX_LINES` | 5,000 | Lines a room keeps. Past it, what replay would never send goes first (a hand's own whole logs a newer one stands after), then the oldest; a hand that joins later is told the room is older than the relay remembers | `Demos/relay-protocol.mjs` (`DEFAULT_MAX_LINES`) |
-| `MM_RELAY_MAX_BYTES` | 32,000,000 | Characters of lines a room keeps, by the same rule | `worker.mjs` (`DEFAULT_MAX_CHARS`) |
-| `MM_RELAY_ASSET_BYTES` | 67,108,864 (64 MiB) | Bytes of pictures a room keeps. Past it a put is refused (507, in words) and no picture is ever let go — an event may still name it | `relay-protocol.mjs` (`DEFAULT_ASSET_ROOM_BYTES`) |
-| `MM_RELAY_STORE_PER_DAY` | 268,435,456 (256 MiB) | What one address may keep a day across every room: the characters of each line kept plus 4 KiB more for the rows it writes (`LINE_COST`), and the bytes of each picture. Past it a line or a picture is refused (429, with `retry-after`, in words). A beat is kept nowhere and costs nothing | `relay/src/store.mjs` (`STORE_PER_DAY`) |
-| `MM_RELAY_MINTED_HELD` | 2,147,483,648 (2 GiB) | What all the rooms the relay opened may hold at once, lines and pictures. Past it such a room keeps nothing more (507) and `POST /rooms` answers 503, *opens no new room until older ones are let go of*; a forgotten room gives its share back. Rooms named by hand are not counted | `store.mjs` (`MINTED_HELD`) |
-| `MM_RELAY_MINTED_PER_DAY` | 2,147,483,648 (2 GiB) | What all the rooms the relay opened may keep in a day together, counted as `MM_RELAY_STORE_PER_DAY` counts (429). Rooms named by hand are not counted | `store.mjs` (`MINTED_PER_DAY`) |
+| `MM_RELAY_MAX_BYTES` | 32,000,000 | UTF-8 bytes of lines a room keeps (never UTF-16 characters: a line of CJK is three bytes a character), by the same rule | `worker.mjs` (`DEFAULT_MAX_BYTES`) |
+| `MM_RELAY_ASSET_BYTES` | 67,108,864 (64 MiB) | Bytes of pictures a room keeps — and at most 1,000 pictures a room, whatever their size (`MAX_ROOM_ASSETS`). Past either a put is refused (507, in words) and no picture is ever let go — an event may still name it | `relay-protocol.mjs` (`DEFAULT_ASSET_ROOM_BYTES`, `MAX_ROOM_ASSETS`) |
+| `MM_RELAY_STORE_PER_DAY` | a thirty-second of `MM_RELAY_MINTED_PER_DAY` (`STORE_SHARE`): 67,108,864 (64 MiB) at the defaults | What one address may keep a day across every room, lines and pictures alike, counted as UTF-8 bytes plus 4 KiB for every storage row an item is kept in (`ROW_COST`) — a line's record, its pieces, the room's meta row and a name it claims; a picture's record, its pieces and the meta row — and, in a room the relay opened, every 64 KiB quantum of the rooms' gauge its items make the room reserve (`MM_RELAY_MINTED_HELD`). An IPv6 address's /56 may keep four times as much (`NET56_TIMES`). A room draws it 64 KiB at a time (`STORE_GRANT`) and keeps what it has not used in its meta row. Past it a line or a picture is refused (429, with `retry-after`, in words). A beat costs nothing and writes nothing | `relay/src/store.mjs` (`storePerDayFrom`, `ROW_COST`), `http.mjs` (`NET56_TIMES`) |
+| `MM_RELAY_MINTED_HELD` | 2,147,483,648 (2 GiB) | What all the rooms the relay opened may hold at once, lines and pictures, counted as UTF-8 bytes plus 256 bytes a storage row (`ROW_HELD`). A room reserves it 64 KiB at a time (`MINTED_QUANTUM`), each quantum charged to the day of the caller whose item it was reserved for, and never more than one quantum ahead of what the room holds. Past it such a room keeps nothing more (507) and `POST /rooms` answers 503, *opens no new room until older ones are let go of*; a forgotten room gives what it reserved back, once. Rooms named by hand are not counted | `store.mjs` (`MINTED_HELD`, `ROW_HELD`, `MINTED_QUANTUM`) |
+| `MM_RELAY_MINTED_PER_DAY` | 2,147,483,648 (2 GiB) | What all the rooms the relay opened may keep in a day together, counted as `MM_RELAY_STORE_PER_DAY` counts — UTF-8 bytes plus 4 KiB a storage row — and drawn 64 KiB at a time (`STORE_GRANT`), a room's unused grant kept in its meta row (429 past it). One address's day is a thirty-second of it unless `MM_RELAY_STORE_PER_DAY` says otherwise. Rooms named by hand are not counted | `store.mjs` (`MINTED_PER_DAY`, `STORE_GRANT`) |
 | `MM_RELAY_MINT` | on | `0`: `POST /rooms` opens no room (503, in words), and `GET /rooms` says `opens: false` | `relay/src/mint.mjs` |
-| `MM_RELAY_MINT_PER_HOUR` | 10 | Rooms one address (an IPv6 address by its /64) may open in an hour (429 with `retry-after` past it) | `mint.mjs` |
-| `MM_RELAY_MINT_PER_DAY` | 500 | Rooms the relay opens in a day, for everyone together | `mint.mjs` |
+| `MM_RELAY_MINT_PER_HOUR` | 10 | Rooms one address (an IPv6 address by its /64) may open in an hour; the /56 that holds it, four times as many (40) — 429 with `retry-after` past either | `mint.mjs` |
+| `MM_RELAY_MINT_PER_DAY` | 500 | Rooms the relay opens in a day, for everyone together — and one address a twentieth of them (`MINT_SHARE`: 25 at the default; a /56, 100), so no one address or home opens the relay's whole day | `mint.mjs` |
 | `MM_RELAY_ROOM_IDLE_DAYS` | 30 | Days a room the relay opened is kept after its last use; then everything it holds is deleted | `relay-protocol.mjs` (`DEFAULT_ROOM_IDLE_DAYS`) |
 | `MM_DECIDE` | `limited` | Who may ask `/decide` and `/extract`: `off`; `keyed` (only the key of a room named by hand); `limited` (the app's own pages, counted by address, and hands with such a key). The key of a room the relay opened is anyone's for the asking, so here it is no key: never `keyed`, held to its address's minute, refused with no `Origin` (`askerOf`). Any other word: 503 | `relay/src/ai.mjs` |
-| `MM_AI_DAILY` | 20,000 | Decisions and extractions a day, for everyone together; past it 429, and the engine's ranking stands. `0` refuses every call | `Demos/decide-protocol.mjs` (`DEFAULT_AI_DAILY`) |
+| `MM_AI_DAILY` | 20,000 | Decisions and extractions a day, for everyone together; past it 429, and the engine's ranking stands. One address may ask a thirty-second of it a day (625 at the default; a /56, four times that). `0` refuses every call | `Demos/decide-protocol.mjs` (`DEFAULT_AI_DAILY`) |
 | `MM_AI_CHAT` | follows `MM_DECIDE`, else `limited` | Who may ask the writer and the reader (`/ai/v1/chat/completions`), the same three words — so `MM_DECIDE = "off"` alone turns every model off, and `MM_AI_CHAT` set says otherwise for the writer and reader | `Demos/ai-protocol.mjs` (`chatModeOf`) |
-| `MM_AI_CHAT_DAILY` | 2,000 | Writer and reader calls a day, for everyone together — a budget apart from the decisions', because a chat call costs far more. `0` refuses every call | `ai-protocol.mjs` (`DEFAULT_AI_CHAT_DAILY`) |
+| `MM_AI_CHAT_DAILY` | 2,000 | Writer and reader calls a day, for everyone together — a budget apart from the decisions', because a chat call costs far more. One address may ask a thirty-second of it a day (62 at the default; a /56, four times that). `0` refuses every call | `ai-protocol.mjs` (`DEFAULT_AI_CHAT_DAILY`) |
 | `MM_AI_WRITER` | `@cf/qwen/qwen3.8-27b` | The Workers AI model the writer asks. The page never names an `@cf` id: it asks for `writer`, and the relay maps it. A value that is no `@cf/…` id leaves the writer *not set up* (503) | `ai-protocol.mjs` (`DEFAULT_AI_MODEL`) |
 | `MM_AI_READER` | `@cf/qwen/qwen3.8-27b` | The one the reader asks; it must take pictures | `ai-protocol.mjs` |
 
@@ -215,24 +215,26 @@ in words and the page seats no house model. The class names, the migration tags 
 line and picture limits, and only the Worker has the floodgate, the counts of what is kept and the model routes).
 Wherever a limit counts an address — rooms opened, a room's floodgates and new names, what is kept, the model
 routes — an IPv6 address is counted by its /64, the network one machine is given (`callerKey`, `callerOf` in
-`relay/src/http.mjs`, one home):
+`relay/src/http.mjs`, one home); and for rooms opened, what is kept and the model routes, also by the /56 that holds
+it, which may have four times an address's allowance in all (`NET56_TIMES`, `callerBuckets`) — a home is commonly
+given a /56, 256 /64s, so it is a few callers' worth, not 256. A room's floodgates and new names count the /64 alone:
 
 | What | Limit | Where |
 |---|---|---|
-| A hand's lines into a room | 30 lines in 10 s and 16,000,000 characters a minute, each a bucket with an equal burst (a hand is its secret's hash, else its name) | `relay-protocol.mjs` (`FLOOD`) |
-| One address's lines into a room, whatever hands it writes as | 150 lines in 10 s, 24,000,000 characters a minute (`cf-connecting-ip`); a picture's bytes go through this gate and the room's as a line's characters do | `relay-protocol.mjs` (`FLOOD_ADDRESS`) |
-| A room, from all its hands | 300 lines in 10 s, 24,000,000 characters a minute | `relay-protocol.mjs` (`FLOOD_ROOM`) |
-| What is kept, counted | a kept line counts its characters and 4 KiB more for its rows; a room draws an address's day 1 MiB at a time, and a room the relay opened reserves 4 MiB of the rooms' gauge at a time (the variables above) | `relay/src/store.mjs` (`LINE_COST`, `STORE_GRANT`, `MINTED_RESERVE`) |
+| A hand's lines into a room | 30 lines in 10 s and 16,000,000 UTF-8 bytes a minute, each a bucket with an equal burst (a hand is its secret's hash, else its name) | `relay-protocol.mjs` (`FLOOD`) |
+| One address's lines into a room, whatever hands it writes as | 150 lines in 10 s, 24,000,000 UTF-8 bytes a minute (`cf-connecting-ip`); a picture's bytes go through this gate and the room's as a line's do | `relay-protocol.mjs` (`FLOOD_ADDRESS`) |
+| A room, from all its hands | 300 lines in 10 s, 24,000,000 UTF-8 bytes a minute | `relay-protocol.mjs` (`FLOOD_ROOM`) |
+| What is kept, counted | an item kept costs its UTF-8 bytes and 4 KiB for each storage row it is kept in (a small line three rows, 12 KiB; a picture its 96 KiB pieces and two more), and holds its bytes and 256 bytes a row; a room draws a day's count 64 KiB at a time and keeps what it has not used in its meta row, so neither a line nor the room's eviction draws a count of its own; a room the relay opened reserves the rooms' gauge in 64 KiB quanta, each paid from the reserving caller's day, never more than one quantum ahead of what it holds (the variables above) | `relay/src/store.mjs` (`ROW_COST`, `ROW_HELD`, `STORE_GRANT`, `MINTED_QUANTUM`) |
 | New names one address may claim in a room | 30, then one more every 20 s | `relay-protocol.mjs` (`NEW_HANDS`) |
 | Names a room keeps | 1,000; names no kept line was written under go first; past it a newcomer is told to open a new room (429) | `relay-protocol.mjs` (`MAX_CLAIMS`) |
 | One line | 4,000,000 characters (413); a hand cuts a bigger log into pieces of 3,000,000 (`LINE_CHARS`, `core/src/store/live.ts`) | `relay-protocol.mjs` (`MAX_LINE_CHARS`) |
 | One picture | 12 MB, a PNG, JPEG, WebP or GIF by its own bytes, its hash checked (413, 415, 422) | `relay-protocol.mjs` (`MAX_ASSET_BYTES`, `assetCheck`) |
 | A room's name | 1–128 characters; a beat on every open stream every 25 s | `relay/src/worker.mjs` |
 | Decisions, per minute | 20 per address, 120 per key of a room named by hand (the key of a room the relay opened counts as none); `/decide` and `/extract` share the count and the day's budget | `decide-protocol.mjs` (`DECIDE_PER_MINUTE`) |
-| Decisions, per day | 1,000 per address, with a room's key or without (a key is free to have: `POST /rooms` mints one) | `decide-protocol.mjs` (`DECIDE_PER_DAY`) |
+| Decisions, per day | a thirty-second of the day's budget per address (`DAY_SHARE`): 625 of the default 20,000 (`MM_AI_DAILY`), an IPv6 /56 four times that (2,500, an eighth), with a room's key or without (a key is free to have: `POST /rooms` mints one) | `decide-protocol.mjs` (`DAY_SHARE`, `decideShareFrom`; `DECIDE_PER_DAY` is the share at the default budget) |
 | A decision's size and wait | 64 KiB of words, 6 MiB with pictures (the pictures' alone), 16 questions; the relay waits 10 s (504) | `decide-protocol.mjs` (`DECIDE_LIMITS`, `DECIDE_WAIT_MS`) |
 | Writer and reader, per minute | 10 per address, 30 per key of a room named by hand | `ai-protocol.mjs` (`AI_CHAT_PER_MINUTE`) |
-| Writer and reader, per day | 200 per address, room key or not | `ai-protocol.mjs` (`AI_CHAT_PER_DAY`) |
+| Writer and reader, per day | a thirty-second of their own day's budget per address, room key or not: 62 of the default 2,000 (`MM_AI_CHAT_DAILY`), an IPv6 /56 four times that (248, about an eighth) | `ai-protocol.mjs` (`aiChatShareFrom`; `AI_CHAT_PER_DAY` is the share at the default budget) |
 | A chat call's size and wait | 32 messages, 64 KiB of words, 4 pictures, 6 MiB with them, at most 4,096 tokens out; the relay waits 60 s (504) | `ai-protocol.mjs` (`AI_CHAT_LIMITS`, `AI_CHAT_WAIT_MS`) |
 
 A request to a model route with neither an `Origin` nor the key of a room named by hand is refused (403): an
@@ -249,17 +251,33 @@ all. Every refusal is a sentence.
   goes in with the person: their marks, and other hands' marks each as a copy they hand on, the pictures put
   on the relay first, up to 12,000,000 characters of log (`CARRY_MAX_CHARS`, `24-relay.js`; past it, *share an
   empty board instead*). Who may open one is counted, not checked: a browser on the app's origins, or a program
-  that sends no `Origin`, each held to 10 rooms an hour by address (an IPv6 address by its /64), the relay to 500 a
-  day — and to none while the rooms it opened hold all they may at once (`MM_RELAY_MINTED_HELD`; 503, in words).
+  that sends no `Origin`, each held to 10 rooms an hour by address (an IPv6 address by its /64; the /56 that holds
+  it, 40) and to 25 of the relay's day (a twentieth; a /56, 100), the relay to 500 a day — all counted in one hit,
+  so a refused request writes no row — and to none while the rooms it opened hold all they may at once
+  (`MM_RELAY_MINTED_HELD`; 503, in words).
 - **What the rooms keep is counted across rooms** (`relay/src/store.mjs`), because a bound per room is no bound
-  when anyone may open rooms: what one address keeps a day in every room (`MM_RELAY_STORE_PER_DAY`), what all the
-  rooms the relay opened hold at once (`MM_RELAY_MINTED_HELD`, a gauge in the `Limits` object's `minted` scope, which
-  its alarm never clears — a room gives its share back when it is forgotten) and what they keep in a day together
-  (`MM_RELAY_MINTED_PER_DAY`, since a room at its caps keeps writing as it lets its oldest lines go). Lines and
-  pictures count alike; a beat is kept nowhere and counts for nothing. A room named by hand counts against its
-  address's day and against neither of the rooms' counts. A line refused for a count is held on the hand's page and
-  sent again later (past a day's count, after its `retry-after`). These are an operating ceiling set below what a
-  plan allows, not a bill (*Costs*, below).
+  when anyone may open rooms: what one address keeps a day in every room (`MM_RELAY_STORE_PER_DAY`, 64 MiB; an IPv6
+  /56, 256 MiB), what all the rooms the relay opened hold at once (`MM_RELAY_MINTED_HELD`, 2 GiB, a gauge in the
+  `Limits` object's `minted` scope, which its alarm never clears — a room gives what it reserved back, once, when it
+  is forgotten) and what they keep in a day together (`MM_RELAY_MINTED_PER_DAY`, 2 GiB, since a room at its caps
+  keeps writing as it lets its oldest lines go). What is counted is what keeping costs: an item's UTF-8 bytes and
+  4 KiB for every storage row it is kept in, so a row is never free however small the item (a 24-byte picture costs
+  what its three rows cost). Lines and pictures count alike; a beat writes nothing and counts for nothing. A room
+  named by hand counts against its address's day and against neither of the rooms' counts. A line refused for a
+  count is held on the hand's page and sent again later (past a day's count, after its `retry-after`). These are an
+  operating ceiling set below what a plan allows, not a bill (*Costs*, below).
+- **What the counts do not stop, and what they cost.** *Many networks are many callers*: many IPv4 addresses, or
+  the 256 /56s of a /48 a tunnel broker hands out, can together fill a relay-wide ceiling — the gauge, the rooms'
+  day, or the rooms opened a day (20 addresses, or 5 /56s, open all 500) — with real data, each paying its own day.
+  Accounts, in the new repository (`NEW-REPO-PLAN.md`), are the fix; no /48 ceiling was added. *A day is not a
+  total*: an address that keeps its day's worth every day holds it until its rooms age out, 30 days after their last
+  use, a clock its own use moves; and a byte kept in a room the relay opened is charged twice, once kept and once
+  reserved, so one IPv4 address fills the 2 GiB gauge with real, paid-for data in about 64 days, a /56 in about 16.
+  A count of what each caller holds at once, or accounts, would bound it. *The cost to honest use is real*: at
+  64 MiB an address keeps about 5,400 small lines a day (each its bytes and three rows, 12 KiB), or about 30 whole
+  logs of a 2 MB board sent again in a room named by hand — about 15 in a room the relay opened while it grows, each
+  byte there paying its quantum too — and an undo in a room sends the whole log again. John's own named rooms share
+  his address's day; `MM_RELAY_STORE_PER_DAY` raises it, for every address.
 - **Copy invite link**: `https://dyna.ink/app/?live=r-…#key=…` — `&relay=` only when the room is on a relay
   other than the address's own. **The key is after `#`**: a browser sends the fragment to no server and no
   `Referer` carries it. A page in a room keeps `?live=<room>` in its address and the key in its fragment, so a
@@ -416,26 +434,37 @@ encryption: whoever runs the Worker (you) and Cloudflare could read a room.
 
 - **A room's lines** — each hand's log: its ink, its words, the readings and names it wrote. No model key and no
   room key is ever in a log.
-- **A room's pictures** — the bytes every hand put there, by their hash.
+- **A room's pictures** — the bytes every hand put there, by their hash, at most 1,000 of them.
 - **A SHA-256 of each claimed name's sitting secret**, never the secret. Presence beats are passed on to the open
-  streams and never stored.
+  streams and never stored; a name only a beat has claimed is held in memory, and written down with the first line
+  of that name the room keeps.
+- **A room's meta row**: the number of its last line, how many it let go of, what it reserved of the rooms' gauge,
+  and what is left of today's 64 KiB grant of each caller who kept something there today — keyed by that caller's
+  address (an IPv6 address by its /64), at most 64 of them. Yesterday's are dropped with the room's next write; a room
+  nobody writes in again keeps them until it is forgotten, and a room named by hand, which is never forgotten, keeps
+  them until its next write.
 - **How long**: a room **the relay opened** (`r-` and 22 characters) is kept until nobody has used it for
   `MM_RELAY_ROOM_IDLE_DAYS` (30). A use is a line sent (a beat included), the stream opened or a picture put; a
-  picture fetched is not one. Then an alarm gives back what the room reserved of the rooms' gauge
-  (`MM_RELAY_MINTED_HELD`), deletes everything the room holds (`storage.deleteAll()`), lets go of its memory and
-  closes its streams; nothing of it is kept anywhere else. Accurate to about an hour. A room
-  **named by hand** (`claude`, a name typed) is never expired: it holds at most `MM_RELAY_MAX_LINES` lines and
-  `MM_RELAY_MAX_BYTES` characters, the oldest let go once what replay never sends has gone, and its pictures up to
-  `MM_RELAY_ASSET_BYTES`, never let go. **Changing the secret deletes nothing**: it makes every key stop opening
-  every room, but what a named room holds stays in storage (a room the relay opened goes 30 days later, since nobody
-  can use it). No route deletes a room; deleting the `Room` class (a
-  migration) deletes every room, opened or named — not tried here.
+  picture fetched is not one. Its alarm moves at most once a day (once a tenth of the idle time, when that is
+  shorter), so at the default a room goes between 29 and 30 days after its last use. Then the room is let go of:
+  from then on it answers 503, in words (*this room is being let go of just now*), and takes nothing; it waits for
+  what is being kept, closes its streams, writes down what it owes the rooms' gauge (`MM_RELAY_MINTED_HELD`), deletes
+  everything it holds (`storage.deleteAll()`), and only then gives back what it owed, once — an alarm that runs
+  twice, or fails half way, gives back no more — and lets go of its memory; nothing of it is kept anywhere else. A
+  room **named by hand** (`claude`, a name typed) is never expired: it holds at most `MM_RELAY_MAX_LINES` lines and
+  `MM_RELAY_MAX_BYTES` UTF-8 bytes of them, the oldest let go once what replay never sends has gone, and its pictures
+  up to `MM_RELAY_ASSET_BYTES` and 1,000 of them, never let go. **Changing the secret deletes nothing**: it makes
+  every key stop opening every room, but what a named room holds stays in storage (a room the relay opened goes 30
+  days later, since nobody can use it). No route deletes a room; deleting the `Room` class (a migration) deletes
+  every room, opened or named — not tried here.
 - **Counts by address**: the `Limits` object keeps, for each window, a count under the caller's address
-  (`cf-connecting-ip`; an IPv6 address by its /64) — for rooms opened an hour, for what it kept a day in every room,
-  and for model calls a minute and a day — and deletes each window once it has ended, so an address is kept at most
-  a day. Beside them it keeps two counts under no address: what all the rooms the relay opened keep in a day (a
-  window like the others) and what they hold at once (a gauge, which no alarm clears — it falls as each room is
-  forgotten). A room's floodgate keeps its buckets in memory only.
+  (`cf-connecting-ip`; an IPv6 address by its /64, and by the /56 that holds it) — for rooms opened an hour and a
+  day, for what it kept a day in every room, and for model calls a minute and a day — and deletes each window once it
+  has ended, so there an address is kept at most a day. Counts asked together are taken all or none, so a room
+  opening or a model call refused writes none of them. Beside them it keeps two counts under no address: what all
+  the rooms the relay opened keep in a day (a window like the others) and what they hold at once (a gauge, which no
+  alarm clears — it falls as each room is forgotten). A room's floodgate keeps its buckets in memory only, and a
+  model route's first count (a minute's, per isolate) is in memory too.
 - **Nothing of a model call** — no state, question, message or picture; nothing is cached, and AI Gateway is not
   used (its logs would keep a board's words).
 - **Not a room key**: keys are recomputed on every request and stored nowhere.
@@ -468,8 +497,12 @@ Workers AI before a public launch.
 picture in that room, draw in it, and save a copy — until the room is forgotten or the secret changes. There is no
 revoking one person's access; rotating the secret retires every key at once.
 
-**Budgets, and turning them off.** Every model call counts against its address's share of the day (1,000 decisions,
-200 writer and reader calls) and the day's budget for everyone (`MM_AI_DAILY` 20,000, `MM_AI_CHAT_DAILY` 2,000). To
+**Budgets, and turning them off.** Every model call counts against its address's share of the day — a thirty-second
+of each route's own budget (`DAY_SHARE`): 625 decisions and 62 writer and reader calls at the defaults, an IPv6 /56
+four times that (2,500 and 248, about an eighth of each day) — and the day's budget for everyone (`MM_AI_DAILY`
+20,000, `MM_AI_CHAT_DAILY` 2,000); a share follows its budget when the budget is set. A request any of these would
+refuse writes no row: it is counted first in memory, then its body is checked, and only then are its counts taken,
+all or none. To
 turn the models off: `MM_DECIDE = "off"` (the decider, and the writer and reader unless `MM_AI_CHAT` says otherwise);
 `MM_AI_CHAT = "off"` (the writer and reader alone); `keyed` admits only hands with the key of a room named by hand
 (a key `POST /rooms` handed out is none there). A page that reads a closed list seats nothing, so the app goes on as
@@ -484,18 +517,26 @@ All unverified here: Cloudflare changes its plans and prices, and no account has
 - **Durable Object duration**: an open stream holds its room's object awake, billed by the wall-clock second, with a
   beat every 25 s. The relay uses Server-Sent Events, not hibernating WebSockets, so a room with a tab left open is
   awake the whole time. One tab and one agent is small; many rooms left open are not.
-- **Durable Object requests and storage**: every line is a request and a few rows written (a kept line about three
-  to five — its record, its pieces, the room's count, a name it claims — which `LINE_COST` counts as 4 KiB; a 2 MB
-  picture about 22); every model call is up to three requests to the `Limits` object, every room opened three, and
-  what an address keeps is drawn from its day 1 MiB at a time. Check the SQLite storage a Durable Object
-  may hold and the rows a plan may write a day; the free plan's are unverified here. The relay's own ceilings —
-  `MM_RELAY_STORE_PER_DAY`, `MM_RELAY_MINTED_HELD`, `MM_RELAY_MINTED_PER_DAY`, and a room's `MM_RELAY_ASSET_BYTES`
-  — are an operating ceiling set below a paid plan's limits, not a bill: on the free plan, lower
-  `MM_RELAY_STORE_PER_DAY` and `MM_RELAY_MINTED_PER_DAY`.
+- **Durable Object requests, rows and storage**: every line is a request and a few rows written — a kept line its
+  record, its pieces (40,000 characters each), the room's meta row and a name it claims, about three for a small
+  line; a picture its 96 KiB pieces and two more, 23 for a 2 MB picture — and the store counts each row at 4 KiB, so
+  the rows written a day are bounded: from one address at most `MM_RELAY_STORE_PER_DAY` / 4 KiB (16,384 at the
+  default; an IPv6 /56, 65,536), from all the rooms the relay opened at most `MM_RELAY_MINTED_PER_DAY` / 4 KiB
+  (524,288), and beside them the `Limits` object's own: a row a bucket for each 64 KiB grant or quantum drawn, at
+  most about three for every sixteen rows counted. A room opened is two requests to the `Limits` object (the gauge
+  read, which writes nothing, and one hit of three to five counts); a model call let through is one, writing three to
+  five; a request refused writes none. A room's alarm moves at most once a day, and a room forgotten writes two rows,
+  once. Whether an alarm set or a delete counts as a row written is unverified here, and so are Cloudflare's published
+  caps. **On the free plan** — 100,000 rows written a day and about 5 GB of storage, as Cloudflare publishes them,
+  unverified here — lower `MM_RELAY_MINTED_PER_DAY` to about 256 MiB (`"268435456"`: 65,536 rows a day). An address's
+  day follows it down to 8 MiB (2,048 rows: about 680 small lines, or three whole 2 MB logs in a room named by hand),
+  unless `MM_RELAY_STORE_PER_DAY` is set; the 2 GiB gauge (`MM_RELAY_MINTED_HELD`) already stands under 5 GB. These
+  ceilings — `MM_RELAY_STORE_PER_DAY`, `MM_RELAY_MINTED_HELD`, `MM_RELAY_MINTED_PER_DAY`, and a room's
+  `MM_RELAY_ASSET_BYTES` — are the relay's own, set below what a plan allows, not a bill.
 - **Workers AI**: billed by use, per model, past whatever free allocation the account has. The defaults cap a day at
   20,000 decisions and 2,000 writer and reader calls, each chat call up to 64 KiB of words in and 4,096 tokens out;
   what that costs is not measured. Some newer models may need Workers Paid.
-- **Rooms**: 500 opened a day at most, each kept 30 days after its last use.
+- **Rooms**: 500 opened a day at most (25 by one address, 100 by a /56), each kept up to 30 days after its last use.
 
 ## Recording a real System One reply
 
@@ -567,7 +608,8 @@ node e2e/run.mjs room                                          # two browsers in
 
 node --test cloudflare/site.test.mjs                           # what is published and why not, the headers, the policy against the source, the deploy's guards
 cd cloudflare/relay && npm test                                # the limits, the decider and chat routes, the protocol on the Worker (a fake Durable
-                                                               # Object storage), the parity with the Node relay, the hands over a socket, and workerd
+                                                               # Object storage), what is kept counted in bytes and rows (relay.store.test.mjs), the
+                                                               # parity with the Node relay, the hands over a socket, and workerd
 ```
 
 To see the real Pages server, run `wrangler pages dev` on `cloudflare/dist` with a wrangler installed **outside**
