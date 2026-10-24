@@ -281,9 +281,12 @@ test('the deploy workflow deploys only what CI passed on master, the commit CI r
     // re-run, so without this an older commit's CI finishing last would put production back on it.
     const have = steps[0];
     assert.match(have, /GH_TOKEN: \$\{\{ github\.token \}\}/, 'the check reads master with the run\'s own token');
-    assert.match(have, /if \[ "\$EVENT" = "workflow_run" \]; then/, 'the tip is asked after CI, not for a deploy by hand');
     assert.match(have, /tip=\$\(gh api "repos\/\$GITHUB_REPOSITORY\/commits\/master" --jq \.sha\) \|\| \{[^}]*exit 1; \}/, 'master\'s tip is read, and a failure to read it deploys nothing, out loud');
-    assert.match(have, /if \[ "\$tip" != "\$DEPLOY_SHA" \]; then echo "yes=false" >> "\$GITHUB_OUTPUT"; echo "[^"]+"; exit 0; fi/, 'a commit master has moved past is not deployed, and the run says so');
+    assert.ok(have.indexOf('gh api') < have.indexOf('if [ "$EVENT" = "workflow_run" ]'), 'the tip is read for every deploy — after CI and by hand alike');
+    assert.match(have, /if \[ "\$EVENT" = "workflow_run" \]; then\n\s+if \[ "\$tip" != "\$DEPLOY_SHA" \]; then echo "yes=false" >> "\$GITHUB_OUTPUT"; echo "[^"]+"; exit 0; fi/, 'a commit master has moved past since CI is not deployed, and the run says so');
+    // A deploy by hand is held to the tip too: GitHub re-runs a run with the commit it was first dispatched at, so a
+    // failed manual deploy re-run days later would put dyna.ink back on it.
+    assert.match(have, /elif \[ "\$tip" != "\$DEPLOY_SHA" \]; then\n\s+echo "yes=false" >> "\$GITHUB_OUTPUT"; echo "[^"]*Run the workflow again[^"]*"; exit 1\n\s+fi/, 'a run by hand dispatched at a commit master has moved past deploys nothing, and fails saying so');
     assert.ok(have.indexOf('CLOUDFLARE_API_TOKEN') < have.indexOf('gh api'), 'with no secrets, nothing is asked of GitHub');
   }
   assert.match(wf, /node cloudflare\/build-site\.mjs --commit "\$DEPLOY_SHA"/, 'the built app names the commit it was built from');

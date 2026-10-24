@@ -14,7 +14,9 @@ name: Deploy to Cloudflare
 # takes minutes, and a failed run can be re-run days later — and the concurrency group below only
 # queues deploys in the order they arrive, so an older commit's CI finishing last would put dyna.ink
 # back on it. A commit master has moved past is not deployed (the run says so and stays green): the
-# tip's own CI deploys the tip. A deploy by hand takes master as it stands, and needs no check.
+# tip's own CI deploys the tip. A deploy by hand takes master as it stands — and is held to the same
+# check, because a re-run of one keeps the commit it was first dispatched at: one that master has
+# moved past since deploys nothing and fails, saying to run the workflow again.
 #
 # Secrets: CLOUDFLARE_API_TOKEN (Pages: Edit, Workers Scripts: Edit) and CLOUDFLARE_ACCOUNT_ID.
 # With either absent — a fork, a repository not yet set up — every deploy step is skipped and
@@ -62,9 +64,11 @@ jobs:
           EVENT: ${{ github.event_name }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "yes=false" >> "$GITHUB_OUTPUT"; echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set — nothing to deploy, which is fine."; exit 0; fi
+          tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/master" --jq .sha) || { echo "Could not read which commit master is at now, so nothing was deployed."; exit 1; }
           if [ "$EVENT" = "workflow_run" ]; then
-            tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/master" --jq .sha) || { echo "Could not read which commit master is at now, so nothing was deployed."; exit 1; }
             if [ "$tip" != "$DEPLOY_SHA" ]; then echo "yes=false" >> "$GITHUB_OUTPUT"; echo "master has moved on to $tip since CI passed $DEPLOY_SHA — nothing deployed: $tip is deployed by its own CI, so dyna.ink never goes back to an older commit."; exit 0; fi
+          elif [ "$tip" != "$DEPLOY_SHA" ]; then
+            echo "yes=false" >> "$GITHUB_OUTPUT"; echo "This run was dispatched at $DEPLOY_SHA and master is at $tip now — nothing deployed, so dyna.ink never goes back to an older commit. Run the workflow again: a re-run keeps the commit it was first dispatched at."; exit 1
           fi
           echo "yes=true" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
@@ -118,9 +122,11 @@ jobs:
           EVENT: ${{ github.event_name }}
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "yes=false" >> "$GITHUB_OUTPUT"; echo "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not set — nothing to deploy, which is fine."; exit 0; fi
+          tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/master" --jq .sha) || { echo "Could not read which commit master is at now, so nothing was deployed."; exit 1; }
           if [ "$EVENT" = "workflow_run" ]; then
-            tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/master" --jq .sha) || { echo "Could not read which commit master is at now, so nothing was deployed."; exit 1; }
             if [ "$tip" != "$DEPLOY_SHA" ]; then echo "yes=false" >> "$GITHUB_OUTPUT"; echo "master has moved on to $tip since CI passed $DEPLOY_SHA — nothing deployed: $tip is deployed by its own CI, so dyna.ink never goes back to an older commit."; exit 0; fi
+          elif [ "$tip" != "$DEPLOY_SHA" ]; then
+            echo "yes=false" >> "$GITHUB_OUTPUT"; echo "This run was dispatched at $DEPLOY_SHA and master is at $tip now — nothing deployed, so dyna.ink never goes back to an older commit. Run the workflow again: a re-run keeps the commit it was first dispatched at."; exit 1
           fi
           echo "yes=true" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
