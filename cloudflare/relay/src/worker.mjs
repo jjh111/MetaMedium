@@ -39,6 +39,7 @@
 //   MM_RELAY_ROOM_IDLE_DAYS  how long a room the relay opened is kept after it was last used (default 30)
 //   MM_RELAY_STORE_PER_DAY  characters and bytes one address may keep a day across every room (default 256 MiB); store.mjs
 //   MM_RELAY_MINTED_HELD    bytes every room the relay opened may hold at once, in all (default 2 GiB); store.mjs
+//   MM_RELAY_MINTED_PER_DAY characters and bytes every room the relay opened may keep a day, in all (default 2 GiB); store.mjs
 //
 // Rooms anyone opens (mint.mjs, `POST /rooms`): their names are `r-` and 128 random bits, and such a room
 // ages out — an alarm at its last use and MM_RELAY_ROOM_IDLE_DAYS empties its storage (lines, pictures,
@@ -288,7 +289,8 @@ export class Room {
    * may be kept, else the refusal as a response.
    */
   async keep(caller, cost, after) {
-    const no = (await chargeStore(this.env, this.grants, caller, cost)) || (isMintedRoom(this.name) ? await reserveMinted(this.env, this, after) : null);
+    const minted = isMintedRoom(this.name);
+    const no = (await chargeStore(this.env, this.grants, caller, cost, { minted })) || (minted ? await reserveMinted(this.env, this, after) : null);
     if (!no) return null;
     return text(no.status, no.words, no.retryAfter ? { 'retry-after': String(no.retryAfter) } : {});
   }

@@ -13,6 +13,10 @@
 //     and gives back all it reserved when it is forgotten (worker.mjs, `alarm`). Past MM_RELAY_MINTED_HELD (default
 //     2 GiB) such a room keeps nothing more (507, in words) and the relay opens no new room (mint.mjs, 503) until
 //     older rooms are let go of. A room named by hand is John's, given out by its key, and is not in the gauge.
+//   * What every room the relay opened keeps, a day, in all — the same count as a caller's, under one key
+//     (`minted:day`), MM_RELAY_MINTED_PER_DAY (default 2 GiB): a room at its caps writes on, letting the oldest go,
+//     so what is held is no bound on what is written, and a caller's day is no bound on many callers. Past it a room
+//     the relay opened keeps nothing more that day (429, in words); a room named by hand keeps on.
 //
 // With no LIMITS binding, or a Limits object that cannot be asked, nothing is kept (503): limited fails closed.
 // These are an operating ceiling, not a bill: what the account's plan allows — its storage, the rows it may write a
@@ -32,6 +36,8 @@ export const STORE_GRANT = 1024 * 1024;
 export const MINTED_HELD = 2 * 1024 * 1024 * 1024;
 /** What a room the relay opened reserves of that at a time. */
 export const MINTED_RESERVE = 4 * 1024 * 1024;
+/** What every room the relay opened may keep a day, in all, in characters and bytes, when nothing says otherwise. */
+export const MINTED_PER_DAY = 2 * 1024 * 1024 * 1024;
 /** The scope and key of the gauge every room the relay opened reserves from. */
 const GAUGE = ['minted', 'rooms'];
 
@@ -41,42 +47,54 @@ export const storePerDayFrom = (env = {}) => sizeFrom(env.MM_RELAY_STORE_PER_DAY
 /** What the rooms the relay opened may hold at once: MM_RELAY_MINTED_HELD, else the default. */
 export const mintedHeldFrom = (env = {}) => sizeFrom(env.MM_RELAY_MINTED_HELD, MINTED_HELD);
 
+/** What the rooms the relay opened may keep a day, in all: MM_RELAY_MINTED_PER_DAY, else the default. */
+export const mintedPerDayFrom = (env = {}) => sizeFrom(env.MM_RELAY_MINTED_PER_DAY, MINTED_PER_DAY);
+/** The key, in the `store` scope, of what every room the relay opened keeps a day: never an address's (`ip:…`). */
+export const MINTED_DAY = 'minted:day';
+
 /** When to ask again, in words a person reads. */
 const later = (s) => (s < 90 ? s + ' seconds' : s < 5400 ? Math.round(s / 60) + ' minutes' : Math.round(s / 3600) + ' hours');
 
 export const STORE_WORDS = {
   day: (s) => 'this address has kept as much on this relay as a day allows — nothing was added; try again in ' + later(s),
+  mintedDay: (s) => 'the rooms people open have kept as much on this relay as a day allows — nothing was added; try again in ' + later(s),
   full: 'this relay holds as much as it may for the rooms people open — nothing was added, and what this room holds stays',
   noRooms: 'this relay holds as much as it may for the rooms people open — it opens no new room until older ones are let go of',
   uncounted: 'this relay cannot count what it keeps just now, so nothing was added — try again in a while',
 };
 
 /**
- * Count `cost` (characters, or bytes) against what `caller` may keep today, across every room. `grants` is the room's
- * own: caller → `{ day, left }`, what it drew from the Limits object and has not used. Null when it fits, else
- * `{ status, words, retryAfter? }` — 429 past the day, 503 when nothing could be counted.
+ * Count `cost` (characters, or bytes) against what `caller` may keep today, across every room — and, with `minted`, a
+ * room the relay opened, against what all such rooms may keep today. `grants` is the room's own: bucket → `{ day,
+ * left }`, what it drew from the Limits object and has not used. Null when it fits, else `{ status, words,
+ * retryAfter? }` — 429 past a day, 503 when nothing could be counted.
  */
-export async function chargeStore(env, grants, caller, cost) {
+export async function chargeStore(env, grants, caller, cost, { minted = false } = {}) {
+  return (await charge(env, grants, 'ip:' + caller, cost, storePerDayFrom(env), STORE_WORDS.day))
+    || (minted ? await charge(env, grants, MINTED_DAY, cost, mintedPerDayFrom(env), STORE_WORDS.mintedDay) : null);
+}
+
+/** `cost` against the day's bucket `key` in the `store` scope, held to `limit`, drawn a grant at a time. */
+async function charge(env, grants, key, cost, limit, words) {
   const day = Math.floor(Date.now() / DAY);
-  const g = grants.get(caller);
+  const g = grants.get(key);
   if (g && g.day === day && g.left >= cost) { g.left -= cost; return null; }
   const short = cost - (g && g.day === day ? g.left : 0);
-  const limit = storePerDayFrom(env);
   let granted = Math.max(short, STORE_GRANT);
   let r;
   try {
-    r = await hit(env, 'store', 'ip:' + caller, { limit, windowMs: DAY, cost: granted });
+    r = await hit(env, 'store', key, { limit, windowMs: DAY, cost: granted });
     // Too little left of the day for a whole grant: what this one needs, if that much is left.
-    if (!r.ok && granted > short) { granted = short; r = await hit(env, 'store', 'ip:' + caller, { limit, windowMs: DAY, cost: granted }); }
+    if (!r.ok && granted > short) { granted = short; r = await hit(env, 'store', key, { limit, windowMs: DAY, cost: granted }); }
   } catch { return { status: 503, words: STORE_WORDS.uncounted }; }
   if (!r || !r.ok) {
     const retryAfter = Math.max(1, Number(r && r.retryAfter) || 3600);
-    return { status: 429, retryAfter, words: STORE_WORDS.day(retryAfter) };
+    return { status: 429, retryAfter, words: words(retryAfter) };
   }
   // What was left may have been spent by another line while the count was asked: never below nothing.
-  const now = grants.get(caller);
+  const now = grants.get(key);
   const left = (now && now.day === day ? now.left : 0) + granted - cost;
-  grants.set(caller, { day, left: Math.max(0, left) });
+  grants.set(key, { day, left: Math.max(0, left) });
   if (grants.size > 256) for (const [k, v] of grants) if (v.day !== day) grants.delete(k);
   return null;
 }

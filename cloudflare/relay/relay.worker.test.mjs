@@ -697,6 +697,23 @@ test('what one address keeps is counted across every room it writes in — lines
   assert.equal((await putAsset(env, rooms[1], pngOf(32), { headers: { 'cf-connecting-ip': '198.51.100.61' } })).status, 204);
 });
 
+test('what every room the relay opened keeps a day is bounded in all — many addresses are no fresh allowance — and a room named by hand keeps on', async () => {
+  const env = openEnv({ MM_RELAY_MINTED_PER_DAY: String(4 * 1024 * 1024) });
+  const pad = 'm'.repeat(900_000);
+  const statuses = [];
+  let said = null;
+  for (let i = 0; i < 8; i++) {
+    const ip = '198.51.100.' + (80 + i);
+    const { room } = await (await mint(env, { ip })).json();
+    const res = await post(env, room, { participant: 'm~' + i, events: [{ pad }], at: 1 }, { headers: { 'x-dyna-hand': ('minted-day-' + i).padEnd(22, 'q'), 'cf-connecting-ip': ip } });
+    statuses.push(res.status);
+    if (res.status === 429 && !said) { said = await res.text(); assert.ok(Number(res.headers.get('retry-after')) >= 1); }
+  }
+  assert.ok(statuses.includes(429) && statuses.filter((s) => s === 204).length <= 4, statuses.join(','));
+  assert.match(said, /^the rooms people open have kept as much on this relay as a day allows — nothing was added; try again in \d+ (seconds|minutes|hours)$/);
+  assert.equal((await post(env, 'claude', { participant: 'john~1', events: [{ pad }], at: 1 }, { headers: { 'x-dyna-hand': 'john-sitting-secret-02', 'cf-connecting-ip': '198.51.100.99' } })).status, 204);
+});
+
 test('pictures go through a room\'s floodgate: a burst of big ones from one address is told to wait, in words', async () => {
   const env = openEnv();
   const big = (n) => { const b = pngOf(n); const out = new Uint8Array(6 * 1024 * 1024); out.set(b); return out; };
