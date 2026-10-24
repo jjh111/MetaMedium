@@ -20,6 +20,8 @@
 // words). Nothing here logs, and the route never logs a message or a picture.
 
 /** The model each short name asks when the relay's variables say nothing: a vision-language model, so it writes and reads. */
+import { DAY_SHARE } from './decide-protocol.mjs';
+
 export const DEFAULT_AI_MODEL = '@cf/qwen/qwen3.8-27b';
 
 /** The house models, by the short name the page asks with: what each is called, its job, the variable that names its model. */
@@ -56,10 +58,12 @@ export const AI_CHAT_LIMITS = {
 export const AI_CHAT_WAIT_MS = 60_000;
 /** Per minute: a page with no key, per address (an IPv6 address by its /64); a hand with a room's key, per room. A chat call is costly, so far fewer than a decision. */
 export const AI_CHAT_PER_MINUTE = { caller: 10, room: 30 };
-/** A page with no key, per address, a day: its share of the day's budget, so one machine cannot spend everyone's. */
-export const AI_CHAT_PER_DAY = { caller: 200 };
 /** Chat calls a day across every caller, when the relay's `MM_AI_CHAT_DAILY` says nothing — a budget of its own, apart from the decisions'. */
 export const DEFAULT_AI_CHAT_DAILY = 2000;
+/** One address's share of the day's chat, from the relay's environment: a DAY_SHARE-th of the budget (decide-protocol.mjs), a /56 four times that — 62 calls, and 250, at the defaults. */
+export function aiChatShareFrom(env = {}) { return Math.max(1, Math.floor(aiChatDailyFrom(env) / DAY_SHARE)); }
+/** The share at the default budget. */
+export const AI_CHAT_PER_DAY = { caller: Math.floor(DEFAULT_AI_CHAT_DAILY / DAY_SHARE) };
 
 const ID = /^@cf\/[a-z0-9._-]+\/[a-z0-9._:-]+$/i;
 const IMAGE_URL = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
@@ -151,7 +155,7 @@ export function chatCatalog(env = {}) {
     object: 'list',
     data,
     ...(unavailable.length ? { unavailable } : {}),
-    limits: { ...AI_CHAT_LIMITS, perMinute: AI_CHAT_PER_MINUTE, perDay: AI_CHAT_PER_DAY },
+    limits: { ...AI_CHAT_LIMITS, perMinute: AI_CHAT_PER_MINUTE, perDay: { caller: aiChatShareFrom(env) } },
   };
 }
 

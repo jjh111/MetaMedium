@@ -17,9 +17,13 @@ import { fakeEnv, fakeAI, chatAnswer, systemOneAnswers } from './test/fake.mjs';
 import { startDevRelay } from './dev-server.mjs';
 import { startRelay } from '../../Demos/relay.mjs';
 import {
-  AI_CHAT_LIMITS, AI_CHAT_PER_MINUTE, AI_CHAT_PER_DAY, AI_WORDS, DEFAULT_AI_MODEL, AI_CHAT_MODELS,
+  AI_CHAT_LIMITS, AI_CHAT_PER_MINUTE, AI_CHAT_PER_DAY, AI_WORDS, aiChatShareFrom, DEFAULT_AI_MODEL, AI_CHAT_MODELS,
   chatCheck, chatModelsFrom, chatReply, chatModeOf, aiChatDailyFrom,
 } from '../../Demos/ai-protocol.mjs';
+import { DAY_SHARE } from '../../Demos/decide-protocol.mjs';
+
+/** A chat budget whose share is a round number: SHARE calls an address, the day DAY_SHARE times that. */
+const SHARE = 20;
 import { DECIDE_WORDS } from '../../Demos/decide-protocol.mjs';
 
 // A line a call is what the route logs (its own test reads them); here they would only say nothing, hundreds of times.
@@ -354,13 +358,14 @@ test(`429: past ${AI_CHAT_PER_MINUTE.caller} a minute from one address, past ${A
   assert.equal(aiChatDailyFrom({ MM_AI_CHAT_DAILY: 'lots' }), 2000);
 });
 
-test(`a caller’s share of the day: past ${AI_CHAT_PER_DAY.caller} from one address the answer is 429 — and the budget stands for everyone else`, async () => {
-  const env = envWith({ MM_AI_CHAT_DAILY: String(AI_CHAT_PER_DAY.caller * 3) });
+test(`a caller’s share of the day — a ${DAY_SHARE}th of the chat budget (${AI_CHAT_PER_DAY.caller} at the default): past it from one address the answer is 429, and the budget stands for everyone else`, async () => {
+  const env = envWith({ MM_AI_CHAT_DAILY: String(SHARE * DAY_SHARE) });
+  assert.equal(aiChatShareFrom(env), SHARE);
   let now = Date.UTC(2026, 9, 23, 0, 0, 30);
   mock.method(Date, 'now', () => now);
   mock.method(console, 'log', () => {});
   try {
-    for (let i = 0; i < AI_CHAT_PER_DAY.caller; i++) {
+    for (let i = 0; i < SHARE; i++) {
       if (i && i % AI_CHAT_PER_MINUTE.caller === 0) now += 61_000;
       assert.equal((await post(env, chat(), { 'cf-connecting-ip': '2001:db8:9::1' })).status, 200, `call ${i + 1}`);
     }
@@ -369,7 +374,7 @@ test(`a caller’s share of the day: past ${AI_CHAT_PER_DAY.caller} from one add
     assert.equal(over.status, 429);
     assert.equal(await said(over), AI_WORDS.share);
     assert.equal((await post(env, chat(), { 'cf-connecting-ip': '198.51.100.9' })).status, 200, 'another caller is still answered');
-    assert.equal(env.AI.calls.length, AI_CHAT_PER_DAY.caller + 1);
+    assert.equal(env.AI.calls.length, SHARE + 1);
   } finally { mock.restoreAll(); }
 });
 
@@ -527,4 +532,23 @@ test('the fakes answer as the relay reads: a chat in either shape, a decision as
   assert.ok(systemOneAnswers({ questions: { q1: { type: 'noul', instructions: 'is it?' } } }).answers.q1);
   assert.deepEqual(Object.keys(AI_CHAT_MODELS), ['writer', 'reader']);
   assert.equal(DECIDE_WORDS.off.length > 0, true);
+});
+
+test('one home’s /56 may ask an eighth of the day’s writing and reading at most, however many /64s it rotates through', async () => {
+  const env = envWith({ MM_AI_CHAT_DAILY: String(SHARE * DAY_SHARE) });
+  let now = Date.UTC(2026, 9, 23, 0, 0, 30);
+  mock.method(Date, 'now', () => now);
+  mock.method(console, 'log', () => {});
+  try {
+    let taken = 0;
+    for (let i = 0; i < 256; i++) {
+      if (i && i % AI_CHAT_PER_MINUTE.caller === 0) now += 61_000;
+      const res = await post(env, chat(), { 'cf-connecting-ip': `2001:db8:5:${i.toString(16)}::1` });
+      if (res.status === 200) taken++;
+      else { assert.equal(res.status, 429); assert.equal(await said(res), AI_WORDS.share); }
+    }
+    assert.ok(taken <= (SHARE * DAY_SHARE) / 8, `a /56 took ${taken} of ${SHARE * DAY_SHARE}`);
+    assert.ok(taken >= SHARE, 'a home is still answered its first /64’s share');
+    assert.equal((await post(env, chat(), { 'cf-connecting-ip': '198.51.100.9' })).status, 200, 'another caller is still answered');
+  } finally { mock.restoreAll(); }
 });

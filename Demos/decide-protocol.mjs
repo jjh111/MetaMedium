@@ -48,10 +48,18 @@ export const EXTRACT_FIELD_TYPES = ['text', 'list'];
 export const DECIDE_WAIT_MS = 10_000;
 /** The routes' limits, per minute: a page with no key, per address (an IPv6 address by its /64); a hand with a room's key, per room. */
 export const DECIDE_PER_MINUTE = { caller: 20, room: 120 };
-/** A page with no key, per address, a day: its share of the day's budget, so one machine cannot spend everyone's. */
-export const DECIDE_PER_DAY = { caller: 1000 };
 /** Calls a day across every caller, when the relay's `MM_AI_DAILY` says nothing. */
 export const DEFAULT_AI_DAILY = 20000;
+/**
+ * A page with no key, per address, a day, may ask a DAY_SHARE-th of the day's budget — and one IPv6 /56, a home's
+ * connection, NET56_TIMES as much (cloudflare/relay/src/http.mjs), an eighth — so one machine or one home cannot spend
+ * everyone's. The writer and reader's share is the same fraction of their own budget (ai-protocol.mjs). One home.
+ */
+export const DAY_SHARE = 32;
+/** One address's share of the day's decisions, from the relay's environment (625 at the default budget). */
+export function decideShareFrom(env = {}) { return Math.max(1, Math.floor(aiDailyFrom(env) / DAY_SHARE)); }
+/** The share at the default budget, as the catalog says it when it is given no environment. */
+export const DECIDE_PER_DAY = { caller: Math.floor(DEFAULT_AI_DAILY / DAY_SHARE) };
 
 const IMAGE_URL = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
 const isMap = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
@@ -159,13 +167,13 @@ export function extractCheck(b) {
 }
 
 /** What `GET /decide` (and `/extract`) answers: the models and the limits, for the seat's row — no model is called. */
-export function decideCatalog(route = 'decide') {
+export function decideCatalog(route = 'decide', env) {
   const models = route === 'extract' ? EXTRACT_MODELS : DECIDE_MODELS;
   return {
     ok: true,
     route,
     models: Object.entries(models).map(([model, m]) => ({ model, name: m.name, sees: m.sees })),
-    limits: { ...DECIDE_LIMITS, perMinute: DECIDE_PER_MINUTE, perDay: DECIDE_PER_DAY },
+    limits: { ...DECIDE_LIMITS, perMinute: DECIDE_PER_MINUTE, perDay: { caller: env ? decideShareFrom(env) : DECIDE_PER_DAY.caller } },
   };
 }
 

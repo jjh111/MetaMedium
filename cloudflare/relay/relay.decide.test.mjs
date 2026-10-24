@@ -14,7 +14,10 @@ import worker from './src/worker.mjs';
 import { keyForRoom } from './src/auth.mjs';
 import { fakeEnv, fakeAI, systemOneAnswers } from './test/fake.mjs';
 import { callerKey } from './src/ai.mjs';
-import { decideCheck, extractCheck, DECIDE_LIMITS, DECIDE_PER_MINUTE, DECIDE_PER_DAY, DECIDE_WORDS, DECIDE_MODELS } from '../../Demos/decide-protocol.mjs';
+import { decideCheck, extractCheck, DECIDE_LIMITS, DECIDE_PER_MINUTE, DECIDE_PER_DAY, DECIDE_WORDS, DECIDE_MODELS, DAY_SHARE, decideShareFrom } from '../../Demos/decide-protocol.mjs';
+
+/** A budget whose share is a round number: SHARE calls an address, the day DAY_SHARE times that. */
+const SHARE = 40;
 import { AI_WORDS } from '../../Demos/ai-protocol.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -279,13 +282,14 @@ test('callerKey: an IPv4 address as it is, an IPv6 address by its /64, IPv4 writ
   assert.equal(callerKey('2001:db8::1::2'), '2001:db8::1::2', 'what is not an address is counted as it came');
 });
 
-test(`a caller’s share of the day: past ${DECIDE_PER_DAY.caller} from one address the answer is 429 — and the budget stands for everyone else`, async () => {
-  const env = envWith({ MM_AI_DAILY: String(DECIDE_PER_DAY.caller * 3) });
+test(`a caller’s share of the day — a ${DAY_SHARE}th of the budget (${DECIDE_PER_DAY.caller} at the default): past it from one address the answer is 429, and the budget stands for everyone else`, async () => {
+  const env = envWith({ MM_AI_DAILY: String(SHARE * DAY_SHARE) });
+  assert.equal(decideShareFrom(env), SHARE);
   let now = Date.UTC(2026, 9, 23, 0, 0, 30);
   mock.method(Date, 'now', () => now);
   mock.method(console, 'log', () => {}); // a line a call: a thousand of them say nothing here
   try {
-    for (let i = 0; i < DECIDE_PER_DAY.caller; i++) {
+    for (let i = 0; i < SHARE; i++) {
       if (i && i % DECIDE_PER_MINUTE.caller === 0) now += 61_000;
       assert.equal((await post(env, wire().body, { 'cf-connecting-ip': '2001:db8:9::1' })).status, 200, `call ${i + 1}`);
     }
@@ -294,18 +298,19 @@ test(`a caller’s share of the day: past ${DECIDE_PER_DAY.caller} from one addr
     assert.equal(over.status, 429);
     assert.equal(await said(over), DECIDE_WORDS.share);
     assert.equal((await post(env, wire().body, { 'cf-connecting-ip': '198.51.100.9' })).status, 200, 'another caller is still answered');
-    assert.equal(env.AI.calls.length, DECIDE_PER_DAY.caller + 1);
+    assert.equal(env.AI.calls.length, SHARE + 1);
   } finally { mock.restoreAll(); }
 });
 
 test('a room’s key is no way past an address’s share of the decisions: counted by the address whatever key it holds', async () => {
-  const env = envWith({ MM_AI_DAILY: String(DECIDE_PER_DAY.caller * 3) });
+  const env = envWith({ MM_AI_DAILY: String(SHARE * DAY_SHARE) });
+  assert.equal(decideShareFrom(env), SHARE);
   let now = Date.UTC(2026, 9, 23, 0, 0, 30);
   mock.method(Date, 'now', () => now);
   mock.method(console, 'log', () => {});
   try {
     const key = await keyForRoom(SECRET, 'claude');
-    for (let i = 0; i < DECIDE_PER_DAY.caller; i++) {
+    for (let i = 0; i < SHARE; i++) {
       if (i && i % DECIDE_PER_MINUTE.room === 0) now += 61_000;
       assert.equal((await post(env, wire().body, { authorization: 'Bearer ' + key, 'x-dyna-room': 'claude', 'cf-connecting-ip': '2001:db8:7::1' })).status, 200, `call ${i + 1}`);
     }
@@ -394,4 +399,23 @@ test('the rooms are where they were, and what /ai/… does not hold answers 501 
   const ai = await worker.fetch(new Request('http://relay/ai/chat', { method: 'POST', headers: { origin: APP }, body: '{}' }), env);
   assert.equal(ai.status, 501);
   assert.equal((await ai.json()).error.message, AI_WORDS.elsewhere);
+});
+
+test('one home’s /56 may ask an eighth of the day’s decisions at most, however many /64s it rotates through', async () => {
+  const env = envWith({ MM_AI_DAILY: String(SHARE * DAY_SHARE) });
+  let now = Date.UTC(2026, 9, 23, 0, 0, 30);
+  mock.method(Date, 'now', () => now);
+  mock.method(console, 'log', () => {});
+  try {
+    let taken = 0;
+    for (let i = 0; i < 256; i++) {
+      if (i && i % DECIDE_PER_MINUTE.caller === 0) now += 61_000;
+      const res = await post(env, wire().body, { 'cf-connecting-ip': `2001:db8:5:${i.toString(16)}::1` });
+      if (res.status === 200) taken++;
+      else { assert.equal(res.status, 429); assert.equal(await said(res), DECIDE_WORDS.share); }
+    }
+    assert.ok(taken <= (SHARE * DAY_SHARE) / 8, `a /56 took ${taken} of ${SHARE * DAY_SHARE}`);
+    assert.ok(taken >= SHARE, 'a home is still answered its first /64’s share');
+    assert.equal((await post(env, wire().body, { 'cf-connecting-ip': '198.51.100.9' })).status, 200, 'another caller is still answered');
+  } finally { mock.restoreAll(); }
 });

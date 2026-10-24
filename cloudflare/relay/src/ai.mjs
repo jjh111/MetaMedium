@@ -12,7 +12,7 @@
 //
 // Who may ask (`MM_DECIDE`: off | keyed | limited, `limited` when unset):
 //   * a page of the app (an Origin `http.mjs` allows), limited per address — `DECIDE_PER_MINUTE.caller` a minute and
-//     `DECIDE_PER_DAY.caller` a day, its share of the budget — an IPv6 address by its /64 (`callerKey`), because one
+//     a DAY_SHARE-th of the day's budget a day (`decideShareFrom`; the chat route `aiChatShareFrom`), its share — an IPv6 address by its /64 (`callerKey`), because one
 //     machine holds a whole /64 and would otherwise be 2^64 callers, and by its /56 at NET56_TIMES as much
 //     (`callerBuckets`), because one home holds 256 /64s;
 //   * a hand with the key of a room named by hand (`Authorization: Bearer` and `X-Dyna-Room`, checked as the rooms
@@ -40,12 +40,12 @@ import { secretsOf, keyOpens } from './auth.mjs';
 import { hit, perCaller, prefilter } from './limits.mjs';
 import { isMintedRoom } from '../../../Demos/relay-protocol.mjs';
 import {
-  DECIDE_MODELS, EXTRACT_MODELS, DECIDE_LIMITS, DECIDE_WAIT_MS, DECIDE_PER_MINUTE, DECIDE_PER_DAY, DECIDE_WORDS,
-  decideCheck, extractCheck, decideCatalog, aiDailyFrom, decideTextBytes,
+  DECIDE_MODELS, EXTRACT_MODELS, DECIDE_LIMITS, DECIDE_WAIT_MS, DECIDE_PER_MINUTE, DECIDE_WORDS,
+  decideCheck, extractCheck, decideCatalog, aiDailyFrom, decideShareFrom, decideTextBytes,
 } from '../../../Demos/decide-protocol.mjs';
 import {
-  AI_CHAT_LIMITS, AI_CHAT_WAIT_MS, AI_CHAT_PER_MINUTE, AI_CHAT_PER_DAY, AI_WORDS,
-  chatModeOf, aiChatDailyFrom, chatModelsFrom, chatCatalog, chatCheck, chatTextBytes, chatInput, chatReply, chatError,
+  AI_CHAT_LIMITS, AI_CHAT_WAIT_MS, AI_CHAT_PER_MINUTE, AI_WORDS,
+  chatModeOf, aiChatDailyFrom, aiChatShareFrom, chatModelsFrom, chatCatalog, chatCheck, chatTextBytes, chatInput, chatReply, chatError,
 } from '../../../Demos/ai-protocol.mjs';
 
 /** The paths this module answers. */
@@ -126,7 +126,7 @@ async function modelRoute(request, env, cors, route) {
   const mode = env.MM_DECIDE || 'limited';
   if (request.method === 'GET' || request.method === 'HEAD') {
     const shut = await listClosedWhy(request, env, mode, DECIDE_WORDS);
-    return shut ? no(shut[0], shut[1], cors) : json(200, decideCatalog(route), cors);
+    return shut ? no(shut[0], shut[1], cors) : json(200, decideCatalog(route, env), cors);
   }
   const closed = closedWhy(mode, env, DECIDE_WORDS);
   if (request.method !== 'POST') return no(405, DECIDE_WORDS.method, cors);
@@ -164,7 +164,7 @@ async function modelRoute(request, env, cors, route) {
   const minutes = asker.keyed
     ? [{ key: minute.key, limit: minute.limit, windowMs: MINUTE }]
     : perCaller('ip:', buckets, { limit: DECIDE_PER_MINUTE.caller, windowMs: MINUTE });
-  const shares = perCaller('share:ip:', buckets, { limit: DECIDE_PER_DAY.caller, windowMs: DAY });
+  const shares = perCaller('share:ip:', buckets, { limit: decideShareFrom(env), windowMs: DAY });
   let count;
   try { count = await hit(env, 'ai', [...minutes, ...shares, { key: 'budget', limit: aiDailyFrom(env), windowMs: DAY }]); }
   catch { return no(503, DECIDE_WORDS.uncounted, cors); }
@@ -251,7 +251,7 @@ async function chatRoute(request, env, cors) {
   const minutes = asker.keyed
     ? [{ key: minute.key, limit: minute.limit, windowMs: MINUTE }]
     : perCaller('ip:', buckets, { limit: AI_CHAT_PER_MINUTE.caller, windowMs: MINUTE });
-  const shares = perCaller('share:ip:', buckets, { limit: AI_CHAT_PER_DAY.caller, windowMs: DAY });
+  const shares = perCaller('share:ip:', buckets, { limit: aiChatShareFrom(env), windowMs: DAY });
   let count;
   try { count = await hit(env, 'ai-chat', [...minutes, ...shares, { key: 'budget', limit: aiChatDailyFrom(env), windowMs: DAY }]); }
   catch { return refuse(503, AI_WORDS.uncounted, cors); }
