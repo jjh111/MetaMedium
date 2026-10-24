@@ -14,7 +14,7 @@ exits nonzero if anything in it failed.
 
 ```bash
 cd e2e && npm ci && npx playwright install chromium   # once
-node run.mjs            # from anywhere: the default fifteen (canvas, keep, boards, carry, app, prod, pencil, models, seat, hand, walk, budgets, shard, demo, demo2)
+node run.mjs            # from anywhere: the default eighteen (canvas, keep, boards, carry, app, prod, pencil, models, seat, hand, room, walk, ux, security, budgets, shard, demo, demo2)
 cd e2e && npm run e2e   # the same thing
 
 npx playwright install webkit                   # once, for WebKit
@@ -45,12 +45,16 @@ guessing. Pick scenarios by name to run one: `node e2e/run.mjs canvas`,
 | `models` | a hosted model is asked, and says why when it cannot be (V1-PLAN J5) — `models.mjs`, written here: the models pane and the field driven with the real pointer against `startModelStub` (`servers.mjs`), an OpenAI-compatible endpoint on 127.0.0.1 answering in OpenRouter's recorded shapes (`core/src/llm/fixtures/`); nothing on this machine is probed — Ollama's list is a stand-in in the page, LM Studio does not answer | `app/`, in one context, reloaded once |
 | `seat` | the canvas's seat — `seat.mjs`, written here: Claude Code over MCP as the model the field asks, with a relay of its own, `Demos/mcp.mjs` as the answerer over stdio and `Demos/seat-watch.mjs` beside it | `Demos/session-engine.html?live=claude&relay=…&nosw=1`, in one context, reloaded once, and a second page for *with Claude* |
 | `hand` | the hand in the gate (V1-PLAN H1) — `hand.mjs`, written here: QA-v10's machine rows with `Demos/mcp.mjs` as a hand over stdio in room `mcp-test`, a relay of its own, a tab as *john*, and a counting model of the gate's own | `Demos/session-engine.html?live=mcp-test&relay=…&nosw=1`, in one context, reloaded once |
+| `room` | a room anyone opens and shares — `room.mjs`, written here: two people who are not John draw together through the Worker's own logic (`cloudflare/relay/dev-server.mjs`, a key per room) on a free port of its own, never `:8020` — *Share this board*, the invite from the clipboard, a guest's name, presence, undo per hand, a reload, offline and back, a forged log refused, Join by a pasted link, a wrong key, *Save a copy*, a board too big to carry, an example opened from a room that runs nobody's program but its own, and the room's key in no storage, cache, export, page text or request | `app/?fresh=1&nosw=1&relay=…`, a context per person, each reloaded or taken offline as the record asks |
+| `walk` | the field push (PLAN-FIELD-PAR FP9) — `walk.mjs`'s scenes as records: real pointer input, what the field offers and what Enter does | `Demos/session-engine.html?fresh=1&nosw=1`, a context of its own |
+| `ux` | the first hour on a desktop, a phone and with reduced motion — `ux.mjs`, written here: panes that fit and one Escape ladder, the first run's sheet, an example opened fitted, reduced motion held, the polish records, a field that stays put | `app/?fresh=1&nosw=1` at 1280 × 800, at 390 × 844 with touch, and in a context that asks for less motion |
+| `security` | what another hand's code may do here — `security.mjs`, written here: another hand's `js` and `run` programs do not run until *Play it here*, a played behaviour reaches nothing, a grant is for the code it was given to and holds while this hand's own play stands, a run program's fetch is refused by its frame's CSP and its navigation carries nothing of the page's fragment and is stopped, and injected names, labels, a region, an svg, a Mermaid label and a page never execute | `Demos/session-engine.html?fresh=1&nosw=1`, one context, every would-be beacon caught by a route |
 | `budgets` | the surface's budgets and the equivalence check — `budgets.mjs`, written here, not a page harness | `Demos/session-engine.html?folder=…`, the bench's boards served from memory, a context each |
 
 `--browser chromium` (the default) or `--browser webkit` picks the engine, and
 the run's `e2e.json` records which as `browser` / `browserVersion`. `smoke` is
-**opt-in**: a bare `node run.mjs` runs the fifteen Chromium scenarios (`canvas`,
-`keep`, `boards`, `carry`, `app`, `prod`, `pencil`, `models`, `seat`, `hand`, `walk`, `budgets`, `shard`, `demo`, `demo2`) and
+**opt-in**: a bare `node run.mjs` runs the eighteen Chromium scenarios (`canvas`,
+`keep`, `boards`, `carry`, `app`, `prod`, `pencil`, `models`, `seat`, `hand`, `room`, `walk`, `ux`, `security`, `budgets`, `shard`, `demo`, `demo2`) and
 nothing else, so the default gate needs no second engine installed. CI's
 `webkit` job runs `smoke`, `pencil`, `keep` and `carry` on WebKit.
 

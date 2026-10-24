@@ -18,6 +18,10 @@
 //     none of is gone, so nothing is exfiltrated (the hardening, C1);
 //   - another hand's `run` program does not auto-play, and a run program's
 //     own fetch is refused by the frame's CSP (`connect-src 'none'`, C6);
+//   - a run program that navigates its own frame — which no CSP governs —
+//     carries nothing of the page's fragment (a room's key), even with its
+//     own <base> taken away, and a frame that loads another page is stopped
+//     where it stands (C6b);
 //   - injected names, labels, a region name, an svg script, a mermaid label
 //     and a page's code never execute (the srcdoc frames are script-less or
 //     opaque-origin; xss.mjs);
@@ -113,7 +117,8 @@ export async function runSecurity(browser, servers, { freshContext, screenshot }
   // Every would-be beacon is caught here, and answered, so a call that leaves
   // is seen — and one the CSP or the hardening refused never arrives.
   const seen = [];
-  await guards.context.route('**/exfil**', (route) => { seen.push(route.request().url()); route.fulfill({ status: 204, body: '' }); });
+  // A navigation is answered with a page (C6b: a frame that leaves for one is stopped); anything else with nothing.
+  await guards.context.route('**/exfil**', (route) => { const u = route.request().url(); seen.push(u); route.fulfill(/[?&]nav=/.test(u) ? { status: 200, contentType: 'text/html', body: '<p>elsewhere</p>' } : { status: 204, body: '' }); });
   const page = await guards.context.newPage();
   const pwn = [];
   page.on('dialog', (d) => { pwn.push('DIALOG ' + d.message()); d.dismiss(); });
@@ -228,6 +233,93 @@ export async function runSecurity(browser, servers, { freshContext, screenshot }
       check('C6. a local run program runs under the frame’s CSP (it reports its part)', reported >= 1, { reported });
       check('C6. its fetch is refused by connect-src ‘none’ — nothing leaves the opaque-origin frame', seen.filter((u) => /run=local/.test(u)).length === 0, { seen });
       check('C6. a run frame carries a CSP with connect-src ‘none’', !!csp && /connect-src 'none'/.test(csp), { csp });
+    });
+
+    // ---- C6b. A run program that navigates its own frame — the one way out a CSP does not govern — carries nothing of
+    // the page's address (the room's key lives in its fragment, and the page's <base> holds none), and is stopped ----
+    await record('C6b', async () => {
+      seen.length = 0;
+      await page.evaluate(() => history.replaceState(history.state, '', location.pathname + location.search + '#key=GATEROOMKEY0123456789'));
+      const rid = await page.evaluate(() => {
+        const s = window.__mm.session;
+        // It even takes its own <base> away first, so the frame falls back to whatever base it was made with.
+        const code = "mm.report('nav', 0, 0, 40, 40); setInterval(function(){ try { var b = document.querySelectorAll('base'); for (var i = 0; i < b.length; i++) b[i].remove(); location.href = '/exfil?nav=' + encodeURIComponent(document.baseURI + ' ' + document.referrer); } catch (e) {} }, 250);";
+        const id = s.import({ kind: 'run', path: 'leave.run.js', name: 'leave', bounds: { minX: 2400, minY: 100, maxX: 2600, maxY: 240 }, code: code, at: Date.now() });
+        s.clock({ nodeId: id, op: 'play', at: Date.now() });
+        return id;
+      });
+      await wait(2000);
+      const st = await page.evaluate((id) => { const c = window.__mm.session.getState().clocks[id]; return { playing: !!(c && c.playing), reason: c && c.reason, base: document.baseURI }; }, rid);
+      const navs = seen.filter((u) => /nav=/.test(u));
+      await page.evaluate(() => history.replaceState(history.state, '', location.pathname + location.search));
+      check('C6b. a run program’s navigation of its own frame carries nothing of the page’s fragment — not the room’s key, even with its <base> taken away — and the page’s own base holds none',
+        navs.length >= 1 && navs.every((u) => !/GATEROOMKEY/.test(decodeURIComponent(u))) && !/GATEROOMKEY/.test(st.base), { navs, base: st.base });
+      // A page that answers 204 keeps the frame where it was — nothing loads, so nothing is seen to leave; that a
+      // program can still say what it knows by asking for an address is what the <base> answers, above.
+      check('C6b. a frame that loads another page is stopped where it stands, and says so — once it has left, it leaves no more',
+        !st.playing && /tried to load another page in its frame/.test(st.reason || '') && navs.length === 1, { st, navs: navs.length });
+    });
+
+    // ---- C1.4. A grant is for the code it was given to: another hand's new version of a program this hand plays
+    // does not run here until this hand plays it again ----
+    await record('C1.4', async () => {
+      const st = await page.evaluate(async () => {
+        const mm = window.__mm, session = mm.session;
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        let at = Date.now();
+        const runId = session.import({ kind: 'run', path: 'mine.run.js', name: 'mine', bounds: { minX: 2800, minY: 100, maxX: 3000, maxY: 260 }, code: "mm.report('mine', 0, 0, 40, 40);", at: at++ });
+        session.clock({ nodeId: runId, op: 'play', at: at++ });
+        const jsId = session.import({ kind: 'js', path: 'mine.js', name: 'minefish', bounds: { minX: 3100, minY: 100, maxX: 3200, maxY: 160 }, code: 'return { fx: 0, fy: 0 };', at: at++ });
+        session.clock({ nodeId: jsId, op: 'play', at: at++ });
+        await sleep(1200);
+        const before = { run: mm.playedHere(runId), parts: mm.reportedRegions(runId).map((p) => p.id), js: mm.playedHere(jsId) };
+        // bob, in the room, writes a new version of each (his log's code events, a line that appends).
+        session.rebase(session.getEvents().length, [
+          { type: 'code', nodeId: runId, code: "mm.report('bobs', 0, 0, 40, 40);", kind: 'run', language: 'run', at: at++, origin: 'bob~b1', seq: 1, by: 'bob~b1' },
+          { type: 'code', nodeId: jsId, code: 'return { fx: 500, fy: 0 };', kind: 'js', language: 'js', at: at++, origin: 'bob~b1', seq: 2, by: 'bob~b1' },
+        ]);
+        await sleep(1500);
+        for (let i = 0; i < 4; i++) { try { await mm.runtime().stepOnce(jsId); } catch (e) {} }
+        const b = mm.runtime().bodies.get(jsId);
+        const f = mm.frames && mm.frames.get(runId);
+        const after = { run: mm.playedHere(runId), parts: mm.reportedRegions(runId).map((p) => p.id), js: mm.playedHere(jsId), vx: b ? b.vx : 0,
+          standing: !!(f && f.wrap.classList.contains('playing-elsewhere')) };
+        // Play it here: the person's own play of the version that stands, which then runs.
+        mm.playHere(runId);
+        await sleep(1500);
+        const again = { run: mm.playedHere(runId), parts: mm.reportedRegions(runId).map((p) => p.id) };
+        return { before, after, again };
+      });
+      check('C1.4. this hand’s own program and behaviour, played here, run', st.before.run && st.before.js && st.before.parts.includes('mine'), st.before);
+      check('C1.4. another hand’s new version of each does not run here — its code never ran, the behaviour moves nothing, and the program stands by, dashed, for Play it here',
+        !st.after.run && !st.after.js && !st.after.parts.includes('bobs') && st.after.vx === 0 && st.after.standing, st.after);
+      check('C1.4. Play it here runs the version that stands, by the person’s own act', st.again.run && st.again.parts.includes('bobs'), st.again);
+    });
+
+    // ---- C1.5. A grant holds while this hand's own play stands: another hand playing it too, then an undo of
+    // something else (or a late line that cuts the board), leaves it running here ----
+    await record('C1.5', async () => {
+      const st = await page.evaluate(async () => {
+        const mm = window.__mm, session = mm.session;
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        let at = Date.now();
+        const runId = session.import({ kind: 'run', path: 'ours.run.js', name: 'ours', bounds: { minX: 2800, minY: 400, maxX: 3000, maxY: 560 }, code: "mm.report('ours', 0, 0, 40, 40);", at: at++ });
+        session.clock({ nodeId: runId, op: 'play', at: at++ });
+        const pts = []; for (let i = 0; i <= 30; i++) pts.push({ x: 2800 + i * 4, y: 700 });
+        session.addStroke(pts, at++, undefined, 1);
+        session.rebase(session.getEvents().length, [{ type: 'clock', nodeId: runId, op: 'play', at: at++, origin: 'bob~b1', seq: 3, by: 'bob~b1' }]);
+        await sleep(400);
+        const both = { here: mm.playedHere(runId), author: mm.clockAuthor(runId) };
+        session.undo();
+        await sleep(500);
+        const undone = { here: mm.playedHere(runId), playing: session.getState().clocks[runId].playing };
+        const evs = session.getEvents(), i = evs.length - 1;
+        session.rebase(i, [{ type: 'stroke', id: 'late', points: pts.map((p) => ({ x: p.x, y: p.y + 80 })), at: evs[i].at - 1, origin: 'bob~b1', seq: 4, by: 'bob~b1', scale: 1 }, evs[i]]);
+        await sleep(500);
+        return { both, undone, cut: { here: mm.playedHere(runId) } };
+      });
+      check('C1.5. another hand playing this hand’s program too leaves it running here; so does an undo of an unrelated stroke, and a late line of theirs that cuts the board',
+        st.both.here && st.both.author === 'bob' && st.undone.here && st.undone.playing && st.cut.here, st);
     });
 
     // ---- XSS. Injected names, labels, svg/mermaid/page never execute ----

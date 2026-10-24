@@ -19,7 +19,7 @@ import { AI_CHAT_MODELS, AI_CHAT_WAIT_MS } from '../ai-protocol.mjs';
 
 const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '03-seats.js'), 'utf8');
 const S = new Function(
-  src + '\n  return { SEATS, SEAT_WORDS, resolveReaders, resolveWriters, fallbackWords, keyId, keysToKeep, migrateStored, orderChoices, seatsOfPick, pickOf, SEMANTIC_SOURCE, SEMANTIC_MAX_BYTES, semanticSourceOf, semanticNameOf, semanticWords, semanticFailed, HOUSE_DECIDE, HOUSE_MODELS, HOUSE_DECIDER_MODEL, houseDeciderFor, deciderAtBoot, deciderWords, deciderAsks, HOUSE_AI, HOUSE_SEATS, HOUSE_WAIT_MS, HOUSE_PROBE_MS, houseAiFor, houseAtBoot, houseWords, houseSends, houseWaits, houseLead, houseCannotWords, probesOnOpen };'
+  src + '\n  return { SEATS, SEAT_WORDS, resolveReaders, resolveWriters, fallbackWords, keyId, keysToKeep, migrateStored, orderChoices, seatsOfPick, pickOf, SEMANTIC_SOURCE, SEMANTIC_MAX_BYTES, semanticSourceOf, semanticNameOf, semanticWords, semanticFailed, HOUSE_DECIDE, HOUSE_MODELS, HOUSE_DECIDER_MODEL, houseDeciderFor, deciderAtBoot, deciderWords, deciderAsks, HOUSE_AI, HOUSE_SEATS, HOUSE_WAIT_MS, HOUSE_PROBE_MS, houseAiFor, houseAtBoot, houseLetGo, withHouse, houseWords, houseSends, houseWaits, houseLead, houseCannotWords, probesOnOpen };'
 )();
 
 const m = (id, o = {}) => ({ id, vision: false, seats: [], size: Infinity, claude: false, local: false, ...o });
@@ -306,6 +306,29 @@ test('dyna.ink, its subdomains and the old address ask dyna.ink’s relay for th
   assert.equal(S.houseDeciderFor('127.0.0.1', 'http://127.0.0.1:5555'), 'http://127.0.0.1:5555/decide');
 });
 
+test('dyna.ink’s own let go is kept apart from the seat’s pick: a model of the person’s joined for the seat and gone again never brings it back', () => {
+  const pick = { baseUrl: 'https://openrouter.ai/api/v1', model: 'z-ai/glm-5.3-flash', vision: true };
+  // none on the reader…
+  let kept = S.withHouse({}, 'reader', false);
+  kept.reader = { none: true };
+  assert.equal(S.houseLetGo(kept, 'reader'), true);
+  assert.equal(S.houseAtBoot(kept, 'reader', S.HOUSE_AI).seat, false);
+  // …a model of the person's joins for it (its pick written over the seat) and leaves (the pick let go):
+  kept.reader = pick;
+  delete kept.reader;
+  assert.deepEqual(S.houseAtBoot(kept, 'reader', S.HOUSE_AI), { seat: false, why: 'none' }, 'dyna.ink’s reader is not seated again');
+  assert.equal(S.houseAtBoot(kept, 'writer', S.HOUSE_AI).seat, true, 'each seat is let go by itself');
+  // The decider the same: none, a decision model of one's own, gone again.
+  const d = S.withHouse({}, 'decider', false);
+  assert.deepEqual(S.deciderAtBoot(undefined, S.HOUSE_DECIDE, S.houseLetGo(d, 'decider')), { seat: null, why: 'none' });
+  assert.deepEqual(S.deciderAtBoot({ baseUrl: 'https://openrouter.ai/api/v1', model: 'typesafe/jev-1.13' }, S.HOUSE_DECIDE, true), { seat: 'pick' }, 'a decider of one’s own still rejoins');
+  // Only dyna.ink's own takes it back; and it survives what an older device's pick becomes.
+  const back = S.withHouse(kept, 'reader', true);
+  assert.equal(S.houseLetGo(back, 'reader'), false);
+  assert.equal('off' in back, false);
+  assert.deepEqual(S.migrateStored({ seats: { off: { reader: true } }, pick: pick }).seats.off, { reader: true });
+});
+
 test('once the house answers, its writer and reader are seated where the person chose nothing — never where they let it go, kept a model for the seat, or (the writer) joined one for any job', () => {
   const pick = { baseUrl: 'https://openrouter.ai/api/v1', model: 'z-ai/glm-5.3-flash' };
   assert.deepEqual(S.houseAtBoot(undefined, 'writer', S.HOUSE_AI), { seat: true, why: 'nothing of yours chosen' });
@@ -322,7 +345,7 @@ test('once the house answers, its writer and reader are seated where the person 
 test('their rows and the pane’s lead say what they are and what is sent where, in the person’s words — no key, and never what Cloudflare keeps', () => {
   assert.equal(S.houseWords('writer'), 'dyna.ink’s writer — no key needed');
   assert.equal(S.houseWords('reader'), 'dyna.ink’s reader — no key needed');
-  assert.match(S.houseSends('writer'), /the brief you typed and the words of the marks you ask about, to dyna\.ink’s relay, which asks Cloudflare’s models; dyna\.ink keeps none of it$/);
+  assert.match(S.houseSends('writer'), /the brief you typed and the words of the marks you ask about, with the names you gave your own things, to dyna\.ink’s relay, which asks Cloudflare’s models; dyna\.ink keeps none of it$/);
   assert.match(S.houseSends('reader'), /a picture of the ink you ask it to read/);
   const lead = S.houseLead();
   assert.equal(lead.head, 'Using dyna.ink’s own models — no key needed');

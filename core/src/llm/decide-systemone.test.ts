@@ -165,6 +165,35 @@ describe('what is read', () => {
     expect(r.notes[0]).toMatch(/summed to 2\.000 — normalised/);
   });
 
+  it('a part of a distribution — the pick’s probability alone, or the top few — is no answer: never stretched to a certainty', () => {
+    const one = (answer: unknown) => readSystemOne({ ok: true, answers: { q1: answer } }, REQ, ASKED);
+    for (const answer of [
+      { choice: 'molecule', probabilities: { molecule: 0.6 } },
+      { probabilities: { molecule: 0.55, compound: 0 } },
+      { distribution: [{ option: 'molecule', p: 0.7 }, { option: 'compound', p: 0.2 }] },
+    ]) {
+      const r = one(answer);
+      if (!r.ok) throw new Error(r.error);
+      expect(r.answers, JSON.stringify(answer)).toEqual([]);
+      expect(r.notes.join(' '), JSON.stringify(answer)).toMatch(/q1: its probabilities account for only 0\.\d{3} of the whole — a part of a distribution is no answer/);
+    }
+    // A whole a little under 1, rounded, is the whole: read as it is.
+    const r = one({ probabilities: { molecule: 0.6, compound: 0.3, none_of_these: 0.09 } });
+    if (!r.ok) throw new Error(r.error);
+    expect(r.answers).toHaveLength(1);
+  });
+
+  it('with the seat’s floor, a reply of 0.6 for one option alone holds nothing — it is never a 1.00 past DECIDER_TAKE_AT', async () => {
+    const s = createSession();
+    const mark = s.addStroke(circleStroke(100, 100, 30), 1000);
+    const { fetch } = answers({ status: 200, body: { ok: true, answers: { q1: { choice: 'molecule', probabilities: { molecule: 0.6 } } } } });
+    const seat = createDecideParticipant(s, createSystemOneDecideTransport({ endpoint: 'x', model: 'clef-flash', fetch }), 1100, { takeAt: DECIDER_TAKE_AT });
+    const run = await seat.ask([choice('w', 'which?', [{ id: 'molecule', text: 'm' }, { id: 'compound', text: 'c' }], [mark])], 1200);
+    expect(run.rows).toEqual([]);
+    expect(run.unanswered).toEqual(['w']);
+    expect(run.notes?.[0]).toMatch(/a part of a distribution is no answer/);
+  });
+
   it('an answer to a question nobody asked is left out and said; the rest is read', () => {
     const r = read('not-asked');
     expect(r.answers).toEqual([{ kind: 'noul', questionId: 'box:stroke:ada:9', yes: 0.8 }]);

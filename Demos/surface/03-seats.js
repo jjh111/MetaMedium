@@ -11,7 +11,7 @@
 //   deciderWords (what its row says), deciderAsks (when a decider is asked and what it is sent, in words); and dyna.ink's
 //   own writer and reader (the audit's UX-04): HOUSE_AI, HOUSE_SEATS and HOUSE_WAIT_MS (where they are asked and how long
 //   for), houseAiFor (whether a page may use them, and where), houseAtBoot (whether one is seated once the house answers),
-//   houseWords, houseSends, houseWaits and houseLead (what their rows and the pane's lead say, in words), houseCannotWords (what
+//   houseLetGo and withHouse (dyna.ink's own let go for a seat, kept apart from the seat's pick), houseWords, houseSends, houseWaits and houseLead (what their rows and the pane's lead say, in words), houseCannotWords (what
 //   it could not do just now, in the relay's own words), and probesOnOpen (whether the
 //   pane looks for models on this machine as it opens, or waits for the person to ask — UX-DEP-1).
 // Uses: NOTHING. Like 07-hand.js and 09-field.js, this fragment names no closure variable, touches no DOM and asks
@@ -219,9 +219,12 @@
    * `chosen` when the hand kept it as its pick, else seated silently — `{ seat: 'pick' }` (a decision model the hand
    * joined, rejoined as before), or `{ seat: null }` — the hand chose none, or there is none here.
    */
-  function deciderAtBoot(kept, house) {
+  function deciderAtBoot(kept, house, letGo) {
     if (kept && kept.none) return { seat: null, why: 'none' };
     if (kept && kept.baseUrl && kept.model) return { seat: 'pick' };
+    // dyna.ink's own let go (`houseLetGo`): kept apart from the seat's pick, so a model of the person's that came and
+    // went since never brings it back.
+    if (letGo) return { seat: null, why: 'none' };
     if (!house) return { seat: null, why: 'no house decider here' };
     const chosen = !!(kept && kept.provider === 'dyna');
     const model = chosen && HOUSE_MODELS[kept.model] ? kept.model : HOUSE_DECIDER_MODEL;
@@ -286,9 +289,24 @@
     if (!house) return { seat: false, why: 'no house here' };
     const k = kept || {};
     const mine = (p) => !!p && !!p.baseUrl && !!p.model;
-    if (k[seat] && k[seat].none) return { seat: false, why: 'none' };
+    if ((k[seat] && k[seat].none) || houseLetGo(k, seat)) return { seat: false, why: 'none' };
     if (mine(k[seat]) || (seat === 'writer' && mine(k.any))) return { seat: false, why: 'pick' };
     return { seat: true, why: 'nothing of yours chosen' };
+  }
+
+  /**
+   * Whether the person let dyna.ink's own go for `seat` ('writer' | 'reader' | 'decider'): kept in `mm-seats` under
+   * `off`, apart from the seat's pick, so joining a model of one's own for that seat — which writes its pick there —
+   * and its leaving, which lets the pick go, never undo the choice. Only *dyna.ink's own* takes it back (`withHouse`).
+   */
+  function houseLetGo(kept, seat) { return !!(kept && kept.off && kept.off[seat] === true); }
+  /** What is kept when the person lets dyna.ink's own go for `seat` (`on` false) or takes it back (`on` true). */
+  function withHouse(kept, seat, on) {
+    const next = Object.assign({}, kept || {});
+    const off = Object.assign({}, next.off || {});
+    if (on) delete off[seat]; else off[seat] = true;
+    if (Object.keys(off).length) next.off = off; else delete next.off;
+    return next;
   }
 
   /** What a house seat's row says it is: whose, and that it needs no key. */
@@ -296,7 +314,10 @@
 
   /** What a house model is sent and where, in one line — "keeps none" said of dyna.ink only: nobody here can say what Cloudflare keeps. */
   function houseSends(seat) {
-    const what = seat === 'reader' ? 'a picture of the ink you ask it to read' : 'the brief you typed and the words of the marks you ask about';
+    // What a writer is sent is the marks asked about — their shapes and words, how they sit among themselves — and the
+    // names this hand gave its own things (core's `describeSession`, scoped): never another hand's thing elsewhere on a
+    // shared board, nor who is in the room.
+    const what = seat === 'reader' ? 'a picture of the ink you ask it to read' : 'the brief you typed and the words of the marks you ask about, with the names you gave your own things';
     return 'asked only when you ask — it is sent ' + what + ', to dyna.ink’s relay, which asks Cloudflare’s models; dyna.ink keeps none of it';
   }
 
@@ -365,6 +386,7 @@
     // A seat let go (`{ none: true }` — dyna.ink's own decider, writer or reader) stays let go, unless the old pick takes it.
     const next = {};
     for (const k of ['decider', 'reader', 'writer']) if (seats && seats[k] && seats[k].none) next[k] = { none: true };
+    if (seats && seats.off && typeof seats.off === 'object') next.off = Object.assign({}, seats.off);
     next.writer = pick;
     if (pick.vision) next.reader = pick;
     const kept = Object.assign({}, keys);

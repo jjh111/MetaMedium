@@ -269,7 +269,7 @@
     const evs = session.getEvents();
     if (evs !== tankSeenArr) {
       tankSeenArr = evs; tankSeenLen = evs.length;
-      for (const id of [...tankStartedHere]) { const c = s.clocks[id]; if (!(c && c.playing && session.clockAuthor(id) === null)) tankStartedHere.delete(id); }
+      for (const id of [...tankStartedHere]) { const c = s.clocks[id]; if (!(c && c.playing && ownPlayStands(id))) tankStartedHere.delete(id); }
       return;
     }
     for (let i = tankSeenLen; i < evs.length; i++) { const ev = evs[i]; if (ev && ev.type === 'clock' && ev.op === 'play' && !ev.by) tankStartedHere.add(ev.nodeId); }

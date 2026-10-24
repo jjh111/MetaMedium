@@ -43,7 +43,7 @@ import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, existsSy
 import path from 'node:path';
 
 import {
-  DEFAULT_MAX_LINES, MAX_LINE_CHARS, kindOf, setOf, writerOf, replay, truncationNotice, maxLinesFrom as maxLinesOf, compact, mintRoomName, HAND_HEADER, handHashOf, claimCheck,
+  DEFAULT_MAX_LINES, MAX_LINE_CHARS, kindOf, setOf, writerOf, replay, truncationNotice, forgottenNotice, maxLinesFrom as maxLinesOf, compact, mintRoomName, HAND_HEADER, handHashOf, claimCheck,
   claimsToLetGo, CLAIMS_FULL, REPLAY_BEGINS, REPLAY_ENDS,
   MAX_ASSET_BYTES, assetRoomBytesFrom, assetPathOf, assetCheck, assetSizeVerdict, assetHeaders, sniffImage, ASSET_WORDS,
 } from './relay-protocol.mjs';
@@ -165,11 +165,22 @@ export function startRelay(port = Number(process.env.PORT || 8020), opts = {}) {
       return;
     }
     if (!m) { res.writeHead(404); res.end('rooms/<room>/events, rooms/<room>/assets/<sha256>'); return; }
-    const room = roomOf(decodeURIComponent(m[1]));
+    // A name that will not decode, or is longer than a room's name may be, is refused in words — as the Worker does —
+    // never thrown: one bad request would end every room this relay holds, and the MCP hand that started it.
+    let name;
+    try { name = decodeURIComponent(m[1]); } catch { name = null; }
+    if (name === null) { plain(res, 400, ASSET_WORDS.room); return; }
+    if (!name || name.length > 128) { plain(res, 400, 'a room name is 1–128 characters'); return; }
+    const room = roomOf(name);
     if (req.method === 'GET') {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
       res.write(': hello\n\n');
-      const after = Number(req.headers['last-event-id'] || 0);
+      // A client that read further than this room now goes read a room this relay has since forgotten (it
+      // restarted): it is told so and sent the room from its beginning (relay-protocol.mjs, `forgottenNotice`).
+      const asked = Number(req.headers['last-event-id'] || 0);
+      const forgotten = forgottenNotice(room, asked);
+      if (forgotten) res.write(`data: ${JSON.stringify(forgotten)}\n\n`);
+      const after = forgotten ? 0 : asked;
       // A room that has outlived its buffer says so, rather than handing a
       // client a beginning-less history and calling it complete. Carried as a
       // line with no `participant`, so every client that only knows about

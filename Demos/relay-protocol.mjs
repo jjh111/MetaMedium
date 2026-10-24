@@ -137,6 +137,19 @@ export function truncationNotice(room, after = 0) {
 }
 
 /**
+ * What a client is owed when it has read further than the room now goes: the room forgot everything it held — a
+ * room the relay opened, unused for its idle days (cloudflare/relay), or a relay that restarted — and its ids began
+ * again at 1, so a hand reconnecting with its old Last-Event-ID would be sent none of what the room holds now and
+ * go on sending only the tail of a log whose head the room no longer has. Null when the client's last id is one this
+ * room issued. The relay then replays the room from its beginning, and a store that hears this word sends its own
+ * log again whole and asks the others for theirs (core's `LiveStore`).
+ */
+export function forgottenNotice(room, after = 0) {
+  if (!(after > (Number(room.last) || 0))) return null;
+  return { relay: 'forgotten', room: room.name };
+}
+
+/**
  * The lines a room may let go of before it lets go of any history: the ones
  * `replay` would never send to anyone. Those are a hand's own lines that its
  * newer whole log stands after — whoever connects, from whatever id, is sent

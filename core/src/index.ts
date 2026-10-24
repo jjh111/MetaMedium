@@ -328,7 +328,7 @@ export { mergeLogs, describeAuthorshipCollision } from './store/merge';
 export type { MergeOptions, AuthorshipCollision } from './store/merge';
 // Live logs — multiplayer as a transport over the per-participant logs (v9 S6).
 export { LiveStore, LocalHub, ownLog, SEND_WAIT_MS, COVER_WAIT_MS, COVER_STAGGER_MS } from './store/live';
-export type { LiveLine, LiveTransport, LiveStoreOptions, Presence, RelayNotice, RelayRefusal } from './store/live';
+export type { LiveLine, LiveTransport, LiveStoreOptions, Presence, RelayNotice, RelayRefusal, RelayForgotten } from './store/live';
 export { LiveMerge } from './store/livemerge';
 export type { MergeReport } from './store/livemerge';
 // How a hand is named in a room: one sitting, one log (DIRECTOR-PLAN-W2 L1).
@@ -717,7 +717,7 @@ export {
 } from './llm/provider';
 export type { ProviderConfig, ProviderKind, ChatMessage, ContentPart, CompletionResult, ModelList, Locality, FailureReason, ModelInfo, ModelCatalog, ModelFacts, PostJsonOptions } from './llm/provider';
 // The decision seat's transport over a chat completion (V1-PLAN I7): the wire is the seam a native shape swaps in.
-export { createChatDecideTransport, CHAT_DECIDE_WIRE, DEFAULT_DECIDER_MODEL, wireQuestion } from './llm/decide-openrouter';
+export { createChatDecideTransport, CHAT_DECIDE_WIRE, DEFAULT_DECIDER_MODEL, wireQuestion, wireName } from './llm/decide-openrouter';
 export type { DecideWire, ChatDecideOptions, WireOption, WireQuestion } from './llm/decide-openrouter';
 // The decision seat's System One transport (the audit's S2): Cloudflare's Clef, asked through dyna.ink's relay, no key.
 export {
@@ -897,6 +897,7 @@ export {
   NO_MATCH,
   FLAT_MARGIN,
   DECIDER_TAKE_AT,
+  partialSum,
 } from './participants/decide';
 // What a decision seat is shown of the board: words, never ids (the audit's S1).
 export { decisionStateOf, definitionWords, candidateWords, shapesCounted, wordsBeside, writtenOn, withoutIds, DECIDE_STATE_MAX, WORDS_SAID, CANDIDATE_WORDS_SAID, WRITTEN } from './participants/decide-state';

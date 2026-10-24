@@ -1,7 +1,8 @@
 // ===== core =====
 // Provides: the engine handle, URL params, the theme (light · dark · system) and the colours the canvas
 //   draws with (read from the stylesheet, so ink and chrome agree), device preferences (prefs), the
-//   session, DOM handles, the panel toggle, shared state (state, live, hoverId, lastPen), esc().
+//   session, DOM handles, the panel toggle, shared state (state, live, hoverId, lastPen), esc(), pinBase (the
+//   page's <base>: its address less the fragment, so no frame reads a room's key).
 // Uses: nothing — every other fragment reads from here.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -14,6 +15,32 @@
   const params = new URLSearchParams(location.search);
   const EMBED = params.has('embed');
   if (EMBED) document.body.classList.add('embed');
+
+  // ===== A frame never reads the page's fragment: the base is pinned =======
+  // A srcdoc frame — a program's, a Mermaid diagram's, a page's — takes its base URL from the page that made it, and
+  // with no <base> that is the page's whole address, fragment and all. A room's key lives in the fragment (24-relay.js),
+  // so a program could read it off `document.baseURI` and leave with it by navigating its own frame, which a frame's
+  // `connect-src 'none'` does not govern. So the page carries a <base> of its own address less the fragment (and less an
+  // old link's `?key=`), put first in the head before any frame is made and kept in step whenever the page changes its
+  // address (`pinBase`, after every replaceState): every relative URL resolves exactly as before — the same path and
+  // query — and every frame's base is an address with no key in it; a program that takes its own <base> away falls
+  // back to this one, never to the address.
+  function pinBase() {
+    try {
+      if (!/^https?:$/.test(location.protocol)) return;
+      const q = location.search.replace(/^\?/, '').split('&').filter((p) => p && !/^key(=|$)/i.test(p));
+      const href = location.origin + location.pathname + (q.length ? '?' + q.join('&') : '');
+      const root = document.head || document.documentElement;
+      let base = document.getElementById('mmBase');
+      if (!base) {
+        base = document.createElement('base');
+        base.id = 'mmBase';
+        root.insertBefore(base, root.firstChild);
+      }
+      if (base.getAttribute('href') !== href) base.setAttribute('href', href);
+    } catch (err) { /* an address this page cannot read: nothing in it is a room's */ }
+  }
+  pinBase();
 
   // ===== Device preferences: small, named, held on this device ==============
   const prefs = {

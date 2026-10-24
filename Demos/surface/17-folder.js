@@ -516,6 +516,7 @@
     // only the key in the fragment, and its relay only where it is not this page's own.
     try { history.replaceState(history.state, '', location.pathname + roomSearch(location.search, room, relay, key ? roomRelayFor(location.hostname) : null) + roomHash(key)); }
     catch (err) { /* an address this page may not change: the room still holds, and a reload goes back to the board */ }
+    pinBase();
   }
   /** A name for this hand in a room: the person's name (a preference), and this page load's suffix. */
   function handName() {
@@ -575,9 +576,13 @@
       if (!c || !c.playing || folder.playsSaid.has(id)) continue;
       if (consentedHere(id) || !isProgram(s, id)) continue;
       const who = session.clockAuthor(id);
-      if (!who) continue;
+      // A program this hand plays that another hand gave a new version: that version waits for the person's own play.
+      const by = !who && ownPlayStands(id) ? newVersionBy(s, id) : null;
+      if (!who && !by) continue;
       folder.playsSaid.add(id);
-      say(who + ' set “' + (MM.wordOf(s.nodes.get(id)) || 'a program') + '” playing — it does not run here until you play it; open it and tap “play it here”');
+      const name = '“' + (MM.wordOf(s.nodes.get(id)) || 'a program') + '”';
+      if (who) say(who + ' set ' + name + ' playing — it does not run here until you play it; open it and tap “play it here”');
+      else say(by + ' wrote a new version of ' + name + ' — it does not run here until you play it; open it and tap “play it here”');
     }
   }
 
@@ -1503,6 +1508,7 @@
     if (board.mode !== 'fresh' && (!o.boot || untouched)) restoreBoardView(id);
     if (o.address && !EMBED) {
       try { history.replaceState(history.state, '', location.pathname + boardSearch(location.search, id) + withoutKey(location.hash)); } catch (err) { /* an address this page may not change */ }
+      pinBase();
     }
     if (!o.boot) markAfterOpen();
     syncBoardFaces();

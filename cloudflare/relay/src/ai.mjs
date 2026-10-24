@@ -14,9 +14,10 @@
 //   * a page of the app (an Origin `http.mjs` allows), limited per address — `DECIDE_PER_MINUTE.caller` a minute and
 //     `DECIDE_PER_DAY.caller` a day, its share of the budget — an IPv6 address by its /64 (`callerKey`), because one
 //     machine holds a whole /64 and would otherwise be 2^64 callers;
-//   * a hand with a room's key (`Authorization: Bearer` and `X-Dyna-Room`, checked as the rooms check one), limited
-//     per room — `DECIDE_PER_MINUTE.room` a minute — and by its address's share of the day like any caller (a key is
-//     free to mint, so a share by key is no share); `keyed` admits only these;
+//   * a hand with the key of a room named by hand (`Authorization: Bearer` and `X-Dyna-Room`, checked as the rooms
+//     check one), limited per room — `DECIDE_PER_MINUTE.room` a minute — and by its address's share of the day like
+//     any caller; `keyed` admits only these. The key of a room the relay opened (`POST /rooms`) is anyone's for the
+//     asking, so it counts as no key: never keyed, its caller held to an address's minute and refused with no Origin;
 //   * nothing else: a request with no Origin and no key is refused, because an Origin is easy to leave out and a
 //     script anywhere would otherwise ask the account's Workers AI for free;
 //   * and every call, whoever asks, counts against one budget a day (`MM_AI_DAILY`, `DEFAULT_AI_DAILY`), past which
@@ -29,9 +30,10 @@
 // What is logged is the route, the model, the status, the time and the size — never a state, a question or a
 // criterion.
 
-import { originAllowed, corsHeaders, text, json, callerOf } from './http.mjs';
+import { originAllowed, corsHeaders, text, json, callerOf, callerKey } from './http.mjs';
 import { secretsOf, keyOpens } from './auth.mjs';
 import { hit } from './limits.mjs';
+import { isMintedRoom } from '../../../Demos/relay-protocol.mjs';
 import {
   DECIDE_MODELS, EXTRACT_MODELS, DECIDE_LIMITS, DECIDE_WAIT_MS, DECIDE_PER_MINUTE, DECIDE_PER_DAY, DECIDE_WORDS,
   decideCheck, extractCheck, decideCatalog, aiDailyFrom, decideTextBytes,
@@ -49,26 +51,8 @@ const DAY = 86_400_000;
 
 const no = (status, error, headers = {}) => json(status, { ok: false, error }, headers);
 
-/**
- * Who a caller with no key is counted as: an IPv4 address as it is, an IPv6 address by its /64 — the network one
- * machine is given, so it is one caller and not 2^64 — and an IPv4 address written as IPv6 (`::ffff:…`) as IPv4.
- * Anything that does not read as an address is counted as it came.
- */
-export function callerKey(ip) {
-  const a = String(ip || 'local').trim().toLowerCase().replace(/%.*$/, '');
-  if (!a.includes(':')) return a;
-  const mapped = /^(?:0{0,4}:){0,5}(?::|0{0,4}:)?ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(a);
-  if (mapped) return mapped[1];
-  const halves = a.split('::');
-  if (halves.length > 2) return a;
-  const head = halves[0] ? halves[0].split(':') : [];
-  const tail = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
-  const fill = halves.length === 2 ? 8 - head.length - tail.length : 0;
-  if (fill < 0 || (halves.length === 1 && head.length !== 8)) return a;
-  const groups = [...head, ...Array(fill).fill('0'), ...tail];
-  if (groups.length !== 8 || groups.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return a;
-  return groups.slice(0, 4).map((g) => parseInt(g, 16).toString(16)).join(':') + '::/64';
-}
+/** How a caller is counted (one home, `http.mjs`): kept here by name for what imported it from here. */
+export { callerKey };
 
 /** A request's body as text, read up to `cap` bytes: `{ text, size }`, or `{ over: true }` past it. */
 async function bodyText(request, cap) {
@@ -98,6 +82,11 @@ async function askerOf(request, env) {
   if (!m && !room) return { keyed: false };
   if (!m || !room || room.length > 128) return { refuse: [401, DECIDE_WORDS.keyed] };
   if (!(await keyOpens(secretsOf(env.MM_RELAY_SECRET), room, m[1]))) return { refuse: [403, DECIDE_WORDS.wrongKey(room)] };
+  // A room the relay opened has a key anyone may have for the asking (`POST /rooms`, mint.mjs), so its key says nothing
+  // about who asks: it is counted as no key at all — never `keyed`, never its room's own minute, and with no Origin no
+  // way in. Only a room named by hand, whose key John gave out, makes a hand a keyed one. The page sends no room's key
+  // to these routes, so it loses nothing.
+  if (isMintedRoom(room)) return { keyed: false, minted: true };
   return { keyed: true, room };
 }
 
@@ -148,7 +137,7 @@ async function modelRoute(request, env, cors, route) {
   try {
     count = asker.keyed
       ? await hit(env, 'ai', 'room:' + asker.room, { limit: DECIDE_PER_MINUTE.room, windowMs: MINUTE })
-      : await hit(env, 'ai', 'ip:' + callerKey(callerOf(request)), { limit: DECIDE_PER_MINUTE.caller, windowMs: MINUTE });
+      : await hit(env, 'ai', 'ip:' + callerOf(request), { limit: DECIDE_PER_MINUTE.caller, windowMs: MINUTE });
   } catch { return no(503, DECIDE_WORDS.uncounted, cors); }
   if (!count.ok) return no(429, DECIDE_WORDS.rate, { ...cors, 'retry-after': String(count.retryAfter || 60) });
 
@@ -167,7 +156,7 @@ async function modelRoute(request, env, cors, route) {
   // the app), so a share by key would let one machine mint rooms and spend the day for everyone.
   let budget;
   try {
-    const share = await hit(env, 'ai-share', 'ip:' + callerKey(callerOf(request)), { limit: DECIDE_PER_DAY.caller, windowMs: DAY });
+    const share = await hit(env, 'ai-share', 'ip:' + callerOf(request), { limit: DECIDE_PER_DAY.caller, windowMs: DAY });
     if (!share.ok) return no(429, DECIDE_WORDS.share, { ...cors, 'retry-after': String(share.retryAfter || 3600) });
     budget = await hit(env, 'ai-budget', 'day', { limit: aiDailyFrom(env), windowMs: DAY });
   } catch { return no(503, DECIDE_WORDS.uncounted, cors); }
@@ -222,7 +211,7 @@ async function chatRoute(request, env, cors) {
   if (asker.refuse) return refuse(asker.refuse[0], asker.refuse[0] === 401 ? AI_WORDS.keyed : asker.refuse[1], cors);
   if (!asker.keyed && !request.headers.get('origin')) return refuse(403, AI_WORDS.noOrigin, cors);
   if (mode === 'keyed' && !asker.keyed) return refuse(401, AI_WORDS.keyed, cors);
-  const who = asker.keyed ? 'room:' + asker.room : 'ip:' + callerKey(callerOf(request));
+  const who = asker.keyed ? 'room:' + asker.room : 'ip:' + callerOf(request);
 
   // Counted before the body is read: a flood of anything is a flood.
   let count;
@@ -248,7 +237,7 @@ async function chatRoute(request, env, cors) {
   // key would let one machine mint rooms and spend the day for everyone.
   let budget;
   try {
-    const share = await hit(env, 'ai-chat-share', 'ip:' + callerKey(callerOf(request)), { limit: AI_CHAT_PER_DAY.caller, windowMs: DAY });
+    const share = await hit(env, 'ai-chat-share', 'ip:' + callerOf(request), { limit: AI_CHAT_PER_DAY.caller, windowMs: DAY });
     if (!share.ok) return refuse(429, AI_WORDS.share, { ...cors, 'retry-after': String(share.retryAfter || 3600) });
     budget = await hit(env, 'ai-chat-budget', 'day', { limit: aiChatDailyFrom(env), windowMs: DAY });
   } catch { return refuse(503, AI_WORDS.uncounted, cors); }

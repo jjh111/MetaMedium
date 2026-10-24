@@ -6,6 +6,14 @@
 // `hit(env, scope, key, { limit, windowMs, cost })` is what a route asks: `{ ok: true, remaining }`
 // or `{ ok: false, retryAfter }` in seconds. With no LIMITS binding it throws: a route that is
 // limited fails closed, never open.
+//
+// And a gauge, which no window empties: `hold(env, scope, key, delta, limit)` adds `delta` to what is
+// held under `key` — refused whole when a rise would pass `limit`; a fall is always taken, never below
+// nothing — and says what is held: `{ ok, held }`. What every room the relay opened holds at once is
+// one (worker.mjs, `reserve`), kept under `held:<key>`, which the alarm never lets go of.
+
+/** Where a gauge is kept in a Limits object's storage: never a window's `<windowMs>:<bucket>:<key>`. */
+const HELD = 'held:';
 
 export class Limits {
   constructor(ctx, env) {
@@ -16,6 +24,7 @@ export class Limits {
   async fetch(request) {
     let ask;
     try { ask = await request.json(); } catch { return Response.json({ ok: false, error: 'a limit is asked as JSON' }, { status: 400 }); }
+    if (ask && ask.op === 'hold') return this.hold(ask);
     const { key, limit, windowMs, cost = 1 } = ask || {};
     if (typeof key !== 'string' || !(limit >= 0) || !(windowMs > 0) || !(cost >= 0)) return Response.json({ ok: false, error: 'key, limit, windowMs' }, { status: 400 });
     const now = Date.now();
@@ -33,12 +42,24 @@ export class Limits {
     return Response.json({ ok: true, count: held + cost, remaining: limit - held - cost });
   }
 
-  /** Forget every window that has ended; set the alarm again for the next one that will. */
+  /** A gauge: `delta` added to what is held under `key`, unless a rise would pass `limit`. */
+  async hold({ key, delta, limit }) {
+    if (typeof key !== 'string' || !Number.isFinite(delta) || !(limit >= 0)) return Response.json({ ok: false, error: 'key, delta, limit' }, { status: 400 });
+    const name = HELD + key;
+    const held = Number(await this.ctx.storage.get(name)) || 0;
+    if (delta > 0 && held + delta > limit) return Response.json({ ok: false, held });
+    const now = Math.max(0, held + delta);
+    if (now !== held) await this.ctx.storage.put(name, now);
+    return Response.json({ ok: true, held: now });
+  }
+
+  /** Forget every window that has ended; set the alarm again for the next one that will. A gauge is never a window. */
   async alarm() {
     const now = Date.now();
     const gone = [];
     let next = Infinity;
     for (const name of (await this.ctx.storage.list()).keys()) {
+      if (name.startsWith(HELD)) continue;
       const [w, b] = name.split(':');
       const ends = (Number(b) + 1) * Number(w);
       if (!(ends > now)) gone.push(name);
@@ -54,5 +75,13 @@ export async function hit(env, scope, key, { limit, windowMs, cost = 1 }) {
   if (!env.LIMITS) throw new Error('this relay has no LIMITS binding — its limited routes are closed');
   const stub = env.LIMITS.get(env.LIMITS.idFromName(scope));
   const res = await stub.fetch(new Request('https://limits/hit', { method: 'POST', body: JSON.stringify({ key, limit, windowMs, cost }) }));
+  return res.json();
+}
+
+/** Add `delta` to the gauge `key` in `scope`, held to `limit` on a rise: `{ ok, held }`. Throws with no LIMITS binding. */
+export async function hold(env, scope, key, delta, limit) {
+  if (!env.LIMITS) throw new Error('this relay has no LIMITS binding — its limited routes are closed');
+  const stub = env.LIMITS.get(env.LIMITS.idFromName(scope));
+  const res = await stub.fetch(new Request('https://limits/hold', { method: 'POST', body: JSON.stringify({ op: 'hold', key, delta, limit }) }));
   return res.json();
 }

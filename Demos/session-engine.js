@@ -3,7 +3,8 @@
 // ===== core =====
 // Provides: the engine handle, URL params, the theme (light · dark · system) and the colours the canvas
 //   draws with (read from the stylesheet, so ink and chrome agree), device preferences (prefs), the
-//   session, DOM handles, the panel toggle, shared state (state, live, hoverId, lastPen), esc().
+//   session, DOM handles, the panel toggle, shared state (state, live, hoverId, lastPen), esc(), pinBase (the
+//   page's <base>: its address less the fragment, so no frame reads a room's key).
 // Uses: nothing — every other fragment reads from here.
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
 // in name order inside `(function () Ellipsis)();`. Shared state is the
@@ -16,6 +17,32 @@
   const params = new URLSearchParams(location.search);
   const EMBED = params.has('embed');
   if (EMBED) document.body.classList.add('embed');
+
+  // ===== A frame never reads the page's fragment: the base is pinned =======
+  // A srcdoc frame — a program's, a Mermaid diagram's, a page's — takes its base URL from the page that made it, and
+  // with no <base> that is the page's whole address, fragment and all. A room's key lives in the fragment (24-relay.js),
+  // so a program could read it off `document.baseURI` and leave with it by navigating its own frame, which a frame's
+  // `connect-src 'none'` does not govern. So the page carries a <base> of its own address less the fragment (and less an
+  // old link's `?key=`), put first in the head before any frame is made and kept in step whenever the page changes its
+  // address (`pinBase`, after every replaceState): every relative URL resolves exactly as before — the same path and
+  // query — and every frame's base is an address with no key in it; a program that takes its own <base> away falls
+  // back to this one, never to the address.
+  function pinBase() {
+    try {
+      if (!/^https?:$/.test(location.protocol)) return;
+      const q = location.search.replace(/^\?/, '').split('&').filter((p) => p && !/^key(=|$)/i.test(p));
+      const href = location.origin + location.pathname + (q.length ? '?' + q.join('&') : '');
+      const root = document.head || document.documentElement;
+      let base = document.getElementById('mmBase');
+      if (!base) {
+        base = document.createElement('base');
+        base.id = 'mmBase';
+        root.insertBefore(base, root.firstChild);
+      }
+      if (base.getAttribute('href') !== href) base.setAttribute('href', href);
+    } catch (err) { /* an address this page cannot read: nothing in it is a room's */ }
+  }
+  pinBase();
 
   // ===== Device preferences: small, named, held on this device ==============
   const prefs = {
@@ -577,7 +604,11 @@
   //  - run/mermaid frames: `allow-scripts` WITHOUT `allow-same-origin`, so they
   //    run script at an OPAQUE origin that cannot reach the page, its storage or
   //    its keys — and, since C6, each srcdoc carries a CSP (`connect-src 'none'`,
-  //    13-kinds.js `frameCSP`) so a playing program cannot phone out.
+  //    13-kinds.js `frameCSP`) so a playing program cannot fetch, open a socket or
+  //    beacon. It can still navigate its own frame (no CSP governs a navigation),
+  //    so what it can read holds nothing of the page: the page's <base> is its
+  //    address less the fragment, where a room's key lives (00-core.js `pinBase`),
+  //    and a frame that loads another page is stopped (13-kinds.js `frameLoaded`).
   //  - the `js` worker (13-kinds.js) runs arbitrary behaviour code, and is
   //    defended three ways, any one of which alone contains it: nothing runs
   //    there until this hand played it HERE (the consent gate, C1); the worker
@@ -669,8 +700,9 @@
         iframe.setAttribute('sandbox', kind === 'run' || kind === 'mermaid' ? 'allow-scripts' : 'allow-same-origin');
         iframe.setAttribute('scrolling', 'no');
         iframe.title = MM.wordOf(node) || id;
-        iframe.onload = sizeFramesToScreen; // the type is set for the screen as soon as the document is there
-        wrap.appendChild(iframe);
+        iframe.onload = () => frameLoaded(id, iframe); // the type is set for the screen as soon as the document is there
+        // Put in the wrap only once its document is set (below): a frame inserted with none loads an empty page first,
+        // and a frame's every load after its own document's is the frame navigating itself (`frameLoaded`).
         stage.appendChild(wrap);
         f = { wrap: wrap, iframe: iframe, codeAt: null, parked: false, kind: kind };
         frames.set(id, f);
@@ -691,11 +723,11 @@
       // badge that it is playing for someone else.
       const inLog = !!(s.clocks[id] && s.clocks[id].playing);
       const isProg = kind === 'js' || kind === 'run';
-      const playing = inLog && (!isProg || consentedHere(id));
+      const playing = inLog && (!isProg || consentedHere(id, s));
       f.wrap.classList.toggle('playing', playing);
       // A program playing for another hand — a `js` behaviour as much as a run
       // frame — wears a dashed edge so it reads as standing by, not running.
-      f.wrap.classList.toggle('playing-elsewhere', inLog && isProg && !consentedHere(id));
+      f.wrap.classList.toggle('playing-elsewhere', inLog && isProg && !consentedHere(id, s));
       f.wrap.classList.toggle('writing', isWritingArtifact(node));
       f.wrap.classList.toggle('flipped', flipped.has(id));
 
@@ -718,16 +750,21 @@
         // the second navigation on a board with a dozen frames loading: the
         // program never started and nothing said so. A fresh iframe always
         // navigates; the message listener ignores the old window by identity.
-        if (f.codeAt !== null) {
+        // Its document is set before it is put in the page, so the one load a frame makes is its own document's.
+        const doc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h, { id: id, playing: playing });
+        if (f.codeAt !== null && f.iframe.isConnected) {
           const next = document.createElement('iframe');
           for (const attr of ['sandbox', 'scrolling', 'title']) { const v = f.iframe.getAttribute(attr); if (v !== null) next.setAttribute(attr, v); }
-          next.onload = sizeFramesToScreen;
+          next.onload = () => frameLoaded(id, next);
+          next.srcdoc = doc;
           f.iframe.replaceWith(next);
           f.iframe = next;
+        } else {
+          f.iframe.srcdoc = doc;
+          if (!f.iframe.isConnected) f.wrap.insertBefore(f.iframe, f.wrap.firstChild);
         }
         f.codeAt = stamp;
         if (kind === 'run' || kind === 'mermaid') { reported.delete(id); mermaidStates.delete(id); }
-        f.iframe.srcdoc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h, { id: id, playing: playing });
       }
     }
     syncRuntime(s);
@@ -744,7 +781,7 @@
     for (const [id, f] of frames) {
       if (f.parked || f.kind !== 'run' || !f.iframe) continue;
       const c = state.clocks[id];
-      if (!c || !c.playing || !consentedHere(id)) continue;
+      if (!c || !c.playing || !consentedHere(id, state)) continue;
       const node = state.nodes.get(id);
       const fr = node && MM.frameOf(node);
       if (!fr) continue;
@@ -814,7 +851,7 @@
 //   deciderWords (what its row says), deciderAsks (when a decider is asked and what it is sent, in words); and dyna.ink's
 //   own writer and reader (the audit's UX-04): HOUSE_AI, HOUSE_SEATS and HOUSE_WAIT_MS (where they are asked and how long
 //   for), houseAiFor (whether a page may use them, and where), houseAtBoot (whether one is seated once the house answers),
-//   houseWords, houseSends, houseWaits and houseLead (what their rows and the pane's lead say, in words), houseCannotWords (what
+//   houseLetGo and withHouse (dyna.ink's own let go for a seat, kept apart from the seat's pick), houseWords, houseSends, houseWaits and houseLead (what their rows and the pane's lead say, in words), houseCannotWords (what
 //   it could not do just now, in the relay's own words), and probesOnOpen (whether the
 //   pane looks for models on this machine as it opens, or waits for the person to ask — UX-DEP-1).
 // Uses: NOTHING. Like 07-hand.js and 09-field.js, this fragment names no closure variable, touches no DOM and asks
@@ -1022,9 +1059,12 @@
    * `chosen` when the hand kept it as its pick, else seated silently — `{ seat: 'pick' }` (a decision model the hand
    * joined, rejoined as before), or `{ seat: null }` — the hand chose none, or there is none here.
    */
-  function deciderAtBoot(kept, house) {
+  function deciderAtBoot(kept, house, letGo) {
     if (kept && kept.none) return { seat: null, why: 'none' };
     if (kept && kept.baseUrl && kept.model) return { seat: 'pick' };
+    // dyna.ink's own let go (`houseLetGo`): kept apart from the seat's pick, so a model of the person's that came and
+    // went since never brings it back.
+    if (letGo) return { seat: null, why: 'none' };
     if (!house) return { seat: null, why: 'no house decider here' };
     const chosen = !!(kept && kept.provider === 'dyna');
     const model = chosen && HOUSE_MODELS[kept.model] ? kept.model : HOUSE_DECIDER_MODEL;
@@ -1089,9 +1129,24 @@
     if (!house) return { seat: false, why: 'no house here' };
     const k = kept || {};
     const mine = (p) => !!p && !!p.baseUrl && !!p.model;
-    if (k[seat] && k[seat].none) return { seat: false, why: 'none' };
+    if ((k[seat] && k[seat].none) || houseLetGo(k, seat)) return { seat: false, why: 'none' };
     if (mine(k[seat]) || (seat === 'writer' && mine(k.any))) return { seat: false, why: 'pick' };
     return { seat: true, why: 'nothing of yours chosen' };
+  }
+
+  /**
+   * Whether the person let dyna.ink's own go for `seat` ('writer' | 'reader' | 'decider'): kept in `mm-seats` under
+   * `off`, apart from the seat's pick, so joining a model of one's own for that seat — which writes its pick there —
+   * and its leaving, which lets the pick go, never undo the choice. Only *dyna.ink's own* takes it back (`withHouse`).
+   */
+  function houseLetGo(kept, seat) { return !!(kept && kept.off && kept.off[seat] === true); }
+  /** What is kept when the person lets dyna.ink's own go for `seat` (`on` false) or takes it back (`on` true). */
+  function withHouse(kept, seat, on) {
+    const next = Object.assign({}, kept || {});
+    const off = Object.assign({}, next.off || {});
+    if (on) delete off[seat]; else off[seat] = true;
+    if (Object.keys(off).length) next.off = off; else delete next.off;
+    return next;
   }
 
   /** What a house seat's row says it is: whose, and that it needs no key. */
@@ -1099,7 +1154,10 @@
 
   /** What a house model is sent and where, in one line — "keeps none" said of dyna.ink only: nobody here can say what Cloudflare keeps. */
   function houseSends(seat) {
-    const what = seat === 'reader' ? 'a picture of the ink you ask it to read' : 'the brief you typed and the words of the marks you ask about';
+    // What a writer is sent is the marks asked about — their shapes and words, how they sit among themselves — and the
+    // names this hand gave its own things (core's `describeSession`, scoped): never another hand's thing elsewhere on a
+    // shared board, nor who is in the room.
+    const what = seat === 'reader' ? 'a picture of the ink you ask it to read' : 'the brief you typed and the words of the marks you ask about, with the names you gave your own things';
     return 'asked only when you ask — it is sent ' + what + ', to dyna.ink’s relay, which asks Cloudflare’s models; dyna.ink keeps none of it';
   }
 
@@ -1168,6 +1226,7 @@
     // A seat let go (`{ none: true }` — dyna.ink's own decider, writer or reader) stays let go, unless the old pick takes it.
     const next = {};
     for (const k of ['decider', 'reader', 'writer']) if (seats && seats[k] && seats[k].none) next[k] = { none: true };
+    if (seats && seats.off && typeof seats.off === 'object') next.off = Object.assign({}, seats.off);
     next.writer = pick;
     if (pick.vision) next.reader = pick;
     const kept = Object.assign({}, keys);
@@ -2214,8 +2273,11 @@
     // on its provider still uses is forgotten, as it was — and dyna.ink's own takes a seat left empty again, where the house
     // answered and the hand did not let it go (04-seatpane.js).
     forgetSeats(agent);
+    const had = { writer: houseAgents.writer, reader: houseAgents.reader };
     seatHouse();
-    mpStatus.textContent = modelWords(agent) + ' left.';
+    // dyna.ink's own taking a seat this model left is said: it is where a brief or a picture of the ink goes next.
+    const took = ['writer', 'reader'].filter((seat) => !had[seat] && houseAgents[seat]).map((seat) => HOUSE_SEATS[seat].name);
+    mpStatus.textContent = modelWords(agent) + ' left.' + (took.length ? ' ' + took.join(' and ') + (took.length > 1 ? ' take its place' : ' takes its place') + ' — let it go in its row to keep everything on your own models.' : '');
     renderAgents();
     renderLocal();
     syncTiles();
@@ -2832,6 +2894,7 @@
   }
   /** dyna.ink's own, taken by the hand: kept as its pick, and said — when it is asked and what it is sent. */
   function keepHouseChoice(m) {
+    seatPicks = withHouse(seatPicks, 'decider', true);
     seatPicks.decider = { provider: 'dyna', model: m };
     saveSeats();
     mpStatus.textContent = deciderWords(m, MM.DECIDER_TAKE_AT) + ' — it is the decider.';
@@ -2843,12 +2906,13 @@
   /** At boot, after the seats kept have rejoined: dyna.ink's own decider, silently, unless the hand chose one or chose none (03-seats.js, deciderAtBoot). */
   function seatHouseDecider() {
     if (decider) return;
-    const plan = deciderAtBoot(seatPicks.decider, HOUSE);
+    const plan = deciderAtBoot(seatPicks.decider, HOUSE, houseLetGo(seatPicks, 'decider'));
     if (plan.seat === 'house') joinHouseDecider(plan.model, true, plan.chosen);
   }
   /** The hand lets the decider seat go: none, kept, so a reload does not seat dyna.ink's own again. */
   function noDecider() {
     leaveDecider(true);
+    seatPicks = withHouse(seatPicks, 'decider', false);
     seatPicks.decider = { none: true };
     saveSeats();
     mpStatus.textContent = 'No decider — ' + fallbackWords('decider', { house: !!HOUSE && houseUp.decide }) + '.';
@@ -2898,8 +2962,9 @@
     saveSeats();
     if (!d.house) forgetKeyIfUnused(d.config.baseUrl);
     if (quiet) return;
-    // A decider the hand joined, let go where dyna.ink's own may be used: dyna.ink's own is the decider again.
-    if (!d.house && HOUSE && joinHouseDecider(HOUSE_DECIDER_MODEL, true)) { mpStatus.textContent = d.name + ' left the decider seat — ' + deciderWords(HOUSE_DECIDER_MODEL, MM.DECIDER_TAKE_AT) + ' is the decider again.'; return; }
+    // A decider the hand joined, let go where dyna.ink's own may be used: dyna.ink's own is the decider again — unless
+    // the hand let dyna.ink's own go, which a model of its own coming and going never undoes.
+    if (!d.house && HOUSE && !houseLetGo(seatPicks, 'decider') && joinHouseDecider(HOUSE_DECIDER_MODEL, true)) { mpStatus.textContent = d.name + ' left the decider seat — ' + deciderWords(HOUSE_DECIDER_MODEL, MM.DECIDER_TAKE_AT) + ' is the decider again.'; return; }
     mpStatus.textContent = d.name + ' left the decider seat.'; renderSeats(); syncTiles(); refreshPalette();
   }
 
@@ -3119,6 +3184,7 @@
   /** The hand lets dyna.ink's own writer or reader go: none, kept on this device, so a reload does not seat it again. */
   function noHouse(seat) {
     leaveHouse(seat);
+    seatPicks = withHouse(seatPicks, seat, false);
     seatPicks[seat] = { none: true };
     saveSeats();
     mpStatus.textContent = 'No ' + HOUSE_SEATS[seat].name + ' — ' + fallbackWords(seat, { letGo: true }) + '.';
@@ -3127,7 +3193,9 @@
 
   /** The hand takes dyna.ink's own writer or reader back after letting it go. */
   function houseBack(seat) {
-    if (seatPicks[seat] && seatPicks[seat].none) { delete seatPicks[seat]; saveSeats(); }
+    seatPicks = withHouse(seatPicks, seat, true);
+    if (seatPicks[seat] && seatPicks[seat].none) delete seatPicks[seat];
+    saveSeats();
     seatHouse();
     mpStatus.textContent = houseAgents[seat] ? houseWords(seat) + ' — ' + houseSends(seat) + '.' : 'dyna.ink’s own ' + seat + ' is not here just now.';
     renderSeats();
@@ -3281,11 +3349,11 @@
           '<button class="ghost" data-seat-set="' + seat + '" title="join a model for this seat — the key already entered is used">another…</button>' +
           (held || houseAsked ? '<button class="ghost" data-seat-try="' + seat + '">try it</button>' : '') +
           (house && !held ? '<button class="ghost" data-seat-none="' + seat + '" title="no ' + esc(HOUSE_SEATS[seat].name) + ': nothing is sent there — remembered on this device">none</button>' : '') +
-          (!house && houseUp.ai && seatPicks[seat] && seatPicks[seat].none ? '<button class="ghost" data-seat-house="' + seat + '" title="' + esc(houseWords(seat)) + '">dyna.ink’s own</button>' : '');
+          (!house && houseUp.ai && ((seatPicks[seat] && seatPicks[seat].none) || houseLetGo(seatPicks, seat)) ? '<button class="ghost" data-seat-house="' + seat + '" title="' + esc(houseWords(seat)) + '">dyna.ink’s own</button>' : '');
         if (held) { who = agentWords(held); call = callOf(agentKey(held)); }
         else if (houseAsked) { who = houseWords(seat); note = houseSends(seat); call = callOf(agentKey(house)); }
         else if (house) { who = 'nothing chosen'; note = (names(now) ? 'now: ' + names(now) + ' — ' : '') + houseWaits(seat); }
-        else { who = 'nothing chosen'; note = fallbackWords(seat, { letGo: !!(seatPicks[seat] && seatPicks[seat].none) }) + (names(now) ? ' — now: ' + names(now) : ''); }
+        else { who = 'nothing chosen'; note = fallbackWords(seat, { letGo: !!(seatPicks[seat] && seatPicks[seat].none) || houseLetGo(seatPicks, seat) }) + (names(now) ? ' — now: ' + names(now) : ''); }
       }
       html += '<div class="seatRow" data-seat="' + seat + '"><div class="seatHead"><b>' + seat + '</b><span class="seatJob">' + esc(w.job) + '</span></div>' +
         (body ? '<div class="seatBody">' + body + '</div>' : '') +
@@ -8941,10 +9009,12 @@
     // Under reduced motion a tank this hand did not start here holds still (C4, 14-clocks.js): its play is the person's.
     const still = !elsewhere && c && c.playing && !isProgram(s, id) && tankHeldStill(s, id);
     const who = elsewhere ? session.clockAuthor(id) : null;
+    // Played here, then given a new version by another hand: that version waits for the person's own play.
+    const by = elsewhere && !who && ownPlayStands(id) ? newVersionBy(s, id) : null;
     // A program's time is its own (a run program keeps none the tank could say); a tank's is said.
     const t = isProgram(s, id) && codeKindOf(s.nodes.get(id)) === 'run' ? '' : ' · t = ' + tankTime(id).toFixed(1) + 's';
     const stateText = !c ? 'not played'
-      : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : motionReduced() ? 'waiting for you to play it — this device asks for less motion' : 'played — not running in this tab yet')
+      : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : by ? 'a new version by ' + by + ' — not running here until you play it' : motionReduced() ? 'waiting for you to play it — this device asks for less motion' : 'played — not running in this tab yet')
       : still ? 'playing — held still here, since this device asks for less motion'
       : c.playing ? 'playing' + t : 'paused' + (c.reason ? ' — ' + c.reason : '') + t;
     return '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>' +
@@ -9818,7 +9888,7 @@
 // Provides: documentForKind (the renderers: every kind as a document ink can address), the mermaid harness (mermaidFrom, mermaidStates), postPointer (a hand forwarded into a playing frame), the worker runtime
 //   (a blessed `js` artifact's code runs in a worker with a budget; a throw or a hang pauses its clock
 //   with the reason), runtimeOffset, runtimeBroken, syncRuntime, the consent gate (trackConsent, consentedHere,
-//   grantPlayingPrograms — this tab runs a program only when this hand played it here, C1), frameCSP (a run or
+//   grantPlayingPrograms, ownPlayStands — this tab runs a program only when this hand played that very code here, C1), frameCSP (a run or
 //   mermaid frame cannot phone out), WORKER_HARDEN (the js worker keeps only Math/performance/Function/postMessage).
 // Uses: core (session, esc), artifacts (frames, documentFor), render (render), the first hour (27-first.js: motionReduced —
 //   under reduced motion an example's program is not granted, and waits for the person's own play).
@@ -9953,6 +10023,12 @@
   // stand-in library (served from the gate's own origin) still loads and the
   // CDNs stay in one home. img/media are held to the page's own origin and
   // data:/blob:, so no <img> or <video> GET can beacon to a stranger either.
+  // What no CSP here governs is a navigation: a program may set its own
+  // frame's location, and a GET leaves with whatever it puts in the address.
+  // So the frame can read nothing of the page worth carrying — its origin is
+  // opaque, and its base URL is the page's <base>, the address less the
+  // fragment where a room's key lives (00-core.js, `pinBase`) — and a frame
+  // that loads another page is stopped where it stands (`frameLoaded`).
   function originOf(u) { try { return new URL(u, location.href).origin; } catch (e) { return null; } }
   function frameCSP(scriptUrls) {
     const self = location.origin && location.origin !== 'null' ? location.origin : '';
@@ -10056,11 +10132,21 @@
     '})();',
   ].join('\n');
 
+  /**
+   * The first thing a program's or a diagram's document does, in its head: say it is here (`doc`). A frame element
+   * loads its own document once, so a load that no such word came before is the frame navigating itself
+   * (`frameLoaded`) — and a load before the document's first word (an engine's empty page as the element goes in) is
+   * not counted at all.
+   */
+  function frameHello(id) {
+    return '<script>parent.postMessage({ mm: true, id: ' + JSON.stringify(String(id)).replace(/<\//g, '<\\/') + ', type: "doc" }, "*");<\/script>';
+  }
+
   /** The program in its harness: a clear frame that runs the code and reports its parts. */
   function runDocument(id, code, w, h) {
     const safe = (s) => JSON.stringify(String(s)).replace(/<\//g, '<\\/');
     const script = RUN_HARNESS.replace('__W__', Math.round(w)).replace('__H__', Math.round(h)).replace('__ID__', safe(id)).replace('__CODE__', safe(code)).replace('__THREE__', JSON.stringify(THREE_CDN));
-    return '<!doctype html><html><head><meta charset="utf-8">' + frameCSP([THREE_CDN]) + '<style>html,body{margin:0;background:transparent;overflow:hidden;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px}</style>' +
+    return '<!doctype html><html><head><meta charset="utf-8">' + frameCSP([THREE_CDN]) + frameHello(id) + '<style>html,body{margin:0;background:transparent;overflow:hidden;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px}</style>' +
       '</head><body><script>' + script + '<\/script></body></html>';
   }
 
@@ -10173,7 +10259,7 @@
       '#out .flowchart-link,#out .edgePath path,#out path.relation,#out .messageLine0,#out .messageLine1,#out .actor-line,#out .divider path{stroke:' + ink + ' !important;}' +
       '#out marker path,#out marker circle,#out .arrowMarkerPath,#out #arrowhead path{fill:' + ink + ' !important;stroke:' + ink + ' !important;}' +
       '#out .edgeLabel,#out .edgeLabel rect,#out .labelBkg,#out .cluster rect{fill:transparent !important;background:transparent !important;}';
-    return '<!doctype html><html><head><meta charset="utf-8">' + frameCSP(mermaidSourcesNow()) + '<style>' + css + '</style></head><body>' +
+    return '<!doctype html><html><head><meta charset="utf-8">' + frameCSP(mermaidSourcesNow()) + frameHello(id) + '<style>' + css + '</style></head><body>' +
       '<div id="mmroot"><pre id="src">' + esc(text) + '</pre><p id="note" hidden></p><div id="out" hidden></div></div>' +
       '<script>' + script + '<\/script></body></html>';
   }
@@ -10184,6 +10270,7 @@
     if (!m || m.mm !== true || typeof m.id !== 'string') return;
     const f = frames.get(m.id);
     if (!f || !f.iframe || f.iframe.contentWindow !== e.source) return; // only the frame that owns the id
+    if (m.type === 'doc') { f.iframe.__mmSaidHere = true; return; } // its own document, beginning (`frameHello`)
     if (m.type === 'regions' && Array.isArray(m.regions)) { reported.set(m.id, m.regions); return; }
     // A diagram that was not drawn is not a broken program: the text stands and the frame says why (D2).
     if (m.type === 'mermaid') {
@@ -10449,6 +10536,31 @@
     runtime.pending.clear();
   }
 
+  /**
+   * A frame's document is there: sized for the screen — and, for a program's or a diagram's frame, judged. Each frame
+   * element loads its own document once (a document that changes gets a new element, `syncStage`), and that document
+   * says so as it begins (`frameHello`), so a load after it that no such word came before is the frame navigating
+   * itself: the one way out a frame's CSP cannot shut (a navigation is not a connection). It
+   * carried nothing of the page — the page's <base> holds no fragment (`pinBase`) and a frame's origin is opaque — but
+   * a frame that leaves for another page is stopped where it stands, given its own document back, and said.
+   */
+  function frameLoaded(id, iframe) {
+    sizeFramesToScreen();
+    const f = frames.get(id);
+    if (!f || f.iframe !== iframe || (f.kind !== 'run' && f.kind !== 'mermaid')) return;
+    // Its own document said it was here before this load: this is that document's load.
+    if (iframe.__mmSaidHere) { iframe.__mmSaidHere = false; iframe.__mmOwnLoaded = true; return; }
+    // A load before its own document said a word — an engine's empty page as the element went in, or a still card
+    // that runs nothing — is not a navigation.
+    if (!iframe.__mmOwnLoaded) return;
+    f.codeAt = 'left'; // the next paint gives it a fresh element and its own document
+    const node = state.nodes.get(id);
+    const name = (node && MM.wordOf(node)) || (f.kind === 'mermaid' ? 'the diagram' : 'the program');
+    if (f.kind === 'mermaid') { flash(name + ' tried to load another page in its frame — it was put back'); render(session.getState()); return; }
+    markBroken(id, 'tried to load another page in its frame — a program may not, so it was stopped');
+    flash(name + ' tried to load another page in its frame — it was stopped');
+  }
+
   function markBroken(id, error) {
     runtime.broken.set(id, error);
     const t = runtime.pending.get(id);
@@ -10524,39 +10636,86 @@
   // This is runtime only (like paint culling): it governs what this tab runs,
   // never the session state, so undo per hand still stops it — undo drops this
   // hand's play, the clock stops, the loop stops.
-  const grantedHere = new Set();
+  // A grant is for the CODE it was given to, never only the artifact: another hand may write a new version of a
+  // program this hand played (a revision of theirs, the MCP hand's canvas_write), and that version runs here only
+  // after *Play it here* again. So a grant holds the versions of the artifact's code this hand played, or wrote
+  // itself while playing it (its own model's revision is its own); a newer version from anyone else is not among
+  // them, and the program stands by — dashed, offering *Play it here* — until the person plays it.
+  const grantedHere = new Map(); // artifactId -> Set of code versions (`codeVersionOf`) this hand may run here
   let consentArr = null, consentLen = 0;
+  /** The version of an artifact's code: its newest code rep, by when it was written and what it says. */
+  function codeVersionOf(s, id) {
+    const node = s && s.nodes.get(id);
+    const rep = node && codeRepOf(node);
+    return rep ? rep.data.at + ':' + hashOf(rep.data.code || '') : '';
+  }
+  function grantCode(s, id) {
+    let versions = grantedHere.get(id);
+    if (!versions) grantedHere.set(id, (versions = new Set()));
+    versions.add(codeVersionOf(s, id));
+  }
+  /**
+   * Whether this hand's own play of an artifact still stands: the last of its own clock events (no `by` — every
+   * other hand's line is stamped on arrival) that plays, pauses or resets it is a play. Another hand's play after it
+   * leaves it standing (a guest pressed *Play it here* too); another's pause stops the clock in the log itself.
+   */
+  function ownPlayStands(id) {
+    const evs = session.getEvents();
+    for (let i = evs.length - 1; i >= 0; i--) {
+      const ev = evs[i];
+      if (!ev || ev.type !== 'clock' || ev.nodeId !== id || ev.by) continue;
+      if (ev.op === 'play') return true;
+      if (ev.op === 'pause' || ev.op === 'reset') return false;
+    }
+    return false;
+  }
   function trackConsent(s) {
     const evs = session.getEvents();
     if (evs !== consentArr) {
       // A NEW events array — a load, an undo, a room rebase that cut, a reset.
       // Nothing LOADED is granted (another hand's program, or your own from a
       // file/reload, waits for *Play it here*), but a grant this hand already
-      // gave survives an unrelated change: it is kept only while the artifact
-      // is still live and playing AND the latest play is still this hand's
-      // own (`clockAuthor` null). So undoing an unrelated stroke leaves a
-      // running program running, while undoing this hand's OWN play drops the
-      // grant — the clock falls to whatever is left and it stops here.
+      // gave survives an unrelated change: it is kept while the artifact is
+      // still live and playing AND this hand's own play still stands
+      // (`ownPlayStands`) — whoever played it after. So undoing an unrelated
+      // stroke, or another hand's late line, leaves a running program running,
+      // while undoing this hand's OWN play drops the grant and it stops here.
       consentArr = evs; consentLen = evs.length;
-      for (const id of [...grantedHere]) {
+      for (const id of [...grantedHere.keys()]) {
         const c = s.clocks[id];
-        if (!(s.live.includes(id) && c && c.playing && session.clockAuthor(id) === null)) grantedHere.delete(id);
+        if (!(s.live.includes(id) && c && c.playing && ownPlayStands(id))) grantedHere.delete(id);
       }
     } else {
-      // Appended live: a `clock{op:'play'}` THIS hand wrote (no `by` — every
-      // other hand's line is stamped on arrival) grants its artifact. A room
-      // line that only appends keeps the same array, so a foreign play lands
-      // here too — and is refused, because it carries `by`.
+      // Appended live: a `clock{op:'play'}` THIS hand wrote (no `by`) grants the
+      // code as it stands; a `code` event this hand wrote (its own revision, its
+      // own model's) for a program it plays grants that version too. A room
+      // line that only appends keeps the same array, so a foreign play or a
+      // foreign version lands here too — and is refused, because it carries `by`.
       for (let i = consentLen; i < evs.length; i++) {
         const ev = evs[i];
-        if (ev && ev.type === 'clock' && ev.op === 'play' && !ev.by) grantedHere.add(ev.nodeId);
+        if (!ev || ev.by) continue;
+        if (ev.type === 'clock' && ev.op === 'play') grantCode(s, ev.nodeId);
+        else if (ev.type === 'code' && grantedHere.has(ev.nodeId)) grantCode(s, ev.nodeId);
       }
       consentLen = evs.length;
-      for (const id of [...grantedHere]) if (!s.live.includes(id) && !s.clocks[id]) grantedHere.delete(id);
+      for (const id of [...grantedHere.keys()]) if (!s.live.includes(id) && !s.clocks[id]) grantedHere.delete(id);
     }
   }
-  /** Whether this tab may run this artifact's code: this hand played it here. */
-  function consentedHere(id) { return grantedHere.has(id); }
+  /**
+   * Who wrote the version of a program's code that stands, when it is not this hand — the name of a hand whose new
+   * version of a program this hand plays waits here for *Play it here* — else null.
+   */
+  function newVersionBy(s, id) {
+    const node = s && s.nodes.get(id);
+    const rep = node && codeRepOf(node);
+    if (!rep || !rep.source || rep.source === MM.LOCAL_PARTICIPANT) return null;
+    return nameOfParticipant(rep.source);
+  }
+  /** Whether this tab may run this artifact's code as it stands now: this hand played this very version here. */
+  function consentedHere(id, s) {
+    const versions = grantedHere.get(id);
+    return !!versions && versions.has(codeVersionOf(s || session.getState(), id));
+  }
   /**
    * Play a program HERE — the person's one tap when it is playing for another
    * hand (C1). It writes this hand's OWN `clock{op:'play'}`, so the consent is
@@ -10584,11 +10743,11 @@
     const s = session.getState();
     let any = false;
     for (const id of Object.keys(s.clocks)) {
-      if (!s.clocks[id].playing || grantedHere.has(id)) continue;
+      if (!s.clocks[id].playing || consentedHere(id, s)) continue;
       const node = s.nodes.get(id);
       const rep = node && codeRepOf(node);
       const kind = rep && (rep.data.kind || 'html');
-      if (kind === 'js' || kind === 'run') { grantedHere.add(id); any = true; }
+      if (kind === 'js' || kind === 'run') { grantCode(s, id); any = true; }
     }
     if (any) render(session.getState());
   }
@@ -10598,7 +10757,7 @@
     const out = [];
     for (const id of s.live) {
       const c = s.clocks[id];
-      if (!c || !c.playing || !consentedHere(id)) continue;
+      if (!c || !c.playing || !consentedHere(id, s)) continue;
       const node = s.nodes.get(id);
       const rep = node && codeRepOf(node);
       if (!rep || (rep.data.kind || 'html') !== 'js') continue;
@@ -10978,7 +11137,7 @@
     const evs = session.getEvents();
     if (evs !== tankSeenArr) {
       tankSeenArr = evs; tankSeenLen = evs.length;
-      for (const id of [...tankStartedHere]) { const c = s.clocks[id]; if (!(c && c.playing && session.clockAuthor(id) === null)) tankStartedHere.delete(id); }
+      for (const id of [...tankStartedHere]) { const c = s.clocks[id]; if (!(c && c.playing && ownPlayStands(id))) tankStartedHere.delete(id); }
       return;
     }
     for (let i = tankSeenLen; i < evs.length; i++) { const ev = evs[i]; if (ev && ev.type === 'clock' && ev.op === 'play' && !ev.by) tankStartedHere.add(ev.nodeId); }
@@ -13973,6 +14132,7 @@
     // only the key in the fragment, and its relay only where it is not this page's own.
     try { history.replaceState(history.state, '', location.pathname + roomSearch(location.search, room, relay, key ? roomRelayFor(location.hostname) : null) + roomHash(key)); }
     catch (err) { /* an address this page may not change: the room still holds, and a reload goes back to the board */ }
+    pinBase();
   }
   /** A name for this hand in a room: the person's name (a preference), and this page load's suffix. */
   function handName() {
@@ -14032,9 +14192,13 @@
       if (!c || !c.playing || folder.playsSaid.has(id)) continue;
       if (consentedHere(id) || !isProgram(s, id)) continue;
       const who = session.clockAuthor(id);
-      if (!who) continue;
+      // A program this hand plays that another hand gave a new version: that version waits for the person's own play.
+      const by = !who && ownPlayStands(id) ? newVersionBy(s, id) : null;
+      if (!who && !by) continue;
       folder.playsSaid.add(id);
-      say(who + ' set “' + (MM.wordOf(s.nodes.get(id)) || 'a program') + '” playing — it does not run here until you play it; open it and tap “play it here”');
+      const name = '“' + (MM.wordOf(s.nodes.get(id)) || 'a program') + '”';
+      if (who) say(who + ' set ' + name + ' playing — it does not run here until you play it; open it and tap “play it here”');
+      else say(by + ' wrote a new version of ' + name + ' — it does not run here until you play it; open it and tap “play it here”');
     }
   }
 
@@ -14960,6 +15124,7 @@
     if (board.mode !== 'fresh' && (!o.boot || untouched)) restoreBoardView(id);
     if (o.address && !EMBED) {
       try { history.replaceState(history.state, '', location.pathname + boardSearch(location.search, id) + withoutKey(location.hash)); } catch (err) { /* an address this page may not change */ }
+      pinBase();
     }
     if (!o.boot) markAfterOpen();
     syncBoardFaces();
@@ -17245,7 +17410,8 @@
 //   rereadBoards, boardEntryName, exportLogNow, readLogText), input (flash, say), the
 //   inspector's element (the panel's start), boards list (exampleUrl, exampleRows, exampleName, starterOf),
 //   core (params, EMBED, session), folder (boardMode), view (fitAll, fitTo), render (union, viewportWorld),
-//   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1; consentedHere),
+//   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1 — on that board
+//   only, carried to the page that opens it when the board is made from a room, `exampleGrantAtOpen`; consentedHere),
 //   inspector (isProgram), the first hour (27-first.js: motionReduced — under reduced motion the film waits for a play;
 //   restAfterOpen, restWords — an example opens fitted, nothing inspected; one bigger than the screen on its program, said).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -17500,6 +17666,17 @@
     }
     return box;
   }
+  /** Where an example opened from a room (or a folder) leaves its grant for the page that opens its board: a board id, read once. */
+  const EXAMPLE_GRANT = 'mm-example-grant';
+  /**
+   * The board this page opened on is an example just made by a page that had to leave for it: its own programs may run
+   * here, as they would have had it opened in place — and nothing else's. Read once, at the open, and let go of.
+   */
+  function exampleGrantAtOpen() {
+    let id = null;
+    try { id = sessionStorage.getItem(EXAMPLE_GRANT); sessionStorage.removeItem(EXAMPLE_GRANT); } catch (err) { return; }
+    if (id && id === board.id && boardMode() === 'restore') grantPlayingPrograms();
+  }
   /**
    * Open an example as a board of its own. Resolves the entry made, or false with the reason said
    * through `o.said` (the pane's line, or the status line's) — never thrown, never a board half made.
@@ -17526,7 +17703,11 @@
       // is dyna.ink's own, from the site's own origin, so this hand's board of
       // its own may run it without a tap (the consent gate, C1). A deliberate,
       // narrow grant, made only here; a loaded board of someone else's gets none.
-      if (made) {
+      // Only on the board just made, on screen: from a room, a folder or a repository the board opens in a page of its
+      // own (`switchBoard` navigates) while this page — and the room's board, with other hands' programs on it — is
+      // still here for a moment; the grant goes with the page it is for (`EXAMPLE_GRANT`, read as that board opens).
+      if (made && board.id !== made.id) { try { sessionStorage.setItem(EXAMPLE_GRANT, made.id); } catch (err) { /* it waits for a play */ } }
+      else if (made) {
         grantPlayingPrograms();
         // Unless the person asked for less motion (C4): then it waits for their own play, and the opening's sentence says so.
         examples.heldBack = motionReduced() && standingPrograms().length ? ' · the film waits for you — this device asks for less motion; press and hold it, then “Play … here”' : '';
@@ -17580,6 +17761,7 @@
       url.searchParams.delete('example');
       history.replaceState(history.state, '', url.pathname + url.search + url.hash);
     } catch (err) { /* an address that cannot be rewritten still opens the example once */ }
+    pinBase();
     const made = await openExample(id);
     if (made) exampleOpened('“' + made.name + '” — a board of your own, made from the example; the example is as it was');
   }
@@ -20158,6 +20340,8 @@
     const settle = (restored) => {
       // The device's mark, taught again only where the board's log says otherwise (so opening a board is not a change to it).
       markAfterOpen();
+      // An example made by a page that left a room for it: its own programs may run, as in place (22-boards.js).
+      exampleGrantAtOpen();
       rejoinRemembered();
       const others = [...boards.entries.values()].filter((e) => isKept(e) && !e.trashed && e.id !== board.id).length;
       if (restored && !board.saidAtOpen) flash('“' + boardOnScreenName() + '” is back' + (others ? ' — ' + others + ' more in boards' : ''));

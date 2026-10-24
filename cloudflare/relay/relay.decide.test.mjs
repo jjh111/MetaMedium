@@ -247,6 +247,27 @@ test(`429: past ${DECIDE_PER_MINUTE.caller} a minute from one address, past ${DE
   assert.match(r.error, /^HTTP 429 — rate limited: “today’s decisions on dyna\.ink are spent — the engine’s ranking stands”/);
 });
 
+test('the key of a room the relay opened opens no door a page does not have: refused with no Origin, refused where only a room’s key may ask, and one address’s minute across every room it opened', async () => {
+  const env = envWith({ MM_RELAY_MINT_PER_HOUR: '50' });
+  const ip = '198.51.100.44';
+  const rooms = [];
+  for (let i = 0; i < 3; i++) rooms.push(await (await worker.fetch(new Request('http://relay/rooms', { method: 'POST', headers: { origin: APP, 'cf-connecting-ip': ip } }), env)).json());
+  const bare = await worker.fetch(new Request('http://relay/decide', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + rooms[0].key, 'x-dyna-room': rooms[0].room, 'cf-connecting-ip': ip }, body: JSON.stringify(wire().body) }), env);
+  assert.equal(bare.status, 403);
+  assert.equal(await said(bare), DECIDE_WORDS.noOrigin);
+  let ok = 0;
+  for (const r of rooms) for (let j = 0; j < DECIDE_PER_MINUTE.caller; j++) if ((await post(env, wire().body, { authorization: 'Bearer ' + r.key, 'x-dyna-room': r.room, 'cf-connecting-ip': ip })).status === 200) ok++;
+  assert.equal(ok, DECIDE_PER_MINUTE.caller, 'three rooms’ keys from one address are one address’s minute');
+  const keyedOnly = envWith({ MM_DECIDE: 'keyed' });
+  const minted = await (await worker.fetch(new Request('http://relay/rooms', { method: 'POST' }), keyedOnly)).json();
+  const no = await post(keyedOnly, wire().body, { authorization: 'Bearer ' + minted.key, 'x-dyna-room': minted.room });
+  assert.equal(no.status, 401);
+  assert.equal(await said(no), DECIDE_WORDS.keyed);
+  assert.equal(keyedOnly.AI.calls.length, 0);
+  const named = await keyForRoom(SECRET, 'claude');
+  assert.equal((await post(keyedOnly, wire().body, { authorization: 'Bearer ' + named, 'x-dyna-room': 'claude' })).status, 200);
+});
+
 test('callerKey: an IPv4 address as it is, an IPv6 address by its /64, IPv4 written as IPv6 as IPv4', () => {
   assert.equal(callerKey('203.0.113.7'), '203.0.113.7');
   assert.equal(callerKey('2001:db8::1'), '2001:db8:0:0::/64');

@@ -2,7 +2,7 @@
 // Provides: documentForKind (the renderers: every kind as a document ink can address), the mermaid harness (mermaidFrom, mermaidStates), postPointer (a hand forwarded into a playing frame), the worker runtime
 //   (a blessed `js` artifact's code runs in a worker with a budget; a throw or a hang pauses its clock
 //   with the reason), runtimeOffset, runtimeBroken, syncRuntime, the consent gate (trackConsent, consentedHere,
-//   grantPlayingPrograms — this tab runs a program only when this hand played it here, C1), frameCSP (a run or
+//   grantPlayingPrograms, ownPlayStands — this tab runs a program only when this hand played that very code here, C1), frameCSP (a run or
 //   mermaid frame cannot phone out), WORKER_HARDEN (the js worker keeps only Math/performance/Function/postMessage).
 // Uses: core (session, esc), artifacts (frames, documentFor), render (render), the first hour (27-first.js: motionReduced —
 //   under reduced motion an example's program is not granted, and waits for the person's own play).
@@ -137,6 +137,12 @@
   // stand-in library (served from the gate's own origin) still loads and the
   // CDNs stay in one home. img/media are held to the page's own origin and
   // data:/blob:, so no <img> or <video> GET can beacon to a stranger either.
+  // What no CSP here governs is a navigation: a program may set its own
+  // frame's location, and a GET leaves with whatever it puts in the address.
+  // So the frame can read nothing of the page worth carrying — its origin is
+  // opaque, and its base URL is the page's <base>, the address less the
+  // fragment where a room's key lives (00-core.js, `pinBase`) — and a frame
+  // that loads another page is stopped where it stands (`frameLoaded`).
   function originOf(u) { try { return new URL(u, location.href).origin; } catch (e) { return null; } }
   function frameCSP(scriptUrls) {
     const self = location.origin && location.origin !== 'null' ? location.origin : '';
@@ -240,11 +246,21 @@
     '})();',
   ].join('\n');
 
+  /**
+   * The first thing a program's or a diagram's document does, in its head: say it is here (`doc`). A frame element
+   * loads its own document once, so a load that no such word came before is the frame navigating itself
+   * (`frameLoaded`) — and a load before the document's first word (an engine's empty page as the element goes in) is
+   * not counted at all.
+   */
+  function frameHello(id) {
+    return '<script>parent.postMessage({ mm: true, id: ' + JSON.stringify(String(id)).replace(/<\//g, '<\\/') + ', type: "doc" }, "*");<\/script>';
+  }
+
   /** The program in its harness: a clear frame that runs the code and reports its parts. */
   function runDocument(id, code, w, h) {
     const safe = (s) => JSON.stringify(String(s)).replace(/<\//g, '<\\/');
     const script = RUN_HARNESS.replace('__W__', Math.round(w)).replace('__H__', Math.round(h)).replace('__ID__', safe(id)).replace('__CODE__', safe(code)).replace('__THREE__', JSON.stringify(THREE_CDN));
-    return '<!doctype html><html><head><meta charset="utf-8">' + frameCSP([THREE_CDN]) + '<style>html,body{margin:0;background:transparent;overflow:hidden;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px}</style>' +
+    return '<!doctype html><html><head><meta charset="utf-8">' + frameCSP([THREE_CDN]) + frameHello(id) + '<style>html,body{margin:0;background:transparent;overflow:hidden;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px}</style>' +
       '</head><body><script>' + script + '<\/script></body></html>';
   }
 
@@ -357,7 +373,7 @@
       '#out .flowchart-link,#out .edgePath path,#out path.relation,#out .messageLine0,#out .messageLine1,#out .actor-line,#out .divider path{stroke:' + ink + ' !important;}' +
       '#out marker path,#out marker circle,#out .arrowMarkerPath,#out #arrowhead path{fill:' + ink + ' !important;stroke:' + ink + ' !important;}' +
       '#out .edgeLabel,#out .edgeLabel rect,#out .labelBkg,#out .cluster rect{fill:transparent !important;background:transparent !important;}';
-    return '<!doctype html><html><head><meta charset="utf-8">' + frameCSP(mermaidSourcesNow()) + '<style>' + css + '</style></head><body>' +
+    return '<!doctype html><html><head><meta charset="utf-8">' + frameCSP(mermaidSourcesNow()) + frameHello(id) + '<style>' + css + '</style></head><body>' +
       '<div id="mmroot"><pre id="src">' + esc(text) + '</pre><p id="note" hidden></p><div id="out" hidden></div></div>' +
       '<script>' + script + '<\/script></body></html>';
   }
@@ -368,6 +384,7 @@
     if (!m || m.mm !== true || typeof m.id !== 'string') return;
     const f = frames.get(m.id);
     if (!f || !f.iframe || f.iframe.contentWindow !== e.source) return; // only the frame that owns the id
+    if (m.type === 'doc') { f.iframe.__mmSaidHere = true; return; } // its own document, beginning (`frameHello`)
     if (m.type === 'regions' && Array.isArray(m.regions)) { reported.set(m.id, m.regions); return; }
     // A diagram that was not drawn is not a broken program: the text stands and the frame says why (D2).
     if (m.type === 'mermaid') {
@@ -633,6 +650,31 @@
     runtime.pending.clear();
   }
 
+  /**
+   * A frame's document is there: sized for the screen — and, for a program's or a diagram's frame, judged. Each frame
+   * element loads its own document once (a document that changes gets a new element, `syncStage`), and that document
+   * says so as it begins (`frameHello`), so a load after it that no such word came before is the frame navigating
+   * itself: the one way out a frame's CSP cannot shut (a navigation is not a connection). It
+   * carried nothing of the page — the page's <base> holds no fragment (`pinBase`) and a frame's origin is opaque — but
+   * a frame that leaves for another page is stopped where it stands, given its own document back, and said.
+   */
+  function frameLoaded(id, iframe) {
+    sizeFramesToScreen();
+    const f = frames.get(id);
+    if (!f || f.iframe !== iframe || (f.kind !== 'run' && f.kind !== 'mermaid')) return;
+    // Its own document said it was here before this load: this is that document's load.
+    if (iframe.__mmSaidHere) { iframe.__mmSaidHere = false; iframe.__mmOwnLoaded = true; return; }
+    // A load before its own document said a word — an engine's empty page as the element went in, or a still card
+    // that runs nothing — is not a navigation.
+    if (!iframe.__mmOwnLoaded) return;
+    f.codeAt = 'left'; // the next paint gives it a fresh element and its own document
+    const node = state.nodes.get(id);
+    const name = (node && MM.wordOf(node)) || (f.kind === 'mermaid' ? 'the diagram' : 'the program');
+    if (f.kind === 'mermaid') { flash(name + ' tried to load another page in its frame — it was put back'); render(session.getState()); return; }
+    markBroken(id, 'tried to load another page in its frame — a program may not, so it was stopped');
+    flash(name + ' tried to load another page in its frame — it was stopped');
+  }
+
   function markBroken(id, error) {
     runtime.broken.set(id, error);
     const t = runtime.pending.get(id);
@@ -708,39 +750,86 @@
   // This is runtime only (like paint culling): it governs what this tab runs,
   // never the session state, so undo per hand still stops it — undo drops this
   // hand's play, the clock stops, the loop stops.
-  const grantedHere = new Set();
+  // A grant is for the CODE it was given to, never only the artifact: another hand may write a new version of a
+  // program this hand played (a revision of theirs, the MCP hand's canvas_write), and that version runs here only
+  // after *Play it here* again. So a grant holds the versions of the artifact's code this hand played, or wrote
+  // itself while playing it (its own model's revision is its own); a newer version from anyone else is not among
+  // them, and the program stands by — dashed, offering *Play it here* — until the person plays it.
+  const grantedHere = new Map(); // artifactId -> Set of code versions (`codeVersionOf`) this hand may run here
   let consentArr = null, consentLen = 0;
+  /** The version of an artifact's code: its newest code rep, by when it was written and what it says. */
+  function codeVersionOf(s, id) {
+    const node = s && s.nodes.get(id);
+    const rep = node && codeRepOf(node);
+    return rep ? rep.data.at + ':' + hashOf(rep.data.code || '') : '';
+  }
+  function grantCode(s, id) {
+    let versions = grantedHere.get(id);
+    if (!versions) grantedHere.set(id, (versions = new Set()));
+    versions.add(codeVersionOf(s, id));
+  }
+  /**
+   * Whether this hand's own play of an artifact still stands: the last of its own clock events (no `by` — every
+   * other hand's line is stamped on arrival) that plays, pauses or resets it is a play. Another hand's play after it
+   * leaves it standing (a guest pressed *Play it here* too); another's pause stops the clock in the log itself.
+   */
+  function ownPlayStands(id) {
+    const evs = session.getEvents();
+    for (let i = evs.length - 1; i >= 0; i--) {
+      const ev = evs[i];
+      if (!ev || ev.type !== 'clock' || ev.nodeId !== id || ev.by) continue;
+      if (ev.op === 'play') return true;
+      if (ev.op === 'pause' || ev.op === 'reset') return false;
+    }
+    return false;
+  }
   function trackConsent(s) {
     const evs = session.getEvents();
     if (evs !== consentArr) {
       // A NEW events array — a load, an undo, a room rebase that cut, a reset.
       // Nothing LOADED is granted (another hand's program, or your own from a
       // file/reload, waits for *Play it here*), but a grant this hand already
-      // gave survives an unrelated change: it is kept only while the artifact
-      // is still live and playing AND the latest play is still this hand's
-      // own (`clockAuthor` null). So undoing an unrelated stroke leaves a
-      // running program running, while undoing this hand's OWN play drops the
-      // grant — the clock falls to whatever is left and it stops here.
+      // gave survives an unrelated change: it is kept while the artifact is
+      // still live and playing AND this hand's own play still stands
+      // (`ownPlayStands`) — whoever played it after. So undoing an unrelated
+      // stroke, or another hand's late line, leaves a running program running,
+      // while undoing this hand's OWN play drops the grant and it stops here.
       consentArr = evs; consentLen = evs.length;
-      for (const id of [...grantedHere]) {
+      for (const id of [...grantedHere.keys()]) {
         const c = s.clocks[id];
-        if (!(s.live.includes(id) && c && c.playing && session.clockAuthor(id) === null)) grantedHere.delete(id);
+        if (!(s.live.includes(id) && c && c.playing && ownPlayStands(id))) grantedHere.delete(id);
       }
     } else {
-      // Appended live: a `clock{op:'play'}` THIS hand wrote (no `by` — every
-      // other hand's line is stamped on arrival) grants its artifact. A room
-      // line that only appends keeps the same array, so a foreign play lands
-      // here too — and is refused, because it carries `by`.
+      // Appended live: a `clock{op:'play'}` THIS hand wrote (no `by`) grants the
+      // code as it stands; a `code` event this hand wrote (its own revision, its
+      // own model's) for a program it plays grants that version too. A room
+      // line that only appends keeps the same array, so a foreign play or a
+      // foreign version lands here too — and is refused, because it carries `by`.
       for (let i = consentLen; i < evs.length; i++) {
         const ev = evs[i];
-        if (ev && ev.type === 'clock' && ev.op === 'play' && !ev.by) grantedHere.add(ev.nodeId);
+        if (!ev || ev.by) continue;
+        if (ev.type === 'clock' && ev.op === 'play') grantCode(s, ev.nodeId);
+        else if (ev.type === 'code' && grantedHere.has(ev.nodeId)) grantCode(s, ev.nodeId);
       }
       consentLen = evs.length;
-      for (const id of [...grantedHere]) if (!s.live.includes(id) && !s.clocks[id]) grantedHere.delete(id);
+      for (const id of [...grantedHere.keys()]) if (!s.live.includes(id) && !s.clocks[id]) grantedHere.delete(id);
     }
   }
-  /** Whether this tab may run this artifact's code: this hand played it here. */
-  function consentedHere(id) { return grantedHere.has(id); }
+  /**
+   * Who wrote the version of a program's code that stands, when it is not this hand — the name of a hand whose new
+   * version of a program this hand plays waits here for *Play it here* — else null.
+   */
+  function newVersionBy(s, id) {
+    const node = s && s.nodes.get(id);
+    const rep = node && codeRepOf(node);
+    if (!rep || !rep.source || rep.source === MM.LOCAL_PARTICIPANT) return null;
+    return nameOfParticipant(rep.source);
+  }
+  /** Whether this tab may run this artifact's code as it stands now: this hand played this very version here. */
+  function consentedHere(id, s) {
+    const versions = grantedHere.get(id);
+    return !!versions && versions.has(codeVersionOf(s || session.getState(), id));
+  }
   /**
    * Play a program HERE — the person's one tap when it is playing for another
    * hand (C1). It writes this hand's OWN `clock{op:'play'}`, so the consent is
@@ -768,11 +857,11 @@
     const s = session.getState();
     let any = false;
     for (const id of Object.keys(s.clocks)) {
-      if (!s.clocks[id].playing || grantedHere.has(id)) continue;
+      if (!s.clocks[id].playing || consentedHere(id, s)) continue;
       const node = s.nodes.get(id);
       const rep = node && codeRepOf(node);
       const kind = rep && (rep.data.kind || 'html');
-      if (kind === 'js' || kind === 'run') { grantedHere.add(id); any = true; }
+      if (kind === 'js' || kind === 'run') { grantCode(s, id); any = true; }
     }
     if (any) render(session.getState());
   }
@@ -782,7 +871,7 @@
     const out = [];
     for (const id of s.live) {
       const c = s.clocks[id];
-      if (!c || !c.playing || !consentedHere(id)) continue;
+      if (!c || !c.playing || !consentedHere(id, s)) continue;
       const node = s.nodes.get(id);
       const rep = node && codeRepOf(node);
       if (!rep || (rep.data.kind || 'html') !== 'js') continue;

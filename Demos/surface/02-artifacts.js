@@ -22,7 +22,11 @@
   //  - run/mermaid frames: `allow-scripts` WITHOUT `allow-same-origin`, so they
   //    run script at an OPAQUE origin that cannot reach the page, its storage or
   //    its keys — and, since C6, each srcdoc carries a CSP (`connect-src 'none'`,
-  //    13-kinds.js `frameCSP`) so a playing program cannot phone out.
+  //    13-kinds.js `frameCSP`) so a playing program cannot fetch, open a socket or
+  //    beacon. It can still navigate its own frame (no CSP governs a navigation),
+  //    so what it can read holds nothing of the page: the page's <base> is its
+  //    address less the fragment, where a room's key lives (00-core.js `pinBase`),
+  //    and a frame that loads another page is stopped (13-kinds.js `frameLoaded`).
   //  - the `js` worker (13-kinds.js) runs arbitrary behaviour code, and is
   //    defended three ways, any one of which alone contains it: nothing runs
   //    there until this hand played it HERE (the consent gate, C1); the worker
@@ -114,8 +118,9 @@
         iframe.setAttribute('sandbox', kind === 'run' || kind === 'mermaid' ? 'allow-scripts' : 'allow-same-origin');
         iframe.setAttribute('scrolling', 'no');
         iframe.title = MM.wordOf(node) || id;
-        iframe.onload = sizeFramesToScreen; // the type is set for the screen as soon as the document is there
-        wrap.appendChild(iframe);
+        iframe.onload = () => frameLoaded(id, iframe); // the type is set for the screen as soon as the document is there
+        // Put in the wrap only once its document is set (below): a frame inserted with none loads an empty page first,
+        // and a frame's every load after its own document's is the frame navigating itself (`frameLoaded`).
         stage.appendChild(wrap);
         f = { wrap: wrap, iframe: iframe, codeAt: null, parked: false, kind: kind };
         frames.set(id, f);
@@ -136,11 +141,11 @@
       // badge that it is playing for someone else.
       const inLog = !!(s.clocks[id] && s.clocks[id].playing);
       const isProg = kind === 'js' || kind === 'run';
-      const playing = inLog && (!isProg || consentedHere(id));
+      const playing = inLog && (!isProg || consentedHere(id, s));
       f.wrap.classList.toggle('playing', playing);
       // A program playing for another hand — a `js` behaviour as much as a run
       // frame — wears a dashed edge so it reads as standing by, not running.
-      f.wrap.classList.toggle('playing-elsewhere', inLog && isProg && !consentedHere(id));
+      f.wrap.classList.toggle('playing-elsewhere', inLog && isProg && !consentedHere(id, s));
       f.wrap.classList.toggle('writing', isWritingArtifact(node));
       f.wrap.classList.toggle('flipped', flipped.has(id));
 
@@ -163,16 +168,21 @@
         // the second navigation on a board with a dozen frames loading: the
         // program never started and nothing said so. A fresh iframe always
         // navigates; the message listener ignores the old window by identity.
-        if (f.codeAt !== null) {
+        // Its document is set before it is put in the page, so the one load a frame makes is its own document's.
+        const doc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h, { id: id, playing: playing });
+        if (f.codeAt !== null && f.iframe.isConnected) {
           const next = document.createElement('iframe');
           for (const attr of ['sandbox', 'scrolling', 'title']) { const v = f.iframe.getAttribute(attr); if (v !== null) next.setAttribute(attr, v); }
-          next.onload = sizeFramesToScreen;
+          next.onload = () => frameLoaded(id, next);
+          next.srcdoc = doc;
           f.iframe.replaceWith(next);
           f.iframe = next;
+        } else {
+          f.iframe.srcdoc = doc;
+          if (!f.iframe.isConnected) f.wrap.insertBefore(f.iframe, f.wrap.firstChild);
         }
         f.codeAt = stamp;
         if (kind === 'run' || kind === 'mermaid') { reported.delete(id); mermaidStates.delete(id); }
-        f.iframe.srcdoc = documentForKind({ data: { ...rep.data, code: code } }, fr.w, fr.h, { id: id, playing: playing });
       }
     }
     syncRuntime(s);
@@ -189,7 +199,7 @@
     for (const [id, f] of frames) {
       if (f.parked || f.kind !== 'run' || !f.iframe) continue;
       const c = state.clocks[id];
-      if (!c || !c.playing || !consentedHere(id)) continue;
+      if (!c || !c.playing || !consentedHere(id, state)) continue;
       const node = state.nodes.get(id);
       const fr = node && MM.frameOf(node);
       if (!fr) continue;

@@ -373,32 +373,41 @@ test(`a caller’s share of the day: past ${AI_CHAT_PER_DAY.caller} from one add
   } finally { mock.restoreAll(); }
 });
 
-test(`a room’s key is no way past an address’s share: rooms opened from one address and asked with their keys stop at ${AI_CHAT_PER_DAY.caller} for the day`, async () => {
-  const env = envWith({ MM_AI_CHAT_DAILY: String(AI_CHAT_PER_DAY.caller * 10), MM_RELAY_MINT_PER_HOUR: '50' });
+test(`the key of a room the relay opened is no key at all: refused with no Origin and where only a room’s key may ask, and from a page counted by its address — ${AI_CHAT_PER_MINUTE.caller} a minute across every room it opened`, async () => {
+  const env = envWith({ MM_RELAY_MINT_PER_HOUR: '50' });
   const ip = '203.0.113.99';
   const rooms = [];
-  // As many rooms as it takes to ask past the share within one minute — each opened by POST /rooms, as any page may.
-  for (let i = 0; i * AI_CHAT_PER_MINUTE.room <= AI_CHAT_PER_DAY.caller; i++) {
+  // More rooms than it takes to ask past an address's minute, each opened by POST /rooms as any page may.
+  for (let i = 0; i < 3; i++) {
     const opened = await worker.fetch(new Request('http://relay/rooms', { method: 'POST', headers: { origin: APP, 'cf-connecting-ip': ip } }), env);
     assert.equal(opened.status, 201);
     rooms.push(await opened.json());
   }
+  // A script with no Origin and a key it opened for itself is refused, and no model is asked.
+  const bare = await worker.fetch(new Request('http://relay/ai/v1/chat/completions', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + rooms[0].key, 'x-dyna-room': rooms[0].room, 'cf-connecting-ip': ip }, body: JSON.stringify(chat()) }), env);
+  assert.equal(bare.status, 403);
+  assert.equal(await said(bare), AI_WORDS.noOrigin);
+  assert.equal(env.AI.calls.length, 0);
+  // From a page, every room's key together is one address's minute — never a room's minute each.
   const statuses = {};
-  let shareSaid = null;
   for (const r of rooms) {
     for (let j = 0; j < AI_CHAT_PER_MINUTE.room; j++) {
       const res = await post(env, chat(), { authorization: 'Bearer ' + r.key, 'x-dyna-room': r.room, 'cf-connecting-ip': ip });
       statuses[res.status] = (statuses[res.status] || 0) + 1;
-      if (res.status === 429 && !shareSaid) shareSaid = await said(res);
     }
   }
-  assert.equal(statuses[200], AI_CHAT_PER_DAY.caller, JSON.stringify(statuses));
-  assert.equal(shareSaid, AI_WORDS.share);
-  assert.equal(env.AI.calls.length, AI_CHAT_PER_DAY.caller);
-  // Another address, with a key or none, is still answered.
-  const other = await keyForRoom(SECRET, 'another');
-  assert.equal((await post(env, chat(), { authorization: 'Bearer ' + other, 'x-dyna-room': 'another', 'cf-connecting-ip': '198.51.100.20' })).status, 200);
-  assert.equal((await post(env, chat(), { 'cf-connecting-ip': '198.51.100.21' })).status, 200);
+  assert.equal(statuses[200], AI_CHAT_PER_MINUTE.caller, JSON.stringify(statuses));
+  assert.equal(env.AI.calls.length, AI_CHAT_PER_MINUTE.caller);
+  // Where only a room's key may ask, the key of a room anyone may open is refused — the list too — and a room named by hand is not.
+  const keyedOnly = envWith({ MM_AI_CHAT: 'keyed', MM_DECIDE: 'keyed' });
+  const minted = await (await worker.fetch(new Request('http://relay/rooms', { method: 'POST', headers: { origin: APP } }), keyedOnly)).json();
+  const asMinted = { authorization: 'Bearer ' + minted.key, 'x-dyna-room': minted.room };
+  assert.equal((await post(keyedOnly, chat(), asMinted)).status, 401);
+  assert.equal((await worker.fetch(new Request('http://relay/ai/v1/models', { headers: { origin: APP, ...asMinted } }), keyedOnly)).status, 401);
+  assert.equal((await worker.fetch(new Request('http://relay/ai/v1/chat/completions', { method: 'POST', headers: { 'content-type': 'application/json', ...asMinted }, body: JSON.stringify(chat()) }), keyedOnly)).status, 403);
+  const named = await keyForRoom(SECRET, 'claude');
+  assert.equal((await post(keyedOnly, chat(), { authorization: 'Bearer ' + named, 'x-dyna-room': 'claude' })).status, 200);
+  assert.equal(keyedOnly.AI.calls.length, 1);
 });
 
 test('with no LIMITS binding the route fails closed, with no AI binding it says so — the list too — and no model is asked', async () => {

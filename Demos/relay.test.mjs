@@ -137,6 +137,35 @@ test('over a real socket: the stream opens, the stale snapshot is gone and the p
   } finally { server.close(); }
 });
 
+test('a room name that will not decode, or is too long, is refused in words — the relay goes on — as the Worker refuses it', async () => {
+  const server = await startRelay(0);
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const bad = await fetch(`${base}/rooms/%E0%A4%A/events`);
+    assert.equal(bad.status, 400);
+    assert.equal(await bad.text(), 'a room name is text');
+    const long = await fetch(`${base}/rooms/${'x'.repeat(129)}/events`, { method: 'POST', body: '{}' });
+    assert.equal(long.status, 400);
+    assert.match(await long.text(), /1–128 characters/);
+    assert.equal((await fetch(`${base}/rooms/r/events`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ participant: 'a', events: [{}] }) })).status, 204, 'the relay is still up');
+  } finally { server.close(); }
+});
+
+test('a hand that reconnects with a last id past every id the room has — the relay restarted — is told the room was forgotten and sent it from its beginning', async () => {
+  const server = await startRelay(0);
+  const url = `http://127.0.0.1:${server.address().port}/rooms/r/events`;
+  try {
+    for (const t of ['new1', 'new2']) await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ participant: 'fern', events: [{ type: t }], at: 1 }) });
+    const res = await fetch(url, { headers: { accept: 'text/event-stream', 'last-event-id': '40' } });
+    const reader = res.body.getReader();
+    let text = '';
+    while (!text.includes('{"relay":"live"}')) text += new TextDecoder().decode((await reader.read()).value);
+    await reader.cancel();
+    assert.ok(text.includes('{"relay":"forgotten","room":"r"}'), text);
+    assert.ok(text.includes('"new1"') && text.includes('"new2"'));
+  } finally { server.close(); }
+});
+
 // ===== Ids that hold (DIRECTOR-PLAN-W2 L1) ====================================
 // Real hands this time — LiveStores over the relay transport a Node hand uses
 // (live-node.mjs), on a relay of their own — because the notice is only worth
