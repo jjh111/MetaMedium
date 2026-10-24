@@ -255,10 +255,14 @@ export class Room {
    * the gauge counts too high, never too low. `settle` tells it, after the write.
    */
   trim() {
-    if (!isMintedRoom(this.name)) return;
+    if (!isMintedRoom(this.name)) return 0;
     const excess = mintedExcess(this.reserved, this.held());
     if (excess > 0) { this.reserved -= excess; this.owed += excess; }
+    return excess;
   }
+
+  /** A trim taken back: the write that was to carry it failed, so what is written still says the room reserved it. */
+  untrim(excess) { this.reserved += excess; this.owed -= excess; }
 
   /** What was given back, told to the gauge; left for the next try when it cannot be. */
   async settle() {
@@ -413,7 +417,7 @@ export class Room {
     this.assets.set(hash, rec);
     this.assetBytes += bytes.length;
     this.assetRows += n + 1;
-    this.trim();
+    const excess = this.trim();
     const write = (async () => {
       const keys = [];
       for (let k = 0; k < n; k++) keys.push([acKey(hash, k), bytes.slice(k * ASSET_CHUNK, (k + 1) * ASSET_CHUNK)]);
@@ -425,6 +429,7 @@ export class Room {
       this.assets.delete(hash);
       this.assetBytes -= bytes.length;
       this.assetRows -= n + 1;
+      this.untrim(excess);
       return text(507, 'this room could not keep that picture — nothing was added');
     } finally { this.writing.delete(hash); }
     await this.settle();
@@ -598,7 +603,7 @@ export class Room {
     for (const l of gone) { this.bytes -= l.b; this.lineRows -= l.n + 1; }
     this.dropped += dropped;
     this.lost = lost;
-    this.trim();
+    const excess = this.trim();
     // To every open stream at once and in order; the write below is awaited, so
     // the 204 means the line is kept.
     for (const c of this.clients) c.writer.write(enc.encode(`id: ${id}\ndata: ${body}\n\n`)).catch(() => this.drop(c));
@@ -607,7 +612,7 @@ export class Room {
     // The writer's claim is written with its first line kept — a name claimed now, or held since a beat claimed it.
     const claimed = verdict.claim || (this.unwritten.has(writer) ? writer : '');
     if (claimed) { put[hKey(claimed)] = this.claims.get(claimed); this.unwritten.delete(claimed); }
-    await this.ctx.storage.put(put);
+    try { await this.ctx.storage.put(put); } catch (err) { this.untrim(excess); throw err; }
     await this.forget(gone.flatMap((l) => [mKey(l.id), ...Array.from({ length: l.n }, (_, k) => cKey(l.id, k))]).concat(unclaim.map(hKey)));
     await this.settle();
     return new Response(null, { status: 204 });
