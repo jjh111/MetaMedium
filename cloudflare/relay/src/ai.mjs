@@ -13,7 +13,8 @@
 // Who may ask (`MM_DECIDE`: off | keyed | limited, `limited` when unset):
 //   * a page of the app (an Origin `http.mjs` allows), limited per address — `DECIDE_PER_MINUTE.caller` a minute and
 //     `DECIDE_PER_DAY.caller` a day, its share of the budget — an IPv6 address by its /64 (`callerKey`), because one
-//     machine holds a whole /64 and would otherwise be 2^64 callers;
+//     machine holds a whole /64 and would otherwise be 2^64 callers, and by its /56 at NET56_TIMES as much
+//     (`callerBuckets`), because one home holds 256 /64s;
 //   * a hand with the key of a room named by hand (`Authorization: Bearer` and `X-Dyna-Room`, checked as the rooms
 //     check one), limited per room — `DECIDE_PER_MINUTE.room` a minute — and by its address's share of the day like
 //     any caller; `keyed` admits only these. The key of a room the relay opened (`POST /rooms`) is anyone's for the
@@ -22,7 +23,11 @@
 //     script anywhere would otherwise ask the account's Workers AI for free;
 //   * and every call, whoever asks, counts against one budget a day (`MM_AI_DAILY`, `DEFAULT_AI_DAILY`), past which
 //     the answer is 429 and the sentence says the engine's ranking stands.
-// The counts are `limits.mjs`'s (one count wherever a request lands; with no LIMITS binding the route fails closed).
+// The counts are `limits.mjs`'s (one count wherever a request lands; with no LIMITS binding the route fails closed),
+// and a request that will be refused writes no row there: it is counted first in the isolate's own memory
+// (`prefilter`, the minute's limit), then its body is read and checked, and only a request that could reach a model
+// is counted where it lasts — its minute, its address's share of the day and the day's budget in one hit, taken all
+// or none, so one that any of them refuses writes nothing. A request let through writes a row for each count.
 //
 // The call: `env.AI.run(<@cf id>, { state, questions | fields, images? })`, raced against `DECIDE_WAIT_MS` (504 in
 // words), a throw said with its first 160 characters (502), and on 200 `{ ok, model, ms, answers }` with the
@@ -30,9 +35,9 @@
 // What is logged is the route, the model, the status, the time and the size — never a state, a question or a
 // criterion.
 
-import { originAllowed, corsHeaders, text, json, callerOf, callerKey } from './http.mjs';
+import { originAllowed, corsHeaders, text, json, callerKey, callerBucketsOf } from './http.mjs';
 import { secretsOf, keyOpens } from './auth.mjs';
-import { hit } from './limits.mjs';
+import { hit, perCaller, prefilter } from './limits.mjs';
 import { isMintedRoom } from '../../../Demos/relay-protocol.mjs';
 import {
   DECIDE_MODELS, EXTRACT_MODELS, DECIDE_LIMITS, DECIDE_WAIT_MS, DECIDE_PER_MINUTE, DECIDE_PER_DAY, DECIDE_WORDS,
@@ -132,15 +137,16 @@ async function modelRoute(request, env, cors, route) {
   if (!asker.keyed && !request.headers.get('origin')) return no(403, DECIDE_WORDS.noOrigin, cors);
   if (mode === 'keyed' && !asker.keyed) return no(401, DECIDE_WORDS.keyed, cors);
 
-  // Counted before the body is read: a flood of anything is a flood.
-  let count;
-  try {
-    count = asker.keyed
-      ? await hit(env, 'ai', 'room:' + asker.room, { limit: DECIDE_PER_MINUTE.room, windowMs: MINUTE })
-      : await hit(env, 'ai', 'ip:' + callerOf(request), { limit: DECIDE_PER_MINUTE.caller, windowMs: MINUTE });
-  } catch { return no(503, DECIDE_WORDS.uncounted, cors); }
-  if (!count.ok) return no(429, DECIDE_WORDS.rate, { ...cors, 'retry-after': String(count.retryAfter || 60) });
+  // Counted in memory first: a flood from one caller is refused here and writes nothing anywhere.
+  const buckets = callerBucketsOf(request);
+  const minute = asker.keyed
+    ? { key: 'room:' + asker.room, limit: DECIDE_PER_MINUTE.room }
+    : { key: 'ip:' + buckets[0].key, limit: DECIDE_PER_MINUTE.caller };
+  const wait = prefilter(env, 'ai ' + minute.key, minute.limit, MINUTE);
+  if (wait) return no(429, DECIDE_WORDS.rate, { ...cors, 'retry-after': String(wait) });
 
+  // The body read and checked before anything is counted where it lasts: a request that would be refused for what it
+  // is writes no row.
   const read = await bodyText(request, DECIDE_LIMITS.bodyWithImages);
   if (read.over) return no(413, DECIDE_WORDS.tooBig(DECIDE_LIMITS.bodyWithImages / 1024), cors);
   let body;
@@ -151,16 +157,22 @@ async function modelRoute(request, env, cors, route) {
   const why = route === 'extract' ? extractCheck(body) : decideCheck(body);
   if (why) return no(400, why, cors);
 
-  // Every call that will reach a model counts against the day's budget — one budget for both routes — and against
-  // its address's share of it first, a room's key or none: a key is free to have (POST /rooms mints one for any page of
-  // the app), so a share by key would let one machine mint rooms and spend the day for everyone.
-  let budget;
-  try {
-    const share = await hit(env, 'ai-share', 'ip:' + callerOf(request), { limit: DECIDE_PER_DAY.caller, windowMs: DAY });
-    if (!share.ok) return no(429, DECIDE_WORDS.share, { ...cors, 'retry-after': String(share.retryAfter || 3600) });
-    budget = await hit(env, 'ai-budget', 'day', { limit: aiDailyFrom(env), windowMs: DAY });
-  } catch { return no(503, DECIDE_WORDS.uncounted, cors); }
-  if (!budget.ok) return no(429, DECIDE_WORDS.spent, { ...cors, 'retry-after': String(budget.retryAfter || 3600) });
+  // Then, in one hit taken all or none: the minute (a room's, or its address's), its address's share of the day's
+  // budget — one budget for both routes — whatever key it holds (a key is free to have: POST /rooms mints one for any
+  // page of the app, so a share by key would let one machine mint rooms and spend the day for everyone), and the
+  // day's budget across everyone.
+  const minutes = asker.keyed
+    ? [{ key: minute.key, limit: minute.limit, windowMs: MINUTE }]
+    : perCaller('ip:', buckets, { limit: DECIDE_PER_MINUTE.caller, windowMs: MINUTE });
+  const shares = perCaller('share:ip:', buckets, { limit: DECIDE_PER_DAY.caller, windowMs: DAY });
+  let count;
+  try { count = await hit(env, 'ai', [...minutes, ...shares, { key: 'budget', limit: aiDailyFrom(env), windowMs: DAY }]); }
+  catch { return no(503, DECIDE_WORDS.uncounted, cors); }
+  if (!count.ok) {
+    const i = Number(count.refused);
+    const words = i < minutes.length ? DECIDE_WORDS.rate : i < minutes.length + shares.length ? DECIDE_WORDS.share : DECIDE_WORDS.spent;
+    return no(429, words, { ...cors, 'retry-after': String(count.retryAfter || (i < minutes.length ? 60 : 3600)) });
+  }
 
   const m = models[body.model];
   const input = route === 'extract'
@@ -211,15 +223,16 @@ async function chatRoute(request, env, cors) {
   if (asker.refuse) return refuse(asker.refuse[0], asker.refuse[0] === 401 ? AI_WORDS.keyed : asker.refuse[1], cors);
   if (!asker.keyed && !request.headers.get('origin')) return refuse(403, AI_WORDS.noOrigin, cors);
   if (mode === 'keyed' && !asker.keyed) return refuse(401, AI_WORDS.keyed, cors);
-  const who = asker.keyed ? 'room:' + asker.room : 'ip:' + callerOf(request);
+  // Counted in memory first: a flood from one caller is refused here and writes nothing anywhere.
+  const buckets = callerBucketsOf(request);
+  const minute = asker.keyed
+    ? { key: 'room:' + asker.room, limit: AI_CHAT_PER_MINUTE.room }
+    : { key: 'ip:' + buckets[0].key, limit: AI_CHAT_PER_MINUTE.caller };
+  const wait = prefilter(env, 'ai-chat ' + minute.key, minute.limit, MINUTE);
+  if (wait) return refuse(429, AI_WORDS.rate, { ...cors, 'retry-after': String(wait) });
 
-  // Counted before the body is read: a flood of anything is a flood.
-  let count;
-  try {
-    count = await hit(env, 'ai-chat', who, { limit: asker.keyed ? AI_CHAT_PER_MINUTE.room : AI_CHAT_PER_MINUTE.caller, windowMs: MINUTE });
-  } catch { return refuse(503, AI_WORDS.uncounted, cors); }
-  if (!count.ok) return refuse(429, AI_WORDS.rate, { ...cors, 'retry-after': String(count.retryAfter || 60) });
-
+  // The body read and checked before anything is counted where it lasts: a request that would be refused for what it
+  // is writes no row.
   const read = await bodyText(request, AI_CHAT_LIMITS.bodyWithImages);
   if (read.over) return refuse(413, AI_WORDS.tooBig(AI_CHAT_LIMITS.bodyWithImages), cors);
   let body;
@@ -232,16 +245,21 @@ async function chatRoute(request, env, cors) {
   const m = models[body.model];
   if (!m.id) return refuse(503, AI_WORDS.notSet(body.model), cors);
 
-  // Every call that will reach a model counts against the day's budget for chat, and against its address's share of it
-  // first — a room's key or none: a key is free to have (POST /rooms mints one for any page of the app), so a share by
-  // key would let one machine mint rooms and spend the day for everyone.
-  let budget;
-  try {
-    const share = await hit(env, 'ai-chat-share', 'ip:' + callerOf(request), { limit: AI_CHAT_PER_DAY.caller, windowMs: DAY });
-    if (!share.ok) return refuse(429, AI_WORDS.share, { ...cors, 'retry-after': String(share.retryAfter || 3600) });
-    budget = await hit(env, 'ai-chat-budget', 'day', { limit: aiChatDailyFrom(env), windowMs: DAY });
-  } catch { return refuse(503, AI_WORDS.uncounted, cors); }
-  if (!budget.ok) return refuse(429, AI_WORDS.spent, { ...cors, 'retry-after': String(budget.retryAfter || 3600) });
+  // Then, in one hit taken all or none: the minute (a room's, or its address's), its address's share of the day's
+  // budget for chat whatever key it holds (a key is free to have: POST /rooms mints one for any page of the app), and
+  // the day's budget for chat across everyone.
+  const minutes = asker.keyed
+    ? [{ key: minute.key, limit: minute.limit, windowMs: MINUTE }]
+    : perCaller('ip:', buckets, { limit: AI_CHAT_PER_MINUTE.caller, windowMs: MINUTE });
+  const shares = perCaller('share:ip:', buckets, { limit: AI_CHAT_PER_DAY.caller, windowMs: DAY });
+  let count;
+  try { count = await hit(env, 'ai-chat', [...minutes, ...shares, { key: 'budget', limit: aiChatDailyFrom(env), windowMs: DAY }]); }
+  catch { return refuse(503, AI_WORDS.uncounted, cors); }
+  if (!count.ok) {
+    const i = Number(count.refused);
+    const words = i < minutes.length ? AI_WORDS.rate : i < minutes.length + shares.length ? AI_WORDS.share : AI_WORDS.spent;
+    return refuse(429, words, { ...cors, 'retry-after': String(count.retryAfter || (i < minutes.length ? 60 : 3600)) });
+  }
 
   const input = chatInput(body, m);
   const t0 = Date.now();
