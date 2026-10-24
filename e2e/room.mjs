@@ -22,6 +22,8 @@
 //   fern      saves a copy of the room to her boards, and it opens as a board of her own; shared again, every mark on it
 //             goes in — ann's as ann's — and a guest of the new room sees them all;
 //   a board   too big to carry is said before anything is sent, with the way to share an empty one;
+//   bob       in eve's room, her program playing and not played by him, opens the film example: her program never runs
+//             in his page as it leaves for the example's board, and the example's own film is let run there;
 //   and the key is in no storage, no cache, no export, no text on the page and no address a request went to.
 
 import { startDevRelay } from '../cloudflare/relay/dev-server.mjs';
@@ -395,6 +397,48 @@ export async function runRoom(browser, servers, ctx) {
       const me = (await room(E.page)).me;
       check(`R11b. “Share an empty board instead”: asked her name first (she had none), then a room with nothing carried in — “${words.slice(0, 60)}” — as ${me}`,
         named && shared && /^an empty board is shared/.test(words) && /^bea~/.test(me) && asked.length === 1, { words, me, asked });
+    });
+
+    // ---- R13. an example opened from a room runs nobody's program but its own: another hand's, playing in the room,
+    // never runs in the page that leaves for the example, and the example's own film is let run on the board made ------
+    await record('R13', async () => {
+      const ev = await contextOf(browser, freshContext, servers, relay, 'room-eve', { name: 'eve' });
+      guardsList.push(ev.guards);
+      ev.page = await ev.context.newPage();
+      await ev.page.goto(`${app}?fresh=1&nosw=1&relay=${encodeURIComponent(relay.url)}`, { waitUntil: 'load', timeout: 60000 });
+      await waitReady(ev.page);
+      await ev.page.evaluate(() => {
+        const s = window.__mm.session; let at = Date.now();
+        const id = s.import({ kind: 'run', path: 'eve.run.js', name: 'eve', bounds: { minX: 700, minY: 300, maxX: 900, maxY: 460 }, code: "mm.report('eve-code-ran', 0, 0, 40, 40);", at: at++ });
+        s.clock({ nodeId: id, op: 'play', at: at++ });
+      });
+      await ev.page.evaluate(() => window.__mm.shareBoard());
+      await until(ev.page, () => window.__mm.room().inRoom);
+      const link = await ev.page.evaluate(() => location.href);
+      const bo = await contextOf(browser, freshContext, servers, relay, 'room-bob', { name: 'bob' });
+      guardsList.push(bo.guards);
+      bo.page = await bo.context.newPage();
+      const reports = [];
+      await bo.page.exposeFunction('__roomReport', (r) => reports.push(r));
+      // The room's own address, as eve's page keeps it — the key in its fragment, as an invite carries it.
+      await bo.page.goto(link, { waitUntil: 'load', timeout: 60000 });
+      await waitReady(bo.page);
+      await until(bo.page, () => window.__mm.room().inRoom && window.__mm.session.getState().live.length >= 1);
+      const runId = await bo.page.evaluate(() => { const s = window.__mm.session.getState(); return s.live.find((id) => s.clocks[id] && s.clocks[id].playing) || null; });
+      await bo.page.waitForTimeout(800);
+      const before = await bo.page.evaluate((id) => ({ here: window.__mm.playedHere(id), parts: window.__mm.reportedRegions(id).length, author: window.__mm.clockAuthor(id) }), runId);
+      await bo.page.evaluate((id) => { setInterval(() => { const p = window.__mm.reportedRegions(id); if (p.length) window.__roomReport(p.length); }, 20); }, runId);
+      // A slow network: the board's own page takes a while to come, and the room's page is still here meanwhile.
+      await bo.page.route((u) => /\/app\/\?.*board=/.test(String(u)), async (route) => { await new Promise((r) => setTimeout(r, 1200)); await route.continue(); });
+      await bo.page.click('#ccBtn'); await bo.page.click('#boardsBtn');
+      await bo.page.waitForSelector('#boardsPanel:not([hidden]) [data-example-open="story"]', { timeout: 10000 });
+      await bo.page.click('[data-example-open="story"]');
+      await bo.page.waitForURL(/board=/, { timeout: 20000 });
+      await waitReady(bo.page);
+      const film = await until(bo.page, () => { const s = window.__mm.session.getState(); return s.live.some((id) => s.clocks[id] && s.clocks[id].playing && window.__mm.playedHere(id)); }, null, 15000);
+      const after = await bo.page.evaluate(() => ({ inRoom: window.__mm.room().inRoom, search: location.search }));
+      check(`R13. bob, in eve's room with her program playing and not played here (${JSON.stringify(before)}), opens the film example: her program never ran in his page as it left (${reports.length} reports), and on the board made the example's own film is let run (${film}) — out of the room (${after.search})`,
+        !!runId && !before.here && before.parts === 0 && before.author === 'eve' && reports.length === 0 && film && !after.inRoom, { before, reports: reports.length, film, after });
     });
 
     // ---- R12. the key is nowhere it should not be ----------------------------------------------------------------------

@@ -576,9 +576,13 @@
       if (!c || !c.playing || folder.playsSaid.has(id)) continue;
       if (consentedHere(id) || !isProgram(s, id)) continue;
       const who = session.clockAuthor(id);
-      if (!who) continue;
+      // A program this hand plays that another hand gave a new version: that version waits for the person's own play.
+      const by = !who && ownPlayStands(id) ? newVersionBy(s, id) : null;
+      if (!who && !by) continue;
       folder.playsSaid.add(id);
-      say(who + ' set “' + (MM.wordOf(s.nodes.get(id)) || 'a program') + '” playing — it does not run here until you play it; open it and tap “play it here”');
+      const name = '“' + (MM.wordOf(s.nodes.get(id)) || 'a program') + '”';
+      if (who) say(who + ' set ' + name + ' playing — it does not run here until you play it; open it and tap “play it here”');
+      else say(by + ' wrote a new version of ' + name + ' — it does not run here until you play it; open it and tap “play it here”');
     }
   }
 

@@ -141,11 +141,11 @@
       // badge that it is playing for someone else.
       const inLog = !!(s.clocks[id] && s.clocks[id].playing);
       const isProg = kind === 'js' || kind === 'run';
-      const playing = inLog && (!isProg || consentedHere(id));
+      const playing = inLog && (!isProg || consentedHere(id, s));
       f.wrap.classList.toggle('playing', playing);
       // A program playing for another hand — a `js` behaviour as much as a run
       // frame — wears a dashed edge so it reads as standing by, not running.
-      f.wrap.classList.toggle('playing-elsewhere', inLog && isProg && !consentedHere(id));
+      f.wrap.classList.toggle('playing-elsewhere', inLog && isProg && !consentedHere(id, s));
       f.wrap.classList.toggle('writing', isWritingArtifact(node));
       f.wrap.classList.toggle('flipped', flipped.has(id));
 
@@ -199,7 +199,7 @@
     for (const [id, f] of frames) {
       if (f.parked || f.kind !== 'run' || !f.iframe) continue;
       const c = state.clocks[id];
-      if (!c || !c.playing || !consentedHere(id)) continue;
+      if (!c || !c.playing || !consentedHere(id, state)) continue;
       const node = state.nodes.get(id);
       const fr = node && MM.frameOf(node);
       if (!fr) continue;

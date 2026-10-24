@@ -20,7 +20,8 @@
 //   rereadBoards, boardEntryName, exportLogNow, readLogText), input (flash, say), the
 //   inspector's element (the panel's start), boards list (exampleUrl, exampleRows, exampleName, starterOf),
 //   core (params, EMBED, session), folder (boardMode), view (fitAll, fitTo), render (union, viewportWorld),
-//   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1; consentedHere),
+//   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1 — on that board
+//   only, carried to the page that opens it when the board is made from a room, `exampleGrantAtOpen`; consentedHere),
 //   inspector (isProgram), the first hour (27-first.js: motionReduced — under reduced motion the film waits for a play;
 //   restAfterOpen, restWords — an example opens fitted, nothing inspected; one bigger than the screen on its program, said).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -275,6 +276,17 @@
     }
     return box;
   }
+  /** Where an example opened from a room (or a folder) leaves its grant for the page that opens its board: a board id, read once. */
+  const EXAMPLE_GRANT = 'mm-example-grant';
+  /**
+   * The board this page opened on is an example just made by a page that had to leave for it: its own programs may run
+   * here, as they would have had it opened in place — and nothing else's. Read once, at the open, and let go of.
+   */
+  function exampleGrantAtOpen() {
+    let id = null;
+    try { id = sessionStorage.getItem(EXAMPLE_GRANT); sessionStorage.removeItem(EXAMPLE_GRANT); } catch (err) { return; }
+    if (id && id === board.id && boardMode() === 'restore') grantPlayingPrograms();
+  }
   /**
    * Open an example as a board of its own. Resolves the entry made, or false with the reason said
    * through `o.said` (the pane's line, or the status line's) — never thrown, never a board half made.
@@ -301,7 +313,11 @@
       // is dyna.ink's own, from the site's own origin, so this hand's board of
       // its own may run it without a tap (the consent gate, C1). A deliberate,
       // narrow grant, made only here; a loaded board of someone else's gets none.
-      if (made) {
+      // Only on the board just made, on screen: from a room, a folder or a repository the board opens in a page of its
+      // own (`switchBoard` navigates) while this page — and the room's board, with other hands' programs on it — is
+      // still here for a moment; the grant goes with the page it is for (`EXAMPLE_GRANT`, read as that board opens).
+      if (made && board.id !== made.id) { try { sessionStorage.setItem(EXAMPLE_GRANT, made.id); } catch (err) { /* it waits for a play */ } }
+      else if (made) {
         grantPlayingPrograms();
         // Unless the person asked for less motion (C4): then it waits for their own play, and the opening's sentence says so.
         examples.heldBack = motionReduced() && standingPrograms().length ? ' · the film waits for you — this device asks for less motion; press and hold it, then “Play … here”' : '';

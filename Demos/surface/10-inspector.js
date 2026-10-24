@@ -61,10 +61,12 @@
     // Under reduced motion a tank this hand did not start here holds still (C4, 14-clocks.js): its play is the person's.
     const still = !elsewhere && c && c.playing && !isProgram(s, id) && tankHeldStill(s, id);
     const who = elsewhere ? session.clockAuthor(id) : null;
+    // Played here, then given a new version by another hand: that version waits for the person's own play.
+    const by = elsewhere && !who && ownPlayStands(id) ? newVersionBy(s, id) : null;
     // A program's time is its own (a run program keeps none the tank could say); a tank's is said.
     const t = isProgram(s, id) && codeKindOf(s.nodes.get(id)) === 'run' ? '' : ' · t = ' + tankTime(id).toFixed(1) + 's';
     const stateText = !c ? 'not played'
-      : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : motionReduced() ? 'waiting for you to play it — this device asks for less motion' : 'played — not running in this tab yet')
+      : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : by ? 'a new version by ' + by + ' — not running here until you play it' : motionReduced() ? 'waiting for you to play it — this device asks for less motion' : 'played — not running in this tab yet')
       : still ? 'playing — held still here, since this device asks for less motion'
       : c.playing ? 'playing' + t : 'paused' + (c.reason ? ' — ' + c.reason : '') + t;
     return '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>' +

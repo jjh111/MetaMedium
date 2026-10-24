@@ -723,11 +723,11 @@
       // badge that it is playing for someone else.
       const inLog = !!(s.clocks[id] && s.clocks[id].playing);
       const isProg = kind === 'js' || kind === 'run';
-      const playing = inLog && (!isProg || consentedHere(id));
+      const playing = inLog && (!isProg || consentedHere(id, s));
       f.wrap.classList.toggle('playing', playing);
       // A program playing for another hand — a `js` behaviour as much as a run
       // frame — wears a dashed edge so it reads as standing by, not running.
-      f.wrap.classList.toggle('playing-elsewhere', inLog && isProg && !consentedHere(id));
+      f.wrap.classList.toggle('playing-elsewhere', inLog && isProg && !consentedHere(id, s));
       f.wrap.classList.toggle('writing', isWritingArtifact(node));
       f.wrap.classList.toggle('flipped', flipped.has(id));
 
@@ -781,7 +781,7 @@
     for (const [id, f] of frames) {
       if (f.parked || f.kind !== 'run' || !f.iframe) continue;
       const c = state.clocks[id];
-      if (!c || !c.playing || !consentedHere(id)) continue;
+      if (!c || !c.playing || !consentedHere(id, state)) continue;
       const node = state.nodes.get(id);
       const fr = node && MM.frameOf(node);
       if (!fr) continue;
@@ -8978,10 +8978,12 @@
     // Under reduced motion a tank this hand did not start here holds still (C4, 14-clocks.js): its play is the person's.
     const still = !elsewhere && c && c.playing && !isProgram(s, id) && tankHeldStill(s, id);
     const who = elsewhere ? session.clockAuthor(id) : null;
+    // Played here, then given a new version by another hand: that version waits for the person's own play.
+    const by = elsewhere && !who && ownPlayStands(id) ? newVersionBy(s, id) : null;
     // A program's time is its own (a run program keeps none the tank could say); a tank's is said.
     const t = isProgram(s, id) && codeKindOf(s.nodes.get(id)) === 'run' ? '' : ' · t = ' + tankTime(id).toFixed(1) + 's';
     const stateText = !c ? 'not played'
-      : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : motionReduced() ? 'waiting for you to play it — this device asks for less motion' : 'played — not running in this tab yet')
+      : elsewhere ? (who ? 'playing for ' + who + ' — not running here' : by ? 'a new version by ' + by + ' — not running here until you play it' : motionReduced() ? 'waiting for you to play it — this device asks for less motion' : 'played — not running in this tab yet')
       : still ? 'playing — held still here, since this device asks for less motion'
       : c.playing ? 'playing' + t : 'paused' + (c.reason ? ' — ' + c.reason : '') + t;
     return '<div class="row"><span class="k">clock</span><span class="v' + (err ? ' warn' : '') + '">' + esc(stateText) + '</span></div>' +
@@ -9855,7 +9857,7 @@
 // Provides: documentForKind (the renderers: every kind as a document ink can address), the mermaid harness (mermaidFrom, mermaidStates), postPointer (a hand forwarded into a playing frame), the worker runtime
 //   (a blessed `js` artifact's code runs in a worker with a budget; a throw or a hang pauses its clock
 //   with the reason), runtimeOffset, runtimeBroken, syncRuntime, the consent gate (trackConsent, consentedHere,
-//   grantPlayingPrograms — this tab runs a program only when this hand played it here, C1), frameCSP (a run or
+//   grantPlayingPrograms, ownPlayStands — this tab runs a program only when this hand played that very code here, C1), frameCSP (a run or
 //   mermaid frame cannot phone out), WORKER_HARDEN (the js worker keeps only Math/performance/Function/postMessage).
 // Uses: core (session, esc), artifacts (frames, documentFor), render (render), the first hour (27-first.js: motionReduced —
 //   under reduced motion an example's program is not granted, and waits for the person's own play).
@@ -10587,39 +10589,86 @@
   // This is runtime only (like paint culling): it governs what this tab runs,
   // never the session state, so undo per hand still stops it — undo drops this
   // hand's play, the clock stops, the loop stops.
-  const grantedHere = new Set();
+  // A grant is for the CODE it was given to, never only the artifact: another hand may write a new version of a
+  // program this hand played (a revision of theirs, the MCP hand's canvas_write), and that version runs here only
+  // after *Play it here* again. So a grant holds the versions of the artifact's code this hand played, or wrote
+  // itself while playing it (its own model's revision is its own); a newer version from anyone else is not among
+  // them, and the program stands by — dashed, offering *Play it here* — until the person plays it.
+  const grantedHere = new Map(); // artifactId -> Set of code versions (`codeVersionOf`) this hand may run here
   let consentArr = null, consentLen = 0;
+  /** The version of an artifact's code: its newest code rep, by when it was written and what it says. */
+  function codeVersionOf(s, id) {
+    const node = s && s.nodes.get(id);
+    const rep = node && codeRepOf(node);
+    return rep ? rep.data.at + ':' + hashOf(rep.data.code || '') : '';
+  }
+  function grantCode(s, id) {
+    let versions = grantedHere.get(id);
+    if (!versions) grantedHere.set(id, (versions = new Set()));
+    versions.add(codeVersionOf(s, id));
+  }
+  /**
+   * Whether this hand's own play of an artifact still stands: the last of its own clock events (no `by` — every
+   * other hand's line is stamped on arrival) that plays, pauses or resets it is a play. Another hand's play after it
+   * leaves it standing (a guest pressed *Play it here* too); another's pause stops the clock in the log itself.
+   */
+  function ownPlayStands(id) {
+    const evs = session.getEvents();
+    for (let i = evs.length - 1; i >= 0; i--) {
+      const ev = evs[i];
+      if (!ev || ev.type !== 'clock' || ev.nodeId !== id || ev.by) continue;
+      if (ev.op === 'play') return true;
+      if (ev.op === 'pause' || ev.op === 'reset') return false;
+    }
+    return false;
+  }
   function trackConsent(s) {
     const evs = session.getEvents();
     if (evs !== consentArr) {
       // A NEW events array — a load, an undo, a room rebase that cut, a reset.
       // Nothing LOADED is granted (another hand's program, or your own from a
       // file/reload, waits for *Play it here*), but a grant this hand already
-      // gave survives an unrelated change: it is kept only while the artifact
-      // is still live and playing AND the latest play is still this hand's
-      // own (`clockAuthor` null). So undoing an unrelated stroke leaves a
-      // running program running, while undoing this hand's OWN play drops the
-      // grant — the clock falls to whatever is left and it stops here.
+      // gave survives an unrelated change: it is kept while the artifact is
+      // still live and playing AND this hand's own play still stands
+      // (`ownPlayStands`) — whoever played it after. So undoing an unrelated
+      // stroke, or another hand's late line, leaves a running program running,
+      // while undoing this hand's OWN play drops the grant and it stops here.
       consentArr = evs; consentLen = evs.length;
-      for (const id of [...grantedHere]) {
+      for (const id of [...grantedHere.keys()]) {
         const c = s.clocks[id];
-        if (!(s.live.includes(id) && c && c.playing && session.clockAuthor(id) === null)) grantedHere.delete(id);
+        if (!(s.live.includes(id) && c && c.playing && ownPlayStands(id))) grantedHere.delete(id);
       }
     } else {
-      // Appended live: a `clock{op:'play'}` THIS hand wrote (no `by` — every
-      // other hand's line is stamped on arrival) grants its artifact. A room
-      // line that only appends keeps the same array, so a foreign play lands
-      // here too — and is refused, because it carries `by`.
+      // Appended live: a `clock{op:'play'}` THIS hand wrote (no `by`) grants the
+      // code as it stands; a `code` event this hand wrote (its own revision, its
+      // own model's) for a program it plays grants that version too. A room
+      // line that only appends keeps the same array, so a foreign play or a
+      // foreign version lands here too — and is refused, because it carries `by`.
       for (let i = consentLen; i < evs.length; i++) {
         const ev = evs[i];
-        if (ev && ev.type === 'clock' && ev.op === 'play' && !ev.by) grantedHere.add(ev.nodeId);
+        if (!ev || ev.by) continue;
+        if (ev.type === 'clock' && ev.op === 'play') grantCode(s, ev.nodeId);
+        else if (ev.type === 'code' && grantedHere.has(ev.nodeId)) grantCode(s, ev.nodeId);
       }
       consentLen = evs.length;
-      for (const id of [...grantedHere]) if (!s.live.includes(id) && !s.clocks[id]) grantedHere.delete(id);
+      for (const id of [...grantedHere.keys()]) if (!s.live.includes(id) && !s.clocks[id]) grantedHere.delete(id);
     }
   }
-  /** Whether this tab may run this artifact's code: this hand played it here. */
-  function consentedHere(id) { return grantedHere.has(id); }
+  /**
+   * Who wrote the version of a program's code that stands, when it is not this hand — the name of a hand whose new
+   * version of a program this hand plays waits here for *Play it here* — else null.
+   */
+  function newVersionBy(s, id) {
+    const node = s && s.nodes.get(id);
+    const rep = node && codeRepOf(node);
+    if (!rep || !rep.source || rep.source === MM.LOCAL_PARTICIPANT) return null;
+    return nameOfParticipant(rep.source);
+  }
+  /** Whether this tab may run this artifact's code as it stands now: this hand played this very version here. */
+  function consentedHere(id, s) {
+    const versions = grantedHere.get(id);
+    return !!versions && versions.has(codeVersionOf(s || session.getState(), id));
+  }
   /**
    * Play a program HERE — the person's one tap when it is playing for another
    * hand (C1). It writes this hand's OWN `clock{op:'play'}`, so the consent is
@@ -10647,11 +10696,11 @@
     const s = session.getState();
     let any = false;
     for (const id of Object.keys(s.clocks)) {
-      if (!s.clocks[id].playing || grantedHere.has(id)) continue;
+      if (!s.clocks[id].playing || consentedHere(id, s)) continue;
       const node = s.nodes.get(id);
       const rep = node && codeRepOf(node);
       const kind = rep && (rep.data.kind || 'html');
-      if (kind === 'js' || kind === 'run') { grantedHere.add(id); any = true; }
+      if (kind === 'js' || kind === 'run') { grantCode(s, id); any = true; }
     }
     if (any) render(session.getState());
   }
@@ -10661,7 +10710,7 @@
     const out = [];
     for (const id of s.live) {
       const c = s.clocks[id];
-      if (!c || !c.playing || !consentedHere(id)) continue;
+      if (!c || !c.playing || !consentedHere(id, s)) continue;
       const node = s.nodes.get(id);
       const rep = node && codeRepOf(node);
       if (!rep || (rep.data.kind || 'html') !== 'js') continue;
@@ -11041,7 +11090,7 @@
     const evs = session.getEvents();
     if (evs !== tankSeenArr) {
       tankSeenArr = evs; tankSeenLen = evs.length;
-      for (const id of [...tankStartedHere]) { const c = s.clocks[id]; if (!(c && c.playing && session.clockAuthor(id) === null)) tankStartedHere.delete(id); }
+      for (const id of [...tankStartedHere]) { const c = s.clocks[id]; if (!(c && c.playing && ownPlayStands(id))) tankStartedHere.delete(id); }
       return;
     }
     for (let i = tankSeenLen; i < evs.length; i++) { const ev = evs[i]; if (ev && ev.type === 'clock' && ev.op === 'play' && !ev.by) tankStartedHere.add(ev.nodeId); }
@@ -14096,9 +14145,13 @@
       if (!c || !c.playing || folder.playsSaid.has(id)) continue;
       if (consentedHere(id) || !isProgram(s, id)) continue;
       const who = session.clockAuthor(id);
-      if (!who) continue;
+      // A program this hand plays that another hand gave a new version: that version waits for the person's own play.
+      const by = !who && ownPlayStands(id) ? newVersionBy(s, id) : null;
+      if (!who && !by) continue;
       folder.playsSaid.add(id);
-      say(who + ' set “' + (MM.wordOf(s.nodes.get(id)) || 'a program') + '” playing — it does not run here until you play it; open it and tap “play it here”');
+      const name = '“' + (MM.wordOf(s.nodes.get(id)) || 'a program') + '”';
+      if (who) say(who + ' set ' + name + ' playing — it does not run here until you play it; open it and tap “play it here”');
+      else say(by + ' wrote a new version of ' + name + ' — it does not run here until you play it; open it and tap “play it here”');
     }
   }
 
@@ -17310,7 +17363,8 @@
 //   rereadBoards, boardEntryName, exportLogNow, readLogText), input (flash, say), the
 //   inspector's element (the panel's start), boards list (exampleUrl, exampleRows, exampleName, starterOf),
 //   core (params, EMBED, session), folder (boardMode), view (fitAll, fitTo), render (union, viewportWorld),
-//   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1; consentedHere),
+//   kinds (grantPlayingPrograms: a shipped example's own program may run in its board of your own, C1 — on that board
+//   only, carried to the page that opens it when the board is made from a room, `exampleGrantAtOpen`; consentedHere),
 //   inspector (isProgram), the first hour (27-first.js: motionReduced — under reduced motion the film waits for a play;
 //   restAfterOpen, restWords — an example opens fitted, nothing inspected; one bigger than the screen on its program, said).
 // A fragment of one closure: Demos/build-surface.mjs concatenates surface/*.js
@@ -17565,6 +17619,17 @@
     }
     return box;
   }
+  /** Where an example opened from a room (or a folder) leaves its grant for the page that opens its board: a board id, read once. */
+  const EXAMPLE_GRANT = 'mm-example-grant';
+  /**
+   * The board this page opened on is an example just made by a page that had to leave for it: its own programs may run
+   * here, as they would have had it opened in place — and nothing else's. Read once, at the open, and let go of.
+   */
+  function exampleGrantAtOpen() {
+    let id = null;
+    try { id = sessionStorage.getItem(EXAMPLE_GRANT); sessionStorage.removeItem(EXAMPLE_GRANT); } catch (err) { return; }
+    if (id && id === board.id && boardMode() === 'restore') grantPlayingPrograms();
+  }
   /**
    * Open an example as a board of its own. Resolves the entry made, or false with the reason said
    * through `o.said` (the pane's line, or the status line's) — never thrown, never a board half made.
@@ -17591,7 +17656,11 @@
       // is dyna.ink's own, from the site's own origin, so this hand's board of
       // its own may run it without a tap (the consent gate, C1). A deliberate,
       // narrow grant, made only here; a loaded board of someone else's gets none.
-      if (made) {
+      // Only on the board just made, on screen: from a room, a folder or a repository the board opens in a page of its
+      // own (`switchBoard` navigates) while this page — and the room's board, with other hands' programs on it — is
+      // still here for a moment; the grant goes with the page it is for (`EXAMPLE_GRANT`, read as that board opens).
+      if (made && board.id !== made.id) { try { sessionStorage.setItem(EXAMPLE_GRANT, made.id); } catch (err) { /* it waits for a play */ } }
+      else if (made) {
         grantPlayingPrograms();
         // Unless the person asked for less motion (C4): then it waits for their own play, and the opening's sentence says so.
         examples.heldBack = motionReduced() && standingPrograms().length ? ' · the film waits for you — this device asks for less motion; press and hold it, then “Play … here”' : '';
@@ -20224,6 +20293,8 @@
     const settle = (restored) => {
       // The device's mark, taught again only where the board's log says otherwise (so opening a board is not a change to it).
       markAfterOpen();
+      // An example made by a page that left a room for it: its own programs may run, as in place (22-boards.js).
+      exampleGrantAtOpen();
       rejoinRemembered();
       const others = [...boards.entries.values()].filter((e) => isKept(e) && !e.trashed && e.id !== board.id).length;
       if (restored && !board.saidAtOpen) flash('“' + boardOnScreenName() + '” is back' + (others ? ' — ' + others + ' more in boards' : ''));

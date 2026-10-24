@@ -215,6 +215,8 @@
     const settle = (restored) => {
       // The device's mark, taught again only where the board's log says otherwise (so opening a board is not a change to it).
       markAfterOpen();
+      // An example made by a page that left a room for it: its own programs may run, as in place (22-boards.js).
+      exampleGrantAtOpen();
       rejoinRemembered();
       const others = [...boards.entries.values()].filter((e) => isKept(e) && !e.trashed && e.id !== board.id).length;
       if (restored && !board.saidAtOpen) flash('“' + boardOnScreenName() + '” is back' + (others ? ' — ' + others + ' more in boards' : ''));

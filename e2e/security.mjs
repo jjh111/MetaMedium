@@ -260,6 +260,68 @@ export async function runSecurity(browser, servers, { freshContext, screenshot }
         !st.playing && /tried to load another page in its frame/.test(st.reason || '') && navs.length === 1, { st, navs: navs.length });
     });
 
+    // ---- C1.4. A grant is for the code it was given to: another hand's new version of a program this hand plays
+    // does not run here until this hand plays it again ----
+    await record('C1.4', async () => {
+      const st = await page.evaluate(async () => {
+        const mm = window.__mm, session = mm.session;
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        let at = Date.now();
+        const runId = session.import({ kind: 'run', path: 'mine.run.js', name: 'mine', bounds: { minX: 2800, minY: 100, maxX: 3000, maxY: 260 }, code: "mm.report('mine', 0, 0, 40, 40);", at: at++ });
+        session.clock({ nodeId: runId, op: 'play', at: at++ });
+        const jsId = session.import({ kind: 'js', path: 'mine.js', name: 'minefish', bounds: { minX: 3100, minY: 100, maxX: 3200, maxY: 160 }, code: 'return { fx: 0, fy: 0 };', at: at++ });
+        session.clock({ nodeId: jsId, op: 'play', at: at++ });
+        await sleep(1200);
+        const before = { run: mm.playedHere(runId), parts: mm.reportedRegions(runId).map((p) => p.id), js: mm.playedHere(jsId) };
+        // bob, in the room, writes a new version of each (his log's code events, a line that appends).
+        session.rebase(session.getEvents().length, [
+          { type: 'code', nodeId: runId, code: "mm.report('bobs', 0, 0, 40, 40);", kind: 'run', language: 'run', at: at++, origin: 'bob~b1', seq: 1, by: 'bob~b1' },
+          { type: 'code', nodeId: jsId, code: 'return { fx: 500, fy: 0 };', kind: 'js', language: 'js', at: at++, origin: 'bob~b1', seq: 2, by: 'bob~b1' },
+        ]);
+        await sleep(1500);
+        for (let i = 0; i < 4; i++) { try { await mm.runtime().stepOnce(jsId); } catch (e) {} }
+        const b = mm.runtime().bodies.get(jsId);
+        const f = mm.frames && mm.frames.get(runId);
+        const after = { run: mm.playedHere(runId), parts: mm.reportedRegions(runId).map((p) => p.id), js: mm.playedHere(jsId), vx: b ? b.vx : 0,
+          standing: !!(f && f.wrap.classList.contains('playing-elsewhere')) };
+        // Play it here: the person's own play of the version that stands, which then runs.
+        mm.playHere(runId);
+        await sleep(1500);
+        const again = { run: mm.playedHere(runId), parts: mm.reportedRegions(runId).map((p) => p.id) };
+        return { before, after, again };
+      });
+      check('C1.4. this hand’s own program and behaviour, played here, run', st.before.run && st.before.js && st.before.parts.includes('mine'), st.before);
+      check('C1.4. another hand’s new version of each does not run here — its code never ran, the behaviour moves nothing, and the program stands by, dashed, for Play it here',
+        !st.after.run && !st.after.js && !st.after.parts.includes('bobs') && st.after.vx === 0 && st.after.standing, st.after);
+      check('C1.4. Play it here runs the version that stands, by the person’s own act', st.again.run && st.again.parts.includes('bobs'), st.again);
+    });
+
+    // ---- C1.5. A grant holds while this hand's own play stands: another hand playing it too, then an undo of
+    // something else (or a late line that cuts the board), leaves it running here ----
+    await record('C1.5', async () => {
+      const st = await page.evaluate(async () => {
+        const mm = window.__mm, session = mm.session;
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        let at = Date.now();
+        const runId = session.import({ kind: 'run', path: 'ours.run.js', name: 'ours', bounds: { minX: 2800, minY: 400, maxX: 3000, maxY: 560 }, code: "mm.report('ours', 0, 0, 40, 40);", at: at++ });
+        session.clock({ nodeId: runId, op: 'play', at: at++ });
+        const pts = []; for (let i = 0; i <= 30; i++) pts.push({ x: 2800 + i * 4, y: 700 });
+        session.addStroke(pts, at++, undefined, 1);
+        session.rebase(session.getEvents().length, [{ type: 'clock', nodeId: runId, op: 'play', at: at++, origin: 'bob~b1', seq: 3, by: 'bob~b1' }]);
+        await sleep(400);
+        const both = { here: mm.playedHere(runId), author: mm.clockAuthor(runId) };
+        session.undo();
+        await sleep(500);
+        const undone = { here: mm.playedHere(runId), playing: session.getState().clocks[runId].playing };
+        const evs = session.getEvents(), i = evs.length - 1;
+        session.rebase(i, [{ type: 'stroke', id: 'late', points: pts.map((p) => ({ x: p.x, y: p.y + 80 })), at: evs[i].at - 1, origin: 'bob~b1', seq: 4, by: 'bob~b1', scale: 1 }, evs[i]]);
+        await sleep(500);
+        return { both, undone, cut: { here: mm.playedHere(runId) } };
+      });
+      check('C1.5. another hand playing this hand’s program too leaves it running here; so does an undo of an unrelated stroke, and a late line of theirs that cuts the board',
+        st.both.here && st.both.author === 'bob' && st.undone.here && st.undone.playing && st.cut.here, st);
+    });
+
     // ---- XSS. Injected names, labels, svg/mermaid/page never execute ----
     await record('XSS', async () => {
       await page.goto(`${origin}/${APP}`, { waitUntil: 'load', timeout: 60000 });
