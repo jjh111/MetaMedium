@@ -56,8 +56,8 @@ describe('what is sent', () => {
     await createChatDecideTransport(CONFIG, { complete })([score('q2', 'how big?', ['low', 'mid', 'high']), noul('q3', 'is it a box?')], {});
     const body = JSON.parse(String(sent[0].messages[1].content));
     expect(body.questions.map((q: any) => [q.id, q.kind, q.options.map((o: any) => o.id)])).toEqual([
-      ['q2', 'score', ['low', 'mid', 'high']],
-      ['q3', 'noul', ['yes', 'no']],
+      ['q1', 'score', ['low', 'mid', 'high']],
+      ['q2', 'noul', ['yes', 'no']],
     ]);
   });
 
@@ -111,6 +111,38 @@ describe('what is read', () => {
     const { complete } = says(R.fenced.content);
     const r = await createChatDecideTransport(CONFIG, { complete })([q1], {});
     expect(r.ok && r.answers.length).toBe(1);
+  });
+
+  it('names the questions q1…qn on the wire and reads the answers back by them: a question’s own id — a node id and the hand’s log name in it — never leaves the page', async () => {
+    const qs: DecisionQuestion[] = [
+      choice('which:stroke:john~a1b2:3', 'which of these is the group of marks?', [{ id: 'molecule', text: 'a molecule' }, { id: 'compound', text: 'a compound' }], ['stroke:john~a1b2:3']),
+      choice('notation:stroke:john~a1b2:3', 'which kind of diagram is this drawing?', [{ id: 'flowchart', text: 'a flowchart' }, { id: 'diagram', text: 'a diagram' }], ['stroke:john~a1b2:3']),
+    ];
+    const reply = JSON.stringify({ answers: [
+      { id: 'q1', probabilities: { molecule: 0.995, compound: 0.003, [NO_MATCH]: 0.002 } },
+      { id: 'q2', probabilities: { flowchart: 0.01, diagram: 0.98, [NO_MATCH]: 0.01 } },
+    ] });
+    const { complete, sent } = says(reply);
+    const r = await createChatDecideTransport(CONFIG, { complete })(qs, {});
+    const user = String(sent[0].messages[1].content);
+    expect(JSON.parse(user).questions.map((q: { id: string }) => q.id)).toEqual(['q1', 'q2']);
+    expect(user).not.toMatch(/stroke:|john~a1b2/);
+    if (!r.ok) throw new Error(r.error);
+    expect(r.answers.map((a) => [a.questionId, a.kind === 'choice' && a.pick])).toEqual([['which:stroke:john~a1b2:3', 'molecule'], ['notation:stroke:john~a1b2:3', 'diagram']]);
+  });
+
+  it('a part of a distribution is no answer — the pick’s probability alone is never stretched to a certainty — and a sum over 1 is normalised', async () => {
+    for (const probabilities of [{ molecule: 0.6 }, { molecule: 0.55, compound: 0 }, { molecule: 0.7, compound: 0.2 }]) {
+      const { complete } = says(JSON.stringify({ answers: [{ id: 'q1', probabilities }] }));
+      const r = await createChatDecideTransport(CONFIG, { complete })([q1], {});
+      expect(r.ok).toBe(true);
+      if (r.ok) expect(r.answers, JSON.stringify(probabilities)).toEqual([]);
+    }
+    const { complete } = says(JSON.stringify({ answers: [{ id: 'q1', probabilities: { molecule: 60, compound: 30, [NO_MATCH]: 10 } }] }));
+    const r = await createChatDecideTransport(CONFIG, { complete })([q1], {});
+    if (!r.ok) throw new Error(r.error);
+    const a = r.answers[0];
+    expect(a.kind === 'choice' && a.distribution.find((d) => d.of === 'molecule')?.p).toBeCloseTo(0.6, 9);
   });
 
   it('refuses an option nobody offered and a distribution that is not one: the question is unanswered, never guessed', async () => {

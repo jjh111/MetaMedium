@@ -73,6 +73,22 @@ export const DECIDER_TAKE_AT = 0.99;
  */
 export const FLAT_MARGIN = 0.05;
 
+/**
+ * How far a distribution's sum may stand off 1 and still be read as the model's own. A sum a little under 1 is the
+ * whole, rounded; one further under is a PART of a distribution — the chosen label's probability alone, or the top
+ * few — and is no answer: spread over what it left out as nothing and divided by its sum, a 0.6 would be held as a
+ * certainty, past `DECIDER_TAKE_AT`. A sum over 1 is normalised (percentages, a vendor that does not divide), and
+ * said. Read by both decision transports (`llm/decide-openrouter.ts`, `llm/decide-systemone.ts`).
+ */
+export const SUM_SLACK = 0.02;
+
+/** Why a distribution's sum makes it no answer, or null when it may be normalised: one home for both transports. */
+export function partialSum(sum: number): string | null {
+  if (!(sum > 0)) return 'its probabilities sum to nothing';
+  if (sum < 1 - SUM_SLACK) return `its probabilities account for only ${sum.toFixed(3)} of the whole — a part of a distribution is no answer`;
+  return null;
+}
+
 export interface DecisionCandidate {
   /** The id the reply comes back as. Mapped to a node id in code, never by the seat. */
   id: string;

@@ -36,8 +36,10 @@
 //     `{ key: p }` or a list of `{ option|of|id|level|label, p|prob|probability }` (and, for a score, a list of
 //     numbers in the levels' order). Every spelling present must agree; none present is no answer — a reply that
 //     says only a pick and a confidence is unanswered, because a distribution made out of a pick is a guess;
-//   * a key nobody offered — a vendor's own `none` or `other` — a negative or non-finite probability, or a sum of
-//     nothing, leaves the question unanswered; a sum more than `SUM_SLACK` off 1 is normalised, and said;
+//   * a key nobody offered — a vendor's own `none` or `other` — a negative or non-finite probability, a sum of
+//     nothing, or a sum more than `SUM_SLACK` under 1 (a part of a distribution: the pick's probability alone, the
+//     top few — stretched over the rest as nothing, a 0.6 would be held as a certainty) leaves the question
+//     unanswered; a sum more than `SUM_SLACK` over 1 is normalised, and said;
 //   * a score's keys may be its level words or their places (`"0"`, `"1"` …): where a level word is itself
 //     integer-like the two cannot be told apart, and the question is unanswered rather than read one way; a
 //     `legend` that says the levels otherwise than they were sent leaves it unanswered too;
@@ -57,6 +59,8 @@ import { postJson } from './provider';
 import {
   FLAT_MARGIN,
   NO_MATCH,
+  SUM_SLACK,
+  partialSum,
   type DecideResult,
   type DecideState,
   type DecideTransport,
@@ -77,8 +81,8 @@ export const SYSTEMONE_TIMEOUT_MS = 20_000;
 export const SYSTEMONE_WORDS_MAX = 1000;
 /** The most characters of a state that are sent. */
 export const SYSTEMONE_STATE_MAX = 16000;
-/** How far a distribution's sum may stand off 1 before it is normalised and said. */
-export const SUM_SLACK = 0.02;
+/** How far a distribution's sum may stand off 1 before it is normalised and said — or, under, is no answer (the seat's, `decide.ts`). */
+export { SUM_SLACK };
 /** How far two spellings of one number may differ and still be one number. */
 const SAME = 1e-6;
 
@@ -238,7 +242,8 @@ function distributionOf(
 function overOffered(dist: Map<string, number>, offered: Map<string, string>, notes: string[], name: string): Probability[] | string {
   if ([...dist.values()].some((p) => !Number.isFinite(p) || p < 0)) return 'a probability that is not one';
   const sum = [...dist.values()].reduce((n, p) => n + p, 0);
-  if (!(sum > 0)) return 'its probabilities sum to nothing';
+  const partial = partialSum(sum);
+  if (partial) return partial;
   if (Math.abs(sum - 1) > SUM_SLACK) notes.push(`${name}: its probabilities summed to ${sum.toFixed(3)} — normalised`);
   return [...offered].map(([k, id]) => ({ of: id, p: (dist.get(k) ?? 0) / sum }));
 }

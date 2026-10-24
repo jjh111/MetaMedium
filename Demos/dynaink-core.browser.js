@@ -693,6 +693,7 @@ var DynaInkCore = (() => {
     parseSafetensors: () => parseSafetensors,
     parseShapes: () => parseShapes,
     parseTranscripts: () => parseTranscripts,
+    partialSum: () => partialSum,
     participantOfLog: () => participantOfLog,
     pendingBriefs: () => pendingBriefs,
     pictureOf: () => pictureOf,
@@ -883,6 +884,7 @@ var DynaInkCore = (() => {
     whichQuestion: () => whichQuestion,
     whoseInk: () => whoseInk,
     whyNotResolved: () => whyNotResolved,
+    wireName: () => wireName,
     wireQuestion: () => wireQuestion,
     withParams: () => withParams,
     withinReach: () => withinReach,
@@ -27437,6 +27439,12 @@ ${pad}</${tag}>`;
   var NO_MATCH = "no-match";
   var DECIDER_TAKE_AT = 0.99;
   var FLAT_MARGIN = 0.05;
+  var SUM_SLACK = 0.02;
+  function partialSum(sum) {
+    if (!(sum > 0)) return "its probabilities sum to nothing";
+    if (sum < 1 - SUM_SLACK) return `its probabilities account for only ${sum.toFixed(3)} of the whole \u2014 a part of a distribution is no answer`;
+    return null;
+  }
   function choice(id, ask, candidates, about, options = {}) {
     const has2 = candidates.some((c) => c.id === NO_MATCH);
     return {
@@ -27667,13 +27675,14 @@ ${pad}</${tag}>`;
     "Reply with JSON only, in exactly this shape, and nothing around it:",
     '{"answers":[{"id":"<the question id>","probabilities":{"<option id>":<0 to 1>, ...}}]}'
   ].join("\n");
+  var wireName = (i) => "q" + (i + 1);
   var CHAT_DECIDE_WIRE = {
     id: "chat",
     build(questions, state) {
       const said3 = state && state.text ? { state: state.text } : {};
       return [
         { role: "system", content: SYSTEM },
-        { role: "user", content: JSON.stringify({ ...said3, questions: questions.map(wireQuestion) }) }
+        { role: "user", content: JSON.stringify({ ...said3, questions: questions.map((q, i) => ({ ...wireQuestion(q), id: wireName(i) })) }) }
       ];
     },
     parse(text, questions) {
@@ -27681,7 +27690,7 @@ ${pad}</${tag}>`;
       if (body === void 0) return { ok: false, error: `the decision model\u2019s reply could not be read \u2014 no JSON in \u201C${clip2(text)}\u201D` };
       const list5 = Array.isArray(body?.answers) ? body.answers : Array.isArray(body) ? body : null;
       if (!list5) return { ok: false, error: `the decision model\u2019s reply could not be read \u2014 no \u201Canswers\u201D in \u201C${clip2(text)}\u201D` };
-      const asked = new Map(questions.map((q) => [q.id, q]));
+      const asked = new Map(questions.map((q, i) => [wireName(i), q]));
       const answers = [];
       for (const raw of list5) {
         const id = raw?.id;
@@ -27712,7 +27721,7 @@ ${pad}</${tag}>`;
     const known2 = new Set(wq.options.map((o) => o.id));
     for (const [k, p] of given) if (!known2.has(k) || !Number.isFinite(p) || p < 0) return null;
     const sum = [...given.values()].reduce((n2, p) => n2 + p, 0);
-    if (!(sum > 0)) return null;
+    if (partialSum(sum)) return null;
     return wq.options.map((o) => ({ of: o.id, p: (given.get(o.id) ?? 0) / sum }));
   }
   function answerOf(q, dist12) {
@@ -27773,7 +27782,6 @@ ${pad}</${tag}>`;
   var SYSTEMONE_TIMEOUT_MS = 2e4;
   var SYSTEMONE_WORDS_MAX = 1e3;
   var SYSTEMONE_STATE_MAX = 16e3;
-  var SUM_SLACK = 0.02;
   var SAME2 = 1e-6;
   var NONE_WORDS = "none of these \u2014 choose this when no other option is right";
   function clip3(text, max) {
@@ -27878,7 +27886,8 @@ ${pad}</${tag}>`;
   function overOffered(dist12, offered2, notes, name) {
     if ([...dist12.values()].some((p) => !Number.isFinite(p) || p < 0)) return "a probability that is not one";
     const sum = [...dist12.values()].reduce((n2, p) => n2 + p, 0);
-    if (!(sum > 0)) return "its probabilities sum to nothing";
+    const partial = partialSum(sum);
+    if (partial) return partial;
     if (Math.abs(sum - 1) > SUM_SLACK) notes.push(`${name}: its probabilities summed to ${sum.toFixed(3)} \u2014 normalised`);
     return [...offered2].map(([k, id]) => ({ of: id, p: (dist12.get(k) ?? 0) / sum }));
   }

@@ -22,12 +22,14 @@
 //
 // WHAT THE SEAT IS HELD TO (decide.ts's rules, not this file's):
 //   * the options it is given always carry *none of these* — a seat forced to pick will pick;
-//   * it is shown option ids and words, never a node id it could get wrong — and, when the caller
-//     gives one, the board's STATE in words (`DecideState`, `decide-state.ts`), never an id;
+//   * it is shown option ids and words, never a node id it could get wrong — a question is named
+//     `q1 … qn` on the wire (`wireName`), never by its own id, which names a mark and the hand that
+//     drew it — and, when the caller gives one, the board's STATE in words (`DecideState`,
+//     `decide-state.ts`), never an id;
 //   * its answer is read as a distribution over EXACTLY the options offered — an option nobody
-//     offered, a negative or non-finite probability, or nothing that sums to anything makes that
-//     question unanswered (never guessed), and the pick is read back off the distribution, never
-//     taken on trust;
+//     offered, a negative or non-finite probability, nothing that sums to anything, or a sum well
+//     under 1 (a part of a distribution, `partialSum`) makes that question unanswered (never
+//     guessed), and the pick is read back off the distribution, never taken on trust;
 //   * it is used only where it leads by `DECIDER_TAKE_AT` (decide.ts), else the engine's ranking
 //     stands.
 
@@ -35,6 +37,7 @@ import { complete as completeChat, type ChatMessage, type CompletionResult, type
 import {
   FLAT_MARGIN,
   NO_MATCH,
+  partialSum,
   type ChoiceAnswer,
   type DecideResult,
   type DecideTransport,
@@ -89,6 +92,9 @@ const SYSTEM = [
   '{"answers":[{"id":"<the question id>","probabilities":{"<option id>":<0 to 1>, ...}}]}',
 ].join('\n');
 
+/** What the `i`th question is called on the wire: never its own id, which names a mark and the hand that drew it. */
+export const wireName = (i: number): string => 'q' + (i + 1);
+
 /** The chat wire: the questions as one JSON user message, the answer asked for as one JSON object. */
 export const CHAT_DECIDE_WIRE: DecideWire = {
   id: 'chat',
@@ -96,7 +102,7 @@ export const CHAT_DECIDE_WIRE: DecideWire = {
     const said = state && state.text ? { state: state.text } : {};
     return [
       { role: 'system', content: SYSTEM },
-      { role: 'user', content: JSON.stringify({ ...said, questions: questions.map(wireQuestion) }) },
+      { role: 'user', content: JSON.stringify({ ...said, questions: questions.map((q, i) => ({ ...wireQuestion(q), id: wireName(i) })) }) },
     ];
   },
   parse(text, questions) {
@@ -106,7 +112,9 @@ export const CHAT_DECIDE_WIRE: DecideWire = {
       ? ((body as { answers: unknown[] }).answers)
       : Array.isArray(body) ? (body as unknown[]) : null;
     if (!list) return { ok: false, error: `the decision model’s reply could not be read — no “answers” in “${clip(text)}”` };
-    const asked = new Map(questions.map((q) => [q.id, q] as const));
+    // A question is sent as `q1 … qn` (`wireName`) and read back by that name: its own id (`which:stroke:ada:7`, a
+    // node id and the hand's log name in it) never leaves the page.
+    const asked = new Map(questions.map((q, i) => [wireName(i), q] as const));
     const answers: DecisionAnswer[] = [];
     for (const raw of list) {
       const id = (raw as { id?: unknown })?.id;
@@ -138,8 +146,10 @@ function distributionOf(wq: WireQuestion, raw: unknown): Probability[] | null {
   } else return null;
   const known = new Set(wq.options.map((o) => o.id));
   for (const [k, p] of given) if (!known.has(k) || !Number.isFinite(p) || p < 0) return null; // an option nobody offered; not a probability
+  // A part of a distribution — the pick's probability alone, the top few — is no answer: divided by its sum, a 0.6
+  // would be held as a certainty (`partialSum`, the seat's one rule). A sum over 1 is normalised.
   const sum = [...given.values()].reduce((n, p) => n + p, 0);
-  if (!(sum > 0)) return null;
+  if (partialSum(sum)) return null;
   return wq.options.map((o) => ({ of: o.id, p: (given.get(o.id) ?? 0) / sum }));
 }
 
