@@ -29,11 +29,21 @@
 // A result written beside a formula with no `=` (`C 48`, `(C × 2) − B 72″`)
 // and a worked line across a gap (`Chest + 6″ ÷ 2   (36 + 6)/2 = 21″`) are
 // read as if an `=` stood between them — that is how a drafter writes it.
+//
+// And what the engine writes in its own formulas reads back (27 Oct 2026):
+// `√(24² + 8²)`, `x³`, `x^2`, `π × 5²`, `28 ÷ 2π`, `atan(8 ÷ 24)`, `sin 40°`.
+// A function word is lowercase (`sqrt` in any case) — a name on a page is
+// capitalised, and `Tan` may be a colour — and it takes what follows it the
+// way a minus sign does: `sin 40° ÷ 7` is the sine, then divided; `√16 × 2`
+// is 8; `−3²` is −9. An angle is in degrees, as every angle the engine says
+// is; a bare number in a sine is read as degrees and the reading says so.
 
-import type { ArithOp, Comparison, LengthUnit, Quantity } from './quantity';
+import type { AngleFn, ArithOp, Comparison, LengthUnit, Quantity } from './quantity';
 import {
+  angleQuantity,
   arithmetic,
   compareQuantities,
+  decimalsWritten,
   formatQuantity,
   holds,
   isBare,
@@ -41,24 +51,32 @@ import {
   isVulgar,
   negateQuantity,
   parseQuantity,
+  powerQuantity,
   quantity,
   rangeOf,
+  rootQuantity,
   scanMeasure,
 } from './quantity';
 
 export type ExprOp = ArithOp;
 
+/** A function the grammar reads: the square root, and the trigonometry of an angle in degrees. */
+export type ExprFn = 'sqrt' | AngleFn;
+
 const GLYPH: Record<ExprOp, string> = { '+': '+', '-': '−', '*': '×', '/': '÷' };
 
 /** A parsed expression. `num` ids are source offsets, so a range can be bound to the value a worked line chose. */
 export type Expr =
-  | { k: 'num'; q: Quantity; text: string; id: number }
+  /** `deg`: written with °. `sym`: what it is shown as instead of its digits — π, 2π. */
+  | { k: 'num'; q: Quantity; text: string; id: number; deg?: boolean; sym?: string }
   | { k: 'name'; name: string }
   | { k: 'ref'; step: number; text: string; bare?: boolean }
   | { k: 'op'; op: ExprOp; a: Expr; b: Expr }
   | { k: 'neg'; a: Expr }
   /** A running total's previous result: the formula so far, with what was written for it as the fallback. */
-  | { k: 'carry'; a: Expr; written: Quantity; text: string };
+  | { k: 'carry'; a: Expr; written: Quantity; text: string }
+  | { k: 'fn'; fn: ExprFn; a: Expr }
+  | { k: 'pow'; a: Expr; n: number };
 
 /** How a name is matched: case, spacing and hyphens do not matter. */
 export function normName(s: string): string {
@@ -72,6 +90,13 @@ const DASHES = '-–—−‐‑‒';
 const TIMES = '×*·⋅✕✖';
 const DIVIDES = '÷/⁄';
 const LETTER = /[A-Za-zÀ-ɏ]/;
+/** Lowercase only: a name on a page is capitalised (`Tan` may be a colour). `sqrt` is read in any case. */
+const FN_WORDS: Record<string, ExprFn> = {
+  sqrt: 'sqrt', sin: 'sin', cos: 'cos', tan: 'tan', asin: 'asin', acos: 'acos', atan: 'atan', arcsin: 'asin', arccos: 'acos', arctan: 'atan',
+};
+const SUPERSCRIPT = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+const superscript = (n: number) => String(n).split('').map((d) => SUPERSCRIPT[Number(d)]).join('');
+const isTrig = (fn: ExprFn) => fn === 'sin' || fn === 'cos' || fn === 'tan';
 
 const CIRCLED: Record<string, number> = (() => {
   const m: Record<string, number> = {};
@@ -90,7 +115,7 @@ interface At {
 }
 
 type Tok =
-  | (At & { t: 'num'; q: Quantity; text: string })
+  | (At & { t: 'num'; q: Quantity; text: string; deg?: boolean; sym?: string })
   | (At & { t: 'word'; w: string })
   | (At & { t: 'name'; name: string })
   | (At & { t: 'ref'; step: number; text: string; bare: boolean })
@@ -99,6 +124,8 @@ type Tok =
   | (At & { t: 'lp' })
   | (At & { t: 'rp' })
   | (At & { t: 'eq'; approx: boolean; glyph: string })
+  | (At & { t: 'fn'; fn: ExprFn; glyph: string })
+  | (At & { t: 'pow'; n: number; glyph: string })
   | (At & { t: 'junk'; text: string });
 
 type NumTok = Extract<Tok, { t: 'num' }>;
@@ -106,10 +133,10 @@ type NumTok = Extract<Tok, { t: 'num' }>;
 const isDigit = (c: string | undefined) => c !== undefined && c >= '0' && c <= '9';
 
 function operandEnd(t: Tok | undefined): boolean {
-  return !!t && (t.t === 'num' || t.t === 'word' || t.t === 'name' || t.t === 'ref' || t.t === 'rp');
+  return !!t && (t.t === 'num' || t.t === 'word' || t.t === 'name' || t.t === 'ref' || t.t === 'rp' || t.t === 'pow');
 }
 function operandStart(t: Tok | undefined): boolean {
-  return !!t && (t.t === 'num' || t.t === 'word' || t.t === 'name' || t.t === 'ref' || t.t === 'lp');
+  return !!t && (t.t === 'num' || t.t === 'word' || t.t === 'name' || t.t === 'ref' || t.t === 'lp' || t.t === 'fn');
 }
 
 function scan(s: string): Tok[] {
@@ -129,10 +156,16 @@ function scan(s: string): Tok[] {
     if (isDigit(c) || (c === '.' && isDigit(s[i + 1])) || isVulgar(c)) {
       const m = scanMeasure(s, i);
       if (m) {
-        const q = quantity(m.value, m.unit, { approx: approxNext, precision: m.precision });
-        out.push({ t: 'num', q, text: s.slice(i, m.end), at: i, end: m.end, space: sp() });
+        // 40° is an angle; 2π is one number, so 28 ÷ 2π divides by 2π as the solver means it.
+        const deg = !m.unit && (s[m.end] === '°' || s[m.end] === 'º');
+        const pi = !m.unit && !deg && s[m.end] === 'π';
+        const end = deg || pi ? m.end + 1 : m.end;
+        const q = pi
+          ? quantity(m.value * Math.PI, null, { approx: approxNext })
+          : quantity(m.value, m.unit, { approx: approxNext, precision: m.precision });
+        out.push({ t: 'num', q, text: s.slice(i, end), ...(deg ? { deg: true } : {}), ...(pi ? { sym: `${m.text}π` } : {}), at: i, end, space: sp() });
         approxNext = false;
-        i = m.end;
+        i = end;
         continue;
       }
     }
@@ -141,10 +174,27 @@ function scan(s: string): Tok[] {
       i++;
       continue;
     }
+    if (c === 'π') {
+      out.push({ t: 'num', q: quantity(Math.PI, null, { approx: approxNext }), text: c, sym: 'π', at: i, end: i + 1, space: sp() });
+      approxNext = false;
+      i++;
+      continue;
+    }
+    if (c === '√') { out.push({ t: 'fn', fn: 'sqrt', glyph: c, at: i, end: i + 1, space: sp() }); i++; continue; }
+    if (SUPERSCRIPT.includes(c) || c === '^') {
+      // x², x³, x^2: a power of the operand just before it.
+      const m = c === '^' ? /^\^\s*(\d{1,2})(?![\d.])/.exec(s.slice(i)) : new RegExp(`^[${SUPERSCRIPT}]+`).exec(s.slice(i));
+      const n = m ? (c === '^' ? Number(m[1]) : Number(m[0].split('').map((d) => SUPERSCRIPT.indexOf(d)).join(''))) : 0;
+      if (m && n >= 1 && operandEnd(out[out.length - 1])) {
+        out.push({ t: 'pow', n, glyph: m[0], at: i, end: i + m[0].length, space: sp() });
+        i += m[0].length;
+        continue;
+      }
+    }
     if (c === '(') {
-      // (1) on its own is a step reference — or the number 1 in brackets when no step 1 exists.
+      // (1) on its own is a step reference — or the number 1 in brackets when no step 1 exists. After a function it is what the function takes.
       const m = /^\(\s*(\d{1,2})\s*\)/.exec(s.slice(i));
-      if (m) {
+      if (m && out[out.length - 1]?.t !== 'fn') {
         out.push({ t: 'ref', step: Number(m[1]), text: m[0], bare: true, at: i, end: i + m[0].length, space: sp() });
         i += m[0].length;
         continue;
@@ -187,6 +237,18 @@ function scan(s: string): Tok[] {
         break;
       }
       const w = s.slice(i, j);
+      const fn = FN_WORDS[w] ?? (w.toLowerCase() === 'sqrt' ? 'sqrt' : undefined);
+      if (fn) {
+        out.push({ t: 'fn', fn, glyph: w, at: i, end: j, space: sp() });
+        i = j;
+        continue;
+      }
+      if (w === 'pi') {
+        out.push({ t: 'num', q: quantity(Math.PI, null, { approx: approxNext }), text: w, sym: 'π', at: i, end: j, space: sp() });
+        approxNext = false;
+        i = j;
+        continue;
+      }
       if (w.toLowerCase() === 'step') {
         const m = /^\s*(\d{1,3})(?!\d)/.exec(s.slice(j));
         if (m) {
@@ -256,7 +318,9 @@ export interface ExprReading {
 }
 
 type PTok =
-  | { t: 'num'; q: Quantity; text: string; id: number }
+  | { t: 'num'; q: Quantity; text: string; id: number; deg?: boolean; sym?: string }
+  | { t: 'fn'; fn: ExprFn }
+  | { t: 'pow'; n: number }
   | { t: 'name'; name: string }
   | { t: 'ref'; step: number; text: string; bare: boolean }
   | { t: 'op'; op: ExprOp }
@@ -271,7 +335,7 @@ function parseTokens(toks: PTok[], leftToRight: boolean): Expr | null {
     switch (t.t) {
       case 'num':
         p++;
-        return { k: 'num', q: t.q, text: t.text, id: t.id };
+        return { k: 'num', q: t.q, text: t.text, id: t.id, ...(t.deg ? { deg: true } : {}), ...(t.sym ? { sym: t.sym } : {}) };
       case 'name':
         p++;
         return { k: 'name', name: t.name };
@@ -290,6 +354,15 @@ function parseTokens(toks: PTok[], leftToRight: boolean): Expr | null {
         return null;
     }
   };
+  // x², (a + b)³: a power binds tighter than anything in front of it, so −3² is −9.
+  const postfix = (): Expr | null => {
+    let a = primary();
+    for (let t = toks[p]; a && t?.t === 'pow'; t = toks[p]) {
+      a = { k: 'pow', a, n: t.n };
+      p++;
+    }
+    return a;
+  };
   const unary = (): Expr | null => {
     const t = toks[p];
     if (t?.t === 'op' && t.op === '-') {
@@ -301,7 +374,13 @@ function parseTokens(toks: PTok[], leftToRight: boolean): Expr | null {
       p++;
       return unary();
     }
-    return primary();
+    // A function takes what follows it as a minus sign does: sin 40° ÷ 7 is the sine, then divided.
+    if (t?.t === 'fn') {
+      p++;
+      const a = unary();
+      return a ? { k: 'fn', fn: t.fn, a } : null;
+    }
+    return postfix();
   };
   const level = (ops: ExprOp[], next: () => Expr | null) => (): Expr | null => {
     let a = next();
@@ -326,7 +405,7 @@ function parseTokens(toks: PTok[], leftToRight: boolean): Expr | null {
 export function sameExpr(a: Expr, b: Expr): boolean {
   switch (a.k) {
     case 'num':
-      return b.k === 'num' && a.q.lo === b.q.lo && a.q.hi === b.q.hi && a.q.unit === b.q.unit && a.q.dim === b.q.dim;
+      return b.k === 'num' && a.q.lo === b.q.lo && a.q.hi === b.q.hi && a.q.unit === b.q.unit && a.q.dim === b.q.dim && !a.deg === !b.deg;
     case 'name':
       return b.k === 'name' && normName(a.name) === normName(b.name);
     case 'ref':
@@ -337,6 +416,10 @@ export function sameExpr(a: Expr, b: Expr): boolean {
       return b.k === 'neg' && sameExpr(a.a, b.a);
     case 'carry':
       return b.k === 'carry' && sameExpr(a.a, b.a);
+    case 'fn':
+      return b.k === 'fn' && a.fn === b.fn && sameExpr(a.a, b.a);
+    case 'pow':
+      return b.k === 'pow' && a.n === b.n && sameExpr(a.a, b.a);
   }
 }
 
@@ -347,7 +430,10 @@ function opOf(e: Expr): ExprOp | null {
 }
 
 const leafText = (e: Expr): string =>
-  e.k === 'num' ? formatQuantity(e.q) : e.k === 'name' ? e.name : e.k === 'ref' ? e.text : '';
+  e.k === 'num' ? e.sym ?? formatQuantity(e.q) + (e.deg ? '°' : '') : e.k === 'name' ? e.name : e.k === 'ref' ? e.text : '';
+
+/** A leaf a function or a power can stand on without brackets: `√16`, `sin 40°`, `A²` — not `√(Top to waist)`. */
+const bareLeaf = (e: Expr): boolean => e.k === 'num' || e.k === 'ref' || (e.k === 'name' && !/\s/.test(e.name));
 
 /**
  * Brackets for clarity, not minimality: a right operand that is itself an
@@ -373,11 +459,74 @@ function fmtExpr(e: Expr, sub?: (e: Expr) => string | undefined): string {
       const oa = opOf(e.a), ob = opOf(e.b);
       return `${oa && oa !== e.op ? `(${la})` : la} ${GLYPH[e.op]} ${ob ? `(${lb})` : lb}`;
     }
+    case 'fn': {
+      const x = e.a;
+      // A bare number in a sine is an angle in degrees: shown with its °, as it is read.
+      const degrees = isTrig(e.fn) && x.k === 'num' && !x.deg && !x.sym && isBare(x.q) && sub?.(x) === undefined;
+      const inner = fmtExpr(x, sub) + (degrees ? '°' : '');
+      if (e.fn === 'sqrt') return bareLeaf(x) ? `√${inner}` : `√(${inner})`;
+      return isTrig(e.fn) && bareLeaf(x) ? `${e.fn} ${inner}` : `${e.fn}(${inner})`;
+    }
+    case 'pow': {
+      const x = e.a;
+      const base = fmtExpr(x, sub);
+      const plain = x.k === 'num' ? !x.sym && !x.deg && !isRange(x.q) && x.q.lo >= 0 && isBare(x.q) : bareLeaf(x);
+      return `${plain ? base : `(${base})`}${superscript(e.n)}`;
+    }
   }
 }
 
 export function formatExpr(e: Expr): string {
   return fmtExpr(e);
+}
+
+/**
+ * Whether a formula comes to an angle, in degrees: a number written with °, what asin, acos and atan give, and
+ * sums and differences of those — `180° − 40° − 60°` is 80°, and `106.26° ÷ 180°` is a number again.
+ */
+function angleOf(e: Expr): boolean {
+  switch (e.k) {
+    case 'num':
+      return !!e.deg;
+    case 'neg':
+    case 'carry':
+      return angleOf(e.a);
+    case 'fn':
+      return e.fn === 'asin' || e.fn === 'acos' || e.fn === 'atan';
+    case 'op':
+      if (e.op === '+' || e.op === '-') return angleOf(e.a) || angleOf(e.b);
+      if (e.op === '*') return angleOf(e.a) !== angleOf(e.b);
+      return angleOf(e.a) && !angleOf(e.b);
+    default:
+      return false;
+  }
+}
+
+/** The most places any number in a formula was written to: its result is shown as finely. */
+function placesIn(e: Expr): number {
+  switch (e.k) {
+    case 'num':
+      return decimalsWritten(e.q);
+    case 'op':
+      return Math.max(placesIn(e.a), placesIn(e.b));
+    case 'neg':
+    case 'carry':
+    case 'fn':
+    case 'pow':
+      return placesIn(e.a);
+    default:
+      return 0;
+  }
+}
+
+/**
+ * A formula's value as people read it: at least as finely as the numbers in it were written — `1.005 + 1` is
+ * 2.005, never 2.01 beside an operand shown as 1 — and with its ° when it is an angle (`atan(8 ÷ 24)` is 18.43°).
+ */
+export function formatValue(expr: Expr | null, value: Quantity | null): string {
+  if (!value) return 'no value';
+  const digits = Math.max(2, expr ? placesIn(expr) : 0, decimalsWritten(value));
+  return formatQuantity(value, { digits }) + (expr && isBare(value) && angleOf(expr) ? '°' : '');
 }
 
 function hasNames(e: Expr): boolean {
@@ -389,6 +538,8 @@ function hasNames(e: Expr): boolean {
     case 'num':
       return false;
     case 'neg':
+    case 'fn':
+    case 'pow':
       return hasNames(e.a);
     case 'op':
       return hasNames(e.a) || hasNames(e.b);
@@ -409,12 +560,14 @@ function fold(e: Expr): Expr {
     const a = fold(e.a);
     return a.k === 'num' ? { k: 'num', q: negateQuantity(a.q), text: formatQuantity(negateQuantity(a.q)), id: -1 } : { k: 'neg', a };
   }
+  if (e.k === 'fn' || e.k === 'pow') return { ...e, a: fold(e.a) };
   return e;
 }
 
 function depth(e: Expr): number {
   if (e.k === 'op') return 1 + Math.max(depth(e.a), depth(e.b));
   if (e.k === 'neg' || e.k === 'carry') return depth(e.a);
+  if (e.k === 'fn' || e.k === 'pow') return 1 + depth(e.a);
   return 0;
 }
 
@@ -434,6 +587,10 @@ export function describeExpr(expr: Expr): string | undefined {
         return say(x.a, top);
       case 'neg':
         return `minus ${say(x.a, false)}`;
+      case 'fn':
+        return x.fn === 'sqrt' ? `the square root of ${say(x.a, false)}` : `${x.fn} ${say(x.a, false)}`;
+      case 'pow':
+        return `${say(x.a, false)} ${x.n === 2 ? 'squared' : x.n === 3 ? 'cubed' : `to the power ${x.n}`}`;
       case 'op': {
         const a = say(x.a, false), b = say(x.b, false);
         const simple = x.a.k !== 'op' && x.b.k === 'num';
@@ -461,8 +618,33 @@ export function describeExpr(expr: Expr): string | undefined {
 interface DashPlan {
   index: number;
   mode: 'unary' | 'minus' | 'range' | 'choice';
-  /** For a choice: what the notation gives on its face. A typed minus sign is a minus; any other dash a range. */
+  /**
+   * For a choice: what the notation gives on its face. A typed minus sign is a minus; an en dash a range; any
+   * other dash a range — unless a number beside it is held by something that binds tighter (`bound`).
+   */
   plain?: 'range' | 'minus';
+  /**
+   * What holds a number beside the dash: `24 × 3 - 4` has the 3 in a product, `sin 30 - 4` in a sine, `2 - 3²`
+   * the 3 in a power. Read as a range, the two numbers would be taken into it — `24 × (3–4)` — so a plain dash
+   * there is a minus first, and the range a reading beside it.
+   */
+  bound?: string;
+}
+
+/** A dash typed as a minus sign, or as an en dash, says which it is; a hyphen is the hand's, and may be either. */
+const EN_DASH = '–';
+
+const FN_SAID: Record<ExprFn, string> = {
+  sqrt: 'a square root', sin: 'a sine', cos: 'a cosine', tan: 'a tangent', asin: 'an arcsine', acos: 'an arccosine', atan: 'an arctangent',
+};
+
+function boundBy(toks: Tok[], k: number): string | undefined {
+  const before = toks[k - 2], after = toks[k + 2];
+  if (before?.t === 'op' && before.op === '*') return 'a product';
+  if (before?.t === 'op' && before.op === '/') return 'a quotient';
+  if (before?.t === 'fn') return FN_SAID[before.fn];
+  if (after?.t === 'pow') return 'a power';
+  return undefined;
 }
 
 const MAX_CHOICES = 3;
@@ -471,6 +653,13 @@ function readSegment(toks: Tok[], src: string): { readings: ExprReading[]; error
   const junk = toks.find((t) => t.t === 'junk');
   if (junk && junk.t === 'junk') return { readings: [], error: `cannot read “${junk.text}”` };
   if (toks.some((t) => t.t === 'eq')) return { readings: [], error: 'more than one expression' };
+  // A function with nothing after it to work on is said so — never read as a name.
+  for (let k = 0; k < toks.length; k++) {
+    const t = toks[k], next = toks[k + 1];
+    if (t.t !== 'fn' || operandStart(next) || next?.t === 'dash' || (next?.t === 'op' && next.op === '+')) continue;
+    const like = t.fn === 'sqrt' ? 'a number after it, like √16' : isTrig(t.fn) ? `an angle after it, like ${t.fn} 30°` : `a number after it, like ${t.fn}(0.5)`;
+    return { readings: [], error: `${t.glyph} needs ${like}` };
+  }
 
   const plans: DashPlan[] = [];
   toks.forEach((t, k) => {
@@ -482,7 +671,9 @@ function readSegment(toks: Tok[], src: string): { readings: ExprReading[]; error
       prev.t === 'num' && next?.t === 'num' && !isRange(prev.q) && !isRange(next.q) && prev.q.lo < next.q.lo &&
       (prev.q.unit === null || next.q.unit === null || prev.q.unit === next.q.unit)
     ) {
-      return plans.push({ index: k, mode: 'choice', plain: t.glyph === '−' ? 'minus' : 'range' });
+      const bound = boundBy(toks, k);
+      const plain = t.glyph === '−' || (bound && t.glyph !== EN_DASH) ? 'minus' : 'range';
+      return plans.push({ index: k, mode: 'choice', plain, ...(bound ? { bound } : {}) });
     }
     plans.push({ index: k, mode: 'minus' });
   });
@@ -523,10 +714,10 @@ function readSegment(toks: Tok[], src: string): { readings: ExprReading[]; error
           });
           ptoks.pop();
           const text = src.slice(prevTok.at, next.end);
-          ptoks.push({ t: 'num', q, text, id: prevTok.at });
+          ptoks.push({ t: 'num', q, text, id: prevTok.at, ...(prevTok.deg || next.deg ? { deg: true } : {}) });
           if (plan.mode === 'choice') {
             dashChoices.push({ kind: 'dash', text, as: 'range', plain: plan.plain === 'range' });
-            dashReasons.push(dashReason(prevTok.q, next.q, 'range', plan.plain === 'range'));
+            dashReasons.push(dashReason(prevTok.q, next.q, 'range', plan.plain === 'range', plan.bound));
           }
           k++;
           continue;
@@ -535,14 +726,20 @@ function readSegment(toks: Tok[], src: string): { readings: ExprReading[]; error
           const prevTok = toks[k - 1] as NumTok;
           const nextTok = next as NumTok;
           dashChoices.push({ kind: 'dash', text: src.slice(prevTok.at, nextTok.end), as: 'minus', plain: plan.plain === 'minus' });
-          dashReasons.push(dashReason(prevTok.q, nextTok.q, 'minus', plan.plain === 'minus'));
+          dashReasons.push(dashReason(prevTok.q, nextTok.q, 'minus', plan.plain === 'minus', plan.bound));
         }
         ptoks.push({ t: 'op', op: '-' });
         continue;
       }
       switch (t.t) {
         case 'num':
-          ptoks.push({ t: 'num', q: t.q, text: t.text, id: t.at });
+          ptoks.push({ t: 'num', q: t.q, text: t.text, id: t.at, ...(t.deg ? { deg: true } : {}), ...(t.sym ? { sym: t.sym } : {}) });
+          break;
+        case 'fn':
+          ptoks.push({ t: 'fn', fn: t.fn });
+          break;
+        case 'pow':
+          ptoks.push({ t: 'pow', n: t.n });
           break;
         case 'name':
           ptoks.push({ t: 'name', name: t.name });
@@ -598,9 +795,18 @@ function readSegment(toks: Tok[], src: string): { readings: ExprReading[]; error
   return { readings: ranked };
 }
 
-function dashReason(a: Quantity, b: Quantity, as: 'range' | 'minus', plain: boolean): string {
+function dashReason(a: Quantity, b: Quantity, as: 'range' | 'minus', plain: boolean, bound?: string): string {
   const A = formatQuantity(a), B = formatQuantity(b);
   const range = formatQuantity(rangeOf(a.lo, b.hi, b.unit ?? a.unit));
+  if (bound) {
+    const into = bound === 'a power' ? 'raised to the power' : `taken into ${bound}`;
+    if (as === 'minus') {
+      return plain
+        ? `a dash ${bound === 'a power' ? 'before' : 'after'} ${bound} is a minus: as a range, ${range} would be ${into}`
+        : `the dash as a minus`;
+    }
+    return plain ? `${range}, a range, ${into}` : `read as a range instead, ${range}, ${into}`;
+  }
   const diff = arithmetic('-', a, b).quantity;
   const D = diff ? formatQuantity(diff) : '?';
   if (as === 'range') {
@@ -933,6 +1139,25 @@ export function evaluateExpr(expr: Expr, scope: MathsScope = {}, options: EvalOp
         note(`carried the written ${e.text}`);
         return e.written;
       }
+      case 'fn': {
+        const v = rec(e.a);
+        if (!v) return null;
+        if (isTrig(e.fn) && isBare(v) && !angleOf(e.a)) {
+          const x = e.a;
+          note(x.k === 'num' && !x.sym ? `${leafText(x)} read as ${leafText(x)}°: an angle here is in degrees` : `${fmtExpr(x)} read in degrees, as every angle here is`);
+        }
+        const r = e.fn === 'sqrt' ? rootQuantity(v) : angleQuantity(e.fn, v);
+        r.notes.forEach(note);
+        if (r.error) note(r.error);
+        return r.quantity;
+      }
+      case 'pow': {
+        const v = rec(e.a);
+        if (!v) return null;
+        const r = powerQuantity(v, e.n);
+        if (r.error) note(r.error);
+        return r.quantity;
+      }
     }
   };
   const value = rec(expr);
@@ -977,10 +1202,14 @@ export interface ChainReading {
   expr: Expr | null;
   formula: string;
   value: Quantity | null;
+  /** The value as people read it (`formatValue`): `18.43°`, `2.005`, or `no value`. */
+  text: string;
   /** The formula with the values put in. */
   worked: string;
   checks: WrittenCheck[];
   bindings: WorkedBinding[];
+  /** What was written on the line that this reading could not use: said, never dropped in silence. */
+  dropped: string[];
   /** How many segments restated the formula with numbers put in — a worked line that has this reading's form. */
   restated: number;
   /** The alternative reading of the names this took ("with seam allowance"), when it took one. */
@@ -1049,6 +1278,13 @@ function unify(f: Expr, w: Expr, ctx: UnifyCtx, acc: Acc): boolean {
     case 'carry':
       if (w.k === 'num') return partial();
       return unify(f.a, w, ctx, acc);
+    // `√(24² + 8²) = √(576 + 64) = √640`: the same function or power with numbers put in, or one number for all of it.
+    case 'fn':
+      if (w.k === 'fn') return f.fn === w.fn && unify(f.a, w.a, ctx, acc);
+      return w.k === 'num' || w.k === 'neg' ? partial() : false;
+    case 'pow':
+      if (w.k === 'pow') return f.n === w.n && unify(f.a, w.a, ctx, acc);
+      return w.k === 'num' || w.k === 'neg' ? partial() : false;
     case 'name':
     case 'ref': {
       if (w.k === 'name') return f.k === 'name' && normName(f.name) === normName(w.name);
@@ -1107,7 +1343,7 @@ function leftmostNum(e: Expr): Extract<Expr, { k: 'num' }> | null {
 function replaceLeaf(e: Expr, leaf: Expr, by: Expr): Expr {
   if (e === leaf) return by;
   if (e.k === 'op') return { ...e, a: replaceLeaf(e.a, leaf, by), b: replaceLeaf(e.b, leaf, by) };
-  if (e.k === 'neg') return { ...e, a: replaceLeaf(e.a, leaf, by) };
+  if (e.k === 'neg' || e.k === 'fn' || e.k === 'pow') return { ...e, a: replaceLeaf(e.a, leaf, by) };
   return e;
 }
 
@@ -1117,7 +1353,7 @@ function namesIn(e: Expr, out: string[] = []): string[] {
   } else if (e.k === 'op') {
     namesIn(e.a, out);
     namesIn(e.b, out);
-  } else if (e.k === 'neg' || e.k === 'carry') namesIn(e.a, out);
+  } else if (e.k === 'neg' || e.k === 'carry' || e.k === 'fn' || e.k === 'pow') namesIn(e.a, out);
   return out;
 }
 
@@ -1149,6 +1385,8 @@ interface Run {
   restatedTexts: string[];
   /** The worked line another reading restated, which this one does not: skipped, and said. */
   skipped: string[];
+  /** Segments it could not read or use. */
+  dropped: string[];
   /** What this reading took from that worked line: the measurement it put in. */
   seeded: WorkedBinding[];
   notes: string[];
@@ -1165,7 +1403,7 @@ function refsIn(e: Expr, out: number[] = []): number[] {
   else if (e.k === 'op') {
     refsIn(e.a, out);
     refsIn(e.b, out);
-  } else if (e.k === 'neg' || e.k === 'carry') refsIn(e.a, out);
+  } else if (e.k === 'neg' || e.k === 'carry' || e.k === 'fn' || e.k === 'pow') refsIn(e.a, out);
   return out;
 }
 
@@ -1194,6 +1432,7 @@ function runChain(
   const restatedSegs: number[] = [];
   const restatedTexts: string[] = [];
   const skipped: string[] = [];
+  const dropped: string[] = [];
   rest.forEach((seg, k) => {
     const segment = k + 1;
     if (skip.has(segment)) {
@@ -1202,6 +1441,7 @@ function runChain(
     }
     if (!seg.readings.length) {
       notes.push(seg.error ?? `cannot read “${seg.text}”`);
+      dropped.push(seg.text);
       return;
     }
     const lone = loneQuantity(seg);
@@ -1249,11 +1489,12 @@ function runChain(
     }
     if (!options.length) {
       notes.push(`“${seg.text}” neither restates the line nor carries it on`);
+      dropped.push(seg.text);
       return;
     }
     options.reduce((best, o) => (cmpScore(o.score, best.score) < 0 ? o : best)).apply();
   });
-  return { reading, label, cur, acc, restated, restatedSegs, restatedTexts, skipped, seeded, notes };
+  return { reading, label, cur, acc, restated, restatedSegs, restatedTexts, skipped, dropped, seeded, notes };
 }
 
 const joinNames = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
@@ -1279,7 +1520,7 @@ export function evaluateChain(chain: ExprChain, scope: MathsScope = {}): ChainRe
   if (!first) return [];
   if (!first.readings.length) {
     const why = first.error ?? `cannot read “${first.text}”`;
-    return [{ expr: null, formula: first.text, value: null, worked: first.text, checks: [], bindings: [], restated: 0, uses: [], unknowns: [], notes: [why], reason: why }];
+    return [{ expr: null, formula: first.text, value: null, text: 'no value', worked: first.text, checks: [], bindings: [], dropped: [], restated: 0, uses: [], unknowns: [], notes: [why], reason: why }];
   }
   const labels = alternativeLabels(first.readings.map((r) => r.expr), scope);
   let runs: Run[] = [];
@@ -1333,7 +1574,10 @@ export function evaluateChain(chain: ExprChain, scope: MathsScope = {}): ChainRe
       clauses.push(`the worked line ${run.skipped.map((t) => `“${t}”`).join(' and ')} does not have this form${run.seeded.length ? `; it puts ${run.seeded.map((b) => `${b.subject} as ${formatQuantity(b.value)}`).join(' and ')}` : ''}`);
     }
     const offs = run.acc.checks.filter((c) => c.status === 'off');
-    clauses.push(ev.value ? `${formula} = ${formatQuantity(ev.value)}` : `${formula}: no value`);
+    const text = formatValue(run.cur, ev.value);
+    // The sum once: a dash's reason may have said it already (`46 − 48 = −2`), and a lone number is not a sum (`46–48 = 46–48`).
+    const sum = !ev.value ? `${formula}: no value` : formula === text ? '' : `${formula} = ${text}`;
+    if (sum && !clauses.some((c) => c.endsWith(sum))) clauses.push(sum);
     if (run.acc.checks.length) {
       clauses.push(
         offs.length
@@ -1349,9 +1593,11 @@ export function evaluateChain(chain: ExprChain, scope: MathsScope = {}): ChainRe
       expr: run.cur,
       formula,
       value: ev.value,
-      worked: ev.value && ev.worked !== formatQuantity(ev.value) ? `${ev.worked} = ${formatQuantity(ev.value)}` : ev.worked,
+      text,
+      worked: ev.value && ev.worked !== text ? `${ev.worked} = ${text}` : ev.worked,
       checks: run.acc.checks,
       bindings: [...run.seeded, ...run.acc.bound],
+      dropped: run.dropped,
       restated: run.restated,
       ...(run.label ? { label: run.label } : {}),
       uses: ev.uses,

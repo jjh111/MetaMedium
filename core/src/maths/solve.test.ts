@@ -11,7 +11,8 @@
 // along one edge summing to their whole; an over-determined circle; an
 // unlabelled measure offered from the scale as the ink's; and a right angle
 // only from a declared square or a labelled angle — a corner that measures
-// near 90° is a reading, with the tolerance cited from measure.ts.
+// near 90° is a reading, with the tolerance said. And every formula it writes
+// reads back, through the field's own grammar, as the value it says.
 
 import { describe, it, expect } from 'vitest';
 import type { Bounds, Point } from '../types';
@@ -25,6 +26,8 @@ import type { Figure, FigureLabel } from './dimension';
 import { solveBoard, solveFigure, describeSolution } from './solve';
 import type { BoardMaths, Solution } from './solve';
 import { quantity, rangeOf } from './quantity';
+import type { Quantity } from './quantity';
+import { evaluateChain, parseChain } from './expr';
 import { TRIANGLE_LABELS, TRIANGLE_CORNERS, TRIANGLE_SQUARE, TRIANGLE_LABEL_BOXES, TRIANGLE_EXPECTED } from './fixtures/triangle';
 import { APRON_LINES } from './fixtures/apron.sample';
 
@@ -338,7 +341,7 @@ describe('the page beside the drawing', () => {
 });
 
 describe('a right angle is declared, never measured into a fact', () => {
-  it('with no square, a corner that measures right is only a reading, the tolerance cited from measure.ts', () => {
+  it('with no square, a corner that measures right is only a reading, the tolerance said — and no source file named to a person', () => {
     const { s, tri } = triangleBoard({ square: false, longSide: false });
     const sol = solutionOf(solveBoard(s.getState(), { unit: 'in' }), tri);
     expect(sol.readings).toHaveLength(1);
@@ -346,6 +349,7 @@ describe('a right angle is declared, never measured into a fact', () => {
     expect(r.assumes).toHaveLength(1);
     expect(r.assumes![0]).toMatch(/measures (89|90|91)°/);
     expect(r.assumes![0]).toContain(`±${RIGHT_ANGLE_TOLERANCE}°`);
+    expect(r.assumes![0]).not.toMatch(/\b[\w-]+\.(ts|mjs|js)\b/);
     expect(r.assumes![0]).toMatch(/a reading, not a fact/);
     expect(r.sentence).toMatch(/^if the corner at [ABC] is right, legs of 24 and 8 make the long side 25\.30″$/);
   });
@@ -366,5 +370,76 @@ describe('a right angle is declared, never measured into a fact', () => {
     solveBoard(s.getState(), { unit: 'in' });
     expect(JSON.stringify(s.getEvents())).toBe(before);
     expect(before).not.toMatch(/25\.3|22\.6/);
+  });
+});
+
+// The panel shows each derived value with its formula (`√(24² + 8²)`), and a person may type that formula after
+// `=` in the field: the grammar that reads it is the same one the page is read with. So a formula the solver
+// writes must read back as the value it says — √, ², π, °, asin and sin 40° included — or it says something the
+// canvas cannot check. (It could not: `√`, `²`, `π` and the trig were unreadable until 27 Oct 2026, and the arc's
+// chord from its length took the sine of radians, which a page in degrees would misread.)
+describe('every formula the solver writes reads back as the value it says', () => {
+  const tri = (v: Point[]) => polygonFigure(v, { id: 'figure:t', sideIds: [['a'], ['b'], ['c']] });
+  const label = (key: string, value: Quantity, text = String(value.lo)): FigureLabel => ({ key, value, text, ids: [key], number: key, confidence: 1, reason: 'written' });
+  const inch = (key: string, v: number) => label(key, quantity(v, 'in', { precision: 1 }));
+  const deg = (k: number, v: number) => label(`angle${k}`, quantity(v, null, { precision: 1 }), `${v}°`);
+  const figureOf = (stroke: Point[]) => {
+    const s = createSession();
+    const id = s.addStroke(stroke, 1000);
+    return solveBoard(s.getState()).figures.find((x) => x.figure.id === id)!.figure;
+  };
+
+  function solutions(): [string, Solution][] {
+    const right = triangleBoard({ longSide: false });
+    const t = tri([{ x: 0, y: 0 }, { x: 500, y: 0 }, { x: 350, y: 606 }]);
+    const rect = figureOf(rectStroke(100, 100, 300, 100));
+    const arc = figureOf(arcStroke(1400, 400, 80));
+    const circle: Figure = {
+      id: 'figure:c', kind: 'circle', ids: ['c'], vertices: [{ x: 0, y: 0 }],
+      sides: [
+        { key: 'radius', label: 'the radius', from: { x: 0, y: 0 }, to: { x: 50, y: 0 }, length: 50, ids: ['c'] },
+        { key: 'diameter', label: 'the diameter', from: { x: -50, y: 0 }, to: { x: 50, y: 0 }, length: 100, ids: ['c'] },
+      ],
+      centre: { x: 0, y: 0 }, radius: 50, closed: true, outline: [], reason: 'by hand',
+    };
+    const legs = polygonFigure([{ x: 100, y: 300 }, { x: 340, y: 300 }, { x: 100, y: 220 }], { id: 'figure:legs', sideIds: [['a'], ['b'], ['c']] });
+    const square = { key: 'angle0', value: quantity(90), text: '∟', ids: ['sq'], declared: true, confidence: 1, reason: 'a square in the corner' } as FigureLabel;
+    return [
+      ['the right triangle', solutionOf(solveBoard(right.s.getState(), { unit: 'in' }), right.tri)],
+      ['SSS', solveFigure(tri([{ x: 0, y: 0 }, { x: 300, y: 0 }, { x: 0, y: 400 }]), [inch('side0', 3), inch('side1', 5), inch('side2', 4)], { unit: 'in' })],
+      ['SAS', solveFigure(t, [inch('side0', 5), inch('side2', 7), deg(0, 60)], { unit: 'in' })],
+      ['ASA', solveFigure(tri([{ x: 0, y: 0 }, { x: 1000, y: 0 }, { x: 669, y: 561 }]), [deg(0, 40), deg(1, 60), inch('side0', 10)], { unit: 'in' })],
+      ['SSA', solveFigure(tri([{ x: 0, y: 0 }, { x: 1000, y: 0 }, { x: 730, y: 612 }]), [deg(0, 40), inch('side0', 10), inch('side1', 7)], { unit: 'in' })],
+      ['a range', solveFigure(legs, [label('side0', rangeOf(2, 4, 'in', { precision: 1 }), '2–4″'), inch('side2', 8), square], { unit: 'in' })],
+      ['a rectangle', solveFigure(rect, [inch('width', 30), inch('height', 10)], { unit: 'in' })],
+      ['a rectangle from its diagonal and area', solveFigure(rect, [label('diagonal', quantity(31.62, 'in', { precision: 0.01 })), label('area', quantity(300, 'in', { dim: 2 }))], { unit: 'in' })],
+      ['a rectangle from its diagonal and perimeter', solveFigure(rect, [label('diagonal', quantity(31.62, 'in', { precision: 0.01 })), inch('perimeter', 80)], { unit: 'in' })],
+      ['a rectangle from its area and perimeter', solveFigure(rect, [label('area', quantity(300, 'in', { dim: 2 })), inch('perimeter', 80)], { unit: 'in' })],
+      ['a circle from its radius', solveFigure(circle, [inch('radius', 5)], { unit: 'in' })],
+      ['a circle from its circumference', solveFigure(circle, [inch('circumference', 28)], { unit: 'in' })],
+      ['a circle from its area', solveFigure(circle, [label('area', quantity(78.54, 'in', { dim: 2, precision: 0.01 }))], { unit: 'in' })],
+      ['an arc from its chord and rise', solveFigure(arc, [inch('chord', 12), inch('rise', 3)], { unit: 'in' })],
+      ['an arc from its radius and length', solveFigure(arc, [inch('radius', 10), inch('arc', 15)], { unit: 'in' })],
+    ];
+  }
+
+  it('each derived value, read back from its formula, is the value it says', () => {
+    let read = 0;
+    for (const [name, sol] of solutions()) {
+      for (const r of sol.readings) {
+        for (const v of r.values) {
+          if (v.from !== 'derived' || !v.formula) continue;
+          const back = evaluateChain(parseChain(v.formula))[0];
+          const what = `${name}: ${v.label} = ${v.formula} (${v.text})`;
+          expect(back?.value, `${what} has no value: ${back?.reason}`).toBeTruthy();
+          const near = (a: number, b: number) => Math.abs(a - b) <= 0.01 + 0.002 * Math.abs(b);
+          expect(near(back!.value!.lo, v.value.lo) && near(back!.value!.hi, v.value.hi), `${what} reads back as ${back!.text}`).toBe(true);
+          // An angle reads back in degrees, and says so.
+          if (v.key.startsWith('angle') || v.key === 'sweep') expect(back!.text, what).toMatch(/°$/);
+          read++;
+        }
+      }
+    }
+    expect(read).toBeGreaterThan(40);
   });
 });

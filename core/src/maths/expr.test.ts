@@ -310,3 +310,74 @@ describe('what the chain never does', () => {
     expect(p.shape).toBe('unreadable');
   });
 });
+
+// Found reading the engine back through its own field, 27 Oct 2026: each was said as if it were right.
+describe('what the grammar read wrongly, and what the engine writes that it could not read', () => {
+  const value = (t: string) => {
+    const r = evaluateChain(parseChain(t));
+    return r[0];
+  };
+
+  it('a function is read as a function: sqrt(16), √16, sin 30°, atan(…) — never a name and a worked value', () => {
+    expect(formatExpr(parseExpression('sqrt(16)')[0].expr)).toBe('√16');
+    expect(formatExpr(parseExpression('√(24² + 8²)')[0].expr)).toBe('√(24² + 8²)');
+    expect(formatExpr(parseExpression('sin 40° ÷ 7')[0].expr)).toBe('sin 40° ÷ 7');
+    expect(formatExpr(parseExpression('asin(10 × sin 40° ÷ 7)')[0].expr)).toBe('asin((10 × sin 40°) ÷ 7)');
+    expect(value('sqrt(16)')).toMatchObject({ text: '4', restated: 0, bindings: [] });
+    expect(value('atan(8 ÷ 24)').text).toBe('18.43°');
+  });
+
+  it('a square binds tighter than a minus in front of it, and a root takes what follows it', () => {
+    expect(value('−3²').text).toBe('−9');
+    expect(value('(−3)²').text).toBe('9');
+    expect(value('√16 × 2').text).toBe('8');
+    expect(value('2π').text).toBe('6.28');
+    expect(value('28 ÷ 2π').text).toBe('4.46');
+  });
+
+  it('a square of a length is an area, and the root of an area a length', () => {
+    expect(value('(3″)²').text).toBe('9 in²');
+    expect(value('√(3″ × 3″)').text).toBe('3″');
+    expect(value('√3″').notes.join(' ')).toMatch(/length/);
+  });
+
+  it('what has no value says why in words: a negative root, an asin past 1, a tan at 90°, sin of a length', () => {
+    expect(value('√(0 − 4)').notes.join(' ')).toMatch(/negative/);
+    expect(value('asin(1.5)').notes.join(' ')).toMatch(/−1 to 1/);
+    expect(value('tan 90°').notes.join(' ')).toMatch(/90°/);
+    expect(value('sin 3″').notes.join(' ')).toMatch(/length/);
+    expect(parseChain('sin').segments[0].error ?? '').toMatch(/sin needs/);
+  });
+
+  it('a bare number in a sine is read as degrees, and says so', () => {
+    const r = value('sin 30');
+    expect(r.text).toBe('0.5');
+    expect(r.formula).toBe('sin 30°');
+    expect(r.reason).toMatch(/30 read as 30°/);
+  });
+
+  it('a written number is shown as precisely as it was written, and the result with it', () => {
+    const r = value('1.005 + 1');
+    expect(r.formula).toBe('1.005 + 1');
+    expect(r.text).toBe('2.005');
+    expect(fmt(q('7.125'))).toBe('7.125');
+  });
+
+  it('a dash after a product is a minus first; after a sum it is still a range', () => {
+    expect(parseExpression('24 * 3 - 4').map((r) => r.formula)).toEqual(['(24 × 3) − 4', '24 × 3–4']);
+    expect(parseExpression('24 * 3 - 4')[0].reason).toMatch(/after a product/);
+    expect(parseExpression('2 + 3-6"').map((r) => r.formula)).toEqual(['2 + 3–6″', '(2 + 3) − 6″']);
+  });
+
+  it('a reason says each sum once: never “46 − 48 = −2; 46 − 48 = −2”, never “46–48 = 46–48”', () => {
+    const [minus, range] = evaluateChain(parseChain('46 − 48'));
+    expect(minus.reason.split('46 − 48 = −2').length - 1).toBe(1);
+    expect(range.reason).not.toMatch(/46–48 = 46–48/);
+  });
+
+  it('a segment it cannot use is said, never dropped in silence', () => {
+    const r = value('5′ 8″ in furlongs');
+    expect(r.dropped).toEqual(['in furlongs']);
+    expect(value('2 + 3 = 5').dropped).toEqual([]);
+  });
+});

@@ -39,14 +39,15 @@ import { boundingBoxDistance } from '../geometry';
 import type { BoardDimensions, BoardNumber } from './dimension';
 import { numbersOf } from './dimension';
 import { sheetLines } from './gather';
-import { checkWritten, readSheet } from './sheet';
+import { checkWritten, readSheet, sheetScope } from './sheet';
 import type { CheckEntry, Sheet, StepEntry } from './sheet';
 import type { ChainReading } from './expr';
+import { evaluateChain, formatValue, parseChain, parseLine } from './expr';
 import { solveBoard } from './solve';
 import { garmentMaths, garmentNotFigures, garmentOf } from './garment';
 import type { BoardMaths, Conflict, FigureMaths, SolvedValue } from './solve';
-import { formatNumber, formatQuantity, unitSuffix } from './quantity';
-import type { Quantity } from './quantity';
+import { convertQuantity, formatNumber, formatQuantity, scanUnit, unitName, unitSuffix } from './quantity';
+import type { LengthUnit, Quantity } from './quantity';
 
 // ===== Which ink a number can be about =====
 
@@ -335,11 +336,11 @@ function stepSaid(readings: readonly ChainReading[]): { text: string; standing: 
     const why = [...top.notes, ...top.unknowns.map((u) => `${u} is not on this sheet`)].filter((x, i, xs) => xs.indexOf(x) === i);
     return { text: `? ${why[0] ?? 'no value'}`, standing: true };
   }
-  const v = fmt(top.value);
+  const v = top.text;
   const off = top.checks.find((c) => c.status === 'off');
   if (off) return { text: `✗ ${v} · written ${fmt(off.written)}`, standing: true };
   const agrees = top.checks.length > 0 && top.checks.every((c) => c.status !== 'unknown');
-  const others = readings.slice(1).map((r) => (r.value ? fmt(r.value) : '')).filter((x, i, xs) => x && x !== v && xs.indexOf(x) === i);
+  const others = readings.slice(1).map((r) => (r.value ? r.text : '')).filter((x, i, xs) => x && x !== v && xs.indexOf(x) === i);
   return { text: `${agrees ? '✓' : '='} ${v}${others.length ? ` · or ${others.slice(0, 2).join(', ')}` : ''}`, standing: false };
 }
 
@@ -358,11 +359,25 @@ function stepChips(sheet: Sheet): MathsChip[] {
   return out;
 }
 
+/** The line and why: the sheet's reason already says each other reading once, with its ✗ (sheet.ts, stepReason). */
 function stepReason(e: StepEntry | CheckEntry): string {
-  const top = e.readings[0];
-  if (!top) return e.reason;
-  const rest = e.readings.slice(1).map((r) => `or ${fmt(r.value)}${r.label ? ` ${r.label}` : ' from the measurements'}${r.checks.some((c) => c.status === 'off') ? ` ✗ written ${fmt(r.checks.find((c) => c.status === 'off')!.written)}` : ''}`);
-  return [`${e.text} — ${e.reason}`, ...rest].join('; ');
+  return `${e.text} — ${e.reason}`;
+}
+
+/**
+ * When steps that could each be read two ways do not all take the same one — 4 and 5 hold with seam allowance,
+ * 6 from the measurements — the page agrees step by step and still not with itself, and that is said.
+ */
+function footing(steps: readonly StepEntry[]): string {
+  const groups = new Map<string, string[]>();
+  for (const e of steps) {
+    if (!e.readings.some((r) => r.label)) continue;
+    const label = e.readings[0]?.label ?? 'from the measurements';
+    groups.set(label, [...(groups.get(label) ?? []), e.key]);
+  }
+  if (groups.size < 2) return '';
+  const said = [...groups].map(([label, keys]) => `${keys.length === 1 ? 'step' : 'steps'} ${keys.length === 1 ? keys[0] : `${keys.slice(0, -1).join(', ')} and ${keys[keys.length - 1]}`} ${label}`);
+  return `, but not all on one reading: ${said.join('; ')}`;
 }
 
 /**
@@ -433,7 +448,7 @@ export function mathsSaid(board: BoardMaths, ids: readonly string[]): MathsSaid 
   if (page.length) {
     const steps = page.filter((e): e is StepEntry => e.kind === 'step' && !e.conflict);
     const off = steps.filter((e) => e.readings[0]?.checks.some((c) => c.status === 'off') || !e.readings[0]?.value);
-    if (steps.length) lines.push(`${steps.length} step${steps.length === 1 ? '' : 's'} — ${off.length ? `${steps.length - off.length} agree, ${off.length} ${off.length === 1 ? 'does' : 'do'} not (${off.map((e) => e.key).join(', ')})` : steps.length === 1 ? 'it agrees' : 'every one agrees'}`);
+    if (steps.length) lines.push(`${steps.length} step${steps.length === 1 ? '' : 's'} — ${off.length ? `${steps.length - off.length} agree, ${off.length} ${off.length === 1 ? 'does' : 'do'} not (${off.map((e) => e.key).join(', ')})` : steps.length === 1 ? 'it agrees' : 'every one agrees'}${footing(steps)}`);
     for (const e of page) {
       if (e.kind !== 'step' && e.kind !== 'check') continue;
       if (e.kind === 'step' && e.conflict) { rows.push({ k: e.text, v: e.conflict }); continue; }
@@ -455,33 +470,89 @@ export type TypedMaths =
  * resolve a name (*= A ÷ 3*), its unit is a bare number's — with no model. A
  * formula typed alone is stood with its result (*24 ÷ 3 = 8*); one typed whole
  * with an `=` is kept as typed when it holds; one that does not says how, and
- * says nothing else. What it cannot read it says why.
+ * says nothing else. `in cm` (or `to`, `as`, `→`) after it converts the result
+ * (*68″ = 172.72 cm*). What it cannot read it says why — never a part of what
+ * was typed left out in silence, and never a name given a number only because
+ * it was written beside it.
  */
 export function evaluateTyped(text: string, board: BoardMaths | null): TypedMaths {
   const body = text.replace(/^\s*=\s*/, '').trim();
   if (!body) return { ok: false, reason: 'type a sum, like = 24 ÷ 3' };
+  const into = conversionOf(body);
+  if (into) return converted(body, into.sum, into.unit, board);
   const page = board ? board.sheet.entries.map((e) => e.text) : [];
   // Typed after `=`, it is a sum whatever its words: what the page lacks is said, not taken for prose.
   const sheet = readSheet([...page, { text: body, maths: true }]);
   const e = sheet.entries[sheet.entries.length - 1];
   if (!e) return { ok: false, reason: 'type a sum, like = 24 ÷ 3' };
   if (e.kind !== 'check') {
-    if (e.kind === 'value') return { ok: false, reason: `${body} is only a number — type a sum, like = 24 ÷ 3` };
+    if (e.kind === 'value') {
+      // π and 2π are numbers worth saying in digits.
+      const lone = parseLine(body).chain.segments[0]?.readings[0]?.expr;
+      if (lone?.k === 'num' && lone.sym) {
+        const result = formatValue(lone, lone.q);
+        return { ok: true, body, result, words: `${lone.sym} = ${result}` };
+      }
+      return { ok: false, reason: `${body} is only a number — type a sum, like = 24 ÷ 3` };
+    }
     if (e.kind === 'definition') return { ok: false, reason: `${body} says what ${e.key} is — type a sum, like = ${e.key} ÷ 3` };
+    if (e.kind === 'note' && !e.reason.startsWith('cannot read')) return { ok: false, reason: e.reason };
     return { ok: false, reason: `cannot read “${body}” as a sum` };
   }
   const top = e.readings[0];
-  if (!top || !top.value) {
-    const why = top ? [...top.notes, ...top.unknowns.map((u) => `${u} is not on this sheet`)].filter((x, i, xs) => xs.indexOf(x) === i) : [];
-    return { ok: false, reason: why[0] ?? `cannot read “${body}” as a sum` };
-  }
-  const off = top.checks.find((c) => c.status === 'off');
-  if (off) return { ok: false, reason: `${top.formula} is ${fmt(top.value)}, not ${fmt(off.written)}` };
-  const result = fmt(top.value);
+  const refused = refusal(top, body);
+  if (refused) return { ok: false, reason: refused };
   const second = e.readings[1];
   return {
-    ok: true, body, result,
-    words: body.includes('=') ? body : `${top.formula} = ${result}`,
-    ...(second && second.value ? { also: `${second.formula} = ${fmt(second.value)}` } : {}),
+    ok: true, body, result: top.text,
+    words: body.includes('=') ? body : `${top.formula} = ${top.text}`,
+    ...(second && second.value ? { also: `${second.formula} = ${second.text}` } : {}),
   };
+}
+
+/** Why a typed sum's reading is not one to put on the board — or null when it is. */
+function refusal(top: ChainReading | undefined, body: string): string | null {
+  if (!top || !top.value) {
+    const why = top ? [...top.notes, ...top.unknowns.map((u) => `${u} is not on this sheet`)].filter((x, i, xs) => xs.indexOf(x) === i) : [];
+    return why[0] ?? `cannot read “${body}” as a sum`;
+  }
+  if (top.dropped.length) return `cannot read “${top.dropped[0]}” as part of the sum`;
+  // `Foo(16)`: a name the page lacks, with a number beside it, is not a sum that comes to that number.
+  const lacking = top.bindings.find((b) => b.kind === 'name');
+  if (lacking) return `${lacking.subject} is not on this sheet`;
+  const off = top.checks.find((c) => c.status === 'off');
+  if (off) return `${top.formula} is ${top.text}, not ${fmt(off.written)}`;
+  return null;
+}
+
+/** `… in cm`, `… to in`, `… as mm`, `… → ft`: a sum and the unit its result is wanted in. Null when the last word is no unit. */
+function conversionOf(body: string): { sum: string; unit: LengthUnit } | null {
+  const m = /^(.*\S)\s+(?:in|into|to|as)\s+(\S+)\s*$/i.exec(body) ?? /^(.*\S)\s*→\s*(\S+)\s*$/.exec(body);
+  if (!m) return null;
+  const u = scanUnit(m[2], 0);
+  return u && u.end === m[2].length ? { sum: m[1], unit: u.unit } : null;
+}
+
+function converted(body: string, sum: string, unit: LengthUnit, board: BoardMaths | null): TypedMaths {
+  const sheet = board?.sheet ?? readSheet([]);
+  const top = evaluateChain(parseChain(sum), sheetScope(sheet))[0];
+  const refused = refusal(top, sum);
+  if (refused) return { ok: false, reason: refused };
+  const named = unitName(unit, true);
+  let v = top.value!;
+  if (v.dim === 0) {
+    // A bare number is in the page's unit, as every bare measurement on it is; with none, there is nothing to convert.
+    if (!sheet.unit) return { ok: false, reason: `${top.formula === top.text ? top.text : `${top.formula} = ${top.text}`} has no unit, so there is nothing to convert to ${named} — write the unit it is in` };
+    v = { ...v, unit: sheet.unit, dim: 1 };
+  }
+  const shown = formatValue(top.expr, v);
+  const leaf = !!top.expr && (top.expr.k === 'num' || top.expr.k === 'name' || top.expr.k === 'ref');
+  if (v.unit === unit) {
+    if (leaf) return { ok: false, reason: `${shown} is in ${named} already` };
+    return { ok: true, body, result: shown, words: sum.includes('=') ? sum : `${top.formula} = ${shown}` };
+  }
+  const result = formatQuantity(convertQuantity(v, unit).quantity);
+  // A lone measurement is said as its value, never as `A = …`, which a page reads as A defined again.
+  const words = sum.includes('=') ? `${sum} = ${result}` : leaf ? `${shown} = ${result}` : `${top.formula} = ${shown} = ${result}`;
+  return { ok: true, body, result, words };
 }

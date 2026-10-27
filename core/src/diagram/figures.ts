@@ -593,7 +593,7 @@ function figureOfCycle(
       shape = 'rectangle';
       const worst = Math.max(...angles.map((a) => Math.abs(a - 90)));
       fit = 1 - 0.5 * (worst / RIGHT_ANGLE_TOLERANCE);
-      says = `a rectangle — its four corners are right within ±${RIGHT_ANGLE_TOLERANCE}° (measure.ts), as the ink measures them`;
+      says = `a rectangle — its four corners are right within ±${RIGHT_ANGLE_TOLERANCE}°, as the ink measures them`;
     } else {
       shape = 'quadrilateral';
       says = 'a quadrilateral';

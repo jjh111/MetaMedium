@@ -359,13 +359,19 @@ function triangleModels(facts: Fact[]): Model[] {
         }
       }
       if (!ok) continue;
-      out.push(triangleModel(basis, sidesIv, anglesIv, branches > 1 ? b : -1));
+      // A measure of the whole triangle, taken at each corner of the inputs as the sides are: its sides and angles move
+      // together, and taken over their ranges one by one an area of ½ × 8 × (2–4) came to 7.38–17.35, not 8–16.
+      const whole = (f: (t: Tri) => number) => over(ivs, (xs) => {
+        const t = at(xs)[b];
+        return t ? f(t) : null;
+      });
+      out.push(triangleModel(basis, sidesIv, anglesIv, branches > 1 ? b : -1, whole));
     }
   }
   return out;
 }
 
-function triangleModel(basis: Fact[], sides: Iv[], angles: Iv[], branch: number): Model {
+function triangleModel(basis: Fact[], sides: Iv[], angles: Iv[], branch: number, whole: (f: (t: Tri) => number) => Iv | null): Model {
   const vals = new Map<string, Val>();
   const known = new Map<string, Fact>(basis.map((x) => [x.key, x]));
   const sideKnown = [0, 1, 2].filter((k) => known.has(`side${k}`));
@@ -468,9 +474,10 @@ function triangleModel(basis: Fact[], sides: Iv[], angles: Iv[], branch: number)
     const y = known.get(`angle${k}`);
     vals.set(`angle${k}`, y ? { iv: y.iv, from: y.assumed ? 'assumed' : y.fixed ? 'declared' : 'labelled', fact: y } : { iv: angles[k], from: 'derived', formula: formulas.get(`angle${k}`) });
   }
-  const area = over([sides[0], sides[1], angles[shared(0, 1)]], ([p, q, C]) => 0.5 * p * q * Math.sin(C * DEG));
+  const area = whole((t) => 0.5 * t.sides[0] * t.sides[1] * Math.sin(t.angles[shared(0, 1)] * DEG));
   if (area) vals.set('area', { iv: area, from: 'derived', formula: formulas.get('area') });
-  vals.set('perimeter', { iv: { lo: sides[0].lo + sides[1].lo + sides[2].lo, hi: sides[0].hi + sides[1].hi + sides[2].hi }, from: 'derived', formula: formulas.get('perimeter') });
+  const perimeter = whole((t) => t.sides[0] + t.sides[1] + t.sides[2]);
+  if (perimeter) vals.set('perimeter', { iv: perimeter, from: 'derived', formula: formulas.get('perimeter') });
   const assumed = basis.find((x) => x.assumed)?.assumed;
   return { basis, vals, how, makes, ...(assumed ? { assumed } : {}), ...(branch >= 0 ? { branch } : {}) };
 }
@@ -641,7 +648,9 @@ function arcModels(f: Figure, facts: Fact[]): Model[] {
     if (r.group === l.group) continue;
     const c = over([r.iv, l.iv], ([rr, ll]) => 2 * rr * Math.sin(ll / rr / 2));
     const h = over([r.iv, l.iv], ([rr, ll]) => rr * (1 - Math.cos(ll / rr / 2)));
-    if (c && h) build([r, l], c, h, r.iv, { chord: `2 × ${numText(r)} × sin(${numText(l)} ÷ (2 × ${numText(r)}))`, rise: `${numText(r)} × (1 − cos(${numText(l)} ÷ (2 × ${numText(r)})))` }, ['chord']);
+    // The half-sweep in degrees, as every angle the canvas says is: l ÷ 2r radians is 90° × l ÷ (π × r).
+    const half = `90° × ${numText(l)} ÷ (π × ${numText(r)})`;
+    if (c && h) build([r, l], c, h, r.iv, { chord: `2 × ${numText(r)} × sin(${half})`, rise: `${numText(r)} × (1 − cos(${half}))` }, ['chord']);
   }
   // One fact alone fixes only itself.
   for (const x of facts) {
@@ -914,7 +923,7 @@ export function solveFigure(figure: Figure, labels: readonly FigureLabel[], opti
         const taken = new Set(angleFacts.map((x) => x.key));
         f.angles.forEach((deg, k) => {
           if (models.length || taken.has(`angle${k}`) || angleClass(deg) !== 'right') return;
-          const assumed = `the corner at ${V[k]} measures ${Math.round(deg)}°, right within ±${RIGHT_ANGLE_TOLERANCE}° (measure.ts) — a reading, not a fact`;
+          const assumed = `the corner at ${V[k]} measures ${Math.round(deg)}°, right within ±${RIGHT_ANGLE_TOLERANCE}° — a reading, not a fact`;
           const hyp: Fact = { i: -1, key: `angle${k}`, iv: point(90), q: { lo: 90, hi: 90, unit: null, dim: 0, approx: false }, text: '90°', shown: '90', group: `assumed:${k}`, fixed: true, assumed, ids: [] };
           models = triangleModels([...facts, hyp]);
         });

@@ -863,7 +863,7 @@ export function endOf(
       symbol: landed,
       head: undefined,
       quality: 1,
-      said: { end: e.end, point: { x: e.point.x, y: e.point.y }, symbol: landed.id, reason: `it ends on ${landed.id}, which heads.ts reads as a head and the flowchart as a symbol` },
+      said: { end: e.end, point: { x: e.point.x, y: e.point.y }, symbol: landed.id, reason: `it ends on ${landed.id}, which is read as a head at the end of a line, and by the flowchart as a symbol` },
     };
   }
   let best: { c: Candidate; d: number } | undefined;
