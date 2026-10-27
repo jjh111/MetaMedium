@@ -212,6 +212,121 @@ describe('what is typed after =', () => {
   });
 });
 
+// Each of these was the committed bundle's answer in the field, 27 Oct 2026: said as if it were right.
+describe('what is typed after =, as the field answered it wrongly', () => {
+  const apron = () => {
+    const s = createSession();
+    text(s, APRON_LINES.join('\n'), { minX: 100, maxX: 500, minY: 100, maxY: 400 }, 1000);
+    return boardMaths(s.getState());
+  };
+  /** What `=` puts on the board reads back, as a line of the page, as a sum that holds. */
+  const holds = (words: string) => {
+    const e = readSheet([{ text: words, maths: true }]).entries[0];
+    return e.kind === 'check' && !!e.readings[0]?.value && e.readings[0].checks.every((c) => c.status === 'ok' || c.status === 'rounded');
+  };
+
+  it('sqrt(16) is a square root — never a name given the number in its brackets (it was “sqrt = 16”)', () => {
+    expect(evaluateTyped('= sqrt(16)', null)).toMatchObject({ ok: true, result: '4', words: '√16 = 4' });
+    expect(evaluateTyped('= sqrt 16', null)).toMatchObject({ ok: true, result: '4' });
+    expect(evaluateTyped('= Sqrt(16)', null)).toMatchObject({ ok: true, result: '4' });
+    expect(holds('√16 = 4')).toBe(true);
+    const negative = evaluateTyped('= sqrt(-4)', null);
+    expect(negative.ok).toBe(false);
+    if (!negative.ok) expect(negative.reason).toMatch(/negative/);
+  });
+
+  it('a name the page lacks is not given the number in brackets beside it', () => {
+    const r = evaluateTyped('= Foo(16)', null);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toMatch(/Foo is not on this sheet/);
+  });
+
+  it('the operands shown agree with the result: 1.005 + 1 = 2.005 (it was “1 + 1 = 2.01”)', () => {
+    expect(evaluateTyped('= 1.005 + 1', null)).toMatchObject({ ok: true, result: '2.005', words: '1.005 + 1 = 2.005' });
+    expect(evaluateTyped('= 0.125 × 3', null)).toMatchObject({ ok: true, result: '0.375', words: '0.125 × 3 = 0.375' });
+    expect(holds('1.005 + 1 = 2.005')).toBe(true);
+  });
+
+  it('a dash between a product and a number is a minus first: 24 * 3 - 4 is 68, or 72–96 as a range', () => {
+    const r = evaluateTyped('= 24 * 3 - 4', null);
+    expect(r).toMatchObject({ ok: true, result: '68', words: '(24 × 3) − 4 = 68' });
+    if (r.ok) expect(r.also).toMatch(/= 72–96$/);
+    // After a sum the dash is still the range a drafter writes: + 3–6″ (the tunic's step 3).
+    expect(evaluateTyped('= 2 + 3-6"', null)).toMatchObject({ ok: true, result: '5–8″' });
+  });
+
+  it('“in cm” converts, and what it cannot convert it says — never a request dropped in silence (it was “68″ = 68″”)', () => {
+    expect(evaluateTyped('= 5′ 8″ in cm', null)).toMatchObject({ ok: true, result: '172.72 cm', words: '68″ = 172.72 cm' });
+    expect(evaluateTyped('= 25.4 mm in in', null)).toMatchObject({ ok: true, result: '1″', words: '25.4 mm = 1″' });
+    expect(evaluateTyped('= 10 ft in in', null)).toMatchObject({ ok: true, result: '120″', words: '10′ = 120″' });
+    expect(evaluateTyped('= 24″ + 3″ to cm', null)).toMatchObject({ ok: true, result: '68.58 cm', words: '24″ + 3″ = 27″ = 68.58 cm' });
+    for (const w of ['68″ = 172.72 cm', '25.4 mm = 1″', '24″ + 3″ = 27″ = 68.58 cm']) expect(holds(w), w).toBe(true);
+    // A bare number takes the page's unit, as every bare measurement on it does.
+    expect(evaluateTyped('= A in cm', apron())).toMatchObject({ ok: true, result: '91.44 cm' });
+    const bare = evaluateTyped('= 24 ÷ 3 in cm', null);
+    expect(bare.ok).toBe(false);
+    if (!bare.ok) expect(bare.reason).toMatch(/no unit/);
+    const odd = evaluateTyped('= 5′ 8″ in furlongs', null);
+    expect(odd.ok).toBe(false);
+    if (!odd.ok) expect(odd.reason).toMatch(/furlongs/);
+  });
+
+  it('sin 30 is a sine, in degrees — never a definition of sin (it was “sin 30 says what sin is”)', () => {
+    expect(evaluateTyped('= sin 30', null)).toMatchObject({ ok: true, result: '0.5', words: 'sin 30° = 0.5' });
+    expect(evaluateTyped('sin 30', null)).toMatchObject({ ok: true, result: '0.5' });
+    expect(holds('sin 30° = 0.5')).toBe(true);
+    const alone = evaluateTyped('= sin', null);
+    expect(alone.ok).toBe(false);
+    if (!alone.ok) expect(alone.reason).toMatch(/sin needs/);
+    const wide = evaluateTyped('= asin(2)', null);
+    expect(wide.ok).toBe(false);
+    if (!wide.ok) expect(wide.reason).toMatch(/−1 to 1/);
+  });
+
+  it('reads what the engine writes in its formulas: √, ², ³, π, ° and the trig of a triangle', () => {
+    const cases: [string, string][] = [
+      ['= 3²', '9'], ['= 2³', '8'], ['= 3^2', '9'], ['= −3²', '−9'], ['= √16', '4'], ['= π × 2', '6.28'], ['= 2π', '6.28'],
+      ['= 28 ÷ 2π', '4.46'], ['= √(24² + 8²)', '25.3'], ['= atan(8 ÷ 24)', '18.43°'], ['= 180° − 40° − 60°', '80°'],
+      ['= ½ × 24 × 8 × sin 90°', '96'], ['= 10 × sin 40° ÷ sin 80°', '6.53'], ['= acos((24² + 25.3² − 8²) ÷ (2 × 24 × 25.3))', '18.43°'],
+      ['= √(8² + (2–4)²)', '8.25–8.94'], ['= 2 × asin(12 ÷ (2 × 7.5))', '106.26°'], ['= π × 7.5 × 106.26° ÷ 180°', '13.91'],
+    ];
+    for (const [typed, result] of cases) expect(evaluateTyped(typed, null), typed).toMatchObject({ ok: true, result });
+    for (const [typed] of cases) {
+      const r = evaluateTyped(typed, null);
+      if (r.ok) expect(holds(r.words), r.words).toBe(true);
+    }
+  });
+});
+
+describe('the panel says each reading once, and says when the steps do not stand on one reading', () => {
+  const page = () => {
+    const s = createSession();
+    const id = text(s, APRON_LINES.join('\n'), { minX: 100, maxX: 500, minY: 100, maxY: 400 }, 1000);
+    return mathsSaid(boardMaths(s.getState())!, [id])!;
+  };
+
+  it('a step’s second reading is said once, not twice (it was “or 46″ from the measurements; or 46″ from the measurements ✗ written 48”)', () => {
+    const said = page();
+    for (const row of said.rows) {
+      const ors = (row.why ?? '').match(/; or /g) ?? [];
+      const readings = row.v.includes(' · or ') ? row.v.split(' · or ').length - 1 : 0;
+      expect(ors.length, `${row.k} ${row.why}`).toBe(readings);
+    }
+    const four = said.rows.find((r) => r.k === '4.')!;
+    expect(four.why).toMatch(/or 46″ from the measurements ✗ written 48/);
+  });
+
+  it('every step agrees, and the summary says that steps 4 and 5 take the seam allowance and step 6 does not (it was “every one agrees”)', () => {
+    expect(page().lines[0]).toBe('6 steps — every one agrees, but not all on one reading: steps 4 and 5 with seam allowance; step 6 from the measurements');
+  });
+
+  it('a page whose steps stand on one reading says only that they agree', () => {
+    const s = createSession();
+    const id = text(s, ['A. Bust 36', '1. A ÷ 3 = 12', '2. ① ÷ 2 = 6'].join('\n'), { minX: 100, maxX: 500, minY: 100, maxY: 200 }, 1000);
+    expect(mathsSaid(boardMaths(s.getState())!, [id])!.lines[0]).toBe('2 steps — every one agrees');
+  });
+});
+
 // A number's figure stands beside it, so only the ink beside a number is read for figures: on a board of
 // two thousand marks with one number on it the dimensions and the solver walked every figure against every
 // other, two seconds a stroke (bench/board.mjs, measured at R4c's 2,000). What the maths says of a drawing

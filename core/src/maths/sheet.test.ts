@@ -285,3 +285,19 @@ describe('prose is not maths', () => {
     expect(e.kind).toBe('check');
   });
 });
+
+// Found reading the engine back through its own field, 27 Oct 2026.
+describe('a step says each of its readings once', () => {
+  it('a reading whose formula is its value is not named by it again: “or 46–48”, never “or 46–48 as 46–48”', () => {
+    const one = readSheet(['1. 46 − 48']).entries[0];
+    expect(one.reason).toMatch(/; or 46–48$/);
+    expect(one.reason.split('46 − 48 = −2').length - 1).toBe(1);
+  });
+
+  it('another reading carries its own ✗ once, in the step’s reason: the panel adds nothing to it', () => {
+    const four = step(readSheet(APRON_LINES), '4');
+    expect(four.reason).toMatch(/; or 46″ from the measurements ✗ written 48$/);
+    expect(four.reason.match(/; or /g)).toHaveLength(1);
+  });
+});
+

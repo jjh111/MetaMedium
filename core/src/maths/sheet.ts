@@ -207,7 +207,7 @@ function unitsWritten(p: LineParse): LengthUnit[] {
     } else if (e.k === 'op') {
       walk(e.a);
       walk(e.b);
-    } else if (e.k === 'neg' || e.k === 'carry') walk(e.a);
+    } else if (e.k === 'neg' || e.k === 'carry' || e.k === 'fn' || e.k === 'pow') walk(e.a);
   };
   for (const seg of p.chain.segments) if (seg.readings[0]) walk(seg.readings[0].expr);
   return out;
@@ -251,7 +251,9 @@ function classify(src: Source, line: number): Draft {
   const parse = parseLine(src.text);
   const d: Draft = { line, src, parse, kind: 'note' };
   const L = parse.label;
-  const unreadable = () => (parse.shape === 'empty' ? `${L ? `${L.text} with nothing after it` : 'an empty line'}` : `cannot read “${parse.body}”`);
+  // What could not be read says why, when the grammar knows: `sin needs an angle after it, like sin 30°`.
+  const why = parse.chain.segments.find((g) => g.error && !g.error.startsWith('cannot read'))?.error;
+  const unreadable = () => (parse.shape === 'empty' ? `${L ? `${L.text} with nothing after it` : 'an empty line'}` : why ?? `cannot read “${parse.body}”`);
   if (L?.kind === 'letter') {
     if (parse.shape === 'definition') return { ...d, kind: 'definition', key: L.letter, letter: L.letter, name: parse.name, value: parse.value };
     if (parse.shape === 'value') return { ...d, kind: 'definition', key: L.letter, letter: L.letter, value: parse.value };
@@ -311,6 +313,13 @@ function proseToNotes(drafts: Draft[]): void {
         return a && b;
       }
       case 'neg': case 'carry': return wordsOnly(e.a, op);
+      // `sin 30` is maths; `the sin of pride` is not: a function of words is a sentence.
+      case 'fn': case 'pow': {
+        const a = wordsOnly(e.a, op);
+        if (a) op.prose = true;
+        else op.n++;
+        return a;
+      }
       default: return false;
     }
   };
@@ -342,7 +351,7 @@ function proseToNotes(drafts: Draft[]): void {
 }
 
 function hasNames(chain: ExprChain): boolean {
-  const walk = (e: Expr): boolean => (e.k === 'name' || e.k === 'ref' ? true : e.k === 'op' ? walk(e.a) || walk(e.b) : e.k === 'neg' || e.k === 'carry' ? walk(e.a) : false);
+  const walk = (e: Expr): boolean => (e.k === 'name' || e.k === 'ref' ? true : e.k === 'op' ? walk(e.a) || walk(e.b) : e.k === 'neg' || e.k === 'carry' || e.k === 'fn' || e.k === 'pow' ? walk(e.a) : false);
   return chain.segments.some((g) => g.readings.some((r) => walk(r.expr)));
 }
 
@@ -356,7 +365,7 @@ function mentions(chain: ExprChain): { names: string[]; steps: number[] } {
     else if (e.k === 'op') {
       walk(e.a);
       walk(e.b);
-    } else if (e.k === 'neg' || e.k === 'carry') walk(e.a);
+    } else if (e.k === 'neg' || e.k === 'carry' || e.k === 'fn' || e.k === 'pow') walk(e.a);
   };
   for (const g of chain.segments) for (const r of g.readings) walk(r.expr);
   return { names, steps };
@@ -369,7 +378,7 @@ function addsAmount(e: Expr | null | undefined, amount: Quantity): boolean {
     if (e.op === '+' && e.b.k === 'num' && !isRange(e.b.q) && compareQuantities(amount, e.b.q).status === 'ok') return true;
     return addsAmount(e.a, amount) || addsAmount(e.b, amount);
   }
-  if (e.k === 'neg' || e.k === 'carry') return addsAmount(e.a, amount);
+  if (e.k === 'neg' || e.k === 'carry' || e.k === 'fn' || e.k === 'pow') return addsAmount(e.a, amount);
   return false;
 }
 
@@ -534,7 +543,7 @@ export function readSheet(input: readonly SheetLineInput[], options: SheetOption
         const why = loop.length === 1
           ? `${who(key)} refers to itself — a cycle, so it cannot be worked out`
           : `${loop.map(who).join(' and ')} refer to each other — a cycle, so none of them can be worked out`;
-        readings.set(key, [{ expr: null, formula: d.parse.body, value: null, worked: d.parse.body, checks: [], bindings: [], restated: 0, uses: [...deps.get(key)!], unknowns: [], notes: [why], reason: why }]);
+        readings.set(key, [{ expr: null, formula: d.parse.body, value: null, text: 'no value', worked: d.parse.body, checks: [], bindings: [], dropped: [], restated: 0, uses: [...deps.get(key)!], unknowns: [], notes: [why], reason: why }]);
         values.set(key, null);
         return;
       }
@@ -630,7 +639,7 @@ export function readSheet(input: readonly SheetLineInput[], options: SheetOption
       }
       case 'check': {
         const readings = evaluateChain(d.chain!, done.scopeFor(undefined));
-        return { ...base, kind: 'check', value: readings[0]?.value ?? null, readings, reason: readings[0]?.reason ?? `cannot read “${d.parse.body}”` };
+        return { ...base, kind: 'check', value: readings[0]?.value ?? null, readings, reason: readings.length ? stepReason(readings, nameIndex) : `cannot read “${d.parse.body}”` };
       }
       case 'worked':
         return { ...base, kind: 'worked', step: d.step!, reason: `the worked line of ${who(d.step!)}` };
@@ -666,8 +675,19 @@ function stepReason(readings: ChainReading[], nameIndex: Map<string, string>): s
   for (const b of top.bindings) {
     if (b.kind === 'name' && !nameIndex.has(normName(b.subject))) parts.push(`${b.subject} is not on this sheet; the worked line puts ${fmt(b.value)} for it`);
   }
-  for (const o of readings.slice(1)) parts.push(`or ${fmt(o.value)} ${nameOf(o, readings)}`);
+  for (const o of readings.slice(1)) parts.push(`or ${o.text}${otherNamed(o, readings)}${offMark(o)}`);
   return parts.join('; ');
+}
+
+/** What another reading is called after its value: ` from the measurements` — nothing when its formula IS its value (`or 46–48`, never `or 46–48 as 46–48`). */
+function otherNamed(r: ChainReading, readings: ChainReading[]): string {
+  return !r.label && r.formula === r.text && !readings.some((x) => x.label) ? '' : ` ${nameOf(r, readings)}`;
+}
+
+/** A reading whose written result is off says so beside it: ` ✗ written 48`. */
+function offMark(r: ChainReading): string {
+  const off = r.checks.find((c) => c.status === 'off');
+  return off ? ` ✗ written ${fmt(off.written)}` : '';
 }
 
 function checkReadings(key: string, readings: ChainReading[], w: Quantity): StepCheck {
@@ -718,6 +738,28 @@ export function sheetEntry(sheet: Sheet, key: string): SheetEntry | undefined {
     if (e.kind === 'definition') return normName(e.key) === n || (!!e.name && normName(e.name) === n) || (!!e.letter && normName(e.letter) === n);
     return e.kind === 'step' && normName(e.key) === n;
   });
+}
+
+/**
+ * A scope over a sheet's own measurements and steps, by letter, name and number, as a check on the page reads
+ * them (no allowance): for a sum typed against the page that is not a line of it — `= A in cm`.
+ */
+export function sheetScope(sheet: Sheet): MathsScope {
+  return {
+    unit: sheet.unit,
+    describeUnknown: (name) => `${name} is not on this sheet`,
+    name: (n) => {
+      const e = sheetEntry(sheet, n);
+      if (e?.kind === 'definition') return [{ value: e.value, key: e.key, label: 'from the measurements', ...(e.value ? {} : { reason: `${e.key} has no number yet` }) }];
+      if (e?.kind === 'step' && e.letter) return [{ value: e.value, key: e.key, ...(e.value ? {} : { reason: `${e.key} has no value` }) }];
+      return undefined;
+    },
+    step: (n) => {
+      const e = sheetEntry(sheet, String(n));
+      if (e?.kind !== 'step' || e.n !== n) return undefined;
+      return { value: e.value, key: e.key, ...(e.value ? {} : { reason: `step ${n} has no value` }) };
+    },
+  };
 }
 
 /** The value a definition holds, or a step's first reading. */
@@ -843,7 +885,7 @@ export function describeSheet(sheet: Sheet): string {
           lines.push(`${head} ${top.formula} — ${why.join('; ') || 'no value'}`);
           break;
         }
-        lines.push(`${head} ${top.formula} = ${fmt(top.value)}${top.label ? ` ${top.label}` : ''}${mark(top)}${rest.map((r) => ` · or ${fmt(r.value)} ${nameOf(r, e.readings)}${mark(r)}`).join('')}`);
+        lines.push(`${head} ${top.formula} = ${top.text}${top.label ? ` ${top.label}` : ''}${mark(top)}${rest.map((r) => ` · or ${r.text}${otherNamed(r, e.readings)}${mark(r)}`).join('')}`);
         break;
       }
       case 'label':

@@ -852,7 +852,7 @@ export function readUmlClass(state: SessionState, scopeIds?: readonly string[]):
       const fills = ob ? [...marks.values()].filter((m) => m.id !== outline && m.id !== id && !classOfMark.has(m.id) && !isWord(m.node) && !!strokePointsOf(m.node) && m.bounds.minX >= ob.minX - grow && m.bounds.maxX <= ob.maxX + grow && m.bounds.minY >= ob.minY - grow && m.bounds.maxY <= ob.maxY + grow) : [];
       if (fills.length) {
         const h = headApart(nodes.get(id)!, e.end, [marks.get(outline!)!.node, ...fills.map((m) => m.node)]);
-        if (h && h.filled && h.kind === heads[0].kind) heads = [{ ...h, ids: [outline!, ...fills.map((m) => m.id)], reason: `${h.reason} — read apart from the class beside it, which heads.ts gave its fill` }, ...heads];
+        if (h && h.filled && h.kind === heads[0].kind) heads = [{ ...h, ids: [outline!, ...fills.map((m) => m.id)], reason: `${h.reason} — read apart from the class beside it, which had been given the head’s fill` }, ...heads];
       }
     }
     const head = heads[0];
@@ -866,7 +866,7 @@ export function readUmlClass(state: SessionState, scopeIds?: readonly string[]):
     }
     if (landed) {
       const c = classOfMark.get(landed.ids.find((x) => x !== id && classOfMark.has(x))!)!;
-      return { class: c, headIds: [], quality: 1, said: { end: e.end, point: { ...e.point }, symbol: c.id, reason: `it ends on ${c.id}, which heads.ts reads as a head and this notation as a class` } };
+      return { class: c, headIds: [], quality: 1, said: { end: e.end, point: { ...e.point }, symbol: c.id, reason: `it ends on ${c.id}, which is read as a head at the end of a line, and by this notation as a class` } };
     }
     let best: { c: Candidate; d: number } | undefined;
     for (const c of kept) {

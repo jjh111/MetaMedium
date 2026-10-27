@@ -150,7 +150,8 @@ function asFraction(v: number, den: number): string | null {
 export function formatQuantity(q: Quantity, opts: { digits?: number; words?: boolean; fractions?: number } = {}): string {
   const written = q.precision && q.precision < 1 ? Math.round(1 / q.precision) : 0;
   const den = opts.fractions ?? (FRACTION_DENOMINATORS.includes(written) && Math.abs(1 / q.precision! - written) < 1e-9 ? written : 0);
-  const n = (v: number) => (den ? asFraction(v, den) : null) ?? formatNumber(v, opts.digits ?? 2);
+  // A number written to more places than two is shown as written: 1.005 rounded to 1 put beside a sum of 2.01 said a sum that does not hold.
+  const n = (v: number) => (den ? asFraction(v, den) : null) ?? formatNumber(v, opts.digits ?? Math.max(2, decimalsWritten(q)));
   let body: string;
   if (!isRange(q)) body = n(q.lo);
   else if (q.lo < 0 || q.hi < 0) body = `${n(q.lo)} to ${n(q.hi)}`;
@@ -158,7 +159,16 @@ export function formatQuantity(q: Quantity, opts: { digits?: number; words?: boo
   return (q.approx ? '~' : '') + body + unitSuffix(q.unit, q.dim, opts.words);
 }
 
-function unitName(unit: LengthUnit, plural: boolean): string {
+/** How many decimal places a number was written to — 3 for 1.005 — or 0 for a whole number, a fraction or a computed value. */
+export function decimalsWritten(q: Quantity): number {
+  const p = q.precision;
+  if (!p || p >= 1) return 0;
+  const d = Math.round(-Math.log10(p));
+  return d > 0 && d <= 9 && Math.abs(p - 10 ** -d) < 1e-12 ? d : 0;
+}
+
+/** A unit in words: inch, centimetres. */
+export function unitName(unit: LengthUnit, plural: boolean): string {
   return UNIT_WORD[unit][plural ? 1 : 0];
 }
 
@@ -442,6 +452,68 @@ export function arithmetic(op: ArithOp, a: Quantity, b: Quantity): Arith {
   return { quantity: computed(Math.min(...p), Math.max(...p), unit, a.dim - y.dim, approx), notes };
 }
 
+// ===== Powers, roots and angles =====
+//
+// What the solver writes in its formulas — √(24² + 8²), atan(8 ÷ 24), 10 × sin 40° ÷ sin 80°, π × 5² — read
+// back. An angle is a bare number in degrees: every angle the engine reads, writes and labels is in degrees, so
+// sin, cos and tan take degrees and asin, acos and atan give them. Over intervals, like the four operations: a
+// function that turns inside a range is taken at its turning points too. Never throws.
+
+export type AngleFn = 'sin' | 'cos' | 'tan' | 'asin' | 'acos' | 'atan';
+
+const DEG = Math.PI / 180;
+
+/** `q` to a whole power: a length squared is an area, and a range through zero squared starts at zero. */
+export function powerQuantity(q: Quantity, n: number): Arith {
+  if (!Number.isInteger(n) || n < 1) return { quantity: null, notes: [], error: `cannot raise to the power ${n}` };
+  let lo = q.lo ** n, hi = q.hi ** n;
+  if (n % 2 === 0 && q.lo < 0 && q.hi > 0) {
+    hi = Math.max(lo, hi);
+    lo = 0;
+  }
+  return { quantity: computed(lo, hi, q.unit, q.dim * n, q.approx), notes: [] };
+}
+
+/** The square root: of a number, a number; of an area, a length. Of a length it has no unit, and is refused. */
+export function rootQuantity(q: Quantity): Arith {
+  if (q.dim % 2 !== 0) return { quantity: null, notes: [], error: `the square root of ${dimName(q)} has no unit — √ takes a number or an area` };
+  const t = tolFor(q.lo, q.hi);
+  if (q.hi < -t) return { quantity: null, notes: [], error: `cannot take the square root of ${formatQuantity(q)}: it is negative` };
+  if (q.lo < -t) return { quantity: null, notes: [], error: `cannot take the square root of ${formatQuantity(q)}: it may be negative` };
+  return { quantity: computed(Math.sqrt(Math.max(0, q.lo)), Math.sqrt(Math.max(0, q.hi)), q.unit, q.dim / 2, q.approx), notes: [] };
+}
+
+/** Where a function of degrees turns inside [lo, hi]: sin at 90° + 180°k, cos at 180°k. */
+function turnsWithin(lo: number, hi: number, first: number): number[] {
+  const out: number[] = [];
+  for (let at = first + 180 * Math.ceil((lo - first) / 180); at <= hi && out.length < 4; at += 180) out.push(at);
+  return out;
+}
+
+/** sin, cos or tan of an angle in degrees; asin, acos or atan of a number, in degrees. */
+export function angleQuantity(fn: AngleFn, q: Quantity): Arith {
+  const forward = fn === 'sin' || fn === 'cos' || fn === 'tan';
+  const fail = (error: string): Arith => ({ quantity: null, notes: [], error });
+  if (q.dim !== 0) return fail(`${fn} of ${dimName(q)} has no meaning — ${fn} takes ${forward ? 'an angle, in degrees' : 'a number'}`);
+  const at = (v: number) => formatNumber(v);
+  if (forward) {
+    if (fn === 'tan') {
+      const pole = turnsWithin(q.lo - 1e-9, q.hi + 1e-9, 90)[0];
+      if (pole !== undefined) return fail(isRange(q) ? `tan has no value across ${at(pole)}°, inside ${formatQuantity(q)}°` : `tan ${at(pole)}° has no value`);
+      return { quantity: computed(Math.tan(q.lo * DEG), Math.tan(q.hi * DEG), null, 0, q.approx), notes: [] };
+    }
+    const f = fn === 'sin' ? (d: number) => Math.sin(d * DEG) : (d: number) => Math.cos(d * DEG);
+    if (q.hi - q.lo >= 360) return { quantity: computed(-1, 1, null, 0, q.approx), notes: [] };
+    const values = [q.lo, q.hi, ...turnsWithin(q.lo, q.hi, fn === 'sin' ? 90 : 0)].map(f);
+    return { quantity: computed(Math.min(...values), Math.max(...values), null, 0, q.approx), notes: [] };
+  }
+  if (fn === 'atan') return { quantity: computed(Math.atan(q.lo) / DEG, Math.atan(q.hi) / DEG, null, 0, q.approx), notes: [] };
+  if (q.lo < -1 - 1e-9 || q.hi > 1 + 1e-9) return fail(`${fn} takes a number from −1 to 1, not ${formatQuantity(q)}`);
+  const clamp = (v: number) => Math.max(-1, Math.min(1, v));
+  const f = fn === 'asin' ? Math.asin : Math.acos;
+  return { quantity: computed(f(clamp(q.lo)) / DEG, f(clamp(q.hi)) / DEG, null, 0, q.approx), notes: [] };
+}
+
 // ===== Checking a written result =====
 
 /**
@@ -507,6 +579,9 @@ export function compareQuantities(computedQ: Quantity | null, written: Quantity)
     return off(c.lo < written.lo ? written.lo - c.lo : written.hi - c.lo);
   }
   if (Math.abs(written.lo - c.lo) <= t && Math.abs(written.hi - c.hi) <= t) return { ...base, status: 'ok', difference: 0, reason: `✓ ${cs}` };
+  // Each end as precisely as it was written: 8.25–8.94 for 8.246–8.944 is that range, rounded.
+  const p = written.precision ?? 0;
+  if (p > 0 && Math.abs(written.lo - c.lo) <= p / 2 + t && Math.abs(written.hi - c.hi) <= p / 2 + t) return { ...base, status: 'rounded', difference: 0, reason: `≈ ${cs}, written ${ws}` };
   if (written.lo <= c.hi + t && c.lo <= written.hi + t) return { ...base, status: 'within', difference: 0, reason: `${ws} overlaps ${cs}` };
   return off(written.lo > c.hi ? written.lo - c.hi : written.hi - c.lo);
 }
