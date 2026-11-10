@@ -38,6 +38,7 @@ const FOLDERS = {
   // Source and tooling no page asks for: the pages load the engine's committed bundles in Demos/.
   core: "the engine's source and tests — the pages load its bundles from Demos/",
   skills: "Claude Code's skills",
+  docs: "the engineering reference CLAUDE.md indexes — the repository's, read on GitHub",
   'manim-explainer': "an explainer video's sources",
 };
 

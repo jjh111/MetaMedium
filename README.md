@@ -106,7 +106,7 @@ after CI has passed on `master`'s tip.
 
 - [V1-SPEC.md](V1-SPEC.md) — v1 as specced on 2 October 2026: the promises, the units, and the
   ladder of releases
-- [CLAUDE.md](CLAUDE.md) — the codebase guide and the repository's one inventory
+- [CLAUDE.md](CLAUDE.md) — the codebase guide; [docs/](docs/) holds the engineering reference it indexes and [the repository's one inventory](docs/REPOSITORY-MAP.md)
 - [HELP.md](HELP.md) — the app's help, for a person using it
 - [QA-v1.md](QA-v1.md) — the checklist walked by hand for the acceptance scenarios
 - [NEW-REPO-PLAN.md](NEW-REPO-PLAN.md) — starting the dyna.ink repository from this milestone

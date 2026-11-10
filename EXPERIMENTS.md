@@ -388,5 +388,5 @@ When something here has earned its place in the platform:
    improve — reconcile by test, not by guess).
 2. Rebuild the browser bundle and re-copy it to `Demos/` — CI fails if the
    committed copy drifts.
-3. Update [ROADMAP.md](ROADMAP.md) and the repo map in [CLAUDE.md](CLAUDE.md).
+3. Update [ROADMAP.md](ROADMAP.md) and the repo map in [docs/REPOSITORY-MAP.md](docs/REPOSITORY-MAP.md).
 4. Move this entry to **folded in** with a one-line note on where it landed.

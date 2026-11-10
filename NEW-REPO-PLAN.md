@@ -137,9 +137,11 @@ Then the seed's own edits, one commit each, every one green on the suite below:
 4. **`docs/`**: `git mv` the dated root documents into `docs/history/` (and `V1-SPEC.md`,
    `KEYFRAMES.md`, `PERF.md`, `QA-v1.md` into `docs/`), add `docs/history/SEED.md` naming the
    source repository, the commit, the drop list and where each dropped item still lives.
-5. **`README.md` and `CLAUDE.md`, new**: the README as a front page; `CLAUDE.md` cut from 370 KB to a
-   map of about 15 KB (what dyna.ink is, the repository map, the commands, the invariants, §6's kept
-   names), with its architecture sections moved verbatim into `docs/architecture/`.
+5. **`README.md` and `CLAUDE.md`, new**: the README as a front page; `CLAUDE.md` as a map of about
+   20 KB (what dyna.ink is, the repository map, the commands, the invariants), with its architecture
+   sections moved verbatim into `docs/architecture/`. **Done here, 10 Nov 2026**, ahead of the seed
+   (it was 395 KB, loaded into every session and agent): `docs/architecture/*.md`, `docs/STATUS.md`
+   and `docs/REPOSITORY-MAP.md` hold what it held; the seed adds §6's kept names.
 6. **What names what is left**: `HELP.md`'s pointer to `QA-v8.md`; `NOTICE`'s entries for paths left
    behind; `skills/dynaink-code/skill.md`'s Web App Skeleton lines; `.claude/launch.json`; remove
    `.nojekyll` (GitHub Pages only); `scripts/release.mjs`'s printed address.

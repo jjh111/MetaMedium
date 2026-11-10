@@ -195,7 +195,7 @@ Everything below is sequenced to get that loop **into one shippable demo** and
 ## Where Things Actually Stand
 
 *What each thing **is** lives in the repo map in
-[CLAUDE.md](CLAUDE.md#repository-map) — the single inventory. This table
+[docs/REPOSITORY-MAP.md](docs/REPOSITORY-MAP.md) — the single inventory. This table
 tracks only **status**. Experiments are tracked in
 [EXPERIMENTS.md](EXPERIMENTS.md).*
 
