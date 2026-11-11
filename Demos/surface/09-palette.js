@@ -276,7 +276,7 @@
         run: () => readOffer.run(),
       });
       if (concept) conceived.splice(at, 1, reads); else conceived.unshift(reads);
-      for (const i of offers) if (i.key === 'read' || i.key === 'read-lines' || i.key === 'what') i.group = 'hidden';
+      for (const i of offers) if (i.key === 'read' || i.key === 'read-lines' || i.key === 'what' || i.key === 'why') i.group = 'hidden';
     }
     const items = known.concat(lined, lead, worded, proposed, notated, conceived, offers.filter((i) => !i.certain));
     // A pill that asks a model none here can answer says what it needs, inline, while it is pointed at (J5).
@@ -345,6 +345,8 @@
   const TOOL_ACTS = {
     // The summon stays open; the refused offer is gone from it.
     correct: { after: () => refreshPalette() },
+    // Why? is answered on the canvas, beside the marks; the word typed for it is spent, and the field stays for the next act.
+    why: { after: () => { const f = fieldInput(); if (f) f.value = ''; query = ''; say('why — said beside the marks, from what was measured; no model asked'); refreshPalette(); } },
     // The field stays open: a button click never closes it (the hand chains
     // commands — line up, then match sizes, then name).
     tidy: { after: (o, scope, t) => { flash((t.detail.mode === 'tidy' ? 'lined up ' : 'matched ') + t.detail.count + (t.detail.mode === 'tidy' ? ' marks' : ' sizes')); refreshPalette(); } },

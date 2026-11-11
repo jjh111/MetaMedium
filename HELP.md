@@ -38,6 +38,12 @@ corner, to see the rest.
   one decision, five flows*). A diagram is not a name, so Enter never takes it
   as one; tap it and the canvas says it, or, for the one it can write, makes the
   Mermaid text (below). The panel says the same under **is**.
+- **Why?** — the canvas says why it reads the held marks as it does, in a card
+  beside them: what they matched and how (*the same shapes and the same links
+  between them as the molecule you named*), what is there (*three circles and
+  two lines — a line joins a circle, four times*), and each reading's own
+  reason. It is measured from your ink and asks no model. Type **why** where no
+  pill shows; scratch the card out, or undo, to take it away.
 - **What it can become** — the acts: *Draw them clean*, *Line up across*,
   *Match sizes*, *Show it in 3D*, *Frame these*, … A pill with a dot asks a
   model.

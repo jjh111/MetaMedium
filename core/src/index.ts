@@ -762,6 +762,7 @@ export type { Rankable, Uses } from './tools/rank';
 export { NO_CONTEXT } from './tools/tool';
 export type { Tool, Offer, Grounds, ToolScope, ToolHost, ToolReading, Taken, Context, ScopeReading, SessionReader } from './tools/tool';
 export { BUILTIN_TOOLS } from './tools/builtin';
+export { WHY, whyOf, shapesInWords, linksInWords } from './tools/why';
 export { NAMING_IS, nameMarks } from './tools/name';
 export { LABELLING_IS, labelInk, theirMarks, madeThese, makersOf, whoseInk } from './tools/label';
 export type { LabelRefusal } from './tools/label';

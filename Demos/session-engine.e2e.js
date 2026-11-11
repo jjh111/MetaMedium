@@ -3781,7 +3781,8 @@ window.__scenario = async function(){
   // a line of writing — and the states they pass through (typed at, named and
   // drawn again, read, taken as text): every pill's key, label, reason and dot
   // in the order shown, and every item held in the order the reader walks.
-  // Captured before the offers came from registered tools; unchanged since.
+  // Captured before the offers came from registered tools; unchanged since but for *Why?* (10 Nov 2026),
+  // the one offer added on purpose: a pill where there is a reading to explain, typed otherwise.
   {
     const got49 = await window.__fieldGolden();
     for (const name of Object.keys(window.__FIELD_GOLDEN)) {
@@ -5612,9 +5613,10 @@ window.__FIELD_GOLDEN = {
       {"key": "row:tidy-row", "label": "Line up across", "title": "align and space them evenly — 3 comparable marks sitting side by side (overlap 0.95, similarity 1.00) — already well lined up", "dot": false},
       {"key": "row:equalize", "label": "Match sizes", "title": "make them the same size as the largest — 3 comparable marks sitting side by side (overlap 0.95, similarity 1.00) — already well lined up", "dot": false},
       {"key": "what", "label": "What is this?", "title": "every joined model reads the group; its readings join the row above", "dot": true},
+      {"key": "why", "label": "Why?", "title": "what was measured, and what it was matched against — said beside the marks; no model asked", "dot": false},
     ],
     more: "",
-    ranked: ["snap", "concept:row", "row:tidy-row", "row:equalize", "what", "duplicate", "keep"],
+    ranked: ["snap", "concept:row", "row:tidy-row", "row:equalize", "what", "why", "duplicate", "keep"],
   },
   "row of three boxes, \"row\" typed": {
     core: ["name", "copy", "paste", "erase"],
@@ -5627,7 +5629,7 @@ window.__FIELD_GOLDEN = {
       {"key": "row:equalize", "label": "Match sizes", "title": "make them the same size as the largest — 3 comparable marks sitting side by side (overlap 0.95, similarity 1.00) — already well lined up", "dot": false},
     ],
     more: "",
-    ranked: ["snap", "concept:row", "row:tidy-row", "row:equalize", "what", "duplicate", "keep"],
+    ranked: ["snap", "concept:row", "row:tidy-row", "row:equalize", "what", "why", "duplicate", "keep"],
   },
   "row of three boxes, \"nav\" typed": {
     core: ["name", "copy", "paste", "erase"],
@@ -5638,7 +5640,7 @@ window.__FIELD_GOLDEN = {
       {"key": "label-word", "label": "Write “nav” on it", "title": "“nav” on each of the 3 marks you made, in your ink at the board's scale — it makes nothing: no definition, no name the library learns, no file; undo takes it off", "dot": false},
     ],
     more: "",
-    ranked: ["snap", "concept:row", "row:tidy-row", "row:equalize", "what", "duplicate", "keep"],
+    ranked: ["snap", "concept:row", "row:tidy-row", "row:equalize", "what", "why", "duplicate", "keep"],
   },
   "molecule": {
     core: ["name", "copy", "paste", "erase"],
@@ -5650,9 +5652,10 @@ window.__FIELD_GOLDEN = {
       {"key": "snap", "label": "Draw them clean", "title": "3 circles, 2 lines · ink kept — each reads confidently as one shape", "dot": false},
       {"key": "3d", "label": "Show it in 3D", "title": "3 spheres and 2 bonds in the frame, turning — press inside to turn it; ink over a sphere lands on its mark → then: What is this? asks which molecule", "dot": false},
       {"key": "what", "label": "What is this?", "title": "every joined model reads the group; its readings join the row above", "dot": true},
+      {"key": "why", "label": "Why?", "title": "what was measured, and what it was matched against — said beside the marks; no model asked", "dot": false},
     ],
     more: "",
-    ranked: ["snap", "concept:flow", "3d", "what", "duplicate", "keep"],
+    ranked: ["snap", "concept:flow", "3d", "what", "why", "duplicate", "keep"],
   },
   "molecule, the second one drawn": {
     core: ["name", "copy", "paste", "erase"],
@@ -5666,9 +5669,10 @@ window.__FIELD_GOLDEN = {
       {"key": "not:<match-1>", "label": "Not a molecule", "title": "remembered — a group like this is not offered as one again", "dot": false},
       {"key": "3d", "label": "Show it in 3D", "title": "3 spheres and 2 bonds in the frame, turning — press inside to turn it; ink over a sphere lands on its mark → then: What is this? asks which molecule", "dot": false},
       {"key": "what", "label": "What is this?", "title": "every joined model reads the group; its readings join the row above", "dot": true},
+      {"key": "why", "label": "Why?", "title": "what was measured, and what it was matched against — said beside the marks; no model asked", "dot": false},
     ],
     more: "",
-    ranked: ["sug:<match-1>", "snap", "concept:flow", "not:<match-1>", "3d", "what", "duplicate", "keep"],
+    ranked: ["sug:<match-1>", "snap", "concept:flow", "not:<match-1>", "3d", "what", "why", "duplicate", "keep"],
   },
   // Recorded again 28 Sep 2026 by design (PLAN-USER-SURFACE W2): writing nobody has read is one
   // option — its reading, which reads it (the dot, ↵ read it) — and Read the writing and What is
@@ -5681,7 +5685,7 @@ window.__FIELD_GOLDEN = {
     ],
     afford: [],
     more: "",
-    ranked: ["concept:writing", "read", "what", "duplicate", "keep"],
+    ranked: ["concept:writing", "read", "what", "why", "duplicate", "keep"],
   },
   "line of writing, read": {
     core: ["name", "copy", "paste", "erase"],
@@ -5694,9 +5698,10 @@ window.__FIELD_GOLDEN = {
       {"key": "label:hello wide world", "label": "Write “hello wide world” on the writing", "title": "“hello wide world” on the writing itself, as a caption, in your ink at the board's scale — it makes nothing: no definition, no name the library learns, no file; undo takes it off — read from your handwriting by llm:e2e-stub", "dot": false},
       {"key": "line-text:<word1>,<word2>,<word3>", "label": "Make it text “hello wide world”", "title": "text where the line is, fitted to the ink; flip it to see the writing", "dot": false},
       {"key": "what", "label": "What is this?", "title": "every joined model reads the group; its readings join the row above", "dot": true},
+      {"key": "why", "label": "Why?", "title": "what was measured, and what it was matched against — said beside the marks; no model asked", "dot": false},
     ],
     more: "",
-    ranked: ["line:<word1>,<word2>,<word3>", "label:hello wide world", "concept:writing", "line-text:<word1>,<word2>,<word3>", "what", "duplicate", "keep"],
+    ranked: ["line:<word1>,<word2>,<word3>", "label:hello wide world", "concept:writing", "line-text:<word1>,<word2>,<word3>", "what", "why", "duplicate", "keep"],
   },
   "text made from the writing": {
     core: ["name", "copy", "paste", "erase"],
@@ -5708,6 +5713,6 @@ window.__FIELD_GOLDEN = {
       {"key": "what", "label": "What is this?", "title": "every joined model reads the group; its readings join the row above", "dot": true},
     ],
     more: "",
-    ranked: ["edit-text:<text>", "flip:<text>", "what", "duplicate", "keep"],
+    ranked: ["edit-text:<text>", "flip:<text>", "what", "why", "duplicate", "keep"],
   },
 };

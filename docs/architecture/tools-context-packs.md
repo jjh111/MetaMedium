@@ -244,3 +244,29 @@ reading and the chip beside the group read `molecule 0.91 · basics`, the
 tooltip *from the Basics pack (basics@1), which this board uses* — and the
 selection's *becomes* row says it. e2e 51–51f, and the boards scenario's N17
 for the journal through a reload.
+
+## Why? — the canvas says why, with no model (10 Nov 2026)
+
+> `core/src/tools/why.ts` (`WHY`, `whyOf`, `shapesInWords`, `linksInWords`), `why.test.ts`; the card in
+> `Demos/surface/08-render.js`; the after-act in `09-palette.js`.
+
+The headline loop ends *ask why and get grounded reasoning*, and the only door was *What is this?*, which asks a
+model: with none joined, *why* was kept for one. The engine already held the answer. *Why?* is a tier 1 tool,
+registered last: `whyOf(scope)` writes sentences a person can check against the drawing — what the marks matched
+and how the match was measured (the signature comparison's own reasoning, in words, and whose definition it was:
+*the molecule you named*, *the Basics pack's molecule*, *a drawing you said was one*); what is there (*three
+circles and two lines — a line joins a circle, four times*: the group's own structural signature, each pair of
+kinds said the one way that says most, *near* only when nothing stronger holds); the diagram it reads as, above
+`NOTATION_FLOOR`; the firmest concept with its reasoning; for one mark alone, every reading the shape rung
+holds with its reason, plural; and what another voice read, attributed. No id, no tier, no threshold.
+
+It is a pill where there is a reading to explain (a match, a diagram, a concept, another voice) and typed
+(*why*) for bare shapes; never for held marks that are all unread writing, which keep their one option (W2).
+Taking it is `session.answer` in the engine's name — one act, one undo — so the answer is a card beside the
+marks like any other, erasable, and never a reading: nothing is named, blessed or changed. The card says *the
+canvas*, not *engine*. Found with it: a card stopped after six lines with nothing to show for the rest; it now
+keeps the writer's line breaks, holds `CARD_MAX_LINES`, and ends a cut line with an ellipsis.
+
+And *molecule* is no longer a word for *Show it in 3D* (`tools/intents.ts`): a word that starts an act's word
+takes Enter, so typing the headline loop's own name built a 3D model and called the definition *graph in 3d*.
+`why.test.ts` holds that neither *bubble* nor *molecule* names any act.

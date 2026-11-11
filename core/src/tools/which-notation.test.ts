@@ -51,8 +51,8 @@ describe('Which diagram is this?', () => {
     expect(which(s, {})).toEqual([]);
     expect(which(s, { decider: null })).toEqual([]);
     // Nothing else the field offers changed by its being there: it is the last offer.
-    expect(offered(s).map((o) => o.tool).indexOf('which-notation')).toBe(offered(s).length - 1);
-    expect(BUILTIN_TOOLS[BUILTIN_TOOLS.length - 1].id).toBe('which-notation');
+    expect(offered(s).map((o) => o.tool).indexOf('which-notation')).toBe(offered(s).length - 2); // *Why?* follows it
+    expect(BUILTIN_TOOLS[BUILTIN_TOOLS.length - 2].id).toBe('which-notation');
   });
 
   it('is not offered for one mark, for an artifact, for a group a definition matches, or where a notation reads surely', () => {

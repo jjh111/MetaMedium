@@ -87,7 +87,7 @@ describe('context — what stands beside the hand lifts what it makes likelier, 
 
     // The same scope: the same offers, in the same order, before any context.
     expect(keys(offersF)).toEqual(keys(offersR));
-    expect(keys(rankOffers(offersF))).toEqual(['row:tidy-row', 'row:equalize', 'snap', 'what', 'duplicate', 'keep']);
+    expect(keys(rankOffers(offersF))).toEqual(['row:tidy-row', 'row:equalize', 'snap', 'what', 'why', 'duplicate', 'keep']);
 
     // Beside the flowchart, drawing them clean leads — the flowchart is drawn clean (A1).
     const byF = rank(offersF, ctxF);
@@ -140,7 +140,7 @@ describe('context — what stands beside the hand lifts what it makes likelier, 
     const s1 = createSession();
     const row = threeBoxes(s1);
     hold(s1, row);
-    same(s1, row, ['snap', 'row:tidy-row', 'row:equalize', 'what', 'duplicate', 'keep']);
+    same(s1, row, ['snap', 'row:tidy-row', 'row:equalize', 'what', 'why', 'duplicate', 'keep']);
 
     // A molecule; named, and the second one drawn.
     const s2 = createSession();
@@ -151,28 +151,28 @@ describe('context — what stands beside the hand lifts what it makes likelier, 
     ];
     const first = mol(0);
     hold(s2, first);
-    same(s2, first, ['snap', '3d', 'what', 'duplicate', 'keep']);
+    same(s2, first, ['snap', '3d', 'what', 'why', 'duplicate', 'keep']);
     s2.bless({ summonId: s2.getState().summon!.id, name: 'molecule', at: (clock += 100) });
     const second = mol(560);
     hold(s2, second);
     const sug = s2.getState().summon!.suggestions.find((x) => x.kind === 'match')!;
-    same(s2, second, ['snap', 'not:' + sug.id, '3d', 'what', 'duplicate', 'keep']);
+    same(s2, second, ['snap', 'not:' + sug.id, '3d', 'what', 'why', 'duplicate', 'keep']);
 
     // A line of writing, unread and read.
     const s3 = createSession();
     const words = ([[200, 300, 90, 28, 6], [320, 302, 110, 26, 7], [460, 300, 80, 28, 5]] as const).map(([x, y, w, h, humps]) => draw(s3, word(x, y, w, h, humps), 100));
     hold(s3, words);
-    same(s3, words, ['read', 'what', 'duplicate', 'keep']);
+    same(s3, words, ['read', 'what', 'why', 'duplicate', 'keep']);
     const reader = s3.join('agent', 'e2e-stub', (clock += 100), 2, 'local');
     words.forEach((id, i) => s3.propose({ participantId: reader, nodeId: id, edges: [], reps: [{ modality: 'transcript', data: { text: ['hello', 'wide', 'world'][i] }, confidence: 0.9 }], at: (clock += 1) }));
-    same(s3, words, ['label:hello wide world', 'line-text:' + words.join(','), 'what', 'duplicate', 'keep']);
+    same(s3, words, ['label:hello wide world', 'line-text:' + words.join(','), 'what', 'why', 'duplicate', 'keep']);
 
     // A pair a board away from a flowchart: nothing beside it, and B1's order — lining up leads.
     const s4 = createSession();
     drawFlowchart(s4, FLOWCHART_VARIANTS[0]);
     const far = pair(s4, 5000, 320);
     hold(s4, far);
-    same(s4, far, ['row:tidy-row', 'row:equalize', 'snap', 'what', 'duplicate', 'keep']);
+    same(s4, far, ['row:tidy-row', 'row:equalize', 'snap', 'what', 'why', 'duplicate', 'keep']);
   });
 
   it('small score changes never flip the top offer within one context', () => {

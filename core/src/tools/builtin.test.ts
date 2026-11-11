@@ -79,8 +79,8 @@ describe('the built-in tools', () => {
     const row = [[200, 200], [360, 204], [520, 200]].map(([x, y]) => draw(s, rect(x, y, 120, 80)));
     hold(s, row);
     const offers = ranked(s);
-    expect(keys(offers)).toEqual(['snap', 'row:tidy-row', 'row:equalize', 'what', 'duplicate', 'keep']);
-    expect(pills(offers)).toEqual([['Draw them clean', false], ['Line up across', false], ['Match sizes', false], ['What is this?', true]]);
+    expect(keys(offers)).toEqual(['snap', 'row:tidy-row', 'row:equalize', 'what', 'why', 'duplicate', 'keep']);
+    expect(pills(offers)).toEqual([['Draw them clean', false], ['Line up across', false], ['Match sizes', false], ['What is this?', true], ['Why?', false]]);
     // A concept's conversion stands on the concept's reading, and says it.
     const tidy = offers.find((o) => o.key === 'row:tidy-row')!;
     expect(tidy).toMatchObject({ tool: 'tidy', reason: 'align and space them evenly', grounds: { on: 'row' } });
@@ -93,13 +93,13 @@ describe('the built-in tools', () => {
     const s = createSession();
     const first = molecule(s, 0);
     hold(s, first);
-    expect(keys(ranked(s))).toEqual(['snap', '3d', 'what', 'duplicate', 'keep']);
+    expect(keys(ranked(s))).toEqual(['snap', '3d', 'what', 'why', 'duplicate', 'keep']);
     expect(ranked(s).find((o) => o.key === '3d')!.reason).toMatch(/^3 spheres and 2 bonds in the frame, turning/);
     s.bless({ summonId: s.getState().summon!.id, name: 'molecule', at: (clock += 100) });
     const second = molecule(s, 560);
     hold(s, second);
     const sug = s.getState().summon!.suggestions.find((x) => x.kind === 'match')!;
-    expect(keys(ranked(s))).toEqual(['snap', 'not:' + sug.id, '3d', 'what', 'duplicate', 'keep']);
+    expect(keys(ranked(s))).toEqual(['snap', 'not:' + sug.id, '3d', 'what', 'why', 'duplicate', 'keep']);
     expect(ranked(s).find((o) => o.key === 'not:' + sug.id)!.label).toBe('Not a molecule');
   });
 
@@ -107,13 +107,13 @@ describe('the built-in tools', () => {
     const s = createSession();
     const words = threeWords(s);
     hold(s, words);
-    expect(keys(ranked(s))).toEqual(['read', 'what', 'duplicate', 'keep']);
+    expect(keys(ranked(s))).toEqual(['read', 'what', 'why', 'duplicate', 'keep']);
     expect(ranked(s)[0]).toMatchObject({ label: 'Read the writing', reason: 'a line of 3 words, unread', asks: 'model' });
     // With no model that can see, it says what it would take.
     expect(ranked(s, { models: [] })[0].reason).toBe('a line of 3 words, unread — needs a model that can see');
     readAs(s, words, ['hello', 'wide', 'world']);
     const offers = ranked(s);
-    expect(keys(offers)).toEqual(['label:hello wide world', 'line-text:' + words.join(','), 'what', 'duplicate', 'keep']);
+    expect(keys(offers)).toEqual(['label:hello wide world', 'line-text:' + words.join(','), 'what', 'why', 'duplicate', 'keep']);
     expect(offers[0]).toMatchObject({
       label: 'Write “hello wide world” on the writing',
       grounds: { on: 'written', confidence: 0.9, why: 'read from your handwriting by e2e-stub' },
@@ -132,7 +132,7 @@ describe('the built-in tools', () => {
     s.attachCode({ participantId: LOCAL_PARTICIPANT, nodeId: id, kind: 'text', code: 'hello wide world', from: 'writing', at: (clock += 1) });
     s.deselect((clock += 1));
     hold(s, [id]);
-    expect(keys(ranked(s))).toEqual(['edit-text:' + id, 'flip:' + id, 'what', 'duplicate', 'keep']);
+    expect(keys(ranked(s))).toEqual(['edit-text:' + id, 'flip:' + id, 'what', 'why', 'duplicate', 'keep']);
     expect(ranked(s).find((o) => o.key === 'flip:' + id)!.label).toBe('Show the ink');
     expect(ranked(s, { ...HOST, isFlipped: (x) => x === id }).find((o) => o.key === 'flip:' + id)!.label).toBe('Show the text');
   });

@@ -97,7 +97,9 @@ export const INTENTS: readonly Intent[] = [
     id: '3d',
     is: (k) => k === '3d',
     label: 'Show it in 3D',
-    words: ['3d', '3 d', 'three d', 'spheres', 'in 3d', 'molecule model', 'spin'],
+    // Never *molecule*: it is the name a person gives the drawing in the headline loop, and a word that
+    // starts an act's word takes Enter (`wordScore`), so *molecule* built a 3D model in place of naming it.
+    words: ['3d', '3 d', 'three d', 'spheres', 'in 3d', 'spin'],
     missing: () => 'only circles joined by lines stand in 3D',
   },
   {
@@ -125,7 +127,13 @@ export const INTENTS: readonly Intent[] = [
     id: 'what',
     is: (k) => k === 'what',
     label: 'What is this?',
-    words: ['what', 'what is this', 'what is it', 'explain', 'identify', 'why'],
+    words: ['what', 'what is this', 'what is it', 'identify', 'ask a model'],
+  },
+  {
+    id: 'why',
+    is: (k) => k === 'why',
+    label: 'Why?',
+    words: ['why', 'why is it', 'how do you know', 'explain', 'reason', 'because'],
   },
   {
     id: 'duplicate',

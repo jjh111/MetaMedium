@@ -1334,7 +1334,7 @@
   // shifting along the free side until it is clear. A card's place is a
   // consequence of the view, so it is found again on every zoom and pan:
   // positions in canvas units, every size in screen ones.
-  const CARD_W = 260, CARD_PAD = 9, CARD_HEAD = 15, CARD_LINE = 15, CARD_GAP = 14;
+  const CARD_W = 260, CARD_PAD = 9, CARD_HEAD = 15, CARD_LINE = 15, CARD_GAP = 14, CARD_MAX_LINES = 12;
   const CARD_STEPS = 8;        // half-card shifts either way along the free side
   const MAX_OBSTACLES = 200;   // the ink the search reads: bounded, so a busy board still paints
   const CARD_FONT = 'px ui-monospace, SFMono-Regular, Menlo, monospace';
@@ -1407,7 +1407,8 @@
     const madeBy = node.edges.find((e) => e.rel === 'made-by');
     return {
       id: id, lines: lines, about: about,
-      who: (madeBy && MM.wordOf(s.nodes.get(madeBy.to))) || 'agent',
+      // The engine's own answer (*Why?*) is the canvas speaking; a person never meets the word "engine".
+      who: madeBy && madeBy.to === MM.ENGINE_PARTICIPANT ? 'the canvas' : (madeBy && MM.wordOf(s.nodes.get(madeBy.to))) || 'agent',
       what: subjectOf(s, about),
       ago: agoOf(node.createdAt),
       subject: boxes.length ? union(boxes) : anchor,
@@ -1584,16 +1585,22 @@
   }
 
   function wrapText(text, maxWidth) {
-    const words = String(text).split(/\s+/);
+    // A line the writer broke stays broken; a card holds CARD_MAX_LINES, and one cut short says so
+    // with an ellipsis — it used to stop mid-sentence after six lines with nothing to show for the rest.
     const lines = [];
-    let line = '';
-    for (const word of words) {
-      const next = line ? line + ' ' + word : word;
-      if (ctx.measureText(next).width > maxWidth && line) { lines.push(line); line = word; }
-      else line = next;
+    for (const para of String(text).split(/\n+/)) {
+      let line = '';
+      for (const word of para.split(/\s+/).filter(Boolean)) {
+        const next = line ? line + ' ' + word : word;
+        if (ctx.measureText(next).width > maxWidth && line) { lines.push(line); line = word; }
+        else line = next;
+      }
+      if (line) lines.push(line);
     }
-    if (line) lines.push(line);
-    return lines.slice(0, 6);
+    if (lines.length <= CARD_MAX_LINES) return lines;
+    const kept = lines.slice(0, CARD_MAX_LINES);
+    kept[CARD_MAX_LINES - 1] = clipText(kept[CARD_MAX_LINES - 1] + ' \u2026', maxWidth);
+    return kept;
   }
 
   function roundRect(x, y, w, h, r) {

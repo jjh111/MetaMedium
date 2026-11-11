@@ -312,6 +312,7 @@ var DynaInkCore = (() => {
     USE_LIFT_RATE: () => USE_LIFT_RATE,
     VERBS: () => VERBS,
     WHICH_NOTATION: () => WHICH_NOTATION,
+    WHY: () => WHY,
     WINDOW_SHARE: () => WINDOW_SHARE,
     WORDS_SAID: () => WORDS_SAID,
     WORD_GAP_RATIO: () => WORD_GAP_RATIO,
@@ -594,6 +595,7 @@ var DynaInkCore = (() => {
     likelihoodOf: () => likelihoodOf,
     lineIsRead: () => lineIsRead,
     linesBrief: () => linesBrief,
+    linksInWords: () => linksInWords,
     listModels: () => listModels,
     listedPacks: () => listedPacks,
     localityOf: () => localityOf,
@@ -807,6 +809,7 @@ var DynaInkCore = (() => {
     shapeExtent: () => shapeExtent,
     shapeTokens: () => shapeTokens,
     shapesCounted: () => shapesCounted,
+    shapesInWords: () => shapesInWords,
     shapesSummary: () => shapesSummary,
     shareInside: () => shareInside,
     sheetEntry: () => sheetEntry,
@@ -884,6 +887,7 @@ var DynaInkCore = (() => {
     whichQuestion: () => whichQuestion,
     whoseInk: () => whoseInk,
     whyNotResolved: () => whyNotResolved,
+    whyOf: () => whyOf,
     wireName: () => wireName,
     wireQuestion: () => wireQuestion,
     withParams: () => withParams,
@@ -1127,10 +1131,10 @@ var DynaInkCore = (() => {
     const total = cum[cum.length - 1];
     if (total === 0) return path.slice(0, n2);
     const out = [];
-    const count10 = closed ? n2 : n2 - 1;
+    const count11 = closed ? n2 : n2 - 1;
     let j = 0;
     for (let i = 0; i < (closed ? n2 : n2); i++) {
-      const target = i / count10 * total;
+      const target = i / count11 * total;
       while (j < cum.length - 2 && cum[j + 1] < target) j++;
       const span = cum[j + 1] - cum[j];
       const t = span > 0 ? (target - cum[j]) / span : 0;
@@ -2397,7 +2401,7 @@ var DynaInkCore = (() => {
       if (g) g.push(i);
       else groups.set(i.tier, [i]);
     }
-    return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([key2, list5]) => ({ key: key2, label: `tier ${key2}`, interpretations: list5 }));
+    return [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([key2, list6]) => ({ key: key2, label: `tier ${key2}`, interpretations: list6 }));
   }
   function bySource(interpretations) {
     const groups = /* @__PURE__ */ new Map();
@@ -2407,10 +2411,10 @@ var DynaInkCore = (() => {
       if (g) g.push(i);
       else groups.set(key2, [i]);
     }
-    return [...groups.entries()].map(([key2, list5]) => ({
+    return [...groups.entries()].map(([key2, list6]) => ({
       key: key2,
-      label: list5[0].sourceName,
-      interpretations: list5
+      label: list6[0].sourceName,
+      interpretations: list6
     }));
   }
   function disagreement(interpretations) {
@@ -6369,12 +6373,12 @@ var DynaInkCore = (() => {
       }
     }
     const px2 = 1 / scale;
-    const one = `1${unit7 ? unitSuffix(unit7, 1) : ""} \u2248 ${formatNumber(px2)} px`;
+    const one2 = `1${unit7 ? unitSuffix(unit7, 1) : ""} \u2248 ${formatNumber(px2)} px`;
     const toScale = spread2 <= TO_SCALE_WITHIN;
     let reason;
-    if (ratios.length === 1) reason = `one label sets the scale, ${one}; nothing to check it against`;
-    else if (toScale) reason = `${one}, to scale within ${Math.max(1, Math.ceil(spread2 * 100 - 1e-9))}%`;
-    else reason = `${one}; not to scale; the labels rule (${worst.text} on ${worst.key} is ${pct(spread2)} off the ink)`;
+    if (ratios.length === 1) reason = `one label sets the scale, ${one2}; nothing to check it against`;
+    else if (toScale) reason = `${one2}, to scale within ${Math.max(1, Math.ceil(spread2 * 100 - 1e-9))}%`;
+    else reason = `${one2}; not to scale; the labels rule (${worst.text} on ${worst.key} is ${pct(spread2)} off the ink)`;
     return {
       unit: unit7,
       unitsPerCanvasUnit: scale,
@@ -6500,12 +6504,12 @@ var DynaInkCore = (() => {
         for (const f of members) if (raw.has(f.id)) labels.set(f.id, raw.get(f.id));
         continue;
       }
-      const count10 = /* @__PURE__ */ new Map();
-      for (const f of members) for (const l of raw.get(f.id) ?? []) if (!l.declared && l.value.unit && l.value.dim >= 1) count10.set(l.value.unit, (count10.get(l.value.unit) ?? 0) + 1);
+      const count11 = /* @__PURE__ */ new Map();
+      for (const f of members) for (const l of raw.get(f.id) ?? []) if (!l.declared && l.value.unit && l.value.dim >= 1) count11.set(l.value.unit, (count11.get(l.value.unit) ?? 0) + 1);
       let written2 = null;
-      for (const [u, n2] of count10) if (!written2 || n2 > count10.get(written2)) written2 = u;
+      for (const [u, n2] of count11) if (!written2 || n2 > count11.get(written2)) written2 = u;
       const unit7 = written2 ?? fallback;
-      const unitReason = written2 ? `${UNIT_NAMES2[written2]}, written on ${count10.get(written2)} of its labels` : unit7 ? `${UNIT_NAMES2[unit7]}, the unit the page speaks` : "no unit written, so its numbers stay bare";
+      const unitReason = written2 ? `${UNIT_NAMES2[written2]}, written on ${count11.get(written2)} of its labels` : unit7 ? `${UNIT_NAMES2[unit7]}, the unit the page speaks` : "no unit written, so its numbers stay bare";
       const given2 = [];
       for (const f of members) {
         const ls = (raw.get(f.id) ?? []).map((l) => {
@@ -7937,14 +7941,14 @@ var DynaInkCore = (() => {
       let ys = xs.get(cx2);
       if (!ys) xs.set(cx2, ys = /* @__PURE__ */ new Map());
       let here2 = ys.get(cy2);
-      const count10 = this.counts.get(level) ?? { marks: 0, cells: 0 };
+      const count11 = this.counts.get(level) ?? { marks: 0, cells: 0 };
       if (!here2) {
         ys.set(cy2, here2 = /* @__PURE__ */ new Set());
-        count10.cells++;
+        count11.cells++;
       }
       here2.add(id);
-      count10.marks++;
-      this.counts.set(level, count10);
+      count11.marks++;
+      this.counts.set(level, count11);
       this.filed.set(id, { level, cx: cx2, cy: cy2, bounds: { minX: bounds.minX, minY: bounds.minY, maxX: bounds.maxX, maxY: bounds.maxY } });
     }
     delete(id) {
@@ -7955,14 +7959,14 @@ var DynaInkCore = (() => {
       const ys = xs.get(f.cx);
       const here2 = ys.get(f.cy);
       here2.delete(id);
-      const count10 = this.counts.get(f.level);
-      count10.marks--;
+      const count11 = this.counts.get(f.level);
+      count11.marks--;
       if (here2.size === 0) {
         ys.delete(f.cy);
-        count10.cells--;
+        count11.cells--;
         if (ys.size === 0) xs.delete(f.cx);
       }
-      if (count10.marks === 0) {
+      if (count11.marks === 0) {
         this.counts.delete(f.level);
         this.levels.delete(f.level);
       }
@@ -8032,8 +8036,8 @@ var DynaInkCore = (() => {
         const x0 = Math.floor(box.minX / cell) - 1, x1 = Math.floor(box.maxX / cell);
         const y0 = Math.floor(box.minY / cell) - 1, y1 = Math.floor(box.maxY / cell);
         const span = (x1 - x0 + 1) * (y1 - y0 + 1);
-        const count10 = this.counts.get(level);
-        if (span > count10.cells) {
+        const count11 = this.counts.get(level);
+        if (span > count11.cells) {
           for (const [cx2, ys] of xs) {
             if (cx2 < x0 || cx2 > x1) continue;
             for (const [cy2, here2] of ys) {
@@ -8549,8 +8553,8 @@ var DynaInkCore = (() => {
     });
   }
   function describeHeads(h2) {
-    const one = (e) => e.heads[0] ? `${e.end}: ${e.heads[0].filled ? "filled " : e.heads[0].kind === "arrow" ? "open " : "hollow "}${e.heads[0].kind} ${e.heads[0].confidence.toFixed(2)}` : `${e.end}: plain`;
-    return `${h2.shape} ${h2.id} \u2014 ${one(h2.start)}; ${one(h2.end)}`;
+    const one2 = (e) => e.heads[0] ? `${e.end}: ${e.heads[0].filled ? "filled " : e.heads[0].kind === "arrow" ? "open " : "hollow "}${e.heads[0].kind} ${e.heads[0].confidence.toFixed(2)}` : `${e.end}: plain`;
+    return `${h2.shape} ${h2.id} \u2014 ${one2(h2.start)}; ${one2(h2.end)}`;
   }
 
   // src/diagram/roles.ts
@@ -8577,9 +8581,9 @@ var DynaInkCore = (() => {
     for (const [w2, v] of Object.entries(s.wires)) {
       for (const e of v.ends) {
         x.ended.add(e);
-        const list5 = x.wiredTo.get(e);
-        if (!list5) x.wiredTo.set(e, [w2]);
-        else if (list5[list5.length - 1] !== w2) list5.push(w2);
+        const list6 = x.wiredTo.get(e);
+        if (!list6) x.wiredTo.set(e, [w2]);
+        else if (list6[list6.length - 1] !== w2) list6.push(w2);
       }
     }
     indexes.set(s, x);
@@ -9970,9 +9974,9 @@ var DynaInkCore = (() => {
     for (const [id, n2] of nodes) {
       for (const e of n2.edges) {
         if (e.rel !== "bound-to" || typeof e.end !== "string" || !e.site) continue;
-        const list5 = out.get(e.to);
-        if (!list5) out.set(e.to, [id]);
-        else if (!list5.includes(id)) list5.push(id);
+        const list6 = out.get(e.to);
+        if (!list6) out.set(e.to, [id]);
+        else if (!list6.includes(id)) list6.push(id);
       }
     }
     return out;
@@ -10576,7 +10580,7 @@ var DynaInkCore = (() => {
     ["regions", "region", "regions"]
   ];
   function holdsSaid(holds2) {
-    const parts = NOUNS.filter(([k]) => holds2[k] > 0).map(([k, one, many]) => holds2[k] + " " + (holds2[k] === 1 ? one : many));
+    const parts = NOUNS.filter(([k]) => holds2[k] > 0).map(([k, one2, many]) => holds2[k] + " " + (holds2[k] === 1 ? one2 : many));
     return parts.length ? parts.join(", ") : "nothing yet";
   }
   function regionSaid(d) {
@@ -10596,8 +10600,8 @@ var DynaInkCore = (() => {
       }
       parentOf.set(r.id, best ? best.id : null);
     }
-    const reading7 = (list5) => {
-      const byTop = list5.slice().sort((a, b) => a.bounds.minY - b.bounds.minY || a.bounds.minX - b.bounds.minX);
+    const reading7 = (list6) => {
+      const byTop = list6.slice().sort((a, b) => a.bounds.minY - b.bounds.minY || a.bounds.minX - b.bounds.minX);
       const rows = [];
       for (const r of byTop) {
         const row = rows[rows.length - 1];
@@ -14911,9 +14915,9 @@ var DynaInkCore = (() => {
   function framesOf(b) {
     const { centre: centre3, axis, long, short } = b.tight;
     const a = rightward(axis), p = rightward(across(axis));
-    const one = { centre: centre3, u: a, v: across(a), w: long, h: short };
+    const one2 = { centre: centre3, u: a, v: across(a), w: long, h: short };
     const two = { centre: centre3, u: p, v: across(p), w: short, h: long };
-    return offLevel(a) <= offLevel(p) ? [one, two] : [two, one];
+    return offLevel(a) <= offLevel(p) ? [one2, two] : [two, one2];
   }
   var inFrame = (f, p) => ({ u: dot4(sub6(p, f.centre), f.u), v: dot4(sub6(p, f.centre), f.v) });
   var onBoard = (f, u, v) => ({ x: f.centre.x + f.u.x * u + f.v.x * v, y: f.centre.y + f.u.y * u + f.v.y * v });
@@ -18484,8 +18488,8 @@ var DynaInkCore = (() => {
         if (!fold2 || Math.max(...ds) < fold2.d) fold2 = { pc: pc2, edge: m, d: Math.max(...ds) };
       }
       if (fold2) {
-        const conf2 = MAX9 * (0.95 - 2 * sh.dev) * (sh.heads.start === "hook" && sh.heads.end === "hook" ? 0.9 : 1);
-        mark(fold2.pc, "fold", sh.ids, sh.id, conf2, `a line with a head at each end, ${px(fold2.d)} off the ${fold2.edge.side + 1 === 1 ? "first" : `${fold2.edge.side + 1}th`} side and along it \u2014 that edge is cut on the fold`, [sh.a, sh.b], { from: sh.a, to: sh.b, heading, along: fold2.edge.side, edge: fold2.edge, length: sh.length });
+        const conf3 = MAX9 * (0.95 - 2 * sh.dev) * (sh.heads.start === "hook" && sh.heads.end === "hook" ? 0.9 : 1);
+        mark(fold2.pc, "fold", sh.ids, sh.id, conf3, `a line with a head at each end, ${px(fold2.d)} off the ${fold2.edge.side + 1 === 1 ? "first" : `${fold2.edge.side + 1}th`} side and along it \u2014 that edge is cut on the fold`, [sh.a, sh.b], { from: sh.a, to: sh.b, heading, along: fold2.edge.side, edge: fold2.edge, length: sh.length });
         folds.add(sh.id);
         sh.ids.forEach((x) => owned.add(x));
         continue;
@@ -18495,9 +18499,9 @@ var DynaInkCore = (() => {
       const sides = pc.corners.map((c, i) => between3(dir, sub9(pc.corners[(i + 1) % pc.corners.length], c)));
       const nearest2 = sides.indexOf(Math.min(...sides));
       const along2 = sides[nearest2] <= PARALLEL_DEG ? nearest2 : void 0;
-      const conf = MAX9 * (0.95 - 2 * sh.dev) * (sh.heads.start === "hook" && sh.heads.end === "hook" ? 0.9 : 1);
+      const conf2 = MAX9 * (0.95 - 2 * sh.dev) * (sh.heads.start === "hook" && sh.heads.end === "hook" ? 0.9 : 1);
       const how = along2 !== void 0 ? `parallel to the ${along2 + 1 === 1 ? "first" : `${along2 + 1}th`} side` : "on the bias";
-      mark(pc, "grain", sh.ids, sh.id, conf, `a straight line with a head at each end, ${pct8(sh.length / pc.long)} of the piece's length, ${how}`, [sh.a, sh.b], { from: sh.a, to: sh.b, heading, ...along2 !== void 0 ? { along: along2 } : {}, length: sh.length });
+      mark(pc, "grain", sh.ids, sh.id, conf2, `a straight line with a head at each end, ${pct8(sh.length / pc.long)} of the piece's length, ${how}`, [sh.a, sh.b], { from: sh.a, to: sh.b, heading, ...along2 !== void 0 ? { along: along2 } : {}, length: sh.length });
       sh.ids.forEach((x) => owned.add(x));
     }
     const rings = (pc) => pc.seam ? [pc.ring, pc.seam.ring] : [pc.ring];
@@ -18639,8 +18643,8 @@ var DynaInkCore = (() => {
       },
       /* @__PURE__ */ new Map()
     );
-    const count10 = (name) => out.filter((s) => s.symbol === name).length;
-    const grains = count10("grain"), foldsN = count10("fold"), notches = count10("notch"), darts = count10("dart"), seams = count10("seam");
+    const count11 = (name) => out.filter((s) => s.symbol === name).length;
+    const grains = count11("grain"), foldsN = count11("fold"), notches = count11("notch"), darts = count11("dart"), seams = count11("seam");
     const evi = evidence;
     if (grains) evi.push({ what: grains === 1 ? "a grain line" : `${countWord(grains)} grain lines`, weight: 1 - (1 - EVIDENCE4.grain) ** grains });
     if (foldsN) evi.push({ what: foldsN === 1 ? "a fold" : `${countWord(foldsN)} folds`, weight: 1 - (1 - EVIDENCE4.fold) ** foldsN });
@@ -18653,7 +18657,7 @@ var DynaInkCore = (() => {
     const confidence = MAX9 * Math.sqrt(coverage) * sure * (PLAIN_SHARE4 + (1 - PLAIN_SHARE4) * settled);
     if (!(confidence > 0)) return null;
     const names = pieceMarks.map((s) => s.name?.text).filter(Boolean);
-    const said3 = (n2, one, many) => `${countWord(n2)} ${n2 === 1 ? one : many}`;
+    const said3 = (n2, one2, many) => `${countWord(n2)} ${n2 === 1 ? one2 : many}`;
     const on = [
       grains ? said3(grains, "grain line", "grain lines") : "",
       foldsN ? said3(foldsN, "fold", "folds") : "",
@@ -19522,8 +19526,8 @@ var DynaInkCore = (() => {
     return null;
   }
   function entriesOf(solved) {
-    const list5 = "dimensions" in solved ? solved.figures : solved;
-    return list5.map((x) => "solution" in x ? { figure: x.figure, solution: x.solution, labels: x.labels } : { figure: x.figure, solution: x, labels: null });
+    const list6 = "dimensions" in solved ? solved.figures : solved;
+    return list6.map((x) => "solution" in x ? { figure: x.figure, solution: x.solution, labels: x.labels } : { figure: x.figure, solution: x, labels: null });
   }
   function inkBounds(f) {
     const pts = f.outline.length ? f.outline : f.vertices;
@@ -19601,15 +19605,15 @@ var DynaInkCore = (() => {
     const board2 = "dimensions" in solved ? solved : null;
     const owned = board2 ? garmentOwned(board2) : /* @__PURE__ */ new Set();
     const entries = entriesOf(solved).filter((e) => !(board2 && e.figure.ids.every((id) => owned.has(id)) && !pieceOfFigure(board2, e.figure.id))).map((e) => ({ e, b: inkBounds(e.figure) })).sort((p, q2) => p.b.minX - q2.b.minX || p.b.minY - q2.b.minY || (p.e.figure.id < q2.e.figure.id ? -1 : p.e.figure.id > q2.e.figure.id ? 1 : 0)).map((x2) => x2.e);
-    const count10 = /* @__PURE__ */ new Map();
-    for (const e of entries) count10.set(e.figure.kind, (count10.get(e.figure.kind) ?? 0) + 1);
+    const count11 = /* @__PURE__ */ new Map();
+    for (const e of entries) count11.set(e.figure.kind, (count11.get(e.figure.kind) ?? 0) + 1);
     const seen = /* @__PURE__ */ new Map();
     const nameOf4 = /* @__PURE__ */ new Map();
     for (const e of entries) {
       const k = e.figure.kind;
       const i = (seen.get(k) ?? 0) + 1;
       seen.set(k, i);
-      nameOf4.set(e.figure.id, options.names?.[e.figure.id] ?? ((count10.get(k) ?? 0) > 1 ? `${k} ${i}` : k));
+      nameOf4.set(e.figure.id, options.names?.[e.figure.id] ?? ((count11.get(k) ?? 0) > 1 ? `${k} ${i}` : k));
     }
     const drawable = [];
     const omitted = [];
@@ -19683,10 +19687,10 @@ var DynaInkCore = (() => {
       return { e, shape, box, name, notes: notes2, precision, figUnit, reading: reading7, decor };
     });
     const clauses = [];
-    const one = built.length === 1;
+    const one2 = built.length === 1;
     for (const b of built) {
       const n2 = b.e.solution.readings.length;
-      const who = one ? "" : `the ${b.name} `;
+      const who = one2 ? "" : `the ${b.name} `;
       if (b.e.solution.conflicts.length) clauses.push(`${who}drawn from the first of ${n2} readings: its labels conflict`);
       else if (n2 > 1) clauses.push(`${who}drawn from the first of ${n2} readings`);
       const assumed = b.reading.assumes?.[0] && /^the corner at ([A-Z])/.exec(b.reading.assumes[0]);
@@ -19696,7 +19700,7 @@ var DynaInkCore = (() => {
     const leftOut = omitted.filter((o) => o.labelled);
     const unlabelled = omitted.filter((o) => !o.labelled);
     if (leftOut.length) clauses.push(`${leftOut.length} figure${leftOut.length > 1 ? "s" : ""} left out`);
-    const subject = built.length === 0 ? "Nothing" : one ? `${article(built[0].e.figure.kind)} ${built[0].e.figure.kind}` : `${built.length} figures`;
+    const subject = built.length === 0 ? "Nothing" : one2 ? `${article(built[0].e.figure.kind)} ${built[0].e.figure.kind}` : `${built.length} figures`;
     const title = `${subject} at true size, in ${UNIT_WORDS2[U]}${clauses.length ? ` \u2014 ${clauses.join("; ")}` : ""}`;
     const notes = [
       ...built.flatMap((b) => b.notes),
@@ -19853,8 +19857,8 @@ ${barParts.join("\n")}
       const why = `the margins and a ${amount(od, U)} overlap leave no room on ${P.name} ${orientation}`;
       return empty(`nothing to print: ${why}`, why);
     }
-    const count10 = (len4, tile) => len4 <= tile + 1e-9 ? 1 : Math.ceil((len4 - od) / (tile - od) - 1e-9);
-    const cols = count10(rw, Wd), rows = count10(rh, Hd);
+    const count11 = (len4, tile) => len4 <= tile + 1e-9 ? 1 : Math.ceil((len4 - od) / (tile - od) - 1e-9);
+    const cols = count11(rw, Wd), rows = count11(rh, Hd);
     const n2 = rows * cols;
     const x0 = (c) => region.minX + c * (Wd - od);
     const y0 = (r) => region.minY + r * (Hd - od);
@@ -21554,28 +21558,28 @@ ${p.svg}</section>`),
       const k = authorKey(ev);
       if (k === null) return;
       const mine = { name, i, ev };
-      const list5 = this.numbered.get(k);
-      if (!list5) {
+      const list6 = this.numbered.get(k);
+      if (!list6) {
         this.numbered.set(k, [mine]);
         return;
       }
       const origin = ev.origin;
-      for (const other of list5) {
+      for (const other of list6) {
         if (this.misnumbered.has(origin)) break;
         if (sameEvent(other.ev, ev)) continue;
         const [kept3, dropped] = this.keeps(other, mine) ? [other, mine] : [mine, other];
         this.misnumbered.set(origin, describeAuthorshipCollision({ origin, seq: ev.seq, kept: kept3.name, dropped: dropped.name }));
       }
-      list5.push(mine);
+      list6.push(mine);
     }
     /** A log's events, no longer held under their authorship: it is about to be replaced. */
     unnumber(name) {
       for (const ev of this.logs[name] ?? []) {
         const k = authorKey(ev);
         if (k === null) continue;
-        const list5 = this.numbered.get(k);
-        if (!list5) continue;
-        const rest = list5.filter((x) => x.name !== name);
+        const list6 = this.numbered.get(k);
+        if (!list6) continue;
+        const rest = list6.filter((x) => x.name !== name);
         if (rest.length) this.numbered.set(k, rest);
         else this.numbered.delete(k);
       }
@@ -21740,11 +21744,11 @@ ${p.svg}</section>`),
     if (a.name !== b.name) return a.name < b.name ? -1 : 1;
     return a.i - b.i;
   };
-  function lowerBound(list5, e) {
-    let lo = 0, hi = list5.length;
+  function lowerBound(list6, e) {
+    let lo = 0, hi = list6.length;
     while (lo < hi) {
       const mid11 = lo + hi >> 1;
-      if (order(list5[mid11], e) < 0) lo = mid11 + 1;
+      if (order(list6[mid11], e) < 0) lo = mid11 + 1;
       else hi = mid11;
     }
     return lo;
@@ -23503,20 +23507,20 @@ ${lines.join("\n")}
   }
   var mean5 = (xs) => xs.reduce((a, x) => a + x, 0) / xs.length;
   function layoutLayered(nodes, links, opts) {
-    const list5 = [];
+    const list6 = [];
     const index = /* @__PURE__ */ new Map();
     for (const v of nodes) {
       if (index.has(v.id)) continue;
-      index.set(v.id, list5.length);
-      list5.push(v);
+      index.set(v.id, list6.length);
+      list6.push(v);
     }
-    const n2 = list5.length;
+    const n2 = list6.length;
     const across2 = opts.direction === "LR" || opts.direction === "RL";
     const along2 = (v) => across2 ? v.w : v.h;
     const wide = (v) => across2 ? v.h : v.w;
-    const forward = list5.map(() => []);
-    const before = list5.map(() => []);
-    const neighbours = list5.map(() => []);
+    const forward = list6.map(() => []);
+    const before = list6.map(() => []);
+    const neighbours = list6.map(() => []);
     const pairs = [];
     const back = [];
     const loops = [];
@@ -23534,7 +23538,7 @@ ${lines.join("\n")}
       } else back.push({ index: k, cycle: null });
     });
     for (const f of forward) f.sort((x, y) => x - y);
-    const behind = list5.map(() => []);
+    const behind = list6.map(() => []);
     for (const [a, b] of pairs) if (a > b) behind[a].push(b);
     const ranksOf = (strict) => {
       const out = [];
@@ -23554,9 +23558,9 @@ ${lines.join("\n")}
     for (const b of back) {
       const l = links[b.index];
       const path = forwardPath(index.get(l.to), index.get(l.from), forward);
-      if (path) b.cycle = [...path, path[0]].map((i) => list5[i].id);
+      if (path) b.cycle = [...path, path[0]].map((i) => list6[i].id);
     }
-    const sep = (i, j) => (wide(list5[i]) + wide(list5[j])) / 2 + opts.nodeGap;
+    const sep = (i, j) => (wide(list6[i]) + wide(list6[j])) / 2 + opts.nodeGap;
     const c = new Array(n2).fill(0);
     for (const row of ranks) {
       const targets = row.map(() => 0);
@@ -23577,7 +23581,7 @@ ${lines.join("\n")}
         row.forEach((i, k) => c[i] = placed2[k]);
       }
     }
-    const thick = ranks.map((row) => Math.max(0, ...row.map((i) => along2(list5[i]))));
+    const thick = ranks.map((row) => Math.max(0, ...row.map((i) => along2(list6[i]))));
     const base = [];
     thick.forEach((t, r) => base.push(r ? base[r - 1] + (thick[r - 1] + t) / 2 : t / 2));
     let sideways = 0, fixed = 0, spans = 0;
@@ -23597,7 +23601,7 @@ ${lines.join("\n")}
       } else kept3 = unstretched > sideways;
     }
     const m = base.map((b, r) => b + opts.rankGap * stretch * r);
-    const raw = list5.map((_, i) => {
+    const raw = list6.map((_, i) => {
       const a = m[rank2[i]], x = c[i];
       switch (opts.direction) {
         case "LR":
@@ -23611,7 +23615,7 @@ ${lines.join("\n")}
       }
     });
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    list5.forEach((v, i) => {
+    list6.forEach((v, i) => {
       minX = Math.min(minX, raw[i].x - v.w / 2);
       maxX = Math.max(maxX, raw[i].x + v.w / 2);
       minY = Math.min(minY, raw[i].y - v.h / 2);
@@ -23619,11 +23623,11 @@ ${lines.join("\n")}
     });
     if (!n2) minX = minY = maxX = maxY = 0;
     const at = /* @__PURE__ */ new Map();
-    list5.forEach((v, i) => at.set(v.id, { x: raw[i].x - minX, y: raw[i].y - minY }));
+    list6.forEach((v, i) => at.set(v.id, { x: raw[i].x - minX, y: raw[i].y - minY }));
     return {
       at,
-      rank: new Map(list5.map((v, i) => [v.id, rank2[i]])),
-      ranks: ranks.map((row) => row.map((i) => list5[i].id)),
+      rank: new Map(list6.map((v, i) => [v.id, rank2[i]])),
+      ranks: ranks.map((row) => row.map((i) => list6[i].id)),
       back,
       loops,
       unknown,
@@ -25186,21 +25190,21 @@ ${lines.join("\n")}
       const a = standing2.get(l.left), b = standing2.get(l.right);
       for (const [k, s, other, which] of [[a, sa, b, 0], [b, sb, a, 1]]) {
         const key2 = `${k.id}:${s}`;
-        const list5 = onSide.get(key2) ?? [];
-        list5.push({ l, which, toward: sideMiddle(other.box, which === 0 ? sb : sa) });
-        onSide.set(key2, list5);
+        const list6 = onSide.get(key2) ?? [];
+        list6.push({ l, which, toward: sideMiddle(other.box, which === 0 ? sb : sa) });
+        onSide.set(key2, list6);
       }
     }
     const endPoint = /* @__PURE__ */ new Map();
-    for (const [key2, list5] of onSide) {
+    for (const [key2, list6] of onSide) {
       const [cls, side] = key2.split(/:(?=[a-z]+$)/);
       const [p, q] = sideEnds(standing2.get(cls).box, side);
       const d = { x: q.x - p.x, y: q.y - p.y };
       const along2 = (x) => ((x.x - p.x) * d.x + (x.y - p.y) * d.y) / (d.x * d.x + d.y * d.y);
-      list5.sort((m, n2) => along2(m.toward) - along2(n2.toward) || m.l.index - n2.l.index);
-      list5.forEach((e, i) => {
-        const share = (i + 1) / (list5.length + 1);
-        endPoint.set(`${e.l.index}:${e.which}`, { point: { x: p.x + d.x * share, y: p.y + d.y * share }, share, side, count: list5.length });
+      list6.sort((m, n2) => along2(m.toward) - along2(n2.toward) || m.l.index - n2.l.index);
+      list6.forEach((e, i) => {
+        const share = (i + 1) / (list6.length + 1);
+        endPoint.set(`${e.l.index}:${e.which}`, { point: { x: p.x + d.x * share, y: p.y + d.y * share }, share, side, count: list6.length });
       });
     }
     const st = () => session.getState();
@@ -25887,21 +25891,21 @@ ${lines.join("\n")}
       const a = standing2.get(l.a), b = standing2.get(l.b);
       for (const [k, s, other, which] of [[a, sa, b, 0], [b, sb, a, 1]]) {
         const key2 = `${k.id}\0${s}`;
-        const list5 = onSide.get(key2) ?? [];
-        list5.push({ index: l.index, which, toward: sideMiddle2(other.box, which === 0 ? sb : sa) });
-        onSide.set(key2, list5);
+        const list6 = onSide.get(key2) ?? [];
+        list6.push({ index: l.index, which, toward: sideMiddle2(other.box, which === 0 ? sb : sa) });
+        onSide.set(key2, list6);
       }
     }
     const ends = /* @__PURE__ */ new Map();
-    for (const [key2, list5] of onSide) {
+    for (const [key2, list6] of onSide) {
       const [id, side] = key2.split("\0");
       const [p, q] = sideEnds2(standing2.get(id).box, side);
       const d = sub12(q, p);
       const along2 = (x) => ((x.x - p.x) * d.x + (x.y - p.y) * d.y) / (d.x * d.x + d.y * d.y);
-      list5.sort((m, n2) => along2(m.toward) - along2(n2.toward) || m.index - n2.index);
-      list5.forEach((e, i) => {
-        const share = (i + 1) / (list5.length + 1);
-        ends.set(`${e.index}:${e.which}`, { point: { x: p.x + d.x * share, y: p.y + d.y * share }, share, side, count: list5.length });
+      list6.sort((m, n2) => along2(m.toward) - along2(n2.toward) || m.index - n2.index);
+      list6.forEach((e, i) => {
+        const share = (i + 1) / (list6.length + 1);
+        ends.set(`${e.index}:${e.which}`, { point: { x: p.x + d.x * share, y: p.y + d.y * share }, share, side, count: list6.length });
       });
     }
     return { routes, ends };
@@ -27688,11 +27692,11 @@ ${pad}</${tag}>`;
     parse(text, questions) {
       const body = jsonOf2(text);
       if (body === void 0) return { ok: false, error: `the decision model\u2019s reply could not be read \u2014 no JSON in \u201C${clip2(text)}\u201D` };
-      const list5 = Array.isArray(body?.answers) ? body.answers : Array.isArray(body) ? body : null;
-      if (!list5) return { ok: false, error: `the decision model\u2019s reply could not be read \u2014 no \u201Canswers\u201D in \u201C${clip2(text)}\u201D` };
+      const list6 = Array.isArray(body?.answers) ? body.answers : Array.isArray(body) ? body : null;
+      if (!list6) return { ok: false, error: `the decision model\u2019s reply could not be read \u2014 no \u201Canswers\u201D in \u201C${clip2(text)}\u201D` };
       const asked = new Map(questions.map((q, i) => [wireName(i), q]));
       const answers = [];
-      for (const raw of list5) {
+      for (const raw of list6) {
         const id = raw?.id;
         const q = typeof id === "string" ? asked.get(id) : void 0;
         if (!q || answers.some((a) => a.questionId === q.id)) continue;
@@ -28816,7 +28820,7 @@ if (mm.THREE && mm.scene) {
   function frameTemplatesFor(s, ids) {
     const members = artifactsIn(s, ids);
     if (!members.length) return [];
-    const kindsOf = (list5) => list5.map((id) => {
+    const kindsOf = (list6) => list6.map((id) => {
       const n2 = s.nodes.get(id);
       const r = n2 && codeRepOf(n2);
       return r && r.data.kind || (n2 && blessedBehaviourOf(n2) ? "behaviour" : "ink");
@@ -29197,12 +29201,12 @@ Reply with ONLY a JSON object, no prose, no code fences:
     }
     return void 0;
   }
-  function parseLineReadings(text, count10) {
-    const out = Array.from({ length: Math.max(0, count10) }, () => []);
-    if (!text || count10 < 1) return out;
+  function parseLineReadings(text, count11) {
+    const out = Array.from({ length: Math.max(0, count11) }, () => []);
+    if (!text || count11 < 1) return out;
     const clean = unfence(text);
     const put = (line, t, confidence) => {
-      if (!Number.isInteger(line) || line < 1 || line > count10) return;
+      if (!Number.isInteger(line) || line < 1 || line > count11) return;
       const said3 = typeof t === "string" ? t.trim() : "";
       if (said3) out[line - 1].push({ text: said3, confidence: clamp01(confidence) });
     };
@@ -29231,7 +29235,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
           any = true;
         }
       }
-      if (!any && count10 === 1) {
+      if (!any && count11 === 1) {
         const bare = clean.replace(/^["'\s]+|["'\s]+$/g, "");
         if (bare && bare.length <= 200 && !/\n/.test(bare) && !/^the image|^i (can|cannot|can't)/i.test(bare)) put(1, bare, 0.5);
       }
@@ -29242,7 +29246,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
     if (!text) return [];
     const clean = unfence(text);
     const parsed = jsonIn(clean);
-    const take = (list5) => list5.map((x) => typeof x === "string" ? x : x && typeof x === "object" && typeof x.text === "string" ? x.text : "").map((x) => x.trim()).filter(Boolean);
+    const take = (list6) => list6.map((x) => typeof x === "string" ? x : x && typeof x === "object" && typeof x.text === "string" ? x.text : "").map((x) => x.trim()).filter(Boolean);
     if (Array.isArray(parsed)) return take(parsed);
     if (parsed && typeof parsed === "object" && Array.isArray(parsed.lines)) return take(parsed.lines);
     if (/[[{]/.test(clean)) return [];
@@ -29725,8 +29729,8 @@ Reply with ONLY a JSON object, no prose, no code fences:
     const said3 = [...tally2].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([w2, n2]) => {
       if (w2 === "thing") return `${count9(n2)} ${n2 === 1 ? "thing made" : "things made"}`;
       if (w2 === "ink") return `${count9(n2)} ${n2 === 1 ? "mark the shapes do not place" : "marks the shapes do not place"}`;
-      const [one, many] = PLURAL[w2] ?? [w2, w2 + "s"];
-      return `${count9(n2)} ${n2 === 1 ? one : many}`;
+      const [one2, many] = PLURAL[w2] ?? [w2, w2 + "s"];
+      return `${count9(n2)} ${n2 === 1 ? one2 : many}`;
     });
     return said3.join(", ") || "nothing";
   }
@@ -30036,7 +30040,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
   // src/tools/mermaid-draw.ts
   var THINGS = { sequence: ["participant", "participants"], "uml-class": ["class", "classes"] };
   var LINKS = { sequence: ["message", "messages"] };
-  var counted = (n2, [one, many]) => `${n2} ${n2 === 1 ? one : many}`;
+  var counted = (n2, [one2, many]) => `${n2} ${n2 === 1 ? one2 : many}`;
   function withArticle(name) {
     const acronym = /^[A-Z]{2,}\b/.test(name);
     const said3 = acronym ? name : name.toLowerCase();
@@ -30343,8 +30347,143 @@ Reply with ONLY a JSON object, no prose, no code fences:
     take: () => ({ host: "like" })
   };
 
+  // src/tools/why.ts
+  var NUMBERS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
+  var count10 = (n2) => n2 >= 0 && n2 < NUMBERS.length ? NUMBERS[n2] : String(n2);
+  function shapeWord(type, n2) {
+    if (type === "text") return n2 === 1 ? "piece of writing" : "pieces of writing";
+    if (type === "art") return n2 === 1 ? "mark it could not place" : "marks it could not place";
+    return n2 === 1 ? type : /(s|x|ch)$/.test(type) ? `${type}es` : `${type}s`;
+  }
+  var one = (type) => type === "text" ? "writing" : type === "art" ? "an unplaced mark" : `${/^[aeiou]/.test(type) ? "an" : "a"} ${type}`;
+  function list5(parts) {
+    if (parts.length <= 1) return parts.join("");
+    return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  }
+  var byCount = (bag) => Object.entries(bag).sort((p, q) => q[1] - p[1] || p[0].localeCompare(q[0]));
+  function shapesInWords(sig2) {
+    return list5(byCount(sig2.shapes).map(([t, n2]) => `${count10(n2)} ${shapeWord(t, n2)}`));
+  }
+  var CONNECTORS2 = /* @__PURE__ */ new Set(["line", "arrow", "arc"]);
+  var LINK_ORDER = ["connects", "points-to", "contains", "crossing", "touching", "near"];
+  var LINK_WORD = { touching: "touches", near: "is near", crossing: "crosses", connects: "joins", contains: "holds", "points-to": "points to" };
+  function linksInWords(sig2) {
+    const parsed = byCount(sig2.links).map(([key2, n2]) => {
+      const m = /^(.+?)[>-]([a-z-]+?)[>-]([^>-]+)$/.exec(key2);
+      if (!m) return { a: key2, rel: "", b: "", n: n2, directed: true };
+      const directed = key2.includes(">");
+      const swap = !directed && CONNECTORS2.has(m[3]) && !CONNECTORS2.has(m[1]);
+      return { a: swap ? m[3] : m[1], rel: m[2], b: swap ? m[1] : m[3], n: n2, directed };
+    });
+    const pair = (l) => [l.a, l.b].sort().join("|");
+    const rank2 = (l) => {
+      const i = LINK_ORDER.indexOf(l.rel);
+      return i < 0 ? LINK_ORDER.length : i;
+    };
+    const best = /* @__PURE__ */ new Map();
+    for (const l of parsed) {
+      const k = pair(l), b = best.get(k);
+      if (!b || rank2(l) < rank2(b)) best.set(k, l);
+    }
+    const strongest3 = parsed.filter((l) => best.get(pair(l)) === l);
+    const kept3 = strongest3.some((l) => l.rel !== "near") ? strongest3.filter((l) => l.rel !== "near") : strongest3;
+    const said3 = kept3.slice(0, 2).map((l) => {
+      const words = l.rel ? `${one(l.a)} ${LINK_WORD[l.rel] ?? l.rel} ${one(l.b)}` : l.a;
+      return l.n === 1 ? words : `${words}, ${l.n === 2 ? "twice" : `${count10(l.n)} times`}`;
+    });
+    const more = kept3.length - said3.length;
+    return said3.join("; ") + (more > 0 ? `; and ${count10(more)} more kind${more === 1 ? "" : "s"} of link` : "");
+  }
+  function matchInWords(reasoning, whose) {
+    const r = reasoning ?? "";
+    const shapes = /same shapes/.test(r) ? "the same shapes" : /shapes (\d+)\/(\d+) in common/.exec(r) ? RegExp.$1 + " of " + RegExp.$2 + " shapes in common" : "";
+    const links = /no links either side/.test(r) ? "no links to compare" : /same links/.test(r) ? "the same links between them" : /links (\d+)\/(\d+) in common/.exec(r) ? RegExp.$1 + " of " + RegExp.$2 + " links in common" : "";
+    const against = /an accepted example/.test(r) ? "a drawing you said was one" : whose;
+    const parts = [shapes, links].filter(Boolean);
+    return parts.length ? `${list5(parts)} as ${against}` : `measured against ${against}`;
+  }
+  var conf = (n2) => n2.toFixed(2);
+  function whyOf(scope) {
+    const { state, marks, summon, reading: reading7 } = scope;
+    const nodes = state.nodes;
+    const lines = [];
+    let grounded = false;
+    const matches = (summon.suggestions ?? []).filter((s) => s.kind === "match" && typeof s.score === "number").slice(0, 2);
+    for (const m of matches) {
+      const whose = m.pack ? `the ${shippedPack(m.pack)?.name ?? m.pack} pack\u2019s ${m.label}` : `the ${m.label} you named`;
+      lines.push(`Reads as ${m.label} ${conf(m.score)}: ${matchInWords(m.reasoning, whose)}.`);
+      grounded = true;
+    }
+    if (marks.length > 1) {
+      const sig2 = structuralSignature(marks, nodes, (id) => topInterpretation(nodes.get(id)) ?? "art");
+      const links = linksInWords(sig2);
+      lines.push(`Here: ${shapesInWords(sig2)}${links ? ` \u2014 ${links}` : ", none of them touching, crossing or holding another"}.`);
+    }
+    if (marks.length > 1) {
+      const top = sayable(notationsOf(state, marks)).filter((r) => r.confidence >= NOTATION_FLOOR)[0];
+      if (top) {
+        lines.push(`As a diagram: ${describeNotation(top)}.`);
+        grounded = true;
+      }
+    }
+    for (const c of (reading7.concepts ?? []).slice(0, matches.length ? 1 : 2)) {
+      lines.push(`${c.concept} ${conf(c.confidence)}: ${c.reasoning}.`.replace(/\.\.$/, "."));
+      grounded = true;
+    }
+    if (marks.length === 1) {
+      const node = nodes.get(marks[0]);
+      const rung = node ? interpretationsOf(node, nodes).filter(isShapeRungReading).slice(0, 3) : [];
+      if (rung.length) {
+        lines.push(rung.map((r, i) => `${i ? "or " : ""}${one(r.label)} ${conf(r.weight)}${r.reasoning ? ` \u2014 ${r.reasoning}` : ""}`).join("; ") + ".");
+        if (rung.length > 1) lines.push("More than one reading stands; none is settled until you choose.");
+      } else {
+        lines.push("The canvas could not place this mark as a shape.");
+      }
+    }
+    const heard = [];
+    for (const id of marks) {
+      const node = nodes.get(id);
+      if (!node) continue;
+      for (const r of interpretationsOf(node, nodes).filter(isHeardReading)) {
+        const line = `${scope.host.nameOf(r.source ?? "") || r.sourceName} read it as ${r.label} ${conf(r.weight)}${r.reasoning ? `: ${r.reasoning}` : ""}.`;
+        if (!heard.includes(line)) heard.push(line);
+      }
+    }
+    if (heard.length) {
+      lines.push(...heard.slice(0, 2));
+      grounded = true;
+    }
+    lines.push("Measured from the ink; no model was asked.");
+    return { text: lines.join("\n"), grounded };
+  }
+  var WHY = {
+    id: "why",
+    name: "saying why",
+    describe: () => "say why the canvas reads these marks as it does, from what it measured; no model asked",
+    offers(scope) {
+      if (!scope.marks.length) return [];
+      const { grounded } = whyOf(scope);
+      return [{
+        key: "why",
+        label: "Why?",
+        reason: "what was measured, and what it was matched against \u2014 said beside the marks; no model asked",
+        base: 0.2,
+        tool: "why",
+        verbs: ["why", "why?", "how do you know", "because", "reason"],
+        // A pill where there is a reading to explain; typed (*why*) for bare shapes.
+        hidden: !grounded,
+        data: { ids: scope.marks.slice() }
+      }];
+    },
+    take(_offer, scope, session, at) {
+      const { text } = whyOf(scope);
+      session.answer({ participantId: ENGINE_PARTICIPANT, question: "why", text, aboutIds: scope.marks.slice(), at });
+      return { detail: { lines: text.split("\n").length } };
+    }
+  };
+
   // src/tools/builtin.ts
-  var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH, TRACE, REGION, LIKE, WHICH_NOTATION];
+  var BUILTIN_TOOLS = [CORRECT, TEXT, NAME2, LABEL, TIDY, CONTROL, CLEAN, GRAPH3D, FRAMES2, TEXT_EDIT, VERBS3, CLOCKS, READ, WHAT, DUPLICATE, KEEP, STRUCTURE, MATHS, MERMAID, MERMAID_DRAW, ROUTE, WHICH, TRACE, REGION, LIKE, WHICH_NOTATION, WHY];
   registerTool(CORRECT);
   registerTool(TEXT);
   registerTool(NAME2);
@@ -30371,6 +30510,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
   registerTool(REGION);
   registerTool(LIKE);
   registerTool(WHICH_NOTATION);
+  registerTool(WHY);
 
   // src/search/tokens.ts
   var SPECIAL = { "\xDF": "ss", "\xE6": "ae", "\u0153": "oe", "\xF8": "o", "\u0111": "d", "\u0142": "l", "\u0131": "i" };
@@ -30663,7 +30803,9 @@ Reply with ONLY a JSON object, no prose, no code fences:
       id: "3d",
       is: (k) => k === "3d",
       label: "Show it in 3D",
-      words: ["3d", "3 d", "three d", "spheres", "in 3d", "molecule model", "spin"],
+      // Never *molecule*: it is the name a person gives the drawing in the headline loop, and a word that
+      // starts an act's word takes Enter (`wordScore`), so *molecule* built a 3D model in place of naming it.
+      words: ["3d", "3 d", "three d", "spheres", "in 3d", "spin"],
       missing: () => "only circles joined by lines stand in 3D"
     },
     {
@@ -30691,7 +30833,13 @@ Reply with ONLY a JSON object, no prose, no code fences:
       id: "what",
       is: (k) => k === "what",
       label: "What is this?",
-      words: ["what", "what is this", "what is it", "explain", "identify", "why"]
+      words: ["what", "what is this", "what is it", "identify", "ask a model"]
+    },
+    {
+      id: "why",
+      is: (k) => k === "why",
+      label: "Why?",
+      words: ["why", "why is it", "how do you know", "explain", "reason", "because"]
     },
     {
       id: "duplicate",
@@ -31346,7 +31494,7 @@ Reply with ONLY a JSON object, no prose, no code fences:
       if (!top) continue;
       counts.set(top, (counts.get(top) ?? 0) + 1);
     }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([label, count10]) => `${count10}\xD7${label}`).join(" + ");
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([label, count11]) => `${count11}\xD7${label}`).join(" + ");
   }
   function rect(r, round = true) {
     const v = (x) => round ? Math.round(x) : Number(x.toFixed(2));
@@ -33341,13 +33489,13 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
   var DEG11 = Math.PI / 180;
   function fan(tree, root) {
     const leaves = /* @__PURE__ */ new Map();
-    const count10 = (id) => {
+    const count11 = (id) => {
       const kids = tree.get(id) ?? [];
-      const n2 = kids.length ? kids.reduce((a, k) => a + count10(k), 0) : 1;
+      const n2 = kids.length ? kids.reduce((a, k) => a + count11(k), 0) : 1;
       leaves.set(id, n2);
       return n2;
     };
-    count10(root);
+    count11(root);
     const angle = /* @__PURE__ */ new Map();
     const place2 = (id, from, span) => {
       const kids = tree.get(id) ?? [];
@@ -33683,14 +33831,14 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
       const width = BYTES[t.dtype];
       if (!width) throw new StaticModelError(`the tensor \u201C${name}\u201D is dtype ${t.dtype}, which this reader does not take (F32, F16 and BF16 are read)`);
       const [from, to] = t.data_offsets;
-      const count10 = t.shape.reduce((a, b) => a * b, 1);
-      if (!(from >= 0 && to >= from) || to - from !== count10 * width) throw new StaticModelError(`the tensor \u201C${name}\u201D says ${count10} values of ${t.dtype} at bytes ${from}\u2013${to}, which do not fit`);
+      const count11 = t.shape.reduce((a, b) => a * b, 1);
+      if (!(from >= 0 && to >= from) || to - from !== count11 * width) throw new StaticModelError(`the tensor \u201C${name}\u201D says ${count11} values of ${t.dtype} at bytes ${from}\u2013${to}, which do not fit`);
       if (start + to > bytes.length) throw new StaticModelError(`the weights end before the table does \u2014 the file is cut off (the table of \u201C${name}\u201D ends at byte ${start + to}, the file at ${bytes.length})`);
-      const data = new Float32Array(count10);
+      const data = new Float32Array(count11);
       const at = start + from;
-      if (t.dtype === "F32") for (let i = 0; i < count10; i++) data[i] = dv.getFloat32(at + i * 4, true);
-      else if (t.dtype === "F16") for (let i = 0; i < count10; i++) data[i] = half(dv.getUint16(at + i * 2, true));
-      else for (let i = 0; i < count10; i++) data[i] = bf16(dv.getUint16(at + i * 2, true));
+      if (t.dtype === "F32") for (let i = 0; i < count11; i++) data[i] = dv.getFloat32(at + i * 4, true);
+      else if (t.dtype === "F16") for (let i = 0; i < count11; i++) data[i] = half(dv.getUint16(at + i * 2, true));
+      else for (let i = 0; i < count11; i++) data[i] = bf16(dv.getUint16(at + i * 2, true));
       out[name] = { dtype: t.dtype, shape: t.shape, data };
     }
     return out;
@@ -33881,12 +34029,12 @@ The canvas already read: ${describeBehaviour({ terms: local.terms })}. Read the 
     });
     (o.extra ?? []).forEach((w2, i) => add7(w2.toLowerCase(), row(mulberry322(seed * 131 + fnv2(w2) + i | 0), null, 0.2)));
     add7("##s", row(mulberry322(seed * 17), null, 0.05));
-    const count10 = rows.length * dim;
+    const count11 = rows.length * dim;
     const width = dtype === "F16" ? 2 : 4;
-    const head = JSON.stringify({ embeddings: { dtype, shape: [rows.length, dim], data_offsets: [0, count10 * width] }, __metadata__: { format: "pt" } });
+    const head = JSON.stringify({ embeddings: { dtype, shape: [rows.length, dim], data_offsets: [0, count11 * width] }, __metadata__: { format: "pt" } });
     const pad = (8 - head.length % 8) % 8;
     const headBytes = new TextEncoder().encode(head + " ".repeat(pad));
-    const bytes = new Uint8Array(8 + headBytes.length + count10 * width);
+    const bytes = new Uint8Array(8 + headBytes.length + count11 * width);
     const dv = new DataView(bytes.buffer);
     dv.setBigUint64(0, BigInt(headBytes.length), true);
     bytes.set(headBytes, 8);
